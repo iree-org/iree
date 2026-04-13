@@ -940,11 +940,34 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
     if (useDirectLoad) {
-      // Use DMA for all operands including scales. Scale operands may need
-      // destination padding to meet DMA alignment — handled by
-      // GPUConvertToCoalescedDMA.
       Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-      promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
+      // Check if per-workgroup scale shape is DMA-aligned. Scale operands
+      // have shape [M/N, Ko] where Ko = kTileSize. Sub-aligned scales
+      // (e.g., 32x2 f8E8M0FNU for small matmuls) cannot use DMA because
+      // the padding creates undistributed memref.copy ops.
+      int64_t scaleMDim = workgroupTileSizes[contractionM.back()];
+      int64_t scaleKoDim = reductionTileSizes[contractionK.back()];
+      int64_t scaleElements = scaleMDim * scaleKoDim;
+      int64_t scaleBits = 8; // f8E8M0FNU is 8-bit
+      ArrayRef<int64_t> dmaSizes;
+      if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+        dmaSizes = dmaSizesAttr.asArrayRef();
+      }
+      bool scaleAligned = false;
+      for (int64_t dmaSize : dmaSizes) {
+        if (dmaSize % scaleBits != 0) {
+          continue;
+        }
+        int64_t elementsPerTransfer =
+            targetSubgroupSize * (dmaSize / scaleBits);
+        if (scaleElements % elementsPerTransfer == 0) {
+          scaleAligned = true;
+          break;
+        }
+      }
+      Attribute scaleConfig =
+          scaleAligned ? useGlobalDma : (Attribute)defaultConfigAttr;
+      promotionArray = {useGlobalDma, useGlobalDma, scaleConfig, scaleConfig};
     } else {
       // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
       FailureOr<Attribute> lhsSwizzleAttr =

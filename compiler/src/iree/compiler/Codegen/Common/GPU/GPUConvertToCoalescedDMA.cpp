@@ -60,6 +60,23 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   return mapping;
 }
 
+/// Check if a pad value matches what hardware OOB clamping returns (zero
+/// bytes). For IEEE floats this is ±0.0. For types like f8E8M0FNU where the
+/// all-zeros bit pattern (0x00) represents 2^(-127) rather than IEEE zero,
+/// we check the bit pattern directly since gather_to_lds OOB clamping returns
+/// zero bytes regardless of the element type's semantics.
+static bool padValueMatchesHardwareOOBZero(Value padVal) {
+  if (matchPattern(padVal, m_AnyZeroFloat()) ||
+      matchPattern(padVal, m_Zero())) {
+    return true;
+  }
+  APFloat floatVal(APFloat::IEEEdouble());
+  if (matchPattern(padVal, m_ConstantFloat(&floatVal))) {
+    return floatVal.bitcastToAPInt().isZero();
+  }
+  return false;
+}
+
 /// Trace through extract_slice operations to find an underlying tensor.pad.
 /// Returns the PadOp if found, nullptr otherwise.
 static tensor::PadOp traceToTensorPad(Value source) {
@@ -274,8 +291,7 @@ static bool hasDMACompatiblePadding(tensor::PadOp pad) {
     }
   }
   Value padVal = pad.getConstantPaddingValue();
-  if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
-                   matchPattern(padVal, m_Zero()))) {
+  if (!padVal || !padValueMatchesHardwareOOBZero(padVal)) {
     return false;
   }
   return true;

@@ -900,19 +900,19 @@ func.func @copy_scale_padding(%source: tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8
     ins(%source : tensor<64x2xf8E8M0FNU>)
     outs(%empty : tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8E8M0FNU>
 
-  // Per-warp padding: source is padded 64x2 -> 128x2 (256 elements) to meet
-  // the minimum DMA transfer size. Padding happens inside the warp forall,
-  // after subgroup tiling but before thread tiling.
+  // Per-warp padding: destination is padded 64x2 -> 128x2 (256 elements) to
+  // meet the minimum DMA transfer size. The source pad (f8E8M0FNU zero =
+  // 2^(-127), all-zero bits) is fused into the DMA via in_bounds OOB clamping.
   // CHECK: scf.forall
-  // CHECK:   tensor.pad %[[SRC]] low[0, 0] high[64, 0]
-  // CHECK:   tensor<64x2xf8E8M0FNU> to tensor<128x2xf8E8M0FNU>
   // CHECK:   %[[PADDED_DST:.+]] = tensor.empty() : tensor<128x2xf8E8M0FNU>
 
-  // Thread-level forall with DMA on padded tensors.
+  // Thread-level forall with DMA using pad fusion (in_bounds [false, true]).
+  // Source is the original 64x2, not the padded 128x2.
   // CHECK:   %[[THREAD_FORALL:.+]] = scf.forall
   // CHECK-SAME: shared_outs(%{{.+}} = %[[PADDED_DST]]) -> (tensor<128x2xf8E8M0FNU>)
   // CHECK:     iree_gpu.coalesced_gather_dma
-  // CHECK-SAME:  tensor<128x2xf8E8M0FNU>, tensor<128x2xf8E8M0FNU>
+  // CHECK-SAME:  in_bounds [false, true]
+  // CHECK-SAME:  tensor<64x2xf8E8M0FNU>, tensor<128x2xf8E8M0FNU>
 
   // Extract_slice recovers the original 64x2 shape from the padded result.
   // CHECK:   tensor.extract_slice %[[THREAD_FORALL]][0, 0] [64, 2] [1, 1]
