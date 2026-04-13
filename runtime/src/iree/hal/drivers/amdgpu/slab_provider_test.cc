@@ -85,7 +85,8 @@ class TestLogicalDevice {
   iree_hal_device_group_t* device_group = NULL;
 };
 
-TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolMaterializesMappedBuffer) {
+TEST_F(SlabProviderTest,
+       DefaultPhysicalDevicePoolMaterializesDeviceLocalBuffer) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
 
@@ -100,8 +101,7 @@ TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolMaterializesMappedBuffer) {
 
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-  params.usage =
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_pool_allocate_buffer(
@@ -111,17 +111,9 @@ TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolMaterializesMappedBuffer) {
   EXPECT_GE(iree_hal_buffer_allocation_size(buffer), 128u);
   EXPECT_GE(iree_hal_buffer_byte_length(buffer), 128u);
   EXPECT_TRUE(iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
-                                IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                                    IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
-                                    IREE_HAL_MEMORY_TYPE_HOST_COHERENT));
-
-  iree_hal_buffer_mapping_t mapping;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_WRITE,
-      /*local_byte_offset=*/0, /*local_byte_length=*/128, &mapping));
-  ASSERT_EQ(mapping.contents.data_length, 128u);
-  memset(mapping.contents.data, 0xA5, mapping.contents.data_length);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+                                IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
+  EXPECT_FALSE(iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                                 IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
 
   iree_hal_buffer_release(buffer);
 }

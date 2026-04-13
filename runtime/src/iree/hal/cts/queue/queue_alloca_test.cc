@@ -4,14 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include <cstring>
-#include <thread>
 #include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/memory/fixed_block_pool.h"
 #include "iree/hal/memory/passthrough_pool.h"
 #include "iree/hal/memory/tlsf_pool.h"
+#include "iree/io/file_handle.h"
 
 namespace iree::hal::cts {
 
@@ -28,12 +29,10 @@ constexpr iree_hal_queue_affinity_t kQueueAffinity1 =
 
 iree_hal_buffer_params_t MakeQueueAllocaBufferParams() {
   iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
   params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
   return params;
 }
 
@@ -109,6 +108,97 @@ class QueueAllocaTest : public CtsTestBase<> {
                                      backend.notification, epoch_query,
                                      iree_allocator_system(), out_pool);
   }
+
+  void QueueWriteAndWait(iree_hal_queue_affinity_t queue_affinity,
+                         iree_hal_buffer_t* source_buffer,
+                         iree_device_size_t source_offset,
+                         iree_hal_file_t* target_file, uint64_t target_offset,
+                         iree_device_size_t length) {
+    SemaphoreList empty_wait;
+    SemaphoreList write_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_write(
+        device_, queue_affinity, empty_wait, write_signal, source_buffer,
+        source_offset, target_file, target_offset, length,
+        IREE_HAL_WRITE_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        write_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  }
+
+  void FillBufferAndWait(iree_hal_queue_affinity_t queue_affinity,
+                         iree_hal_buffer_t* target_buffer,
+                         iree_device_size_t target_offset,
+                         iree_device_size_t length, const void* pattern,
+                         iree_host_size_t pattern_length) {
+    SemaphoreList empty_wait;
+    SemaphoreList fill_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_fill(
+        device_, queue_affinity, empty_wait, fill_signal, target_buffer,
+        target_offset, length, pattern, pattern_length,
+        IREE_HAL_FILL_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  }
+
+  std::vector<uint8_t> ReadBufferBytes(iree_hal_queue_affinity_t queue_affinity,
+                                       iree_hal_buffer_t* buffer,
+                                       iree_device_size_t offset,
+                                       iree_device_size_t length) {
+    std::vector<uint8_t> data(length);
+    if (iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+        iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
+                          IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
+      IREE_EXPECT_OK(
+          iree_hal_buffer_map_read(buffer, offset, data.data(), length));
+      return data;
+    }
+
+    iree_io_file_handle_t* handle = NULL;
+    IREE_EXPECT_OK(iree_io_file_handle_wrap_host_allocation(
+        IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+        iree_make_byte_span(data.data(), length),
+        iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+        &handle));
+    if (!handle) return data;
+
+    iree_hal_file_t* file = NULL;
+    IREE_EXPECT_OK(iree_hal_file_import(
+        device_, queue_affinity, IREE_HAL_MEMORY_ACCESS_WRITE, handle,
+        IREE_HAL_EXTERNAL_FILE_FLAG_NONE, &file));
+    iree_io_file_handle_release(handle);
+    if (!file) return data;
+
+    QueueWriteAndWait(queue_affinity, buffer, offset, file, 0, length);
+    iree_hal_file_release(file);
+    return data;
+  }
+
+  template <typename T>
+  T ReadBufferValue(iree_hal_queue_affinity_t queue_affinity,
+                    iree_hal_buffer_t* buffer, iree_device_size_t offset = 0) {
+    T value = 0;
+    std::vector<uint8_t> data =
+        ReadBufferBytes(queue_affinity, buffer, offset, sizeof(T));
+    if (data.size() == sizeof(T)) {
+      memcpy(&value, data.data(), sizeof(T));
+    }
+    return value;
+  }
+
+  template <typename T>
+  std::vector<T> ReadBufferData(iree_hal_queue_affinity_t queue_affinity,
+                                iree_hal_buffer_t* buffer,
+                                iree_device_size_t offset = 0) {
+    iree_device_size_t byte_length =
+        iree_hal_buffer_byte_length(buffer) - offset;
+    std::vector<T> values(byte_length / sizeof(T));
+    std::vector<uint8_t> data = ReadBufferBytes(queue_affinity, buffer, offset,
+                                                values.size() * sizeof(T));
+    if (data.size() == values.size() * sizeof(T)) {
+      memcpy(values.data(), data.data(), data.size());
+    }
+    return values;
+  }
 };
 
 // Allocates a buffer with no wait semaphores. Verifies the buffer is returned
@@ -121,13 +211,7 @@ TEST_P(QueueAllocaTest, BasicAlloca) {
   SemaphoreList wait_semaphore_list;
   SemaphoreList signal_semaphore_list(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
@@ -138,7 +222,7 @@ TEST_P(QueueAllocaTest, BasicAlloca) {
 
   // Wait for the allocation to complete.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Verify buffer metadata.
@@ -146,19 +230,15 @@ TEST_P(QueueAllocaTest, BasicAlloca) {
 
   // Write a pattern and read it back to verify the buffer is usable.
   uint8_t pattern = 0xAB;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
-  iree_hal_buffer_mapping_t mapping;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                           allocation_size, &mapping));
-
+  std::vector<uint8_t> data =
+      ReadBufferBytes(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size);
   for (iree_device_size_t i = 0; i < allocation_size; ++i) {
-    ASSERT_EQ(mapping.contents.data[i], 0xAB) << "Mismatch at byte " << i;
+    ASSERT_EQ(data[i], 0xAB) << "Mismatch at byte " << i;
   }
 
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
   iree_hal_buffer_release(buffer);
 }
 
@@ -182,27 +262,20 @@ TEST_P(QueueAllocaTest, ExplicitPassthroughPoolAllocaDealloca) {
   ASSERT_NE(buffer.get(), nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   uint32_t pattern = 0xA11CA7EDu;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer.get(), 0, allocation_size,
-                                          &pattern, sizeof(pattern)));
-
-  iree_hal_buffer_mapping_t mapping;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      buffer.get(), IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
-      0, sizeof(pattern), &mapping));
-  uint32_t readback = 0;
-  memcpy(&readback, mapping.contents.data, sizeof(readback));
+  FillBufferAndWait(kQueueAffinity0, buffer.get(), 0, allocation_size, &pattern,
+                    sizeof(pattern));
+  uint32_t readback = ReadBufferValue<uint32_t>(kQueueAffinity0, buffer.get());
   EXPECT_EQ(readback, pattern);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
 
   SemaphoreList dealloca_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity0, alloca_signal, dealloca_signal, buffer.get(),
       IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 // Allocates from an explicit suballocating pool, uses the transient buffer in a
@@ -245,9 +318,10 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolTransferAllocaDealloca) {
       device_, kQueueAffinity0, copy_signal, dealloca_signal,
       source_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
-  const std::vector<uint32_t> data = ReadBufferData<uint32_t>(target_buffer);
+  const std::vector<uint32_t> data =
+      ReadBufferData<uint32_t>(kQueueAffinity0, target_buffer.get());
   for (uint32_t value : data) {
     EXPECT_EQ(value, pattern);
   }
@@ -284,7 +358,7 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
       queue0_buffer.out()));
   ASSERT_NE(queue0_buffer.get(), nullptr);
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   SemaphoreList queue0_dealloca_signal(device_, {0}, {1});
@@ -292,7 +366,7 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
       device_, kQueueAffinity0, queue0_alloca_signal, queue0_dealloca_signal,
       queue0_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   queue0_buffer.reset();
 
@@ -314,18 +388,18 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
   EXPECT_EQ(stats.wait_count, 1u);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   uint32_t pattern = 0xB10CADA0u;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(
-      queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
+  FillBufferAndWait(kQueueAffinity1, queue1_buffer.get(), 0, sizeof(pattern),
+                    &pattern, sizeof(pattern));
 
   SemaphoreList queue1_dealloca_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity1, queue1_alloca_signal, queue1_dealloca_signal,
       queue1_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
@@ -380,23 +454,23 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolPendingDeallocaWaitFrontier) {
   EXPECT_EQ(stats.wait_count, 1u);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   queue0_buffer.reset();
 
   uint32_t pattern = 0xD0A110CAu;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(
-      queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
+  FillBufferAndWait(kQueueAffinity1, queue1_buffer.get(), 0, sizeof(pattern),
+                    &pattern, sizeof(pattern));
 
   SemaphoreList queue1_dealloca_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity1, queue1_alloca_signal, queue1_dealloca_signal,
       queue1_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
@@ -430,7 +504,7 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolRequiresWaitFrontierFlag) {
       queue0_buffer.out()));
   ASSERT_NE(queue0_buffer.get(), nullptr);
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   SemaphoreList queue0_dealloca_signal(device_, {0}, {1});
@@ -438,7 +512,7 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolRequiresWaitFrontierFlag) {
       device_, kQueueAffinity0, queue0_alloca_signal, queue0_dealloca_signal,
       queue0_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   queue0_buffer.reset();
 
@@ -486,7 +560,7 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
       queue0_buffer.out()));
   ASSERT_NE(queue0_buffer.get(), nullptr);
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   SemaphoreList queue0_dealloca_signal(device_, {0}, {1});
@@ -494,7 +568,7 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
       device_, kQueueAffinity0, queue0_alloca_signal, queue0_dealloca_signal,
       queue0_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue0_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   queue0_buffer.reset();
 
@@ -516,18 +590,18 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
   EXPECT_EQ(stats.wait_count, 1u);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
   uint32_t pattern = 0x715FADA0u;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(
-      queue1_buffer.get(), 0, sizeof(pattern), &pattern, sizeof(pattern)));
+  FillBufferAndWait(kQueueAffinity1, queue1_buffer.get(), 0, sizeof(pattern),
+                    &pattern, sizeof(pattern));
 
   SemaphoreList queue1_dealloca_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity1, queue1_alloca_signal, queue1_dealloca_signal,
       queue1_buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_dealloca_signal,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
@@ -553,7 +627,7 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolNotificationRetry) {
       buffer0.out()));
   ASSERT_NE(buffer0.get(), nullptr);
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca0_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca0_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   Ref<iree_hal_buffer_t> buffer1;
   SemaphoreList alloca1_signal(device_, {0}, {1});
@@ -566,38 +640,31 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolNotificationRetry) {
   iree_hal_pool_stats_t stats;
   iree_hal_pool_query_stats(pool.get(), &stats);
   EXPECT_GE(stats.exhausted_count, 1u);
-
-  iree_hal_buffer_mapping_t premature_mapping;
-  EXPECT_THAT(
-      Status(iree_hal_buffer_map_range(
-          buffer1.get(), IREE_HAL_MAPPING_MODE_SCOPED,
-          IREE_HAL_MEMORY_ACCESS_READ, 0, allocation_size, &premature_mapping)),
-      StatusIs(StatusCode::kFailedPrecondition));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(alloca1_signal));
 
   SemaphoreList dealloca0_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity0, alloca0_signal, dealloca0_signal, buffer0.get(),
       IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca1_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca1_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca0_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca0_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   buffer0.reset();
 
   uint32_t pattern = 0xB10CA110u;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer1.get(), 0, sizeof(pattern),
-                                          &pattern, sizeof(pattern)));
+  FillBufferAndWait(kQueueAffinity0, buffer1.get(), 0, sizeof(pattern),
+                    &pattern, sizeof(pattern));
 
   SemaphoreList dealloca1_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, kQueueAffinity0, alloca1_signal, dealloca1_signal, buffer1.get(),
       IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca1_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca1_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
-// Allocates a buffer that waits on a semaphore before committing. Signals the
-// wait semaphore from a background thread to verify the async path.
+// Allocates a buffer that waits on a semaphore before committing.
 TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
   IREE_TRACE_SCOPE();
 
@@ -606,11 +673,7 @@ TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
   SemaphoreList wait_semaphore_list(device_, {0}, {1});
   SemaphoreList signal_semaphore_list(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
@@ -619,34 +682,23 @@ TEST_P(QueueAllocaTest, AllocaWithWaitSemaphores) {
       IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
   ASSERT_NE(buffer, nullptr);
 
-  // The backing is not committed until the signal semaphore fires.
-  iree_hal_buffer_mapping_t premature_mapping;
-  EXPECT_THAT(
-      Status(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                       allocation_size, &premature_mapping)),
-      StatusIs(StatusCode::kFailedPrecondition));
-
-  // Signal the wait semaphore from a background thread after a short delay.
-  std::thread waker([&]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list,
-                                                  /*frontier=*/NULL));
-  });
+  // The backing is not committed until the wait semaphore fires.
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(signal_semaphore_list));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list,
+                                                /*frontier=*/NULL));
 
   // Wait for the allocation to complete.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Verify the buffer is usable after the signal.
   EXPECT_GE(iree_hal_buffer_byte_length(buffer), allocation_size);
 
   uint8_t pattern = 0xCD;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
-  waker.join();
   iree_hal_buffer_release(buffer);
 }
 
@@ -661,13 +713,7 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
     SemaphoreList alloca_signal(device_, {0}, {1});
     SemaphoreList dealloca_signal(device_, {0}, {1});
 
-    iree_hal_buffer_params_t params = {0};
-    params.type =
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-    params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                   IREE_HAL_BUFFER_USAGE_MAPPING |
-                   IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+    iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
     iree_hal_buffer_t* buffer = NULL;
     SemaphoreList empty_wait;
@@ -679,30 +725,23 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
 
     // Wait for alloca, fill the buffer.
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+        alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     uint32_t pattern = 0xDEADCAFE;
-    IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size,
-                                            &pattern, sizeof(pattern)));
+    FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                      &pattern, sizeof(pattern));
 
-    // Verify the fill.
-    iree_hal_buffer_mapping_t mapping;
-    IREE_ASSERT_OK(iree_hal_buffer_map_range(
-        buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
-        sizeof(uint32_t), &mapping));
-    uint32_t readback = 0;
-    memcpy(&readback, mapping.contents.data, sizeof(readback));
+    uint32_t readback =
+        ReadBufferValue<uint32_t>(IREE_HAL_QUEUE_AFFINITY_ANY, buffer);
     EXPECT_EQ(readback, 0xDEADCAFE);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
 
     // Dealloca: wait on alloca completion, signal dealloca completion.
     IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
         buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
 
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal,
-                                                iree_make_timeout_ms(5000),
-                                                IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     iree_hal_buffer_release(buffer);
   }
@@ -712,13 +751,7 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
     SemaphoreList alloca_signal(device_, {0}, {1});
     SemaphoreList dealloca_signal(device_, {0}, {1});
 
-    iree_hal_buffer_params_t params = {0};
-    params.type =
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-    params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                   IREE_HAL_BUFFER_USAGE_MAPPING |
-                   IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+    iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
     iree_hal_buffer_t* buffer = NULL;
     SemaphoreList empty_wait;
@@ -729,28 +762,22 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
     ASSERT_NE(buffer, nullptr);
 
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+        alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     uint32_t pattern = 0xCAFEF00D;
-    IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size,
-                                            &pattern, sizeof(pattern)));
+    FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                      &pattern, sizeof(pattern));
 
-    iree_hal_buffer_mapping_t mapping;
-    IREE_ASSERT_OK(iree_hal_buffer_map_range(
-        buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
-        sizeof(uint32_t), &mapping));
-    uint32_t readback = 0;
-    memcpy(&readback, mapping.contents.data, sizeof(readback));
+    uint32_t readback =
+        ReadBufferValue<uint32_t>(IREE_HAL_QUEUE_AFFINITY_ANY, buffer);
     EXPECT_EQ(readback, 0xCAFEF00D);
-    IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
 
     IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
         buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
 
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal,
-                                                iree_make_timeout_ms(5000),
-                                                IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     iree_hal_buffer_release(buffer);
   }
@@ -765,13 +792,7 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
   SemaphoreList wait_semaphore_list;
   SemaphoreList signal_semaphore_list(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
@@ -784,8 +805,6 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
   EXPECT_GE(iree_hal_buffer_byte_length(buffer), allocation_size);
   EXPECT_TRUE(iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
                                 IREE_HAL_BUFFER_USAGE_TRANSFER));
-  EXPECT_TRUE(iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
-                                IREE_HAL_BUFFER_USAGE_MAPPING));
   EXPECT_TRUE(iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
                                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE));
 
@@ -800,7 +819,7 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
 
   // Wait for completion and clean up.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Dealloca to clean up the transient buffer.
@@ -809,13 +828,12 @@ TEST_P(QueueAllocaTest, BufferMetadata) {
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, signal_semaphore_list,
       dealloca_signal, buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_buffer_release(buffer);
 }
 
-// Verifies that accessing a decommitted buffer (after dealloca) fails with
-// FAILED_PRECONDITION. This validates the transient buffer's decommit behavior.
+// Verifies that accessing a decommitted buffer after dealloca fails.
 TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
   IREE_TRACE_SCOPE();
 
@@ -824,11 +842,7 @@ TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
   SemaphoreList alloca_signal(device_, {0}, {1});
   SemaphoreList dealloca_signal(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   SemaphoreList empty_wait;
   iree_hal_buffer_t* buffer = NULL;
@@ -839,12 +853,12 @@ TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
   ASSERT_NE(buffer, nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Verify the buffer works before dealloca.
   uint8_t pattern = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
   // Dealloca: wait on alloca completion.
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
@@ -852,16 +866,22 @@ TEST_P(QueueAllocaTest, DeallocaReleasesMemory) {
       buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
-  // Accessing the buffer after dealloca must fail. The transient buffer's
-  // backing has been decommitted — any map attempt should return
-  // FAILED_PRECONDITION.
-  iree_hal_buffer_mapping_t mapping;
-  EXPECT_THAT(Status(iree_hal_buffer_map_range(
-                  buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                  IREE_HAL_MEMORY_ACCESS_READ, 0, allocation_size, &mapping)),
-              StatusIs(StatusCode::kFailedPrecondition));
+  SemaphoreList post_dealloca_signal(device_, {0}, {1});
+  iree_status_t fill_status = iree_hal_device_queue_fill(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, post_dealloca_signal,
+      buffer, 0, allocation_size, &pattern, sizeof(pattern),
+      IREE_HAL_FILL_FLAG_NONE);
+  if (iree_status_is_ok(fill_status)) {
+    EXPECT_THAT(Status(iree_hal_semaphore_list_wait(post_dealloca_signal,
+                                                    iree_infinite_timeout(),
+                                                    IREE_ASYNC_WAIT_FLAG_NONE)),
+                StatusIs(StatusCode::kFailedPrecondition));
+  } else {
+    EXPECT_THAT(Status(std::move(fill_status)),
+                StatusIs(StatusCode::kInvalidArgument));
+  }
 
   iree_hal_buffer_release(buffer);
 }
@@ -888,11 +908,11 @@ TEST_P(QueueAllocaTest, FailedDeallocaWaitDoesNotDealloca) {
   ASSERT_NE(buffer, nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   uint8_t pattern = 0xAB;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
   iree_hal_semaphore_fail(
       failed_wait.semaphores[0],
@@ -903,7 +923,7 @@ TEST_P(QueueAllocaTest, FailedDeallocaWaitDoesNotDealloca) {
       buffer, IREE_HAL_DEALLOCA_FLAG_NONE);
   if (iree_status_is_ok(dealloca_status)) {
     EXPECT_THAT(Status(iree_hal_semaphore_list_wait(failed_dealloca_signal,
-                                                    iree_make_timeout_ms(5000),
+                                                    iree_infinite_timeout(),
                                                     IREE_ASYNC_WAIT_FLAG_NONE)),
                 StatusIs(StatusCode::kCancelled));
   } else {
@@ -912,15 +932,15 @@ TEST_P(QueueAllocaTest, FailedDeallocaWaitDoesNotDealloca) {
   }
 
   pattern = 0xCD;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
   SemaphoreList cleanup_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, cleanup_signal, buffer,
       IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      cleanup_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      cleanup_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_buffer_release(buffer);
 }
@@ -937,13 +957,7 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
   SemaphoreList alloca_signal(device_, {0}, {1});
   SemaphoreList dealloca_signal(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   SemaphoreList empty_wait;
   iree_hal_buffer_t* buffer = NULL;
@@ -960,7 +974,7 @@ TEST_P(QueueAllocaTest, ChainedAllocaDealloca) {
 
   // Wait for the entire chain to complete.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_buffer_release(buffer);
 }
@@ -974,13 +988,7 @@ TEST_P(QueueAllocaTest, DefaultPoolRepeatedChainedAllocaDealloca) {
   const iree_device_size_t allocation_size = 1024;
   const uint32_t iteration_count = 32;
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   for (uint32_t i = 0; i < iteration_count; ++i) {
     SemaphoreList alloca_signal(device_, {0}, {1});
@@ -998,9 +1006,8 @@ TEST_P(QueueAllocaTest, DefaultPoolRepeatedChainedAllocaDealloca) {
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
         buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
 
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal,
-                                                iree_make_timeout_ms(5000),
-                                                IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     iree_hal_buffer_release(buffer);
   }
@@ -1015,13 +1022,7 @@ TEST_P(QueueAllocaTest, DeallocaPrefersOriginPlacement) {
   SemaphoreList alloca_signal(device_, {0}, {1});
   SemaphoreList dealloca_signal(device_, {0}, {1});
 
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
 
   SemaphoreList empty_wait;
   iree_hal_buffer_t* buffer = NULL;
@@ -1035,7 +1036,7 @@ TEST_P(QueueAllocaTest, DeallocaPrefersOriginPlacement) {
       device_, /*queue_affinity=*/0, alloca_signal, dealloca_signal, buffer,
       IREE_HAL_DEALLOCA_FLAG_PREFER_ORIGIN));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_buffer_release(buffer);
 }
@@ -1053,11 +1054,9 @@ TEST_P(QueueAllocaTest, ZeroAccessFlagsCanonicalized) {
   // The HAL module constructs params with only .type and .usage, leaving
   // .access = 0. The driver must canonicalize this to MEMORY_ACCESS_ALL.
   iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING |
-                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
@@ -1067,22 +1066,17 @@ TEST_P(QueueAllocaTest, ZeroAccessFlagsCanonicalized) {
   ASSERT_NE(buffer, nullptr);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000),
+                                              iree_infinite_timeout(),
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Fill and readback: exercises DISCARD_WRITE and READ access on the buffer.
   uint32_t pattern = 0x12345678;
-  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, allocation_size, &pattern,
-                                          sizeof(pattern)));
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
 
-  iree_hal_buffer_mapping_t mapping;
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                           sizeof(uint32_t), &mapping));
-  uint32_t readback = 0;
-  memcpy(&readback, mapping.contents.data, sizeof(readback));
+  uint32_t readback =
+      ReadBufferValue<uint32_t>(IREE_HAL_QUEUE_AFFINITY_ANY, buffer);
   EXPECT_EQ(readback, 0x12345678);
-  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
 
   iree_hal_buffer_release(buffer);
 }

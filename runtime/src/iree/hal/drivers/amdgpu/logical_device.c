@@ -747,7 +747,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_capabilities(
   out_capabilities->flags |= IREE_HAL_DEVICE_CAPABILITY_HOST_COHERENT;
 
   // All AMDGPU devices support device-scope atomics. System-scope atomics are
-  // supported on fine-grained memory (which is what we allocate by default).
+  // supported on fine-grained memory when callers explicitly opt into
+  // host-visible placement.
   out_capabilities->flags |= IREE_HAL_DEVICE_CAPABILITY_ATOMIC_SCOPE_DEVICE;
   out_capabilities->flags |= IREE_HAL_DEVICE_CAPABILITY_ATOMIC_SCOPE_SYSTEM;
 
@@ -1136,7 +1137,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_import_file(
 
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
-      /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
+      logical_device->proactor, iree_hal_device_host_allocator(base_device),
+      out_file);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_create_semaphore(
