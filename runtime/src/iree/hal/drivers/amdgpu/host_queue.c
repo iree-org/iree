@@ -529,7 +529,7 @@ static void iree_hal_amdgpu_pending_op_record_error_status(
   if (!iree_atomic_compare_exchange_strong(
           &op->error_status, &expected, (intptr_t)status,
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    iree_status_ignore(status);
+    iree_status_free(status);
   }
 }
 
@@ -1155,6 +1155,44 @@ static void iree_hal_amdgpu_host_queue_cancel_pending(
 // Initialization / deinitialization
 //===----------------------------------------------------------------------===//
 
+void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_post_drain_action_t* action,
+    iree_hal_amdgpu_host_queue_post_drain_fn_t fn, void* user_data) {
+  action->next = NULL;
+  action->fn = fn;
+  action->user_data = user_data;
+
+  iree_slim_mutex_lock(&queue->post_drain_mutex);
+  if (queue->post_drain_tail) {
+    queue->post_drain_tail->next = action;
+  } else {
+    queue->post_drain_head = action;
+  }
+  queue->post_drain_tail = action;
+  iree_slim_mutex_unlock(&queue->post_drain_mutex);
+}
+
+static void iree_hal_amdgpu_host_queue_run_post_drain_actions(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  for (;;) {
+    iree_slim_mutex_lock(&queue->post_drain_mutex);
+    iree_hal_amdgpu_host_queue_post_drain_action_t* action =
+        queue->post_drain_head;
+    if (action) {
+      queue->post_drain_head = action->next;
+      if (!queue->post_drain_head) {
+        queue->post_drain_tail = NULL;
+      }
+      action->next = NULL;
+    }
+    iree_slim_mutex_unlock(&queue->post_drain_mutex);
+
+    if (!action) break;
+    action->fn(action->user_data);
+  }
+}
+
 // Drains completed notification entries and reclaims kernarg space. If the GPU
 // queue has faulted (error_status is set), fails all pending entries instead of
 // draining normally.
@@ -1192,6 +1230,7 @@ static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
     iree_hal_amdgpu_kernarg_ring_reclaim(&queue->kernarg_ring,
                                          kernarg_reclaim_position);
   }
+  iree_hal_amdgpu_host_queue_run_post_drain_actions(queue);
   return count;
 }
 
@@ -1220,6 +1259,14 @@ static void iree_hal_amdgpu_host_queue_request_completion_thread_stop(
   }
 }
 
+static hsa_signal_value_t iree_hal_amdgpu_host_queue_last_drained_signal_value(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  const uint64_t last_drained_epoch = (uint64_t)iree_atomic_load(
+      &queue->notification_ring.epoch.last_drained, iree_memory_order_acquire);
+  return (hsa_signal_value_t)(IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE -
+                              last_drained_epoch);
+}
+
 // Completion thread entry point. Blocks in HSA until either the queue epoch
 // signal changes or teardown/error signals the stop signal. Completion wakeups
 // drain normally; stop/error wakeups perform one final drain/fail before exit.
@@ -1238,7 +1285,7 @@ static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
       iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring);
   hsa_signal_t stop_signal = queue->completion_thread_stop_signal;
   hsa_signal_value_t last_epoch_value =
-      iree_hsa_signal_load_scacquire(IREE_LIBHSA(queue->libhsa), epoch_signal);
+      iree_hal_amdgpu_host_queue_last_drained_signal_value(queue);
 
   bool keep_running = true;
   while (keep_running) {
@@ -1263,8 +1310,13 @@ static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
 
     if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_EPOCH_SIGNAL) {
       iree_hal_amdgpu_host_queue_drain_completions(queue);
-      last_epoch_value = iree_hsa_signal_load_scacquire(
-          IREE_LIBHSA(queue->libhsa), epoch_signal);
+      // Arm the next wait from the epoch we actually drained, not from a raw
+      // HSA signal load. A GPU completion can race with the drain and update
+      // the signal after drain() sampled it; observing that newer value here
+      // would mark an undrained epoch as already seen and could sleep forever
+      // with a user semaphore still pending.
+      last_epoch_value =
+          iree_hal_amdgpu_host_queue_last_drained_signal_value(queue);
     }
 
     if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_STOP_SIGNAL ||
@@ -1320,10 +1372,10 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_hal_pool_t* default_pool, iree_host_size_t device_ordinal,
-    uint32_t aql_queue_capacity, uint32_t notification_capacity,
-    uint32_t kernarg_capacity_in_blocks, iree_allocator_t host_allocator,
-    iree_hal_amdgpu_host_queue_t* out_queue) {
+    iree_hal_pool_t* default_pool, iree_hal_amdgpu_staging_pool_t* staging_pool,
+    iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
+    uint32_t notification_capacity, uint32_t kernarg_capacity_in_blocks,
+    iree_allocator_t host_allocator, iree_hal_amdgpu_host_queue_t* out_queue) {
   IREE_ASSERT_ARGUMENT(libhsa);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(proactor);
@@ -1361,6 +1413,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
 
   // Submission pipeline state.
   iree_slim_mutex_initialize(&out_queue->submission_mutex);
+  iree_slim_mutex_initialize(&out_queue->post_drain_mutex);
   out_queue->axis = axis;
   out_queue->wait_barrier_strategy = wait_barrier_strategy;
   out_queue->queue_affinity = queue_affinity;
@@ -1370,6 +1423,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   out_queue->can_publish_frontier = true;
   out_queue->transfer_context = transfer_context;
   out_queue->default_pool = default_pool;
+  out_queue->staging_pool = staging_pool;
   out_queue->device_ordinal = device_ordinal;
   out_queue->pending_head = NULL;
   iree_async_frontier_initialize(iree_hal_amdgpu_host_queue_frontier(out_queue),
@@ -1474,6 +1528,10 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   IREE_ASSERT_ARGUMENT(queue);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  queue->is_shutting_down = true;
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
   if (queue->completion_thread) {
     iree_hal_amdgpu_host_queue_request_completion_thread_stop(queue);
     // There is only one owner for the thread, so this also joins the thread.
@@ -1515,6 +1573,7 @@ void iree_hal_amdgpu_host_queue_deinitialize(
     iree_hal_amdgpu_kernarg_ring_reclaim(&queue->kernarg_ring,
                                          kernarg_reclaim_position);
   }
+  iree_hal_amdgpu_host_queue_run_post_drain_actions(queue);
 
   // Deregister from the epoch signal table before destroying the notification
   // ring (which owns the epoch signal). Guarded by epoch_table != NULL to
@@ -1551,6 +1610,7 @@ void iree_hal_amdgpu_host_queue_deinitialize(
     queue->completion_thread_stop_signal.handle = 0;
   }
 
+  iree_slim_mutex_deinitialize(&queue->post_drain_mutex);
   iree_slim_mutex_deinitialize(&queue->submission_mutex);
 
   IREE_TRACE_ZONE_END(z0);

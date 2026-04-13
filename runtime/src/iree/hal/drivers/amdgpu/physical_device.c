@@ -229,6 +229,8 @@ void iree_hal_amdgpu_physical_device_options_initialize(
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_ALIGNMENT_DEFAULT;
   out_options->default_pool.frontier_capacity =
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT;
+
+  iree_hal_amdgpu_staging_pool_options_initialize(&out_options->file_staging);
 }
 
 iree_status_t iree_hal_amdgpu_physical_device_options_verify(
@@ -316,6 +318,8 @@ iree_status_t iree_hal_amdgpu_physical_device_options_verify(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "default pool frontier_capacity must be non-zero");
   }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_staging_pool_options_verify(&options->file_staging));
 
   return iree_ok_status();
 }
@@ -503,6 +507,13 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     }
   }
 
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_staging_pool_initialize(
+        logical_device, libhsa, &system->topology, host_memory_pools,
+        queue_affinity_mask, &options->file_staging, host_allocator,
+        &out_physical_device->file_staging_pool);
+  }
+
   // Initialize the host signal pool.
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_host_signal_pool_initialize(
@@ -618,7 +629,8 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
         completion_thread_affinity, physical_device->wait_barrier_strategy,
         epoch_signal_table, &physical_device->fine_host_block_pool,
         &physical_device->buffer_transfer_context,
-        physical_device->default_pool, physical_device->device_ordinal,
+        physical_device->default_pool, &physical_device->file_staging_pool,
+        physical_device->device_ordinal,
         physical_device->host_queue_aql_capacity,
         physical_device->host_queue_notification_capacity,
         physical_device->host_queue_kernarg_capacity, host_allocator,
@@ -658,6 +670,9 @@ void iree_hal_amdgpu_physical_device_deinitialize(
 
   iree_hal_slab_provider_release(physical_device->default_slab_provider);
   iree_async_notification_release(physical_device->default_pool_notification);
+
+  iree_hal_amdgpu_staging_pool_deinitialize(
+      &physical_device->file_staging_pool);
 
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 

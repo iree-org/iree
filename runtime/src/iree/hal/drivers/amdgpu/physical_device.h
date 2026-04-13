@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
+#include "iree/hal/drivers/amdgpu/host_queue_staging.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
@@ -133,6 +134,9 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
     uint8_t frontier_capacity;
   } default_pool;
 
+  // Fixed-size queue_read/queue_write staging policy.
+  iree_hal_amdgpu_staging_pool_options_t file_staging;
+
   // Forces cross-queue wait barriers to use software deferral instead of the
   // optimal device-side strategy for the GPU ISA.
   uint32_t force_wait_barrier_defer : 1;
@@ -189,6 +193,9 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_hal_tlsf_pool_options_t default_pool_options;
   // Frontier-aware default queue-allocation pool for this physical device.
   iree_hal_pool_t* default_pool;
+
+  // Fixed-size staging pool for non-mappable queue_read/queue_write transfers.
+  iree_hal_amdgpu_staging_pool_t file_staging_pool;
 
   // Builtin kernel table for this GPU agent and a host/device-neutral transfer
   // context that points to it. Shared by all queues on the physical device.

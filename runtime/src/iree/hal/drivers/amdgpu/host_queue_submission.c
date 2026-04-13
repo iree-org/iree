@@ -147,12 +147,18 @@ static iree_hal_amdgpu_aql_packet_control_t
 iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
-    const iree_hal_semaphore_list_t signal_semaphore_list) {
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hsa_fence_scope_t minimum_acquire_scope,
+    iree_hsa_fence_scope_t minimum_release_scope) {
   return iree_hal_amdgpu_aql_packet_control_barrier(
       iree_hal_amdgpu_host_queue_max_fence_scope(
-          IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
-      iree_hal_amdgpu_host_queue_signal_list_release_scope(
-          queue, signal_semaphore_list));
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+          minimum_acquire_scope),
+      iree_hal_amdgpu_host_queue_max_fence_scope(
+          iree_hal_amdgpu_host_queue_signal_list_release_scope(
+              queue, signal_semaphore_list),
+          minimum_release_scope));
 }
 
 // Returns the packet control for a final no-op/barrier completion packet.
@@ -403,6 +409,7 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
   submission->reclaim_entry->kernarg_write_position =
       submission->kernarg_write_position;
   submission->reclaim_entry->count = submission->reclaim_resource_count;
+  submission->reclaim_entry->pre_signal_action = submission->pre_signal_action;
 
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
   iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
@@ -410,7 +417,9 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
   uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
       iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
-          queue, resolution, signal_semaphore_list));
+          queue, resolution, signal_semaphore_list,
+          submission->minimum_acquire_scope,
+          submission->minimum_release_scope));
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
   iree_hal_amdgpu_aql_ring_doorbell(

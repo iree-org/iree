@@ -235,6 +235,75 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy(
       IREE_ARRAYSIZE(operation_resources), submission_flags);
 }
 
+iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags,
+    iree_hsa_fence_scope_t minimum_acquire_scope,
+    iree_hsa_fence_scope_t minimum_release_scope,
+    iree_hal_amdgpu_reclaim_action_t pre_signal_action,
+    iree_hal_resource_t* const* extra_operation_resources,
+    iree_host_size_t extra_operation_resource_count,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+  if (IREE_UNLIKELY(queue->is_shutting_down)) {
+    return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
+  }
+  if (IREE_UNLIKELY(extra_operation_resource_count > 0 &&
+                    !extra_operation_resources)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "extra operation resources must be non-null");
+  }
+
+  iree_hsa_kernel_dispatch_packet_t dispatch_packet;
+  iree_hal_amdgpu_device_buffer_copy_kernargs_t kernargs;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
+      queue, source_buffer, source_offset, target_buffer, target_offset, length,
+      flags, &dispatch_packet, &kernargs));
+
+  iree_host_size_t operation_resource_count = 0;
+  if (!iree_host_size_checked_add(2, extra_operation_resource_count,
+                                  &operation_resource_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "copy operation resource count overflows");
+  }
+  iree_host_size_t operation_resources_size = 0;
+  if (!iree_host_size_checked_mul(operation_resource_count,
+                                  sizeof(iree_hal_resource_t*),
+                                  &operation_resources_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "copy operation resource table size overflows");
+  }
+  iree_hal_resource_t** operation_resources =
+      (iree_hal_resource_t**)iree_alloca(operation_resources_size);
+  operation_resources[0] = (iree_hal_resource_t*)source_buffer;
+  operation_resources[1] = (iree_hal_resource_t*)target_buffer;
+  for (iree_host_size_t i = 0; i < extra_operation_resource_count; ++i) {
+    operation_resources[2 + i] = extra_operation_resources[i];
+  }
+
+  iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+      queue, resolution, signal_semaphore_list, operation_resource_count,
+      /*kernarg_block_count=*/1, &submission));
+  memcpy(submission.kernarg_blocks->data, &kernargs, sizeof(kernargs));
+  submission.dispatch_setup =
+      iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
+          &submission.dispatch_slot->dispatch, &dispatch_packet,
+          submission.kernarg_blocks->data,
+          iree_hal_amdgpu_notification_ring_epoch_signal(
+              &queue->notification_ring));
+  submission.minimum_acquire_scope = minimum_acquire_scope;
+  submission.minimum_release_scope = minimum_release_scope;
+  submission.pre_signal_action = pre_signal_action;
+  iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      operation_resource_count, submission_flags, &submission);
+  return iree_ok_status();
+}
+
 #define IREE_HAL_AMDGPU_HOST_QUEUE_UPDATE_SOURCE_ALIGNMENT 16
 
 // Validates a queue_update request and resolves the source host span and target

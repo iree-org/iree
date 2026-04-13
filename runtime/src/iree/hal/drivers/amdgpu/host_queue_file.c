@@ -10,6 +10,7 @@
 
 #include "iree/async/operations/file.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
+#include "iree/hal/drivers/amdgpu/host_queue_staging.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 
 typedef enum iree_hal_amdgpu_file_action_kind_e {
@@ -169,6 +170,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_direct_file_buffer(
         operation_name);
   }
   return iree_ok_status();
+}
+
+static bool iree_hal_amdgpu_host_queue_file_buffer_supports_direct_io(
+    iree_hal_buffer_t* buffer) {
+  return iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+         iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
+                           IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED);
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_validate_direct_file_handle(
@@ -477,12 +486,20 @@ iree_status_t iree_hal_amdgpu_host_queue_read_file(
   if (!storage_buffer) {
     IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_direct_file_handle(
         source_file, "read"));
-    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_direct_file_buffer(
-        target_buffer, "read", target_offset, length));
-    return iree_hal_amdgpu_host_queue_submit_direct_file_action(
+    if (iree_hal_amdgpu_host_queue_file_buffer_supports_direct_io(
+            target_buffer)) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_amdgpu_host_queue_validate_direct_file_buffer(
+              target_buffer, "read", target_offset, length));
+      return iree_hal_amdgpu_host_queue_submit_direct_file_action(
+          (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
+          signal_semaphore_list, IREE_HAL_AMDGPU_FILE_ACTION_READ, source_file,
+          source_offset, target_buffer, target_offset, length);
+    }
+    return iree_hal_amdgpu_host_queue_submit_staged_read(
         (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
-        signal_semaphore_list, IREE_HAL_AMDGPU_FILE_ACTION_READ, source_file,
-        source_offset, target_buffer, target_offset, length);
+        signal_semaphore_list, source_file, source_offset, target_buffer,
+        target_offset, length);
   }
   return queue->vtable->copy(queue, wait_semaphore_list, signal_semaphore_list,
                              storage_buffer, source_device_offset,
@@ -515,12 +532,20 @@ iree_status_t iree_hal_amdgpu_host_queue_write_file(
   if (!storage_buffer) {
     IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_direct_file_handle(
         target_file, "write"));
-    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_direct_file_buffer(
-        source_buffer, "write", source_offset, length));
-    return iree_hal_amdgpu_host_queue_submit_direct_file_action(
+    if (iree_hal_amdgpu_host_queue_file_buffer_supports_direct_io(
+            source_buffer)) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_amdgpu_host_queue_validate_direct_file_buffer(
+              source_buffer, "write", source_offset, length));
+      return iree_hal_amdgpu_host_queue_submit_direct_file_action(
+          (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
+          signal_semaphore_list, IREE_HAL_AMDGPU_FILE_ACTION_WRITE, target_file,
+          target_offset, source_buffer, source_offset, length);
+    }
+    return iree_hal_amdgpu_host_queue_submit_staged_write(
         (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
-        signal_semaphore_list, IREE_HAL_AMDGPU_FILE_ACTION_WRITE, target_file,
-        target_offset, source_buffer, source_offset, length);
+        signal_semaphore_list, source_buffer, source_offset, target_file,
+        target_offset, length);
   }
   return queue->vtable->copy(queue, wait_semaphore_list, signal_semaphore_list,
                              source_buffer, source_offset, storage_buffer,
