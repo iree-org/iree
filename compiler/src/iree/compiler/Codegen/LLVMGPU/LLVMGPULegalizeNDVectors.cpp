@@ -121,8 +121,7 @@ struct UnrollElementwiseOps final
     for (auto [inputs, convertedTy] :
          llvm::zip_equal(opOperands, convertedTypes)) {
       clonedResultTypes.assign(numResults, convertedTy);
-      Operation *clonedOp =
-          clone(rewriter, op, clonedResultTypes, inputs);
+      Operation *clonedOp = clone(rewriter, op, clonedResultTypes, inputs);
       for (auto j : llvm::seq<int64_t>(numResults)) {
         replacements[j].push_back(clonedOp->getResult(j));
       }
