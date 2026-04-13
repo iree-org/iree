@@ -7,12 +7,21 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 
+#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+/// Given a target and a matmul problem, try to find an MMA schedule for the
+/// problem based on the available mma intrinsics and heuristic seeds.
+std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
+    bool transposedLhs, bool transposedRhs, bool isGemm, bool scaled,
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned = true,
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
 
 /// Helper for setting up a data tiled multi-MMA inner_tiled config based on the
 /// specified target.

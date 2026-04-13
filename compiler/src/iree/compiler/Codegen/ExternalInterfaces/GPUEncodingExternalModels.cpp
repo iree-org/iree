@@ -34,12 +34,14 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -51,6 +53,13 @@
 #include <numeric>
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
+
+static llvm::cl::opt<bool> clPartialDTScaledMMA(
+    "iree-gpu-partial-dt-scaled-mma",
+    llvm::cl::desc(
+        "Use PartialDataTiledScaledMMAAttr for scaled matmuls: data operands "
+        "are pack-only (row-major), scales are fully shuffled."),
+    llvm::cl::init(false));
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -207,7 +216,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // * Note that typically, the load bitwidth unrolling factor will be 1, so the
   // total K unrolling factor will just be the scales vector size.
   if (auto scaledMmaAttr = dyn_cast<ScaledMMAAttr>(intrinsicAttr)) {
-    intrinsicsK = std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
+    intrinsicsK =
+          std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
   }
 
   // The total amount of unrolling along the M and N dimensions is normally
@@ -363,6 +373,49 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   auto scaledMmaInterleaveK = DenseI64ArrayAttr::get(
       ctx, {kScaledMMAOperandLhsScale, kScaledMMAOperandRhsScale});
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
+
+  if (clPartialDTScaledMMA) {
+    if (succeeded(matmulSizes) &&
+        !ShapedType::isDynamic(matmulSizes->M) &&
+        !ShapedType::isDynamic(matmulSizes->N) &&
+        !ShapedType::isDynamic(matmulSizes->K)) {
+      GPUMatmulShapeType problem(
+          {matmulSizes->M}, {matmulSizes->N},
+          {matmulSizes->K, matmulSizes->Kb}, /*batch=*/{},
+          eTypes[kScaledMMAOperandLhs], eTypes[kScaledMMAOperandRhs],
+          eTypes[kScaledMMAOperandAcc], eTypes[kScaledMMAOperandLhsScale],
+          eTypes[kScaledMMAOperandRhsScale]);
+      auto schedule = getMmaScheduleFromProblemAndTarget(
+          target, problem, UnknownLoc::get(ctx),
+          /*transposedLhs=*/false, /*transposedRhs=*/false,
+          /*isGemm=*/true, /*scaled=*/true,
+          /*useDirectLoad=*/false, /*prefetchNumStages=*/2);
+      if (schedule) {
+        intrinsicsM = schedule->getTotalMTileSize();
+        intrinsicsN = schedule->getTotalNTileSize();
+        subgroupsM = schedule->getTotalMSubgroupCount();
+        subgroupsN = schedule->getTotalNSubgroupCount();
+        intrinsicsK = schedule->getTotalKTileSize();
+        subgroupsK = 1;
+      } else {
+        intrinsicsK = 2;
+      }
+    }
+    auto scaledMmaInterleaveM =
+        DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandLhsScale});
+    auto scaledMmaInterleaveN =
+        DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandRhsScale});
+    return PartialDataTiledScaledMMAAttr::get(
+        ctx, intrinsicScaledMma.getIntrinsic(),
+        intrinsicScaledMma.getLhsElemType(),
+        intrinsicScaledMma.getRhsElemType(),
+        intrinsicScaledMma.getAccElemType(), intrinsicsM, subgroupsM,
+        intrinsicsN, subgroupsN, intrinsicsK, subgroupsK,
+        /*operands_interleaving_intrinsics_m=*/scaledMmaInterleaveM,
+        /*operands_interleaving_intrinsics_n=*/scaledMmaInterleaveN,
+        /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK);
+  }
+
   return DataTiledScaledMMAAttr::get(
       ctx, intrinsicScaledMma.getIntrinsic(),
       intrinsicScaledMma.getLhsElemType(), intrinsicScaledMma.getRhsElemType(),
@@ -541,7 +594,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr), semantics);
+        cast<Codegen::InnerTileDescAttrInterface>(dataTiledAttr), semantics);
   }
   default: {
     assert(false && "unexpected encoding op type");
@@ -590,8 +643,10 @@ struct GPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
+
+    unsigned opIdx = encoding.getOperandIndex().getInt();
     FailureOr<IREE::Codegen::TileSwizzle> maybeSwizzle =
-        getEncodingSwizzle(encoding, mma, encoding.getOperandIndex().getInt());
+        getEncodingSwizzle(encoding, mma, opIdx);
     if (failed(maybeSwizzle)) {
       return info;
     }

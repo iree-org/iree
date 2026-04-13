@@ -50,6 +50,13 @@ static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
         "Enable encoding op fusion if the producer has more than one use"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clPartialDTScaledMMA(
+    "iree-dispatch-creation-partial-dt-scaled-mma",
+    llvm::cl::desc(
+        "Only hoist scale operand encodings; keep data operand encodings "
+        "inside dispatches (for PartialDataTiledScaledMMAAttr path)."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -273,7 +280,12 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     // op, so hoist them out of their current dispatch regions. Also, bubble
     // SetEncodingOps through special operations like bit-extending ops and
     // broadcasting ops.
-    passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
+    {
+      HoistEncodingOpsPassOptions hoistOpts;
+      hoistOpts.partialDTScaledMMA = clPartialDTScaledMMA;
+      passManager.addPass(
+          DispatchCreation::createHoistEncodingOpsPass(hoistOpts));
+    }
   }
   FunctionLikeNest(passManager)
       .addPass([&]() {

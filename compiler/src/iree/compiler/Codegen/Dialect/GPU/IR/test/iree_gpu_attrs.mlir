@@ -263,6 +263,24 @@ module {
 //  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32, intrinsics_m = 4, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
 
 module {
+  func.func @test_partial_data_tiled_scaled_mfma_F32_16x16x128_B32_defaults() attributes {
+      mma_types = #iree_gpu.partial_data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_partial_data_tiled_scaled_mfma_F32_16x16x128_B32_defaults
+//  CHECK-SAME:   mma_types = #iree_gpu.partial_data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
+
+module {
+  func.func @test_partial_data_tiled_scaled_mfma_F32_16x16x128_B32_multi() attributes {
+      mma_types = #iree_gpu.partial_data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [2, 3]>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_partial_data_tiled_scaled_mfma_F32_16x16x128_B32_multi
+//  CHECK-SAME:   mma_types = #iree_gpu.partial_data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [2, 3]>
+
+module {
   func.func @test_any_lowering_config() attributes {
       lowering_config = #iree_gpu.lowering_config<{workgroup = [16, 16], thread = [0, 4]}>} {
     return
