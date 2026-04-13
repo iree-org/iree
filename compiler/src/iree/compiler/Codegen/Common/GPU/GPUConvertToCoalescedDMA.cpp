@@ -236,6 +236,7 @@ getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
   if (!minAligned || availableElements % *minAligned != 0) {
     return std::nullopt;
   }
+  // getMinDMAAlignedElements already validated subgroupSize is present.
   return getSubgroupSize(funcOp);
 }
 
@@ -324,16 +325,16 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   }
 
   auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
-  int64_t rank = outputType.getRank();
   ArrayRef<int64_t> shape = outputType.getShape();
   if (llvm::any_of(shape, ShapedType::isDynamic)) {
     return false;
   }
 
-  int64_t innermostDim = shape[rank - 1];
+  int64_t innermostDim = shape[shape.size() - 1];
   int64_t availableElements = innermostDim;
   Value output = copyOp.getOutputs()[0];
-  if (tracesToTensorEmpty(output)) {
+  bool outputIsEmpty = tracesToTensorEmpty(output);
+  if (outputIsEmpty) {
     availableElements = ShapedType::getNumElements(shape);
   }
 
@@ -348,9 +349,14 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     return false;
   }
 
-  // Already aligned.
   if (availableElements % *minAligned == 0) {
     return true;
+  }
+
+  // Padding requires replacing the destination with tensor.empty, so it's
+  // only viable when the original output is already tensor.empty.
+  if (!outputIsEmpty) {
+    return false;
   }
 
   // Check if padding can bring it to alignment.
@@ -905,19 +911,11 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Get the function containing this operation.
     auto funcOp = gatherOp->getParentOfType<FunctionOpInterface>();
     if (!funcOp) {
       return failure();
     }
 
-    // Get subgroup size from translation_info.
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize) {
-      return failure();
-    }
-
-    // Validate that innermost dimension is large enough for coalesced DMA.
     auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
@@ -925,32 +923,14 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    auto minAligned =
+        getMinDMAAlignedElements(funcOp, outputType.getElementType());
+    if (!minAligned || innermostDim % *minAligned != 0) {
       return failure();
     }
 
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim % minElementsPerTransfer != 0) {
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!subgroupSize) {
       return failure();
     }
 
@@ -1189,46 +1169,16 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-    // transfer size. The minimum transfer size is subgroupSize *
-    // minElementsPerLane, where minElementsPerLane is determined by the
-    // smallest DMA size and element type.
-    int64_t innermostDim = shape[rank - 1];
-    if (ShapedType::isDynamic(innermostDim)) {
-      return failure();
-    }
-
-    // Get the element type bit width.
     Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    // Get DMA sizes from target to compute minimum transfer size.
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
+    auto minAligned = getMinDMAAlignedElements(funcOp, elementType);
+    if (!minAligned) {
       return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    // Find minimum elements per transfer across all DMA sizes.
-    // We need innermostDim >= subgroupSize * minElementsPerLane.
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
     }
 
     // Determine how many elements are available for coalesced access.
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
+    int64_t innermostDim = shape[rank - 1];
     int64_t availableElements = innermostDim;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
@@ -1238,14 +1188,9 @@ private:
       }
     }
 
-    // If no valid DMA size found, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
-      return failure();
-    }
-
     // Allow sub-aligned copies through if they can be padded to alignment.
     // Padding will be inserted per-warp during the conversion pattern.
-    if (availableElements % minElementsPerTransfer != 0) {
+    if (availableElements % *minAligned != 0) {
       auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation());
       if (!copyOp || !isCopyDMAConvertible(copyOp)) {
         return failure();
