@@ -75,10 +75,11 @@ static std::optional<Value> promotionImpl(OpBuilder &builder,
       }
     }
 
-    if (auto generic = dyn_cast<linalg::GenericOp>(producer.getOperation())) {
+    if (isa<linalg::LinalgOp>(producer.getOperation())) {
       // Don't skip promotion for transpose producers — they need to go through
       // the swizzle path so XOR swizzle hints are applied.
-      if (!linalg::isaTransposeOpInterface(generic)) {
+      auto generic = dyn_cast<linalg::GenericOp>(producer.getOperation());
+      if (!generic || !linalg::isaTransposeOpInterface(generic)) {
         setLoweringConfig(producer, attr);
         return operand.get();
       }
