@@ -1565,14 +1565,21 @@ getMNKShape(VirtualMMAIntrinsic type) {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {32, 32, 16};
   // Sparse trick VDMFMAs for skinny GEMMs: semantically 8x16xK.
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
     return {8, 16, 64};
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
     return {8, 16, 128};
   }
   assert(false && "unhandled virtual mma layout type.");
@@ -1583,6 +1590,8 @@ static std::tuple<Type, Type, Type>
 getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
   Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+  Type f8E4M3FN = Float8E4M3FNType::get(context);
+  Type f8E5M2 = Float8E5M2Type::get(context);
   Type bf16 = BFloat16Type::get(context);
   Type f16 = Float16Type::get(context);
   Type f32 = Float32Type::get(context);
@@ -1601,20 +1610,31 @@ getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {f16, f16, f32};
   // Sparse trick VDMFMAs for skinny GEMMs.
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
     return {f16, f16, f32};
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
     return {bf16, bf16, f32};
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
     return {i8, i8, i32};
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
     return {f8E5M2FNUZ, f8E5M2FNUZ, f32};
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
     return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
     return {f8E4M3FNUZ, f8E5M2FNUZ, f32};
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
     return {f8E4M3FNUZ, f8E4M3FNUZ, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+    return {f8E5M2, f8E5M2, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+    return {f8E5M2, f8E4M3FN, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+    return {f8E4M3FN, f8E5M2, f32};
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+    return {f8E4M3FN, f8E4M3FN, f32};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1697,13 +1717,20 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8: {
     return 64;
   }
   }
@@ -1788,14 +1815,23 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ: {
     return 2;
+  }
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8: {
+    return 1;
   }
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ: {
@@ -1879,13 +1915,20 @@ getVDMFMABInterleaveIndices(int64_t aSliceWidth, int64_t unrollFactor,
 
 bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic) {
   switch (intrinsic) {
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
     return true;
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
@@ -2030,8 +2073,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     results.push_back(acc);
     return success();
   }
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16: {
     if (getColMajor()) {
       return failure();
     }
@@ -2046,11 +2089,11 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*aSliceWidth=*/4};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ: {
     if (getColMajor()) {
       return failure();
     }
@@ -2065,6 +2108,43 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
+  // CDNA4 VDMFMA 16-bit variants.
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16: {
+    if (getColMajor()) {
+      return failure();
+    }
+    VDMFMAConfig config{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/64,
+                        /*unrollFactor=*/getIntrinsicsK(),
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({4}, builder.getIntegerType(8)),
+                        /*evenSparseIndex=*/0x44,
+                        /*oddSparseIndex=*/0xEE,
+                        /*aSliceWidth=*/8};
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+  }
+  // CDNA4 VDMFMA 8-bit variants.
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN: {
+    if (getColMajor()) {
+      return failure();
+    }
+    VDMFMAConfig config{/*m=*/16,
+                        /*n=*/16,
+                        /*nativeK=*/128,
+                        /*unrollFactor=*/getIntrinsicsK(),
+                        /*sparseIndexVectorType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
+                        /*aSliceWidth=*/16};
+    return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
+  }
   }
   return failure();
 }
@@ -2075,13 +2155,20 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ: {
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8: {
     return 1;
   }
   }
@@ -2147,8 +2234,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
       return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{4, 1}};
     }
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
@@ -2160,11 +2249,16 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
       return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
               /*element=*/{2, 1}};
     }
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
