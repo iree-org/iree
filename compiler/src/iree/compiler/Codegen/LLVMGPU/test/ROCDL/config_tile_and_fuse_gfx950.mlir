@@ -58,21 +58,21 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
-//  CHECK-SAME:     reduction = [0, 0, 1, 1]
+//  CHECK-SAME:     reduction = [0, 0, 2, 1]
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=34816
+// CHECK-REMARKS-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=69632
 
 // -----
 
@@ -104,21 +104,21 @@ func.func @scaled_matmul_with_batch(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
-//  CHECK-SAME:     reduction = [0, 0, 0, 1, 1]
+//  CHECK-SAME:     reduction = [0, 0, 0, 2, 1]
 //  CHECK-SAME:     subgroup = [0, 4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 256, 256, 0, 0]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=34816
+// CHECK-REMARKS-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=69632
 
 // -----
 
@@ -178,21 +178,21 @@ func.func @scaled_matmul_with_dynamic_batch(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
-//  CHECK-SAME:     reduction = [0, 0, 0, 1, 1]
+//  CHECK-SAME:     reduction = [0, 0, 0, 2, 1]
 //  CHECK-SAME:     subgroup = [0, 4, 4, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 128, 256, 0, 0]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=26112
+// CHECK-REMARKS-SAME: Remark=52224
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=26112
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=52224
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=26112
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=52224
 
 // -----
 
@@ -375,21 +375,21 @@ func.func @scaled_matmul_accumulate(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
-//  CHECK-SAME:     reduction = [0, 0, 1, 1]
-//  CHECK-SAME:     subgroup = [2, 8, 0, 0]
-//       CHECK:     workgroup = [128, 256, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 2, 1]
+//  CHECK-SAME:     subgroup = [1, 8, 0, 0]
+//       CHECK:     workgroup = [64, 256, 0, 0]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=157184
+// CHECK-REMARKS-SAME: Remark=109056
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=157184
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=109056
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=157184
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=109056
 
 // -----
 
