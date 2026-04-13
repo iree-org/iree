@@ -394,6 +394,104 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 
 // -----
 
+#lowering_config_swizzle_transpose = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
+
+#transpose_map = affine_map<(d0, d1) -> (d1, d0)>
+#identity_map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @swizzle_operand_transpose_producer(
+    %a_transposed: tensor<64x32xf32>, %b: tensor<64x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty_a = tensor.empty() : tensor<32x64xf32>
+  %transpose_a = linalg.generic {
+    indexing_maps = [#transpose_map, #identity_map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%a_transposed : tensor<64x32xf32>) outs(%empty_a : tensor<32x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config_swizzle_transpose}
+    ins(%transpose_a, %b : tensor<32x64xf32>, tensor<64x128xf32>)
+    outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// Transpose linalg.generic producers are not given a lowering_config early
+// return — they fall through to the swizzle promotion path so XOR swizzle
+// hints are applied to their output buffer.
+// CHECK-LABEL: func.func @swizzle_operand_transpose_producer
+//  CHECK-SAME:   %[[A_T:[A-Za-z0-9]+]]: tensor<64x32xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf32>
+//       CHECK:   %[[TRANSPOSE:.+]] = linalg.generic {{.*}} ins(%[[A_T]] : tensor<64x32xf32>)
+//       CHECK:   %[[EMPTY_A:.+]] = tensor.empty() : tensor<2048xf32>
+//       CHECK:   %[[SWIZZLE_A:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<256, 32>] : tensor<2048xf32>
+//       CHECK:   %[[EXPAND_A:.+]] = tensor.expand_shape %[[SWIZZLE_A]] {{\[\[}}0, 1{{\]\]}} output_shape [32, 64] : tensor<2048xf32> into tensor<32x64xf32>
+//       CHECK:   %[[COPY_A:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[TRANSPOSE]] : tensor<32x64xf32>) outs(%[[EXPAND_A]] : tensor<32x64xf32>)
+//       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32>
+//       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf32> into tensor<64x128xf32>
+//       CHECK:   %[[COPY_B:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[B]] : tensor<64x128xf32>) outs(%[[EXPAND_B]] : tensor<64x128xf32>)
+//       CHECK:   linalg.matmul {{.*}} ins(%[[COPY_A]], %[[COPY_B]] : tensor<32x64xf32>, tensor<64x128xf32>)
+
+// -----
+
+#lowering_config_swizzle_non_transpose = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
+
+#elementwise_map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @swizzle_operand_non_transpose_generic_producer(
+    %a_raw: tensor<32x64xf32>, %b: tensor<64x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty_a = tensor.empty() : tensor<32x64xf32>
+  %negated_a = linalg.generic {
+    indexing_maps = [#elementwise_map, #elementwise_map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%a_raw : tensor<32x64xf32>) outs(%empty_a : tensor<32x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %neg = arith.negf %in : f32
+    linalg.yield %neg : f32
+  } -> tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config_swizzle_non_transpose}
+    ins(%negated_a, %b : tensor<32x64xf32>, tensor<64x128xf32>)
+    outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// Non-transpose linalg.generic producers get a lowering_config stamped on them
+// directly and skip swizzle promotion — no swizzle_hint is created for them.
+// CHECK-LABEL: func.func @swizzle_operand_non_transpose_generic_producer
+//  CHECK-SAME:   %[[A_RAW:[A-Za-z0-9]+]]: tensor<32x64xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf32>
+//       CHECK:   %[[NEGATED:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[A_RAW]] : tensor<32x64xf32>)
+//       CHECK:     lowering_config = #iree_gpu.derived_thread_config
+//   CHECK-NOT:   iree_codegen.swizzle_hint {{.*}} tensor<2048xf32>
+//       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32>
+//       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf32> into tensor<64x128xf32>
+//       CHECK:   %[[COPY_B:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[B]] : tensor<64x128xf32>) outs(%[[EXPAND_B]] : tensor<64x128xf32>)
+//       CHECK:   linalg.matmul {{.*}} ins(%[[NEGATED]], %[[COPY_B]] : tensor<32x64xf32>, tensor<64x128xf32>)
+
+// -----
+
 // Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
 // promotionImpl must never stamp use_global_load_dma on it — it always falls
 // back to derived_thread_config regardless of the requested promotion type.
