@@ -49,6 +49,13 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   uint16_t reclaim_resource_count;
   // Setup bits published with |dispatch_slot|'s final header.
   uint16_t dispatch_setup;
+  // Minimum acquire fence scope required by operation-local data visibility.
+  iree_hsa_fence_scope_t minimum_acquire_scope;
+  // Minimum release fence scope required by operation-local data visibility.
+  iree_hsa_fence_scope_t minimum_release_scope;
+  // Optional action executed before user signals are published when this
+  // submission completes.
+  iree_hal_amdgpu_reclaim_action_t pre_signal_action;
 } iree_hal_amdgpu_host_queue_dispatch_submission_t;
 
 // Returns the number of retained resources required for a submission with

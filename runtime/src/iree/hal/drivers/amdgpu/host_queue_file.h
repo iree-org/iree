@@ -13,7 +13,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Implements queue_read for files with a device-accessible storage buffer.
+// Implements queue_read for memory-file, direct mappable, and staged fd-backed
+// file transfers.
 iree_status_t iree_hal_amdgpu_host_queue_read_file(
     iree_hal_amdgpu_virtual_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -22,7 +23,8 @@ iree_status_t iree_hal_amdgpu_host_queue_read_file(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_read_flags_t flags);
 
-// Implements queue_write for files with a device-accessible storage buffer.
+// Implements queue_write for memory-file, direct mappable, and staged fd-backed
+// file transfers.
 iree_status_t iree_hal_amdgpu_host_queue_write_file(
     iree_hal_amdgpu_virtual_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,

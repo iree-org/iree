@@ -109,9 +109,6 @@ static bool amdgpu_registered_ =
               {"EventTest.*", "AMDGPU does not implement HAL events"},
               {"ExecutableTest.*",
                "AMDGPU executable reflection not yet implemented"},
-              {"FileTest.FdFile*",
-               "AMDGPU fd-backed queue_read/queue_write requires bounded "
-               "staging for default device-local buffers"},
           }},
          {"async_queue"},
      }),

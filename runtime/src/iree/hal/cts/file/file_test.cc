@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@ using ::testing::ContainerEq;
 
 namespace {
 constexpr iree_device_size_t kMinimumAlignment = 128;
+constexpr iree_device_size_t kLargeFdFileSize = 20 * 1024 * 1024;
 }  // namespace
 
 class FileTest : public CtsTestBase<> {
@@ -124,6 +126,20 @@ class FileTest : public CtsTestBase<> {
   std::string CreatePatternedTempFile(size_t size, uint8_t pattern) {
     std::vector<uint8_t> data(size, pattern);
     return CreateTempFileWithContents(data.data(), data.size());
+  }
+
+  // Reads exactly |length| bytes from a temp file on disk.
+  std::vector<uint8_t> ReadTempFileContents(const std::string& path,
+                                            size_t length) {
+    std::vector<uint8_t> data(length);
+    std::ifstream file(path, std::ios::binary);
+    EXPECT_TRUE(file.good());
+    if (file.good()) {
+      file.read(reinterpret_cast<char*>(data.data()),
+                static_cast<std::streamsize>(data.size()));
+      EXPECT_EQ(file.gcount(), static_cast<std::streamsize>(data.size()));
+    }
+    return data;
   }
 
   // Imports an on-disk file as a HAL file via its path.
@@ -815,9 +831,10 @@ TEST_P(FileTest, FdFileReadModifyWrite) {
   iree_hal_file_release(file);
 }
 
-// Reads a large file (256KB) to exercise non-trivial I/O paths.
+// Reads a large file to exercise chunked I/O paths in implementations with
+// bounded staging.
 TEST_P(FileTest, FdFileLargeRead) {
-  const iree_device_size_t file_size = 256 * 1024;
+  const iree_device_size_t file_size = kLargeFdFileSize;
   std::vector<uint8_t> file_data(file_size);
   for (size_t i = 0; i < file_size; ++i) {
     file_data[i] = static_cast<uint8_t>((i * 7 + 13) & 0xFF);
@@ -837,7 +854,39 @@ TEST_P(FileTest, FdFileLargeRead) {
   EXPECT_EQ(contents[1000], file_data[1000]);
   EXPECT_EQ(contents[file_size / 2], file_data[file_size / 2]);
   EXPECT_EQ(contents[file_size - 1], file_data[file_size - 1]);
-  EXPECT_THAT(contents, ContainerEq(file_data));
+  ASSERT_EQ(contents.size(), file_data.size());
+  EXPECT_EQ(memcmp(contents.data(), file_data.data(), file_data.size()), 0);
+
+  iree_hal_buffer_release(buffer);
+  iree_hal_file_release(file);
+}
+
+// Writes a large file to exercise chunked I/O paths in implementations with
+// bounded staging.
+TEST_P(FileTest, FdFileLargeWrite) {
+  const iree_device_size_t file_size = kLargeFdFileSize;
+  std::string path = CreatePatternedTempFile(file_size, 0x00);
+
+  iree_hal_file_t* file = NULL;
+  ImportFdFile(path, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+               &file);
+  iree_hal_buffer_t* buffer = NULL;
+  CreatePatternedDeviceBuffer(file_size, 0xA7, &buffer);
+
+  QueueWriteAndWait(buffer, 0, file, 0, file_size);
+
+  std::vector<uint8_t> contents = ReadTempFileContents(path, file_size);
+  ASSERT_EQ(contents.size(), file_size);
+  EXPECT_EQ(contents[0], 0xA7);
+  EXPECT_EQ(contents[1000], 0xA7);
+  EXPECT_EQ(contents[file_size / 2], 0xA7);
+  EXPECT_EQ(contents[file_size - 1], 0xA7);
+  for (uint8_t byte : contents) {
+    if (byte != 0xA7) {
+      ADD_FAILURE() << "large fd write contents did not match pattern";
+      break;
+    }
+  }
 
   iree_hal_buffer_release(buffer);
   iree_hal_file_release(file);

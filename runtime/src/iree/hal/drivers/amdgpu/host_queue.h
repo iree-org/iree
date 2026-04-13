@@ -29,6 +29,7 @@ extern "C" {
 
 typedef struct iree_hal_amdgpu_pending_op_t iree_hal_amdgpu_pending_op_t;
 typedef struct iree_hal_amdgpu_pm4_ib_slot_t iree_hal_amdgpu_pm4_ib_slot_t;
+typedef struct iree_hal_amdgpu_staging_pool_t iree_hal_amdgpu_staging_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 // Hardware mechanism used for cross-queue epoch waits after wait resolution
@@ -42,6 +43,30 @@ typedef enum iree_hal_amdgpu_wait_barrier_strategy_e {
   // AMD vendor AQL PM4-IB packet executing a WAIT_REG_MEM64 PM4 packet.
   IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64 = 2,
 } iree_hal_amdgpu_wait_barrier_strategy_t;
+
+typedef struct iree_hal_amdgpu_host_queue_post_drain_action_t
+    iree_hal_amdgpu_host_queue_post_drain_action_t;
+
+// Callback run by the completion thread after notification-ring drain has
+// published completed entries and reclaimed queue-owned ring state.
+typedef void(IREE_API_PTR* iree_hal_amdgpu_host_queue_post_drain_fn_t)(
+    void* user_data);
+
+// Intrusive completion-thread continuation queued by pre-signal reclaim
+// actions.
+//
+// Pre-signal actions run while notification-ring drain is still publishing a
+// completion entry. Work that may submit additional AQL packets must instead
+// queue one of these actions so it runs after drain has released all completed
+// notification/kernarg state.
+struct iree_hal_amdgpu_host_queue_post_drain_action_t {
+  // Next action in the queue-owned pending list.
+  iree_hal_amdgpu_host_queue_post_drain_action_t* next;
+  // Callback invoked exactly once after the action is dequeued.
+  iree_hal_amdgpu_host_queue_post_drain_fn_t fn;
+  // User data passed to |fn|.
+  void* user_data;
+};
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_host_queue_t
@@ -179,6 +204,16 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // release after signal commit. The proactor thread does not acquire this.
   iree_slim_mutex_t submission_mutex;
 
+  // Serializes the post-drain continuation list.
+  iree_slim_mutex_t post_drain_mutex;
+
+  // First queued post-drain continuation. Protected by post_drain_mutex.
+  iree_hal_amdgpu_host_queue_post_drain_action_t* post_drain_head;
+
+  // Tail pointer for appending post-drain continuations. Protected by
+  // post_drain_mutex.
+  iree_hal_amdgpu_host_queue_post_drain_action_t* post_drain_tail;
+
   // Set under submission_mutex when queue teardown begins. Deferred ops whose
   // waits race to completion after this point are failed with CANCELLED instead
   // of issuing new AQL packets.
@@ -270,6 +305,10 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Borrowed default pool for this queue's physical device.
   iree_hal_pool_t* default_pool;
 
+  // Borrowed fixed-size staging pool used by queue_read/queue_write for
+  // non-mappable file transfers.
+  iree_hal_amdgpu_staging_pool_t* staging_pool;
+
   // Intrusive singly-linked list of pending (deferred) operations. Used for
   // cleanup on shutdown and GPU fault propagation. Operations add themselves
   // on deferral and remove themselves on issue/fail/cancel. Protected by
@@ -329,6 +368,14 @@ iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count);
 
+// Enqueues |action| to run on the queue completion thread after the current or
+// next notification-ring drain has fully published completed entries. The
+// action storage must remain valid until |action->fn| is invoked.
+void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_post_drain_action_t* action,
+    iree_hal_amdgpu_host_queue_post_drain_fn_t fn, void* user_data);
+
 // Initializes a host queue in caller-provided memory.
 // The caller must allocate at least sizeof(iree_hal_amdgpu_host_queue_t).
 //
@@ -369,10 +416,10 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_hal_pool_t* default_pool, iree_host_size_t device_ordinal,
-    uint32_t aql_queue_capacity, uint32_t notification_capacity,
-    uint32_t kernarg_capacity_in_blocks, iree_allocator_t host_allocator,
-    iree_hal_amdgpu_host_queue_t* out_queue);
+    iree_hal_pool_t* default_pool, iree_hal_amdgpu_staging_pool_t* staging_pool,
+    iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
+    uint32_t notification_capacity, uint32_t kernarg_capacity_in_blocks,
+    iree_allocator_t host_allocator, iree_hal_amdgpu_host_queue_t* out_queue);
 
 // Deinitializes the queue. Destroys all owned resources and stops the
 // completion thread.
