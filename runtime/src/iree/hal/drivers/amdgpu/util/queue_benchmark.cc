@@ -514,6 +514,60 @@ class QueueBenchmark : public benchmark::Fixture {
     return Wait(completion_semaphore_, payload_value);
   }
 
+  iree_status_t HostCallBatchSubmit(iree_hal_host_call_flags_t flags,
+                                    int64_t batch_count,
+                                    SubmittedCompletion* out_completion) {
+    for (int64_t i = 0; i < batch_count; ++i) {
+      const bool is_final_operation = i + 1 == batch_count;
+      uint64_t wait_payload_value = stream_payload_value_;
+      uint64_t signal_payload_value = stream_payload_value_ + 1;
+      iree_hal_semaphore_t* wait_semaphore = stream_semaphore_;
+      iree_hal_semaphore_list_t wait_semaphore_list =
+          iree_hal_semaphore_list_empty();
+      if (i > 0) {
+        wait_semaphore_list = iree_hal_semaphore_list_t{
+            /*count=*/1,
+            /*semaphores=*/&wait_semaphore,
+            /*payload_values=*/&wait_payload_value,
+        };
+      }
+
+      iree_hal_semaphore_t* signal_semaphores[2] = {
+          stream_semaphore_,
+          completion_semaphore_,
+      };
+      uint64_t signal_payload_values[2] = {
+          signal_payload_value,
+          completion_payload_value_ + 1,
+      };
+      iree_hal_semaphore_list_t signal_semaphore_list = {
+          /*count=*/is_final_operation ? 2u : 1u,
+          /*semaphores=*/signal_semaphores,
+          /*payload_values=*/signal_payload_values,
+      };
+      iree_hal_host_call_t call =
+          iree_hal_make_host_call(NoopHostCall, /*user_data=*/nullptr);
+      uint64_t args[4] = {0, 0, 0, 0};
+      IREE_RETURN_IF_ERROR(iree_hal_device_queue_host_call(
+          device_, kQueue0, wait_semaphore_list, signal_semaphore_list, call,
+          args, flags));
+      stream_payload_value_ = signal_payload_value;
+      if (is_final_operation) {
+        ++completion_payload_value_;
+      }
+    }
+
+    *out_completion = {completion_semaphore_, completion_payload_value_};
+    return iree_ok_status();
+  }
+
+  iree_status_t HostCallBatchAndWait(iree_hal_host_call_flags_t flags,
+                                     int64_t batch_count) {
+    SubmittedCompletion completion;
+    IREE_RETURN_IF_ERROR(HostCallBatchSubmit(flags, batch_count, &completion));
+    return Wait(completion.semaphore, completion.payload_value);
+  }
+
   iree_status_t SameQueueBarrierBatchSubmit(
       int64_t batch_count, SubmittedCompletion* out_completion) {
     uint64_t payload_value = completion_payload_value_;
@@ -1319,6 +1373,50 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
     }
   }
   SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   HostCallBlockingBatch20FinalWait)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(
+            state,
+            HostCallBatchAndWait(IREE_HAL_HOST_CALL_FLAG_NONE, kBatchCount),
+            "blocking host call batch failed")) {
+      break;
+    }
+  }
+  state.counters["host_functions_per_sync"] = static_cast<double>(kBatchCount);
+  SetQueueSubmissionsProcessed(state, kBatchCount);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, HostCallBlockingRelaxedBatch20FinalWait)(
+    benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(
+            state,
+            HostCallBatchAndWait(IREE_HAL_HOST_CALL_FLAG_RELAXED, kBatchCount),
+            "relaxed blocking host call batch failed")) {
+      break;
+    }
+  }
+  state.counters["host_functions_per_sync"] = static_cast<double>(kBatchCount);
+  SetQueueSubmissionsProcessed(state, kBatchCount);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, HostCallNonBlockingBatch20FinalWait)(
+    benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(
+            state,
+            HostCallBatchAndWait(IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING |
+                                     IREE_HAL_HOST_CALL_FLAG_RELAXED,
+                                 kBatchCount),
+            "relaxed nonblocking host call batch failed")) {
+      break;
+    }
+  }
+  state.counters["host_functions_per_sync"] = static_cast<double>(kBatchCount);
+  SetQueueSubmissionsProcessed(state, kBatchCount);
 }
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
@@ -2158,6 +2256,15 @@ BENCHMARK_REGISTER_F(QueueBenchmark, HostCallBlockingRelaxedWait)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark, HostCallNonBlockingWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallBlockingBatch20FinalWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallBlockingRelaxedBatch20FinalWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallNonBlockingBatch20FinalWait)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark, SameQueueBarrierBatch20FinalWait)
