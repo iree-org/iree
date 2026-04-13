@@ -363,12 +363,16 @@ func.func @transfer_gather_contiguous_dim(%base: memref<64x64xf16>, %pad: f16) -
 
 // -----
 
-// TODO: 2-D vector delinearize_index needs a dedicated conversion pattern.
-// expected-error @+1 {{failed to legalize}}
 func.func @delinearize_2d_vector_unroll(%vec: vector<2x2xindex>) -> (vector<2x2xindex>, vector<2x2xindex>) {
   %0:2 = affine.delinearize_index %vec into (4, 8) : vector<2x2xindex>, vector<2x2xindex>
   return %0#0, %0#1 : vector<2x2xindex>, vector<2x2xindex>
 }
+// CHECK-LABEL: func.func @delinearize_2d_vector_unroll
+//  CHECK-SAME:   (%[[V0:.+]]: vector<2xindex>, %[[V1:.+]]: vector<2xindex>)
+//  CHECK-SAME:   -> (vector<2xindex>, vector<2xindex>, vector<2xindex>, vector<2xindex>)
+//       CHECK:   %[[R0:.+]]:2 = affine.delinearize_index %[[V0]] into (4, 8) : vector<2xindex>, vector<2xindex>
+//       CHECK:   %[[R1:.+]]:2 = affine.delinearize_index %[[V1]] into (4, 8) : vector<2xindex>, vector<2xindex>
+//       CHECK:   return %[[R0]]#0, %[[R1]]#0, %[[R0]]#1, %[[R1]]#1 : vector<2xindex>, vector<2xindex>, vector<2xindex>, vector<2xindex>
 
 // -----
 

@@ -92,8 +92,7 @@ struct UnrollElementwiseOps final
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<ValueRange> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!op->hasTrait<OpTrait::Elementwise>() ||
-        op->getNumResults() != 1) {
+    if (!op->hasTrait<OpTrait::Elementwise>()) {
       return failure();
     }
     VectorType dstVecTy = dyn_cast<VectorType>(op->getResult(0).getType());
@@ -117,13 +116,19 @@ struct UnrollElementwiseOps final
       opOperands.push_back(newOperands);
     }
 
-    SmallVector<Value> results;
+    int64_t numResults = op->getNumResults();
+    SmallVector<Type> clonedResultTypes(numResults);
+    SmallVector<SmallVector<Value>> replacements(numResults);
     for (auto [inputs, convertedTy] :
          llvm::zip_equal(opOperands, convertedTypes)) {
-      Operation *clonedOp = clone(rewriter, op, convertedTy, inputs);
-      results.push_back(clonedOp->getResult(0));
+      clonedResultTypes.assign(numResults, convertedTy);
+      Operation *clonedOp =
+          clone(rewriter, op, clonedResultTypes, inputs);
+      for (auto j : llvm::seq<int64_t>(numResults)) {
+        replacements[j].push_back(clonedOp->getResult(j));
+      }
     }
-    rewriter.replaceOpWithMultiple(op, {results});
+    rewriter.replaceOpWithMultiple(op, replacements);
     return success();
   }
 };
