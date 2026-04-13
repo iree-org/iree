@@ -111,6 +111,62 @@ getCompatibleMMAAttrsForLinalgOp(IREE::GPU::TargetAttr gpuTarget,
                                linalgOp.getContext());
 }
 
+/// Contraction-like dimension classification used by both matmul and conv.
+struct ContractionLikeDims {
+  SmallVector<unsigned> m;
+  SmallVector<unsigned> n;
+  SmallVector<unsigned> k;
+};
+
+/// Get contraction-like (m,n,k) dims for a linalg op.
+/// Only supports contraction and convolution today.
+static FailureOr<ContractionLikeDims>
+inferContractionLikeDims(linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    auto contractionDims = linalg::inferContractionDims(linalgOp);
+    if (failed(contractionDims)) {
+      return failure();
+    }
+    return ContractionLikeDims{
+        {contractionDims->m.begin(), contractionDims->m.end()},
+        {contractionDims->n.begin(), contractionDims->n.end()},
+        {contractionDims->k.begin(), contractionDims->k.end()}};
+  }
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+    auto convolutionDims = linalg::inferConvolutionDims(linalgOp);
+    if (failed(convolutionDims) || convolutionDims->outputImage.empty() ||
+        convolutionDims->outputChannel.empty() ||
+        convolutionDims->inputChannel.empty()) {
+      return failure();
+    }
+    // Maps outputImage→M, outputChannel→N, inputChannel→K.
+    return ContractionLikeDims{{convolutionDims->outputImage.begin(),
+                                convolutionDims->outputImage.end()},
+                               {convolutionDims->outputChannel.begin(),
+                                convolutionDims->outputChannel.end()},
+                               {convolutionDims->inputChannel.begin(),
+                                convolutionDims->inputChannel.end()}};
+  }
+  return failure();
+}
+
+/// Problem size, loop count, and indexing maps for a root op.
+struct RootOpLoopInfo {
+  SmallVector<int64_t> staticLoopRanges;
+  unsigned numLoops;
+  SmallVector<AffineMap> indexingMaps;
+};
+
+/// Returns loop info for supported root ops.
+static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    return RootOpLoopInfo{linalgOp.getStaticLoopRanges(),
+                          linalgOp.getNumLoops(),
+                          linalgOp.getIndexingMapsArray()};
+  }
+  return std::nullopt;
+}
+
 /// Build the VectorDistribute knobs dict for contraction-like dims.
 static DictionaryAttr
 buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
@@ -191,71 +247,21 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
   return success();
 }
 
-/// Contraction-like dimension classification used by both matmul and conv.
-struct ContractionLikeDims {
-  SmallVector<unsigned> m;
-  SmallVector<unsigned> n;
-  SmallVector<unsigned> k;
-};
-
-/// Get contraction-like (m,n,k) dims for a linalg op.
-/// Only supports contraction and convolution today.
-static FailureOr<ContractionLikeDims>
-inferContractionLikeDims(linalg::LinalgOp linalgOp) {
-  if (linalg::isaContractionOpInterface(linalgOp)) {
-    auto contractionDims = linalg::inferContractionDims(linalgOp);
-    if (failed(contractionDims)) {
-      return failure();
-    }
-    return ContractionLikeDims{contractionDims->m, contractionDims->n,
-                               contractionDims->k};
-  }
-  if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    auto convolutionDims = linalg::inferConvolutionDims(linalgOp);
-    if (failed(convolutionDims) || convolutionDims->outputImage.empty() ||
-        convolutionDims->outputChannel.empty() ||
-        convolutionDims->inputChannel.empty()) {
-      return failure();
-    }
-    // Maps outputImage→M, outputChannel→N, inputChannel→K.
-    return ContractionLikeDims{convolutionDims->outputImage,
-                               convolutionDims->outputChannel,
-                               convolutionDims->inputChannel};
-  }
-  return failure();
-}
-
-/// Problem size, loop count, and indexing maps for a root op.
-struct RootOpLoopInfo {
-  SmallVector<int64_t> staticLoopRanges;
-  unsigned numLoops;
-  SmallVector<AffineMap> indexingMaps;
-};
-
-/// Returns loop info for supported root ops.
-static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    return RootOpLoopInfo{linalgOp.getStaticLoopRanges(),
-                          linalgOp.getNumLoops(),
-                          linalgOp.getIndexingMapsArray()};
-  }
-  return std::nullopt;
-}
-
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
+/// TODO(#23535): Implement real constraint logics here.
 static LogicalResult
 emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                 const ContractionLikeDims &dims,
                                 IREE::GPU::TargetAttr gpuTarget,
                                 ArrayRef<Value> smtDimArgs) {
-  Location loc = linalgOp.getLoc();
   return success();
 }
 
 /// Emit constraints for a single root op under the VectorDistribute pipeline.
 /// Only supports linalg contraction and convolution today.
 static LogicalResult
-emitVectorDistributeConstraintsForOp(Operation *rootOp, Attribute rootOpAttr) {
+emitVectorDistributeConstraintsForOp(Operation *rootOp,
+                                     IREE::Codegen::RootOpAttr rootOpAttr) {
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp) ||
@@ -283,8 +289,8 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp, Attribute rootOpAttr) {
   auto compatibleMMAs = getCompatibleMMAAttrsForLinalgOp(gpuTarget, linalgOp);
   DictionaryAttr knobs =
       buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
-  Attribute pipelineAttr = Attribute(
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute);
+  Attribute pipelineAttr = IREE::GPU::PipelineAttr::get(
+      ctx, IREE::GPU::LoweringPipeline::VectorDistribute);
 
   auto shell =
       createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
@@ -309,7 +315,7 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
   if (!tunableOp) {
     return success();
   }
-  auto OpAttr = tunableOp->getAttrOfType<IREE::Codegen::RootOpAttr>("root_op");
+  auto opAttr = tunableOp->getAttrOfType<IREE::Codegen::RootOpAttr>("root_op");
   return emitVectorDistributeConstraintsForOp(tunableOp, opAttr);
 }
 
