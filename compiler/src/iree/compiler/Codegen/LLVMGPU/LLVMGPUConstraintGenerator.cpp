@@ -248,12 +248,23 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
 }
 
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
-/// TODO(#23535): Implement real constraint logics here.
+/// TODO(#23535): Complete real constraint logics here.
 static LogicalResult
 emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                 const ContractionLikeDims &dims,
                                 IREE::GPU::TargetAttr gpuTarget,
                                 ArrayRef<Value> smtDimArgs) {
+  Location loc = linalgOp.getLoc();
+  DenseMap<unsigned, Value> wgKnobs;
+  for (unsigned d : dims.m) {
+    wgKnobs[d] = mkKnob(builder, loc, "wg_" + std::to_string(d));
+  }
+  for (unsigned d : dims.m) {
+    assertDivisible(
+        builder, loc, smtDimArgs[d], wgKnobs[d],
+        ("dim_" + Twine(d) + " must be divisible by wg_" + Twine(d)).str());
+  }
+
   return success();
 }
 
@@ -264,8 +275,8 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp,
                                      IREE::Codegen::RootOpAttr rootOpAttr) {
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp) ||
-      !linalg::isaConvolutionOpInterface(linalgOp)) {
+  if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
+                    !linalg::isaConvolutionOpInterface(linalgOp))) {
     return success();
   }
 
