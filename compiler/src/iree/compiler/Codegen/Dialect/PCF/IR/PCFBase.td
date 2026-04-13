@@ -200,15 +200,15 @@ def PCF_TestScopeAttr
 
   let extraClassDeclaration = [{
     SmallVector<Value> getWorkerCounts(OpBuilder&, Location, int64_t) {
-      assert(false && "why are you here?");
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
       return {};
     }
     SmallVector<Value> getWorkerIDs(OpBuilder&, Location, int64_t) {
-      assert(false && "why are you here?");
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
       return {};
     }
     int64_t getNativeNumProcessorIds() {
-      assert(false && "why are you here?");
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
       return 1;
     }
   }];

@@ -33,7 +33,9 @@ namespace mlir::iree_compiler::IREE::PCF {
 /// Converts scf.forall ops to pcf.loop by linearizing/delinearizing ids beyond
 /// |numIds| into the slowest varying id. Uses DeviceMappingAttrInterface to
 /// infer the order of ids from slowest to fastest varying. If |numIds| <= 0,
-/// then no linearization/delinearization is done.
+/// then no linearization/delinearization is done. Returns the newly created
+/// pcf.loop; callers are responsible for replacing or erasing the original
+/// scf.forall op as needed.
 FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
                                               scf::ForallOp forallOp,
                                               PCF::ScopeAttrInterface scope,
@@ -46,9 +48,10 @@ FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
 /// Worker IDs are linearized, chunk bounds computed for work distribution,
 /// and delinearized back to multi-dimensional forall bounds. Uneven chunks
 /// are distributed greedily, with only the last worker lexicographically
-/// getting fewer loop iterations.
+/// getting fewer loop iterations. Returns the newly created outermost
+/// pcf.generic; callers are responsible for replacing or erasing the original
+/// scf.forall op as needed.
 ///
-/// Returns the outermost pcf.generic op on success.
 FailureOr<PCF::GenericOp>
 convertForallToGenericNest(RewriterBase &rewriter, scf::ForallOp forallOp,
                            ArrayRef<PCF::ScopeAttrInterface> scopes);

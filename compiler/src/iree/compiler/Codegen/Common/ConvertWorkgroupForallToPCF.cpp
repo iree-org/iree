@@ -67,6 +67,7 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
       /*reverse=*/false);
   assert(succeeded(hintRes) &&
          "Unexpected failure to construct workgroup count hint");
+  rewriter.replaceOp(op, res->getResults());
   return success();
 }
 

@@ -57,6 +57,32 @@ func.func @test_1d_single_scope(%init: tensor<64xf32>) -> tensor<64xf32> {
 
 // -----
 
+// CHECK-1SCOPE: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 3 + 2)>
+// CHECK-1SCOPE-LABEL: func.func @test_non_zero_lb_step
+// CHECK-1SCOPE-SAME:    %[[INIT:.+]]: tensor<16xf32>
+// CHECK-1SCOPE:       %[[RESULT:.+]] = pcf.generic
+// CHECK-1SCOPE-SAME:    scope(#pcf.sequential)
+// CHECK-1SCOPE:         execute(%[[REF:.+]] = %[[INIT]])[%[[ID:.+]]: index, %[[COUNT:.+]]: index]
+// Total iteration count is ceildiv(11 - 2, 3) = 3.
+// CHECK-1SCOPE:         %[[C3:.+]] = arith.constant 3 : index
+// CHECK-1SCOPE:         %[[TILE_SIZE:.+]] = arith.ceildivui %[[C3]], %[[COUNT]]
+// CHECK-1SCOPE:         scf.forall (%[[IV:.+]]) =
+// CHECK-1SCOPE:           %[[MAPPED_IV:.+]] = affine.apply #[[$MAP]]()[%[[IV]]]
+// CHECK-1SCOPE:           %[[SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[MAPPED_IV]]]
+// CHECK-1SCOPE:           pcf.write_slice %[[SLICE]] into %[[REF]][%[[MAPPED_IV]]]
+// CHECK-1SCOPE:         pcf.return
+func.func @test_non_zero_lb_step(%init: tensor<16xf32>) -> tensor<16xf32> {
+  %result = scf.forall (%i) = (2) to (11) step (3) shared_outs(%out = %init) -> tensor<16xf32> {
+    %slice = tensor.extract_slice %out[%i] [1] [1] : tensor<16xf32> to tensor<1xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %out[%i] [1] [1] : tensor<1xf32> into tensor<16xf32>
+    }
+  }
+  return %result : tensor<16xf32>
+}
+
+// -----
+
 // CHECK-1SCOPE-LABEL: func.func @test_2d_multi_dim
 // CHECK-1SCOPE-SAME:    %[[INIT:.+]]: tensor<64x128xf32>
 // CHECK-1SCOPE:       pcf.generic
@@ -158,7 +184,7 @@ func.func @test_3d_permutation(%init: tensor<4x8x16xf32>) -> tensor<4x8x16xf32> 
 
 // -----
 
-// CHECK-1SCOPE-LABEL: func.func @test_empty_mapping
+// CHECK-1SCOPE-LABEL: func.func @test_no_mapping
 // CHECK-1SCOPE-SAME:    %[[INIT:.+]]: tensor<64xf32>
 // CHECK-1SCOPE:       pcf.generic
 // CHECK-1SCOPE:         execute(%[[REF:.+]] = %[[INIT]])[%[[ID:.+]]: index, %[[COUNT:.+]]: index]
@@ -166,7 +192,7 @@ func.func @test_3d_permutation(%init: tensor<4x8x16xf32>) -> tensor<4x8x16xf32> 
 // CHECK-1SCOPE:           %[[SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[IV]]]
 // CHECK-1SCOPE:           pcf.write_slice %[[SLICE]] into %[[REF]][%[[IV]]]
 // CHECK-1SCOPE:         pcf.return
-func.func @test_empty_mapping(%init: tensor<64xf32>) -> tensor<64xf32> {
+func.func @test_no_mapping(%init: tensor<64xf32>) -> tensor<64xf32> {
   %result = scf.forall (%i) in (64) shared_outs(%out = %init) -> tensor<64xf32> {
     %slice = tensor.extract_slice %out[%i] [1] [1] : tensor<64xf32> to tensor<1xf32>
     scf.forall.in_parallel {

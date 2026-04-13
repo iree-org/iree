@@ -36,16 +36,15 @@ namespace mlir::iree_compiler::IREE::PCF {
 
 namespace {
 
-//===----------------------------------------------------------------------===//
-// Shared Utilities
-//===----------------------------------------------------------------------===//
-
-/// Returns true if the forall op has LocalMappingAttr mapping attributes,
-/// or the mapping is empty/not present.
-static bool hasEmptyOrLocalMapping(scf::ForallOp forallOp) {
+/// Returns true if the forall op has no mapping, or only LocalMappingAttr
+/// mapping attributes.
+static bool hasNoMappingOrLocalMapping(scf::ForallOp forallOp) {
   std::optional<ArrayAttr> mapping = forallOp.getMapping();
-  if (!mapping || mapping->empty()) {
+  if (!mapping) {
     return true;
+  }
+  if (mapping->empty()) {
+    return false;
   }
   return llvm::all_of(mapping.value(),
                       llvm::IsaPred<IREE::Codegen::LocalMappingAttr>);
@@ -74,8 +73,8 @@ static SmallVector<int64_t> getMappingPermutation(ArrayAttr mapping) {
 }
 
 /// Returns the permutation for processor ID ordering from the forall's mapping.
-/// For unspecified or empty mappings, returns a reversed sequence (assumes
-/// natural fastest-to-slowest is reverse of dimension order).
+/// For unspecified mappings, returns a reversed sequence (assumes natural
+/// fastest-to-slowest is reverse of dimension order).
 static FailureOr<SmallVector<int64_t>>
 getProcessorIdPermutation(scf::ForallOp forallOp) {
   std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
@@ -87,7 +86,7 @@ getProcessorIdPermutation(scf::ForallOp forallOp) {
   // Empty mappings are unsupported at the moment. It's unclear when a forall
   // with an empty mapping would be useful or important.
   if (mappingAttr.value().empty()) {
-    return SmallVector<int64_t>{};
+    return failure();
   }
 
   SmallVector<int64_t> perm = getMappingPermutation(mappingAttr.value());
@@ -95,6 +94,39 @@ getProcessorIdPermutation(scf::ForallOp forallOp) {
     return failure();
   }
   return perm;
+}
+
+static OpFoldResult getIterationCount(RewriterBase &rewriter, Location loc,
+                                      OpFoldResult ub, OpFoldResult lb,
+                                      OpFoldResult step) {
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr numIters = (s0 - s1).ceilDiv(s2);
+  return affine::makeComposedFoldedAffineApply(
+      rewriter, loc, numIters, ArrayRef<OpFoldResult>{ub, lb, step});
+}
+
+static SmallVector<OpFoldResult>
+getIterationCounts(RewriterBase &rewriter, Location loc,
+                   ArrayRef<OpFoldResult> ubs, ArrayRef<OpFoldResult> lbs,
+                   ArrayRef<OpFoldResult> steps) {
+  SmallVector<OpFoldResult> counts;
+  counts.reserve(ubs.size());
+  for (auto [ub, lb, step] : llvm::zip_equal(ubs, lbs, steps)) {
+    counts.push_back(getIterationCount(rewriter, loc, ub, lb, step));
+  }
+  return counts;
+}
+
+static Value applyStepAndLowerBound(RewriterBase &rewriter, Location loc,
+                                    Value id, OpFoldResult step,
+                                    OpFoldResult lb) {
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr applyLbAndStep = s0 * s1 + s2;
+  OpFoldResult newId = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, applyLbAndStep, ArrayRef<OpFoldResult>{id, step, lb});
+  return getValueOrCreateConstantIndexOp(rewriter, loc, newId);
 }
 
 /// Validates that the forall op can be converted.
@@ -138,15 +170,17 @@ static LogicalResult matchForallConversion(scf::ForallOp forallOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// scf.forall -> pcf.loop Implementation
+// scf.forall -> pcf.loop
 //===----------------------------------------------------------------------===//
 
+// Conversion rewrite implementation. matchForallConversion must pass before
+// this function is called as this function relies on properties guaranteed by
+// the match.
 static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
                                               scf::ForallOp forallOp,
                                               PCF::ScopeAttrInterface scope,
                                               int64_t numIds) {
-  assert(succeeded(matchForallConversion(forallOp)) &&
-         "converting unsupported forall op");
+  OpBuilder::InsertionGuard insertionGuard(rewriter);
 
   // Maps from fastest -> slowest to current order.
   SmallVector<int64_t> perm = *getProcessorIdPermutation(forallOp);
@@ -179,14 +213,11 @@ static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
   }
 
   Location loc = forallOp.getLoc();
-
-  AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
-  AffineExpr numIters = (s0 - s1).ceilDiv(s2);
+  SmallVector<OpFoldResult> iterationCountOfrs =
+      getIterationCounts(rewriter, loc, mixedUbs, mixedLbs, mixedStep);
   SmallVector<Value> iterationCounts;
-  for (auto [ub, lb, step] : llvm::zip_equal(mixedUbs, mixedLbs, mixedStep)) {
-    OpFoldResult iterCount = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, numIters, ArrayRef<OpFoldResult>{ub, lb, step});
+  iterationCounts.reserve(iterationCountOfrs.size());
+  for (OpFoldResult iterCount : iterationCountOfrs) {
     iterationCounts.push_back(
         getValueOrCreateConstantIndexOp(rewriter, loc, iterCount));
   }
@@ -199,6 +230,8 @@ static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
   SmallVector<Value> delinearizationBasis(
       llvm::reverse(ArrayRef<Value>(iterationCounts).take_back(numDelinIds)));
   if (!delinearizationBasis.empty()) {
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
     AffineExpr mul = s0 * s1;
     Value total = delinearizationBasis.front();
     total = std::accumulate(
@@ -236,13 +269,9 @@ static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
                              loopOp.getIdArgs().end());
     }
 
-    // id * step + lb.
-    AffineExpr applyLbAndStep = s0 * s1 + s2;
-    for (auto [id, step, lb] :
-         llvm::zip_equal(argReplacements, mixedStep, mixedLbs)) {
-      OpFoldResult newId = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, applyLbAndStep, {id, step, lb});
-      id = getValueOrCreateConstantIndexOp(rewriter, loc, newId);
+    for (auto [i, id] : llvm::enumerate(argReplacements)) {
+      argReplacements[i] =
+          applyStepAndLowerBound(rewriter, loc, id, mixedStep[i], mixedLbs[i]);
     }
   }
 
@@ -256,27 +285,30 @@ static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
     regionRefArg.setType(newSrefType);
   }
 
-  rewriter.setInsertionPoint(terminator);
   llvm::SmallDenseMap<Value, Value> argToReplacementMap;
-  for (auto [bbArg, refArg] :
-       llvm::zip_equal(bodySharedOuts, loopOp.getRegionRefArgs())) {
-    argToReplacementMap[bbArg] = refArg;
-  }
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(terminator);
+    for (auto [bbArg, refArg] :
+         llvm::zip_equal(bodySharedOuts, loopOp.getRegionRefArgs())) {
+      argToReplacementMap[bbArg] = refArg;
+    }
 
-  // Iterate the insert_slice ops in the order to retain the order of writes.
-  SmallVector<tensor::ParallelInsertSliceOp> insertOps(
-      terminator.getBody()->getOps<tensor::ParallelInsertSliceOp>());
-  for (tensor::ParallelInsertSliceOp insertSliceOp : insertOps) {
-    PCF::WriteSliceOp::create(
-        rewriter, insertSliceOp.getLoc(), insertSliceOp.getSource(),
-        argToReplacementMap[insertSliceOp.getDest()],
-        insertSliceOp.getMixedOffsets(), insertSliceOp.getMixedSizes(),
-        insertSliceOp.getMixedStrides());
-    rewriter.eraseOp(insertSliceOp);
-  }
+    // Iterate the insert_slice ops in the order to retain the order of writes.
+    SmallVector<tensor::ParallelInsertSliceOp> insertOps(
+        terminator.getBody()->getOps<tensor::ParallelInsertSliceOp>());
+    for (tensor::ParallelInsertSliceOp insertSliceOp : insertOps) {
+      PCF::WriteSliceOp::create(
+          rewriter, insertSliceOp.getLoc(), insertSliceOp.getSource(),
+          argToReplacementMap[insertSliceOp.getDest()],
+          insertSliceOp.getMixedOffsets(), insertSliceOp.getMixedSizes(),
+          insertSliceOp.getMixedStrides());
+      rewriter.eraseOp(insertSliceOp);
+    }
 
-  // Replace the terminator with the new terminator kind.
-  rewriter.replaceOpWithNewOp<PCF::ReturnOp>(terminator);
+    // Replace the terminator with the new terminator kind.
+    rewriter.replaceOpWithNewOp<PCF::ReturnOp>(terminator);
+  }
 
   // Use the inits as the replacements for the shared outs bbargs to appease
   // `inlineBlockBefore`. By this point all of their users have been replaced
@@ -285,12 +317,11 @@ static PCF::LoopOp convertForallToPCFLoopImpl(RewriterBase &rewriter,
   rewriter.inlineBlockBefore(forallOp.getBody(), loopOp.getBody(),
                              loopOp.getBody()->end(), argReplacements);
 
-  rewriter.replaceOp(forallOp, loopOp);
   return loopOp;
 }
 
 //===----------------------------------------------------------------------===//
-// scf.forall -> pcf.generic nest Implementation
+// scf.forall -> pcf.generic nest
 //===----------------------------------------------------------------------===//
 
 static PCF::GenericOp
@@ -299,6 +330,7 @@ convertForallToGenericNestImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
   assert(succeeded(matchForallConversion(forallOp)) &&
          "converting unsupported forall op");
   assert(!scopes.empty() && "at least one scope required");
+  OpBuilder::InsertionGuard insertionGuard(rewriter);
 
   Location loc = forallOp.getLoc();
   MLIRContext *ctx = rewriter.getContext();
@@ -391,12 +423,21 @@ convertForallToGenericNestImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
         arith::MulIOp::create(rewriter, loc, totalWorkers, allCounts[i]);
   }
 
-  // Compute total iteration count from forall bounds.
+  // Compute total iteration count from forall bounds, lower bounds, and steps.
   SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
+  SmallVector<OpFoldResult> iterationCounts =
+      getIterationCounts(rewriter, loc, mixedUbs, mixedLbs, mixedSteps);
   Value totalIters = arith::ConstantIndexOp::create(rewriter, loc, 1);
-  for (OpFoldResult ub : mixedUbs) {
-    Value dim = getValueOrCreateConstantIndexOp(rewriter, loc, ub);
-    totalIters = arith::MulIOp::create(rewriter, loc, totalIters, dim);
+  if (!iterationCounts.empty()) {
+    totalIters =
+        getValueOrCreateConstantIndexOp(rewriter, loc, iterationCounts.front());
+    for (OpFoldResult iterCount :
+         ArrayRef<OpFoldResult>(iterationCounts).drop_front()) {
+      Value dim = getValueOrCreateConstantIndexOp(rewriter, loc, iterCount);
+      totalIters = arith::MulIOp::create(rewriter, loc, totalIters, dim);
+    }
   }
 
   // Compute chunk bounds: chunkSize = ceildiv(total, totalWorkers). We'll
@@ -441,38 +482,44 @@ convertForallToGenericNestImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
   // Sort by rank descending (highest rank = slowest first).
   llvm::sort(rankAndDim, [](auto &a, auto &b) { return a.first > b.first; });
 
-  // Build permuted upper bounds (slowest to fastest).
-  SmallVector<OpFoldResult> permutedUbs;
+  // Build permuted iteration counts (slowest to fastest).
+  SmallVector<OpFoldResult> permutedIterationCounts;
   SmallVector<int64_t> delinToOrigDim; // Maps delinearized result index to
                                        // original forall dim.
   for (auto [rank, dim] : rankAndDim) {
-    permutedUbs.push_back(mixedUbs[dim]);
+    permutedIterationCounts.push_back(iterationCounts[dim]);
     delinToOrigDim.push_back(dim);
   }
 
-  // Map old induction variables to new linearized index.
-  // For 1D: directly use the induction variable.
-  // For multi-D: need delinearization with permutation handling.
   IRMapping mapping;
-  if (forallOp.getRank() == 1) {
-    // Shortcut rank-1 foralls to avoid creating the delinearize_index.
-    mapping.map(forallOp.getInductionVars()[0],
-                innerForall.getInductionVars()[0]);
-  } else {
-    // For multi-dimensional forall, we need to delinearize.
-    // Delinearize the iteration index back to multi-D indices.
+  {
+    OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(innerForall.getBody());
-    Value linearIdx = innerForall.getInductionVars()[0];
-    auto delinearized = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, linearIdx, permutedUbs, /*hasOuterBound=*/true);
-    // The delinearized results are in permuted order (slowest to fastest).
-    // Map them back to the corresponding forall induction variables.
-    // delinToOrigDim[i] tells us which original forall dim corresponds to
-    // delinearized result i.
-    for (size_t i = 0, e = delinToOrigDim.size(); i < e; ++i) {
-      int64_t origDim = delinToOrigDim[i];
-      mapping.map(forallOp.getInductionVars()[origDim],
-                  delinearized.getResult(i));
+    if (forallOp.getRank() == 1) {
+      // Shortcut rank-1 foralls to avoid creating the delinearize_index.
+      Value iv = applyStepAndLowerBound(rewriter, loc,
+                                        innerForall.getInductionVars()[0],
+                                        mixedSteps[0], mixedLbs[0]);
+      mapping.map(forallOp.getInductionVars()[0], iv);
+    } else {
+      // For multi-dimensional forall, we need to delinearize the iteration
+      // index back to logical iteration counts and then re-apply the original
+      // lower bounds and steps.
+      Value linearIdx = innerForall.getInductionVars()[0];
+      auto delinearized = affine::AffineDelinearizeIndexOp::create(
+          rewriter, loc, linearIdx, permutedIterationCounts,
+          /*hasOuterBound=*/true);
+      // The delinearized results are in permuted order (slowest to fastest).
+      // Map them back to the corresponding forall induction variables.
+      // delinToOrigDim[i] tells us which original forall dim corresponds to
+      // delinearized result i.
+      for (size_t i = 0, e = delinToOrigDim.size(); i < e; ++i) {
+        int64_t origDim = delinToOrigDim[i];
+        Value iv =
+            applyStepAndLowerBound(rewriter, loc, delinearized.getResult(i),
+                                   mixedSteps[origDim], mixedLbs[origDim]);
+        mapping.map(forallOp.getInductionVars()[origDim], iv);
+      }
     }
   }
 
@@ -549,7 +596,7 @@ convertForallToGenericNestImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
 }
 
 //===----------------------------------------------------------------------===//
-// scf.forall -> pcf.loop Pass
+// Test Pass Implementations
 //===----------------------------------------------------------------------===//
 
 struct TestConvertForallToLoopsPass final
@@ -557,11 +604,10 @@ struct TestConvertForallToLoopsPass final
   void runOnOperation() override {
     SmallVector<scf::ForallOp> opsToConvert;
     getOperation()->walk([&](scf::ForallOp forallOp) {
-      // Empty mapping, no mapping, and local mapping all map to
+      // Foralls without mapping and foralls with local mapping both lower to
       // `pcf.sequential`. If it is a local mapping, then the lowering pattern
-      // will automatically handle any mapping permutation based on the mapping
-      // attribute's relative id.
-      if (hasEmptyOrLocalMapping(forallOp)) {
+      // automatically handles the permutation implied by the mapping ids.
+      if (hasNoMappingOrLocalMapping(forallOp)) {
         opsToConvert.push_back(forallOp);
       }
     });
@@ -571,17 +617,16 @@ struct TestConvertForallToLoopsPass final
         PCF::SequentialAttr::get(&getContext());
     for (scf::ForallOp forallOp : opsToConvert) {
       rewriter.setInsertionPoint(forallOp);
-      if (failed(convertForallToPCFLoop(rewriter, forallOp, sequentialScope))) {
+      FailureOr<PCF::LoopOp> result =
+          convertForallToPCFLoop(rewriter, forallOp, sequentialScope);
+      if (failed(result)) {
         forallOp->emitOpError("failed to convert forall");
         return signalPassFailure();
       }
+      rewriter.replaceOp(forallOp, result->getResults());
     }
   }
 };
-
-//===----------------------------------------------------------------------===//
-// scf.forall -> pcf.generic nest Pass
-//===----------------------------------------------------------------------===//
 
 struct TestConvertForallToGenericNestPass final
     : impl::TestConvertForallToGenericNestPassBase<
@@ -605,8 +650,8 @@ struct TestConvertForallToGenericNestPass final
     IRRewriter rewriter(ctx);
     SmallVector<scf::ForallOp> forallOps;
     getOperation()->walk([&](scf::ForallOp forallOp) {
-      // Only convert foralls with empty mapping or local_mapping attributes.
-      if (hasEmptyOrLocalMapping(forallOp)) {
+      // Only convert foralls without mapping or with local_mapping attributes.
+      if (hasNoMappingOrLocalMapping(forallOp)) {
         forallOps.push_back(forallOp);
       }
     });
@@ -628,7 +673,7 @@ struct TestConvertForallToGenericNestPass final
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// Public API: scf.forall -> pcf.loop
+// Public API
 //===----------------------------------------------------------------------===//
 
 FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
@@ -640,10 +685,6 @@ FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
   }
   return convertForallToPCFLoopImpl(rewriter, forallOp, scope, numIds);
 }
-
-//===----------------------------------------------------------------------===//
-// Public API: scf.forall -> pcf.generic nest
-//===----------------------------------------------------------------------===//
 
 FailureOr<PCF::GenericOp>
 convertForallToGenericNest(RewriterBase &rewriter, scf::ForallOp forallOp,
