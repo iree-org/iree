@@ -489,6 +489,31 @@ class QueueBenchmark : public benchmark::Fixture {
     return Wait(completion_semaphore_, payload_value);
   }
 
+  static iree_status_t NoopHostCall(void* user_data, const uint64_t args[4],
+                                    iree_hal_host_call_context_t* context) {
+    (void)user_data;
+    (void)args;
+    (void)context;
+    return iree_ok_status();
+  }
+
+  iree_status_t HostCallAndWait(iree_hal_host_call_flags_t flags) {
+    uint64_t payload_value = ++completion_payload_value_;
+    iree_hal_semaphore_t* signal_semaphore = completion_semaphore_;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        /*count=*/1,
+        /*semaphores=*/&signal_semaphore,
+        /*payload_values=*/&payload_value,
+    };
+    iree_hal_host_call_t call =
+        iree_hal_make_host_call(NoopHostCall, /*user_data=*/nullptr);
+    uint64_t args[4] = {0, 0, 0, 0};
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_host_call(
+        device_, kQueue0, iree_hal_semaphore_list_empty(),
+        signal_semaphore_list, call, args, flags));
+    return Wait(completion_semaphore_, payload_value);
+  }
+
   iree_status_t SameQueueBarrierBatchSubmit(
       int64_t batch_count, SubmittedCompletion* out_completion) {
     uint64_t payload_value = completion_payload_value_;
@@ -1255,6 +1280,41 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
   for (auto _ : state) {
     if (!HandleStatus(state, SameQueueBarrierAndWait(),
                       "same-queue barrier failed")) {
+      break;
+    }
+  }
+  SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   HostCallBlockingWait)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(state, HostCallAndWait(IREE_HAL_HOST_CALL_FLAG_NONE),
+                      "blocking host call failed")) {
+      break;
+    }
+  }
+  SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   HostCallBlockingRelaxedWait)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(state, HostCallAndWait(IREE_HAL_HOST_CALL_FLAG_RELAXED),
+                      "relaxed blocking host call failed")) {
+      break;
+    }
+  }
+  SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   HostCallNonBlockingWait)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!HandleStatus(state,
+                      HostCallAndWait(IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING |
+                                      IREE_HAL_HOST_CALL_FLAG_RELAXED),
+                      "relaxed nonblocking host call failed")) {
       break;
     }
   }
@@ -2089,6 +2149,15 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
 }
 
 BENCHMARK_REGISTER_F(QueueBenchmark, SameQueueBarrierWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallBlockingWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallBlockingRelaxedWait)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, HostCallNonBlockingWait)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark, SameQueueBarrierBatch20FinalWait)

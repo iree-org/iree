@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <atomic>
-#include <chrono>
 #include <future>
 #include <thread>
 #include <vector>
@@ -18,8 +17,8 @@ using iree::testing::status::StatusIs;
 
 class QueueHostCallTest : public CtsTestBase<> {};
 
-// Enqueues a host call on a wait condition that will not be satisfied until
-// after the enqueue request completes.
+// Enqueues a host call on a wait condition that is signaled after the queue
+// request starts.
 TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
   IREE_TRACE_SCOPE();
 
@@ -42,20 +41,21 @@ TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
 
   EXPECT_EQ(state.did_call, 0);
 
-  // Signal the wait semaphore from a background thread. The sleep gives the
-  // main thread time to enter the (potentially blocking) queue_host_call
-  // before the signal fires — necessary for synchronous backends where the
-  // call blocks inline waiting for the wait semaphore.
-  std::thread waker([&]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(
-        iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
+  uint64_t args[4] = {10, 20, 30, UINT64_MAX};
+  std::promise<void> queue_call_started;
+  auto queue_call_started_future = queue_call_started.get_future();
+  std::thread submitter([&]() {
+    queue_call_started.set_value();
+    IREE_EXPECT_OK(iree_hal_device_queue_host_call(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
+        signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
   });
 
-  uint64_t args[4] = {10, 20, 30, UINT64_MAX};
-  IREE_EXPECT_OK(iree_hal_device_queue_host_call(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
+  queue_call_started_future.wait();
+  EXPECT_EQ(state.did_call, 0);
+  IREE_EXPECT_OK(
+      iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
+  submitter.join();
 
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
                                               iree_infinite_timeout(),
@@ -66,8 +66,6 @@ TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
   EXPECT_EQ(state.args[1], args[1]);
   EXPECT_EQ(state.args[2], args[2]);
   EXPECT_EQ(state.args[3], args[3]);
-
-  waker.join();
 }
 
 // Tests that a host call with no wait semaphores gets called ASAP.
@@ -315,18 +313,22 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   EXPECT_EQ(state.did_call, 0);
   EXPECT_FALSE(state.wait_completed);
 
-  // Same pattern as EnqueueBeforeSignal: sleep to let the main thread enter
-  // the blocking queue_host_call before signaling the wait semaphore.
-  std::thread waker([&]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(
-        iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
+  uint64_t args[4] = {13, 14, 15, 16};
+  std::promise<void> queue_call_started;
+  auto queue_call_started_future = queue_call_started.get_future();
+  std::thread submitter([&]() {
+    queue_call_started.set_value();
+    IREE_EXPECT_OK(iree_hal_device_queue_host_call(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
+        signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
   });
 
-  uint64_t args[4] = {13, 14, 15, 16};
-  IREE_EXPECT_OK(iree_hal_device_queue_host_call(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
-      signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
+  queue_call_started_future.wait();
+  EXPECT_EQ(state.did_call, 0);
+  EXPECT_FALSE(state.wait_completed);
+  IREE_EXPECT_OK(
+      iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
+  submitter.join();
 
   EXPECT_THAT(Status(iree_hal_semaphore_list_wait(signal_semaphore_list,
                                                   iree_infinite_timeout(),
@@ -353,8 +355,6 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   EXPECT_THAT(Status(iree_hal_semaphore_query(
                   signal_semaphore_list.semaphores[1], &value1)),
               StatusIs(StatusCode::kPermissionDenied));
-
-  waker.join();
 }
 
 CTS_REGISTER_TEST_SUITE(QueueHostCallTest);
