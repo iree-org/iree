@@ -499,26 +499,26 @@ func.func @matmul_large_very_tall_m_f16(
 
 // -----
 
-// Small M*N matmul: M=8, N=8, K=5000. Both M and N need padding.
-// Without the M*N utilization rule, this picks MFMA_F32_32x32x8_F16
-// (6.25% util). With it, picks MFMA_F32_16x16x16_F16 (25% util, 4x better).
+// Small M*N matmul: M=8, N=8, K=5000. With VDMFMA enabled for skinny
+// GEMMs on gfx950, this now selects VDMFMA_F32_8x16x64_F16 instead of padding
+// up to a dense MFMA shape.
 func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %out: tensor<8x8xf32>) -> tensor<8x8xf32> {
   %result = linalg.matmul ins(%lhs, %rhs : tensor<8x5000xf16>, tensor<5000x8xf16>) outs(%out : tensor<8x8xf32>) -> tensor<8x8xf32>
   return %result : tensor<8x8xf32>
 }
 // CHECK-LABEL: func.func @small_mn_matmul
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:      padding = [16, 16, 16]
+// CHECK-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F16>
+// CHECK-SAME:      padding = [8, 16, 64]
 // CHECK-SAME:      subgroup = [1, 1, 0]
-// CHECK-SAME:      workgroup = [16, 16, 0]
+// CHECK-SAME:      workgroup = [8, 16, 0]
 
 // -----
 
 // Small-channel grouped convolution (weight backward): 32 groups, 8 in/out channels per group.
-// With old heuristics, this picks MFMA_F32_32x32x8_F16 with workgroup = [1, 16, 1, 1, 16, 0].
-// Now it picks MFMA_F32_16x16x16_F16 (less wasted compute per instruction for 8x8 per-group channels),
-// distributes the N=3 filter dim, and increases batch tile from 1 to 4.
+// On gfx950, the skinny-M VDMFMA path now applies here as well, so the IGEMM
+// configuration uses VDMFMA_F32_8x16x64_F16 while preserving the same tiling
+// structure and filter-dimension distribution.
 #map_gc = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d2 + d6, d3 + d7, d0, d4)>
 #map_gc1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d1)>
 #map_gc2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
@@ -535,9 +535,64 @@ func.func @group_conv_small_channels(%arg0: tensor<32x102x102x32x8xf16>, %arg1: 
 }
 // IGEMM-LABEL: func.func @group_conv_small_channels
 // IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// IGEMM-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// IGEMM-SAME:      padding = [4, 16, 1, 3, 16, 128]
+// IGEMM-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64_F16>
+// IGEMM-SAME:      padding = [1, 8, 1, 3, 16, 128]
+// IGEMM-SAME:      padding_conv = [0, 0, 0, 0, 16, 0, 0, 0]
 // IGEMM-SAME:      promote_operands = [0, 1]
-// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 8]
+// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 2]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
-// IGEMM-SAME:      workgroup = [4, 16, 1, 3, 16, 0]
+// IGEMM-SAME:      workgroup = [1, 8, 1, 3, 16, 0]
+
+// -----
+
+// Skinny GEMM (M=8, F8E4M3FN): should select VDMFMA_F32_8x16x128_F8E4M3FN.
+func.func @skinny_gemm_m8_f8e4m3fn(%lhs: tensor<8x4096xf8E4M3FN>, %rhs: tensor<4096x4096xf8E4M3FN>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xf8E4M3FN>, tensor<4096x4096xf8E4M3FN>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: f8E4M3FN, %in_0: f8E4M3FN, %out: f32):
+    %0 = arith.extf %in : f8E4M3FN to f32
+    %1 = arith.extf %in_0 : f8E4M3FN to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_f8e4m3fn(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FN>
+
+// -----
+
+// Skinny GEMM (M=8, F8E5M2): should select VDMFMA_F32_8x16x128_F8E5M2.
+func.func @skinny_gemm_m8_f8e5m2(%lhs: tensor<8x4096xf8E5M2>, %rhs: tensor<4096x4096xf8E5M2>) -> tensor<8x4096xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<8x4096xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<8x4096xf8E5M2>, tensor<4096x4096xf8E5M2>) outs(%fill : tensor<8x4096xf32>) {
+  ^bb0(%in: f8E5M2, %in_0: f8E5M2, %out: f32):
+    %0 = arith.extf %in : f8E5M2 to f32
+    %1 = arith.extf %in_0 : f8E5M2 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+
+// CHECK-LABEL: func.func @skinny_gemm_m8_f8e5m2(
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2>

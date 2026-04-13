@@ -570,9 +570,10 @@ def IREEGPU_VirtualMMAAttr :
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
-    // Factor to unroll K from native MMA/intrinsic size to virtual size.
-    // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
-    // in this example, intrinsicsK = 32/16 = 2.
+    // Nominal number of native K-slices represented by this virtual
+    // intrinsic. For example, VMFMA_F32_16x16x32_F16 represents two
+    // 16x16x16 MFMA K-slices. Target-specific lowerings may still use wider
+    // native instructions and emit fewer operations.
     int64_t getIntrinsicsK() const;
   }];
 }

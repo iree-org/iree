@@ -326,6 +326,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
+    MLIRContext *ctx = target.getContext();
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
@@ -339,6 +340,30 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+
+      // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
+      // use the sparse trick (smfmac) and are only efficient when the
+      // problem's M dimension fits within the VDMFMA's M tile size (8).
+      // Without the M-size guard below, compareIntrinsics would prefer
+      // VDMFMA for all M sizes due to its larger intrinsic area
+      // ((8+16)*64=1536 vs (16+16)*16=512), which is incorrect for M>8.
+      //
+      // Note: VMFMA intrinsics are intentionally excluded here. Adding
+      // them would change MMA selection for all problems (VMFMA's larger
+      // area wins over concrete MFMA in compareIntrinsics). That should
+      // be a separate change with benchmarking.
+      for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
+        if (!isVDMFMAIntrinsic(vi)) {
+          continue;
+        }
+        auto vmma = VirtualMMAAttr::get(ctx, vi);
+        auto [vm, vn, vk] = vmma.getMNKShape();
+        if (problem.mSizes.empty() || problem.mSizes.back() > vm) {
+          continue;
+        }
+        auto [va, vb, vc] = vmma.getABCElementTypes();
+        intrinsics.emplace_back(vm, vn, vk, va, vb, vc, vmma);
+      }
     }
   }
   if (intrinsics.empty()) {

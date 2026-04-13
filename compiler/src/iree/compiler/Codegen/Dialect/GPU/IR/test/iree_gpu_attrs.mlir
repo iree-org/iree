@@ -100,6 +100,42 @@ module {
 //  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FNUZ>
 
 module {
+  func.func @test_vdmfma_f8E5M2_8x16x128() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vdmfma_f8E5M2_8x16x128
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2>
+
+module {
+  func.func @test_vdmfma_f8E5M2_f8E4M3FN_8x16x128() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vdmfma_f8E5M2_f8E4M3FN_8x16x128
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E5M2_F8E4M3FN>
+
+module {
+  func.func @test_vdmfma_f8E4M3FN_f8E5M2_8x16x128() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vdmfma_f8E4M3FN_f8E5M2_8x16x128
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FN_F8E5M2>
+
+module {
+  func.func @test_vdmfma_f8E4M3FN_8x16x128() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FN>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vdmfma_f8E4M3FN_8x16x128
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128_F8E4M3FN>
+
+module {
   func.func @test_WMMAR3_f16_16x16x16_f32() attributes {
       mma_types = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>} {
     return
