@@ -55,9 +55,6 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              // Queue operation gaps.
-              {"QueueHostCallTest.*", "AMDGPU queue_host_call not implemented"},
-
               // These semaphore-submission tests use command-buffer-backed
               // queue_execute. The barrier-only queue_execute coverage remains
               // enabled via SubmitWithNoCommandBuffers.
