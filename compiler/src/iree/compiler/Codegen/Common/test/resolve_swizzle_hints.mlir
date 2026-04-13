@@ -325,6 +325,23 @@ func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #a
 
 // -----
 
+// Verify that rank-1 contiguous memref with dynamic offset is accepted.
+func.func @swizzle_strided_rank1_after_multibuffer(%src: memref<4096xi8, strided<[1], offset: ?>>) -> vector<16xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<4096xi8, strided<[1], offset: ?>>
+  // row 15, tile 2: 15*128+2*16 = 1952 -> (7 XOR 2)*16+15*128 = 2000
+  %index = arith.constant 1952 : index
+  %1 = vector.load %0[%index] : memref<4096xi8, strided<[1], offset: ?>>, vector<16xi8>
+  return %1: vector<16xi8>
+}
+
+// CHECK-LABEL: func @swizzle_strided_rank1_after_multibuffer
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<4096xi8, strided<[1], offset: ?>>
+//       CHECK:   %[[SWIZZLED_INDEX:.+]] = arith.constant 2000 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWIZZLED_INDEX]]]
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
 // Verify that swizzle_hint fails on non-flat (rank > 1) memrefs.
 func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector<4xf32> {
   // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32>'}}
