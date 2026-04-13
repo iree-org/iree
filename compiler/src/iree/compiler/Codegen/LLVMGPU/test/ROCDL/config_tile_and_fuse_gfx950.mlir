@@ -509,7 +509,7 @@ func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %
 // CHECK-LABEL: func.func @small_mn_matmul
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
-// CHECK-SAME:      padding = [8, 16, 64]
+// CHECK-SAME:      padding = [8, 16, 128]
 // CHECK-SAME:      subgroup = [1, 1, 0]
 // CHECK-SAME:      workgroup = [8, 16, 0]
 
@@ -536,8 +536,8 @@ func.func @group_conv_small_channels(%arg0: tensor<32x102x102x32x8xf16>, %arg1: 
 // IGEMM-LABEL: func.func @group_conv_small_channels
 // IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // IGEMM-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
-// IGEMM-SAME:      padding = [1, 8, 1, 3, 16, 128]
+// IGEMM-SAME:      padding = [1, 8, 1, 3, 16, 256]
 // IGEMM-SAME:      promote_operands = [0, 1]
-// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 2]
+// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 4]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
 // IGEMM-SAME:      workgroup = [1, 8, 1, 3, 16, 0]
