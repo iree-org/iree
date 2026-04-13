@@ -146,8 +146,8 @@ static iree_status_t iree_hal_mock_device_query_i64(
 
 static iree_status_t iree_hal_mock_device_query_string(
     iree_hal_device_t* base_device, iree_string_view_t category,
-    iree_string_view_t key, iree_host_size_t out_string_size,
-    char* out_string) {
+    iree_string_view_t key, iree_host_size_t out_string_capacity,
+    char* out_string, iree_host_size_t* out_string_length) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 

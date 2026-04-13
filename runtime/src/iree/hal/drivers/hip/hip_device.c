@@ -780,14 +780,10 @@ static iree_status_t iree_hal_hip_device_query_i64(
 
 static iree_status_t iree_hal_hip_device_query_string(
     iree_hal_device_t* base_device, iree_string_view_t category,
-    iree_string_view_t key, iree_host_size_t out_string_size,
-    char* out_string) {
+    iree_string_view_t key, iree_host_size_t out_string_capacity,
+    char* out_string, iree_host_size_t* out_string_length) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  if (out_string_size == 0) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "output string too small");
-  }
-  out_string[0] = '\0';
+  if (out_string_length) *out_string_length = 0;
   if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
     if (iree_string_view_equal(key, IREE_SV("architecture"))) {
       hipDeviceProp_tR0000 prop;
@@ -795,11 +791,12 @@ static iree_status_t iree_hal_hip_device_query_string(
           device->hip_symbols,
           hipGetDeviceProperties(&prop, device->devices[0].hip_device),
           "hipGetDeviceProperties");
-      if (out_string_size <= strlen(prop.gcnArchName)) {
-        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                "output string too small");
+      iree_host_size_t string_length = strlen(prop.gcnArchName);
+      if (out_string_length) *out_string_length = string_length;
+      if (!out_string || out_string_capacity < string_length) {
+        return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
       }
-      memcpy(out_string, prop.gcnArchName, strlen(prop.gcnArchName) + 1);
+      memcpy(out_string, prop.gcnArchName, string_length);
       return iree_ok_status();
     }
   }
