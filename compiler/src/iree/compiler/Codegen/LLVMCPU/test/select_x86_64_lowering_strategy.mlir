@@ -1674,3 +1674,35 @@ func.func @gather(%source: tensor<16x8x32x128xf16>, %indices: tensor<4xi64>, %ou
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   iree_linalg_ext.gather
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Batchless convolutions (where N=1 was folded away by unit dim folding)
+// should be assigned the ConvTileAndDecomposeExpert pipeline.
+
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+#map_batchless_input = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0 * 2 + d3, d1 * 2 + d4, d5)>
+#map_batchless_filter = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d2)>
+#map_batchless_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+func.func @batchless_conv_static(%input: tensor<225x225x3xf32>, %filter: tensor<3x3x3x16xf32>) -> tensor<112x112x16xf32> attributes {hal.executable.target = #executable_target_system_elf_x86_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<112x112x16xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<112x112x16xf32>) -> tensor<112x112x16xf32>
+  %conv = linalg.generic {
+    indexing_maps = [#map_batchless_input, #map_batchless_filter, #map_batchless_output],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
+  } ins(%input, %filter : tensor<225x225x3xf32>, tensor<3x3x3x16xf32>)
+    outs(%fill : tensor<112x112x16xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<112x112x16xf32>
+  return %conv : tensor<112x112x16xf32>
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [16, 56, 16, 0, 0, 0], vector_common_parallel = [1, 4, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 1, 1, 3]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+//      CHECK: func.func @batchless_conv_static(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.generic
+//      CHECK:         lowering_config = #[[CONFIG]]
