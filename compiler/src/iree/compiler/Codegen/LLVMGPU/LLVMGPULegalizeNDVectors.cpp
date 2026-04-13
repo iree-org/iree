@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
@@ -15,6 +16,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -1014,6 +1016,23 @@ struct ConvertTransferScatter final
   }
 };
 
+/// Convert util.return with 1:N type-converted operands.
+struct ConvertUtilReturn final
+    : public OpConversionPattern<IREE::Util::ReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::ReturnOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> flatOperands;
+    for (ValueRange vals : adaptor.getOperands()) {
+      llvm::append_range(flatOperands, vals);
+    }
+    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(op, flatOperands);
+    return success();
+  }
+};
+
 struct LLVMGPULegalizeNDVectorsPass final
     : impl::LLVMGPULegalizeNDVectorsPassBase<LLVMGPULegalizeNDVectorsPass> {
 
@@ -1026,8 +1045,8 @@ struct LLVMGPULegalizeNDVectorsPass final
 
     scf::populateSCFStructuralTypeConversionTarget(typeConverter, target);
     scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
-    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
-        patterns, typeConverter);
+    populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
+                                                        typeConverter);
     populateReturnOpTypeConversionPattern(patterns, typeConverter);
     patterns.add<UnrollElementwiseOps>(typeConverter, ctx);
     patterns.add<
@@ -1036,18 +1055,14 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast, ConvertTransferGather,
-        ConvertTransferScatter>(typeConverter, ctx);
+        ConvertTransferScatter, ConvertUtilReturn>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
     // materializations above bridge the gap. This is unfortunate; ops that
     // want to represent structs should use struct types, not n-D vectors.
     target.addLegalOp<nvgpu::LdMatrixOp, nvgpu::MmaSyncOp>();
-    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
-      return typeConverter.isSignatureLegal(op.getFunctionType());
-    });
 
-    // Any other op with an n-D vector operand or result is illegal.
     auto hasNDVector = [](TypeRange types) {
       return llvm::any_of(types, [](Type t) {
         auto vecType = dyn_cast<VectorType>(t);
@@ -1055,6 +1070,10 @@ struct LLVMGPULegalizeNDVectorsPass final
       });
     };
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
+      if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
+        return typeConverter.isSignatureLegal(
+            cast<FunctionType>(funcOp.getFunctionType()));
+      }
       return !hasNDVector(op->getOperandTypes()) &&
              !hasNDVector(op->getResultTypes());
     });

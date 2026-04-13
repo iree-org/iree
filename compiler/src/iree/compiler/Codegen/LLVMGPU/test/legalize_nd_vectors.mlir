@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-legalize-nd-vectors))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-legalize-nd-vectors),util.func(iree-llvmgpu-legalize-nd-vectors))" \
 // RUN:   --split-input-file %s | FileCheck %s
 
 func.func @addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4xf32> {
@@ -386,3 +386,16 @@ func.func @linearize_2d_vector_unroll(%v0: vector<2x2xindex>, %v1: vector<2x2xin
 //       CHECK:   %[[R0:.+]] = affine.linearize_index [%[[V0_0]], %[[V1_0]]] by (4, 8) : vector<2xindex>
 //       CHECK:   %[[R1:.+]] = affine.linearize_index [%[[V0_1]], %[[V1_1]]] by (4, 8) : vector<2xindex>
 //       CHECK:   return %[[R0]], %[[R1]] : vector<2xindex>, vector<2xindex>
+
+// -----
+
+util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4xf32> {
+  %0 = arith.addf %arg0, %arg1 : vector<2x4xf32>
+  util.return %0 : vector<2x4xf32>
+}
+// CHECK-LABEL: util.func public @util_func_addf_2d
+//  CHECK-SAME:   (%[[A0:.+]]: vector<4xf32>, %[[A1:.+]]: vector<4xf32>, %[[B0:.+]]: vector<4xf32>, %[[B1:.+]]: vector<4xf32>)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[R0:.+]] = arith.addf %[[A0]], %[[B0]] : vector<4xf32>
+//       CHECK:   %[[R1:.+]] = arith.addf %[[A1]], %[[B1]] : vector<4xf32>
+//       CHECK:   util.return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
