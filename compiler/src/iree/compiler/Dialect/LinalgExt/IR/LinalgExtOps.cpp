@@ -1294,8 +1294,6 @@ MutableOperandRange TopkOp::getDpsInitsMutable() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ArgCompareOp::verify() {
-  Operation *op = getOperation();
-
   ShapedType inputValueType = getInputType();
   Type inputValueElemType = inputValueType.getElementType();
 
@@ -1308,7 +1306,7 @@ LogicalResult ArgCompareOp::verify() {
     Type inputIndexElemType = getInputIndexElementType();
 
     if (inputValueType.getShape() != inputIndexType.getShape()) {
-      return op->emitOpError(
+      return emitOpError(
                  "explicit-index mode: value and index inputs must have "
                  "the same shape. ")
              << "Value shape: "
@@ -1318,14 +1316,14 @@ LogicalResult ArgCompareOp::verify() {
     }
 
     if (!isa<IntegerType, IndexType>(inputIndexElemType)) {
-      return op->emitOpError(
+      return emitOpError(
                  "explicit-index mode: index input must have integer or index "
                  "element type, but got ")
              << inputIndexElemType;
     }
 
     if (inputIndexElemType != outputIndexElemType) {
-      return op->emitOpError(
+      return emitOpError(
                  "explicit-index mode: input and output index element types "
                  "must match. ")
              << "Input index type: " << inputIndexElemType
@@ -1333,36 +1331,35 @@ LogicalResult ArgCompareOp::verify() {
     }
 
     if (getIndexBase()) {
-      return op->emitOpError(
-          "index_base must not be used with explicit indices");
+      return emitOpError("index_base must not be used with explicit indices");
     }
   }
 
   Type outputValueElemType = outputValueType.getElementType();
   if (inputValueElemType != outputValueElemType) {
-    return op->emitOpError("input and output value element types must match. ")
+    return emitOpError("input and output value element types must match. ")
            << "Input type: " << inputValueElemType
            << ", output value type: " << outputValueElemType;
   }
 
   if (!isa<IntegerType, IndexType>(outputIndexElemType)) {
-    return op->emitOpError(
+    return emitOpError(
                "output index must have integer or index element type, but got ")
            << outputIndexElemType;
   }
 
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
-    return op->emitOpError("output indices/values shape must match. ")
+    return emitOpError("output indices/values shape must match. ")
            << "Output value shape: "
            << llvm::interleaved_array(outputValueType.getShape())
            << ", output index shape: "
            << llvm::interleaved_array(outputIndexType.getShape());
   }
 
-  uint64_t dim = getDimension();
+  int64_t dim = getDimension();
   int64_t rank = getInputRank();
   if (dim >= rank) {
-    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+    return emitOpError("reduction dimension exceeds or equals input rank. ")
            << "got dimension: " << dim << ", but input rank is: " << rank;
   }
 
@@ -1373,44 +1370,44 @@ LogicalResult ArgCompareOp::verify() {
     }
   }
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
-    return op->emitOpError("output shape must match input shape with reduction "
-                           "dimension removed. ")
+    return emitOpError("output shape must match input shape with reduction "
+                       "dimension removed. ")
            << "Expected: " << llvm::interleaved_array(expectedShape)
            << ", but got: "
            << llvm::interleaved_array(outputValueType.getShape());
   }
 
-  Region &region = getRegion();
-  Block &block = region.front();
-  unsigned numArgs = block.getNumArguments();
-  if (numArgs != 2) {
-    return op->emitOpError("region block should have 2 arguments, but got ")
-           << numArgs;
+  return success();
+}
+
+LogicalResult ArgCompareOp::verifyRegions() {
+  Block &block = getRegion().front();
+  if (block.getNumArguments() != 2) {
+    return emitOpError("region block should have 2 arguments, but got ")
+           << block.getNumArguments();
   }
 
+  Type inputValueElemType = getInputType().getElementType();
   Type arg0Type = block.getArgument(0).getType();
   Type arg1Type = block.getArgument(1).getType();
-
   if (arg0Type != inputValueElemType || arg1Type != inputValueElemType) {
-    return op->emitOpError(
+    return emitOpError(
                "comparator arguments must match input value element type. ")
            << "Expected: " << inputValueElemType << ", but got: " << arg0Type
            << " and " << arg1Type;
   }
 
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
-  unsigned numOperands = yieldOp->getNumOperands();
-  if (numOperands != 1) {
-    return op->emitOpError(
+  if (yieldOp->getNumOperands() != 1) {
+    return emitOpError(
                "expected linalg_ext.yield to return 1 operand, but got ")
-           << numOperands;
+           << yieldOp->getNumOperands();
   }
 
-  Type yieldType = yieldOp.getOperand(0).getType();
-  if (!yieldType.isInteger(1)) {
-    return op->emitOpError(
+  if (!yieldOp.getOperand(0).getType().isInteger(1)) {
+    return emitOpError(
                "region block must end with a linalg_ext.yield i1, but got: ")
-           << yieldType;
+           << yieldOp.getOperand(0).getType();
   }
   return success();
 }

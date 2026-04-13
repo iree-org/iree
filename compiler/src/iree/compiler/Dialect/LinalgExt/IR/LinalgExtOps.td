@@ -790,6 +790,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     Variadic<AnyRankedTensor>:$results
   );
   let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
