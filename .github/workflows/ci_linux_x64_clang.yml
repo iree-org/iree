@@ -35,7 +35,6 @@ jobs:
           python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: Build IREE
         run: |
-          source ./build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
