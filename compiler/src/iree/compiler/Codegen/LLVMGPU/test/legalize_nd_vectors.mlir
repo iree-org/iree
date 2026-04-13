@@ -360,3 +360,25 @@ func.func @transfer_gather_contiguous_dim(%base: memref<64x64xf16>, %pad: f16) -
 //       CHECK:   %[[IDX3:.+]] = arith.addi %[[C0]], %[[C3]] : index
 //       CHECK:   %[[G3:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[IDX3]], %[[C0]]], %[[PAD]] {indexing_maps = [#[[$CONTIG_BASE]]]} : memref<64x64xf16>, vector<8xf16>
 //       CHECK:   return %[[G0]], %[[G1]], %[[G2]], %[[G3]]
+
+// -----
+
+// TODO: 2-D vector delinearize_index needs a dedicated conversion pattern.
+// expected-error @+1 {{failed to legalize}}
+func.func @delinearize_2d_vector_unroll(%vec: vector<2x2xindex>) -> (vector<2x2xindex>, vector<2x2xindex>) {
+  %0:2 = affine.delinearize_index %vec into (4, 8) : vector<2x2xindex>, vector<2x2xindex>
+  return %0#0, %0#1 : vector<2x2xindex>, vector<2x2xindex>
+}
+
+// -----
+
+func.func @linearize_2d_vector_unroll(%v0: vector<2x2xindex>, %v1: vector<2x2xindex>) -> vector<2x2xindex> {
+  %0 = affine.linearize_index [%v0, %v1] by (4, 8) : vector<2x2xindex>
+  return %0 : vector<2x2xindex>
+}
+// CHECK-LABEL: func.func @linearize_2d_vector_unroll
+//  CHECK-SAME:   (%[[V0_0:.+]]: vector<2xindex>, %[[V0_1:.+]]: vector<2xindex>, %[[V1_0:.+]]: vector<2xindex>, %[[V1_1:.+]]: vector<2xindex>)
+//  CHECK-SAME:   -> (vector<2xindex>, vector<2xindex>)
+//       CHECK:   %[[R0:.+]] = affine.linearize_index [%[[V0_0]], %[[V1_0]]] by (4, 8) : vector<2xindex>
+//       CHECK:   %[[R1:.+]] = affine.linearize_index [%[[V0_1]], %[[V1_1]]] by (4, 8) : vector<2xindex>
+//       CHECK:   return %[[R0]], %[[R1]] : vector<2xindex>, vector<2xindex>

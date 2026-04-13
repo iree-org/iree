@@ -92,7 +92,7 @@ struct UnrollElementwiseOps final
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<ValueRange> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op) ||
+    if (!op->hasTrait<OpTrait::Elementwise>() ||
         op->getNumResults() != 1) {
       return failure();
     }
