@@ -629,7 +629,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     // Disable redundant vector transfer hoisting because it does not
     // properly consider distributed code on memrefs.
     options.redundantHoisting = false;
-    funcPassManager.addPass(createOptimizeVectorTransferPass(options));
+    funcPassManager.addPass(createOptimizeVectorTransferPass());
   }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   funcPassManager.addPass(createCanonicalizerPass());
