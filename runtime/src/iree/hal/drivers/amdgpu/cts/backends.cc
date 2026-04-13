@@ -110,8 +110,8 @@ static bool amdgpu_registered_ =
               {"ExecutableTest.*",
                "AMDGPU executable reflection not yet implemented"},
               {"FileTest.FdFile*",
-               "AMDGPU queue_read/queue_write for fd-backed files not yet "
-               "implemented"},
+               "AMDGPU fd-backed queue_read/queue_write requires bounded "
+               "staging for default device-local buffers"},
           }},
          {"async_queue"},
      }),

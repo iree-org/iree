@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_file.h"
 #include "iree/hal/drivers/amdgpu/host_queue_host_call.h"
 #include "iree/hal/drivers/amdgpu/host_queue_memory.h"
+#include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
@@ -114,6 +115,7 @@ typedef enum iree_hal_amdgpu_pending_op_type_e {
   IREE_HAL_AMDGPU_PENDING_OP_ALLOCA,
   IREE_HAL_AMDGPU_PENDING_OP_DEALLOCA,
   IREE_HAL_AMDGPU_PENDING_OP_HOST_CALL,
+  IREE_HAL_AMDGPU_PENDING_OP_HOST_ACTION,
 } iree_hal_amdgpu_pending_op_type_t;
 
 // Completion ownership for a deferred operation.
@@ -316,6 +318,9 @@ struct iree_hal_amdgpu_pending_op_t {
       uint64_t args[4];
       iree_hal_host_call_flags_t flags;
     } host_call;
+    struct {
+      iree_hal_amdgpu_reclaim_action_t action;
+    } host_action;
   };
 };
 
@@ -377,6 +382,18 @@ static void iree_hal_amdgpu_pending_op_release_retained(
     iree_hal_resource_release(op->retained_resources[i]);
   }
   op->retained_resource_count = 0;
+}
+
+static void iree_hal_amdgpu_pending_op_fail_host_action(
+    iree_hal_amdgpu_pending_op_t* op, iree_status_t status) {
+  if (op->type != IREE_HAL_AMDGPU_PENDING_OP_HOST_ACTION ||
+      !op->host_action.action.fn) {
+    return;
+  }
+  op->host_action.action.fn(/*entry=*/NULL, op->host_action.action.user_data,
+                            status);
+  op->host_action.action.fn = NULL;
+  op->host_action.action.user_data = NULL;
 }
 
 // Releases any queue-owned alloca memory-readiness reservation. This runs only
@@ -550,6 +567,7 @@ static void iree_hal_amdgpu_pending_op_complete_resolved_waits(
 // capture phase runs under the mutex (Phase 1 of the two-phase protocol).
 static void iree_hal_amdgpu_pending_op_destroy_under_lock(
     iree_hal_amdgpu_pending_op_t* op, iree_status_t status) {
+  iree_hal_amdgpu_pending_op_fail_host_action(op, status);
   // Fail signal semaphores so downstream waiters get the error.
   iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
   iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
@@ -1009,6 +1027,17 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
           iree_hal_amdgpu_pending_op_release_retained(op);
         }
         break;
+      case IREE_HAL_AMDGPU_PENDING_OP_HOST_ACTION:
+        status = iree_hal_amdgpu_host_queue_submit_barrier(
+            queue, &resolution, iree_hal_semaphore_list_empty(),
+            op->host_action.action, op->retained_resources,
+            op->retained_resource_count,
+            /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
+        if (iree_status_is_ok(status)) {
+          op->retained_resource_count = 0;
+        }
+        break;
       default:
         status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                   "pending op issue not yet wired up");
@@ -1017,6 +1046,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
   }
 
   if (!iree_status_is_ok(status)) {
+    iree_hal_amdgpu_pending_op_fail_host_action(op, status);
     iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
     iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
     iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
@@ -1041,6 +1071,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
 static void iree_hal_amdgpu_pending_op_fail(iree_hal_amdgpu_pending_op_t* op,
                                             iree_status_t status) {
   iree_hal_amdgpu_host_queue_t* queue = op->queue;
+  iree_hal_amdgpu_pending_op_fail_host_action(op, status);
   // Fail signal semaphores (records error, does not release our retains).
   iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
   iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
@@ -2441,6 +2472,77 @@ static iree_status_t iree_hal_amdgpu_host_queue_write(
   return iree_hal_amdgpu_host_queue_write_file(
       base_queue, wait_semaphore_list, signal_semaphore_list, source_buffer,
       source_offset, target_file, target_offset, length, flags);
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_defer_host_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t* wait_semaphore_list,
+    iree_hal_amdgpu_reclaim_action_t action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_amdgpu_pending_op_t** out_op) {
+  uint16_t max_resources = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      /*signal_semaphore_count=*/0,
+      /*operation_resource_count=*/operation_resource_count, &max_resources));
+  iree_hal_amdgpu_pending_op_t* op = NULL;
+  const iree_hal_semaphore_list_t empty_signal_list =
+      iree_hal_semaphore_list_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
+      queue, wait_semaphore_list, &empty_signal_list,
+      IREE_HAL_AMDGPU_PENDING_OP_HOST_ACTION, max_resources, &op));
+  for (iree_host_size_t i = 0; i < operation_resource_count; ++i) {
+    iree_hal_amdgpu_pending_op_retain(op, operation_resources[i]);
+  }
+  op->host_action.action = action;
+  *out_op = op;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    iree_hal_amdgpu_reclaim_action_t action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count) {
+  if (IREE_UNLIKELY(!action.fn)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "host action callback must be non-null");
+  }
+  if (IREE_UNLIKELY(operation_resource_count > 0 && !operation_resources)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "host action resources must be non-null");
+  }
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_hal_amdgpu_wait_resolution_t resolution;
+  iree_hal_amdgpu_host_queue_resolve_waits(queue, wait_semaphore_list,
+                                           &resolution);
+  // Host actions execute on CPU threads and must observe device-produced
+  // host-visible memory even when a semaphore edge itself is device-local.
+  resolution.inline_acquire_scope = iree_hal_amdgpu_host_queue_max_fence_scope(
+      resolution.inline_acquire_scope, IREE_HSA_FENCE_SCOPE_SYSTEM);
+  resolution.barrier_acquire_scope = iree_hal_amdgpu_host_queue_max_fence_scope(
+      resolution.barrier_acquire_scope, IREE_HSA_FENCE_SCOPE_SYSTEM);
+  iree_status_t status = iree_ok_status();
+  iree_hal_amdgpu_pending_op_t* deferred_op = NULL;
+  if (resolution.needs_deferral) {
+    status = iree_hal_amdgpu_host_queue_defer_host_action(
+        queue, &wait_semaphore_list, action, operation_resources,
+        operation_resource_count, &deferred_op);
+  } else {
+    status = iree_hal_amdgpu_host_queue_submit_barrier(
+        queue, &resolution, iree_hal_semaphore_list_empty(), action,
+        operation_resources, operation_resource_count,
+        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  if (iree_status_is_ok(status) && deferred_op) {
+    status = iree_hal_amdgpu_pending_op_enqueue_waits(deferred_op);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_defer_host_call(

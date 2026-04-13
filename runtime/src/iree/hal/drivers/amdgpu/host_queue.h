@@ -316,6 +316,19 @@ iree_hal_amdgpu_host_queue_const_frontier(
   return (const iree_async_frontier_t*)&queue->frontier;
 }
 
+// Enqueues a driver-owned host action ordered after |wait_semaphore_list|.
+// |action| uses the reclaim-action status ownership contract: OK means the
+// ordering barrier completed, while non-OK is a borrowed queue/device failure
+// status that must be cloned before any async propagation.
+// |operation_resources| are retained before this returns and released after the
+// action has executed or failed; callers keep ownership of their references.
+iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    iree_hal_amdgpu_reclaim_action_t action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count);
+
 // Initializes a host queue in caller-provided memory.
 // The caller must allocate at least sizeof(iree_hal_amdgpu_host_queue_t).
 //

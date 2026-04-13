@@ -443,7 +443,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   }
 
   // Create the default queue-allocation slab provider over the device
-  // fine-grained HSA pool and derive the TLSF policy used once topology
+  // coarse-grained HSA pool and derive the TLSF policy used once topology
   // assignment provides an epoch query.
   iree_hal_queue_affinity_t queue_affinity_mask = 0;
   for (iree_host_size_t queue_ordinal = 0;
@@ -460,14 +460,14 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_slab_provider_create(
-        logical_device, libhsa, &system->topology, fine_block_memory_pool,
+        logical_device, libhsa, &system->topology, coarse_block_memory_pool,
         queue_affinity_mask, host_allocator,
         &out_physical_device->default_slab_provider);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_amdgpu_slab_provider_memory_pool_properties_t properties;
     status = iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
-        libhsa, fine_block_memory_pool, &properties);
+        libhsa, coarse_block_memory_pool, &properties);
     if (iree_status_is_ok(status) &&
         properties.allocation_alignment < options->default_pool.alignment) {
       status = iree_make_status(

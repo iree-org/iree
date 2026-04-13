@@ -13,7 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 // A buffer backed by an HSA memory pool allocation.
-// The allocation is host-visible (fine-grained) so map/unmap are trivial.
+// Device-local buffers are usually coarse-grained and unmappable; explicit
+// host-visible/host-local buffers use fine-grained pools and can be mapped.
 typedef struct iree_hal_amdgpu_buffer_t {
   iree_hal_buffer_t base;
   iree_allocator_t host_allocator;
@@ -117,7 +118,7 @@ static iree_status_t iree_hal_amdgpu_buffer_map_range(
           ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
           : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
 
-  // Fine-grained HSA allocations are directly host-accessible.
+  // Host-visible AMDGPU HSA allocations are directly host-accessible.
   mapping->contents = iree_make_byte_span(
       (uint8_t*)buffer->host_ptr + local_byte_offset, local_byte_length);
 
@@ -127,21 +128,21 @@ static iree_status_t iree_hal_amdgpu_buffer_map_range(
 static iree_status_t iree_hal_amdgpu_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  // Nothing to do — fine-grained memory is always coherent.
+  // Nothing to do — all host-visible AMDGPU allocations are currently coherent.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_buffer_invalidate_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  // Nothing to do — fine-grained memory is always coherent.
+  // Nothing to do — all host-visible AMDGPU allocations are currently coherent.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_buffer_flush_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  // Nothing to do — fine-grained memory is always coherent.
+  // Nothing to do — all host-visible AMDGPU allocations are currently coherent.
   return iree_ok_status();
 }
 

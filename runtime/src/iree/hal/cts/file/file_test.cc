@@ -46,8 +46,7 @@ class FileTest : public CtsTestBase<> {
                                    iree_hal_buffer_t** out_buffer) {
     iree_hal_buffer_params_t params = {0};
     params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-    params.usage =
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+    params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
     params.min_alignment = kMinimumAlignment;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(

@@ -21,6 +21,7 @@ iree_cc_library(
     iree::hal::memory::fixed_block_pool
     iree::hal::memory::passthrough_pool
     iree::hal::memory::tlsf_pool
+    iree::io::file_handle
   TESTONLY
   ALWAYSLINK
   PUBLIC
