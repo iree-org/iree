@@ -182,3 +182,42 @@ func.func @fold_compose_strides(%init: tensor<64xf32>) -> tensor<64xf32> {
 //       CHECK:         pcf.write_slice %{{.+}} into %[[REF]][{{.+}}] [2] [2]
 //  CHECK-SAME:           into !pcf.sref<64xf32, sync(#pcf.sequential)>
 //       CHECK:     pcf.return
+
+// -----
+
+// Test folding when the pcf.loop count is computed in the forall body and
+// needs to be hoisted before rewriting.
+func.func @fold_hoists_loop_count(%init: tensor<8xf32>, %one: index)
+    -> tensor<8xf32> {
+  %0 = scf.forall (%id) in (4) shared_outs(%iter = %init) -> (tensor<8xf32>) {
+    %tile_init = tensor.extract_slice %iter[%id] [2] [1]
+        : tensor<8xf32> to tensor<2xf32>
+    %count = arith.addi %one, %one : index
+    %loop_result = pcf.loop scope(#pcf.sequential) count(%count)
+        execute(%ref = %tile_init)[%loop_id: index]
+            : (!pcf.sref<2xf32, sync(#pcf.sequential)>)
+           -> (tensor<2xf32>) {
+      %slice = tensor.extract_slice %init[%loop_id] [1] [1]
+          : tensor<8xf32> to tensor<1xf32>
+      pcf.write_slice %slice into %ref[%loop_id] [1] [1]
+          : tensor<1xf32> into !pcf.sref<2xf32, sync(#pcf.sequential)>
+      pcf.return
+    }
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %loop_result into %iter[%id] [2] [1]
+          : tensor<2xf32> into tensor<8xf32>
+    }
+  } {mapping = [#iree_codegen.local_mapping<0>]}
+  return %0 : tensor<8xf32>
+}
+
+// CHECK-LABEL: @fold_hoists_loop_count
+//  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<8xf32>, %[[ONE:[A-Za-z0-9_]+]]: index
+//       CHECK:   %[[COUNT:[A-Za-z0-9_]+]] = arith.addi %[[ONE]], %[[ONE]] : index
+//       CHECK:   %[[GENERIC:.+]] = pcf.generic
+//       CHECK:     execute(%{{.+}} = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index, %[[GEN_COUNT:[A-Za-z0-9_]+]]: index]
+//       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into (4, %[[COUNT]])
+//       CHECK:     %[[OUTER_STEP:.+]] = affine.apply {{.*}}[%[[GEN_COUNT]], %[[COUNT]]]
+//       CHECK:       scf.forall (%{{.+}}) = (%{{.+}}) to (%{{.+}}) step (%[[OUTER_STEP]])
+//       CHECK:       %[[INNER_STEP:.+]] = affine.apply {{.*}}[%[[GEN_COUNT]], %[[COUNT]]]
+//       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1) to (%[[COUNT]]) step (%[[INNER_STEP]])

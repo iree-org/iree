@@ -48,10 +48,9 @@ func.func @fuse_with_offset(%init: tensor<32x64xf32>, %dest: !pcf.sref<32x64xf32
 //  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<32x64xf32>
 //  CHECK-SAME:   %[[DEST:[A-Za-z0-9_]+]]: !pcf.sref<32x64xf32, sync(#pcf.sequential)>
 
-//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //       CHECK:   scf.forall (%[[I:.+]], %[[J:.+]]) in (4, 8) {
 //       CHECK:     %[[TILE:.+]] = tensor.generate
-//       CHECK:     %[[COMPOSED_OFFSET:.+]] = arith.addi %[[I]], %[[C16]]
+//       CHECK:     %[[COMPOSED_OFFSET:.+]] = affine.apply {{.*}}[%[[I]]]
 //       CHECK:     pcf.write_slice %[[TILE]] into %[[DEST]][%[[COMPOSED_OFFSET]], %[[J]]] [8, 8] [1, 1]
 //       CHECK:   }
 //       CHECK-NOT:   pcf.write_slice
@@ -78,11 +77,10 @@ func.func @fuse_with_stride(%init: tensor<32x64xf32>, %dest: !pcf.sref<64x128xf3
 //  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<32x64xf32>
 //  CHECK-SAME:   %[[DEST:[A-Za-z0-9_]+]]: !pcf.sref<64x128xf32, sync(#pcf.sequential)>
 
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   scf.forall (%[[I:.+]], %[[J:.+]]) in (4, 8) {
 //       CHECK:     %[[TILE:.+]] = tensor.generate
-//   CHECK-DAG:     %[[OFFSET_0:.+]] = arith.muli %[[I]], %[[C2]]
-//   CHECK-DAG:     %[[OFFSET_1:.+]] = arith.muli %[[J]], %[[C2]]
+//   CHECK-DAG:     %[[OFFSET_0:.+]] = affine.apply {{.*}}[%[[I]]]
+//   CHECK-DAG:     %[[OFFSET_1:.+]] = affine.apply {{.*}}[%[[J]]]
 //       CHECK:     pcf.write_slice %[[TILE]] into %[[DEST]][%[[OFFSET_0]], %[[OFFSET_1]]] [8, 8] [2, 2]
 //       CHECK:   }
 //       CHECK-NOT:   pcf.write_slice
@@ -140,10 +138,10 @@ func.func @fuse_with_offset_after_forall(%init: tensor<32x64xf32>, %dest: !pcf.s
 //  CHECK-SAME:   %[[OFFSET_BASE:[A-Za-z0-9_]+]]: index
 
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
-//   CHECK-DAG:   %[[OFFSET:.+]] = arith.addi %[[OFFSET_BASE]], %[[C16]]
+//   CHECK-DAG:   %[[OFFSET:.+]] = arith.addi %[[OFFSET_BASE]], %[[C16]] : index
 //       CHECK:   scf.forall (%[[I:.+]], %[[J:.+]]) in (4, 8) {
 //       CHECK:     %[[TILE:.+]] = tensor.generate
-//       CHECK:     %[[COMPOSED_OFFSET:.+]] = arith.addi %[[OFFSET]], %[[I]]
+//       CHECK:     %[[COMPOSED_OFFSET:.+]] = affine.apply {{.*}}[%[[OFFSET]], %[[I]]]
 //       CHECK:     pcf.write_slice %[[TILE]] into %[[DEST]][%[[COMPOSED_OFFSET]], %[[J]]] [8, 8] [1, 1]
 //       CHECK:   }
 //       CHECK-NOT:   pcf.write_slice

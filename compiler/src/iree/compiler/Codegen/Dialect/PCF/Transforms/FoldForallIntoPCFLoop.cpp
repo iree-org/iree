@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::IREE::PCF {
 
@@ -84,21 +85,12 @@ static FailureOr<PCF::LoopOp> matchFoldTerminator(scf::ForallOp forallOp) {
 
 /// Validates the pcf.loop structure for folding:
 /// - Single count argument (linearized).
-/// - Count value dominates the forall.
 /// - Loop is last op before terminator.
 static LogicalResult matchFoldPCFLoop(scf::ForallOp forallOp,
                                       PCF::LoopOp loopOp) {
   // Single count argument required.
   if (loopOp.getCount().size() != 1) {
     return failure();
-  }
-
-  // Count must dominate the forall.
-  Value countValue = loopOp.getCount()[0];
-  if (auto defOp = countValue.getDefiningOp()) {
-    if (!defOp->isBeforeInBlock(forallOp)) {
-      return failure();
-    }
   }
 
   // Loop must be last op before terminator.
@@ -114,11 +106,8 @@ static LogicalResult matchFoldPCFLoop(scf::ForallOp forallOp,
 /// Validates pcf.loop region ref args:
 /// - All users are pcf.write_slice ops.
 /// - Ref args have SyncOnReturnAttr sync scope.
-/// Populates writesByResult with write_slice ops grouped by result index.
-static LogicalResult matchFoldWriteSlices(
-    PCF::LoopOp loopOp,
-    DenseMap<unsigned, SmallVector<PCF::WriteSliceOp>> &writesByResult) {
-  for (auto [idx, refArg] : llvm::enumerate(loopOp.getRegionRefArgs())) {
+static LogicalResult matchFoldWriteSlices(PCF::LoopOp loopOp) {
+  for (BlockArgument refArg : loopOp.getRegionRefArgs()) {
     // Check sync scope is sync_on_return.
     auto srefType = cast<PCF::ShapedRefType>(refArg.getType());
     Attribute syncScope = srefType.getSyncScope();
@@ -132,7 +121,6 @@ static LogicalResult matchFoldWriteSlices(
       if (!writeOp) {
         return failure();
       }
-      writesByResult[idx].push_back(writeOp);
     }
   }
 
@@ -155,15 +143,9 @@ computeForallIterCounts(RewriterBase &rewriter, Location loc,
 
   SmallVector<OpFoldResult> iterCountOFRs;
   for (int64_t i = 0, e = numDims; i < e; ++i) {
-    OpFoldResult lb = i < (int64_t)lowerBounds.size()
-                          ? lowerBounds[i]
-                          : rewriter.getIndexAttr(0);
-    OpFoldResult ub = upperBounds[i];
-    OpFoldResult step =
-        i < (int64_t)steps.size() ? steps[i] : rewriter.getIndexAttr(1);
-
     OpFoldResult iterCount = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, numItersExpr, {ub, lb, step});
+        rewriter, loc, numItersExpr,
+        {upperBounds[i], lowerBounds[i], steps[i]});
     iterCountOFRs.push_back(iterCount);
   }
   return iterCountOFRs;
@@ -183,16 +165,11 @@ static void computeForallIVs(RewriterBase &rewriter, Location loc,
   AffineExpr applyLbAndStep = s0 * s1 + s2;
 
   for (int64_t i = 0, e = numDims; i < e; ++i) {
-    OpFoldResult lb = i < (int64_t)lowerBounds.size()
-                          ? lowerBounds[i]
-                          : rewriter.getIndexAttr(0);
-    OpFoldResult step =
-        i < (int64_t)steps.size() ? steps[i] : rewriter.getIndexAttr(1);
-
     Value actualIv = getValueOrCreateConstantIndexOp(
         rewriter, loc,
-        affine::makeComposedFoldedAffineApply(rewriter, loc, applyLbAndStep,
-                                              {delinearizedIvs[i], step, lb}));
+        affine::makeComposedFoldedAffineApply(
+            rewriter, loc, applyLbAndStep,
+            {delinearizedIvs[i], steps[i], lowerBounds[i]}));
     forallMapping.map(forallOp.getInductionVar(i), actualIv);
   }
 }
@@ -201,16 +178,15 @@ static void computeForallIVs(RewriterBase &rewriter, Location loc,
 /// the forall terminator, creating new write_slice ops that write directly
 /// to the pcf.generic's sref arguments.
 ///
-/// Composition formula (matching FusePCFWrites):
-///   offsets: writeOffset + insertOffset * writeStride
-///   sizes:   insertSizes
-///   strides: writeStride * insertStride
-static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
-                                          scf::ForallOp forallOp,
-                                          PCF::LoopOp loopOp,
-                                          PCF::GenericOp genericOp,
-                                          scf::InParallelOp terminator,
-                                          IRMapping &forallMapping) {
+/// This reuses composeNestedSliceParameters() by treating the
+/// tensor.parallel_insert_slice as the outer slice and the pcf.write_slice as
+/// the inner slice.
+static LogicalResult composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
+                                                   scf::ForallOp forallOp,
+                                                   PCF::LoopOp loopOp,
+                                                   PCF::GenericOp genericOp,
+                                                   scf::InParallelOp terminator,
+                                                   IRMapping &forallMapping) {
   // Build mapping from pcf.loop result index -> generic ref arg index.
   SmallVector<unsigned> resultToRefArgIdx(loopOp->getNumResults());
   for (Operation &op : terminator.getYieldingOps()) {
@@ -221,16 +197,6 @@ static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
     unsigned argIdx = destArg.getArgNumber() - forallOp.getRank();
     resultToRefArgIdx[resultIdx] = argIdx;
   }
-
-  AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
-  // Composition formula (note: opposite direction from FusePCFWrites):
-  //   write puts source[j] at loopRef[writeOff + j * writeStride]
-  //   insert maps loopRef[p] to fullTensor[insertOff + p * insertStride]
-  //   => source[j] at fullTensor[insertOff + writeOff * insertStride
-  //                               + j * writeStride * insertStride]
-  AffineExpr composeOffExpr = s0 + s1 * s2;
-  AffineExpr mulExpr = s0 * s1;
 
   // Helper to remap OpFoldResult Values through forallMapping.
   auto remapOFR = [&](OpFoldResult ofr) -> OpFoldResult {
@@ -263,9 +229,22 @@ static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
       SmallVector<OpFoldResult> writeStrides = writeOp.getMixedStrides();
       SmallVector<OpFoldResult> writeSizes = writeOp.getMixedSizes();
 
-      SmallVector<OpFoldResult> insertOffsets = insertOp.getMixedOffsets();
-      SmallVector<OpFoldResult> insertSizes = insertOp.getMixedSizes();
-      SmallVector<OpFoldResult> insertStrides = insertOp.getMixedStrides();
+      SmallVector<OpFoldResult> insertOffsets =
+          llvm::map_to_vector(insertOp.getMixedOffsets(), remapOFR);
+      SmallVector<OpFoldResult> insertSizes =
+          llvm::map_to_vector(insertOp.getMixedSizes(), remapOFR);
+      SmallVector<OpFoldResult> insertStrides =
+          llvm::map_to_vector(insertOp.getMixedStrides(), remapOFR);
+
+      SmallVector<OpFoldResult> composedOffsets;
+      SmallVector<OpFoldResult> composedSizes;
+      SmallVector<OpFoldResult> composedStrides;
+      if (failed(composeNestedSliceParameters(
+              rewriter, writeOp.getLoc(), insertOffsets, insertSizes,
+              insertStrides, writeOffsets, writeSizes, writeStrides,
+              composedOffsets, composedSizes, composedStrides))) {
+        return failure();
+      }
 
       // Expand source to match sref rank by adding unit dims.
       auto sourceType = cast<RankedTensorType>(writeOp.getSource().getType());
@@ -309,38 +288,6 @@ static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
             reassociation);
       }
 
-      // Compose offsets, sizes, and strides.
-      SmallVector<OpFoldResult> composedOffsets;
-      SmallVector<OpFoldResult> composedSizes;
-      SmallVector<OpFoldResult> composedStrides;
-
-      // First writeRank dimensions: compose with insert slice.
-      for (int64_t i = 0, e = writeOffsets.size(); i < e; ++i) {
-        // offsets: insertOffset + writeOffset * insertStride.
-        OpFoldResult composedOff = affine::makeComposedFoldedAffineApply(
-            rewriter, writeOp.getLoc(), composeOffExpr,
-            {remapOFR(insertOffsets[i]), writeOffsets[i],
-             remapOFR(insertStrides[i])});
-        composedOffsets.push_back(composedOff);
-
-        // sizes: from write_slice (the source data size is unchanged).
-        composedSizes.push_back(writeSizes[i]);
-
-        // strides: writeStride * insertStride.
-        OpFoldResult composedStride = affine::makeComposedFoldedAffineApply(
-            rewriter, writeOp.getLoc(), mulExpr,
-            {writeStrides[i], remapOFR(insertStrides[i])});
-        composedStrides.push_back(composedStride);
-      }
-
-      // Remaining dimensions from insert (rank expansion).
-      for (int64_t i = writeOffsets.size(), e = insertOffsets.size(); i < e;
-           ++i) {
-        composedOffsets.push_back(remapOFR(insertOffsets[i]));
-        composedSizes.push_back(remapOFR(insertSizes[i]));
-        composedStrides.push_back(remapOFR(insertStrides[i]));
-      }
-
       // Replace old write_slice with composed one.
       rewriter.replaceOpWithNewOp<PCF::WriteSliceOp>(
           writeOp, expandedSource, genericRefArg, composedOffsets,
@@ -349,14 +296,20 @@ static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
 
     rewriter.eraseOp(insertOp);
   }
+
+  return success();
 }
 
 /// Core implementation of foldForallIntoPCFLoop after matching succeeds.
-static PCF::GenericOp foldForallIntoPCFLoopImpl(RewriterBase &rewriter,
-                                                scf::ForallOp forallOp,
-                                                PCF::LoopOp loopOp) {
+static FailureOr<PCF::GenericOp>
+foldForallIntoPCFLoopImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
+                          PCF::LoopOp loopOp) {
   Location loc = forallOp.getLoc();
   scf::InParallelOp terminator = forallOp.getTerminator();
+
+  if (failed(moveValueDefinitions(rewriter, loopOp.getCount(), forallOp))) {
+    return failure();
+  }
 
   // Replace RegionIterArgs with initial values (except in terminator).
   for (auto [iterArg, init] :
@@ -477,8 +430,10 @@ static PCF::GenericOp foldForallIntoPCFLoopImpl(RewriterBase &rewriter,
   }
 
   // Compose write_slice ops with parallel_insert_slice ops.
-  composeWriteSlicesIntoGeneric(rewriter, forallOp, loopOp, genericOp,
-                                terminator, forallMapping);
+  if (failed(composeWriteSlicesIntoGeneric(
+          rewriter, forallOp, loopOp, genericOp, terminator, forallMapping))) {
+    return failure();
+  }
 
   // Replace forall results with generic results.
   for (auto [forallResult, genericResult] :
@@ -595,8 +550,7 @@ FailureOr<GenericOp> foldForallIntoPCFLoop(RewriterBase &rewriter,
   }
 
   // Step 3: Validate write_slice ops.
-  DenseMap<unsigned, SmallVector<WriteSliceOp>> writesByResult;
-  if (failed(matchFoldWriteSlices(loopOp, writesByResult))) {
+  if (failed(matchFoldWriteSlices(loopOp))) {
     return failure();
   }
 

@@ -175,6 +175,26 @@ fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
                                      PCF::GenericOp genericOp,
                                      tensor::CollapseShapeOp collapseOp);
 
+// Composes two nested slice parameter sets so the resulting slice addresses the
+// outer base directly. The outer slice describes how an intermediate value is
+// embedded in the final destination, and the inner slice describes how a value
+// is embedded in that intermediate.
+//
+// For each dimension present in both slices:
+//   offsets = outerOffset + innerOffset * outerStride
+//   sizes = innerSizes
+//   strides = outerStride * innerStride
+//
+// Any remaining outer dimensions are forwarded unchanged.
+LogicalResult composeNestedSliceParameters(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> outerOffsets,
+    ArrayRef<OpFoldResult> outerSizes, ArrayRef<OpFoldResult> outerStrides,
+    ArrayRef<OpFoldResult> innerOffsets, ArrayRef<OpFoldResult> innerSizes,
+    ArrayRef<OpFoldResult> innerStrides,
+    SmallVectorImpl<OpFoldResult> &composedOffsets,
+    SmallVectorImpl<OpFoldResult> &composedSizes,
+    SmallVectorImpl<OpFoldResult> &composedStrides);
+
 // Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
 // scf.forall terminator. The write_slice's destination must be produced by the
 // forall op, and the parallel_insert_slice must be inserting into that result.
