@@ -814,6 +814,16 @@ static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
       return failure();
     }
   }
+  if (auto pdtsmma =
+          dyn_cast<IREE::GPU::PartialDataTiledScaledMMAAttr>(intrinsic)) {
+    switch (pdtsmma.getIntrinsic()) {
+    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+      return XorShuffleParams({/*rowElems=*/256,
+                               /*accessElems=*/32});
+    default:
+      return failure();
+    }
+  }
   return failure();
 }
 

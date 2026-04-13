@@ -87,17 +87,12 @@ DataTiledMMAInterfaceAttr::getUndistributedTileDimExpansion(
   return std::nullopt;
 }
 
-LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
-    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+LogicalResult populateSwizzleBasedOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, const TileSwizzle &swizzle,
+    Value threadId, ArrayRef<int64_t> permutation,
+    SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) {
-  TileSwizzle swizzle = getTileSwizzle(operandIndex);
-
-  LDBG() << "DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides\n"
-         << "    operand: " << operandIndex << "\n"
-         << "    swizzle: " << swizzle << "\n";
-
   SmallVector<int64_t> distributionThreadSizes =
       getSwizzledDistributionShape(swizzle);
 
@@ -151,6 +146,21 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   strides.append(tileStrides);
 
   return success();
+}
+
+LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) {
+  TileSwizzle swizzle = getTileSwizzle(operandIndex);
+
+  LDBG() << "DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides\n"
+         << "    operand: " << operandIndex << "\n"
+         << "    swizzle: " << swizzle << "\n";
+
+  return populateSwizzleBasedOffsetsSizesStrides(
+      builder, loc, swizzle, threadId, permutation, offsets, sizes, strides);
 }
 
 Attribute DataTiledMMAInterfaceAttr::getDistributionMappingKind() {

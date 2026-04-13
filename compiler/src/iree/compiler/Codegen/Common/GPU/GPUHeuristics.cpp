@@ -516,6 +516,16 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                               mTotalTileToDistribute % splitFactor == 0;
   bool canNDistributeEvenly = nTotalTileToDistribute > splitFactor &&
                               nTotalTileToDistribute % splitFactor == 0;
+
+  // PartialDataTiledScaledMMAAttr needs more subgroups on N than M so that the
+  // scale-operand swizzle encodes correctly. When both dimensions can
+  // distribute evenly, suppress M so the N-first branch is taken.
+  if (canMDistributeEvenly && canNDistributeEvenly &&
+      isa_and_nonnull<IREE::GPU::PartialDataTiledScaledMMAAttr>(
+          intrinsic.mmaKind)) {
+    canMDistributeEvenly = false;
+  }
+
   if (canMDistributeEvenly) {
     LDBG() << "Distributing seed evenly to M dim";
     distributeSqrtForDim(true, subgroupSqrt, tileSqrt, mTotalTileToDistribute,

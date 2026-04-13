@@ -111,6 +111,26 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   };
   if (ukernelConfig) {
     op->setAttr(kUkernelAttrName, ukernelConfig);
+  } else if (auto partialDT = dyn_cast<GPU::PartialDataTiledScaledMMAAttr>(
+                 dataTiledMmaAttr)) {
+    // PartialDataTiledScaledMMAAttr keeps data in row-major layout (no
+    // transpose), which causes LDS bank conflicts. Apply XOR swizzle on the
+    // promoted data operands to avoid them.
+    auto defaultCfg = GPU::DerivedThreadConfigAttr::get(context);
+    FailureOr<Attribute> lhsSwizzle =
+        getXorShuffleAttr(context, defaultCfg, target, partialDT,
+                          /*reductionTileSizes=*/{}, kScaledMMAOperandLhs);
+    FailureOr<Attribute> rhsSwizzle =
+        getXorShuffleAttr(context, defaultCfg, target, partialDT,
+                          /*reductionTileSizes=*/{}, kScaledMMAOperandRhs);
+    if (succeeded(lhsSwizzle) && succeeded(rhsSwizzle)) {
+      SmallVector<Attribute> promotionArray = {*lhsSwizzle, *rhsSwizzle,
+                                               defaultCfg, defaultCfg};
+      GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2, 3},
+                                      promotionArray);
+    } else {
+      GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2, 3});
+    }
   } else {
     // Promote operands to use shared memory for LHS and RHS.
     // Don't do that with ukernels: their untiled reduction dimension is too
@@ -123,9 +143,13 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // By default, don't add any special padding or prefetching, since the
-  // data-tiled layout is already what we want.
+  // data-tiled layout is already what we want. For
+  // PartialDataTiledScaledMMAAttr default to 2 prefetch stages to enable
+  // software pipelining.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  int64_t prefetchStages = prefetchNumStages.value_or(0);
+  int64_t defaultPrefetch =
+      isa<GPU::PartialDataTiledScaledMMAAttr>(dataTiledMmaAttr) ? 2 : 0;
+  int64_t prefetchStages = prefetchNumStages.value_or(defaultPrefetch);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchNumStages=*/prefetchStages,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
@@ -299,11 +323,11 @@ getContractionHeuristicSeeds(IREE::GPU::TargetAttr target,
 /// When `doCPromotion` is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
-static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm, bool scaled,
-    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned = true,
-    bool doCPromotion = false, int64_t splitReductionTripCnt = 0) {
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
+    bool doCPromotion, int64_t splitReductionTripCnt) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -730,16 +754,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
   bool couldNeedPadding = false;
 
-  // Helper to pad bounds to a preferred alignment.
-  auto maybePaddedBounds = [&](int64_t originalBound,
-                               int64_t alignment) -> int64_t {
-    int64_t remainder = originalBound % alignment;
-    if (remainder == 0) {
-      return originalBound;
-    }
-    couldNeedPadding = true;
-    return originalBound + alignment - remainder;
-  };
   // Since the TileAndFuse (I)GEMM pipeline can support padding we can align
   // the bounds of our problem so that we get favorable tile sizes.
   // Please see the document linked in
@@ -754,17 +768,15 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                           bool paddingCanBeExpensive) -> SmallVector<int64_t> {
     return llvm::map_to_vector(dims, [&](int64_t dim) {
       if (ShapedType::isDynamic(bounds[dim]) || !canSupportUnaligned ||
-          paddingCanBeExpensive) {
+          paddingCanBeExpensive || bounds[dim] <= 32) {
         return bounds[dim];
       }
-      if (bounds[dim] > 128) {
-        return maybePaddedBounds(bounds[dim], 128);
+      int64_t alignment = bounds[dim] > 128 ? 128 : 32;
+      int64_t padded = padBoundForHeuristic(bounds[dim], alignment);
+      if (padded != bounds[dim]) {
+        couldNeedPadding = true;
       }
-      if (bounds[dim] > 32) {
-        return maybePaddedBounds(bounds[dim], 32);
-      }
-
-      return bounds[dim];
+      return padded;
     });
   };
 

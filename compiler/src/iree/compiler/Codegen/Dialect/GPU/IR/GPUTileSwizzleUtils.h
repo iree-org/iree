@@ -23,6 +23,14 @@ Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
 Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                                 unsigned operandIdx);
 
+/// Returns the swizzle for the partial-data-tiled-scaled-mma tile. For data
+/// operands (LHS, RHS), returns the standard swizzle with an identity
+/// permutation (pack-only, row-major within tile). For scale/acc operands,
+/// returns the standard permuted swizzle.
+Codegen::TileSwizzle
+getSwizzle(IREE::GPU::PartialDataTiledScaledMMAAttr partialMma,
+           unsigned operandIdx);
+
 /// Returns the swizzle for the data-tiled-mma tile, based on the `fragment`
 /// and contraction dimensions required from the `encoding`.
 FailureOr<Codegen::TileSwizzle>
