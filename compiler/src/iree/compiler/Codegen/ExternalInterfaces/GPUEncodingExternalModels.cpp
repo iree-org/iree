@@ -216,12 +216,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // * Note that typically, the load bitwidth unrolling factor will be 1, so the
   // total K unrolling factor will just be the scales vector size.
   if (auto scaledMmaAttr = dyn_cast<ScaledMMAAttr>(intrinsicAttr)) {
-    if (clPartialDTScaledMMA) {
-      intrinsicsK = 2;
-    } else {
-      intrinsicsK =
+    intrinsicsK =
           std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
-    }
   }
 
   // The total amount of unrolling along the M and N dimensions is normally
@@ -401,6 +397,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
         subgroupsN = schedule->getTotalNSubgroupCount();
         intrinsicsK = schedule->getTotalKTileSize();
         subgroupsK = 1;
+      } else {
+        intrinsicsK = 2;
       }
     }
     auto scaledMmaInterleaveM =
@@ -593,18 +591,10 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsScalesExprs, ctx));
     indexingMaps.push_back(AffineMap::get(numDims, 0, rhsScalesExprs, ctx));
     indexingMaps.push_back(AffineMap::get(numDims, 0, accExprs, ctx));
-    if (auto partialAttr =
-            dyn_cast<IREE::GPU::PartialDataTiledScaledMMAAttr>(
-                dataTiledAttr)) {
-      return Codegen::InnerTiledOp::create(
-          builder, loc, operands.take_front(inputs.size()),
-          operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-          partialAttr, semantics);
-    }
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr), semantics);
+        cast<Codegen::InnerTileDescAttrInterface>(dataTiledAttr), semantics);
   }
   default: {
     assert(false && "unexpected encoding op type");
