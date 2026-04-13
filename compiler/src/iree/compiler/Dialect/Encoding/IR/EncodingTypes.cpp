@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
+#include "EncodingTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -166,7 +167,7 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   return failure();
 }
 
-std::string stringifyOperandIndex(IntegerAttr valueAttr) {
+static std::string stringifyMatmulOperandIndex(IntegerAttr valueAttr) {
   uint64_t value = valueAttr.getValue().getZExtValue();
   switch (value) {
   case MATMUL_LHS:
@@ -176,7 +177,57 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
   case MATMUL_RESULT:
     return "RESULT";
   default:
-    return "OPERAND" + std::to_string(value);
+    assert(false && "invalid index");
+    return "";
+  }
+}
+
+static std::string stringifyScaledMatmulOperandIndex(IntegerAttr valueAttr) {
+  uint64_t value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case SCALED_MATMUL_LHS:
+    return "LHS";
+  case SCALED_MATMUL_LHS_SCALES:
+    return "LHS_SCALES";
+  case SCALED_MATMUL_RHS:
+    return "RHS";
+  case SCALED_MATMUL_RHS_SCALES:
+    return "RHS_SCALES";
+  case SCALED_MATMUL_RESULT:
+    return "RESULT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
+}
+
+static std::string stringifyConvOperandIndex(IntegerAttr valueAttr) {
+  uint64_t value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case CONV_IN:
+    return "IN";
+  case CONV_FILTER:
+    return "FILTER";
+  case CONV_OUT:
+    return "OUT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
+}
+
+std::string stringifyOperandIndex(EncodingOpType opType,
+                                  IntegerAttr valueAttr) {
+  switch (opType) {
+  case EncodingOpType::matmul:
+    return stringifyMatmulOperandIndex(valueAttr);
+  case EncodingOpType::scaled_matmul:
+    return stringifyScaledMatmulOperandIndex(valueAttr);
+  case EncodingOpType::conv:
+    return stringifyConvOperandIndex(valueAttr);
+  default:
+    assert(false && "invalid index");
+    return "";
   }
 }
 

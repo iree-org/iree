@@ -20,6 +20,8 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+enum class EncodingOpType : uint32_t;
+
 static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
 
 /// Assign a name to operand indices for clarity
@@ -38,7 +40,8 @@ const int64_t CONV_FILTER = 1;
 const int64_t CONV_OUT = 2;
 
 /// Convert operand index to strings for printing
-std::string stringifyOperandIndex(IntegerAttr);
+std::string stringifyOperandIndex(EncodingOpType opType,
+                                  IntegerAttr operandIndex);
 
 /// Designates a dimension in a matmul (either the M or the N dimension) as
 /// being "narrow", i.e. small enough that we bother lowering the amount of
