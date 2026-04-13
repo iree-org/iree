@@ -147,14 +147,21 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 }
 
 /// Trace a memref value through view-like ops to find a SwizzleHintOp.
-/// Returns the swizzle attribute if found, std::nullopt otherwise.
+/// Returns the swizzle attribute if it is an XOR swizzle (which is
+/// self-inverse), std::nullopt otherwise.
 static std::optional<IREE::Codegen::SwizzleAttrInterface>
 getDestSwizzleAttr(Value dest) {
   while (auto viewOp = dest.getDefiningOp<mlir::ViewLikeOpInterface>()) {
     dest = viewOp.getViewSource();
   }
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
-    return hintOp.getSwizzle();
+    auto swizzle = hintOp.getSwizzle();
+    // Only XOR swizzle is self-inverse (swizzle(swizzle(x)) = x), so it can
+    // be applied to source addresses as the inverse transformation. Other
+    // swizzle types (e.g. rotate_rows) are not self-inverse.
+    if (isa<IREE::Codegen::XORShuffleAttr>(swizzle)) {
+      return swizzle;
+    }
   }
   return std::nullopt;
 }
