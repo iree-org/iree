@@ -356,6 +356,38 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                    ArrayRef<Operation *> targets,
                                    IREE::Flow::DispatchRegionOp regionOp) {
+  llvm::SetVector<Operation *> targetSet;
+  targetSet.insert(targets.begin(), targets.end());
+
+  // Gather values that would need to be rewritten to dispatch results and
+  // ensure their external users can move below the dispatch.
+  SmallVector<Value> precheckReplacedValues;
+  for (Operation *target : llvm::reverse(targets)) {
+    for (Value result : target->getResults()) {
+      bool hasUsesOutsideOfRegion =
+          llvm::any_of(result.getUses(), [&](OpOperand &use) {
+            Operation *user = use.getOwner();
+            return !regionOp->isProperAncestor(user) &&
+                   !targetSet.contains(user);
+          });
+      if (hasUsesOutsideOfRegion) {
+        precheckReplacedValues.push_back(result);
+      }
+    }
+  }
+  Block &body = regionOp.getBody().front();
+  Block *dispatchBlock = regionOp->getBlock();
+  SmallVector<Operation *> bodyOps;
+  for (Operation &op : body) {
+    bodyOps.push_back(&op);
+  }
+  auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
+  if (hasUnmovableUse(dispatchBlock, regionOp, regionOp, precheckReplacedValues,
+                      bodyOps, isInTargetSet)) {
+    return rewriter.notifyMatchFailure(
+        regionOp, "external user cannot be moved after dispatch");
+  }
+
   // Values replaced by moving the `targets` into the dispatch region.
   SmallVector<Value> replacedValues;
 
@@ -365,11 +397,6 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
   // New values that are yielded from dispatch.
   SmallVector<Value> yieldedResults;
-
-  llvm::SetVector<Operation *> targetSet;
-  targetSet.insert(targets.begin(), targets.end());
-
-  Block &body = regionOp.getBody().front();
   for (Operation *target : llvm::reverse(targets)) {
     // Clone op into dispatch region.
     OpBuilder::InsertionGuard g(rewriter);
@@ -384,7 +411,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
             // The use is not in
             // 1. the current dispatch
             // 2. Not in one of the targets.
-            return !regionOp->isProperAncestor(user) && !targetSet.count(user);
+            return !regionOp->isProperAncestor(user) &&
+                   !targetSet.contains(user);
           });
       if (hasUsesOutsideOfRegion) {
         replacedValues.push_back(result);
@@ -403,20 +431,6 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
     rewriter.replaceOpUsesWithinBlock(target, clonedTarget->getResults(),
                                       &body);
-  }
-
-  // Any external user left before the dispatch would lose dominance when its
-  // operand is rewritten to a dispatch result.
-  Block *dispatchBlock = regionOp->getBlock();
-  SmallVector<Operation *> bodyOps;
-  for (Operation &op : body) {
-    bodyOps.push_back(&op);
-  }
-  auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
-  if (hasUnmovableUse(dispatchBlock, regionOp, regionOp, replacedValues,
-                      bodyOps, isInTargetSet)) {
-    return rewriter.notifyMatchFailure(
-        regionOp, "external user cannot be moved after dispatch");
   }
 
   // Collect all ops that must be moved after the dispatch. Start from direct
