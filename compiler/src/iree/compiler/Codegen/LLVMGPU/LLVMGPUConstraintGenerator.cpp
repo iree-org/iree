@@ -10,8 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -37,15 +36,138 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
 }
 
 using IntKnobAttr = IREE::Codegen::IntKnobAttr;
+using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
 
-/// Build a flat knobs dict with workgroup tile knobs for each loop dim.
-static DictionaryAttr buildKnobsDict(MLIRContext *ctx, unsigned numLoops) {
-  SmallVector<Attribute> workgroupEntries;
-  for (unsigned d = 0; d < numLoops; ++d) {
-    workgroupEntries.push_back(IntKnobAttr::get(ctx, ("wg_" + Twine(d)).str()));
+/// Helper to create an i64 IntegerAttr with a fixed value.
+static Attribute makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
+  return IntegerAttr::get(IntegerType::get(ctx, 64), value);
+}
+
+/// Helper to create a IntKnobAttr.
+static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
+  return IREE::Codegen::IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
+}
+
+/// Get compatible MMA attrs for the given target and element types.
+/// Uses the same filtering as KernelConfig.cpp: subgroup size and
+/// distribution mapping kind, plus element type compatibility.
+/// Returns unique Attribute objects (MMAAttr and VirtualMMAAttr).
+static SmallVector<Attribute>
+getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget, Type lhsElemType,
+                      Type rhsElemType, Type accElemType, MLIRContext *ctx,
+                      bool includeVirtual = false) {
+  const int64_t targetSubgroupSize = gpuTarget.getPreferredSubgroupSize();
+
+  SmallVector<Attribute> attrs;
+  for (IREE::GPU::MMAAttr mma : gpuTarget.getWgp().getMma()) {
+    // Filter 1: Subgroup size.
+    if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Filter 2: Distribution mapping.
+    if (!mma.getDistributionMappingKind()) {
+      continue;
+    }
+    // Filter 3: Element type compatibility.
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (aType != lhsElemType || bType != rhsElemType) {
+      continue;
+    }
+    // Allow accumulator upcasting: MMA acc type can be narrower.
+    if (cType != accElemType &&
+        cType.getIntOrFloatBitWidth() > accElemType.getIntOrFloatBitWidth()) {
+      continue;
+    }
+
+    Attribute mmaAttr = Attribute(mma);
+    if (!llvm::is_contained(attrs, mmaAttr)) {
+      attrs.push_back(mmaAttr);
+    }
+
+    if (!includeVirtual) {
+      continue;
+    }
+    for (IREE::GPU::VirtualMMAIntrinsic vmma : mma.getVirtualIntrinsics()) {
+      auto vmmaAttr = Attribute(IREE::GPU::VirtualMMAAttr::get(ctx, vmma));
+      if (!llvm::is_contained(attrs, vmmaAttr)) {
+        attrs.push_back(vmmaAttr);
+      }
+    }
   }
+  return attrs;
+}
+
+/// Get compatible MMA attrs for a linalg op.
+static SmallVector<Attribute>
+getCompatibleMMAAttrsForLinalgOp(IREE::GPU::TargetAttr gpuTarget,
+                                 linalg::LinalgOp linalgOp) {
+  Type lhsElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
+  Type rhsElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(1)->get().getType());
+  Type accElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
+  return getCompatibleMMAAttrs(gpuTarget, lhsElemType, rhsElemType, accElemType,
+                               linalgOp.getContext());
+}
+
+/// Build the VectorDistribute knobs dict for contraction-like dims.
+static DictionaryAttr
+buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                               const ContractionLikeDims &dims,
+                               ArrayRef<Attribute> compatibleMMAs) {
   SmallVector<NamedAttribute> knobsEntries;
+
+  // Build workgroup array: M and N dims get IntKnobAttr, others get 0 : i64.
+  SmallVector<Attribute> workgroupEntries(loopInfo.numLoops,
+                                          makeIntAttr(ctx, 0));
+  for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
+    for (unsigned d : dimSet) {
+      workgroupEntries[d] = makeIntKnob(ctx, "wg_" + std::to_string(d));
+    }
+  }
   knobsEntries.emplace_back("workgroup", ArrayAttr::get(ctx, workgroupEntries));
+
+  // Build reduction array: K dims get IntKnobAttr, others get 0 : i64.
+  SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
+                                          makeIntAttr(ctx, 0));
+  for (unsigned d : dims.k) {
+    reductionEntries[d] = IntKnobAttr::get(ctx, "red_" + std::to_string(d));
+  }
+  knobsEntries.emplace_back("reduction", ArrayAttr::get(ctx, reductionEntries));
+
+  // Add mma_kind knob.
+  knobsEntries.emplace_back(
+      "mma_kind", OneOfKnobAttr::get(ctx, StringAttr::get(ctx, "mma_idx"),
+                                     ArrayAttr::get(ctx, compatibleMMAs)));
+
+  // Build subgroup basis with counts and mapping.
+  SmallVector<NamedAttribute> subgroupBasisEntries;
+  // Only innermost M and N dims get subgroup tiling, others stay 1.
+  SmallVector<Attribute> subgroupCounts(loopInfo.numLoops, makeIntAttr(ctx, 1));
+  // A successful call to linalg::inferContractionDims guarantees that dims.m
+  // and dims.n are non-empty.
+  subgroupCounts[dims.m.back()] = makeIntKnob(ctx, "sg_m_cnt");
+  subgroupCounts[dims.n.back()] = makeIntKnob(ctx, "sg_n_cnt");
+  subgroupBasisEntries.emplace_back("counts",
+                                    ArrayAttr::get(ctx, subgroupCounts));
+  SmallVector<Attribute> subgroupMapping;
+  for (size_t i = 0; i < loopInfo.numLoops; ++i) {
+    subgroupMapping.push_back(makeIntAttr(ctx, i));
+  }
+  subgroupBasisEntries.emplace_back("mapping",
+                                    ArrayAttr::get(ctx, subgroupMapping));
+  knobsEntries.emplace_back("subgroup_basis",
+                            DictionaryAttr::get(ctx, subgroupBasisEntries));
+
+  // Add workgroup size and subgroup size at the top level.
+  SmallVector<Attribute> wgSizeKnobs;
+  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_x"));
+  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_y"));
+  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_z"));
+  knobsEntries.emplace_back("workgroup_size", ArrayAttr::get(ctx, wgSizeKnobs));
+  knobsEntries.emplace_back("subgroup_size", makeIntKnob(ctx, "sg_size"));
+
   return DictionaryAttr::get(ctx, knobsEntries);
 }
 
@@ -69,63 +191,107 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
   return success();
 }
 
-static LogicalResult
-emitContractionConstraints(OpBuilder &builder, Operation *rootOp,
-                           const ConstraintsOpShell &shell) {
-  return emitConstraints(builder, rootOp, shell.smtDimArgs);
+/// Contraction-like dimension classification used by both matmul and conv.
+struct ContractionLikeDims {
+  SmallVector<unsigned> m;
+  SmallVector<unsigned> n;
+  SmallVector<unsigned> k;
+};
+
+/// Get contraction-like (m,n,k) dims for a linalg op.
+/// Only supports contraction and convolution today.
+static FailureOr<ContractionLikeDims>
+inferContractionLikeDims(linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    auto contractionDims = linalg::inferContractionDims(linalgOp);
+    if (failed(contractionDims)) {
+      return failure();
+    }
+    return ContractionLikeDims{contractionDims->m, contractionDims->n,
+                               contractionDims->k};
+  }
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+    auto convolutionDims = linalg::inferConvolutionDims(linalgOp);
+    if (failed(convolutionDims) || convolutionDims->outputImage.empty() ||
+        convolutionDims->outputChannel.empty() ||
+        convolutionDims->inputChannel.empty()) {
+      return failure();
+    }
+    // Maps outputImage→M, outputChannel→N, inputChannel→K.
+    return ContractionLikeDims{convolutionDims->outputImage,
+                               convolutionDims->outputChannel,
+                               convolutionDims->inputChannel};
+  }
+  return failure();
 }
 
-static LogicalResult
-emitConvolutionConstraints(OpBuilder &builder, Operation *rootOp,
-                           const ConstraintsOpShell &shell) {
-  return emitConstraints(builder, rootOp, shell.smtDimArgs);
-}
-
-static LogicalResult emitAttentionConstraints(OpBuilder &builder,
-                                              Operation *rootOp,
-                                              const ConstraintsOpShell &shell) {
-  return emitConstraints(builder, rootOp, shell.smtDimArgs);
-}
-
-/// Emit constraints for a single root op under VectorDistribute pipeline.
-/// Supported root ops are AttentionOp, linalg contraction ops, and linalg
-/// convolution ops.
-static LogicalResult emitConstraintsForOp(Operation *rootOp,
-                                          Attribute pipelineAttr) {
-  unsigned numLoops = 0;
+/// Problem size, loop count, and indexing maps for a root op.
+struct RootOpLoopInfo {
+  SmallVector<int64_t> staticLoopRanges;
+  unsigned numLoops;
   SmallVector<AffineMap> indexingMaps;
+};
 
-  if (isa<IREE::LinalgExt::AttentionOp>(rootOp)) {
-    auto fusionOp = cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
-    numLoops = fusionOp.getNumLoops();
-    indexingMaps = fusionOp.getIndexingMapsArray();
-  } else if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    numLoops = linalgOp.getNumLoops();
-    indexingMaps = linalgOp.getIndexingMapsArray();
-  } else {
+/// Returns loop info for supported root ops.
+static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    return RootOpLoopInfo{linalgOp.getStaticLoopRanges(),
+                          linalgOp.getNumLoops(),
+                          linalgOp.getIndexingMapsArray()};
+  }
+  return std::nullopt;
+}
+
+/// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
+static LogicalResult
+emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                                const ContractionLikeDims &dims,
+                                IREE::GPU::TargetAttr gpuTarget,
+                                ArrayRef<Value> smtDimArgs) {
+  Location loc = linalgOp.getLoc();
+  return success();
+}
+
+/// Emit constraints for a single root op under the VectorDistribute pipeline.
+/// Only supports linalg contraction and convolution today.
+static LogicalResult
+emitVectorDistributeConstraintsForOp(Operation *rootOp, Attribute rootOpAttr) {
+  // Gate on contraction-like linalg ops.
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp) ||
+      !linalg::isaConvolutionOpInterface(linalgOp)) {
+    return success();
+  }
+
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(rootOp);
+  if (!gpuTarget) {
+    return success();
+  }
+
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(rootOp);
+  if (!loopInfo) {
+    return success();
+  }
+
+  auto dims = inferContractionLikeDims(linalgOp);
+  if (failed(dims)) {
     return success();
   }
 
   MLIRContext *ctx = rootOp->getContext();
   OpBuilder builder(ctx);
-  DictionaryAttr knobs = buildKnobsDict(ctx, numLoops);
-  ConstraintsOpShell shell =
-      createConstraintsOpShell(builder, rootOp, getRootOpInfo(rootOp),
-                               pipelineAttr, knobs, numLoops, indexingMaps);
+  auto compatibleMMAs = getCompatibleMMAAttrsForLinalgOp(gpuTarget, linalgOp);
+  DictionaryAttr knobs =
+      buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
+  Attribute pipelineAttr = Attribute(
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute);
 
-  if (isa<IREE::LinalgExt::AttentionOp>(rootOp)) {
-    return emitAttentionConstraints(builder, rootOp, shell);
-  }
+  auto shell =
+      createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
+                               loopInfo->numLoops, loopInfo->indexingMaps);
 
-  auto linalgOp = cast<linalg::LinalgOp>(rootOp);
-  if (linalg::isaContractionOpInterface(linalgOp)) {
-    return emitContractionConstraints(builder, rootOp, shell);
-  }
-  if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    return emitConvolutionConstraints(builder, rootOp, shell);
-  }
-
-  return success();
+  return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
+                                         shell.smtDimArgs);
 }
 
 LogicalResult emitLLVMGPUConstraints(Attribute attr,
@@ -143,8 +309,8 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
   if (!tunableOp) {
     return success();
   }
-
-  return emitConstraintsForOp(tunableOp, pipelineAttr);
+  auto OpAttr = tunableOp->getAttrOfType<IREE::Codegen::RootOpAttr>("root_op");
+  return emitVectorDistributeConstraintsForOp(tunableOp, opAttr);
 }
 
 } // namespace mlir::iree_compiler
