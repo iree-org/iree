@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -28,6 +30,18 @@ using ::testing::ContainerEq;
 namespace {
 constexpr iree_device_size_t kMinimumAlignment = 128;
 constexpr iree_device_size_t kLargeFdFileSize = 20 * 1024 * 1024;
+
+uint8_t PatternByte(size_t index) {
+  return static_cast<uint8_t>((index * 7 + 13) & 0xFF);
+}
+
+std::vector<uint8_t> MakePatternData(size_t size) {
+  std::vector<uint8_t> data(size);
+  for (size_t i = 0; i < size; ++i) {
+    data[i] = PatternByte(i);
+  }
+  return data;
+}
 }  // namespace
 
 class FileTest : public CtsTestBase<> {
@@ -54,16 +68,21 @@ class FileTest : public CtsTestBase<> {
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
         device_allocator_, params, buffer_size, &device_buffer));
 
+    FillDeviceBufferRange(device_buffer, 0, buffer_size, pattern);
+    *out_buffer = device_buffer;
+  }
+
+  void FillDeviceBufferRange(iree_hal_buffer_t* buffer,
+                             iree_device_size_t offset,
+                             iree_device_size_t length, uint8_t pattern) {
+    if (length == 0) return;
     SemaphoreList empty_wait;
     SemaphoreList fill_signal(device_, {0}, {1});
     IREE_ASSERT_OK(iree_hal_device_queue_fill(
-        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, fill_signal,
-        device_buffer, 0, buffer_size, &pattern, sizeof(pattern),
-        IREE_HAL_FILL_FLAG_NONE));
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, fill_signal, buffer,
+        offset, length, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-
-    *out_buffer = device_buffer;
   }
 
   void CreatePatternedMemoryFile(iree_hal_memory_access_t access,
@@ -95,6 +114,7 @@ class FileTest : public CtsTestBase<> {
   // Creates a temp file on disk with |data|, returns the path.
   // The file is closed after writing.
   std::string CreateTempFileWithContents(const void* data, size_t length) {
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
 #if defined(IREE_PLATFORM_WINDOWS)
     char temp_dir[MAX_PATH] = {0};
     GetTempPathA(MAX_PATH, temp_dir);
@@ -103,9 +123,24 @@ class FileTest : public CtsTestBase<> {
     HANDLE handle = CreateFileA(temp_path, GENERIC_WRITE, 0, NULL,
                                 CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     EXPECT_NE(handle, INVALID_HANDLE_VALUE);
-    DWORD bytes_written = 0;
-    WriteFile(handle, data, (DWORD)length, &bytes_written, NULL);
-    CloseHandle(handle);
+    size_t total_written = 0;
+    if (handle != INVALID_HANDLE_VALUE) {
+      while (total_written < length) {
+        const size_t remaining = length - total_written;
+        const DWORD chunk_length =
+            static_cast<DWORD>(std::min<size_t>(remaining, UINT32_MAX));
+        DWORD bytes_written = 0;
+        const BOOL did_write = WriteFile(handle, bytes + total_written,
+                                         chunk_length, &bytes_written, NULL);
+        EXPECT_TRUE(did_write);
+        if (!did_write) break;
+        EXPECT_GT(bytes_written, 0u);
+        if (bytes_written == 0) break;
+        total_written += bytes_written;
+      }
+      CloseHandle(handle);
+    }
+    EXPECT_EQ(total_written, length);
     temp_paths_.push_back(temp_path);
     return temp_path;
 #else
@@ -113,8 +148,16 @@ class FileTest : public CtsTestBase<> {
     int fd = mkstemp(temp_path);
     EXPECT_GE(fd, 0);
     if (fd >= 0) {
-      ssize_t written = write(fd, data, length);
-      EXPECT_EQ(written, static_cast<ssize_t>(length));
+      size_t total_written = 0;
+      while (total_written < length) {
+        ssize_t written =
+            write(fd, bytes + total_written, length - total_written);
+        if (written < 0 && errno == EINTR) continue;
+        EXPECT_GT(written, 0);
+        if (written <= 0) break;
+        total_written += static_cast<size_t>(written);
+      }
+      EXPECT_EQ(total_written, length);
       close(fd);
     }
     temp_paths_.push_back(temp_path);
@@ -250,6 +293,48 @@ class FileTest : public CtsTestBase<> {
 
     iree_hal_file_release(file);
     return data;
+  }
+
+  void ExpectByteRangeRepeated(const std::vector<uint8_t>& data, size_t offset,
+                               size_t length, uint8_t pattern) {
+    ASSERT_LE(offset, data.size());
+    ASSERT_LE(length, data.size() - offset);
+    for (size_t i = 0; i < length; ++i) {
+      if (data[offset + i] != pattern) {
+        ADD_FAILURE() << "byte mismatch at offset " << (offset + i)
+                      << ": expected 0x" << std::hex
+                      << static_cast<int>(pattern) << ", got 0x"
+                      << static_cast<int>(data[offset + i]);
+        return;
+      }
+    }
+  }
+
+  void ExpectByteRangeMatches(const std::vector<uint8_t>& data, size_t offset,
+                              const std::vector<uint8_t>& expected) {
+    ASSERT_LE(offset, data.size());
+    ASSERT_LE(expected.size(), data.size() - offset);
+    if (!expected.empty()) {
+      EXPECT_EQ(memcmp(data.data() + offset, expected.data(), expected.size()),
+                0);
+    }
+  }
+
+  void ExpectBufferRangeMatches(iree_hal_buffer_t* buffer,
+                                iree_device_size_t offset,
+                                const std::vector<uint8_t>& expected) {
+    std::vector<uint8_t> contents =
+        ReadBufferContents(buffer, offset, expected.size());
+    ASSERT_EQ(contents.size(), expected.size());
+    ExpectByteRangeMatches(contents, 0, expected);
+  }
+
+  void ExpectBufferRangeRepeated(iree_hal_buffer_t* buffer,
+                                 iree_device_size_t offset,
+                                 iree_device_size_t length, uint8_t pattern) {
+    std::vector<uint8_t> contents = ReadBufferContents(buffer, offset, length);
+    ASSERT_EQ(contents.size(), length);
+    ExpectByteRangeRepeated(contents, 0, contents.size(), pattern);
   }
 
   std::vector<std::string> temp_paths_;
@@ -835,10 +920,7 @@ TEST_P(FileTest, FdFileReadModifyWrite) {
 // bounded staging.
 TEST_P(FileTest, FdFileLargeRead) {
   const iree_device_size_t file_size = kLargeFdFileSize;
-  std::vector<uint8_t> file_data(file_size);
-  for (size_t i = 0; i < file_size; ++i) {
-    file_data[i] = static_cast<uint8_t>((i * 7 + 13) & 0xFF);
-  }
+  std::vector<uint8_t> file_data = MakePatternData(file_size);
   std::string path = CreateTempFileWithContents(file_data.data(), file_size);
 
   iree_hal_file_t* file = NULL;
@@ -848,14 +930,45 @@ TEST_P(FileTest, FdFileLargeRead) {
 
   QueueReadAndWait(file, 0, buffer, 0, file_size);
 
-  // Spot-check several positions rather than comparing 256KB.
   auto contents = ReadBufferContents(buffer, 0, file_size);
+  ASSERT_EQ(contents.size(), file_data.size());
   EXPECT_EQ(contents[0], file_data[0]);
   EXPECT_EQ(contents[1000], file_data[1000]);
   EXPECT_EQ(contents[file_size / 2], file_data[file_size / 2]);
   EXPECT_EQ(contents[file_size - 1], file_data[file_size - 1]);
-  ASSERT_EQ(contents.size(), file_data.size());
-  EXPECT_EQ(memcmp(contents.data(), file_data.data(), file_data.size()), 0);
+  ExpectByteRangeMatches(contents, 0, file_data);
+
+  iree_hal_buffer_release(buffer);
+  iree_hal_file_release(file);
+}
+
+// Reads a large subrange into a non-zero target offset, verifying both chunk
+// boundary math and that target padding is untouched.
+TEST_P(FileTest, FdFileLargeReadSubrangeWithPadding) {
+  const iree_device_size_t file_size = kLargeFdFileSize;
+  const iree_device_size_t source_offset = 1237;
+  const iree_device_size_t transfer_length = file_size - source_offset - 8191;
+  const iree_device_size_t target_offset = 4099;
+  const iree_device_size_t target_suffix_length = 3071;
+  const iree_device_size_t buffer_size =
+      target_offset + transfer_length + target_suffix_length;
+  std::vector<uint8_t> file_data = MakePatternData(file_size);
+  std::string path = CreateTempFileWithContents(file_data.data(), file_size);
+
+  iree_hal_file_t* file = NULL;
+  ImportFdFile(path, IREE_HAL_MEMORY_ACCESS_READ, &file);
+  iree_hal_buffer_t* buffer = NULL;
+  CreatePatternedDeviceBuffer(buffer_size, 0x5A, &buffer);
+
+  QueueReadAndWait(file, source_offset, buffer, target_offset, transfer_length);
+
+  ExpectBufferRangeRepeated(buffer, 0, target_offset, 0x5A);
+  std::vector<uint8_t> expected(
+      file_data.begin() + static_cast<size_t>(source_offset),
+      file_data.begin() + static_cast<size_t>(source_offset + transfer_length));
+  ExpectBufferRangeMatches(buffer, target_offset, expected);
+  ExpectBufferRangeRepeated(buffer, target_offset + transfer_length,
+                            target_suffix_length, 0x5A);
 
   iree_hal_buffer_release(buffer);
   iree_hal_file_release(file);
@@ -881,12 +994,40 @@ TEST_P(FileTest, FdFileLargeWrite) {
   EXPECT_EQ(contents[1000], 0xA7);
   EXPECT_EQ(contents[file_size / 2], 0xA7);
   EXPECT_EQ(contents[file_size - 1], 0xA7);
-  for (uint8_t byte : contents) {
-    if (byte != 0xA7) {
-      ADD_FAILURE() << "large fd write contents did not match pattern";
-      break;
-    }
-  }
+  ExpectByteRangeRepeated(contents, 0, contents.size(), 0xA7);
+
+  iree_hal_buffer_release(buffer);
+  iree_hal_file_release(file);
+}
+
+// Writes a large subrange from a non-zero source offset, verifying both chunk
+// boundary math and that file padding is untouched.
+TEST_P(FileTest, FdFileLargeWriteSubrangeWithPadding) {
+  const iree_device_size_t file_size = kLargeFdFileSize;
+  const iree_device_size_t target_offset = 2049;
+  const iree_device_size_t transfer_length = file_size - target_offset - 4096;
+  const iree_device_size_t source_offset = 3073;
+  const iree_device_size_t source_suffix_length = 4091;
+  const iree_device_size_t buffer_size =
+      source_offset + transfer_length + source_suffix_length;
+  std::string path = CreatePatternedTempFile(file_size, 0x11);
+
+  iree_hal_file_t* file = NULL;
+  ImportFdFile(path, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+               &file);
+  iree_hal_buffer_t* buffer = NULL;
+  CreatePatternedDeviceBuffer(buffer_size, 0x3C, &buffer);
+  FillDeviceBufferRange(buffer, source_offset, transfer_length, 0xE6);
+
+  QueueWriteAndWait(buffer, source_offset, file, target_offset,
+                    transfer_length);
+
+  std::vector<uint8_t> contents = ReadTempFileContents(path, file_size);
+  ASSERT_EQ(contents.size(), file_size);
+  ExpectByteRangeRepeated(contents, 0, target_offset, 0x11);
+  ExpectByteRangeRepeated(contents, target_offset, transfer_length, 0xE6);
+  ExpectByteRangeRepeated(contents, target_offset + transfer_length,
+                          file_size - target_offset - transfer_length, 0x11);
 
   iree_hal_buffer_release(buffer);
   iree_hal_file_release(file);
