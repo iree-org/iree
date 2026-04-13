@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrInterfaces.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers
@@ -15,6 +16,13 @@
 // clang-format on: must be included after all LLVM/MLIR headers
 
 namespace mlir::iree_compiler::IREE::TensorExt {
+
+bool matchDimOp(Operation *op, Value &source, IntegerAttr &dimIndex) {
+  return matchPattern(op, m_Op<memref::DimOp>(matchers::m_Any(&source),
+                                              m_Constant(&dimIndex))) ||
+         matchPattern(op, m_Op<tensor::DimOp>(matchers::m_Any(&source),
+                                              m_Constant(&dimIndex)));
+}
 
 LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp) {
   // Check that the operation has only one result.
@@ -71,12 +79,11 @@ std::optional<SparseRangeResolver> getSparseRangeResolver(Range range) {
   SparseCastOpInterface sparseOp;
   int64_t resultDim;
 
-  // For now just check that the defining operation of the upper bound is a
-  // `memref.dim` operation of a result of a sparse operation.
+  // Check that the defining operation of the upper bound is a
+  // `memref.dim` or `tensor.dim` operation of a result of a sparse operation.
   Value ubSource;
   IntegerAttr dim;
-  if (!matchPattern(upperBound, m_Op<memref::DimOp>(matchers::m_Any(&ubSource),
-                                                    m_Constant(&dim)))) {
+  if (!matchDimOp(upperBound.getDefiningOp(), ubSource, dim)) {
     return std::nullopt;
   }
   sparseOp = ubSource.getDefiningOp<SparseCastOpInterface>();
