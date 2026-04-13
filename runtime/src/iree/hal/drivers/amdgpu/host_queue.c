@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
 #include "iree/hal/drivers/amdgpu/host_queue_dispatch.h"
 #include "iree/hal/drivers/amdgpu/host_queue_file.h"
+#include "iree/hal/drivers/amdgpu/host_queue_host_call.h"
 #include "iree/hal/drivers/amdgpu/host_queue_memory.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
@@ -998,6 +999,14 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
         if (iree_status_is_ok(status)) {
           op->retained_resource_count = 0;
+        }
+        break;
+      case IREE_HAL_AMDGPU_PENDING_OP_HOST_CALL:
+        status = iree_hal_amdgpu_host_queue_submit_host_call(
+            queue, &resolution, op->signal_semaphore_list, op->host_call.call,
+            op->host_call.args, op->host_call.flags);
+        if (iree_status_is_ok(status)) {
+          iree_hal_amdgpu_pending_op_release_retained(op);
         }
         break;
       default:
@@ -2434,14 +2443,59 @@ static iree_status_t iree_hal_amdgpu_host_queue_write(
       source_offset, target_file, target_offset, length, flags);
 }
 
+static iree_status_t iree_hal_amdgpu_host_queue_defer_host_call(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t* wait_semaphore_list,
+    const iree_hal_semaphore_list_t* signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags, iree_hal_amdgpu_pending_op_t** out_op) {
+  uint16_t max_resources = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      signal_semaphore_list->count,
+      /*operation_resource_count=*/0, &max_resources));
+  iree_hal_amdgpu_pending_op_t* op = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
+      queue, wait_semaphore_list, signal_semaphore_list,
+      IREE_HAL_AMDGPU_PENDING_OP_HOST_CALL, max_resources, &op));
+  op->host_call.call = call;
+  memcpy(op->host_call.args, args, sizeof(op->host_call.args));
+  op->host_call.flags = flags;
+  *out_op = op;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_amdgpu_host_queue_host_call(
     iree_hal_amdgpu_virtual_queue_t* base_queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_host_call_t call, const uint64_t args[4],
     iree_hal_host_call_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "host_queue host_call not yet implemented");
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_validate_host_call(call, args, flags));
+
+  iree_hal_amdgpu_host_queue_t* queue =
+      (iree_hal_amdgpu_host_queue_t*)base_queue;
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_hal_amdgpu_wait_resolution_t resolution;
+  iree_hal_amdgpu_host_queue_resolve_waits(queue, wait_semaphore_list,
+                                           &resolution);
+  iree_status_t status = iree_ok_status();
+  iree_hal_amdgpu_pending_op_t* deferred_op = NULL;
+  if (resolution.needs_deferral) {
+    status = iree_hal_amdgpu_host_queue_defer_host_call(
+        queue, &wait_semaphore_list, &signal_semaphore_list, call, args, flags,
+        &deferred_op);
+  } else {
+    status = iree_hal_amdgpu_host_queue_submit_host_call(
+        queue, &resolution, signal_semaphore_list, call, args, flags);
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  if (iree_status_is_ok(status) && deferred_op) {
+    status = iree_hal_amdgpu_pending_op_enqueue_waits(deferred_op);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_flush(
