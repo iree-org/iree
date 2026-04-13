@@ -6,10 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
@@ -1016,19 +1013,22 @@ struct ConvertTransferScatter final
   }
 };
 
-/// Convert util.return with 1:N type-converted operands.
-struct ConvertUtilReturn final
-    : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+/// Convert any ReturnLike op with 1:N type-converted operands.
+struct ConvertReturnLike final
+    : public OpTraitConversionPattern<OpTrait::ReturnLike> {
+  using Base::Base;
 
   LogicalResult
-  matchAndRewrite(IREE::Util::ReturnOp op, OneToNOpAdaptor adaptor,
+  matchAndRewrite(Operation *op, ArrayRef<ValueRange> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    if (!op->hasTrait<OpTrait::ReturnLike>()) {
+      return failure();
+    }
     SmallVector<Value> flatOperands;
-    for (ValueRange vals : adaptor.getOperands()) {
+    for (ValueRange vals : operands) {
       llvm::append_range(flatOperands, vals);
     }
-    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(op, flatOperands);
+    rewriter.modifyOpInPlace(op, [&] { op->setOperands(flatOperands); });
     return success();
   }
 };
@@ -1047,15 +1047,14 @@ struct LLVMGPULegalizeNDVectorsPass final
     scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
     populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                         typeConverter);
-    populateReturnOpTypeConversionPattern(patterns, typeConverter);
-    patterns.add<UnrollElementwiseOps>(typeConverter, ctx);
+    patterns.add<UnrollElementwiseOps, ConvertReturnLike>(typeConverter, ctx);
     patterns.add<
         ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
         ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast, ConvertTransferGather,
-        ConvertTransferScatter, ConvertUtilReturn>(typeConverter, ctx);
+        ConvertTransferScatter>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
