@@ -32,8 +32,8 @@
   promotion_types = [
     #iree_gpu.use_global_load_dma,
     #iree_gpu.use_global_load_dma,
-    #iree_gpu.derived_thread_config,
-    #iree_gpu.derived_thread_config],
+    #iree_gpu.use_global_load_dma,
+    #iree_gpu.use_global_load_dma],
   reduction = [0, 0, 1, 1],
   subgroup = [4, 8, 0, 0],
   workgroup = [256, 256, 0, 0]
