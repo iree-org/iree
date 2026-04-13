@@ -340,6 +340,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (!mma.getDistributionMappingKind()) {
       continue;
     }
+    // TODO: Add block intrinsic support for vector distribute convolutions.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Skip adding any virtual intrinsics since they are not tested for
     // convolutions.
@@ -575,6 +579,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize) {
       continue;
     }
+    // We currently dont use block intrinsics for GEMMs.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     // Intrinsics without distribution mapping cannot be distributed.
     if (!mma.getDistributionMappingKind()) {
       continue;
@@ -656,6 +664,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+
   // Tile all batch dimensions with unit size.
   for (int64_t batch : contractionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -831,6 +840,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     }
     // Intrinsics without distribution mapping cannot be distributed.
     if (!mma.getDistributionMappingKind()) {
+      continue;
+    }
+    // TODO: Enable block intrinsics for attention.
+    if (mma.isBlockIntrinsic()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);

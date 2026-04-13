@@ -204,6 +204,9 @@ spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetAttr target) {
 
   SmallVector<Attribute, 4> coopMatAttrs;
   for (IREE::GPU::MMAAttr mmaOp : wgp.getMma()) {
+    if (mmaOp.isBlockIntrinsic()) {
+      continue;
+    }
     auto [mSize, nSize, kSize] = mmaOp.getMNKShape();
     auto [aType, bType, cType] = mmaOp.getABCElementTypes();
 

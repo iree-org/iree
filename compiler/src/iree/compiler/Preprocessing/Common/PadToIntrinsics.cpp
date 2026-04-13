@@ -165,11 +165,18 @@ getIntrinsics(linalg::LinalgOp linalgOp,
 
   IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
 
-  return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
+  // We do not pad to block intrinsics as that can lead to unnecessary and
+  // excessive padding.
+  SmallVector<GPUIntrinsicType> intrinsics;
+  for (IREE::GPU::MMAAttr mma : mmaKinds) {
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
-  });
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+  }
+  return intrinsics;
 }
 
 static void

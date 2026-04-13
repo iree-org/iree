@@ -112,6 +112,7 @@ struct GPUMMASchedule {
   SmallVector<int64_t, 2> mSizes;
   SmallVector<int64_t, 2> nSizes;
   SmallVector<int64_t, 2> kSizes;
+  SmallVector<int64_t, 2> batchSizes;
 
   // Number of subgroups along each M and N dimension.
   SmallVector<int64_t, 2> mSubgroupCounts;
