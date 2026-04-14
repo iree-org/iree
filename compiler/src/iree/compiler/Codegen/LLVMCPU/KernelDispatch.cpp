@@ -2040,19 +2040,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   for (auto pos : dimPos) {
     distConfig.vectorSizeHints[pos] = vectorSize;
   }
+  // Note that, unlike the matmul ops itself (e.g. mmt4d), we do not take the
+  // inner tile sizes into account here. As PackOp is an element-wise op, the
+  // only reason to need multiple tiles is to distribute work to multiple
+  // threads. Memory locality should not be a concern; if it were a concern,
+  // that would be a codegen bug (suboptimal traversal within the tile).
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
-
-  // The default function aims to returns the number of workload per workgroup,
-  // but it does not know that it is working on packed domain. We need to take
-  // inner tile sizes into account and adjust the distribution tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
-      continue;
-    }
-    distTileSizes[pos] = distTileSizes[pos] / size;
-    distTileSizes[pos] = std::max(distTileSizes[pos], int64_t{1});
-  }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
   // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
