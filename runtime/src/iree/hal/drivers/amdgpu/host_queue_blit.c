@@ -304,8 +304,6 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
   return iree_ok_status();
 }
 
-#define IREE_HAL_AMDGPU_HOST_QUEUE_UPDATE_SOURCE_ALIGNMENT 16
-
 // Validates a queue_update request and resolves the source host span and target
 // device pointer. The source host pointer is captured by the caller either into
 // the pending-op arena or into the queue-owned kernarg ring.
@@ -397,8 +395,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
       &source_bytes, &source_length, &target_device_ptr));
 
   const iree_host_size_t source_payload_offset =
-      iree_host_align(sizeof(iree_hal_amdgpu_device_buffer_copy_kernargs_t),
-                      IREE_HAL_AMDGPU_HOST_QUEUE_UPDATE_SOURCE_ALIGNMENT);
+      IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_OFFSET;
   iree_host_size_t kernarg_length = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_add(
           source_payload_offset, source_length, &kernarg_length))) {
@@ -428,14 +425,14 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
   if (IREE_UNLIKELY(!iree_hal_amdgpu_device_buffer_copy_emplace(
           queue->transfer_context, &dispatch_packet,
           (const void*)(uintptr_t)
-              IREE_HAL_AMDGPU_HOST_QUEUE_UPDATE_SOURCE_ALIGNMENT,
+              IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_ALIGNMENT,
           target_device_ptr, length, &kernargs))) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "unsupported update dispatch shape (target_offset=%" PRIdsz
         ", length=%" PRIdsz ", source_payload_alignment=%d)",
         target_offset, length,
-        IREE_HAL_AMDGPU_HOST_QUEUE_UPDATE_SOURCE_ALIGNMENT);
+        IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_ALIGNMENT);
   }
 
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;

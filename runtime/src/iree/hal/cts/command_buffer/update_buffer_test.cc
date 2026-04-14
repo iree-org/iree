@@ -51,6 +51,42 @@ TEST_P(CommandBufferUpdateBufferTest, WholeBuffer) {
   iree_hal_buffer_release(device_buffer);
 }
 
+TEST_P(CommandBufferUpdateBufferTest, LargerPayload) {
+  iree_device_size_t target_buffer_size = 256;
+  std::vector<uint8_t> source_buffer(target_buffer_size);
+  for (iree_host_size_t i = 0; i < source_buffer.size(); ++i) {
+    source_buffer[i] = (uint8_t)(i ^ 0xA5u);
+  }
+
+  iree_hal_buffer_t* device_buffer = NULL;
+  CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer);
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+
+  IREE_ASSERT_OK(iree_hal_command_buffer_update_buffer(
+      command_buffer,
+      /*source_buffer=*/source_buffer.data(), /*source_offset=*/0,
+      iree_hal_make_buffer_ref(device_buffer, 0, target_buffer_size),
+      IREE_HAL_UPDATE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+
+  std::vector<uint8_t> actual_data(target_buffer_size);
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0, actual_data.data(),
+      actual_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
+  EXPECT_THAT(actual_data, ContainerEq(source_buffer));
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(device_buffer);
+}
+
 TEST_P(CommandBufferUpdateBufferTest, WithOffsets) {
   iree_device_size_t target_buffer_size = 16;
   std::vector<uint8_t> source_buffer{0x01, 0x02, 0x03, 0x04,  //

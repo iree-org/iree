@@ -68,6 +68,13 @@ typedef struct iree_hal_amdgpu_device_buffer_copy_kernargs_t {
   sizeof(iree_hal_amdgpu_device_buffer_copy_kernargs_t)
 #define IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_KERNARG_ALIGNMENT \
   IREE_AMDGPU_ALIGNOF(iree_hal_amdgpu_device_buffer_copy_kernargs_t)
+// Alignment used for host-staged update payloads consumed by copy kernels.
+#define IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_ALIGNMENT 16
+// Byte offset to a host-staged update payload following copy kernargs.
+#define IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_OFFSET       \
+  ((IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_KERNARG_SIZE +                 \
+    IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_ALIGNMENT - 1) & \
+   ~(IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_ALIGNMENT - 1))
 
 // Populates a builtin fill dispatch packet and its kernargs in already-reserved
 // storage. The caller owns packet header commit, completion signal assignment,

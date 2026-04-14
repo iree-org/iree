@@ -59,8 +59,6 @@ static bool amdgpu_registered_ =
               // replay for the corresponding queue operation.
               {"CommandBufferTest.*",
                "AMDGPU command buffers not yet implemented"},
-              {"CommandBufferUpdateBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
               {"TransientBufferTest.*",
                "AMDGPU command buffers not yet implemented"},
 

@@ -238,13 +238,21 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
     iree_hal_amdgpu_command_buffer_update_command_t {
   // Common command record header.
   iree_hal_amdgpu_command_buffer_command_header_t header;
-  // Byte offset to the update payload in rodata storage.
-  uint32_t rodata_offset;
-  // Byte length of the update payload.
-  uint32_t rodata_length;
+  // Byte offset into command-buffer rodata storage.
+  uint64_t rodata_offset;
+  // Byte offset into the target buffer reference.
+  uint64_t target_offset;
+  // Byte length of the update payload and target range.
+  uint32_t length;
+  // Static buffer ordinal or dynamic binding-table slot for the target.
+  uint32_t target_ordinal;
+  // Target reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
+  uint8_t target_kind;
+  // Reserved bytes that must be zero in version 0.
+  uint8_t reserved0[7];
 } iree_hal_amdgpu_command_buffer_update_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_update_command_t) == 24,
+    sizeof(iree_hal_amdgpu_command_buffer_update_command_t) == 48,
     "update command size must remain qword aligned");
 
 // Unconditional branch terminator.
