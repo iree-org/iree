@@ -341,7 +341,7 @@ TEST_P(DispatchReuseTest, AllocaExecuteDeallocaCycle) {
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   alloca_params.usage =
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
 
@@ -400,7 +400,7 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   alloca_params.usage =
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
 

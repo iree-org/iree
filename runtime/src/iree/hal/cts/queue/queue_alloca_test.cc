@@ -29,7 +29,7 @@ constexpr iree_hal_queue_affinity_t kQueueAffinity1 =
 
 iree_hal_buffer_params_t MakeQueueAllocaBufferParams() {
   iree_hal_buffer_params_t params = {0};
-  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   params.access = IREE_HAL_MEMORY_ACCESS_ALL;
   params.usage =
       IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
@@ -1054,7 +1054,7 @@ TEST_P(QueueAllocaTest, ZeroAccessFlagsCanonicalized) {
   // The HAL module constructs params with only .type and .usage, leaving
   // .access = 0. The driver must canonicalize this to MEMORY_ACCESS_ALL.
   iree_hal_buffer_params_t params = {0};
-  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   params.usage =
       IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
 

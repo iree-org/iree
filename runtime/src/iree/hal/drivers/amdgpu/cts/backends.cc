@@ -55,12 +55,6 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              // Command-buffer transient allocations require recording-time
-              // alloca/dealloca support.
-              {"TransientBufferTest.*",
-               "AMDGPU command-buffer transient allocations not yet "
-               "implemented"},
-
               // Features and API surface not currently implemented.
               {"EventTest.*", "AMDGPU does not implement HAL events"},
           }},

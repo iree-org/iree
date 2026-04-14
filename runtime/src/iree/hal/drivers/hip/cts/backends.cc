@@ -65,7 +65,24 @@ static bool hip_registered_ =
                "transient-buffer wrapper that bridges "
                "pool_acquire_reservation/release_reservation through the "
                "async-alloc path."},
+              {"QueueAllocaTest.ExplicitTLSFPoolTransferAllocaDealloca",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest."
+               "ExplicitFixedBlockPoolPendingDeallocaWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolRequiresWaitFrontierFlag",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueWaitFrontier",
                "Blocked by the same iree_hal_hip_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
