@@ -535,6 +535,7 @@ def IREEGPU_VirtualMMAAttr :
     "getOperandIteratorTypes",
     "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
+    "getKTileHeuristicScaleFactor",
   ]>
 ]> {
   let mnemonic = "virtual_mma_layout";

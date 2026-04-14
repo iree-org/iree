@@ -356,6 +356,15 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
     --kDim;
   }
 
+  // Some intrinsics expose a heuristic-only scale factor to enlarge the
+  // innermost reduction tile for latency hiding. This is not part of the
+  // intrinsic's semantic MNK shape or layout.
+  int64_t kTileHeuristicScale =
+      intrinsic.mmaKind.getKTileHeuristicScaleFactor();
+  assert(kTileHeuristicScale >= 1 &&
+         "K tile heuristic scale factor must be positive");
+  kTileSizes.back() *= kTileHeuristicScale;
+
   return kTileSizes;
 }
 
