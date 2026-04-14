@@ -85,24 +85,24 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "amdgpu_metadata",
-    srcs = ["amdgpu_metadata.c"],
-    hdrs = ["amdgpu_metadata.h"],
+    name = "hsaco_metadata",
+    srcs = ["hsaco_metadata.c"],
+    hdrs = ["hsaco_metadata.h"],
     deps = [
         "//runtime/src/iree/base",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "amdgpu_metadata_test",
-    srcs = ["amdgpu_metadata_test.cc"],
+    name = "hsaco_metadata_test",
+    srcs = ["hsaco_metadata_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",
         "nodocker",
     ],
     deps = [
-        ":amdgpu_metadata",
+        ":hsaco_metadata",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -110,10 +110,10 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_fuzz(
-    name = "amdgpu_metadata_fuzz",
-    srcs = ["amdgpu_metadata_fuzz.cc"],
+    name = "hsaco_metadata_fuzz",
+    srcs = ["hsaco_metadata_fuzz.cc"],
     deps = [
-        ":amdgpu_metadata",
+        ":hsaco_metadata",
         "//runtime/src/iree/base",
     ],
 )
