@@ -1581,3 +1581,123 @@ func.func @no_lower_oob_without_fat_raw_buffer(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
+
+// -----
+
+// Test: Inverse source swizzle when destination has swizzle_hint.
+// The destination traces through expand_shape -> swizzle_hint -> alloc.
+// Source indices should be swizzled, destination indices should be linear.
+//
+// Shape: 4x128 f32 dest. With 64 lanes, 128-bit DMA = 4 elements/lane.
+// 256 elements/transfer, 512 total = 2 transfers.
+// XOR swizzle with row_width=128, access_width=16 permutes source offsets.
+
+#executable_target_rocm_hsaco_fb_swizzle = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_swizzle = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_with_dest_swizzle
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+func.func @lower_dma_with_dest_swizzle(
+    %source: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_swizzle,
+    translation_info = #translation_swizzle} {
+  %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+  %dest = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [4, 128]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+      into memref<4x128xf32, #gpu.address_space<workgroup>>
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // CHECK: %[[C4:.+]] = arith.constant 4 : index
+    // CHECK: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: linearOffset = 0, source gets XOR-swizzled offset.
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // XOR swizzle: extractCol, extractRow, xori, updateCol, diff, add.
+    // CHECK: %[[COL0:.+]] = affine.apply
+    // CHECK: %[[ROW0:.+]] = affine.apply
+    // CHECK: %[[XOR0:.+]] = arith.xori %[[ROW0]], %[[COL0]]
+    // CHECK: %[[UCOL0:.+]] = affine.apply
+    // CHECK: %[[DIFF0:.+]] = arith.subi %[[UCOL0]], %[[SRC_LIN0]]
+    // CHECK: %[[SWIZZLED0:.+]] = arith.addi %[[SRC_LIN0]], %[[DIFF0]]
+    // Source delinearized from swizzled offset.
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SWIZZLED0]] into (4, 128)
+    // Destination delinearized from unswizzled offset (no xori).
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 128)
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN0]]#0, %[[SRC_DELIN0]]#1], %{{.+}}[%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
+    //
+    // Remaining 1 transfer also has XOR swizzle on source.
+    // CHECK-COUNT-1: amdgpu.gather_to_lds
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
+
+// -----
+
+// Test: Swizzle trace through chained view-like ops.
+// Destination traces: subview -> expand_shape -> swizzle_hint -> alloc.
+// The swizzle should still be detected through the chain.
+
+#executable_target_rocm_hsaco_fb_swizzle_chain = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_swizzle_chain = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_with_chained_view_ops
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+func.func @lower_dma_with_chained_view_ops(
+    %source: memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_swizzle_chain,
+    translation_info = #translation_swizzle_chain} {
+  %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+  %expanded = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [4, 128]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+      into memref<4x128xf32, #gpu.address_space<workgroup>>
+  %dest = memref.subview %expanded[0, 0] [2, 128] [1, 1]
+      : memref<4x128xf32, #gpu.address_space<workgroup>>
+      to memref<2x128xf32, strided<[128, 1]>, #gpu.address_space<workgroup>>
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // XOR swizzle should still be applied through the subview+expand chain.
+    // CHECK: arith.xori
+    // CHECK: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<2x128xf32, strided<[128, 1]>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
