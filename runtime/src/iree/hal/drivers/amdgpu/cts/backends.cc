@@ -107,8 +107,6 @@ static bool amdgpu_registered_ =
 
               // Features and API surface not currently implemented.
               {"EventTest.*", "AMDGPU does not implement HAL events"},
-              {"ExecutableTest.*",
-               "AMDGPU executable reflection not yet implemented"},
           }},
          {"async_queue"},
      }),
