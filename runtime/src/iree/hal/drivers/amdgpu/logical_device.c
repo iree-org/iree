@@ -12,6 +12,8 @@
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/allocator.h"
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/aql_command_buffer.h"
+#include "iree/hal/drivers/amdgpu/aql_program_builder.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/executable_cache.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
@@ -100,6 +102,8 @@ IREE_API_EXPORT void iree_hal_amdgpu_logical_device_options_initialize(
       IREE_HAL_AMDGPU_LOGICAL_DEVICE_DEFAULT_SMALL_HOST_BLOCK_SIZE;
   out_options->host_block_pools.large.block_size =
       IREE_HAL_AMDGPU_LOGICAL_DEVICE_DEFAULT_LARGE_HOST_BLOCK_SIZE;
+  out_options->host_block_pools.command_buffer.usable_block_size =
+      IREE_HAL_AMDGPU_AQL_PROGRAM_DEFAULT_BLOCK_SIZE;
 
   out_options->device_block_pools.small.block_size =
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_SMALL_DEVICE_BLOCK_SIZE_DEFAULT;
@@ -167,6 +171,18 @@ static iree_status_t iree_hal_amdgpu_logical_device_options_verify(
         "power-of-two greater than %d and got %" PRIhsz,
         IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_LARGE_HOST_BLOCK_SIZE,
         options->host_block_pools.large.block_size);
+  }
+  if (options->host_block_pools.command_buffer.usable_block_size <
+          IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE ||
+      options->host_block_pools.command_buffer.usable_block_size > UINT32_MAX ||
+      !iree_host_size_is_power_of_two(
+          options->host_block_pools.command_buffer.usable_block_size)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "command-buffer host block pool usable size invalid, expected a "
+        "power-of-two between %u and %u and got %" PRIhsz,
+        IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE, UINT32_MAX,
+        options->host_block_pools.command_buffer.usable_block_size);
   }
 
   if (topology->gpu_agent_queue_count > UINT8_MAX) {
@@ -426,12 +442,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   logical_device->host_allocator = host_allocator;
   logical_device->failure_status = IREE_ATOMIC_VAR_INIT(0);
 
-  // Retain the proactor pool and acquire a proactor for this device.
+  // Retain the proactor pool. A proactor is acquired after block pools are
+  // initialized so failure cleanup can always deinitialize the pools.
   logical_device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
-  iree_status_t status = iree_async_proactor_pool_get(
-      logical_device->proactor_pool, 0, &logical_device->proactor);
 
   // Setup physical device table.
   // We need to initialize this first so that any failure cleanup has a valid
@@ -462,6 +477,13 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   iree_arena_block_pool_initialize(options->host_block_pools.large.block_size,
                                    host_allocator,
                                    &logical_device->host_block_pools.large);
+  iree_status_t status = iree_hal_amdgpu_aql_program_block_pool_initialize(
+      options->host_block_pools.command_buffer.usable_block_size,
+      host_allocator, &logical_device->host_block_pools.command_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(logical_device->proactor_pool, 0,
+                                          &logical_device->proactor);
+  }
 
   // Instantiate system container for agents used by the logical device. Loads
   // fixed per-agent resources like the device library.
@@ -513,6 +535,10 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       status = iree_arena_block_pool_preallocate(
           &logical_device->host_block_pools.large, 16);
     }
+    if (iree_status_is_ok(status)) {
+      status = iree_arena_block_pool_preallocate(
+          &logical_device->host_block_pools.command_buffer, 16);
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -549,6 +575,8 @@ static void iree_hal_amdgpu_logical_device_destroy(
   // last.
   iree_arena_block_pool_deinitialize(&logical_device->host_block_pools.small);
   iree_arena_block_pool_deinitialize(&logical_device->host_block_pools.large);
+  iree_arena_block_pool_deinitialize(
+      &logical_device->host_block_pools.command_buffer);
 
   iree_async_proactor_pool_release(logical_device->proactor_pool);
 
@@ -615,6 +643,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_trim(
   // Trim host pools.
   iree_arena_block_pool_trim(&logical_device->host_block_pools.small);
   iree_arena_block_pool_trim(&logical_device->host_block_pools.large);
+  iree_arena_block_pool_trim(&logical_device->host_block_pools.command_buffer);
 
   return iree_ok_status();
 }
@@ -1098,8 +1127,13 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "AMDGPU command buffers not yet implemented");
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  return iree_hal_amdgpu_aql_command_buffer_create(
+      iree_hal_device_allocator(base_device), mode, command_categories,
+      queue_affinity, binding_capacity,
+      &logical_device->host_block_pools.command_buffer,
+      logical_device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_create_event(

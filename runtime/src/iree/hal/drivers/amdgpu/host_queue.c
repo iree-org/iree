@@ -977,19 +977,18 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
       case IREE_HAL_AMDGPU_PENDING_OP_EXECUTE:
         if (op->execute.command_buffer) {
           status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                    "pending command buffer execute not yet "
-                                    "wired up");
-          break;
-        }
-        status = iree_hal_amdgpu_host_queue_submit_barrier(
-            queue, &resolution, op->signal_semaphore_list,
-            (iree_hal_amdgpu_reclaim_action_t){0},
-            /*operation_resources=*/NULL,
-            /*operation_resource_count=*/0,
-            /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
-            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
-        if (iree_status_is_ok(status)) {
-          op->retained_resource_count = 0;
+                                    "AQL command-buffer replay not yet wired");
+        } else {
+          status = iree_hal_amdgpu_host_queue_submit_barrier(
+              queue, &resolution, op->signal_semaphore_list,
+              (iree_hal_amdgpu_reclaim_action_t){0},
+              /*operation_resources=*/NULL,
+              /*operation_resource_count=*/0,
+              /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+              IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
+          if (iree_status_is_ok(status)) {
+            op->retained_resource_count = 0;
+          }
         }
         break;
       case IREE_HAL_AMDGPU_PENDING_OP_ALLOCA: {
@@ -2531,7 +2530,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     }
   } else {
     status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "inline execute AQL emission");
+                              "AQL command-buffer replay not yet wired");
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
 

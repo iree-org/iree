@@ -15,6 +15,7 @@ package(
 iree_runtime_cc_library(
     name = "abi",
     hdrs = [
+        "command_buffer.h",
         "common.h",
         "kernel_args.h",
         "queue.h",

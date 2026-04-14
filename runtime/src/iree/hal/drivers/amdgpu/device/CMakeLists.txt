@@ -15,6 +15,7 @@ set(_BITCODE_SRCS
 )
 
 set(_ABI_HDRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/../abi/command_buffer.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../abi/common.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../abi/kernel_args.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../abi/queue.h"

@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     abi
   HDRS
+    "command_buffer.h"
     "common.h"
     "kernel_args.h"
     "queue.h"

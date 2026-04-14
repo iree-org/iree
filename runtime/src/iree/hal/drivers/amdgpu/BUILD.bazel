@@ -17,6 +17,10 @@ iree_runtime_cc_library(
     srcs = [
         "allocator.c",
         "allocator.h",
+        "aql_command_buffer.c",
+        "aql_command_buffer.h",
+        "aql_program_builder.c",
+        "aql_program_builder.h",
         "buffer.c",
         "buffer.h",
         "driver.c",
@@ -66,6 +70,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/internal/flatcc:parsing",
@@ -95,6 +100,8 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "headers",
     hdrs = [
+        "aql_command_buffer.h",
+        "aql_program_builder.h",
         "buffer.h",
         "driver.h",
         "executable.h",
@@ -122,6 +129,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
         "//runtime/src/iree/hal/drivers/amdgpu/device:dispatch",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
@@ -129,6 +137,43 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
         "//runtime/src/iree/hal/memory:slab_provider",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "aql_command_buffer_test",
+    srcs = ["aql_command_buffer_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "aql_program_builder_test",
+    srcs = ["aql_program_builder_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

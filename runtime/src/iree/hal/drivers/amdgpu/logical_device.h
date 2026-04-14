@@ -33,6 +33,8 @@ typedef struct iree_hal_amdgpu_host_block_pools_t {
   iree_arena_block_pool_t small;
   // Used for large page-sized allocations of 32-64kB.
   iree_arena_block_pool_t large;
+  // Used for durable command-buffer recording blocks.
+  iree_arena_block_pool_t command_buffer;
 } iree_hal_amdgpu_host_block_pools_t;
 
 //===----------------------------------------------------------------------===//
