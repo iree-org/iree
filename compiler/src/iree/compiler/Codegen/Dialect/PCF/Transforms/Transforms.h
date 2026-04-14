@@ -186,7 +186,7 @@ fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
 //   strides = outerStride * innerStride
 //
 // Any remaining outer dimensions are forwarded unchanged.
-LogicalResult composeNestedSliceParameters(
+void composeNestedSliceParameters(
     RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> outerOffsets,
     ArrayRef<OpFoldResult> outerSizes, ArrayRef<OpFoldResult> outerStrides,
     ArrayRef<OpFoldResult> innerOffsets, ArrayRef<OpFoldResult> innerSizes,

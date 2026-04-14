@@ -17,6 +17,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
+#include <cassert>
+
 #define DEBUG_TYPE "iree-pcf-fuse-pcf-writes"
 
 namespace mlir::iree_compiler::IREE::PCF {
@@ -65,7 +67,7 @@ void FusePCFWritesPass::runOnOperation() {
 
 } // namespace
 
-LogicalResult composeNestedSliceParameters(
+void composeNestedSliceParameters(
     RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> outerOffsets,
     ArrayRef<OpFoldResult> outerSizes, ArrayRef<OpFoldResult> outerStrides,
     ArrayRef<OpFoldResult> innerOffsets, ArrayRef<OpFoldResult> innerSizes,
@@ -73,13 +75,16 @@ LogicalResult composeNestedSliceParameters(
     SmallVectorImpl<OpFoldResult> &composedOffsets,
     SmallVectorImpl<OpFoldResult> &composedSizes,
     SmallVectorImpl<OpFoldResult> &composedStrides) {
-  if (outerOffsets.size() != outerSizes.size() ||
-      outerOffsets.size() != outerStrides.size() ||
-      innerOffsets.size() != innerSizes.size() ||
-      innerOffsets.size() != innerStrides.size() ||
-      outerOffsets.size() < innerOffsets.size()) {
-    return failure();
-  }
+  assert(outerOffsets.size() == outerSizes.size() &&
+         "outer slice offsets/sizes length mismatch");
+  assert(outerOffsets.size() == outerStrides.size() &&
+         "outer slice offsets/strides length mismatch");
+  assert(innerOffsets.size() == innerSizes.size() &&
+         "inner slice offsets/sizes length mismatch");
+  assert(innerOffsets.size() == innerStrides.size() &&
+         "inner slice offsets/strides length mismatch");
+  assert(outerOffsets.size() >= innerOffsets.size() &&
+         "inner slice rank cannot exceed outer slice rank");
 
   composedOffsets.clear();
   composedSizes.clear();
@@ -107,8 +112,6 @@ LogicalResult composeNestedSliceParameters(
     composedSizes.push_back(outerSizes[i]);
     composedStrides.push_back(outerStrides[i]);
   }
-
-  return success();
 }
 
 FailureOr<PCF::WriteSliceOp>
@@ -194,13 +197,10 @@ composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
   SmallVector<OpFoldResult> composedOffsets;
   SmallVector<OpFoldResult> composedSizes;
   SmallVector<OpFoldResult> composedStrides;
-  if (failed(composeNestedSliceParameters(
-          rewriter, insertSliceOp.getLoc(), writeOffsets, writeSizes,
-          writeStrides, insertOffsets, insertSizes, insertStrides,
-          composedOffsets, composedSizes, composedStrides))) {
-    return rewriter.notifyMatchFailure(
-        writeSliceOp, "failed to compose write_slice and insert_slice");
-  }
+  composeNestedSliceParameters(rewriter, insertSliceOp.getLoc(), writeOffsets,
+                               writeSizes, writeStrides, insertOffsets,
+                               insertSizes, insertStrides, composedOffsets,
+                               composedSizes, composedStrides);
 
   // Handle rank-reduced parallel_insert_slice sources.
   // The source may have fewer dimensions than the destination sref (e.g.,

@@ -181,12 +181,12 @@ static void computeForallIVs(RewriterBase &rewriter, Location loc,
 /// This reuses composeNestedSliceParameters() by treating the
 /// tensor.parallel_insert_slice as the outer slice and the pcf.write_slice as
 /// the inner slice.
-static LogicalResult composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
-                                                   scf::ForallOp forallOp,
-                                                   PCF::LoopOp loopOp,
-                                                   PCF::GenericOp genericOp,
-                                                   scf::InParallelOp terminator,
-                                                   IRMapping &forallMapping) {
+static void composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
+                                          scf::ForallOp forallOp,
+                                          PCF::LoopOp loopOp,
+                                          PCF::GenericOp genericOp,
+                                          scf::InParallelOp terminator,
+                                          IRMapping &forallMapping) {
   // Build mapping from pcf.loop result index -> generic ref arg index.
   SmallVector<unsigned> resultToRefArgIdx(loopOp->getNumResults());
   for (Operation &op : terminator.getYieldingOps()) {
@@ -239,12 +239,10 @@ static LogicalResult composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
       SmallVector<OpFoldResult> composedOffsets;
       SmallVector<OpFoldResult> composedSizes;
       SmallVector<OpFoldResult> composedStrides;
-      if (failed(composeNestedSliceParameters(
-              rewriter, writeOp.getLoc(), insertOffsets, insertSizes,
-              insertStrides, writeOffsets, writeSizes, writeStrides,
-              composedOffsets, composedSizes, composedStrides))) {
-        return failure();
-      }
+      composeNestedSliceParameters(rewriter, writeOp.getLoc(), insertOffsets,
+                                   insertSizes, insertStrides, writeOffsets,
+                                   writeSizes, writeStrides, composedOffsets,
+                                   composedSizes, composedStrides);
 
       // Expand source to match sref rank by adding unit dims.
       auto sourceType = cast<RankedTensorType>(writeOp.getSource().getType());
@@ -296,20 +294,14 @@ static LogicalResult composeWriteSlicesIntoGeneric(RewriterBase &rewriter,
 
     rewriter.eraseOp(insertOp);
   }
-
-  return success();
 }
 
 /// Core implementation of foldForallIntoPCFLoop after matching succeeds.
-static FailureOr<PCF::GenericOp>
-foldForallIntoPCFLoopImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
-                          PCF::LoopOp loopOp) {
+static PCF::GenericOp foldForallIntoPCFLoopImpl(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp,
+                                                PCF::LoopOp loopOp) {
   Location loc = forallOp.getLoc();
   scf::InParallelOp terminator = forallOp.getTerminator();
-
-  if (failed(moveValueDefinitions(rewriter, loopOp.getCount(), forallOp))) {
-    return failure();
-  }
 
   // Replace RegionIterArgs with initial values (except in terminator).
   for (auto [iterArg, init] :
@@ -430,10 +422,8 @@ foldForallIntoPCFLoopImpl(RewriterBase &rewriter, scf::ForallOp forallOp,
   }
 
   // Compose write_slice ops with parallel_insert_slice ops.
-  if (failed(composeWriteSlicesIntoGeneric(
-          rewriter, forallOp, loopOp, genericOp, terminator, forallMapping))) {
-    return failure();
-  }
+  composeWriteSlicesIntoGeneric(rewriter, forallOp, loopOp, genericOp,
+                                terminator, forallMapping);
 
   // Replace forall results with generic results.
   for (auto [forallResult, genericResult] :
@@ -505,7 +495,7 @@ struct TestFoldForallIntoPCFLoopPass final
       // Check if there's a pcf.loop with sequential scope inside.
       scf::InParallelOp terminator = forallOp.getTerminator();
       Operation *lastOp = terminator->getPrevNode();
-      auto loopOp = dyn_cast_or_null<PCF::LoopOp>(lastOp);
+      auto loopOp = dyn_cast_if_present<PCF::LoopOp>(lastOp);
       if (!loopOp) {
         return;
       }
@@ -540,18 +530,26 @@ FailureOr<GenericOp> foldForallIntoPCFLoop(RewriterBase &rewriter,
   // Step 1: Validate terminator structure.
   FailureOr<LoopOp> loopOpOrFailure = matchFoldTerminator(forallOp);
   if (failed(loopOpOrFailure)) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        forallOp, "Failed to validate forall op terminator");
   }
   LoopOp loopOp = *loopOpOrFailure;
 
-  // Step 2: Validate pcf.loop structure.
   if (failed(matchFoldPCFLoop(forallOp, loopOp))) {
-    return failure();
+    return rewriter.notifyMatchFailure(forallOp,
+                                       "Failed to validate pcf.loop structure");
   }
 
   // Step 3: Validate write_slice ops.
   if (failed(matchFoldWriteSlices(loopOp))) {
-    return failure();
+    return rewriter.notifyMatchFailure(forallOp,
+                                       "Failed to validate write_slice ops");
+  }
+
+  // Step 4: Move count definitions into place before rewriting.
+  if (failed(moveValueDefinitions(rewriter, loopOp.getCount(), forallOp))) {
+    return rewriter.notifyMatchFailure(
+        forallOp, "Failed to move loop trip count definitions");
   }
 
   // All validations passed, perform the fold.

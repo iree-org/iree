@@ -108,10 +108,12 @@ FoldSplitKWorkgroupLoop::matchAndRewrite(scf::ForallOp op,
   }
 
   // Capture values needed for workgroup count computation before folding.
-  // The forall upper bounds and loop counts are defined outside the forall
-  // so they remain valid after the fold erases it.
+  // The fold erases the forall op, so any mixed bounds/steps must be
+  // materialized up front.
   Location loc = op.getLoc();
+  SmallVector<OpFoldResult> lowerBounds = op.getMixedLowerBound();
   SmallVector<OpFoldResult> upperBounds = op.getMixedUpperBound();
+  SmallVector<OpFoldResult> steps = op.getMixedStep();
   SmallVector<Value> loopCounts(loopOp.getCount());
 
   // Fold forall + pcf.loop into pcf.generic.
@@ -124,10 +126,6 @@ FoldSplitKWorkgroupLoop::matchAndRewrite(scf::ForallOp op,
   // Compute total workgroup count after folding (forall iterations * loop
   // count). Generate IR before the pcf.generic.
   rewriter.setInsertionPoint(*result);
-
-  // Account for lower bounds and steps when computing iteration counts.
-  SmallVector<OpFoldResult> lowerBounds = op.getMixedLowerBound();
-  SmallVector<OpFoldResult> steps = op.getMixedStep();
 
   AffineExpr s0, s1, s2;
   bindSymbols(rewriter.getContext(), s0, s1, s2);

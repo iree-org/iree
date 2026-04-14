@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-test-fold-forall-into-pcf-loop)" --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-test-fold-forall-into-pcf-loop)" --mlir-print-local-scope --split-input-file | FileCheck %s
 
 // Test folding scf.forall containing pcf.loop into a single pcf.generic.
 // Forall has 2D iteration space (4, 8) with loop count 4.
@@ -61,7 +61,8 @@ func.func @fold_forall_into_pcf_loop(%init: tensor<16x32xf32>) -> tensor<16x32xf
 // Composed write: sizes [1, 4] and strides [1, 1] from write_slice.
 // Offset dim 0 = insertOff(id0) + writeOff(loop_id) * insertStride(1).
 // Offset dim 1 = insertOff(id1) + writeOff(0) * insertStride(1) = id1.
-//       CHECK:         pcf.write_slice %{{.+}} into %[[REF]]
+//       CHECK:         %[[COMPOSED_OFF_0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%[[FORALL_DELIN]]#0, %[[INNER_IV]]]
+//       CHECK:         pcf.write_slice %{{.+}} into %[[REF]][%[[COMPOSED_OFF_0]], %[[FORALL_DELIN]]#1]
 //  CHECK-SAME:           [1, 4] [1, 1]
 //  CHECK-SAME:           into !pcf.sref<16x32xf32, sync(#pcf.sequential)>
 //       CHECK:     pcf.return
@@ -131,9 +132,11 @@ func.func @fold_forall_multiple_results(%init0: tensor<16xf32>, %init1: tensor<1
 
 // Composed writes: write offset[loop_id] + insert offset[id].
 // Both writes have size 2 and stride 1, targeting different ref args.
-//       CHECK:         pcf.write_slice %{{.+}} into %[[REF0]]{{.*}} [2] [1]
+//       CHECK:         %[[COMPOSED_OFF_0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%{{.+}}, %{{.+}}]
+//       CHECK:         pcf.write_slice %{{.+}} into %[[REF0]][%[[COMPOSED_OFF_0]]] [2] [1]
 //  CHECK-SAME:           into !pcf.sref<16xf32, sync(#pcf.sequential)>
-//       CHECK:         pcf.write_slice %{{.+}} into %[[REF1]]{{.*}} [2] [1]
+//       CHECK:         %[[COMPOSED_OFF_1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%{{.+}}, %{{.+}}]
+//       CHECK:         pcf.write_slice %{{.+}} into %[[REF1]][%[[COMPOSED_OFF_1]]] [2] [1]
 //  CHECK-SAME:           into !pcf.sref<16xf32, sync(#pcf.sequential)>
 //       CHECK:     pcf.return
 //       CHECK:   return %[[GENERIC]]#0, %[[GENERIC]]#1
@@ -176,10 +179,13 @@ func.func @fold_compose_strides(%init: tensor<64xf32>) -> tensor<64xf32> {
 //       CHECK:          : (!pcf.sref<64xf32, sync(#pcf.sequential)>)
 //       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
 //       CHECK:     %[[FORALL_LIN:.+]] = affine.linearize_index disjoint
-//       CHECK:     scf.forall (%{{.+}}) = (%[[FORALL_LIN]])
-//       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1)
+//       CHECK:     %[[OUTER_STEP:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 3)>()[%{{.+}}]
+//       CHECK:     scf.forall (%[[OUTER_IV:.+]]) = (%[[FORALL_LIN]]) to (%{{.+}}) step (%[[OUTER_STEP]])
+//       CHECK:       %[[INNER_STEP:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 3)>()[%{{.+}}]
+//       CHECK:       scf.forall (%[[INNER_IV:.+]]) = (%[[DELIN]]#1) to (%{{.+}}) step (%[[INNER_STEP]])
 // Composed: size 2, stride 2 (write_stride=2 * insert_stride=1).
-//       CHECK:         pcf.write_slice %{{.+}} into %[[REF]][{{.+}}] [2] [2]
+//       CHECK:         %[[COMPOSED_OFF:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[OUTER_IV]]]
+//       CHECK:         pcf.write_slice %{{.+}} into %[[REF]][%[[COMPOSED_OFF]]] [2] [2]
 //  CHECK-SAME:           into !pcf.sref<64xf32, sync(#pcf.sequential)>
 //       CHECK:     pcf.return
 
@@ -217,7 +223,7 @@ func.func @fold_hoists_loop_count(%init: tensor<8xf32>, %one: index)
 //       CHECK:   %[[GENERIC:.+]] = pcf.generic
 //       CHECK:     execute(%{{.+}} = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index, %[[GEN_COUNT:[A-Za-z0-9_]+]]: index]
 //       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into (4, %[[COUNT]])
-//       CHECK:     %[[OUTER_STEP:.+]] = affine.apply {{.*}}[%[[GEN_COUNT]], %[[COUNT]]]
+//       CHECK:     %[[OUTER_STEP:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%[[GEN_COUNT]], %[[COUNT]]]
 //       CHECK:       scf.forall (%{{.+}}) = (%{{.+}}) to (%{{.+}}) step (%[[OUTER_STEP]])
-//       CHECK:       %[[INNER_STEP:.+]] = affine.apply {{.*}}[%[[GEN_COUNT]], %[[COUNT]]]
+//       CHECK:       %[[INNER_STEP:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%[[GEN_COUNT]], %[[COUNT]]]
 //       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1) to (%[[COUNT]]) step (%[[INNER_STEP]])
