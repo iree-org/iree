@@ -252,8 +252,10 @@ struct QuantizedConvNchwToConvNchw
     Value filter = op.getInputs()[1];
     Value iZp = op.getInputs()[2];
     Value fZp = op.getInputs()[3];
+    Value output = op.getOutputs()[0];
+
     auto inputTy = llvm::cast<RankedTensorType>(input.getType());
-    auto resultTy = llvm::cast<ShapedType>(op.getType(0));
+    auto resultTy = llvm::cast<ShapedType>(output.getType());
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();
@@ -309,10 +311,10 @@ struct QuantizedConvNchwToConvNchw
 
       SmallVector<int64_t> poolDims;
       SmallVector<Value> poolDynDims;
-      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 0);
-      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 1);
-      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);
-      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 3);
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 0); // N
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 1); // C
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);  // OH
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 3);  // OW
 
       auto poolTy = RankedTensorType::get(poolDims, accETy);
       Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
@@ -341,7 +343,7 @@ struct QuantizedConvNchwToConvNchw
       inputSum = tensor::CollapseShapeOp::create(builder, collapseTy, inputSum,
                                                  reassociationMap);
 
-      // Apply the zero-point update based on the input sum.
+      // Broadcast inputSum over the output-channel dim using {N=0, OH=2, OW=3}.
       newConv = applyZeroPoint(builder, newConv, inputSum, fZp, {0, 2, 3});
     }
 
