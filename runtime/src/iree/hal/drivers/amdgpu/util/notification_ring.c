@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/hal/utils/resource_set.h"
+
 // All frontier snapshot sizes are multiples of 16 bytes (header=16,
 // entry=16 each), so positions within the byte ring stay aligned as long
 // as the base is aligned. Verify at compile time.
@@ -58,6 +60,7 @@ iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
   IREE_ASSERT_ARGUMENT(out_resources);
   entry->pre_signal_action.fn = NULL;
   entry->pre_signal_action.user_data = NULL;
+  entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
   if (count <= IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY) {
@@ -87,6 +90,7 @@ void iree_hal_amdgpu_reclaim_entry_release(
   for (uint16_t i = 0; i < entry->count; ++i) {
     iree_hal_resource_release(entry->resources[i]);
   }
+  iree_hal_resource_set_free(entry->resource_set);
   if (entry->resources != entry->inline_resources && entry->resources != NULL) {
     iree_arena_block_t* block =
         iree_arena_block_trailer(block_pool, entry->resources);
@@ -95,6 +99,7 @@ void iree_hal_amdgpu_reclaim_entry_release(
   entry->resources = NULL;
   entry->pre_signal_action.fn = NULL;
   entry->pre_signal_action.user_data = NULL;
+  entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
 }

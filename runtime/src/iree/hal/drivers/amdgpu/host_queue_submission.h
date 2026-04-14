@@ -8,6 +8,7 @@
 #define IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_SUBMISSION_H_
 
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
+#include "iree/hal/utils/resource_set.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,10 @@ enum iree_hal_amdgpu_host_queue_submission_flag_bits_t {
   // from the caller into the reclaim entry on success.
   IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES = 1u << 0,
 };
+
+// Validates queue_execute flags supported by the AMDGPU host queue.
+iree_status_t iree_hal_amdgpu_host_queue_validate_execute_flags(
+    iree_hal_execute_flags_t flags);
 
 // One in-flight kernel-dispatch submission assembled under submission_mutex.
 // All queue-private resource transfer and reclaim bookkeeping flows through
@@ -108,8 +113,10 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
 
-// Submits a barrier-only operation using the notification/reclaim path.
-// Caller must hold submission_mutex.
+// Submits a barrier-only operation using the notification/reclaim path. If
+// |resource_set| is provided, ownership transfers to the reclaim entry on
+// success and the set is released after user-visible signals publish. Caller
+// must hold submission_mutex.
 iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
@@ -118,7 +125,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
-    void* post_commit_user_data,
+    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
 
 // Replays an AMDGPU AQL command buffer program onto the host queue.
@@ -129,7 +136,18 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t execute_flags,
+    iree_hal_resource_set_t** inout_binding_resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+
+// Creates a resource set retaining the binding table prefix required by
+// |command_buffer| unless |execute_flags| explicitly borrows buffer lifetimes.
+iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t execute_flags,
+    iree_hal_resource_set_t** out_resource_set);
 
 #ifdef __cplusplus
 }  // extern "C"

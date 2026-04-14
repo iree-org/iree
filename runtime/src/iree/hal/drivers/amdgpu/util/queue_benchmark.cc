@@ -23,6 +23,7 @@
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "runtime/src/iree/hal/drivers/amdgpu/cts/testdata_amdgpu.h"
+#include "runtime/src/iree/hal/drivers/amdgpu/util/testdata_amdgpu_queue_benchmark.h"
 
 namespace {
 
@@ -30,6 +31,7 @@ constexpr int64_t kBatchCount = 20;
 constexpr uint32_t kFrontierAxisTableCapacity = 256;
 constexpr iree_device_size_t kPayloadBufferAlignment = 16;
 constexpr iree_device_size_t kPayloadLength = sizeof(uint32_t);
+constexpr iree_host_size_t kDispatchBindingBenchmarkMaxCount = 256;
 constexpr iree_hal_queue_affinity_t kQueue0 = ((iree_hal_queue_affinity_t)1ull)
                                               << 0;
 constexpr iree_hal_queue_affinity_t kQueue1 = ((iree_hal_queue_affinity_t)1ull)
@@ -109,11 +111,15 @@ class QueueBenchmark : public benchmark::Fixture {
 
   static void DeinitializeOnce() {
     if (!initialized_) return;
+    iree_hal_executable_release(binding_count_executable_);
+    iree_hal_executable_cache_release(binding_count_executable_cache_);
     iree_hal_executable_release(dispatch_executable_);
     iree_hal_executable_cache_release(dispatch_executable_cache_);
     iree_hal_device_release(device_);
     iree_hal_device_group_release(device_group_);
     iree_hal_driver_release(driver_);
+    binding_count_executable_ = nullptr;
+    binding_count_executable_cache_ = nullptr;
     dispatch_executable_ = nullptr;
     dispatch_executable_cache_ = nullptr;
     device_ = nullptr;
@@ -138,6 +144,10 @@ class QueueBenchmark : public benchmark::Fixture {
 
   void TearDown(benchmark::State& state) override {
     ReleasePreResolvedDispatch();
+    for (iree_host_size_t i = 0; i < kDispatchBindingBenchmarkMaxCount; ++i) {
+      iree_hal_buffer_release(binding_count_buffers_[i]);
+      binding_count_buffers_[i] = nullptr;
+    }
     iree_hal_buffer_release(source_buffer_);
     iree_hal_buffer_release(target_buffer_);
     iree_hal_semaphore_release(completion_semaphore_);
@@ -1007,23 +1017,17 @@ class QueueBenchmark : public benchmark::Fixture {
     return AllocatePayloadBuffers(state);
   }
 
-  bool EnsureDispatchExecutable(benchmark::State& state) {
-    if (dispatch_executable_) return true;
+  iree_status_t LoadExecutableFromData(
+      iree_const_byte_span_t executable_data,
+      iree_hal_executable_cache_t** out_executable_cache,
+      iree_hal_executable_t** out_executable) {
+    *out_executable_cache = nullptr;
+    *out_executable = nullptr;
 
     iree_hal_executable_cache_t* executable_cache = nullptr;
     iree_hal_executable_t* executable = nullptr;
     iree_status_t status = iree_hal_executable_cache_create(
         device_, iree_make_cstring_view("default"), &executable_cache);
-
-    iree_const_byte_span_t executable_data = iree_const_byte_span_empty();
-    if (iree_status_is_ok(status)) {
-      executable_data = FindCtsExecutableData(iree_make_cstring_view(
-          "command_buffer_dispatch_constants_bindings_test.bin"));
-      if (executable_data.data_length == 0) {
-        status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                                  "AMDGPU CTS dispatch executable not found");
-      }
-    }
 
     char executable_format[128] = {0};
     iree_host_size_t inferred_size = 0;
@@ -1047,13 +1051,83 @@ class QueueBenchmark : public benchmark::Fixture {
     }
 
     if (iree_status_is_ok(status)) {
-      dispatch_executable_cache_ = executable_cache;
-      dispatch_executable_ = executable;
+      *out_executable_cache = executable_cache;
+      *out_executable = executable;
     } else {
       iree_hal_executable_release(executable);
       iree_hal_executable_cache_release(executable_cache);
     }
+    return status;
+  }
+
+  bool EnsureDispatchExecutable(benchmark::State& state) {
+    if (dispatch_executable_) return true;
+
+    iree_const_byte_span_t executable_data = iree_const_byte_span_empty();
+    iree_status_t status = iree_ok_status();
+    executable_data = FindCtsExecutableData(iree_make_cstring_view(
+        "command_buffer_dispatch_constants_bindings_test.bin"));
+    if (executable_data.data_length == 0) {
+      status = iree_make_status(IREE_STATUS_NOT_FOUND,
+                                "AMDGPU CTS dispatch executable not found");
+    }
+
+    if (iree_status_is_ok(status)) {
+      status = LoadExecutableFromData(
+          executable_data, &dispatch_executable_cache_, &dispatch_executable_);
+    }
     return HandleStatus(state, status, "failed to load dispatch executable");
+  }
+
+  bool EnsureBindingCountExecutable(benchmark::State& state) {
+    if (binding_count_executable_) return true;
+
+    iree_const_byte_span_t executable_data = FindQueueBenchmarkExecutableData(
+        iree_make_cstring_view("queue_benchmark_testdata.bin"));
+    iree_status_t status = iree_ok_status();
+    if (executable_data.data_length == 0) {
+      status = iree_make_status(
+          IREE_STATUS_NOT_FOUND,
+          "AMDGPU queue benchmark dispatch executable not found");
+    }
+    if (iree_status_is_ok(status)) {
+      status = LoadExecutableFromData(executable_data,
+                                      &binding_count_executable_cache_,
+                                      &binding_count_executable_);
+    }
+    return HandleStatus(state, status,
+                        "failed to load binding-count dispatch executable");
+  }
+
+  bool EnsureBindingCountBuffers(benchmark::State& state,
+                                 int64_t binding_count) {
+    if (binding_count < 0 ||
+        binding_count > (int64_t)kDispatchBindingBenchmarkMaxCount) {
+      return HandleStatus(
+          state,
+          iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "unsupported dispatch benchmark binding count %" PRId64,
+              binding_count),
+          "invalid dispatch benchmark binding count");
+    }
+
+    iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
+    iree_hal_buffer_params_t params = {0};
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+    params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+    params.min_alignment = kPayloadBufferAlignment;
+    for (iree_host_size_t i = 0; i < (iree_host_size_t)binding_count; ++i) {
+      if (binding_count_buffers_[i]) continue;
+      iree_status_t status = iree_hal_allocator_allocate_buffer(
+          allocator, params, kPayloadBufferAlignment,
+          &binding_count_buffers_[i]);
+      if (!HandleStatus(state, status,
+                        "failed to allocate dispatch benchmark binding")) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool EnsurePreResolvedDispatch(benchmark::State& state) {
@@ -1207,10 +1281,96 @@ class QueueBenchmark : public benchmark::Fixture {
         IREE_HAL_DISPATCH_FLAG_NONE, out_operation_resource_count);
   }
 
+  static iree_status_t BindingCountExportOrdinal(
+      int64_t binding_count,
+      iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    *out_export_ordinal = 0;
+    switch (binding_count) {
+      case 0:
+        *out_export_ordinal = 0;
+        return iree_ok_status();
+      case 1:
+        *out_export_ordinal = 1;
+        return iree_ok_status();
+      case 8:
+        *out_export_ordinal = 2;
+        return iree_ok_status();
+      case 16:
+        *out_export_ordinal = 3;
+        return iree_ok_status();
+      case 256:
+        *out_export_ordinal = 4;
+        return iree_ok_status();
+      default:
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "unsupported dispatch benchmark binding count "
+                                "%" PRId64,
+                                binding_count);
+    }
+  }
+
+  iree_hal_buffer_ref_list_t BindingCountDispatchBindings(
+      int64_t binding_count) {
+    for (iree_host_size_t i = 0; i < (iree_host_size_t)binding_count; ++i) {
+      binding_count_binding_ref_scratch_[i] = iree_hal_make_buffer_ref(
+          binding_count_buffers_[i], /*offset=*/0,
+          iree_hal_buffer_byte_length(binding_count_buffers_[i]));
+    }
+    return (iree_hal_buffer_ref_list_t){
+        /*count=*/(iree_host_size_t)binding_count,
+        /*values=*/binding_count_binding_ref_scratch_,
+    };
+  }
+
+  iree_status_t ValidateBindingCountDispatchOnce(
+      iree_hal_amdgpu_host_queue_t* host_queue, int64_t binding_count,
+      iree_host_size_t* out_operation_resource_count) {
+    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    IREE_RETURN_IF_ERROR(
+        BindingCountExportOrdinal(binding_count, &export_ordinal));
+    return iree_hal_amdgpu_host_queue_validate_dispatch(
+        host_queue, binding_count_executable_, export_ordinal,
+        iree_hal_make_static_dispatch_config(1, 1, 1),
+        iree_const_byte_span_empty(),
+        BindingCountDispatchBindings(binding_count),
+        IREE_HAL_DISPATCH_FLAG_NONE, out_operation_resource_count);
+  }
+
+  iree_status_t SubmitBindingCountDispatchWithLists(
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_semaphore_list_t wait_semaphore_list,
+      iree_hal_semaphore_list_t signal_semaphore_list, int64_t binding_count) {
+    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    IREE_RETURN_IF_ERROR(
+        BindingCountExportOrdinal(binding_count, &export_ordinal));
+    return iree_hal_device_queue_dispatch(
+        device_, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        binding_count_executable_, export_ordinal,
+        iree_hal_make_static_dispatch_config(1, 1, 1),
+        iree_const_byte_span_empty(),
+        BindingCountDispatchBindings(binding_count),
+        IREE_HAL_DISPATCH_FLAG_NONE);
+  }
+
+  iree_status_t BindingCountDispatchSubmitPublicFinalInline(
+      int64_t binding_count, SubmittedCompletion* out_completion) {
+    uint64_t completion_payload_value = ++completion_payload_value_;
+    iree_hal_semaphore_t* signal_semaphore = completion_semaphore_;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        /*count=*/1,
+        /*semaphores=*/&signal_semaphore,
+        /*payload_values=*/&completion_payload_value,
+    };
+    IREE_RETURN_IF_ERROR(SubmitBindingCountDispatchWithLists(
+        kQueue0, iree_hal_semaphore_list_empty(), signal_semaphore_list,
+        binding_count));
+    *out_completion = {completion_semaphore_, completion_payload_value};
+    return iree_ok_status();
+  }
+
  private:
-  static iree_const_byte_span_t FindCtsExecutableData(
-      iree_string_view_t file_name) {
-    const iree_file_toc_t* toc = iree_cts_testdata_amdgpu_create();
+  static iree_const_byte_span_t FindExecutableData(
+      const iree_file_toc_t* toc, iree_string_view_t file_name) {
     for (iree_host_size_t i = 0; toc[i].name != nullptr; ++i) {
       if (iree_string_view_equal(file_name,
                                  iree_make_cstring_view(toc[i].name))) {
@@ -1219,6 +1379,17 @@ class QueueBenchmark : public benchmark::Fixture {
       }
     }
     return iree_const_byte_span_empty();
+  }
+
+  static iree_const_byte_span_t FindCtsExecutableData(
+      iree_string_view_t file_name) {
+    return FindExecutableData(iree_cts_testdata_amdgpu_create(), file_name);
+  }
+
+  static iree_const_byte_span_t FindQueueBenchmarkExecutableData(
+      iree_string_view_t file_name) {
+    return FindExecutableData(iree_queue_benchmark_testdata_amdgpu_create(),
+                              file_name);
   }
 
   bool AllocatePayloadBuffers(benchmark::State& state) {
@@ -1290,6 +1461,10 @@ class QueueBenchmark : public benchmark::Fixture {
   static iree_hal_executable_cache_t* dispatch_executable_cache_;
   // CTS-derived tiny dispatch executable shared by dispatch benchmark rows.
   static iree_hal_executable_t* dispatch_executable_;
+  // Executable cache used for binding-count dispatch benchmark exports.
+  static iree_hal_executable_cache_t* binding_count_executable_cache_;
+  // Empty-kernel executable with exports that vary only in ABI binding count.
+  static iree_hal_executable_t* binding_count_executable_;
 
   // Precomputed dispatch packet body used by direct-substrate attribution rows.
   iree_hsa_kernel_dispatch_packet_t pre_resolved_dispatch_packet_template_ = {};
@@ -1303,6 +1478,13 @@ class QueueBenchmark : public benchmark::Fixture {
   iree_hal_buffer_t* source_buffer_ = nullptr;
   // Small target buffer used by queue copy and fill payload benchmark rows.
   iree_hal_buffer_t* target_buffer_ = nullptr;
+  // Unique device buffers passed to binding-count dispatch benchmark rows.
+  iree_hal_buffer_t* binding_count_buffers_[kDispatchBindingBenchmarkMaxCount] =
+      {};
+  // Queue_dispatch binding refs assembled from |binding_count_buffers_|.
+  iree_hal_buffer_ref_t
+      binding_count_binding_ref_scratch_[kDispatchBindingBenchmarkMaxCount] =
+          {};
   // Public semaphore used for final host-observable completion.
   iree_hal_semaphore_t* completion_semaphore_ = nullptr;
   // Private single-producer stream semaphore used by queue 1.
@@ -1328,6 +1510,9 @@ iree_hal_device_t* QueueBenchmark::device_ = nullptr;
 iree_hal_executable_cache_t* QueueBenchmark::dispatch_executable_cache_ =
     nullptr;
 iree_hal_executable_t* QueueBenchmark::dispatch_executable_ = nullptr;
+iree_hal_executable_cache_t* QueueBenchmark::binding_count_executable_cache_ =
+    nullptr;
+iree_hal_executable_t* QueueBenchmark::binding_count_executable_ = nullptr;
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
                    SameQueueBarrierWait)(benchmark::State& state) {
@@ -2235,6 +2420,54 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
 }
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
+                   DispatchBindingCountValidateOnly)(benchmark::State& state) {
+  const int64_t binding_count = state.range(0);
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, binding_count)) return;
+  iree_hal_amdgpu_host_queue_t* host_queue = nullptr;
+  if (!HandleStatus(state, LookupHostQueue(kQueue0, &host_queue),
+                    "failed to find queue 0")) {
+    return;
+  }
+
+  for (auto _ : state) {
+    iree_host_size_t operation_resource_count = 0;
+    iree_status_t status = ValidateBindingCountDispatchOnce(
+        host_queue, binding_count, &operation_resource_count);
+    if (!HandleStatus(state, status,
+                      "binding-count dispatch validation failed")) {
+      break;
+    }
+    benchmark::DoNotOptimize(operation_resource_count);
+  }
+  state.counters["binding_count"] = static_cast<double>(binding_count);
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   SameQueueDispatchBindingCountPublicFinalInlineSubmitOnly)(
+    benchmark::State& state) {
+  const int64_t binding_count = state.range(0);
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, binding_count)) return;
+  for (auto _ : state) {
+    SubmittedCompletion completion;
+    if (!HandleStatus(state,
+                      BindingCountDispatchSubmitPublicFinalInline(binding_count,
+                                                                  &completion),
+                      "binding-count dispatch submit failed")) {
+      break;
+    }
+    if (!WaitWithTimingPaused(state, completion,
+                              "binding-count dispatch wait failed")) {
+      break;
+    }
+  }
+  state.counters["binding_count"] = static_cast<double>(binding_count);
+  SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
                    WaitBeforeSignalChain)(benchmark::State& state) {
   if (!EnsureQueueAvailable(state, kQueue1)) return;
   for (auto _ : state) {
@@ -2570,6 +2803,25 @@ BENCHMARK_REGISTER_F(QueueBenchmark,
 BENCHMARK_REGISTER_F(QueueBenchmark, DispatchValidateOnly)
     ->UseRealTime()
     ->Unit(benchmark::kNanosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, DispatchBindingCountValidateOnly)
+    ->Arg(0)
+    ->Arg(1)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(256)
+    ->ArgName("binding_count")
+    ->UseRealTime()
+    ->Unit(benchmark::kNanosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark,
+                     SameQueueDispatchBindingCountPublicFinalInlineSubmitOnly)
+    ->Arg(0)
+    ->Arg(1)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(256)
+    ->ArgName("binding_count")
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark, WaitBeforeSignalChain)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);

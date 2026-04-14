@@ -24,6 +24,7 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
+#include "iree/hal/utils/resource_set.h"
 
 // The inline frontier on host_queue_t uses the same {entry_count, reserved[7],
 // entries[N]} layout as iree_async_frontier_t + FAM. Verify the entries field
@@ -283,8 +284,16 @@ struct iree_hal_amdgpu_pending_op_t {
       iree_hal_dispatch_flags_t flags;
     } dispatch;
     struct {
+      // Command buffer retained until the deferred execute operation issues.
       iree_hal_command_buffer_t* command_buffer;
-      iree_hal_buffer_binding_table_t binding_table;  // Arena-allocated copy.
+
+      // Arena-owned copy of the binding table prefix used by command_buffer.
+      iree_hal_buffer_binding_table_t binding_table;
+
+      // Queue-owned binding resources retained until execute completion.
+      iree_hal_resource_set_t* binding_resource_set;
+
+      // HAL execute flags captured from queue_execute.
       iree_hal_execute_flags_t flags;
     } execute;
     struct {
@@ -382,6 +391,14 @@ static void iree_hal_amdgpu_pending_op_release_retained(
     iree_hal_resource_release(op->retained_resources[i]);
   }
   op->retained_resource_count = 0;
+}
+
+static void iree_hal_amdgpu_pending_op_release_execute_binding_resource_set(
+    iree_hal_amdgpu_pending_op_t* op) {
+  if (op->type == IREE_HAL_AMDGPU_PENDING_OP_EXECUTE) {
+    iree_hal_resource_set_free(op->execute.binding_resource_set);
+    op->execute.binding_resource_set = NULL;
+  }
 }
 
 static void iree_hal_amdgpu_pending_op_fail_host_action(
@@ -573,6 +590,7 @@ static void iree_hal_amdgpu_pending_op_destroy_under_lock(
   iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
   // Release any queue-owned memory reservation before releasing op resources.
   iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
+  iree_hal_amdgpu_pending_op_release_execute_binding_resource_set(op);
   // Release all retained resources (signal semaphores + op resources).
   iree_hal_amdgpu_pending_op_release_retained(op);
   // Release wait semaphores (separately retained by the clone).
@@ -979,6 +997,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
           status = iree_hal_amdgpu_host_queue_submit_command_buffer(
               queue, &resolution, op->signal_semaphore_list,
               op->execute.command_buffer, op->execute.binding_table,
+              op->execute.flags, &op->execute.binding_resource_set,
               IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
           if (iree_status_is_ok(status)) {
             op->retained_resource_count = 0;
@@ -990,6 +1009,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
               /*operation_resources=*/NULL,
               /*operation_resource_count=*/0,
               /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+              /*resource_set=*/NULL,
               IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
           if (iree_status_is_ok(status)) {
             op->retained_resource_count = 0;
@@ -1037,6 +1057,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             op->host_action.action, op->retained_resources,
             op->retained_resource_count,
             /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+            /*resource_set=*/NULL,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
         if (iree_status_is_ok(status)) {
           op->retained_resource_count = 0;
@@ -1054,6 +1075,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
     iree_hal_semaphore_list_fail(op->signal_semaphore_list, status);
     iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
     iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
+    iree_hal_amdgpu_pending_op_release_execute_binding_resource_set(op);
     iree_hal_amdgpu_pending_op_release_retained(op);
   }
 
@@ -1081,6 +1103,7 @@ static void iree_hal_amdgpu_pending_op_fail(iree_hal_amdgpu_pending_op_t* op,
   iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
   // Release any queue-owned memory reservation before releasing op resources.
   iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
+  iree_hal_amdgpu_pending_op_release_execute_binding_resource_set(op);
   // Release all retained resources (signal semaphores + op resources).
   iree_hal_amdgpu_pending_op_release_retained(op);
   // Release wait semaphores (separately retained by the clone).
@@ -1148,6 +1171,7 @@ static void iree_hal_amdgpu_host_queue_cancel_pending(
     iree_hal_semaphore_list_fail(op->signal_semaphore_list, op_status);
     iree_hal_amdgpu_pending_op_abort_unsubmitted_dealloca(op);
     iree_hal_amdgpu_pending_op_release_alloca_memory_wait(op);
+    iree_hal_amdgpu_pending_op_release_execute_binding_resource_set(op);
     iree_hal_amdgpu_pending_op_release_retained(op);
     iree_hal_semaphore_list_release(op->wait_semaphore_list);
     iree_notification_deinitialize(&op->callback_notification);
@@ -2303,6 +2327,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_execute_flags_t flags, iree_hal_amdgpu_pending_op_t** out_op) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_validate_execute_flags(flags));
   if (IREE_UNLIKELY(!command_buffer && binding_table.count != 0)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -2310,46 +2336,44 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
         "(count=%" PRIhsz ")",
         binding_table.count);
   }
+  const iree_host_size_t binding_count =
+      command_buffer ? command_buffer->binding_count : 0;
   if (command_buffer && command_buffer->binding_count == 0) {
     binding_table = iree_hal_buffer_binding_table_empty();
   }
 
-  // Optional command buffer + up to binding_table.count buffers.
-  iree_host_size_t operation_resource_count = command_buffer ? 1 : 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_add(operation_resource_count,
-                                                binding_table.count,
-                                                &operation_resource_count))) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "execute retains too many resources (bindings=%" PRIhsz ")",
-        binding_table.count);
-  }
-  uint16_t max_resources = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
-      signal_semaphore_list->count, operation_resource_count, &max_resources));
-  iree_hal_amdgpu_pending_op_t* op = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
-      queue, wait_semaphore_list, signal_semaphore_list,
-      IREE_HAL_AMDGPU_PENDING_OP_EXECUTE, max_resources, &op));
-  iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)command_buffer);
-  op->execute.command_buffer = command_buffer;
-  op->execute.flags = flags;
+  iree_hal_resource_set_t* binding_resource_set = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
+          queue, command_buffer, binding_table, flags, &binding_resource_set));
 
-  // Copy binding table and retain all bound buffers.
-  iree_status_t status = iree_ok_status();
-  if (binding_table.count > 0) {
+  const iree_host_size_t operation_resource_count = command_buffer ? 1 : 0;
+  uint16_t max_resources = 0;
+  iree_hal_amdgpu_pending_op_t* op = NULL;
+  iree_status_t status = iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      signal_semaphore_list->count, operation_resource_count, &max_resources);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_pending_op_allocate(
+        queue, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_AMDGPU_PENDING_OP_EXECUTE, max_resources, &op);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)command_buffer);
+    op->execute.command_buffer = command_buffer;
+    op->execute.binding_resource_set = binding_resource_set;
+    binding_resource_set = NULL;
+    op->execute.flags = flags;
+  }
+
+  if (iree_status_is_ok(status) && binding_count > 0) {
     iree_hal_buffer_binding_t* bindings_copy = NULL;
     status = iree_arena_allocate(
-        &op->arena, binding_table.count * sizeof(iree_hal_buffer_binding_t),
+        &op->arena, binding_count * sizeof(iree_hal_buffer_binding_t),
         (void**)&bindings_copy);
     if (iree_status_is_ok(status)) {
       memcpy(bindings_copy, binding_table.bindings,
-             binding_table.count * sizeof(iree_hal_buffer_binding_t));
-      for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
-        iree_hal_amdgpu_pending_op_retain(
-            op, (iree_hal_resource_t*)bindings_copy[i].buffer);
-      }
-      op->execute.binding_table.count = binding_table.count;
+             binding_count * sizeof(iree_hal_buffer_binding_t));
+      op->execute.binding_table.count = binding_count;
       op->execute.binding_table.bindings = bindings_copy;
     }
   }
@@ -2357,8 +2381,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
   if (iree_status_is_ok(status)) {
     *out_op = op;
   } else {
-    iree_hal_amdgpu_pending_op_destroy_under_lock(op,
-                                                  iree_status_clone(status));
+    iree_hal_resource_set_free(binding_resource_set);
+    if (op) {
+      iree_hal_amdgpu_pending_op_destroy_under_lock(op,
+                                                    iree_status_clone(status));
+    }
   }
   return status;
 }
@@ -2473,6 +2500,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
         /*operation_resources=*/NULL,
         /*operation_resource_count=*/0,
         /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        /*resource_set=*/NULL,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   } else {
     status = iree_hal_amdgpu_host_queue_submit_dispatch(
@@ -2497,6 +2525,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_amdgpu_host_queue_t* queue =
       (iree_hal_amdgpu_host_queue_t*)base_queue;
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_validate_execute_flags(flags));
 
   if (!command_buffer && wait_semaphore_list.count == 0) {
     if (IREE_UNLIKELY(binding_table.count != 0)) {
@@ -2534,12 +2565,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
           /*operation_resources=*/NULL,
           /*operation_resource_count=*/0,
           /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+          /*resource_set=*/NULL,
           IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
     }
   } else {
+    iree_hal_resource_set_t* binding_resource_set = NULL;
     status = iree_hal_amdgpu_host_queue_submit_command_buffer(
         queue, &resolution, signal_semaphore_list, command_buffer,
-        binding_table,
+        binding_table, flags, &binding_resource_set,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
@@ -2635,6 +2668,7 @@ iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
         queue, &resolution, iree_hal_semaphore_list_empty(), action,
         operation_resources, operation_resource_count,
         /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        /*resource_set=*/NULL,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);

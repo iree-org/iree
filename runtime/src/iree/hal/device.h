@@ -301,6 +301,13 @@ static inline iree_hal_host_call_t iree_hal_make_host_call(
 typedef uint64_t iree_hal_execute_flags_t;
 enum iree_hal_execute_flag_bits_t {
   IREE_HAL_EXECUTE_FLAG_NONE = 0,
+  // Allows the implementation to borrow binding table buffer lifetimes instead
+  // of retaining them until the submitted work completes. Callers using this
+  // flag must keep all buffers referenced by the binding table live and backed
+  // by stable storage until the submission's signal semaphores indicate
+  // completion. The binding table entries themselves are still captured during
+  // the queue_execute call and need not remain live after it returns.
+  IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME = 1ull << 0,
 };
 
 // Device capability flags bitfield.
@@ -804,10 +811,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dispatch(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
-// A optional binding table must be provided if the command buffer has indirect
+// An optional binding table must be provided if the command buffer has indirect
 // bindings and may otherwise be `iree_hal_buffer_binding_table_empty()`. The
 // binding table contents will be captured during the call and need not persist
-// after the call returns.
+// after the call returns. By default, buffers referenced by the binding table
+// are retained until the submitted work completes. Callers that already
+// guarantee buffer lifetimes may pass
+// IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME to allow implementations
+// to skip that tracking on hot paths.
 //
 // The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
