@@ -1631,6 +1631,25 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_execute_flags_t flags);
 
+static iree_status_t iree_hal_amdgpu_host_queue_signal_empty_barrier(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_status_t status = iree_ok_status();
+  if (IREE_UNLIKELY(queue->is_shutting_down)) {
+    status = iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  if (iree_status_is_ok(status)) {
+    // Signal outside submission_mutex: semaphore signaling dispatches satisfied
+    // timepoints, and those callbacks may submit additional queue work.
+    status = iree_hal_semaphore_list_signal(signal_semaphore_list,
+                                            /*frontier=*/NULL);
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_amdgpu_host_queue_defer_alloca(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t* wait_semaphore_list,
@@ -2471,6 +2490,18 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_amdgpu_host_queue_t* queue =
       (iree_hal_amdgpu_host_queue_t*)base_queue;
+
+  if (!command_buffer && wait_semaphore_list.count == 0) {
+    if (IREE_UNLIKELY(binding_table.count != 0)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "barrier-only queue_execute must not provide a binding table "
+          "(count=%" PRIhsz ")",
+          binding_table.count);
+    }
+    return iree_hal_amdgpu_host_queue_signal_empty_barrier(
+        queue, signal_semaphore_list);
+  }
 
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_hal_amdgpu_wait_resolution_t resolution;
