@@ -86,6 +86,10 @@ external_cc_library(
   PUBLIC
 )
 
+# Bare-metal targets do not provide a POSIX environment, but iree-flatcc-cli
+# depends on POSIX APIs (file I/O, etc.).
+# Since bare-metal targets cannot build or run iree-flatcc-cli, we skip building
+# it and only import the host version.
 if(CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Generic")
   if(IREE_HOST_BIN_DIR)
     iree_import_binary(NAME iree-flatcc-cli)
