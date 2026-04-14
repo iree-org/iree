@@ -556,6 +556,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
   size_t numDims = lbs.size();
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
+  int64_t targetThreads = clNumberOfRuntimeThreads;
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
         ShapedType::isDynamic(ubs[i])) {
@@ -567,8 +568,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     assert(lbs[i] <= ubs[i]);
     workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    int64_t targetSize =
-        std::min(workload[i] / clNumberOfRuntimeThreads, maxTileSizes[i]);
+    int64_t targetSize = std::min(workload[i] / targetThreads, maxTileSizes[i]);
     int64_t vectorSize = vectorSizeHints[i];
     if (vectorSize > 1) {
       // Pick the factor of dim which is closest to the target tile size and
@@ -589,6 +589,11 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
     distributedTileSizes[i] = std::min(candidateTileSize, maxTileSizes[i]);
+
+    int64_t numTilesAlongDim = workload[i] / distributedTileSizes[i];
+    if (numTilesAlongDim > 0) {
+      targetThreads = std::max<int64_t>(1, targetThreads / numTilesAlongDim);
+    }
   }
 
   reduceDistributionWorkgroups(workload, distributedTileSizes, maxTileSizes,

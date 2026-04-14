@@ -73,7 +73,7 @@ func.func @matmul_static(%3: tensor<196x240xf32>, %4: tensor<240x40xf32>) -> ten
   %7 = linalg.matmul ins(%3, %4 : tensor<196x240xf32>, tensor<240x40xf32>) outs(%6 : tensor<196x40xf32>) -> tensor<196x40xf32>
   return %7 : tensor<196x40xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [49, 8, 0], distribution = [49, 8, 0], vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 4]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [14, 40, 0], distribution = [14, 40, 0], vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 4]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -165,7 +165,7 @@ func.func @pack(%2: tensor<20x48xf32>) -> tensor<3x48x8x1xf32> attributes {hal.e
   %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x48xf32> -> tensor<3x48x8x1xf32>
   return %pack : tensor<3x48x8x1xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 16], vector_common_parallel = [1, 1]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 24], vector_common_parallel = [1, 1]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>, {enable_decomposition}>
 //       CHECK: func.func @pack(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
