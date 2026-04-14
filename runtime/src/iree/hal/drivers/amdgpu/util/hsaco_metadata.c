@@ -1099,6 +1099,9 @@ static iree_status_t iree_hal_amdgpu_hsaco_metadata_allocate_storage(
   if (count.kernel_count == 0 && count.arg_count == 0) {
     return iree_ok_status();
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count.kernel_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count.arg_count);
 
   iree_host_size_t kernels_size = 0;
   iree_host_size_t args_offset = 0;
@@ -1112,19 +1115,22 @@ static iree_status_t iree_hal_amdgpu_hsaco_metadata_allocate_storage(
       !iree_host_size_checked_mul(count.arg_count, sizeof(metadata->args[0]),
                                   &args_size) ||
       !iree_host_size_checked_add(args_offset, args_size, &total_size)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "AMDGPU metadata storage size overflow");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "AMDGPU metadata storage size overflow"));
   }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, total_size);
 
   uint8_t* storage = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(host_allocator, total_size, (void**)&storage));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&storage));
   memset(storage, 0, total_size);
   metadata->kernels = (iree_hal_amdgpu_hsaco_metadata_kernel_t*)storage;
   metadata->args =
       count.arg_count
           ? (iree_hal_amdgpu_hsaco_metadata_arg_t*)(storage + args_offset)
           : NULL;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -1132,16 +1138,20 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
     iree_const_byte_span_t elf_data, iree_allocator_t host_allocator,
     iree_hal_amdgpu_hsaco_metadata_t* out_metadata) {
   IREE_ASSERT_ARGUMENT(out_metadata);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, elf_data.data_length);
   memset(out_metadata, 0, sizeof(*out_metadata));
   out_metadata->host_allocator = host_allocator;
   out_metadata->elf_data = elf_data;
 
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_hsaco_metadata_find_note(
-      elf_data, &out_metadata->message_pack_data));
+  iree_status_t status = iree_hal_amdgpu_hsaco_metadata_find_note(
+      elf_data, &out_metadata->message_pack_data);
 
   iree_hal_amdgpu_hsaco_metadata_count_t count = {0};
-  iree_status_t status = iree_hal_amdgpu_hsaco_metadata_count_message_pack(
-      out_metadata->message_pack_data, &count);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_hsaco_metadata_count_message_pack(
+        out_metadata->message_pack_data, &count);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_hsaco_metadata_allocate_storage(
         count, host_allocator, out_metadata);
@@ -1153,16 +1163,21 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_hsaco_metadata_deinitialize(out_metadata);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 void iree_hal_amdgpu_hsaco_metadata_deinitialize(
     iree_hal_amdgpu_hsaco_metadata_t* metadata) {
-  if (!metadata) return;
+  if (!metadata) {
+    return;
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (metadata->kernels) {
     iree_allocator_free(metadata->host_allocator, metadata->kernels);
   }
   memset(metadata, 0, sizeof(*metadata));
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static bool iree_hal_amdgpu_hsaco_metadata_arg_kind_is_hidden(

@@ -40,11 +40,13 @@ static void iree_hal_amdgpu_host_call_state_destroy(
     iree_hal_resource_t* resource) {
   iree_hal_amdgpu_host_call_state_t* state =
       (iree_hal_amdgpu_host_call_state_t*)resource;
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (!iree_hal_semaphore_list_is_empty(state->signal_semaphore_list)) {
     iree_hal_semaphore_list_free(state->signal_semaphore_list,
                                  state->host_allocator);
   }
   iree_allocator_free(state->host_allocator, state);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static const iree_hal_resource_vtable_t iree_hal_amdgpu_host_call_state_vtable =
@@ -80,12 +82,14 @@ static iree_status_t iree_hal_amdgpu_host_call_state_create(
     iree_hal_host_call_flags_t flags,
     iree_hal_amdgpu_host_call_state_t** out_state) {
   *out_state = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_host_queue_validate_host_call(call, args, flags));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_host_queue_validate_host_call(call, args, flags));
   iree_hal_amdgpu_host_call_state_t* state = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator,
-                                             sizeof(*state), (void**)&state));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(queue->host_allocator, sizeof(*state),
+                                (void**)&state));
   memset(state, 0, sizeof(*state));
   iree_hal_resource_initialize(&iree_hal_amdgpu_host_call_state_vtable,
                                &state->resource);
@@ -104,6 +108,7 @@ static iree_status_t iree_hal_amdgpu_host_call_state_create(
   } else {
     iree_hal_resource_release(&state->resource);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

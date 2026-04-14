@@ -1238,14 +1238,14 @@ class QueueBenchmark : public benchmark::Fixture {
           IREE_ARRAYSIZE(operation_resources),
           pre_resolved_dispatch_kernarg_block_count_, &submission);
       if (iree_status_is_ok(status)) {
-        std::memcpy(submission.kernarg_blocks->data,
+        std::memcpy(submission.kernel.kernarg_blocks->data,
                     pre_resolved_dispatch_kernargs_,
                     pre_resolved_dispatch_kernarg_length_);
         submission.dispatch_setup =
             iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
                 &submission.dispatch_slot->dispatch,
                 &pre_resolved_dispatch_packet_template_,
-                submission.kernarg_blocks->data,
+                submission.kernel.kernarg_blocks->data,
                 iree_hal_amdgpu_notification_ring_epoch_signal(
                     &host_queue->notification_ring));
         iree_hal_amdgpu_host_queue_finish_dispatch_submission(

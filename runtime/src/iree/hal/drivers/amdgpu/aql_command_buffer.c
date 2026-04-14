@@ -138,8 +138,11 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(
       command_buffer->resource_set) {
     return iree_ok_status();
   }
-  return iree_hal_resource_set_allocate(command_buffer->block_pool,
-                                        &command_buffer->resource_set);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_resource_set_allocate(
+      command_buffer->block_pool, &command_buffer->resource_set);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_static_buffers(
@@ -152,6 +155,8 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_static_buffers(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "command-buffer static buffer table overflow");
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->static_buffer_capacity);
   iree_host_size_t capacity = command_buffer->static_buffer_capacity;
   iree_status_t status = iree_allocator_grow_array(
       command_buffer->host_allocator, /*minimum_capacity=*/16,
@@ -160,6 +165,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_static_buffers(
   if (iree_status_is_ok(status)) {
     command_buffer->static_buffer_capacity = (uint32_t)capacity;
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -198,8 +204,10 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
   if (!page ||
       page->count ==
           IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_PAGE_CAPACITY) {
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->rodata.arena,
-                                             sizeof(*page), (void**)&page));
+    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(&command_buffer->rodata.arena, sizeof(*page),
+                                (void**)&page));
     memset(page, 0, sizeof(*page));
     if (command_buffer->rodata.current_page) {
       command_buffer->rodata.current_page->next = page;
@@ -207,6 +215,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
       command_buffer->rodata.first_page = page;
     }
     command_buffer->rodata.current_page = page;
+    IREE_TRACE_ZONE_END(z0);
   }
 
   const uint32_t ordinal = command_buffer->rodata.segment_count++;
@@ -236,15 +245,21 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_rodata(
   (void)source_end;
 
   uint8_t* rodata = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(
-      &command_buffer->rodata.arena,
-      iree_max((iree_host_size_t)1, source_length), (void**)&rodata));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, source_length);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(&command_buffer->rodata.arena,
+                              iree_max((iree_host_size_t)1, source_length),
+                              (void**)&rodata));
   if (source_length > 0) {
     memcpy(rodata, (const uint8_t*)source_buffer + source_offset,
            source_length);
   }
-  return iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
-      command_buffer, rodata, source_length, out_rodata_ordinal);
+  iree_status_t status =
+      iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
+          command_buffer, rodata, source_length, out_rodata_ordinal);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
