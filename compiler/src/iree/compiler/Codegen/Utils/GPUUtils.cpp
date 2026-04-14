@@ -814,6 +814,16 @@ static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
       return failure();
     }
   }
+  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
+    switch (mma.getIntrinsic()) {
+    case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_BF16:
+    case IREE::GPU::MMAIntrinsic::MFMA_F32_32x32x16_BF16:
+      return XorShuffleParams({/*rowElems=*/64,
+                               /*accessElems=*/8});
+    default:
+      return failure();
+    }
+  }
   return failure();
 }
 

@@ -942,8 +942,25 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // translation_info).
   SmallVector<Attribute> promotionArray;
   if (useDirectLoad) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    promotionArray = {useGlobalDma, useGlobalDma};
+    Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
+    // innermost (contiguous reads) to avoid LDS bank conflicts.
+    if (lhsElemType.isBF16() && !transposedLhs) {
+      FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
+          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
+      if (succeeded(lhsSwizzleAttr)) {
+        lhsAttr = *lhsSwizzleAttr;
+      }
+    }
+    if (rhsElemType.isBF16() && transposedRhs) {
+      FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
+          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
+      if (succeeded(rhsSwizzleAttr)) {
+        rhsAttr = *rhsSwizzleAttr;
+      }
+    }
+    promotionArray = {lhsAttr, rhsAttr};
   }
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
