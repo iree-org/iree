@@ -713,7 +713,7 @@ func.func @pack_many_elements(%2: tensor<1200x500000xf32>) -> tensor<31250x1200x
   %pack = linalg.pack %2 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %3 : tensor<1200x500000xf32> -> tensor<31250x1200x16x1xf32>
   return %pack : tensor<31250x1200x16x1xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [50, 3], vector_common_parallel = [1, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [50, 48], vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
 //      CHECK: func.func @pack_many_elements(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
