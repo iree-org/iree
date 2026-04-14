@@ -10,6 +10,7 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
+#include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
 #include "iree/hal/utils/resource_set.h"
 
 //===----------------------------------------------------------------------===//
@@ -31,6 +32,12 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   uint32_t static_buffer_capacity;
   // Valid entries in |static_buffers|.
   uint32_t static_buffer_count;
+  // Command-buffer-owned immutable payload bytes captured while recording.
+  uint8_t* rodata;
+  // Allocated byte capacity in |rodata|.
+  iree_host_size_t rodata_capacity;
+  // Valid payload bytes in |rodata|.
+  iree_host_size_t rodata_length;
   // Builder used only during begin/end recording.
   iree_hal_amdgpu_aql_program_builder_t builder;
   // Program produced by end() and consumed by queue execution.
@@ -61,6 +68,10 @@ static void iree_hal_amdgpu_aql_command_buffer_reset_resources(
   command_buffer->static_buffers = NULL;
   command_buffer->static_buffer_capacity = 0;
   command_buffer->static_buffer_count = 0;
+  iree_allocator_free(command_buffer->host_allocator, command_buffer->rodata);
+  command_buffer->rodata = NULL;
+  command_buffer->rodata_capacity = 0;
+  command_buffer->rodata_length = 0;
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(
@@ -108,6 +119,57 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_static_buffer(
   *out_ordinal = command_buffer->static_buffer_count;
   command_buffer->static_buffers[command_buffer->static_buffer_count++] =
       buffer;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_rodata_capacity(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
+    iree_host_size_t required_capacity) {
+  if (required_capacity <= command_buffer->rodata_capacity) {
+    return iree_ok_status();
+  }
+  iree_host_size_t capacity = command_buffer->rodata_capacity;
+  iree_status_t status = iree_allocator_grow_array(
+      command_buffer->host_allocator,
+      iree_max((iree_host_size_t)1024, required_capacity),
+      sizeof(*command_buffer->rodata), &capacity,
+      (void**)&command_buffer->rodata);
+  if (iree_status_is_ok(status)) {
+    command_buffer->rodata_capacity = capacity;
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_rodata(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_host_size_t source_length, uint64_t* out_rodata_offset) {
+  *out_rodata_offset = 0;
+  iree_host_size_t source_end = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(source_offset, source_length,
+                                                &source_end))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "command-buffer update source span overflows host size "
+        "(offset=%" PRIhsz ", length=%" PRIhsz ")",
+        source_offset, source_length);
+  }
+  (void)source_end;
+
+  iree_host_size_t required_capacity = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(
+          command_buffer->rodata_length, source_length, &required_capacity))) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "command-buffer rodata storage size overflow");
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_aql_command_buffer_ensure_rodata_capacity(
+          command_buffer, required_capacity));
+
+  uint8_t* rodata = command_buffer->rodata + command_buffer->rodata_length;
+  memcpy(rodata, (const uint8_t*)source_buffer + source_offset, source_length);
+  *out_rodata_offset = (uint64_t)command_buffer->rodata_length;
+  command_buffer->rodata_length = required_capacity;
   return iree_ok_status();
 }
 
@@ -203,6 +265,20 @@ iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
   return ordinal < command_buffer->static_buffer_count
              ? command_buffer->static_buffers[ordinal]
              : NULL;
+}
+
+const uint8_t* iree_hal_amdgpu_aql_command_buffer_rodata(
+    iree_hal_command_buffer_t* base_command_buffer, uint64_t offset,
+    uint32_t length) {
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  if (IREE_UNLIKELY(offset > IREE_HOST_SIZE_MAX)) return NULL;
+  if (IREE_UNLIKELY(length > IREE_HOST_SIZE_MAX - (iree_host_size_t)offset)) {
+    return NULL;
+  }
+  const iree_host_size_t end = (iree_host_size_t)offset + length;
+  return end <= command_buffer->rodata_length ? command_buffer->rodata + offset
+                                              : NULL;
 }
 
 //===----------------------------------------------------------------------===//
@@ -404,7 +480,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_fill_buffer(
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_fill_command_t),
       /*fixup_count=*/0, /*aql_packet_count=*/1,
-      IREE_HAL_AMDGPU_DEVICE_BUFFER_FILL_KERNARG_SIZE, &header,
+      sizeof(iree_hal_amdgpu_kernarg_block_t), &header,
       /*out_fixups=*/NULL));
 
   iree_hal_amdgpu_command_buffer_fill_command_t* fill_command =
@@ -422,9 +498,81 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
     iree_hal_update_flags_t flags) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "AMDGPU command-buffer update replay not implemented");
+  if (IREE_UNLIKELY(!source_buffer)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "update source buffer must be non-null");
+  }
+  if (IREE_UNLIKELY(target_ref.length >
+                    IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "command-buffer update length %" PRIdsz
+                            " exceeds maximum update size %" PRIdsz,
+                            target_ref.length,
+                            IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE);
+  }
+  if (IREE_UNLIKELY(flags != IREE_HAL_UPDATE_FLAG_NONE)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported update flags: 0x%" PRIx64, flags);
+  }
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  uint8_t target_kind = 0;
+  uint32_t target_ordinal = 0;
+  uint64_t target_offset = 0;
+  uint64_t target_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
+      command_buffer, target_ref, IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
+      IREE_HAL_MEMORY_ACCESS_WRITE, &target_kind, &target_ordinal,
+      &target_offset, &target_length));
+
+  uint64_t rodata_offset = 0;
+  const iree_host_size_t source_length = (iree_host_size_t)target_length;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_rodata(
+      command_buffer, source_buffer, source_offset, source_length,
+      &rodata_offset));
+
+  const iree_host_size_t source_payload_offset =
+      IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_OFFSET;
+  iree_host_size_t kernarg_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(
+          source_payload_offset, source_length, &kernarg_length))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "command-buffer update staging payload overflows host size "
+        "(offset=%" PRIhsz ", source_length=%" PRIhsz ")",
+        source_payload_offset, source_length);
+  }
+  const iree_host_size_t kernarg_block_count = iree_host_size_ceil_div(
+      kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
+  iree_host_size_t kernarg_block_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(kernarg_block_count,
+                                      sizeof(iree_hal_amdgpu_kernarg_block_t),
+                                      &kernarg_block_length) ||
+          kernarg_block_length > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "command-buffer update staging payload requires too many kernarg "
+        "bytes (%" PRIhsz ")",
+        kernarg_block_length);
+  }
+
+  iree_hal_amdgpu_command_buffer_command_header_t* header = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_program_builder_append_command(
+      &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_UPDATE,
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
+      sizeof(iree_hal_amdgpu_command_buffer_update_command_t),
+      /*fixup_count=*/0, /*aql_packet_count=*/1, (uint32_t)kernarg_block_length,
+      &header, /*out_fixups=*/NULL));
+
+  iree_hal_amdgpu_command_buffer_update_command_t* update_command =
+      (iree_hal_amdgpu_command_buffer_update_command_t*)header;
+  update_command->rodata_offset = rodata_offset;
+  update_command->target_offset = target_offset;
+  update_command->length = (uint32_t)target_length;
+  update_command->target_ordinal = target_ordinal;
+  update_command->target_kind = target_kind;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_copy_buffer(
@@ -478,7 +626,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_copy_buffer(
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_copy_command_t),
       /*fixup_count=*/0, /*aql_packet_count=*/1,
-      IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_KERNARG_SIZE, &header,
+      sizeof(iree_hal_amdgpu_kernarg_block_t), &header,
       /*out_fixups=*/NULL));
 
   iree_hal_amdgpu_command_buffer_copy_command_t* copy_command =
