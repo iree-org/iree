@@ -966,17 +966,43 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
   return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
-// Returns virtual intrinsics that are composed from this concrete MMA op.
+// Get virtual intrinsics that are composed/based on the queried op.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ};
+  case MMAIntrinsic::MFMA_I32_16x16x32_I8:
+    return {VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16};
+  case MMAIntrinsic::MFMA_I32_16x16x64_I8:
+    return {VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2_F8E4M3FN:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN_F8E5M2:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2};
+  case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN};
   default:
     return {};
   }

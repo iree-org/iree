@@ -508,10 +508,10 @@ func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %
 }
 // CHECK-LABEL: func.func @small_mn_matmul
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:      padding = [16, 16, 16]
+// CHECK-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+// CHECK-SAME:      padding = [8, 16, 64]
 // CHECK-SAME:      subgroup = [1, 1, 0]
-// CHECK-SAME:      workgroup = [16, 16, 0]
+// CHECK-SAME:      workgroup = [8, 16, 0]
 
 // -----
 

@@ -542,7 +542,8 @@ def gpu_target_info_attribute_parsing():
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
         iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
-    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+        iree_gpu.VirtualMMAIntrinsic.VDMFMA_F32_8x16x64x2_F16,
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16, VDMFMA_F32_8x16x64x2_F16], got {mma_intrinsics}"
 
 
 @run
