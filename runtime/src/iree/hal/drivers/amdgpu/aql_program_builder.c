@@ -17,28 +17,34 @@
 iree_status_t iree_hal_amdgpu_aql_program_block_pool_initialize(
     iree_host_size_t block_size, iree_allocator_t host_allocator,
     iree_arena_block_pool_t* out_block_pool) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, block_size);
   if (IREE_UNLIKELY(!iree_host_size_is_power_of_two(block_size) ||
                     block_size < IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command-buffer block size must be a power-of-two "
-                            ">= %u bytes",
-                            IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                             "command-buffer block size must be a "
+                             "power-of-two >= %u bytes",
+                             IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE));
   }
   if (IREE_UNLIKELY(block_size > UINT32_MAX)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "command-buffer block size must fit in the block ABI");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_INVALID_ARGUMENT,
+                "command-buffer block size must fit in the block ABI"));
   }
 
   iree_host_size_t total_block_size = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_add(
           block_size, sizeof(iree_arena_block_t), &total_block_size))) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "command-buffer block size overflow");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                             "command-buffer block size overflow"));
   }
 
   iree_arena_block_pool_initialize(total_block_size, host_allocator,
                                    out_block_pool);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -76,7 +82,10 @@ iree_hal_amdgpu_aql_program_block_next(
 
 void iree_hal_amdgpu_aql_program_release(
     iree_hal_amdgpu_aql_program_t* program) {
-  if (!program->first_block) return;
+  if (!program->first_block) {
+    return;
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_arena_block_t* first_arena_block =
       iree_hal_amdgpu_aql_program_arena_block(program->block_pool,
@@ -89,6 +98,7 @@ void iree_hal_amdgpu_aql_program_release(
   iree_arena_block_pool_release(program->block_pool, first_arena_block,
                                 last_arena_block);
   memset(program, 0, sizeof(*program));
+  IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -104,7 +114,10 @@ void iree_hal_amdgpu_aql_program_builder_initialize(
 
 void iree_hal_amdgpu_aql_program_builder_deinitialize(
     iree_hal_amdgpu_aql_program_builder_t* builder) {
-  if (!builder->block_pool) return;
+  if (!builder->block_pool) {
+    return;
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   if (builder->current_block) {
     iree_arena_block_t* arena_block = iree_hal_amdgpu_aql_program_arena_block(
@@ -124,6 +137,7 @@ void iree_hal_amdgpu_aql_program_builder_deinitialize(
   }
 
   memset(builder, 0, sizeof(*builder));
+  IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,8 +153,10 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_begin_block(
 
   iree_arena_block_t* arena_block = NULL;
   void* block_data = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_block_pool_acquire(
-      builder->block_pool, &arena_block, &block_data));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_block_pool_acquire(builder->block_pool, &arena_block,
+                                        &block_data));
 
   arena_block->next = NULL;
   iree_hal_amdgpu_command_buffer_block_header_t* block =
@@ -163,6 +179,7 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_begin_block(
   builder->current_block_aql_packet_count = 0;
   builder->current_block_kernarg_length = 0;
   ++builder->block_count;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

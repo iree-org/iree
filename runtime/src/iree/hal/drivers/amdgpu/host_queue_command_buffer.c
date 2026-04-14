@@ -130,8 +130,12 @@ iree_hal_amdgpu_host_queue_prepare_command_buffer_binding_ptrs(
           IREE_STATUS_OUT_OF_RANGE,
           "command-buffer binding pointer table size overflow");
     }
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(overflow_arena, binding_ptr_bytes,
-                                             (void**)&binding_ptrs));
+    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->binding_count);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(overflow_arena, binding_ptr_bytes,
+                                (void**)&binding_ptrs));
+    IREE_TRACE_ZONE_END(z0);
   }
 
   iree_status_t status = iree_ok_status();
@@ -190,10 +194,15 @@ iree_hal_amdgpu_host_queue_prepare_command_buffer_packet_metadata(
           IREE_STATUS_OUT_OF_RANGE,
           "command-buffer packet metadata table size overflow");
     }
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(
-        scratch_arena, packet_metadata_bytes, (void**)&packet_headers));
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(
-        scratch_arena, packet_metadata_bytes, (void**)&packet_setups));
+    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, packet_count);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(scratch_arena, packet_metadata_bytes,
+                                (void**)&packet_headers));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(scratch_arena, packet_metadata_bytes,
+                                (void**)&packet_setups));
+    IREE_TRACE_ZONE_END(z0);
   }
 
   memset(packet_headers, 0, packet_count * sizeof(*packet_headers));
@@ -648,8 +657,12 @@ iree_hal_amdgpu_host_queue_prepare_check_dispatch_kernarg_data(
         IREE_STATUS_OUT_OF_RANGE,
         "command-buffer dispatch check kernarg size overflow");
   }
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(scratch_arena, kernarg_length,
-                                           (void**)out_kernarg_data));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, kernarg_block_count);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(scratch_arena, kernarg_length,
+                              (void**)out_kernarg_data));
+  IREE_TRACE_ZONE_END(z0);
   memset(*out_kernarg_data, 0, kernarg_length);
   return iree_ok_status();
 }
@@ -1112,6 +1125,8 @@ iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
     return iree_ok_status();
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->binding_count);
   iree_hal_resource_set_t* resource_set = NULL;
   iree_status_t status =
       iree_hal_resource_set_allocate(queue->block_pool, &resource_set);
@@ -1127,6 +1142,7 @@ iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
   } else {
     iree_hal_resource_set_free(resource_set);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

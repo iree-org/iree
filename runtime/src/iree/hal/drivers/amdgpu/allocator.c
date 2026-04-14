@@ -445,6 +445,9 @@ static void iree_hal_amdgpu_allocator_deallocate_buffer(
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
   iree_hal_amdgpu_allocator_t* allocator =
       iree_hal_amdgpu_allocator_cast(base_allocator);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      z0, iree_hal_buffer_allocation_size(base_buffer));
 
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
@@ -452,12 +455,14 @@ static void iree_hal_amdgpu_allocator_deallocate_buffer(
 
   // The buffer's destroy method handles freeing the HSA allocation.
   iree_hal_buffer_destroy(base_buffer);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static void iree_hal_amdgpu_allocator_release_imported_host(
     void* user_data, iree_hal_buffer_t* buffer) {
   iree_hal_amdgpu_imported_host_release_data_t* data =
       (iree_hal_amdgpu_imported_host_release_data_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_IGNORE_ERROR(
       iree_hsa_amd_memory_unlock(IREE_LIBHSA(data->libhsa), data->host_ptr));
@@ -466,6 +471,7 @@ static void iree_hal_amdgpu_allocator_release_imported_host(
                                      buffer);
   }
   iree_allocator_free(data->host_allocator, data);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
@@ -554,6 +560,8 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, external_buffer->size);
   void* host_ptr = external_buffer->handle.host_allocation.ptr;
   void* agent_ptr = NULL;
   iree_status_t status = iree_hsa_amd_memory_lock(
@@ -603,6 +611,7 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
     }
     iree_hal_buffer_release(buffer);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

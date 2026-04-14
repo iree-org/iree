@@ -364,6 +364,7 @@ static bool iree_hal_amdgpu_logical_device_query_pool_epoch(
 
 static void iree_hal_amdgpu_logical_device_deassign_frontier(
     iree_hal_amdgpu_logical_device_t* logical_device) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
     iree_hal_amdgpu_physical_device_deassign_frontier(
         logical_device->physical_devices[i]);
@@ -380,6 +381,7 @@ static void iree_hal_amdgpu_logical_device_deassign_frontier(
                         logical_device->host_queue_epoch_table);
     logical_device->host_queue_epoch_table = NULL;
   }
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
@@ -1129,6 +1131,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_assign_topology_info(
     iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
     return iree_ok_status();
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_amdgpu_system_t* system = logical_device->system;
 
   const uint8_t device_count = (uint8_t)system->topology.gpu_agent_count;
@@ -1170,6 +1173,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_assign_topology_info(
     iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

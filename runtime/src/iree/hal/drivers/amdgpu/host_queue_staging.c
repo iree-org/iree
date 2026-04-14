@@ -120,11 +120,13 @@ static void iree_hal_amdgpu_staging_allocation_release(
   (void)buffer;
   iree_hal_amdgpu_staging_allocation_t* allocation =
       (iree_hal_amdgpu_staging_allocation_t*)user_data;
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (allocation->allocation_base) {
     IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
         IREE_LIBHSA(allocation->libhsa), allocation->allocation_base));
   }
   iree_allocator_free(allocation->host_allocator, allocation);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_hal_amdgpu_staging_pool_waiter_t*
@@ -274,8 +276,12 @@ iree_status_t iree_hal_amdgpu_staging_pool_initialize(
   IREE_ASSERT_ARGUMENT(host_memory_pools);
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(out_pool);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, options->slot_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, options->slot_count);
 
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_staging_pool_options_verify(options));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_staging_pool_options_verify(options));
 
   memset(out_pool, 0, sizeof(*out_pool));
   out_pool->host_allocator = host_allocator;
@@ -288,59 +294,52 @@ iree_status_t iree_hal_amdgpu_staging_pool_initialize(
   if (options->force_fine_host_memory || !memory_pool.handle) {
     memory_pool = host_memory_pools->fine_pool;
   }
+  iree_status_t status = iree_ok_status();
   if (IREE_UNLIKELY(!memory_pool.handle)) {
-    iree_slim_mutex_deinitialize(&out_pool->mutex);
-    memset(out_pool, 0, sizeof(*out_pool));
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "AMDGPU staging requires a host memory pool");
+    status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "AMDGPU staging requires a host memory pool");
   }
 
   iree_hal_amdgpu_slab_provider_memory_pool_properties_t memory_pool_properties;
-  iree_status_t status =
-      iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
-          libhsa, memory_pool, &memory_pool_properties);
-  if (!iree_status_is_ok(status)) {
-    iree_slim_mutex_deinitialize(&out_pool->mutex);
-    memset(out_pool, 0, sizeof(*out_pool));
-    return status;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
+        libhsa, memory_pool, &memory_pool_properties);
   }
 
   iree_host_size_t total_size = 0;
-  if (!iree_host_size_checked_mul(options->slot_size, options->slot_count,
+  if (iree_status_is_ok(status) &&
+      !iree_host_size_checked_mul(options->slot_size, options->slot_count,
                                   &total_size)) {
-    iree_slim_mutex_deinitialize(&out_pool->mutex);
-    memset(out_pool, 0, sizeof(*out_pool));
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "staging pool size overflows (slot_size=%" PRIhsz
-                            ", slot_count=%u)",
-                            options->slot_size, options->slot_count);
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "staging pool size overflows (slot_size=%" PRIhsz
+                              ", slot_count=%u)",
+                              options->slot_size, options->slot_count);
   }
 
   iree_host_size_t free_slots_size = 0;
-  if (!iree_host_size_checked_mul(options->slot_count, sizeof(uint32_t),
+  if (iree_status_is_ok(status) &&
+      !iree_host_size_checked_mul(options->slot_count, sizeof(uint32_t),
                                   &free_slots_size)) {
-    iree_slim_mutex_deinitialize(&out_pool->mutex);
-    memset(out_pool, 0, sizeof(*out_pool));
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "staging free-slot table size overflows");
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "staging free-slot table size overflows");
   }
 
   iree_host_size_t allocation_size = total_size;
-  if (memory_pool_properties.allocation_alignment <
-      IREE_HAL_AMDGPU_STAGING_SLOT_ALIGNMENT) {
+  if (iree_status_is_ok(status) && memory_pool_properties.allocation_alignment <
+                                       IREE_HAL_AMDGPU_STAGING_SLOT_ALIGNMENT) {
     if (!iree_host_size_checked_add(total_size,
                                     IREE_HAL_AMDGPU_STAGING_SLOT_ALIGNMENT - 1,
                                     &allocation_size)) {
-      iree_slim_mutex_deinitialize(&out_pool->mutex);
-      memset(out_pool, 0, sizeof(*out_pool));
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "staging aligned allocation size overflows");
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "staging aligned allocation size overflows");
     }
   }
 
   uint32_t* free_slots = NULL;
-  status = iree_allocator_malloc(host_allocator, free_slots_size,
-                                 (void**)&free_slots);
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, free_slots_size,
+                                   (void**)&free_slots);
+  }
 
   void* allocation_base = NULL;
   if (iree_status_is_ok(status)) {
@@ -445,17 +444,22 @@ iree_status_t iree_hal_amdgpu_staging_pool_initialize(
     iree_slim_mutex_deinitialize(&out_pool->mutex);
     memset(out_pool, 0, sizeof(*out_pool));
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 void iree_hal_amdgpu_staging_pool_deinitialize(
     iree_hal_amdgpu_staging_pool_t* pool) {
   IREE_ASSERT_ARGUMENT(pool);
-  if (!pool->buffer && !pool->free_slots && pool->slot_count == 0) return;
+  if (!pool->buffer && !pool->free_slots && pool->slot_count == 0) {
+    return;
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_buffer_release(pool->buffer);
   iree_allocator_free(pool->host_allocator, pool->free_slots);
   iree_slim_mutex_deinitialize(&pool->mutex);
   memset(pool, 0, sizeof(*pool));
+  IREE_TRACE_ZONE_END(z0);
 }
 
 typedef enum iree_hal_amdgpu_staging_transfer_kind_e {
@@ -569,6 +573,7 @@ static void iree_hal_amdgpu_staging_transfer_destroy(
     iree_hal_resource_t* resource) {
   iree_hal_amdgpu_staging_transfer_t* transfer =
       (iree_hal_amdgpu_staging_transfer_t*)resource;
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (!iree_hal_semaphore_list_is_empty(transfer->signal_semaphore_list)) {
     iree_hal_semaphore_list_free(transfer->signal_semaphore_list,
                                  transfer->host_allocator);
@@ -578,6 +583,7 @@ static void iree_hal_amdgpu_staging_transfer_destroy(
   iree_hal_device_release(transfer->logical_device);
   iree_slim_mutex_deinitialize(&transfer->mutex);
   iree_allocator_free(transfer->host_allocator, transfer);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static const iree_hal_resource_vtable_t
@@ -1134,9 +1140,13 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_create(
                             "staging transfer allocation size overflows");
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, queue->staging_pool->slot_count);
   iree_hal_amdgpu_staging_transfer_t* transfer = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator, total_size,
-                                             (void**)&transfer));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(queue->host_allocator, total_size,
+                                (void**)&transfer));
   memset(transfer, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_amdgpu_staging_transfer_vtable,
                                &transfer->resource);
@@ -1169,6 +1179,7 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_create(
   } else {
     iree_hal_resource_release(&transfer->resource);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

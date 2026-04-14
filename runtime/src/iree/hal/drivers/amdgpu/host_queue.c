@@ -42,21 +42,27 @@ static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t gpu_agent,
     hsa_amd_memory_pool_t pm4_ib_pool, uint32_t aql_queue_capacity,
     iree_hal_amdgpu_host_queue_t* out_queue) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, aql_queue_capacity);
   iree_host_size_t pm4_ib_size = 0;
   if (!iree_host_size_checked_mul(aql_queue_capacity,
                                   sizeof(iree_hal_amdgpu_pm4_ib_slot_t),
                                   &pm4_ib_size)) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "PM4 IB slot buffer size overflow");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                             "PM4 IB slot buffer size overflow"));
   }
   if (IREE_UNLIKELY(!pm4_ib_pool.handle)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "PM4 IB memory pool is required");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                             "PM4 IB memory pool is required"));
   }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, pm4_ib_size);
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots = NULL;
-  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_allocate(
-      IREE_LIBHSA(libhsa), pm4_ib_pool, pm4_ib_size,
-      HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, (void**)&pm4_ib_slots));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hsa_amd_memory_pool_allocate(
+              IREE_LIBHSA(libhsa), pm4_ib_pool, pm4_ib_size,
+              HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, (void**)&pm4_ib_slots));
   iree_status_t status = iree_hsa_amd_agents_allow_access(
       IREE_LIBHSA(libhsa), /*num_agents=*/1, &gpu_agent, /*flags=*/NULL,
       pm4_ib_slots);
@@ -67,6 +73,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
     IREE_IGNORE_ERROR(
         iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), pm4_ib_slots));
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -644,6 +651,8 @@ static iree_status_t iree_hal_amdgpu_pending_op_enqueue_waits(
     iree_hal_amdgpu_pending_op_issue(op);
     return iree_ok_status();
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, wait_semaphores.count);
 
   iree_host_size_t wait_entry_bytes = 0;
   if (!iree_host_size_checked_mul(wait_semaphores.count,
@@ -652,12 +661,14 @@ static iree_status_t iree_hal_amdgpu_pending_op_enqueue_waits(
     iree_hal_amdgpu_pending_op_fail(
         op, iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                              "pending op wait entry allocation overflow"));
+    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   iree_status_t status = iree_arena_allocate(&op->arena, wait_entry_bytes,
                                              (void**)&op->wait_entries);
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_pending_op_fail(op, status);
+    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   memset(op->wait_entries, 0, wait_entry_bytes);
@@ -699,10 +710,12 @@ static iree_status_t iree_hal_amdgpu_pending_op_enqueue_waits(
           iree_hal_amdgpu_pending_op_complete_resolved_waits(op);
         }
       }
+      IREE_TRACE_ZONE_END(z0);
       return iree_ok_status();
     }
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -860,6 +873,9 @@ static iree_status_t iree_hal_amdgpu_pending_op_allocate(
     iree_hal_amdgpu_pending_op_t** out_op) {
   IREE_ASSERT_ARGUMENT(out_op);
   *out_op = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, type);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_resource_count);
 
   iree_arena_allocator_t arena;
   iree_arena_initialize(queue->block_pool, &arena);
@@ -868,6 +884,7 @@ static iree_status_t iree_hal_amdgpu_pending_op_allocate(
   iree_status_t status = iree_arena_allocate(&arena, sizeof(*op), (void**)&op);
   if (!iree_status_is_ok(status)) {
     iree_arena_deinitialize(&arena);
+    IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
@@ -923,6 +940,7 @@ static iree_status_t iree_hal_amdgpu_pending_op_allocate(
     iree_notification_deinitialize(&op->callback_notification);
     iree_arena_deinitialize(&op->arena);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -1711,11 +1729,13 @@ static iree_status_t iree_hal_amdgpu_pending_op_ensure_alloca_memory_wait(
     iree_hal_amdgpu_alloca_memory_wait_t** out_wait) {
   iree_hal_amdgpu_alloca_memory_wait_t* wait = op->alloca_op.memory_wait;
   if (!wait) {
-    IREE_RETURN_IF_ERROR(
-        iree_arena_allocate(&op->arena, sizeof(*wait), (void**)&wait));
+    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(&op->arena, sizeof(*wait), (void**)&wait));
     memset(wait, 0, sizeof(*wait));
     iree_atomic_store(&wait->callback_complete, 1, iree_memory_order_relaxed);
     op->alloca_op.memory_wait = wait;
+    IREE_TRACE_ZONE_END(z0);
   }
   *out_wait = wait;
   return iree_ok_status();
@@ -1739,14 +1759,18 @@ static iree_status_t iree_hal_amdgpu_pending_op_prepare_alloca_frontier_wait(
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_pending_op_ensure_alloca_memory_wait(op, &wait));
   iree_async_frontier_t* wait_frontier_copy = NULL;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(&op->arena, wait_frontier_size,
-                                           (void**)&wait_frontier_copy));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, wait_frontier->entry_count);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(&op->arena, wait_frontier_size,
+                              (void**)&wait_frontier_copy));
 
   memcpy(wait_frontier_copy, wait_frontier, wait_frontier_size);
   wait->frontier.reservation = alloca_reservation->reservation;
   wait->frontier.wait_frontier = wait_frontier_copy;
   iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
       op, wait, IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_FRONTIER);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

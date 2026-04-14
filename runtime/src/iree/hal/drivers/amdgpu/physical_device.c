@@ -650,12 +650,14 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
 
 void iree_hal_amdgpu_physical_device_deassign_frontier(
     iree_hal_amdgpu_physical_device_t* physical_device) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   for (iree_host_size_t i = 0; i < physical_device->host_queue_count; ++i) {
     iree_hal_amdgpu_host_queue_deinitialize(&physical_device->host_queues[i]);
   }
   physical_device->host_queue_count = 0;
   iree_hal_pool_release(physical_device->default_pool);
   physical_device->default_pool = NULL;
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_hal_amdgpu_physical_device_deinitialize(

@@ -76,9 +76,12 @@ iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
     }
     iree_arena_block_t* block = NULL;
     void* block_ptr = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_arena_block_pool_acquire(block_pool, &block, &block_ptr));
+    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, count);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_block_pool_acquire(block_pool, &block, &block_ptr));
     entry->resources = (iree_hal_resource_t**)block_ptr;
+    IREE_TRACE_ZONE_END(z0);
   }
   *out_resources = entry->resources;
   return iree_ok_status();
@@ -92,9 +95,11 @@ void iree_hal_amdgpu_reclaim_entry_release(
   }
   iree_hal_resource_set_free(entry->resource_set);
   if (entry->resources != entry->inline_resources && entry->resources != NULL) {
+    IREE_TRACE_ZONE_BEGIN(z0);
     iree_arena_block_t* block =
         iree_arena_block_trailer(block_pool, entry->resources);
     iree_arena_block_pool_release(block_pool, block, block);
+    IREE_TRACE_ZONE_END(z0);
   }
   entry->resources = NULL;
   entry->pre_signal_action.fn = NULL;

@@ -302,12 +302,16 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
   *out_device_info_count = 0;
   *out_device_infos = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Query available devices based on the default configuration.
   iree_hal_amdgpu_topology_t topology;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_initialize_with_defaults(
-      &driver->libhsa, &topology));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_topology_initialize_with_defaults(&driver->libhsa,
+                                                            &topology));
   if (topology.gpu_agent_count == 0) {
+    iree_hal_amdgpu_topology_deinitialize(&topology);
+    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();  // no devices
   }
 
@@ -349,6 +353,7 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   }
 
   iree_string_builder_deinitialize(&builder);
+  iree_hal_amdgpu_topology_deinitialize(&topology);
 
   if (iree_status_is_ok(status)) {
     *out_device_info_count = device_info_count;
@@ -356,6 +361,7 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   } else {
     iree_allocator_free(host_allocator, device_infos);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -385,6 +391,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_id);
 
   // Use the provided params to overwrite the default options.
   // The format of the params is implementation-defined. The params strings can
@@ -392,11 +400,12 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
   // access them during the create call below.
   iree_hal_amdgpu_logical_device_options_t options =
       driver->options.default_device_options;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_options_parse(
-      &options, (iree_string_pair_list_t){
-                    .count = param_count,
-                    .pairs = params,
-                }));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_logical_device_options_parse(
+              &options, (iree_string_pair_list_t){
+                            .count = param_count,
+                            .pairs = params,
+                        }));
 
   // ROCR lazily allocates global singleton state during agent enumeration,
   // memory pool queries, and ISA iteration. These allocations are never freed
@@ -423,6 +432,7 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
   iree_hal_amdgpu_topology_deinitialize(&topology);
 
   IREE_LEAK_CHECK_DISABLE_POP();
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -433,6 +443,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, device_path.data, device_path.size);
 
   // Use the provided params to overwrite the default options.
   // The format of the params is implementation-defined. The params strings can
@@ -440,17 +452,19 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
   // access them during the create call below.
   iree_hal_amdgpu_logical_device_options_t options =
       driver->options.default_device_options;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_options_parse(
-      &options, (iree_string_pair_list_t){
-                    .count = param_count,
-                    .pairs = params,
-                }));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_logical_device_options_parse(
+              &options, (iree_string_pair_list_t){
+                            .count = param_count,
+                            .pairs = params,
+                        }));
 
   // Load HSA. HSA may already be loaded and we retain a copy during creation to
   // ensure it doesn't get unloaded.
   iree_hal_amdgpu_libhsa_t libhsa;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_driver_load_libhsa(
-      &driver->options, host_allocator, &libhsa));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_driver_load_libhsa(&driver->options, host_allocator,
+                                             &libhsa));
 
   // ROCR lazily allocates global singleton state during agent enumeration,
   // memory pool queries, and ISA iteration. These allocations are never freed
@@ -475,6 +489,7 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
   iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
 
   IREE_LEAK_CHECK_DISABLE_POP();
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
