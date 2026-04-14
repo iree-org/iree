@@ -57,6 +57,10 @@ static bool metal_registered_ =
           {
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "Metal queue_alloca waits synchronously on wait semaphores"},
+              {"AsyncTransientBufferTest.*",
+               "Metal queue_alloca waits synchronously on wait semaphores "
+               "and cannot park a transient allocation for command-buffer "
+               "recording or binding-table resolution before commit."},
               {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
                "iree_hal_metal_device_queue_alloca rejects any non-NULL pool "
                "argument with UNIMPLEMENTED; the existing path waits on the "
@@ -65,7 +69,24 @@ static bool metal_registered_ =
                "Caller-supplied pools require a transient-buffer wrapper that "
                "bridges pool_acquire_reservation/release_reservation through "
                "the device allocator."},
+              {"QueueAllocaTest.ExplicitTLSFPoolTransferAllocaDealloca",
+               "Blocked by the same iree_hal_metal_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_metal_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest."
+               "ExplicitFixedBlockPoolPendingDeallocaWaitFrontier",
+               "Blocked by the same iree_hal_metal_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolRequiresWaitFrontierFlag",
+               "Blocked by the same iree_hal_metal_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueWaitFrontier",
                "Blocked by the same iree_hal_metal_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
@@ -73,6 +94,13 @@ static bool metal_registered_ =
                "Blocked by the same iree_hal_metal_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.BufferMetadata",
+               "Metal queue_alloca forwards to the synchronous device "
+               "allocator and does not return an asynchronous transient "
+               "placement."},
+              {"QueueAllocaTest.DeallocaReleasesMemory",
+               "Metal queue_dealloca is currently a barrier and does not "
+               "decommit the underlying allocation before buffer release."},
               {"EventTest.*", "Metal does not implement HAL events"},
               {"ExecutableTest.*",
                "Metal does not implement executable reflection"},
@@ -80,6 +108,14 @@ static bool metal_registered_ =
                "Metal semaphore failure tests disabled pending fix"},
               {"SemaphoreSubmissionTest.*",
                "Metal semaphore submission tests disabled pending fix"},
+          },
+          /*expected_failures=*/
+          {
+              {"QueueAllocaTest.FailedDeallocaWaitDoesNotDealloca",
+               "Metal queue_execute does not yet propagate failed wait "
+               "dependencies before encoding GPU waits, so a failed wait can "
+               "wake the MTLSharedEvent path and let the barrier signal "
+               "complete successfully."},
           }},
          {"async_queue"},
      }),

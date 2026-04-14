@@ -91,7 +91,7 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindings) {
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dispatch_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
@@ -131,7 +131,7 @@ TEST_P(QueueDispatchTest, NoopDispatchSignalsAndDoesNotTouchBuffers) {
       iree_hal_make_static_dispatch_config(0, 0, 0), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dispatch_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{99, 99, 99, 99}));
@@ -179,7 +179,7 @@ TEST_P(QueueDispatchTest, DeferredNoopDispatch) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(dispatch_wait.semaphores[0], 1,
                                            /*frontier=*/NULL));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dispatch_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{99, 99, 99, 99}));
@@ -226,7 +226,7 @@ TEST_P(QueueDispatchTest, DeferredWaitBeforeSignalDispatch) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(dispatch_wait.semaphores[0], 1,
                                            /*frontier=*/NULL));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dispatch_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));

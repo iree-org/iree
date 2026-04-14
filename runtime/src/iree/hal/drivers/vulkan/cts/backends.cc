@@ -57,6 +57,10 @@ static bool vulkan_registered_ =
           {
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "Vulkan queue_alloca waits synchronously on wait semaphores"},
+              {"AsyncTransientBufferTest.*",
+               "Vulkan queue_alloca waits synchronously on wait semaphores "
+               "and cannot park a transient allocation for command-buffer "
+               "recording or binding-table resolution before commit."},
               {"QueueAllocaTest.BufferMetadata",
                "Vulkan queue_alloca is implemented as synchronous allocator "
                "allocation without async queue placement metadata"},
@@ -71,7 +75,24 @@ static bool vulkan_registered_ =
                "Caller-supplied pools require a transient-buffer wrapper that "
                "bridges pool_acquire_reservation/release_reservation through "
                "the device allocator."},
+              {"QueueAllocaTest.ExplicitTLSFPoolTransferAllocaDealloca",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest."
+               "ExplicitFixedBlockPoolPendingDeallocaWaitFrontier",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolRequiresWaitFrontierFlag",
+               "Blocked by the same iree_hal_vulkan_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueWaitFrontier",
                "Blocked by the same iree_hal_vulkan_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
@@ -92,6 +113,13 @@ static bool vulkan_registered_ =
               {"SemaphoreSubmissionTest.*",
                "Vulkan timeline semaphore waits hang without async queue "
                "submission"},
+          },
+          /*expected_failures=*/
+          {
+              {"QueueAllocaTest.FailedDeallocaWaitDoesNotDealloca",
+               "Vulkan queue_execute does not yet propagate failed wait "
+               "dependencies before encoding GPU waits, so a failed wait can "
+               "let the barrier signal complete successfully."},
           }},
          {"async_queue"},
      }),

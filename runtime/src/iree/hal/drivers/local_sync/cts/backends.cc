@@ -109,6 +109,10 @@ static bool local_sync_registered_ =
               {"QueueDispatchTest.DeferredWaitBeforeSignalDispatch",
                "sync driver blocks on semaphore waits during queue_dispatch "
                "and cannot model wait-before-signal queue submission."},
+              {"DispatchReuseTest.DeferredExecuteRetainsDispatchBindingTable",
+               "sync driver blocks on semaphore waits during queue_execute "
+               "and cannot model deferred command-buffer submission behind an "
+               "unresolved wait."},
           },
           /*expected_failures=*/
           {

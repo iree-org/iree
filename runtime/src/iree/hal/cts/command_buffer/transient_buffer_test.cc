@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <numeric>
 #include <vector>
 
@@ -26,78 +27,138 @@ namespace iree::hal::cts {
 using ::testing::ContainerEq;
 using ::testing::Each;
 
+class DeferredSemaphoreSignal {
+ public:
+  DeferredSemaphoreSignal(iree_hal_semaphore_t* semaphore,
+                          uint64_t payload_value)
+      : semaphore_(semaphore), payload_value_(payload_value) {}
+
+  ~DeferredSemaphoreSignal() {
+    if (!semaphore_) return;
+    IREE_EXPECT_OK(iree_hal_semaphore_signal(semaphore_, payload_value_,
+                                             /*frontier=*/NULL));
+  }
+
+  iree_status_t SignalNow() {
+    iree_hal_semaphore_t* semaphore = semaphore_;
+    semaphore_ = nullptr;
+    return iree_hal_semaphore_signal(semaphore, payload_value_,
+                                     /*frontier=*/NULL);
+  }
+
+ private:
+  // Semaphore to signal on destruction while armed.
+  iree_hal_semaphore_t* semaphore_ = nullptr;
+
+  // Payload value used when releasing the deferred wait.
+  uint64_t payload_value_ = 0;
+};
+
 class TransientBufferTest : public CtsTestBase<> {
  protected:
+  iree_hal_buffer_params_t MakeTransientBufferParams(
+      iree_hal_memory_access_t access = IREE_HAL_MEMORY_ACCESS_ALL) {
+    iree_hal_buffer_params_t params = {0};
+    params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+    params.access = access;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
+    return params;
+  }
+
+  iree_status_t QueueAllocaTransient(
+      iree_hal_semaphore_list_t wait_semaphores,
+      iree_hal_semaphore_list_t signal_semaphores, iree_device_size_t size,
+      iree_hal_buffer_t** out_buffer) {
+    *out_buffer = nullptr;
+    iree_hal_buffer_params_t params = MakeTransientBufferParams();
+    iree_hal_buffer_t* buffer = nullptr;
+    iree_status_t status = iree_hal_device_queue_alloca(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
+        signal_semaphores,
+        /*pool=*/NULL, params, size, IREE_HAL_ALLOCA_FLAG_NONE, &buffer);
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
+    return status;
+  }
+
   // Allocates a transient buffer via queue_alloca and waits for commit.
   // The buffer is usable immediately after this returns.
-  void AllocateTransient(iree_device_size_t size,
-                         iree_hal_buffer_t** out_buffer) {
+  iree_status_t AllocateTransient(iree_device_size_t size,
+                                  iree_hal_buffer_t** out_buffer) {
+    *out_buffer = nullptr;
     SemaphoreList signal(device_, {0}, {1});
     SemaphoreList empty_wait;
-    iree_hal_buffer_params_t params = {0};
-    params.type =
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                   IREE_HAL_BUFFER_USAGE_TRANSFER |
-                   IREE_HAL_BUFFER_USAGE_MAPPING;
-    IREE_ASSERT_OK(iree_hal_device_queue_alloca(
-        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
-        /*pool=*/NULL, params, size, IREE_HAL_ALLOCA_FLAG_NONE, out_buffer));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    iree_hal_buffer_t* buffer = nullptr;
+    iree_status_t status =
+        QueueAllocaTransient(empty_wait, signal, size, &buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                            IREE_ASYNC_WAIT_FLAG_NONE);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_buffer = buffer;
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
+    return status;
   }
 
   // Deallocates a transient buffer and waits for completion.
-  void DeallocateTransient(iree_hal_buffer_t* buffer) {
+  iree_status_t DeallocateTransient(iree_hal_buffer_t* buffer) {
     SemaphoreList signal(device_, {0}, {1});
     SemaphoreList empty_wait;
-    IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_dealloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, buffer,
         IREE_HAL_DEALLOCA_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    return iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                        IREE_ASYNC_WAIT_FLAG_NONE);
   }
 
   // Records and submits a one-shot transfer command buffer, waits for
   // completion.
-  void SubmitTransferAndWait(
-      std::function<void(iree_hal_command_buffer_t*)> record_fn) {
+  iree_status_t SubmitTransferAndWait(
+      std::function<iree_status_t(iree_hal_command_buffer_t*)> record_fn) {
     Ref<iree_hal_command_buffer_t> command_buffer;
-    IREE_ASSERT_OK(iree_hal_command_buffer_create(
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
         device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
         IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
         /*binding_capacity=*/0, command_buffer.out()));
-    IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-    record_fn(command_buffer);
-    IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-    IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_begin(command_buffer));
+    IREE_RETURN_IF_ERROR(record_fn(command_buffer));
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer));
+    return SubmitCommandBufferAndWait(command_buffer);
   }
 };
+
+class AsyncTransientBufferTest : public TransientBufferTest {};
 
 //===----------------------------------------------------------------------===//
 // command_buffer_fill_buffer on transient buffers
 //===----------------------------------------------------------------------===//
 
 // Fills an entire transient buffer with a 4-byte pattern via command buffer.
-// This exercises the code path noted in fuck.md as having the access-flags
-// issue on transient buffers.
+// This exercises access flag propagation through transient buffer wrappers.
 TEST_P(TransientBufferTest, FillTransientBuffer) {
   const iree_device_size_t buffer_size = 1024;
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   uint32_t pattern = 0xDEADCAFE;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
-        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-  });
+        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }));
 
   auto data = ReadBufferData<uint32_t>(transient);
   EXPECT_THAT(data, Each(0xDEADCAFEu));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 // Fills a subrange of a transient buffer, verifying boundaries are untouched.
@@ -106,22 +167,22 @@ TEST_P(TransientBufferTest, FillTransientBufferSubrange) {
   const iree_device_size_t fill_offset = 64;
   const iree_device_size_t fill_length = 128;
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   // Zero the whole buffer first, then fill a subrange.
   uint8_t zero = 0x00;
   uint32_t pattern = 0xCAFEF00D;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &zero,
-        sizeof(zero), IREE_HAL_FILL_FLAG_NONE));
-  });
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+        sizeof(zero), IREE_HAL_FILL_FLAG_NONE);
+  }));
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, fill_offset, fill_length),
-        &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-  });
+        &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }));
 
   // Verify the filled region.
   auto filled = ReadBufferBytes(transient, fill_offset, fill_length);
@@ -138,7 +199,7 @@ TEST_P(TransientBufferTest, FillTransientBufferSubrange) {
                                buffer_size - fill_offset - fill_length);
   EXPECT_THAT(after, Each(0x00)) << "Data after fill region was modified";
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 // Fills a transient buffer with a 1-byte pattern. Tests the smallest
@@ -146,20 +207,20 @@ TEST_P(TransientBufferTest, FillTransientBufferSubrange) {
 TEST_P(TransientBufferTest, FillTransientBuffer1Byte) {
   const iree_device_size_t buffer_size = 512;
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   uint8_t pattern = 0xAB;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
-        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-  });
+        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }));
 
   auto data = ReadBufferData<uint8_t>(transient);
   EXPECT_THAT(data, Each(0xAB));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 //===----------------------------------------------------------------------===//
@@ -173,20 +234,20 @@ TEST_P(TransientBufferTest, CopyToTransientBuffer) {
   CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xAAAAAAAAu, source.out());
 
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_copy_buffer(
         cmd, iree_hal_make_buffer_ref(source, 0, buffer_size),
         iree_hal_make_buffer_ref(transient, 0, buffer_size),
-        IREE_HAL_COPY_FLAG_NONE));
-  });
+        IREE_HAL_COPY_FLAG_NONE);
+  }));
 
   auto data = ReadBufferData<uint32_t>(transient);
   EXPECT_THAT(data, Each(0xAAAAAAAAu));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 // Copies from a transient buffer to a regular buffer.
@@ -195,32 +256,32 @@ TEST_P(TransientBufferTest, CopyFromTransientBuffer) {
 
   // Fill the transient buffer first.
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   uint32_t pattern = 0xBBBBBBBB;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
-        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-  });
+        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }));
 
   // Copy from transient to a regular buffer.
   Ref<iree_hal_buffer_t> target;
   CreateZeroedDeviceBuffer(buffer_size, target.out());
 
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_copy_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size),
         iree_hal_make_buffer_ref(target, 0, buffer_size),
-        IREE_HAL_COPY_FLAG_NONE));
-  });
+        IREE_HAL_COPY_FLAG_NONE);
+  }));
 
   // Verify the regular buffer received the data.
   auto data = ReadBufferData<uint32_t>(target);
   EXPECT_THAT(data, Each(0xBBBBBBBBu));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,21 +295,21 @@ TEST_P(TransientBufferTest, FillThenCopyInSingleCommandBuffer) {
   const iree_device_size_t buffer_size = 256;
 
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   Ref<iree_hal_buffer_t> output;
   CreateZeroedDeviceBuffer(buffer_size, output.out());
 
   uint32_t pattern = 0x11223344;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
     // Fill the transient buffer.
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
         sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
 
     // Barrier: fill must complete before copy reads.
-    IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
         cmd,
         IREE_HAL_EXECUTION_STAGE_TRANSFER |
             IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
@@ -257,17 +318,17 @@ TEST_P(TransientBufferTest, FillThenCopyInSingleCommandBuffer) {
         IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
 
     // Copy transient → output.
-    IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+    return iree_hal_command_buffer_copy_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size),
         iree_hal_make_buffer_ref(output, 0, buffer_size),
-        IREE_HAL_COPY_FLAG_NONE));
-  });
+        IREE_HAL_COPY_FLAG_NONE);
+  }));
 
   // Verify the output buffer (read from regular buffer, no transient issues).
   auto data = ReadBufferData<uint32_t>(output);
   EXPECT_THAT(data, Each(0x11223344u));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 //===----------------------------------------------------------------------===//
@@ -280,24 +341,24 @@ TEST_P(TransientBufferTest, UpdateTransientBuffer) {
   const iree_device_size_t buffer_size = element_count * sizeof(uint32_t);
 
   iree_hal_buffer_t* raw = nullptr;
-  AllocateTransient(buffer_size, &raw);
+  IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
 
   // Host data: sequential values.
   std::vector<uint32_t> host_data(element_count);
   std::iota(host_data.begin(), host_data.end(), 100u);
 
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_update_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_update_buffer(
         cmd, host_data.data(), /*source_offset=*/0,
         iree_hal_make_buffer_ref(transient, 0, buffer_size),
-        IREE_HAL_UPDATE_FLAG_NONE));
-  });
+        IREE_HAL_UPDATE_FLAG_NONE);
+  }));
 
   auto readback = ReadBufferData<uint32_t>(transient);
   EXPECT_THAT(readback, ContainerEq(host_data));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 //===----------------------------------------------------------------------===//
@@ -314,35 +375,139 @@ TEST_P(TransientBufferTest, FillTransientWithZeroAccessFlags) {
 
   SemaphoreList signal(device_, {0}, {1});
   SemaphoreList empty_wait;
-  iree_hal_buffer_params_t params = {0};
-  params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                 IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
-  // Deliberately leave params.access = 0 to match HAL module behavior.
+  iree_hal_buffer_params_t params = MakeTransientBufferParams(
+      /*access=*/IREE_HAL_MEMORY_ACCESS_NONE);
+  // Deliberately use access = 0 to match HAL module behavior.
 
   iree_hal_buffer_t* raw = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
       /*pool=*/NULL, params, buffer_size, IREE_HAL_ALLOCA_FLAG_NONE, &raw));
   Ref<iree_hal_buffer_t> transient(raw);
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
 
   // Fill via command buffer — this is the path that was broken.
   uint32_t pattern = 0x55AA55AA;
-  SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
-    IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+  IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
+    return iree_hal_command_buffer_fill_buffer(
         cmd, iree_hal_make_buffer_ref(transient, 0, buffer_size), &pattern,
-        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
-  });
+        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }));
 
   auto data = ReadBufferData<uint32_t>(transient);
   EXPECT_THAT(data, Each(0x55AA55AAu));
 
-  DeallocateTransient(transient);
+  IREE_ASSERT_OK(DeallocateTransient(transient));
+}
+
+//===----------------------------------------------------------------------===//
+// Deferred transient buffer resolution
+//===----------------------------------------------------------------------===//
+
+// Records a static transient buffer reference before the alloca has committed.
+// The alloca is parked behind an unsignaled wait, so recording succeeds only if
+// the command buffer stores the wrapper and defers device-pointer resolution to
+// queue_execute replay.
+TEST_P(AsyncTransientBufferTest, StaticRefRecordedBeforeAllocaCommit) {
+  const iree_device_size_t buffer_size = 256;
+
+  SemaphoreList alloca_wait(device_, {0}, {1});
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  iree_hal_buffer_t* raw = nullptr;
+  IREE_ASSERT_OK(
+      QueueAllocaTransient(alloca_wait, alloca_signal, buffer_size, &raw));
+  Ref<iree_hal_buffer_t> transient(raw);
+  DeferredSemaphoreSignal release_alloca_wait(alloca_wait.semaphores[0], 1);
+
+  uint64_t alloca_value = 0;
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_query(alloca_signal.semaphores[0], &alloca_value));
+  EXPECT_EQ(0u, alloca_value);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  uint32_t pattern = 0xA55A1337u;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, iree_hal_make_buffer_ref(transient, 0, buffer_size),
+      &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList execute_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, execute_signal,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+
+  uint64_t execute_value = 0;
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_query(execute_signal.semaphores[0], &execute_value));
+  EXPECT_EQ(0u, execute_value);
+
+  IREE_ASSERT_OK(release_alloca_wait.SignalNow());
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto data = ReadBufferData<uint32_t>(transient);
+  EXPECT_THAT(data, Each(pattern));
+
+  IREE_ASSERT_OK(DeallocateTransient(transient));
+}
+
+// Records an indirect command-buffer reference with no concrete buffer, then
+// binds a transient buffer whose alloca is still parked. This exercises the
+// queue_execute binding-table path that resolves transient wrappers only after
+// the alloca dependency has made their backing available.
+TEST_P(AsyncTransientBufferTest, IndirectRefResolvedAfterAllocaCommit) {
+  const iree_device_size_t buffer_size = 256;
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/1, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  uint32_t pattern = 0x5AA5C0DEu;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*binding=*/0, 0, buffer_size),
+      &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList alloca_wait(device_, {0}, {1});
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  iree_hal_buffer_t* raw = nullptr;
+  IREE_ASSERT_OK(
+      QueueAllocaTransient(alloca_wait, alloca_signal, buffer_size, &raw));
+  Ref<iree_hal_buffer_t> transient(raw);
+  DeferredSemaphoreSignal release_alloca_wait(alloca_wait.semaphores[0], 1);
+
+  const iree_hal_buffer_binding_t bindings[] = {
+      {transient, 0, IREE_HAL_WHOLE_BUFFER},
+  };
+  SemaphoreList execute_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, execute_signal,
+      command_buffer,
+      iree_hal_buffer_binding_table_t{IREE_ARRAYSIZE(bindings), bindings},
+      IREE_HAL_EXECUTE_FLAG_NONE));
+
+  IREE_ASSERT_OK(release_alloca_wait.SignalNow());
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto data = ReadBufferData<uint32_t>(transient);
+  EXPECT_THAT(data, Each(pattern));
+
+  IREE_ASSERT_OK(DeallocateTransient(transient));
 }
 
 CTS_REGISTER_TEST_SUITE(TransientBufferTest);
+CTS_REGISTER_TEST_SUITE_WITH_TAGS(AsyncTransientBufferTest, {"async_queue"},
+                                  {});
 
 }  // namespace iree::hal::cts

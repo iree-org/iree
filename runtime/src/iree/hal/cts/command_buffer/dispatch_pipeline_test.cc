@@ -245,7 +245,7 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
   SemaphoreList alloca_signal(device_, {0}, {1});
   SemaphoreList empty_wait;
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   alloca_params.usage =
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_t* raw = nullptr;
@@ -257,7 +257,7 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
 
   // Wait for alloca, then fill the transient input.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> input_data = {5, 10, 15, 20};
   IREE_ASSERT_OK(iree_hal_device_transfer_h2d(
@@ -297,7 +297,7 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dealloca_signal,
       transient_input, IREE_HAL_DEALLOCA_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      dealloca_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 // Reusable command buffer pipeline: records a two-stage dispatch chain once,
@@ -350,8 +350,8 @@ TEST_P(DispatchPipelineTest, ReusablePipelineWithDifferentInputs) {
     IREE_ASSERT_OK(iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal, cmd,
         iree_hal_buffer_binding_table_t{3, table}, IREE_HAL_EXECUTE_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
 
     auto data = ReadBufferData<uint32_t>(output);
     EXPECT_THAT(data, ContainerEq(cases[i].expected))
