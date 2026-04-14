@@ -51,6 +51,8 @@ TEST(CommandBufferAbiTest, CoreRecordSizes) {
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_command_header_t), 16u);
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_fixup_t), 24u);
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t), 48u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_fill_command_t), 48u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_copy_command_t), 56u);
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_branch_command_t), 24u);
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_return_command_t), 16u);
 }

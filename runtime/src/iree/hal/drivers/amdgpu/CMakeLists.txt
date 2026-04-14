@@ -87,6 +87,7 @@ iree_cc_library(
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
     iree::hal::utils::files
+    iree::hal::utils::resource_set
     iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs
   PUBLIC

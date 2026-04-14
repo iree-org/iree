@@ -35,6 +35,10 @@ bool iree_hal_amdgpu_aql_command_buffer_isa(
 const iree_hal_amdgpu_aql_program_t* iree_hal_amdgpu_aql_command_buffer_program(
     iree_hal_command_buffer_t* command_buffer);
 
+// Returns a direct buffer recorded in the command-buffer static binding table.
+iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
+    iree_hal_command_buffer_t* command_buffer, uint32_t ordinal);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
