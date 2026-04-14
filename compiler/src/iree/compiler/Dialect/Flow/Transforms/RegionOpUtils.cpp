@@ -306,43 +306,48 @@ clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   return newTargetOp;
 }
 
-bool hasUnmovableUse(Block *block, Operation *insertionPoint,
-                     Operation *sliceBoundary, ValueRange values,
-                     ArrayRef<Operation *> groupSeeds,
-                     function_ref<bool(Operation *)> isInGroup) {
+bool hasExternalUserBlockingProducerFusion(
+    Operation *rootOp, Operation *producerOp,
+    ArrayRef<Operation *> fusionGroupOps) {
+  Block *block = rootOp->getBlock();
+  assert(block == producerOp->getBlock() &&
+         "root and producer expected to be in the same block");
+
   BackwardSliceOptions sliceOptions;
   sliceOptions.inclusive = true;
   sliceOptions.omitUsesFromAbove = false;
   sliceOptions.omitBlockArguments = true;
   sliceOptions.filter = [&](Operation *op) {
-    Operation *a = block->findAncestorOpInBlock(*op);
-    return !a || !a->isBeforeInBlock(sliceBoundary);
+    Operation *ancestor = block->findAncestorOpInBlock(*op);
+    return !ancestor || !ancestor->isBeforeInBlock(producerOp);
   };
-  llvm::SmallPtrSet<Operation *, 32> deps;
-  for (Operation *seed : groupSeeds) {
+  llvm::SmallPtrSet<Operation *, 32> fusionGroupSet;
+  fusionGroupSet.insert(fusionGroupOps.begin(), fusionGroupOps.end());
+  llvm::SmallPtrSet<Operation *, 32> fusionGroupDeps;
+  for (Operation *seed : fusionGroupOps) {
     llvm::SetVector<Operation *> slice;
     LogicalResult status = getBackwardSlice(seed, &slice, sliceOptions);
     assert(succeeded(status) && "expected backward slice");
     (void)status;
     for (Operation *op : slice) {
-      if (Operation *a = block->findAncestorOpInBlock(*op)) {
-        deps.insert(a);
+      if (Operation *ancestor = block->findAncestorOpInBlock(*op)) {
+        fusionGroupDeps.insert(ancestor);
       }
     }
   }
-  for (Value val : values) {
-    for (OpOperand &use : val.getUses()) {
+  for (Value producerResult : producerOp->getResults()) {
+    for (OpOperand &use : producerResult.getUses()) {
       Operation *user = block->findAncestorOpInBlock(*use.getOwner());
-      if (!user || isInGroup(user)) {
+      if (!user || fusionGroupSet.contains(user)) {
         continue;
       }
-      if (!user->isBeforeInBlock(insertionPoint)) {
+      if (!user->isBeforeInBlock(rootOp)) {
         continue;
       }
       if (isa<IREE::Flow::DispatchRegionOp>(user)) {
         return true;
       }
-      if (deps.contains(user)) {
+      if (fusionGroupDeps.contains(user)) {
         return true;
       }
     }
@@ -356,38 +361,6 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                    ArrayRef<Operation *> targets,
                                    IREE::Flow::DispatchRegionOp regionOp) {
-  llvm::SetVector<Operation *> targetSet;
-  targetSet.insert(targets.begin(), targets.end());
-
-  // Gather values that would need to be rewritten to dispatch results and
-  // ensure their external users can move below the dispatch.
-  SmallVector<Value> precheckReplacedValues;
-  for (Operation *target : llvm::reverse(targets)) {
-    for (Value result : target->getResults()) {
-      bool hasUsesOutsideOfRegion =
-          llvm::any_of(result.getUses(), [&](OpOperand &use) {
-            Operation *user = use.getOwner();
-            return !regionOp->isProperAncestor(user) &&
-                   !targetSet.contains(user);
-          });
-      if (hasUsesOutsideOfRegion) {
-        precheckReplacedValues.push_back(result);
-      }
-    }
-  }
-  Block &body = regionOp.getBody().front();
-  Block *dispatchBlock = regionOp->getBlock();
-  SmallVector<Operation *> bodyOps;
-  for (Operation &op : body) {
-    bodyOps.push_back(&op);
-  }
-  auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
-  if (hasUnmovableUse(dispatchBlock, regionOp, regionOp, precheckReplacedValues,
-                      bodyOps, isInTargetSet)) {
-    return rewriter.notifyMatchFailure(
-        regionOp, "external user cannot be moved after dispatch");
-  }
-
   // Values replaced by moving the `targets` into the dispatch region.
   SmallVector<Value> replacedValues;
 
@@ -397,6 +370,9 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
   // New values that are yielded from dispatch.
   SmallVector<Value> yieldedResults;
+  llvm::SetVector<Operation *> targetSet;
+  targetSet.insert(targets.begin(), targets.end());
+  Block &body = regionOp.getBody().front();
   for (Operation *target : llvm::reverse(targets)) {
     // Clone op into dispatch region.
     OpBuilder::InsertionGuard g(rewriter);
@@ -437,6 +413,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   // users of replaced values and transitively include ops that use their
   // results, normalizing nested uses to ancestors in the dispatch block so that
   // "uses from above" are handled correctly.
+  Block *dispatchBlock = regionOp->getBlock();
+  auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
   llvm::SetVector<Operation *> opsToMove;
   auto addUser = [&](Value val) {
     for (OpOperand &use : val.getUses()) {

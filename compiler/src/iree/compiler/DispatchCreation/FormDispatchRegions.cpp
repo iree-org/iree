@@ -787,10 +787,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      if (IREE::Flow::hasUnmovableUse(
-              root->getBlock(), root, producer, producer->getResults(),
-              fusionGroup.getFusedOperations(),
-              [&](Operation *op) { return fusionGroup.contains(op); })) {
+      if (IREE::Flow::hasExternalUserBlockingProducerFusion(
+              root, producer, fusionGroup.getFusedOperations())) {
         continue;
       }
 
