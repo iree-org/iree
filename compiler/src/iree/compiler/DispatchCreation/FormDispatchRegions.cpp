@@ -787,6 +787,13 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
+      if (!options.fuseMultiUseProducers &&
+          llvm::count_if(producer->getUses(), [](OpOperand &use) {
+            return !isa<tensor::DimOp>(use.getOwner());
+          }) != 1) {
+        continue;
+      }
+
       if (IREE::Flow::hasExternalUserBlockingProducerFusion(
               root, producer, fusionGroup.getFusedOperations())) {
         continue;
@@ -1023,8 +1030,9 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{aggressiveFusion, fusePadWithConsumers,
-                                         fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{
+      aggressiveFusion, fuseMultiUseProducers, fusePadWithConsumers,
+      fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();

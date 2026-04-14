@@ -212,7 +212,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass([&] {
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
-                options.enableAggressiveFusion,
+                options.enableAggressiveFusion, options.enableFuseMultiUse,
                 options.enableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })

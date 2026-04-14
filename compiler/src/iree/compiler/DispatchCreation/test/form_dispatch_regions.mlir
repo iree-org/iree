@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-multi-use-producers=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-MULTI-USE
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
@@ -2203,6 +2204,19 @@ util.func public @producer_fusion_with_movable_external_use(
 //       CHECK:     linalg.generic
 //  CHECK-SAME:       ins(%[[DISPATCH0]]#1
 //       CHECK:       arith.negf
+// NO-MULTI-USE-LABEL: util.func public @producer_fusion_with_movable_external_use
+//  NO-MULTI-USE:   %[[SUB_DISP:.+]] = flow.dispatch.region
+//  NO-MULTI-USE:     linalg.generic
+//  NO-MULTI-USE:       arith.subf
+//  NO-MULTI-USE:     flow.return %[[SUB:.+]]
+//  NO-MULTI-USE:   %[[NEG_DISP:.+]] = flow.dispatch.region
+//  NO-MULTI-USE:     linalg.generic
+// NO-MULTI-USE-SAME:       ins(%[[SUB_DISP]]
+//  NO-MULTI-USE:       arith.negf
+//  NO-MULTI-USE:   %[[MUL_DISP:.+]] = flow.dispatch.region
+//  NO-MULTI-USE:     linalg.generic
+// NO-MULTI-USE-SAME:       ins(%[[SUB_DISP]]
+//  NO-MULTI-USE:       arith.mulf
 
 // -----
 
