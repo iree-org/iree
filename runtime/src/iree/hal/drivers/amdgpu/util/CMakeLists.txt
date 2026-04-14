@@ -78,6 +78,45 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    amdgpu_metadata
+  HDRS
+    "amdgpu_metadata.h"
+  SRCS
+    "amdgpu_metadata.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    amdgpu_metadata_test
+  SRCS
+    "amdgpu_metadata_test.cc"
+  DEPS
+    ::amdgpu_metadata
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_fuzz(
+  NAME
+    amdgpu_metadata_fuzz
+  SRCS
+    "amdgpu_metadata_fuzz.cc"
+  DEPS
+    ::amdgpu_metadata
+    iree::base
+)
+
+iree_cc_library(
+  NAME
     util
   HDRS
     "affinity.h"
