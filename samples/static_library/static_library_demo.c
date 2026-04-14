@@ -38,19 +38,18 @@ typedef struct {
 // 1. Allocates a device-local buffer view with the provided data
 // 2. Pushes the buffer view to the runtime call's input list
 // 3. Releases the buffer view reference (the call retains its own reference)
-static iree_status_t push_back_buffer_view(
-    iree_hal_device_t* device, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
-    const void* data, iree_host_size_t data_length, iree_runtime_call_t* call) {
+static iree_status_t push_back_buffer_view(iree_hal_device_t* device,
+                                           input_buffer_descriptor_t input,
+                                           iree_runtime_call_t* call) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   iree_status_t status = iree_hal_buffer_view_allocate_buffer_copy(
-      device, iree_hal_device_allocator(device), shape_rank, shape,
-      element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      device, iree_hal_device_allocator(device), input.shape_rank, input.shape,
+      input.element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
-      iree_make_const_byte_span(data, data_length), &buffer_view);
+      iree_make_const_byte_span(input.data, input.data_length), &buffer_view);
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_inputs_push_back_buffer_view(call, buffer_view);
   }
@@ -177,9 +176,7 @@ iree_status_t Run() {
 
   for (size_t i = 0; i < IREE_ARRAYSIZE(inputs); ++i) {
     if (!iree_status_is_ok(status)) break;
-    status = push_back_buffer_view(
-        device, inputs[i].shape_rank, inputs[i].shape, inputs[i].element_type,
-        inputs[i].data, inputs[i].data_length, &call);
+    status = push_back_buffer_view(device, inputs[i], &call);
   }
 
   // Invoke call.
