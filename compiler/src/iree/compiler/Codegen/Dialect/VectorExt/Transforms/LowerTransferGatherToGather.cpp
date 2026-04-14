@@ -63,19 +63,19 @@ struct LowerTransferGatherToVectorGather final
       }
     }
 
+    if (op.getMask()) {
+      return rewriter.notifyMatchFailure(
+          op, "masked transfer_gather not yet supported");
+    }
+
     Location loc = op.getLoc();
     VectorType resultType = op.getVectorType();
     Value indexVec = op.getIndexVecs()[0];
 
-    Value mask;
-    VectorType maskType;
-    if (op.getMask()) {
-      mask = op.getMask();
-    } else {
-      maskType = VectorType::get(resultType.getShape(), rewriter.getI1Type());
-      mask = arith::ConstantOp::create(rewriter, loc,
-                                       DenseElementsAttr::get(maskType, true));
-    }
+    auto maskType =
+        VectorType::get(resultType.getShape(), rewriter.getI1Type());
+    Value mask = arith::ConstantOp::create(
+        rewriter, loc, DenseElementsAttr::get(maskType, true));
 
     Value passthru =
         vector::BroadcastOp::create(rewriter, loc, resultType, op.getPadding());
