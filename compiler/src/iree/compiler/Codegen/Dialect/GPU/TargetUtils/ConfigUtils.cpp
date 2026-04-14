@@ -860,6 +860,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     return failure();
   }
 
+  schedule->kTileSizes.back() *= 2;
+
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;

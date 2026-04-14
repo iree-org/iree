@@ -1202,6 +1202,7 @@ func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
+//  CHECK-SAME:     reduction = [0, 0, 4]
 
 // -----
 
@@ -1229,6 +1230,7 @@ func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096
 // CHECK-LABEL: func.func @skinny_gemm_m8_bf16(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_BF16>
+//  CHECK-SAME:     reduction = [0, 0, 4]
 
 // -----
 
@@ -1256,6 +1258,7 @@ func.func @skinny_gemm_m8_f8e4m3fnuz(%lhs: tensor<8x4096xf8E4M3FNUZ>, %rhs: tens
 // CHECK-LABEL: func.func @skinny_gemm_m8_f8e4m3fnuz(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128x2_F8E4M3FNUZ>
+//  CHECK-SAME:     reduction = [0, 0, 2]
 
 // -----
 
@@ -1283,6 +1286,7 @@ func.func @skinny_gemm_m8_f8e5m2fnuz(%lhs: tensor<8x4096xf8E5M2FNUZ>, %rhs: tens
 // CHECK-LABEL: func.func @skinny_gemm_m8_f8e5m2fnuz(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x128x2_F8E5M2FNUZ>
+//  CHECK-SAME:     reduction = [0, 0, 2]
 
 // -----
 
@@ -1310,3 +1314,4 @@ func.func @skinny_gemm_m8_i8(%lhs: tensor<8x4096xi8>, %rhs: tensor<4096x4096xi8>
 // CHECK-LABEL: func.func @skinny_gemm_m8_i8(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_I32_8x16x128x2_I8>
+//  CHECK-SAME:     reduction = [0, 0, 2]

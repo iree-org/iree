@@ -67,6 +67,10 @@ def IREECodegen_InnerTileDescAttrInterface :
     intrinsics which have their own inherent tiling.
 
     Note: this interface is a generalization of MmaInterfaceAttr.
+
+    Some queries on this interface provide heuristic scheduling hints. Such
+    hints do not describe the intrinsic's semantic MNK shape, layout,
+    distribution, or verifier requirements.
   }];
 
   let methods = [
@@ -270,6 +274,24 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a scale factor for GPU matmul K-tile heuristics.
+
+        This hook is intended for GPU scheduling heuristics that choose K tile
+        sizes. It must not be used as a source of truth for the intrinsic's
+        semantic MNK shape, layout, distribution, or verifier requirements.
+        Returning 1 means no adjustment. Implementations must return a value
+        greater than or equal to 1.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getKTileHeuristicScaleFactor",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return 1;
       }]
     >,
   ];
