@@ -894,13 +894,16 @@ iree_hal_amdgpu_executable_validate_export_parameter_requirements(
     iree_string_view_t symbol_name,
     const iree_hal_amdgpu_hsaco_metadata_export_parameter_requirements_t*
         requirements) {
+  // The flatbuffer owns the HAL ABI counts for wrapped executables. HSACO
+  // metadata may omit arguments that LLVM optimized away, but it must not
+  // require more visible arguments than the flatbuffer layout can supply.
   const uint32_t expected_constant_count =
       iree_hal_amdgpu_ExportDef_constant_count_get(export_def);
-  if (expected_constant_count != requirements->constant_count) {
+  if (requirements->constant_count > expected_constant_count) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "HSACO metadata for export `%.*s` declares %u constants but "
-        "ExecutableDef declares %u",
+        "HSACO metadata for export `%.*s` declares %u reflected constants but "
+        "ExecutableDef only declares %u",
         (int)symbol_name.size, symbol_name.data,
         (uint32_t)requirements->constant_count, expected_constant_count);
   }
@@ -909,11 +912,11 @@ iree_hal_amdgpu_executable_validate_export_parameter_requirements(
       iree_hal_amdgpu_ExportDef_binding_flags_get(export_def);
   const iree_host_size_t expected_binding_count =
       iree_hal_amdgpu_BindingBits_vec_len(binding_flags);
-  if (expected_binding_count != requirements->binding_count) {
+  if (requirements->binding_count > expected_binding_count) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "HSACO metadata for export `%.*s` declares %u bindings but "
-        "ExecutableDef declares %" PRIhsz,
+        "HSACO metadata for export `%.*s` declares %u reflected bindings but "
+        "ExecutableDef only declares %" PRIhsz,
         (int)symbol_name.size, symbol_name.data,
         (uint32_t)requirements->binding_count, expected_binding_count);
   }
@@ -1022,8 +1025,14 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
     memset(info, 0, sizeof(*info));
     info->name = iree_make_string_view(export_name_storage, name.size);
     info->flags = IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE;
-    info->constant_count = requirements.constant_count;
-    info->binding_count = requirements.binding_count;
+    // Preserve the flatbuffer ABI counts even when the HSACO metadata has lost
+    // optimized-unused arguments.
+    info->constant_count =
+        (uint16_t)iree_hal_amdgpu_ExportDef_constant_count_get(export_def);
+    iree_hal_amdgpu_BindingBits_vec_t binding_flags =
+        iree_hal_amdgpu_ExportDef_binding_flags_get(export_def);
+    info->binding_count =
+        (uint16_t)iree_hal_amdgpu_BindingBits_vec_len(binding_flags);
     info->parameter_count = requirements.parameter_count;
     const iree_hal_amdgpu_Dims_struct_t workgroup_size =
         iree_hal_amdgpu_ExportDef_workgroup_size_get(export_def);
