@@ -932,6 +932,17 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Similarly the reduction tile size is just the post-packing tile count.
   for (auto [i, kDim] : llvm::enumerate(kDims)) {
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
+
+    // VDMFMA (smfmac sparse trick) compresses the compute phase to roughly half
+    // the cycles of an equivalent MFMA sequence. In a software-pipelined loop
+    // this can cause the compute to finish before the next tile's loads arrive,
+    // turning latency-hiding overlap into vmcnt stalls. Double the K tile count
+    // to restore the compute-to-memory ratio.
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(schedule->mmaKind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        reductionTileSizes[kDim] *= 2;
+      }
+    }
   }
 
   IREE::Codegen::InnerTileDescAttrInterface kind = schedule->mmaKind;
