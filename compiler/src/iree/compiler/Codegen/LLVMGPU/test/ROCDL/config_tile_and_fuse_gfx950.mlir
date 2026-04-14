@@ -567,3 +567,19 @@ func.func @group_conv_10_channels(%arg0: tensor<32x102x102x32x10xf16>, %arg1: te
 // IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 8]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
 // IGEMM-SAME:      workgroup = [4, 16, 1, 3, 16, 0]
+
+// -----
+
+// BF16 matmul with DMA. Both LHS and RHS are not transposed, so only LHS gets XOR swizzle.
+func.func @matmul_bf16(
+    %arg0: tensor<4096x4096xbf16>,
+    %arg1: tensor<4096x4096xbf16>,
+    %arg2: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<4096x4096xbf16>, tensor<4096x4096xbf16>)
+                      outs(%arg2 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %0 : tensor<4096x4096xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<64, 8>>, #iree_gpu.use_global_load_dma]
