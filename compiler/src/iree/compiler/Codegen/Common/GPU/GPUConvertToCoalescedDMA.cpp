@@ -455,9 +455,88 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       }
 
       if (validPad) {
-        // Use pad.getSource() directly as the DMA source.
-        // This is the tensor.extract_slice result (e.g., tensor<?x64xf32>).
-        source = pad.getSource();
+        Value preSource = pad.getSource();
+
+        // Find the extract_slice closest to the pad output. This is the
+        // subgroup-level tiling's extract_slice, whose offsets tell us
+        // where this warp's tile starts within the padded tensor.
+        tensor::ExtractSliceOp tilingES;
+        {
+          Value trace = input;
+          while (auto es = trace.getDefiningOp<tensor::ExtractSliceOp>()) {
+            trace = es.getSource();
+            if (trace.getDefiningOp<tensor::PadOp>() == pad) {
+              tilingES = es;
+              break;
+            }
+          }
+        }
+
+        if (tilingES) {
+          // Subgroup tiling applied — create a sub-slice of the pre-pad
+          // source at the warp's tiling offset with sizes clamped to
+          // source bounds. Since pad has low=[0,0], the coordinate
+          // systems of the padded output and pre-pad source are aligned.
+          // The DMA's in_bounds attribute handles the case where the
+          // clamped source is smaller than the warp's init tile (the
+          // fat_raw_buffer returns zero for OOB reads).
+          rewriter.setInsertionPoint(inParallelOp);
+
+          SmallVector<OpFoldResult> warpOffsets = tilingES.getMixedOffsets();
+          SmallVector<OpFoldResult> warpSizes = tilingES.getMixedSizes();
+          auto preSourceType = cast<RankedTensorType>(preSource.getType());
+          int64_t rank = preSourceType.getRank();
+
+          SmallVector<OpFoldResult> subOffsets, subSizes, subStrides;
+          for (int64_t i = 0; i < rank; i++) {
+            subStrides.push_back(rewriter.getIndexAttr(1));
+
+            bool dimHasPadding =
+                !isConstantIntValue(pad.getMixedHighPad()[i], 0);
+
+            if (dimHasPadding) {
+              // Source may be smaller than the padded dimension. Clamp
+              // offset and size to stay within source bounds.
+              Value offsetVal = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                                warpOffsets[i]);
+              Value tileSizeVal =
+                  getValueOrCreateConstantIndexOp(rewriter, loc, warpSizes[i]);
+
+              int64_t staticDim = preSourceType.getShape()[i];
+              Value sourceDimSize;
+              if (ShapedType::isDynamic(staticDim)) {
+                sourceDimSize =
+                    tensor::DimOp::create(rewriter, loc, preSource, i);
+              } else {
+                sourceDimSize =
+                    arith::ConstantIndexOp::create(rewriter, loc, staticDim);
+              }
+
+              Value clampedOffset = arith::MinSIOp::create(
+                  rewriter, loc, offsetVal, sourceDimSize);
+              Value remaining = arith::SubIOp::create(
+                  rewriter, loc, sourceDimSize, clampedOffset);
+              Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+              Value clampedRemaining =
+                  arith::MaxSIOp::create(rewriter, loc, remaining, zero);
+              Value clampedSize = arith::MinSIOp::create(
+                  rewriter, loc, clampedRemaining, tileSizeVal);
+
+              subOffsets.push_back(clampedOffset);
+              subSizes.push_back(clampedSize);
+            } else {
+              subOffsets.push_back(warpOffsets[i]);
+              subSizes.push_back(warpSizes[i]);
+            }
+          }
+
+          source = tensor::ExtractSliceOp::create(
+              rewriter, loc, preSource, subOffsets, subSizes, subStrides);
+        } else {
+          // No subgroup tiling (single-warp case) — use full pre-pad
+          // source directly.
+          source = preSource;
+        }
 
         // Check if source tensor's innermost row size is DWORD (4-byte)
         // aligned. On AMD CDNA, per-component range checking is performed for
@@ -619,13 +698,24 @@ protected:
   }
 };
 
-/// Pattern to convert tensor.pad fusion cases directly without requiring
-/// warp-mapped forall parent.
+/// Fallback pattern to convert tensor.pad fusion cases directly without
+/// requiring warp-mapped forall parent. This handles edge cases where
+/// subgroup tiling was unable to distribute the pad-fused copy across warps
+/// (e.g., if computeSubgroupTileSizes fails). Copies that were already
+/// successfully distributed into warp-mapped foralls are handled by
+/// ConvertCopyToCoalescedDMA instead.
 struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
+    // Skip if already inside a warp-mapped forall — those are handled by
+    // ConvertCopyToCoalescedDMA with proper source offset propagation.
+    auto forallOp = copyOp->getParentOfType<scf::ForallOp>();
+    if (hasWarpMapping(forallOp)) {
+      return failure();
+    }
+
     // Only match copies with use_global_load_dma config.
     auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
     if (!config) {
@@ -1054,44 +1144,13 @@ private:
       return failure();
     }
 
-    // Check if this is a tensor.pad fusion case.
-    bool isPadFusion = false;
-    if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-      if (tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0])) {
-        // Check if padding exists (non-zero low/high pad).
-        for (auto [low, high] :
-             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
-          if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
-            isPadFusion = true;
-            break;
-          }
-        }
-      }
-    }
-
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
 
-    if (isPadFusion) {
-      // TODO(#23365): Tile to subgroups for pad fusion by propagating source
-      // offsets through tiling. Currently, after subgroup tiling each warp's
-      // DMA gets the full pre-pad source but a sub-tiled init, and the DMA
-      // lowering has no way to offset into the source. This requires adding
-      // source offset support to CoalescedGatherDMAOp. For now, create a
-      // single-iteration wrapper forall so the DMA sees the full buffer.
-      // Bail out if any dimension is dynamic since we need static tile sizes.
-      if (llvm::any_of(shape, ShapedType::isDynamic)) {
-        return failure();
-      }
-      for (int64_t i = 0; i < rank; ++i) {
-        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
-        ++numTiledDims;
-      }
-    } else {
-      // Compute tile sizes for subgroup-level distribution.
-      std::tie(tileSizes, numTiledDims) =
-          computeSubgroupTileSizes(rewriter, shape, numWarps);
-    }
+    // Distribute across subgroups (warps) for both pad fusion and non-pad
+    // cases.
+    std::tie(tileSizes, numTiledDims) =
+        computeSubgroupTileSizes(rewriter, shape, numWarps);
 
     if (numTiledDims == 0) {
       return failure();
@@ -1143,10 +1202,9 @@ private:
       }
     });
 
-    // Apply subgroup-level tiling to each op.
-    // For tensor.pad fusion cases, tileAtSubgroupLevel creates a
-    // single-iteration wrapper forall to maintain the expected structure while
-    // allowing the DMA to operate on the full buffer.
+    // Apply subgroup-level tiling to each op. If tiling fails (e.g., dynamic
+    // shapes, alignment mismatch), the op is left untiled and handled by the
+    // fallback pattern ConvertPadFusionCopyToCoalescedDMA in Phase 2.
     IRRewriter rewriter(context);
     for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =
