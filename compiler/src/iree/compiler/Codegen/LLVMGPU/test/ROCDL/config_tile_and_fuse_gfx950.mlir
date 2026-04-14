@@ -305,6 +305,36 @@ func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
 
 // -----
 
+module {
+  func.func @partial_data_tiled_scaled_mma_inner_tiled(
+      %lhs: tensor<1x1x1x16x4x32xf4E2M1FN>, %rhs: tensor<1x1x1x16x4x32xf4E2M1FN>,
+      %lhs_scales: tensor<1x1x4x16xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16xf8E8M0FNU>,
+      %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32> {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
+      indexing_maps = [affine_map<(m, n, k, kb) -> (m, k, kb)>,
+                       affine_map<(m, n, k, kb) -> (n, k, kb)>,
+                       affine_map<(m, n, k, kb) -> (m, k)>,
+                       affine_map<(m, n, k, kb) -> (n, k)>,
+                       affine_map<(m, n, k, kb) -> (m, n)>],
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
+      kind = #iree_gpu.partial_data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>,
+      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
+      : tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x4x16xf8E8M0FNU>, tensor<1x1x4x16xf8E8M0FNU> into tensor<1x1x4x16x4xf32>
+      return %0 : tensor<1x1x4x16x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @partial_data_tiled_scaled_mma_inner_tiled
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
+//       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
+//  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
+//  CHECK-SAME:     reduction = [0, 0, 1, 1]
+//  CHECK-SAME:     workgroup = [1, 1, 0, 0]
+
+// -----
+
 // Test that scaled matmul with an existing accumulator (matmul_accumulate)
 // gets smaller tiles than a zero-initialized matmul to account for accumulator
 // memory in workgroup memory (LDS). Without this, 256x256 tiles would be
