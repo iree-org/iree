@@ -40,6 +40,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+// constexpr int64_t kMinRedSizeVDMFMA = 5000;
 
 /// Helper to build a TranslationInfoAttr with a GPU pipeline.
 static IREE::Codegen::TranslationInfoAttr
@@ -320,6 +321,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
+    MLIRContext *ctx = target.getContext();
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
@@ -342,6 +344,34 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       } else {
         auto [mSize, nSize, kSize] = mma.getMNKShape();
         intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+
+        // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
+        // use the sparse trick (smfmac) and are only efficient when the
+        // problem's total M size fits within the VDMFMA's M tile size (8)
+        // and the problem's K size is at least the size of the VDMFMA
+        // intrinsic.
+        //
+        // Note: VMFMA intrinsics are intentionally excluded here. Adding
+        // them would change MMA selection for all problems.
+        for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
+          if (!isVDMFMAIntrinsic(vi)) {
+            continue;
+          }
+          auto vmma = VirtualMMAAttr::get(ctx, vi);
+          auto [vm, vn, vk] = vmma.getMNKShape();
+          if (llvm::product_of(problem.mSizes) > vm) {
+            continue;
+          }
+
+          const int64_t vdmfmaKTileSize = vmma.getIntrinsicsK() * vk;
+          const int64_t problemKSize = llvm::product_of(problem.kSizes);
+          if (problemKSize < vdmfmaKTileSize ||
+              problemKSize % vdmfmaKTileSize != 0) {
+            continue;
+          }
+          auto [va, vb, vc] = vmma.getABCElementTypes();
+          intrinsics.emplace_back(vm, vn, vk, va, vb, vc, vmma);
+        }
       }
     }
   }
@@ -851,6 +881,18 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Similarly the reduction tile size is just the post-packing tile count.
   for (auto [i, kDim] : llvm::enumerate(kDims)) {
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
+
+    // VDMFMA (smfmac sparse trick) compresses the compute phase to roughly half
+    // the cycles of an equivalent MFMA sequence. In a software-pipelined loop
+    // this can cause the compute to finish before the next tile's loads arrive,
+    // turning latency-hiding overlap into vmcnt stalls. Scale the K tile count
+    // by the virtual intrinsic K unroll factor to restore the compute-to-memory
+    // ratio.
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(schedule->mmaKind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        reductionTileSizes[kDim] *= vmma.getIntrinsicsK();
+      }
+    }
   }
 
   IREE::Codegen::InnerTileDescAttrInterface kind = schedule->mmaKind;

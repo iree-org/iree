@@ -970,9 +970,12 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
