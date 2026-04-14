@@ -375,3 +375,81 @@ func.func @unpack_pack_fill_mmt4d_map_store(%arg0: tensor<1x128x16x1xf32>, %arg1
 // INNER-PARALLEL:           linalg.fill
 // INNER-PARALLEL:           linalg.mmt4d
 // INNER-PARALLEL:           iree_linalg_ext.map_store
+
+// -----
+
+// Verify that the root op chain (reduction and its consumers) is NOT fused
+// into the before-root anchor's parallel forall, and that the root's producers
+// are NOT fused into the after-root anchor's parallel forall.
+// Chain: elementwise -> reduction(root) -> broadcast -> pack
+// The elementwise is the before-root anchor (has vector_inner_parallel).
+// The broadcast is the after-root anchor (has vector_inner_parallel).
+#map_ew = affine_map<(d0, d1) -> (d0, d1)>
+#map_red = affine_map<(d0, d1) -> (d0)>
+#map_bcast_in = affine_map<(d0, d1) -> (d0)>
+#map_bcast_out = affine_map<(d0, d1) -> (d0, d1)>
+#config_ew = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_inner_parallel = [0, 4], vector_reduction = [0, 16]>
+#config_red = #iree_cpu.lowering_config<distribution = [4, 0], vector_common_parallel = [4, 0], vector_reduction = [0, 16]>
+#config_fill = #iree_cpu.lowering_config<vector_common_parallel = [4]>
+#config_bcast = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_inner_parallel = [0, 8]>
+#config_pack = #iree_cpu.lowering_config<vector_common_parallel = [1, 0], vector_inner_parallel = [0, 1]>
+func.func @no_fuse_reduction_into_parallel_forall(
+    %input: tensor<4x16xi8>,
+    %init_ew: tensor<4x16xi8>,
+    %init_red: tensor<4xi32>,
+    %init_bcast: tensor<4x8xi32>,
+    %init_pack: tensor<1x4x4x2xi32>) -> tensor<1x4x4x2xi32> {
+  %c0_i32 = arith.constant 0 : i32
+  %c-128_i8 = arith.constant -128 : i8
+  %ew = linalg.generic {
+      indexing_maps = [#map_ew, #map_ew],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%input : tensor<4x16xi8>) outs(%init_ew : tensor<4x16xi8>)
+      attrs = {lowering_config = #config_ew} {
+    ^bb0(%in: i8, %out: i8):
+      %0 = arith.addi %in, %c-128_i8 : i8
+      linalg.yield %0 : i8
+  } -> tensor<4x16xi8>
+  %fill = linalg.fill {lowering_config = #config_fill}
+      ins(%c0_i32 : i32) outs(%init_red : tensor<4xi32>) -> tensor<4xi32>
+  %red = linalg.generic {
+      indexing_maps = [#map_ew, #map_red],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%ew : tensor<4x16xi8>) outs(%fill : tensor<4xi32>)
+      attrs = {lowering_config = #config_red} {
+    ^bb0(%in: i8, %out: i32):
+      %0 = arith.extsi %in : i8 to i32
+      %1 = arith.addi %0, %out : i32
+      linalg.yield %1 : i32
+  } -> tensor<4xi32>
+  %bcast = linalg.generic {
+      indexing_maps = [#map_bcast_in, #map_bcast_out],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%red : tensor<4xi32>) outs(%init_bcast : tensor<4x8xi32>)
+      attrs = {lowering_config = #config_bcast} {
+    ^bb0(%in: i32, %out: i32):
+      linalg.yield %in : i32
+  } -> tensor<4x8xi32>
+  %pack = linalg.pack %bcast outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
+      inner_tiles = [4, 2] into %init_pack
+      {lowering_config = #config_pack}
+      : tensor<4x8xi32> -> tensor<1x4x4x2xi32>
+  return %pack : tensor<1x4x4x2xi32>
+}
+// Before-root anchor (elementwise): the root and its consumers must not be
+// fused into its forall.
+// After-root anchor (broadcast): the root and its producers must not be
+// fused into its forall.
+// INNER-PARALLEL-LABEL: func.func @no_fuse_reduction_into_parallel_forall
+//       INNER-PARALLEL:   scf.forall
+//       INNER-PARALLEL:     linalg.generic
+//       INNER-PARALLEL:     scf.forall.in_parallel
+//   INNER-PARALLEL-NOT:   scf.forall
+//       INNER-PARALLEL:   linalg.fill
+//       INNER-PARALLEL:   linalg.generic
+//  INNER-PARALLEL-SAME:     iterator_types = ["parallel", "reduction"]
+//       INNER-PARALLEL:   scf.forall
+//       INNER-PARALLEL:     linalg.generic
+//  INNER-PARALLEL-SAME:     iterator_types = ["parallel", "parallel"]
+//       INNER-PARALLEL:     linalg.pack
+//       INNER-PARALLEL:     scf.forall.in_parallel
