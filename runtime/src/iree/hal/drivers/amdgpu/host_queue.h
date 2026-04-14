@@ -97,6 +97,16 @@ struct iree_hal_amdgpu_host_queue_post_drain_action_t {
 #define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_RESOURCE_CAPACITY \
   (1u + IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY)
 
+// Queue_execute binding table prefix cached inline as raw device pointers under
+// submission_mutex while replaying an AQL command buffer. Larger tables use a
+// temporary arena block for the current submission.
+#define IREE_HAL_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_BINDING_SCRATCH_CAPACITY 4096u
+
+// Queue_execute packet metadata cached inline under submission_mutex while
+// replaying an AQL command buffer. Larger packet-bearing blocks use a temporary
+// arena block for the current submission.
+#define IREE_HAL_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_PACKET_SCRATCH_CAPACITY 512u
+
 // Host-driven queue with per-queue epoch signal and wait-backed
 // notification ring. Embeds iree_hal_amdgpu_virtual_queue_t at offset 0.
 //
@@ -236,6 +246,22 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // submission_mutex before final kernargs are written to the kernarg ring.
   uint64_t dispatch_binding_ptr_scratch
       [IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY];
+
+  // Queue-local resolved device-pointer table used by common command-buffer
+  // replays under submission_mutex. Entries map queue_execute binding slots to
+  // raw device pointers before per-dispatch recorded offsets are added.
+  uint64_t command_buffer_binding_ptr_scratch
+      [IREE_HAL_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_BINDING_SCRATCH_CAPACITY];
+
+  // Queue-local packet header channel used by common command-buffer replays
+  // under submission_mutex before packet headers are committed to the AQL ring.
+  uint16_t command_buffer_packet_header_scratch
+      [IREE_HAL_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_PACKET_SCRATCH_CAPACITY];
+
+  // Queue-local packet setup channel used by common command-buffer replays
+  // under submission_mutex before packet headers are committed to the AQL ring.
+  uint16_t command_buffer_packet_setup_scratch
+      [IREE_HAL_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_PACKET_SCRATCH_CAPACITY];
 
   // Set under submission_mutex when queue teardown begins. Deferred ops whose
   // waits race to completion after this point are failed with CANCELLED instead

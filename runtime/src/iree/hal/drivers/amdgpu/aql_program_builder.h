@@ -76,16 +76,16 @@ typedef struct iree_hal_amdgpu_aql_program_builder_t {
   iree_hal_amdgpu_command_buffer_block_header_t* current_block;
   // Forward cursor used to append command records.
   uint8_t* command_cursor;
-  // Backward cursor used to append fixup records.
-  uint8_t* fixup_cursor;
+  // Backward cursor used to append binding source records.
+  uint8_t* binding_source_cursor;
   // Number of finalized and current blocks.
   uint32_t block_count;
   // Number of command records emitted into finalized and current blocks.
   uint32_t command_count;
   // Number of command records emitted into the current block.
   uint16_t current_block_command_count;
-  // Number of fixup records emitted into the current block.
-  uint16_t current_block_fixup_count;
+  // Number of binding source records emitted into the current block.
+  uint16_t current_block_binding_source_count;
   // Worst-case AQL packet count emitted by the current block.
   uint32_t current_block_aql_packet_count;
   // Worst-case kernarg byte count emitted by the current block.
@@ -115,7 +115,7 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_end(
     iree_hal_amdgpu_aql_program_builder_t* builder,
     iree_hal_amdgpu_aql_program_t* out_program);
 
-// Appends a command record and optional fixup records.
+// Appends a command record and optional binding source records.
 //
 // |command_length| must be qword-aligned and include the common command header.
 // |aql_packet_count| and |kernarg_length| are worst-case replay resource
@@ -124,10 +124,11 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_end(
 // command while preserving room for a terminator.
 iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
     iree_hal_amdgpu_aql_program_builder_t* builder, uint8_t opcode,
-    uint8_t flags, iree_host_size_t command_length, uint16_t fixup_count,
-    uint32_t aql_packet_count, uint32_t kernarg_length,
+    uint8_t flags, iree_host_size_t command_length,
+    uint16_t binding_source_count, uint32_t aql_packet_count,
+    uint32_t kernarg_length,
     iree_hal_amdgpu_command_buffer_command_header_t** out_command,
-    iree_hal_amdgpu_command_buffer_fixup_t** out_fixups);
+    iree_hal_amdgpu_command_buffer_binding_source_t** out_binding_sources);
 
 #ifdef __cplusplus
 }  // extern "C"

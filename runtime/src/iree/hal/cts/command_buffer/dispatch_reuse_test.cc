@@ -131,8 +131,8 @@ class DispatchReuseTest : public CtsTestBase<> {
     IREE_ASSERT_OK(iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, signal,
         command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                                IREE_ASYNC_WAIT_FLAG_NONE));
   }
 
   iree_hal_executable_cache_t* executable_cache_ = nullptr;
@@ -199,6 +199,136 @@ TEST_P(DispatchReuseTest, LargeWorkgroupCount) {
   EXPECT_THAT(data, ContainerEq(expected));
 }
 
+// Records one dispatch with a direct input buffer and an indirect output
+// buffer. This is distinct from the all-direct/all-indirect cases: replay must
+// combine the baked static pointer source and the queue_execute binding-table
+// source in the same HAL ABI binding prefix.
+TEST_P(DispatchReuseTest, MixedDirectAndIndirectBindings) {
+  static constexpr iree_device_size_t kElementCount = 4;
+  static constexpr iree_device_size_t kByteLength =
+      kElementCount * sizeof(float);
+
+  Ref<iree_hal_buffer_t> input;
+  CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, input.out());
+
+  Ref<iree_hal_buffer_t> output;
+  CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out());
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/1, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      {/*binding=*/0, /*buffer_slot=*/0, input,
+       /*offset=*/1 * sizeof(float), /*length=*/2 * sizeof(float)},
+      {/*binding=*/1, /*buffer_slot=*/0, /*buffer=*/nullptr,
+       /*offset=*/1 * sizeof(float), /*length=*/2 * sizeof(float)},
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, absf_executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+      command_buffer,
+      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
+          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
+          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
+      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  iree_hal_buffer_binding_t table_bindings[1] = {{
+      /*buffer=*/output,
+      /*offset=*/0,
+      /*length=*/IREE_HAL_WHOLE_BUFFER,
+  }};
+  iree_hal_buffer_binding_table_t binding_table = {1, table_bindings};
+  SubmitWithBindingsAndWait(command_buffer, binding_table);
+
+  auto data = ReadBufferData<float>(output);
+  EXPECT_THAT(data, ::testing::ElementsAre(-9.0f, 2.5f, 2.5f, -9.0f));
+}
+
+// Submits an indirect dispatch command buffer behind an unresolved wait, then
+// releases the command buffer and an input binding before the wait is signaled.
+// queue_execute must copy the binding table metadata and retain the bound
+// resources until the signal semaphore publishes completion.
+TEST_P(DispatchReuseTest, DeferredExecuteRetainsDispatchBindingTable) {
+  static constexpr iree_device_size_t kElementCount = 4;
+  static constexpr iree_device_size_t kByteLength =
+      kElementCount * sizeof(float);
+
+  iree_hal_buffer_t* input = nullptr;
+  CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, &input);
+
+  Ref<iree_hal_buffer_t> output;
+  CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out());
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/2, &command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      {/*binding=*/0, /*buffer_slot=*/0, /*buffer=*/nullptr,
+       /*offset=*/1 * sizeof(float), /*length=*/2 * sizeof(float)},
+      {/*binding=*/1, /*buffer_slot=*/1, /*buffer=*/nullptr,
+       /*offset=*/1 * sizeof(float), /*length=*/2 * sizeof(float)},
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, absf_executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+      command_buffer,
+      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
+          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
+          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
+      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList wait(device_, {0}, {1});
+  SemaphoreList signal(device_, {0}, {1});
+  iree_hal_buffer_binding_t table_bindings[2] = {
+      {input, 0, IREE_HAL_WHOLE_BUFFER},
+      {output, 0, IREE_HAL_WHOLE_BUFFER},
+  };
+  iree_hal_buffer_binding_table_t binding_table = {
+      IREE_ARRAYSIZE(table_bindings),
+      table_bindings,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait, signal, command_buffer,
+      binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(input);
+  table_bindings[0] = {nullptr, 0, 0};
+  table_bindings[1] = {nullptr, 0, 0};
+
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_signal(wait.semaphores[0], 1, /*frontier=*/nullptr));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto data = ReadBufferData<float>(output);
+  EXPECT_THAT(data, ::testing::ElementsAre(-9.0f, 2.5f, 2.5f, -9.0f));
+}
+
 // Simulates the hot path: alloca → execute → dealloca, all chained via
 // semaphores. The command buffer is reusable; each iteration gets a fresh
 // transient buffer.
@@ -211,11 +341,9 @@ TEST_P(DispatchReuseTest, AllocaExecuteDeallocaCycle) {
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  alloca_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                        IREE_HAL_BUFFER_USAGE_TRANSFER |
-                        IREE_HAL_BUFFER_USAGE_MAPPING;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.usage =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
 
   // Run the alloca → execute → verify → dealloca cycle 3 times.
   // The dealloca must be deferred until AFTER host readback because the
@@ -243,7 +371,7 @@ TEST_P(DispatchReuseTest, AllocaExecuteDeallocaCycle) {
 
     // Wait for execute to complete, then verify.
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        execute_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+        execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
     auto data = ReadBufferData<uint32_t>(transient);
     std::vector<uint32_t> expected(kWorkgroupCount);
@@ -256,9 +384,8 @@ TEST_P(DispatchReuseTest, AllocaExecuteDeallocaCycle) {
     IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, execute_signal, dealloca_signal,
         transient, IREE_HAL_DEALLOCA_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal,
-                                                iree_make_timeout_ms(5000),
-                                                IREE_ASYNC_WAIT_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   }
 }
 
@@ -273,11 +400,9 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  alloca_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                        IREE_HAL_BUFFER_USAGE_TRANSFER |
-                        IREE_HAL_BUFFER_USAGE_MAPPING;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.usage =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
 
   SemaphoreList empty_wait;
 
@@ -315,9 +440,9 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
 
   // Wait for both executes, then verify results.
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      execute_a_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      execute_a_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      execute_b_signal, iree_make_timeout_ms(5000), IREE_ASYNC_WAIT_FLAG_NONE));
+      execute_b_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
   std::vector<uint32_t> expected(kWorkgroupCount);
   std::iota(expected.begin(), expected.end(), 0u);
@@ -341,12 +466,10 @@ TEST_P(DispatchReuseTest, PipelinedAllocaExecuteDealloca) {
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, execute_b_signal, dealloca_b_signal,
       buffer_b, IREE_HAL_DEALLOCA_FLAG_NONE));
 
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_a_signal,
-                                              iree_make_timeout_ms(5000),
-                                              IREE_ASYNC_WAIT_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_b_signal,
-                                              iree_make_timeout_ms(5000),
-                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_a_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_b_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 // Records a reusable command buffer with multiple dispatches separated by

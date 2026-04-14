@@ -156,10 +156,10 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_begin_block(
 
   builder->current_block = block;
   builder->command_cursor = (uint8_t*)block + sizeof(*block);
-  builder->fixup_cursor =
+  builder->binding_source_cursor =
       (uint8_t*)block + builder->block_pool->usable_block_size;
   builder->current_block_command_count = 0;
-  builder->current_block_fixup_count = 0;
+  builder->current_block_binding_source_count = 0;
   builder->current_block_aql_packet_count = 0;
   builder->current_block_kernarg_length = 0;
   ++builder->block_count;
@@ -171,9 +171,10 @@ static void iree_hal_amdgpu_aql_program_builder_finalize_block(
   iree_hal_amdgpu_command_buffer_block_header_t* block = builder->current_block;
   block->command_length = (uint32_t)(builder->command_cursor -
                                      ((uint8_t*)block + block->command_offset));
-  block->fixup_offset = (uint32_t)(builder->fixup_cursor - (uint8_t*)block);
+  block->binding_source_offset =
+      (uint32_t)(builder->binding_source_cursor - (uint8_t*)block);
   block->command_count = builder->current_block_command_count;
-  block->fixup_count = builder->current_block_fixup_count;
+  block->binding_source_count = builder->current_block_binding_source_count;
   block->aql_packet_count = builder->current_block_aql_packet_count;
   block->kernarg_length = builder->current_block_kernarg_length;
 
@@ -198,12 +199,13 @@ static void iree_hal_amdgpu_aql_program_builder_finalize_block(
 
   builder->current_block = NULL;
   builder->command_cursor = NULL;
-  builder->fixup_cursor = NULL;
+  builder->binding_source_cursor = NULL;
 }
 
 static iree_host_size_t iree_hal_amdgpu_aql_program_builder_remaining(
     const iree_hal_amdgpu_aql_program_builder_t* builder) {
-  return (iree_host_size_t)(builder->fixup_cursor - builder->command_cursor);
+  return (iree_host_size_t)(builder->binding_source_cursor -
+                            builder->command_cursor);
 }
 
 static iree_status_t iree_hal_amdgpu_aql_program_builder_append_terminator(
@@ -272,8 +274,9 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_split_block(
 
 static iree_status_t iree_hal_amdgpu_aql_program_builder_validate_command(
     const iree_hal_amdgpu_aql_program_builder_t* builder, uint8_t opcode,
-    iree_host_size_t command_length, uint16_t fixup_count,
-    iree_host_size_t* out_required_length, iree_host_size_t* out_fixup_length) {
+    iree_host_size_t command_length, uint16_t binding_source_count,
+    iree_host_size_t* out_required_length,
+    iree_host_size_t* out_binding_source_length) {
   if (IREE_UNLIKELY(!builder->current_block)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command-buffer builder is not recording");
@@ -300,22 +303,23 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_validate_command(
                             "uint16 qword units");
   }
 
-  iree_host_size_t fixup_length = 0;
+  iree_host_size_t binding_source_length = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-          fixup_count, sizeof(iree_hal_amdgpu_command_buffer_fixup_t),
-          &fixup_length))) {
+          binding_source_count,
+          sizeof(iree_hal_amdgpu_command_buffer_binding_source_t),
+          &binding_source_length))) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "command fixup table size overflow");
+                            "command binding source table size overflow");
   }
 
   iree_host_size_t required_length = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_add(command_length, fixup_length,
-                                                &required_length))) {
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(
+          command_length, binding_source_length, &required_length))) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "command record size overflow");
   }
   *out_required_length = required_length;
-  *out_fixup_length = fixup_length;
+  *out_binding_source_length = binding_source_length;
   return iree_ok_status();
 }
 
@@ -335,10 +339,12 @@ static bool iree_hal_amdgpu_aql_program_command_fits_empty_block(
 }
 
 static bool iree_hal_amdgpu_aql_program_command_fits_current_block(
-    const iree_hal_amdgpu_aql_program_builder_t* builder, uint16_t fixup_count,
-    uint32_t aql_packet_count, uint32_t kernarg_length) {
+    const iree_hal_amdgpu_aql_program_builder_t* builder,
+    uint16_t binding_source_count, uint32_t aql_packet_count,
+    uint32_t kernarg_length) {
   if (builder->current_block_command_count > UINT16_MAX - 2) return false;
-  if (fixup_count > UINT16_MAX - builder->current_block_fixup_count) {
+  if (binding_source_count >
+      UINT16_MAX - builder->current_block_binding_source_count) {
     return false;
   }
   if (aql_packet_count > UINT32_MAX - builder->current_block_aql_packet_count) {
@@ -420,16 +426,18 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_end(
 
 iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
     iree_hal_amdgpu_aql_program_builder_t* builder, uint8_t opcode,
-    uint8_t flags, iree_host_size_t command_length, uint16_t fixup_count,
-    uint32_t aql_packet_count, uint32_t kernarg_length,
+    uint8_t flags, iree_host_size_t command_length,
+    uint16_t binding_source_count, uint32_t aql_packet_count,
+    uint32_t kernarg_length,
     iree_hal_amdgpu_command_buffer_command_header_t** out_command,
-    iree_hal_amdgpu_command_buffer_fixup_t** out_fixups) {
-  if (IREE_UNLIKELY(!out_command || (fixup_count > 0 && !out_fixups))) {
+    iree_hal_amdgpu_command_buffer_binding_source_t** out_binding_sources) {
+  if (IREE_UNLIKELY(!out_command ||
+                    (binding_source_count > 0 && !out_binding_sources))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "command output pointers are required");
   }
   *out_command = NULL;
-  if (out_fixups) *out_fixups = NULL;
+  if (out_binding_sources) *out_binding_sources = NULL;
 
   if (IREE_UNLIKELY(builder->command_count == UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -437,15 +445,15 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
   }
 
   iree_host_size_t required_length = 0;
-  iree_host_size_t fixup_length = 0;
+  iree_host_size_t binding_source_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_program_builder_validate_command(
-      builder, opcode, command_length, fixup_count, &required_length,
-      &fixup_length));
+      builder, opcode, command_length, binding_source_count, &required_length,
+      &binding_source_length));
   if (IREE_UNLIKELY(!iree_hal_amdgpu_aql_program_command_fits_empty_block(
           builder, required_length))) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "command record and fixups cannot fit in one command-buffer block");
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "command record and binding sources cannot fit in "
+                            "one command-buffer block");
   }
 
   iree_host_size_t required_with_terminator = 0;
@@ -458,7 +466,7 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
   if (iree_hal_amdgpu_aql_program_builder_remaining(builder) <
           required_with_terminator ||
       !iree_hal_amdgpu_aql_program_command_fits_current_block(
-          builder, fixup_count, aql_packet_count, kernarg_length)) {
+          builder, binding_source_count, aql_packet_count, kernarg_length)) {
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_aql_program_builder_split_block(builder));
     if (IREE_UNLIKELY(builder->command_count == UINT32_MAX)) {
@@ -472,11 +480,12 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
   memset(command, 0, command_length);
   builder->command_cursor += command_length;
 
-  iree_hal_amdgpu_command_buffer_fixup_t* fixups = NULL;
-  if (fixup_length > 0) {
-    builder->fixup_cursor -= fixup_length;
-    fixups = (iree_hal_amdgpu_command_buffer_fixup_t*)builder->fixup_cursor;
-    memset(fixups, 0, fixup_length);
+  iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources = NULL;
+  if (binding_source_length > 0) {
+    builder->binding_source_cursor -= binding_source_length;
+    binding_sources = (iree_hal_amdgpu_command_buffer_binding_source_t*)
+                          builder->binding_source_cursor;
+    memset(binding_sources, 0, binding_source_length);
   }
 
   command->opcode = opcode;
@@ -485,19 +494,14 @@ iree_status_t iree_hal_amdgpu_aql_program_builder_append_command(
       (uint16_t)(command_length /
                  IREE_HAL_AMDGPU_COMMAND_BUFFER_RECORD_ALIGNMENT);
   command->command_index = builder->command_count;
-  command->fixup_offset =
-      fixup_length > 0
-          ? (uint32_t)((uint8_t*)fixups - (uint8_t*)builder->current_block)
-          : 0;
-  command->fixup_count = fixup_count;
 
   ++builder->command_count;
   ++builder->current_block_command_count;
-  builder->current_block_fixup_count += fixup_count;
+  builder->current_block_binding_source_count += binding_source_count;
   builder->current_block_aql_packet_count += aql_packet_count;
   builder->current_block_kernarg_length += kernarg_length;
 
   *out_command = command;
-  if (out_fixups) *out_fixups = fixups;
+  if (out_binding_sources) *out_binding_sources = binding_sources;
   return iree_ok_status();
 }

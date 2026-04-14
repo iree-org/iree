@@ -27,21 +27,15 @@ enum iree_hal_amdgpu_host_queue_submission_flag_bits_t {
   IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES = 1u << 0,
 };
 
-// Validates queue_execute flags supported by the AMDGPU host queue.
-iree_status_t iree_hal_amdgpu_host_queue_validate_execute_flags(
-    iree_hal_execute_flags_t flags);
-
-// One in-flight kernel-dispatch submission assembled under submission_mutex.
-// All queue-private resource transfer and reclaim bookkeeping flows through
-// this struct so fill/copy/update/dispatch do not accidentally grow divergent
-// kernel-ring retirement mechanisms.
-typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
+// One in-flight kernel-shaped packet submission assembled under
+// submission_mutex. Owns the generic notification/reclaim, AQL reservation, and
+// kernarg reservation state shared by direct queue dispatches and
+// command-buffer replay.
+typedef struct iree_hal_amdgpu_host_queue_kernel_submission_t {
   // Reclaim entry reserved from the notification ring for this submission.
   iree_hal_amdgpu_reclaim_entry_t* reclaim_entry;
   // Reclaim resource slots owned by |reclaim_entry|.
   iree_hal_resource_t** reclaim_resources;
-  // Final uncommitted dispatch AQL slot.
-  iree_hal_amdgpu_aql_packet_t* dispatch_slot;
   // Queue-owned kernarg blocks reserved for this submission.
   iree_hal_amdgpu_kernarg_block_t* kernarg_blocks;
   // First AQL packet id reserved for this submission.
@@ -50,17 +44,29 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   uint64_t kernarg_write_position;
   // Number of AQL packets reserved starting at |first_packet_id|.
   uint32_t packet_count;
+  // Number of caller-authored payload packets after wait barriers and padding.
+  uint32_t payload_packet_count;
   // Number of valid entries in |reclaim_resources|.
   uint16_t reclaim_resource_count;
+  // Optional action executed before user signals are published when this
+  // submission completes.
+  iree_hal_amdgpu_reclaim_action_t pre_signal_action;
+} iree_hal_amdgpu_host_queue_kernel_submission_t;
+
+// One in-flight single-dispatch submission assembled under submission_mutex.
+// Operation implementations populate the dispatch packet and kernargs directly
+// while generic ownership and publication stay in |kernel|.
+typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
+  // Generic kernel-shaped submission state.
+  iree_hal_amdgpu_host_queue_kernel_submission_t kernel;
+  // Final uncommitted dispatch AQL slot.
+  iree_hal_amdgpu_aql_packet_t* dispatch_slot;
   // Setup bits published with |dispatch_slot|'s final header.
   uint16_t dispatch_setup;
   // Minimum acquire fence scope required by operation-local data visibility.
   iree_hsa_fence_scope_t minimum_acquire_scope;
   // Minimum release fence scope required by operation-local data visibility.
   iree_hsa_fence_scope_t minimum_release_scope;
-  // Optional action executed before user signals are published when this
-  // submission completes.
-  iree_hal_amdgpu_reclaim_action_t pre_signal_action;
 } iree_hal_amdgpu_host_queue_dispatch_submission_t;
 
 // Returns the number of retained resources required for a submission with
@@ -70,6 +76,49 @@ iree_status_t iree_hal_amdgpu_host_queue_count_reclaim_resources(
     iree_host_size_t signal_semaphore_count,
     iree_host_size_t operation_resource_count,
     uint16_t* out_reclaim_resource_count);
+
+// Begins one kernel-shaped packet submission by reserving notification/reclaim
+// state, AQL slots, and queue-owned kernarg blocks. |payload_packet_count|
+// packets will be written by the caller after any padding packets required to
+// keep kernarg-block and AQL-packet positions aligned. Caller must hold
+// submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_begin_kernel_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
+    uint32_t kernarg_block_count,
+    iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission);
+
+// Publishes the software side of a kernel-shaped packet submission: transfers
+// operation resources and an optional resource set to the reclaim entry,
+// advances queue/frontier state, and records user-visible signal metadata.
+// Payload packet headers remain uncommitted when this returns. Caller must hold
+// submission_mutex.
+void iree_hal_amdgpu_host_queue_finish_kernel_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_resource_set_t** inout_resource_set,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
+
+// Emits reclaim-only no-op packets for a kernel-shaped submission whose AQL and
+// kernarg slots were reserved but whose payload could not be published. User
+// signal semaphores are not signaled; only queue-private reclaim can advance.
+void iree_hal_amdgpu_host_queue_fail_kernel_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
+
+// Publishes wait-barrier and no-op padding packets for a successful
+// kernel-shaped submission. Caller must have already populated payload packet
+// bodies but not committed payload packet headers.
+void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
 
 // Begins one kernel-dispatch submission by reserving notification/reclaim
 // state, AQL slots, and |kernarg_block_count| queue-owned kernarg blocks.
@@ -127,27 +176,6 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
     void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
-
-// Replays an AMDGPU AQL command buffer program onto the host queue.
-// Caller must hold submission_mutex.
-iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
-    iree_hal_amdgpu_host_queue_t* queue,
-    const iree_hal_amdgpu_wait_resolution_t* resolution,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table,
-    iree_hal_execute_flags_t execute_flags,
-    iree_hal_resource_set_t** inout_binding_resource_set,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
-
-// Creates a resource set retaining the binding table prefix required by
-// |command_buffer| unless |execute_flags| explicitly borrows buffer lifetimes.
-iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
-    iree_hal_amdgpu_host_queue_t* queue,
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table,
-    iree_hal_execute_flags_t execute_flags,
-    iree_hal_resource_set_t** out_resource_set);
 
 #ifdef __cplusplus
 }  // extern "C"

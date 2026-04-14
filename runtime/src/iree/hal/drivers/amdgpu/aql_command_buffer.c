@@ -8,8 +8,10 @@
 
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
+#include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -60,6 +62,10 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   iree_allocator_t host_allocator;
   // Block pool used for durable command-buffer program blocks.
   iree_arena_block_pool_t* block_pool;
+  // Physical device ordinal selected from the command buffer's queue affinity.
+  uint32_t device_ordinal;
+  // Reserved bytes for stable layout.
+  uint32_t reserved0;
   // Resource set retaining direct buffers and executables when not unretained.
   iree_hal_resource_set_t* resource_set;
   // Direct buffers referenced by static command records.
@@ -98,6 +104,17 @@ static bool iree_hal_amdgpu_aql_command_buffer_retains_resources(
     const iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
   return !iree_all_bits_set(command_buffer->base.mode,
                             IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
+}
+
+static bool iree_hal_amdgpu_aql_command_buffer_validates(
+    const iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  return !iree_any_bit_set(command_buffer->base.mode,
+                           IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED);
+#else
+  (void)command_buffer;
+  return false;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
 }
 
 static void iree_hal_amdgpu_aql_command_buffer_reset_resources(
@@ -241,7 +258,8 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_host_size_t device_ordinal, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -255,6 +273,12 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
   if (IREE_UNLIKELY(!block_pool)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "command-buffer block pool is required");
+  }
+  if (IREE_UNLIKELY(device_ordinal > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "command-buffer device ordinal %" PRIhsz
+                            " exceeds uint32_t storage",
+                            device_ordinal);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -279,6 +303,7 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
       &iree_hal_amdgpu_aql_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->block_pool = block_pool;
+  command_buffer->device_ordinal = (uint32_t)device_ordinal;
   iree_arena_initialize(block_pool, &command_buffer->rodata.arena);
   iree_hal_amdgpu_aql_program_builder_initialize(block_pool,
                                                  &command_buffer->builder);
@@ -315,6 +340,13 @@ const iree_hal_amdgpu_aql_program_t* iree_hal_amdgpu_aql_command_buffer_program(
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
   return &command_buffer->program;
+}
+
+iree_host_size_t iree_hal_amdgpu_aql_command_buffer_device_ordinal(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  return command_buffer->device_ordinal;
 }
 
 iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
@@ -416,8 +448,8 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_execution_barrier(
       &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BARRIER,
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_barrier_command_t),
-      /*fixup_count=*/0, /*aql_packet_count=*/0, /*kernarg_length=*/0, &header,
-      /*out_fixups=*/NULL));
+      /*binding_source_count=*/0, /*aql_packet_count=*/0,
+      /*kernarg_length=*/0, &header, /*out_binding_sources=*/NULL));
 
   iree_hal_amdgpu_command_buffer_barrier_command_t* barrier =
       (iree_hal_amdgpu_command_buffer_barrier_command_t*)header;
@@ -460,27 +492,21 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_wait_events(
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
     iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
-    iree_hal_buffer_ref_t buffer_ref, iree_hal_buffer_usage_t required_usage,
-    iree_hal_memory_access_t required_access, uint8_t* out_kind,
+    iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_amdgpu_command_buffer_binding_kind_t* out_kind,
     uint32_t* out_ordinal, uint64_t* out_offset, uint64_t* out_length) {
   *out_kind = IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID;
   *out_ordinal = 0;
   *out_offset = 0;
   *out_length = 0;
 
-  if (IREE_UNLIKELY(buffer_ref.reserved != 0)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command-buffer buffer reference reserved bits "
-                            "must be zero");
-  }
-
   if (!buffer_ref.buffer) {
-    if (IREE_UNLIKELY(buffer_ref.buffer_slot >=
-                      command_buffer->base.binding_capacity)) {
+    if (IREE_UNLIKELY(buffer_ref.buffer_slot == UINT32_MAX)) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
-          "indirect command-buffer buffer slot %u exceeds binding capacity %u",
-          buffer_ref.buffer_slot, command_buffer->base.binding_capacity);
+          "indirect command-buffer buffer slot %u exceeds binding count "
+          "storage",
+          buffer_ref.buffer_slot);
     }
     command_buffer->base.binding_count = iree_max(
         command_buffer->base.binding_count, buffer_ref.buffer_slot + 1);
@@ -491,29 +517,12 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
     return iree_ok_status();
   }
 
-  if (IREE_UNLIKELY(buffer_ref.buffer_slot != 0)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "direct command-buffer buffer references must not "
-                            "specify a binding table slot");
-  }
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(buffer_ref.buffer), required_usage));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(buffer_ref.buffer), required_access));
-
   iree_device_size_t resolved_offset = 0;
   iree_device_size_t resolved_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_calculate_range(
       /*base_offset=*/0, iree_hal_buffer_byte_length(buffer_ref.buffer),
       buffer_ref.offset, buffer_ref.length, &resolved_offset,
       &resolved_length));
-  iree_hal_buffer_t* allocated_buffer =
-      iree_hal_buffer_allocated_buffer(buffer_ref.buffer);
-  if (IREE_UNLIKELY(!iree_hal_amdgpu_buffer_device_pointer(allocated_buffer))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "command-buffer buffer must be backed by an AMDGPU allocation");
-  }
 
   uint32_t ordinal = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_static_buffer(
@@ -524,6 +533,285 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
   *out_offset = resolved_offset;
   *out_length = resolved_length;
   return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Dispatch Recording
+//===----------------------------------------------------------------------===//
+
+static bool iree_hal_amdgpu_dispatch_config_has_workgroup_size_override(
+    const iree_hal_dispatch_config_t config) {
+  return config.workgroup_size[0] || config.workgroup_size[1] ||
+         config.workgroup_size[2];
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_check_dispatch_flags(
+    iree_hal_dispatch_flags_t flags) {
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "indirect workgroup parameters are not supported by AMDGPU "
+        "command buffers yet");
+  }
+  if (iree_hal_dispatch_uses_indirect_arguments(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "indirect dispatch arguments are not supported by AMDGPU command "
+        "buffers yet");
+  }
+  const iree_hal_dispatch_flags_t supported_flags =
+      IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS |
+      IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION;
+  if (IREE_UNLIKELY(iree_any_bit_set(flags, ~supported_flags))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported dispatch flags: 0x%" PRIx64, flags);
+  }
+  return iree_ok_status();
+}
+
+static void iree_hal_amdgpu_aql_command_buffer_select_dispatch_kernel_args(
+    const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor,
+    const iree_hal_dispatch_config_t config,
+    iree_hal_amdgpu_device_kernel_args_t* override_kernel_args,
+    const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
+  *out_kernel_args = &descriptor->kernel_args;
+  if (!iree_hal_amdgpu_dispatch_config_has_workgroup_size_override(config)) {
+    return;
+  }
+
+  *override_kernel_args = descriptor->kernel_args;
+  for (iree_host_size_t i = 0; i < 3; ++i) {
+    override_kernel_args->workgroup_size[i] =
+        (uint16_t)config.workgroup_size[i];
+  }
+
+  *out_kernel_args = override_kernel_args;
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_validate_dispatch_shape(
+    const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor,
+    const iree_hal_dispatch_config_t config) {
+  if (iree_hal_amdgpu_dispatch_config_has_workgroup_size_override(config)) {
+    for (iree_host_size_t i = 0; i < 3; ++i) {
+      if (IREE_UNLIKELY(!config.workgroup_size[i])) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "dispatch workgroup size override must specify all dimensions");
+      }
+      if (IREE_UNLIKELY(config.workgroup_size[i] > UINT16_MAX)) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "dispatch workgroup size override dimension %" PRIhsz
+            " value %u exceeds %u",
+            i, config.workgroup_size[i], UINT16_MAX);
+      }
+      const uint64_t grid_size =
+          (uint64_t)config.workgroup_count[i] * config.workgroup_size[i];
+      if (IREE_UNLIKELY(grid_size > UINT32_MAX)) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "dispatch grid dimension %" PRIhsz
+            " overflows uint32_t (workgroup_count=%u, workgroup_size=%u)",
+            i, config.workgroup_count[i], config.workgroup_size[i]);
+      }
+    }
+  } else {
+    for (iree_host_size_t i = 0; i < 3; ++i) {
+      if (IREE_UNLIKELY(config.workgroup_count[i] >
+                        descriptor->max_workgroup_count[i])) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "dispatch grid dimension %" PRIhsz
+            " overflows uint32_t (workgroup_count=%u, workgroup_size=%u)",
+            i, config.workgroup_count[i],
+            descriptor->kernel_args.workgroup_size[i]);
+      }
+    }
+  }
+  if (IREE_UNLIKELY(config.dynamic_workgroup_local_memory >
+                    descriptor->max_dynamic_workgroup_local_memory)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch group segment size overflows uint32_t "
+                            "(static=%u, dynamic=%u)",
+                            descriptor->kernel_args.group_segment_size,
+                            config.dynamic_workgroup_local_memory);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t
+iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_binding_sources(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
+    const iree_hal_buffer_ref_list_t bindings) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(command_buffer));
+
+  iree_host_size_t binding_count = command_buffer->base.binding_count;
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t failed_index = 0;
+  for (iree_host_size_t i = 0; i < bindings.count && iree_status_is_ok(status);
+       ++i) {
+    failed_index = i;
+    const iree_hal_buffer_ref_t* binding = &bindings.values[i];
+    if (!binding->buffer) {
+      if (IREE_UNLIKELY(binding->buffer_slot == UINT32_MAX)) {
+        status = iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "indirect command-buffer dispatch binding slot %u exceeds binding "
+            "count storage",
+            binding->buffer_slot);
+      } else {
+        binding_count = iree_max(binding_count, binding->buffer_slot + 1);
+      }
+      continue;
+    }
+
+    iree_hal_buffer_t* allocated_buffer =
+        iree_hal_buffer_allocated_buffer(binding->buffer);
+    void* device_ptr = iree_hal_amdgpu_buffer_device_pointer(allocated_buffer);
+    if (IREE_UNLIKELY(!device_ptr)) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "command-buffer dispatch binding buffer must be backed by an AMDGPU "
+          "allocation");
+      break;
+    }
+    iree_device_size_t device_offset = 0;
+    if (IREE_UNLIKELY(!iree_device_size_checked_add(
+            iree_hal_buffer_byte_offset(binding->buffer), binding->offset,
+            &device_offset))) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "command-buffer dispatch binding device pointer offset overflows "
+          "device size");
+      break;
+    }
+    if (IREE_UNLIKELY(device_offset > UINTPTR_MAX)) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "command-buffer dispatch binding device pointer offset exceeds host "
+          "pointer size");
+      break;
+    }
+    if (command_buffer->resource_set) {
+      status = iree_hal_resource_set_insert(command_buffer->resource_set,
+                                            /*count=*/1, &binding->buffer);
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    command_buffer->base.binding_count = (uint32_t)binding_count;
+  } else {
+    status =
+        iree_status_annotate_f(status, "binding[%" PRIhsz "]", failed_index);
+  }
+  return status;
+}
+
+static void iree_hal_amdgpu_aql_command_buffer_write_dispatch_binding_sources(
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources) {
+  for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+    const iree_hal_buffer_ref_t* binding = &bindings.values[i];
+    iree_hal_amdgpu_command_buffer_binding_source_t* binding_source =
+        &binding_sources[i];
+    if (!binding->buffer) {
+      binding_source->offset_or_pointer = binding->offset;
+      binding_source->slot = binding->buffer_slot;
+      binding_source->flags =
+          IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC;
+      continue;
+    }
+
+    iree_hal_buffer_t* allocated_buffer =
+        iree_hal_buffer_allocated_buffer(binding->buffer);
+    void* device_ptr = iree_hal_amdgpu_buffer_device_pointer(allocated_buffer);
+    const uintptr_t device_offset =
+        (uintptr_t)(iree_hal_buffer_byte_offset(binding->buffer) +
+                    binding->offset);
+    binding_source->offset_or_pointer =
+        (uint64_t)((uintptr_t)device_ptr + device_offset);
+    binding_source->slot = 0;
+    binding_source->flags =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_NONE;
+  }
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_qword_length(
+    iree_host_size_t byte_length, const char* label, uint16_t* out_qwords,
+    iree_host_size_t* out_padded_length) {
+  if (IREE_UNLIKELY(byte_length > IREE_HOST_SIZE_MAX - 7)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "%s byte length %" PRIhsz
+                            " overflows 8-byte alignment",
+                            label, byte_length);
+  }
+  const iree_host_size_t padded_length = iree_host_align(byte_length, 8);
+  const iree_host_size_t qword_length = padded_length / 8;
+  if (IREE_UNLIKELY(qword_length > UINT16_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "%s byte length %" PRIhsz
+                            " exceeds uint16_t qword storage",
+                            label, byte_length);
+  }
+  *out_qwords = (uint16_t)qword_length;
+  if (out_padded_length) *out_padded_length = padded_length;
+  return iree_ok_status();
+}
+
+static void iree_hal_amdgpu_aql_command_buffer_write_implicit_args(
+    const iree_hal_amdgpu_device_kernel_args_t* kernel_args,
+    const iree_hal_dispatch_config_t config,
+    iree_amdgpu_kernel_implicit_args_t* implicit_args) {
+  implicit_args->block_count[0] = config.workgroup_count[0];
+  implicit_args->block_count[1] = config.workgroup_count[1];
+  implicit_args->block_count[2] = config.workgroup_count[2];
+  implicit_args->group_size[0] = kernel_args->workgroup_size[0];
+  implicit_args->group_size[1] = kernel_args->workgroup_size[1];
+  implicit_args->group_size[2] = kernel_args->workgroup_size[2];
+  implicit_args->grid_dims = 3;
+  implicit_args->printf_buffer = NULL;
+  implicit_args->hostcall_buffer = NULL;
+  implicit_args->dynamic_lds_size = config.dynamic_workgroup_local_memory;
+}
+
+static iree_status_t iree_hal_amdgpu_aql_command_buffer_write_dispatch_tail(
+    const iree_hal_amdgpu_device_kernel_args_t* kernel_args,
+    const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* layout,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    iree_hal_amdgpu_command_buffer_kernarg_strategy_t kernarg_strategy,
+    uint8_t* tail_payload) {
+  switch (kernarg_strategy) {
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_HAL: {
+      const iree_host_size_t binding_bytes =
+          (iree_host_size_t)kernel_args->binding_count * sizeof(uint64_t);
+      if (constants.data_length > 0) {
+        memcpy(tail_payload, constants.data, constants.data_length);
+      }
+      if (layout->has_implicit_args) {
+        iree_amdgpu_kernel_implicit_args_t* implicit_args =
+            (iree_amdgpu_kernel_implicit_args_t*)(tail_payload +
+                                                  layout->implicit_args_offset -
+                                                  binding_bytes);
+        iree_hal_amdgpu_aql_command_buffer_write_implicit_args(
+            kernel_args, config, implicit_args);
+      }
+      return iree_ok_status();
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT:
+      if (constants.data_length > 0) {
+        memcpy(tail_payload, constants.data, constants.data_length);
+      }
+      return iree_ok_status();
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_INDIRECT:
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "indirect dispatch arguments are not supported by AMDGPU command "
+          "buffers yet");
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported command-buffer kernarg strategy %u",
+                              kernarg_strategy);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -559,14 +847,14 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_fill_buffer(
 
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
-  uint8_t target_kind = 0;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID;
   uint32_t target_ordinal = 0;
   uint64_t target_offset = 0;
   uint64_t length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
-      command_buffer, target_ref, IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
-      IREE_HAL_MEMORY_ACCESS_WRITE, &target_kind, &target_ordinal,
-      &target_offset, &length));
+      command_buffer, target_ref, &target_kind, &target_ordinal, &target_offset,
+      &length));
 
   uint64_t pattern_bits = 0;
   memcpy(&pattern_bits, pattern, pattern_length);
@@ -575,9 +863,9 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_fill_buffer(
       &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_FILL,
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_fill_command_t),
-      /*fixup_count=*/0, /*aql_packet_count=*/1,
+      /*binding_source_count=*/0, /*aql_packet_count=*/1,
       sizeof(iree_hal_amdgpu_kernarg_block_t), &header,
-      /*out_fixups=*/NULL));
+      /*out_binding_sources=*/NULL));
 
   iree_hal_amdgpu_command_buffer_fill_command_t* fill_command =
       (iree_hal_amdgpu_command_buffer_fill_command_t*)header;
@@ -610,16 +898,17 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_update_buffer(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported update flags: 0x%" PRIx64, flags);
   }
+
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
-  uint8_t target_kind = 0;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID;
   uint32_t target_ordinal = 0;
   uint64_t target_offset = 0;
   uint64_t target_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
-      command_buffer, target_ref, IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
-      IREE_HAL_MEMORY_ACCESS_WRITE, &target_kind, &target_ordinal,
-      &target_offset, &target_length));
+      command_buffer, target_ref, &target_kind, &target_ordinal, &target_offset,
+      &target_length));
 
   uint64_t rodata_ordinal = 0;
   const iree_host_size_t source_length = (iree_host_size_t)target_length;
@@ -658,8 +947,9 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_update_buffer(
       &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_UPDATE,
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_update_command_t),
-      /*fixup_count=*/0, /*aql_packet_count=*/1, (uint32_t)kernarg_block_length,
-      &header, /*out_fixups=*/NULL));
+      /*binding_source_count=*/0, /*aql_packet_count=*/1,
+      (uint32_t)kernarg_block_length, &header,
+      /*out_binding_sources=*/NULL));
 
   iree_hal_amdgpu_command_buffer_update_command_t* update_command =
       (iree_hal_amdgpu_command_buffer_update_command_t*)header;
@@ -675,30 +965,29 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
     iree_hal_copy_flags_t flags) {
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
   if (IREE_UNLIKELY(flags != IREE_HAL_COPY_FLAG_NONE)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported copy flags: 0x%" PRIx64, flags);
   }
-
-  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
-      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
-  uint8_t source_kind = 0;
+  iree_hal_amdgpu_command_buffer_binding_kind_t source_kind =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID;
   uint32_t source_ordinal = 0;
   uint64_t source_offset = 0;
   uint64_t source_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
-      command_buffer, source_ref, IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE,
-      IREE_HAL_MEMORY_ACCESS_READ, &source_kind, &source_ordinal,
-      &source_offset, &source_length));
+      command_buffer, source_ref, &source_kind, &source_ordinal, &source_offset,
+      &source_length));
 
-  uint8_t target_kind = 0;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID;
   uint32_t target_ordinal = 0;
   uint64_t target_offset = 0;
   uint64_t target_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
-      command_buffer, target_ref, IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET,
-      IREE_HAL_MEMORY_ACCESS_WRITE, &target_kind, &target_ordinal,
-      &target_offset, &target_length));
+      command_buffer, target_ref, &target_kind, &target_ordinal, &target_offset,
+      &target_length));
 
   if (IREE_UNLIKELY(source_length != target_length)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -707,24 +996,14 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_copy_buffer(
                             ")",
                             source_length, target_length);
   }
-  if (source_ref.buffer && target_ref.buffer &&
-      IREE_UNLIKELY(iree_hal_buffer_test_overlap(
-                        source_ref.buffer, source_offset, source_length,
-                        target_ref.buffer, target_offset,
-                        target_length) != IREE_HAL_BUFFER_OVERLAP_DISJOINT)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "source and target ranges must not overlap within the same buffer");
-  }
-
   iree_hal_amdgpu_command_buffer_command_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_program_builder_append_command(
       &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COPY,
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
       sizeof(iree_hal_amdgpu_command_buffer_copy_command_t),
-      /*fixup_count=*/0, /*aql_packet_count=*/1,
+      /*binding_source_count=*/0, /*aql_packet_count=*/1,
       sizeof(iree_hal_amdgpu_kernarg_block_t), &header,
-      /*out_fixups=*/NULL));
+      /*out_binding_sources=*/NULL));
 
   iree_hal_amdgpu_command_buffer_copy_command_t* copy_command =
       (iree_hal_amdgpu_command_buffer_copy_command_t*)header;
@@ -752,9 +1031,170 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "AMDGPU command-buffer dispatch replay not implemented");
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  const bool validates =
+      iree_hal_amdgpu_aql_command_buffer_validates(command_buffer);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_aql_command_buffer_check_dispatch_flags(flags));
+
+  const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
+          executable, export_ordinal, command_buffer->device_ordinal,
+          &descriptor));
+
+  if (validates) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_aql_command_buffer_validate_dispatch_shape(descriptor,
+                                                                   config));
+  }
+
+  iree_hal_amdgpu_device_kernel_args_t override_kernel_args;
+  const iree_hal_amdgpu_device_kernel_args_t* kernel_args = NULL;
+  iree_hal_amdgpu_aql_command_buffer_select_dispatch_kernel_args(
+      descriptor, config, &override_kernel_args, &kernel_args);
+
+  const bool uses_custom_direct_arguments =
+      iree_any_bit_set(flags, IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS);
+  if (IREE_UNLIKELY(constants.data_length > 0 && !constants.data)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "dispatch constant data must be non-null when length is non-zero");
+  }
+
+  const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* layout = NULL;
+  uint32_t kernarg_block_count = 0;
+  iree_hal_amdgpu_command_buffer_kernarg_strategy_t kernarg_strategy =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_HAL;
+  if (uses_custom_direct_arguments) {
+    if (IREE_UNLIKELY(constants.data_length !=
+                      descriptor->kernel_args.kernarg_size)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "custom dispatch argument length mismatch; expected %u but got "
+          "%" PRIhsz,
+          descriptor->kernel_args.kernarg_size, constants.data_length);
+    }
+    layout = &descriptor->custom_kernarg_layout;
+    kernarg_block_count = descriptor->custom_kernarg_block_count;
+    kernarg_strategy =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT;
+  } else {
+    const iree_host_size_t expected_constant_length =
+        (iree_host_size_t)descriptor->kernel_args.constant_count *
+        sizeof(uint32_t);
+    if (IREE_UNLIKELY(constants.data_length != expected_constant_length)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "dispatch constant count mismatch; expected %u but got %" PRIhsz,
+          (uint32_t)descriptor->kernel_args.constant_count,
+          constants.data_length / sizeof(uint32_t));
+    }
+    if (IREE_UNLIKELY(bindings.count !=
+                      descriptor->kernel_args.binding_count)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "dispatch binding count mismatch; expected %u but got %" PRIhsz,
+          (uint32_t)descriptor->kernel_args.binding_count, bindings.count);
+    }
+    if (IREE_UNLIKELY(bindings.count > 0 && !bindings.values)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "dispatch bindings must be non-null when count is non-zero");
+    }
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_binding_sources(
+            command_buffer, bindings));
+    layout = &descriptor->hal_kernarg_layout;
+    kernarg_block_count = descriptor->hal_kernarg_block_count;
+  }
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(command_buffer));
+  if (command_buffer->resource_set) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, /*count=*/1, &executable));
+  }
+
+  const iree_host_size_t binding_bytes =
+      uses_custom_direct_arguments
+          ? 0
+          : (iree_host_size_t)kernel_args->binding_count * sizeof(uint64_t);
+  const iree_host_size_t tail_byte_length =
+      layout->total_kernarg_size - binding_bytes;
+  uint16_t tail_length_qwords = 0;
+  iree_host_size_t tail_padded_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_qword_length(
+      tail_byte_length, "dispatch tail payload", &tail_length_qwords,
+      &tail_padded_length));
+  uint16_t kernarg_length_qwords = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_qword_length(
+      layout->total_kernarg_size, "dispatch kernarg", &kernarg_length_qwords,
+      /*out_padded_length=*/NULL));
+  if (IREE_UNLIKELY(kernarg_block_count >
+                    UINT32_MAX / sizeof(iree_hal_amdgpu_kernarg_block_t))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "dispatch kernargs require too many kernarg blocks (%" PRIu32 ")",
+        kernarg_block_count);
+  }
+  const uint32_t kernarg_block_length =
+      kernarg_block_count * sizeof(iree_hal_amdgpu_kernarg_block_t);
+
+  iree_host_size_t command_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(
+          sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t),
+          tail_padded_length, &command_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch command record size overflow");
+  }
+
+  iree_hal_amdgpu_command_buffer_command_header_t* header = NULL;
+  iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_program_builder_append_command(
+      &command_buffer->builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH,
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE, command_length,
+      uses_custom_direct_arguments ? 0 : (uint16_t)bindings.count,
+      /*aql_packet_count=*/1, kernarg_block_length, &header,
+      uses_custom_direct_arguments ? NULL : &binding_sources));
+
+  iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command =
+      (iree_hal_amdgpu_command_buffer_dispatch_command_t*)header;
+  dispatch_command->kernel_object = kernel_args->kernel_object;
+  dispatch_command->binding_source_offset =
+      binding_sources
+          ? (uint32_t)((uint8_t*)binding_sources -
+                       (uint8_t*)command_buffer->builder.current_block)
+          : 0;
+  dispatch_command->tail_payload_offset =
+      sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t);
+  dispatch_command->binding_count = (uint16_t)bindings.count;
+  dispatch_command->kernarg_length_qwords = kernarg_length_qwords;
+  dispatch_command->tail_length_qwords = tail_length_qwords;
+  dispatch_command->kernarg_strategy = (uint8_t)kernarg_strategy;
+  dispatch_command->setup = kernel_args->setup;
+  dispatch_command->workgroup_size[0] = kernel_args->workgroup_size[0];
+  dispatch_command->workgroup_size[1] = kernel_args->workgroup_size[1];
+  dispatch_command->workgroup_size[2] = kernel_args->workgroup_size[2];
+  dispatch_command->grid_size[0] =
+      config.workgroup_count[0] * kernel_args->workgroup_size[0];
+  dispatch_command->grid_size[1] =
+      config.workgroup_count[1] * kernel_args->workgroup_size[1];
+  dispatch_command->grid_size[2] =
+      config.workgroup_count[2] * kernel_args->workgroup_size[2];
+  dispatch_command->private_segment_size = kernel_args->private_segment_size;
+  dispatch_command->group_segment_size =
+      kernel_args->group_segment_size + config.dynamic_workgroup_local_memory;
+
+  if (binding_sources) {
+    iree_hal_amdgpu_aql_command_buffer_write_dispatch_binding_sources(
+        bindings, binding_sources);
+  }
+  uint8_t* tail_payload =
+      (uint8_t*)dispatch_command + dispatch_command->tail_payload_offset;
+  return iree_hal_amdgpu_aql_command_buffer_write_dispatch_tail(
+      kernel_args, layout, config, constants, kernarg_strategy, tail_payload);
 }
 
 //===----------------------------------------------------------------------===//

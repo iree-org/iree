@@ -22,7 +22,7 @@ enum {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_MAGIC = 0x444D4342u,
   // Version of the block ABI defined in this header.
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_VERSION_0 = 0,
-  // Required alignment for all command records and fixup records.
+  // Required alignment for all command records and binding source records.
   IREE_HAL_AMDGPU_COMMAND_BUFFER_RECORD_ALIGNMENT = 8,
 };
 
@@ -46,21 +46,27 @@ typedef enum iree_hal_amdgpu_command_buffer_command_flag_bits_e {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_HAS_BARRIER = 1u << 0,
 } iree_hal_amdgpu_command_buffer_command_flag_bits_t;
 
-// Fixup kinds used to resolve command operands at execution time.
-typedef enum iree_hal_amdgpu_command_buffer_fixup_kind_e {
-  IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_INVALID = 0,
-  IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_DYNAMIC_BINDING = 1,
-  IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_STATIC_BINDING = 2,
-  IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_DEFERRED_STATIC_BINDING = 3,
-  IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_RODATA = 4,
-} iree_hal_amdgpu_command_buffer_fixup_kind_t;
+// Binding source flags used to form HAL dispatch kernarg pointer prefixes.
+typedef enum iree_hal_amdgpu_command_buffer_binding_source_flag_bits_e {
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_NONE = 0u,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC = 1u << 0,
+} iree_hal_amdgpu_command_buffer_binding_source_flag_bits_t;
 
-// Binding reference kinds embedded in command records.
-typedef enum iree_hal_amdgpu_command_buffer_binding_kind_e {
+// Kernarg formation strategy for a dispatch command.
+typedef enum iree_hal_amdgpu_command_buffer_kernarg_strategy_e {
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_HAL = 0,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT = 1,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_INDIRECT = 2,
+} iree_hal_amdgpu_command_buffer_kernarg_strategy_t;
+
+// Binding reference kind constants embedded in command records.
+enum iree_hal_amdgpu_command_buffer_binding_kind_e {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID = 0,
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_STATIC = 1,
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_DYNAMIC = 2,
-} iree_hal_amdgpu_command_buffer_binding_kind_t;
+};
+// Compact binding reference kind storage.
+typedef uint8_t iree_hal_amdgpu_command_buffer_binding_kind_t;
 
 // Header stored at byte 0 of every command-buffer block.
 typedef struct IREE_AMDGPU_ALIGNAS(8)
@@ -81,12 +87,12 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t command_offset;
   // Total bytes occupied by command records.
   uint32_t command_length;
-  // Byte offset from this header to the first fixup record.
-  uint32_t fixup_offset;
+  // Byte offset from this header to the first binding source record.
+  uint32_t binding_source_offset;
   // Number of command records in this block, including terminators.
   uint16_t command_count;
-  // Number of fixup records in this block.
-  uint16_t fixup_count;
+  // Number of binding source records in this block.
+  uint16_t binding_source_count;
   // Worst-case AQL packets emitted when replaying this block.
   uint32_t aql_packet_count;
   // Worst-case kernarg bytes emitted when replaying this block.
@@ -113,34 +119,28 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint16_t length_qwords;
   // Program-global command index used for profiling/source attribution.
   uint32_t command_index;
-  // Byte offset from the block header to this command's first fixup record.
-  uint32_t fixup_offset;
-  // Number of fixup records owned by this command.
-  uint16_t fixup_count;
-  // Reserved bytes that must be zero in version 0.
-  uint16_t reserved0;
 } iree_hal_amdgpu_command_buffer_command_header_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_command_header_t) == 16,
+    sizeof(iree_hal_amdgpu_command_buffer_command_header_t) == 8,
     "command header size is part of the command-buffer ABI");
 
-// Fixup record used to patch a binding, rodata pointer, or condition operand.
-typedef struct IREE_AMDGPU_ALIGNAS(8) iree_hal_amdgpu_command_buffer_fixup_t {
-  // Byte offset from the resolved binding or rodata base.
-  uint64_t source_offset;
-  // Binding or rodata ordinal interpreted according to |kind|.
-  uint32_t ordinal;
-  // Byte offset inside the command's template payload to patch.
-  uint32_t patch_offset;
-  // Fixup kind from iree_hal_amdgpu_command_buffer_fixup_kind_t.
-  uint16_t kind;
-  // Fixup flags reserved for replay policy.
-  uint16_t flags;
+// Source record used to emit one HAL ABI dispatch binding pointer.
+typedef struct IREE_AMDGPU_ALIGNAS(8)
+    iree_hal_amdgpu_command_buffer_binding_source_t {
+  // Static source: final raw device pointer. Dynamic source: byte offset added
+  // to the queue_execute binding table slot.
+  uint64_t offset_or_pointer;
+  // Dynamic source binding table slot. Must be zero for static sources.
+  uint32_t slot;
+  // Source flags from
+  // iree_hal_amdgpu_command_buffer_binding_source_flag_bits_t.
+  uint8_t flags;
   // Reserved bytes that must be zero in version 0.
-  uint32_t reserved0;
-} iree_hal_amdgpu_command_buffer_fixup_t;
-IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_command_buffer_fixup_t) == 24,
-                          "fixup size is part of the command-buffer ABI");
+  uint8_t reserved0[3];
+} iree_hal_amdgpu_command_buffer_binding_source_t;
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_command_buffer_binding_source_t) == 16,
+    "binding source size is part of the command-buffer ABI");
 
 // Barrier metadata command. Replay normally folds this into the next
 // packet-bearing command instead of emitting a standalone packet.
@@ -158,7 +158,7 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t reserved0;
 } iree_hal_amdgpu_command_buffer_barrier_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_barrier_command_t) == 24,
+    sizeof(iree_hal_amdgpu_command_buffer_barrier_command_t) == 16,
     "barrier command size must remain qword aligned");
 
 // Dispatch command record.
@@ -166,25 +166,37 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
     iree_hal_amdgpu_command_buffer_dispatch_command_t {
   // Common command record header.
   iree_hal_amdgpu_command_buffer_command_header_t header;
-  // Command-buffer executable table ordinal.
-  uint32_t executable_ordinal;
-  // Executable export ordinal.
-  uint32_t export_ordinal;
-  // Workgroup count along X, Y, and Z.
-  uint32_t workgroup_count[3];
-  // Workgroup size override along X, Y, and Z, or all zero for export default.
+  // HSA kernel object for the command buffer's selected physical device.
+  uint64_t kernel_object;
+  // Byte offset from the block header to this dispatch's first binding source.
+  uint32_t binding_source_offset;
+  // Byte offset from this command record to constants/implicit tail bytes.
+  uint32_t tail_payload_offset;
+  // Number of HAL ABI binding pointer slots emitted before the tail payload.
+  uint16_t binding_count;
+  // Total kernarg reservation size in 8-byte qwords.
+  uint16_t kernarg_length_qwords;
+  // Tail payload size in 8-byte qwords.
+  uint16_t tail_length_qwords;
+  // Kernarg strategy from iree_hal_amdgpu_command_buffer_kernarg_strategy_t.
+  uint8_t kernarg_strategy;
+  // Reserved bytes that must be zero in version 0.
+  uint8_t reserved0;
+  // AQL dispatch packet setup field.
+  uint16_t setup;
+  // AQL dispatch packet workgroup size fields.
   uint16_t workgroup_size[3];
   // Reserved bytes that must be zero in version 0.
-  uint16_t reserved0;
-  // Dynamic workgroup local memory in bytes.
-  uint32_t dynamic_shared_memory;
-  // Byte offset to the kernarg template payload.
-  uint32_t kernarg_template_offset;
-  // Byte length of the kernarg template payload.
-  uint32_t kernarg_template_length;
+  uint16_t reserved1;
+  // AQL dispatch packet grid size fields.
+  uint32_t grid_size[3];
+  // AQL dispatch packet private segment size field.
+  uint32_t private_segment_size;
+  // AQL dispatch packet group segment size field.
+  uint32_t group_segment_size;
 } iree_hal_amdgpu_command_buffer_dispatch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 56,
+    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 64,
     "dispatch command size must remain qword aligned");
 
 // Fill command record.
@@ -201,14 +213,14 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   // Static buffer ordinal or dynamic binding-table slot.
   uint32_t target_ordinal;
   // Binding reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
-  uint8_t target_kind;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind;
   // Byte length of the fill pattern.
   uint8_t pattern_length;
   // Reserved bytes that must be zero in version 0.
   uint8_t reserved0[2];
 } iree_hal_amdgpu_command_buffer_fill_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_fill_command_t) == 48,
+    sizeof(iree_hal_amdgpu_command_buffer_fill_command_t) == 40,
     "fill command size must remain qword aligned");
 
 // Copy command record.
@@ -227,14 +239,14 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   // Static buffer ordinal or dynamic binding-table slot for the target.
   uint32_t target_ordinal;
   // Source reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
-  uint8_t source_kind;
+  iree_hal_amdgpu_command_buffer_binding_kind_t source_kind;
   // Target reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
-  uint8_t target_kind;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind;
   // Reserved bytes that must be zero in version 0.
   uint8_t reserved0[6];
 } iree_hal_amdgpu_command_buffer_copy_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_copy_command_t) == 56,
+    sizeof(iree_hal_amdgpu_command_buffer_copy_command_t) == 48,
     "copy command size must remain qword aligned");
 
 // Update command record.
@@ -251,12 +263,12 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   // Static buffer ordinal or dynamic binding-table slot for the target.
   uint32_t target_ordinal;
   // Target reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
-  uint8_t target_kind;
+  iree_hal_amdgpu_command_buffer_binding_kind_t target_kind;
   // Reserved bytes that must be zero in version 0.
   uint8_t reserved0[7];
 } iree_hal_amdgpu_command_buffer_update_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_update_command_t) == 48,
+    sizeof(iree_hal_amdgpu_command_buffer_update_command_t) == 40,
     "update command size must remain qword aligned");
 
 // Unconditional branch terminator.
@@ -270,7 +282,7 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t reserved0;
 } iree_hal_amdgpu_command_buffer_branch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_branch_command_t) == 24,
+    sizeof(iree_hal_amdgpu_command_buffer_branch_command_t) == 16,
     "branch command size must remain qword aligned");
 
 // Conditional branch terminator.
@@ -288,7 +300,7 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint8_t reserved0[7];
 } iree_hal_amdgpu_command_buffer_cond_branch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_cond_branch_command_t) == 32,
+    sizeof(iree_hal_amdgpu_command_buffer_cond_branch_command_t) == 24,
     "conditional branch command size must remain qword aligned");
 
 // Return terminator.
@@ -298,7 +310,7 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   iree_hal_amdgpu_command_buffer_command_header_t header;
 } iree_hal_amdgpu_command_buffer_return_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_return_command_t) == 16,
+    sizeof(iree_hal_amdgpu_command_buffer_return_command_t) == 8,
     "return command size must remain qword aligned");
 
 // Returns the byte length encoded in a command header.
@@ -346,22 +358,24 @@ iree_hal_amdgpu_command_buffer_command_next_const(
   return (const iree_hal_amdgpu_command_buffer_command_header_t*)next_command;
 }
 
-// Returns the first fixup record in |block|.
-static inline iree_hal_amdgpu_command_buffer_fixup_t*
-iree_hal_amdgpu_command_buffer_block_fixups(
+// Returns the first binding source record in |block|.
+static inline iree_hal_amdgpu_command_buffer_binding_source_t*
+iree_hal_amdgpu_command_buffer_block_binding_sources(
     iree_hal_amdgpu_command_buffer_block_header_t* block) {
   uint8_t* block_base = (uint8_t*)block;
-  uint8_t* fixup_data = block_base + block->fixup_offset;
-  return (iree_hal_amdgpu_command_buffer_fixup_t*)fixup_data;
+  uint8_t* binding_source_data = block_base + block->binding_source_offset;
+  return (iree_hal_amdgpu_command_buffer_binding_source_t*)binding_source_data;
 }
 
-// Returns the first fixup record in |block|.
-static inline const iree_hal_amdgpu_command_buffer_fixup_t*
-iree_hal_amdgpu_command_buffer_block_fixups_const(
+// Returns the first binding source record in |block|.
+static inline const iree_hal_amdgpu_command_buffer_binding_source_t*
+iree_hal_amdgpu_command_buffer_block_binding_sources_const(
     const iree_hal_amdgpu_command_buffer_block_header_t* block) {
   const uint8_t* block_base = (const uint8_t*)block;
-  const uint8_t* fixup_data = block_base + block->fixup_offset;
-  return (const iree_hal_amdgpu_command_buffer_fixup_t*)fixup_data;
+  const uint8_t* binding_source_data =
+      block_base + block->binding_source_offset;
+  return (const iree_hal_amdgpu_command_buffer_binding_source_t*)
+      binding_source_data;
 }
 
 #ifdef __cplusplus

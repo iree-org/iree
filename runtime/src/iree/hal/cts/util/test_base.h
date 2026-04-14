@@ -32,6 +32,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
+#include "iree/io/file_handle.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -518,8 +519,10 @@ class CtsTestBase : public BaseType {
     iree_device_size_t byte_length =
         iree_hal_buffer_byte_length(buffer) - offset;
     std::vector<T> data(byte_length / sizeof(T));
-    IREE_EXPECT_OK(
-        iree_hal_buffer_map_read(buffer, offset, data.data(), byte_length));
+    std::vector<uint8_t> bytes = ReadBufferBytes(buffer, offset, byte_length);
+    if (bytes.size() == byte_length) {
+      std::memcpy(data.data(), bytes.data(), byte_length);
+    }
     return data;
   }
 
@@ -528,8 +531,38 @@ class CtsTestBase : public BaseType {
                                        iree_device_size_t offset,
                                        iree_device_size_t length) {
     std::vector<uint8_t> data(length);
-    IREE_EXPECT_OK(
-        iree_hal_buffer_map_read(buffer, offset, data.data(), length));
+    if (iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+        iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
+                          IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
+      IREE_EXPECT_OK(
+          iree_hal_buffer_map_read(buffer, offset, data.data(), length));
+      return data;
+    }
+
+    iree_io_file_handle_t* handle = nullptr;
+    IREE_EXPECT_OK(iree_io_file_handle_wrap_host_allocation(
+        IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+        iree_make_byte_span(data.data(), length),
+        iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+        &handle));
+    if (!handle) return data;
+
+    iree_hal_file_t* file = nullptr;
+    IREE_EXPECT_OK(iree_hal_file_import(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, IREE_HAL_MEMORY_ACCESS_WRITE,
+        handle, IREE_HAL_EXTERNAL_FILE_FLAG_NONE, &file));
+    iree_io_file_handle_release(handle);
+    if (!file) return data;
+
+    SemaphoreList empty_wait;
+    SemaphoreList write_signal(device_, {0}, {1});
+    IREE_EXPECT_OK(iree_hal_device_queue_write(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, write_signal, buffer,
+        offset, file, /*target_offset=*/0, length, IREE_HAL_WRITE_FLAG_NONE));
+    IREE_EXPECT_OK(iree_hal_semaphore_list_wait(
+        write_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+    iree_hal_file_release(file);
     return data;
   }
 

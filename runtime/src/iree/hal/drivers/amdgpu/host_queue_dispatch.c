@@ -384,17 +384,20 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     if (iree_status_is_ok(status)) {
       if (uses_custom_direct_arguments) {
         iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
-            plan.layout, constants.data, submission.kernarg_blocks->data);
+            plan.layout, constants.data,
+            submission.kernel.kernarg_blocks->data);
       } else {
         iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
             plan.kernel_args, config.workgroup_count,
             config.dynamic_workgroup_local_memory, plan.layout, binding_ptrs,
-            (const uint32_t*)constants.data, submission.kernarg_blocks->data);
+            (const uint32_t*)constants.data,
+            submission.kernel.kernarg_blocks->data);
       }
       iree_hal_amdgpu_device_dispatch_emplace_packet(
           plan.kernel_args, config.workgroup_count,
           config.dynamic_workgroup_local_memory,
-          &submission.dispatch_slot->dispatch, submission.kernarg_blocks->data);
+          &submission.dispatch_slot->dispatch,
+          submission.kernel.kernarg_blocks->data);
       submission.dispatch_slot->dispatch.completion_signal =
           iree_hal_amdgpu_notification_ring_epoch_signal(
               &queue->notification_ring);
