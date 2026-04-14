@@ -278,6 +278,18 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
     }
   }
 
+  // If the caller requests mappable device-local memory but did not set
+  // HOST_VISIBLE, promote to HOST_VISIBLE so the allocation path can use
+  // managed memory (or fall back to host-local below). Without this,
+  // cuMemAlloc produces a device-only pointer that cannot satisfy mapping.
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL) &&
+      !iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+      iree_any_bit_set(params->usage,
+                       IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+                           IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
+    params->type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  }
+
   // If concurrent managed access is not supported then make device-local +
   // host-visible allocations fall back to host-local + device-visible
   // page-locked memory. This will be significantly slower for the device to

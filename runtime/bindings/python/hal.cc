@@ -192,8 +192,7 @@ py::object HalAllocator::AllocateBufferCopy(
   PyBufferReleaser py_view_releaser(py_view);
 
   iree_hal_buffer_params_t params = {0};
-  // TODO: Should not require host visible :(
-  params.type = memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.type = memory_type;
   params.usage = allowed_usage;
 
   iree_hal_buffer_t* hal_buffer = nullptr;
