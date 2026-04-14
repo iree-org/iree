@@ -1272,6 +1272,342 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 
 // -----
 
+func.func @topk_v2_tensor(%arg0: tensor<4x1024xf32>) -> tensor<4x1024xf32> {
+  %out = tensor.empty() : tensor<4x1024xf32>
+  %0 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out : tensor<4x1024xf32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x1024xf32>
+  return %0 : tensor<4x1024xf32>
+}
+// CHECK-LABEL: func.func @topk_v2_tensor(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_tensor_with_indices(%arg0: tensor<4x1024xf32>) -> (tensor<4x1024xf32>, tensor<4x1024xi32>) {
+  %out_values = tensor.empty() : tensor<4x1024xf32>
+  %out_indices = tensor.empty() : tensor<4x1024xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out_values, %out_indices : tensor<4x1024xf32>, tensor<4x1024xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x1024xf32>, tensor<4x1024xi32>
+  return %0#0, %0#1 : tensor<4x1024xf32>, tensor<4x1024xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_tensor_with_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_memref(%arg0: memref<4x1024xf32>, %arg1: memref<4x1024xf32>) {
+  iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : memref<4x1024xf32>)
+      outs(%arg1 : memref<4x1024xf32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      }
+  return
+}
+// CHECK-LABEL: func.func @topk_v2_memref(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: memref<4x1024xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: memref<4x1024xf32>
+//       CHECK:   iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[ARG1]]
+//       CHECK:      iree_linalg_ext.yield
+
+// -----
+
+func.func @topk_v2_topk_tensor(%arg0: tensor<4x1024xf32>) -> (tensor<4x8xf32>, tensor<4x8xi32>) {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %out_indices = tensor.empty() : tensor<4x8xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out_values, %out_indices : tensor<4x8xf32>, tensor<4x8xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>, tensor<4x8xi32>
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_topk_tensor(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_topk_no_indices(%arg0: tensor<4x1024xf32>) -> tensor<4x8xf32> {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %0 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out_values : tensor<4x8xf32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>
+  return %0 : tensor<4x8xf32>
+}
+// CHECK-LABEL: func.func @topk_v2_topk_no_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_topk_memref(%arg0: memref<4x1024xf32>, %out_values: memref<4x8xf32>, %out_indices: memref<4x8xi32>) {
+  iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : memref<4x1024xf32>)
+      outs(%out_values, %out_indices : memref<4x8xf32>, memref<4x8xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      }
+  return
+}
+// CHECK-LABEL: func.func @topk_v2_topk_memref(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: memref<4x1024xf32>
+//  CHECK-SAME:   %[[OUT_VALUES:[a-zA-Z0-9]+]]: memref<4x8xf32>
+//  CHECK-SAME:   %[[OUT_INDICES:[a-zA-Z0-9]+]]: memref<4x8xi32>
+//       CHECK:   iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+
+// -----
+
+func.func @topk_v2_with_input_indices(%arg0: tensor<4x128xf32>, %arg1: tensor<4x128xi32>) -> (tensor<4x128xf32>, tensor<4x128xi32>) {
+  %out_values = tensor.empty() : tensor<4x128xf32>
+  %out_indices = tensor.empty() : tensor<4x128xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0, %arg1 : tensor<4x128xf32>, tensor<4x128xi32>)
+      outs(%out_values, %out_indices : tensor<4x128xf32>, tensor<4x128xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x128xf32>, tensor<4x128xi32>
+  return %0#0, %0#1 : tensor<4x128xf32>, tensor<4x128xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_with_input_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x128xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<4x128xi32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]], %[[ARG1]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_topk_with_input_indices(%arg0: tensor<4x1024xf32>, %arg1: tensor<4x1024xi32>) -> (tensor<4x8xf32>, tensor<4x8xi32>) {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %out_indices = tensor.empty() : tensor<4x8xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0, %arg1 : tensor<4x1024xf32>, tensor<4x1024xi32>)
+      outs(%out_values, %out_indices : tensor<4x8xf32>, tensor<4x8xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>, tensor<4x8xi32>
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_topk_with_input_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<4x1024xi32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]], %[[ARG1]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_i64_indices(%arg0: tensor<4x128xf32>) -> (tensor<4x128xf32>, tensor<4x128xi64>) {
+  %out_values = tensor.empty() : tensor<4x128xf32>
+  %out_indices = tensor.empty() : tensor<4x128xi64>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x128xf32>)
+      outs(%out_values, %out_indices : tensor<4x128xf32>, tensor<4x128xi64>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x128xf32>, tensor<4x128xi64>
+  return %0#0, %0#1 : tensor<4x128xf32>, tensor<4x128xi64>
+}
+// CHECK-LABEL: func.func @topk_v2_i64_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x128xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_integer_values(%arg0: tensor<4x128xi32>) -> tensor<4x128xi32> {
+  %out = tensor.empty() : tensor<4x128xi32>
+  %0 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<4x128xi32>)
+      outs(%out : tensor<4x128xi32>) {
+      ^bb0(%lhs: i32, %rhs: i32):
+        %cmp = arith.cmpi sgt, %lhs, %rhs : i32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x128xi32>
+  return %0 : tensor<4x128xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_integer_values(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x128xi32>
+//       CHECK:   %[[OUT:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_dynamic(%arg0: tensor<?x?xf32>, %out_values: tensor<?x?xf32>, %out_indices: tensor<?x?xi32>) -> (tensor<?x?xf32>, tensor<?x?xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0 : tensor<?x?xf32>)
+      outs(%out_values, %out_indices : tensor<?x?xf32>, tensor<?x?xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<?x?xf32>, tensor<?x?xi32>
+  return %0#0, %0#1 : tensor<?x?xf32>, tensor<?x?xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_dynamic(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[OUT_VALUES:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[OUT_INDICES:[a-zA-Z0-9]+]]: tensor<?x?xi32>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_sorted_tensor(%arg0: tensor<4x1024xf32>) -> (tensor<4x8xf32>, tensor<4x8xi32>) {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %out_indices = tensor.empty() : tensor<4x8xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1) is_sorted
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out_values, %out_indices : tensor<4x8xf32>, tensor<4x8xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>, tensor<4x8xi32>
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_sorted_tensor(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1) is_sorted
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_sorted_no_indices(%arg0: tensor<4x1024xf32>) -> tensor<4x8xf32> {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %0 = iree_linalg_ext.topk_v2 dimension(1) is_sorted
+      ins(%arg0 : tensor<4x1024xf32>)
+      outs(%out_values : tensor<4x8xf32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>
+  return %0 : tensor<4x8xf32>
+}
+// CHECK-LABEL: func.func @topk_v2_sorted_no_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1) is_sorted
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_sorted_with_input_indices(%arg0: tensor<4x1024xf32>, %arg1: tensor<4x1024xi32>) -> (tensor<4x8xf32>, tensor<4x8xi32>) {
+  %out_values = tensor.empty() : tensor<4x8xf32>
+  %out_indices = tensor.empty() : tensor<4x8xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1) is_sorted
+      ins(%arg0, %arg1 : tensor<4x1024xf32>, tensor<4x1024xi32>)
+      outs(%out_values, %out_indices : tensor<4x8xf32>, tensor<4x8xi32>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x8xf32>, tensor<4x8xi32>
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xi32>
+}
+// CHECK-LABEL: func.func @topk_v2_sorted_with_input_indices(
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1024xf32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<4x1024xi32>
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk_v2
+//  CHECK-SAME:      dimension(1) is_sorted
+//  CHECK-SAME:      ins(%[[ARG0]], %[[ARG1]]
+//  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
+//       CHECK:      iree_linalg_ext.yield
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
 func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>

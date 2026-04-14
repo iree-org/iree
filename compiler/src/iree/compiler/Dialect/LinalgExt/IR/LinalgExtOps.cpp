@@ -1290,6 +1290,111 @@ MutableOperandRange TopkOp::getDpsInitsMutable() {
 }
 
 //===----------------------------------------------------------------------===//
+// TopkV2Op
+//===----------------------------------------------------------------------===//
+
+LogicalResult TopkV2Op::verify() {
+  auto inputValuesType = getInputType();
+  auto outputValuesType = cast<ShapedType>(getOutputValues().getType());
+  uint64_t dim = getDimension();
+
+  if (dim >= static_cast<uint64_t>(getInputRank())) {
+    return emitOpError("dimension exceeds rank");
+  }
+  if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
+    return emitOpError("expected input/output value types to be identical");
+  }
+  if (inputValuesType.getRank() != outputValuesType.getRank()) {
+    return emitOpError("expected input/output to have the same rank");
+  }
+
+  if (Value inputIndices = getInputIndices()) {
+    if (!getOutputIndices()) {
+      return emitOpError(
+          "input indices require output indices to carry provenance");
+    }
+    auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
+    if (!isa<IntegerType>(inputIndicesType.getElementType())) {
+      return emitOpError("expected input indices to be integer type");
+    }
+    if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
+      return emitOpError("input values/indices shape must match");
+    }
+  }
+
+  if (Value outputIndices = getOutputIndices()) {
+    auto outputIndicesType = cast<ShapedType>(outputIndices.getType());
+    if (!isa<IntegerType>(outputIndicesType.getElementType())) {
+      return emitOpError("expected output indices to be integer type");
+    }
+    if (failed(verifyCompatibleShape(outputValuesType, outputIndicesType))) {
+      return emitOpError("output values/indices shape must match");
+    }
+  }
+
+  // All dimensions except the sort dimension must match.
+  for (auto [idx, inDim, outDim] : llvm::enumerate(
+           inputValuesType.getShape(), outputValuesType.getShape())) {
+    if (idx == dim) {
+      continue;
+    }
+    if (ShapedType::isStatic(inDim) && ShapedType::isStatic(outDim) &&
+        inDim != outDim) {
+      return emitOpError("incompatible input/output shapes at dimension ")
+             << idx;
+    }
+  }
+
+  // Validate that output K does not exceed input along the sort dimension.
+  int64_t inputDimSize = inputValuesType.getDimSize(dim);
+  int64_t outputDimSize = outputValuesType.getDimSize(dim);
+  if (ShapedType::isStatic(inputDimSize) &&
+      ShapedType::isStatic(outputDimSize)) {
+    if (outputDimSize == 0) {
+      return emitOpError("output dimension must be positive");
+    }
+    if (outputDimSize > inputDimSize) {
+      return emitOpError("output dimension must not exceed input, got ")
+             << outputDimSize << " > " << inputDimSize;
+    }
+  }
+
+  return success();
+}
+
+LogicalResult TopkV2Op::verifyRegions() {
+  auto inputValuesType = getInputType();
+  Block &block = getRegion().front();
+  if (block.getNumArguments() != 2) {
+    return emitOpError("region block should have 2 arguments");
+  }
+  if (block.getArgument(0).getType() != inputValuesType.getElementType() ||
+      block.getArgument(1).getType() != inputValuesType.getElementType()) {
+    return emitOpError("region block types must match input value type");
+  }
+  auto terminatorOp = cast<YieldOp>(block.getTerminator());
+  if (terminatorOp.getNumOperands() != 1 ||
+      !terminatorOp.getOperand(0).getType().isInteger(1)) {
+    return emitOpError("region block must end with a linalg_ext.yield i1");
+  }
+  return success();
+}
+
+LogicalResult
+TopkV2Op::reifyResultShapes(OpBuilder &b,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+MutableOperandRange TopkV2Op::getDpsInitsMutable() {
+  // Operands order: values, [input_indices], output_values, [output_indices]
+  unsigned numInputs = 1 + (getInputIndices() ? 1 : 0);
+  unsigned numInits = 1 + (getOutputIndices() ? 1 : 0);
+  return MutableOperandRange(*this, numInputs, numInits);
+}
+
+//===----------------------------------------------------------------------===//
 // ArgCompareOp
 //===----------------------------------------------------------------------===//
 
@@ -3130,6 +3235,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
+DEFINE_OP_GET_EFFECTS(TopkV2Op)
 DEFINE_OP_GET_EFFECTS(ArgCompareOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
