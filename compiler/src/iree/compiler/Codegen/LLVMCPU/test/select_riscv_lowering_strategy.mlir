@@ -106,13 +106,13 @@ func.func @thin_depthwise_conv_static(%0: tensor<1x57x57x72xf32>, %1: tensor<3x3
     outs(%3 : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
   return %4 : tensor<1x28x28x72xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 28, 28, 8, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 2, 28, 72, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      CHECK: func.func @thin_depthwise_conv_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
-//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 28, 28, 8, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 2, 28, 72, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      GENERIC: func.func @thin_depthwise_conv_static(
 // GENERIC-SAME:     translation_info = #[[TRANSLATION]]
