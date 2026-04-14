@@ -49,6 +49,8 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
   modulePassManager.addPass(createVMVXSelectLoweringStrategyPass());
 }
 

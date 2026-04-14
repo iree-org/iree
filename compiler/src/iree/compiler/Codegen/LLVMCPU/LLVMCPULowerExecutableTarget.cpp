@@ -151,7 +151,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   // functionality, though the performance may be suboptimal.
   auto hasAttentionOp = [](FunctionOpInterface funcOp) {
     bool hasAttention = false;
-    funcOp.walk([&](IREE::LinalgExt::AttentionOp) {
+    funcOp.walk([&](IREE::LinalgExt::OnlineAttentionOp) {
       hasAttention = true;
       return WalkResult::interrupt();
     });

@@ -745,9 +745,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   tileAndDistributeToWorkgroup(funcPassManager,
                                /*strategy=*/reorderStrategy);
 
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
-
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
@@ -1117,6 +1114,8 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(modulePassManager);
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   if (shouldEmitPipelineConstraints()) {
     FunctionLikeNest(modulePassManager)

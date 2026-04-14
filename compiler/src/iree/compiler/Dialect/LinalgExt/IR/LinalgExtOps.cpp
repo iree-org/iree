@@ -2185,6 +2185,41 @@ SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
+SmallVector<int64_t> OnlineAttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
+  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
+
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+
+  auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
+    for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
+      int pos = cast<AffineDimExpr>(dim).getPosition();
+      if (dimsFound[pos]) {
+        continue;
+      }
+      bounds[pos] = size;
+      dimsFound[pos] = true;
+    }
+  };
+  fillSizes(queryShape, queryDims);
+  fillSizes(valueShape, valueDims);
+  return bounds;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs());
+  return maps;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForResults() {
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
+}
+
 void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                                     MLIRContext *ctx) {
   patterns.insert<StaticizeLinalgExtOp<OnlineAttentionOp>>(ctx);

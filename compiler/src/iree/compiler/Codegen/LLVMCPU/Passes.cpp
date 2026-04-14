@@ -427,8 +427,6 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
@@ -638,6 +636,8 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
 
   modulePassManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
   LLVM_DEBUG({
