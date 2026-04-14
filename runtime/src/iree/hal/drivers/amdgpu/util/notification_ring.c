@@ -319,6 +319,48 @@ iree_status_t iree_hal_amdgpu_notification_ring_reserve(
   return iree_ok_status();
 }
 
+bool iree_hal_amdgpu_notification_ring_can_reserve(
+    const iree_hal_amdgpu_notification_ring_t* ring,
+    iree_host_size_t entry_count, iree_host_size_t frontier_snapshot_count) {
+  IREE_ASSERT_ARGUMENT(ring);
+
+  const uint64_t last_drained = (uint64_t)iree_atomic_load(
+      &ring->epoch.last_drained, iree_memory_order_acquire);
+  if (ring->epoch.next_submission - last_drained >= ring->capacity) {
+    return false;
+  }
+
+  const uint64_t write = iree_hal_amdgpu_notification_ring_load_position(
+      &ring->write, iree_memory_order_relaxed);
+  const uint64_t read = iree_hal_amdgpu_notification_ring_load_position(
+      &ring->read, iree_memory_order_acquire);
+  if (entry_count > ring->capacity ||
+      write - read + entry_count > ring->capacity) {
+    return false;
+  }
+
+  if (frontier_snapshot_count == 0) {
+    return true;
+  }
+
+  iree_host_size_t reserved_snapshot_bytes = 0;
+  if (!iree_host_size_checked_mul_add(
+          IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_SIZE, frontier_snapshot_count,
+          IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_SIZE,
+          &reserved_snapshot_bytes)) {
+    return false;
+  }
+
+  const iree_host_size_t frontier_write =
+      (iree_host_size_t)iree_hal_amdgpu_notification_ring_load_position(
+          &ring->frontier_ring.write, iree_memory_order_relaxed);
+  const iree_host_size_t frontier_read =
+      (iree_host_size_t)iree_hal_amdgpu_notification_ring_load_position(
+          &ring->frontier_ring.read, iree_memory_order_acquire);
+  return frontier_write - frontier_read + reserved_snapshot_bytes <=
+         ring->frontier_ring.capacity;
+}
+
 void iree_hal_amdgpu_notification_ring_push(
     iree_hal_amdgpu_notification_ring_t* ring, uint64_t submission_epoch,
     iree_async_semaphore_t* semaphore, uint64_t timeline_value,

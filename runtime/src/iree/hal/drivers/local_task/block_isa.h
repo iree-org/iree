@@ -76,7 +76,7 @@ typedef struct iree_hal_cmd_header_t {
   // size is 255 * 8 = 2040 bytes. Push constants are inline; bindings are
   // NOT (they live in .data via fixup).
   uint8_t size_qwords;
-  // Work commands (DISPATCH, FILL, COPY): region-local index into .data
+  // Work commands (DISPATCH, FILL, COPY, UPDATE): region-local index into .data
   // tile_indices[]. The builder resets this to 0 at each barrier, so
   // commands in different regions reuse the same .data slots. The multi-
   // worker processor uses this to distribute tiles across workers for ALL
@@ -438,8 +438,8 @@ static_assert(sizeof(iree_hal_cmd_update_t) == 24,
 // worker_budget to decide how many workers to engage.
 typedef struct iree_hal_cmd_barrier_t {
   iree_hal_cmd_header_t header;  // opcode=BARRIER, size_qwords=1
-  // Number of DISPATCH commands in the following region. Used by the
-  // processor to zero exactly this many tile_index entries at region entry.
+  // Number of work commands in the following region. Used by the processor to
+  // zero exactly this many tile_index entries at region entry.
   uint8_t dispatch_count;
   uint8_t reserved;
   // Hint for how many workers should process this region. 0 means the

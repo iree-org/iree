@@ -394,6 +394,13 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
       (iree_host_size_t)fixup_count * sizeof(iree_hal_cmd_fixup_t);
   const iree_host_size_t total_needed = cmd_bytes + fixup_bytes;
 
+  // Region-local work command indices and barrier dispatch counts are 8-bit.
+  // Split before appending the 256th command so the encoded count cannot wrap
+  // while the tile count continues accumulating.
+  if (builder->region_dispatch_count >= UINT8_MAX) {
+    IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_split_block(builder));
+  }
+
   // Check if we need to split. Reserve extra space for the BRANCH (16 bytes)
   // we'd need to insert if splitting, so we're never stuck without room for
   // the terminator. Also reserve for the entry barrier that follows a split
@@ -417,10 +424,6 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
     }
   }
 
-  // Also split if the region count would exceed the scratch buffer.
-  // (This shouldn't happen in normal workloads — 64 regions per block is
-  // very generous.)
-
   // Write the command at the forward cursor.
   iree_hal_cmd_header_t* header = (iree_hal_cmd_header_t*)builder->cmd_cursor;
   memset(header, 0, cmd_bytes);
@@ -428,9 +431,10 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
   header->flags = flags;
   header->size_qwords = (uint8_t)(cmd_bytes / 8);
 
-  // All work commands (DISPATCH, FILL, COPY) get a region-local dispatch
-  // index for their tile_index entry in .data. The multi-worker processor
-  // uses this to distribute tiles across workers for all command types.
+  // All work commands (DISPATCH, FILL, COPY, UPDATE) get a region-local
+  // dispatch index for their tile_index entry in .data. The multi-worker
+  // processor uses this to distribute tiles across workers for all command
+  // types.
   header->dispatch_index = (uint8_t)builder->region_dispatch_count;
   builder->region_dispatch_count++;
   builder->total_dispatch_count++;

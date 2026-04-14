@@ -301,6 +301,108 @@ iree_status_t iree_hal_amdgpu_host_queue_begin_kernel_submission(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
+    uint32_t kernarg_block_count, bool* out_ready,
+    iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission) {
+  IREE_ASSERT_ARGUMENT(queue);
+  IREE_ASSERT_ARGUMENT(resolution);
+  IREE_ASSERT_ARGUMENT(out_ready);
+  IREE_ASSERT_ARGUMENT(out_submission);
+  *out_ready = false;
+  memset(out_submission, 0, sizeof(*out_submission));
+
+  if (IREE_UNLIKELY(payload_packet_count == 0 || kernarg_block_count == 0)) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "kernel submission requires at least one payload "
+                            "packet and one kernarg block");
+  }
+  if (IREE_UNLIKELY(kernarg_block_count < payload_packet_count)) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "kernel submission requires at least as many "
+                            "kernarg blocks as payload packets");
+  }
+
+  const uint64_t packet_count =
+      (uint64_t)resolution->barrier_count + kernarg_block_count;
+  const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
+  if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
+                    packet_count > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "kernel submission requires %" PRIu64
+        " AQL packets (%u barriers + %u kernarg blocks) but queue capacity is "
+        "%" PRIu64,
+        packet_count, resolution->barrier_count, kernarg_block_count,
+        aql_queue_capacity);
+  }
+  if (IREE_UNLIKELY(signal_semaphore_list.count >
+                    queue->notification_ring.capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "kernel submission requires %" PRIhsz
+                            " notification entries but ring capacity is %u",
+                            signal_semaphore_list.count,
+                            queue->notification_ring.capacity);
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      signal_semaphore_list.count, operation_resource_count,
+      &out_submission->reclaim_resource_count));
+
+  const iree_host_size_t frontier_snapshot_count =
+      iree_hal_amdgpu_host_queue_count_frontier_snapshots(
+          queue, signal_semaphore_list);
+  if (!iree_hal_amdgpu_notification_ring_can_reserve(
+          &queue->notification_ring, signal_semaphore_list.count,
+          frontier_snapshot_count)) {
+    return iree_ok_status();
+  }
+
+  uint64_t first_packet_id = 0;
+  if (!iree_hal_amdgpu_aql_ring_try_reserve(
+          &queue->aql_ring, (uint32_t)packet_count, &first_packet_id)) {
+    return iree_ok_status();
+  }
+
+  out_submission->reclaim_entry =
+      iree_hal_amdgpu_notification_ring_reclaim_entry(
+          &queue->notification_ring);
+  iree_status_t status = iree_hal_amdgpu_reclaim_entry_prepare(
+      out_submission->reclaim_entry, queue->block_pool,
+      out_submission->reclaim_resource_count,
+      &out_submission->reclaim_resources);
+  if (iree_status_is_ok(status)) {
+    out_submission->packet_count = (uint32_t)packet_count;
+    out_submission->payload_packet_count = payload_packet_count;
+    out_submission->first_packet_id = first_packet_id;
+    out_submission->kernarg_blocks = iree_hal_amdgpu_kernarg_ring_allocate(
+        &queue->kernarg_ring, kernarg_block_count,
+        &out_submission->kernarg_write_position);
+    if (IREE_UNLIKELY(!out_submission->kernarg_blocks)) {
+      iree_hal_amdgpu_host_queue_emit_noop_packets(
+          queue, out_submission->first_packet_id, out_submission->packet_count);
+      iree_hal_amdgpu_reclaim_entry_release(out_submission->reclaim_entry,
+                                            queue->block_pool);
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "kernarg ring allocation failed after AQL reservation; queue sizing "
+          "invariant was violated");
+    }
+  } else {
+    iree_hal_amdgpu_host_queue_emit_noop_packets(queue, first_packet_id,
+                                                 (uint32_t)packet_count);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_ready = true;
+  } else {
+    memset(out_submission, 0, sizeof(*out_submission));
+  }
+  return status;
+}
+
 void iree_hal_amdgpu_host_queue_fail_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_host_queue_kernel_submission_t* submission) {

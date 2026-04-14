@@ -384,6 +384,73 @@ TEST_F(BlockBuilderTest, BlockSplitOnCapacity) {
   iree_hal_cmd_block_builder_deinitialize(&builder);
 }
 
+TEST_F(BlockBuilderTest, BlockSplitOnRegionDispatchCountLimit) {
+  static constexpr iree_host_size_t kLargeBlockSize = 32768;
+  static constexpr uint16_t kMaxRegionDispatchCount = 255;
+  static constexpr uint16_t kFillCount = 300;
+
+  iree_arena_block_pool_t large_block_pool;
+  iree_arena_block_pool_initialize(kLargeBlockSize, iree_allocator_system(),
+                                   &large_block_pool);
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(&large_block_pool, &builder);
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
+
+  for (uint16_t i = 0; i < kFillCount; ++i) {
+    iree_hal_cmd_fill_t* fill = NULL;
+    IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+        &builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
+        sizeof(iree_hal_cmd_fill_t), 0, 0, 1, (void**)&fill, NULL));
+    fill->target_binding = 0;
+    fill->pattern_length = 4;
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
+
+  ASSERT_EQ(recording.block_count, 2);
+  EXPECT_EQ(recording.max_region_dispatch_count, kMaxRegionDispatchCount);
+
+  const iree_hal_cmd_block_header_t* first_block = recording.first_block;
+  ASSERT_NE(first_block, nullptr);
+  const iree_hal_cmd_block_header_t* second_block = first_block->next_block;
+  ASSERT_NE(second_block, nullptr);
+  EXPECT_EQ(second_block->next_block, nullptr);
+
+  const auto* first_barrier = reinterpret_cast<const iree_hal_cmd_barrier_t*>(
+      iree_hal_cmd_block_commands(first_block));
+  EXPECT_EQ(first_barrier->dispatch_count, kMaxRegionDispatchCount);
+  EXPECT_EQ(first_block->max_region_dispatch_count, kMaxRegionDispatchCount);
+  EXPECT_EQ(first_block->total_dispatch_count, kMaxRegionDispatchCount);
+  EXPECT_EQ(iree_hal_cmd_block_initial_remaining_tiles(first_block)[0],
+            kMaxRegionDispatchCount);
+
+  const iree_hal_cmd_header_t* first_block_terminator =
+      iree_hal_cmd_next(&first_barrier->header);
+  for (uint16_t i = 0; i < kMaxRegionDispatchCount; ++i) {
+    first_block_terminator = iree_hal_cmd_next(first_block_terminator);
+  }
+  ASSERT_EQ(first_block_terminator->opcode, IREE_HAL_CMD_BRANCH);
+  EXPECT_EQ(
+      reinterpret_cast<const iree_hal_cmd_branch_t*>(first_block_terminator)
+          ->target,
+      second_block);
+
+  const uint16_t second_block_fill_count = kFillCount - kMaxRegionDispatchCount;
+  const auto* second_barrier = reinterpret_cast<const iree_hal_cmd_barrier_t*>(
+      iree_hal_cmd_block_commands(second_block));
+  EXPECT_EQ(second_barrier->dispatch_count, second_block_fill_count);
+  EXPECT_EQ(second_block->max_region_dispatch_count, second_block_fill_count);
+  EXPECT_EQ(second_block->total_dispatch_count, second_block_fill_count);
+  EXPECT_EQ(iree_hal_cmd_block_initial_remaining_tiles(second_block)[0],
+            second_block_fill_count);
+
+  iree_hal_cmd_block_recording_release(&recording);
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+  iree_arena_block_pool_deinitialize(&large_block_pool);
+}
+
 //===----------------------------------------------------------------------===//
 // Fixup entries survive block finalization
 //===----------------------------------------------------------------------===//

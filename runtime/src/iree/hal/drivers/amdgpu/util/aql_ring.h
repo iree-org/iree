@@ -145,6 +145,35 @@ static inline uint64_t iree_hal_amdgpu_aql_ring_reserve(
   return first_id;
 }
 
+// Attempts to reserve |count| contiguous packet slots without waiting.
+//
+// Returns false if the ring does not currently have room for the entire range.
+// Unlike reserve(), this never advances write_dispatch_id unless the range is
+// immediately available, so callers can park and retry after completion drain.
+static inline bool iree_hal_amdgpu_aql_ring_try_reserve(
+    iree_hal_amdgpu_aql_ring_t* ring, uint32_t count, uint64_t* out_first_id) {
+  const uint64_t ring_capacity = (uint64_t)(ring->mask + 1);
+  int64_t current_write =
+      iree_atomic_load(ring->write_dispatch_id, iree_memory_order_relaxed);
+  for (;;) {
+    const uint64_t first_id = (uint64_t)current_write;
+    const uint64_t current_read =
+        (uint64_t)iree_atomic_load((iree_atomic_int64_t*)ring->read_dispatch_id,
+                                   iree_memory_order_acquire);
+    if (first_id + count - current_read > ring_capacity) {
+      *out_first_id = 0;
+      return false;
+    }
+    int64_t desired_write = current_write + (int64_t)count;
+    if (iree_atomic_compare_exchange_weak(
+            ring->write_dispatch_id, &current_write, desired_write,
+            iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+      *out_first_id = first_id;
+      return true;
+    }
+  }
+}
+
 // Returns a pointer to the packet slot for |packet_id|. The caller
 // populates the packet fields (all except the header) and then commits
 // the header via iree_hal_amdgpu_aql_ring_commit().

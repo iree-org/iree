@@ -249,8 +249,9 @@ struct iree_hal_amdgpu_pending_op_t {
   // Flat array of all retained HAL resources (arena-allocated). Signal
   // semaphores are stored first (signal_semaphore_list.semaphores aliases
   // this region), followed by operation-specific resources (buffers,
-  // executables, command buffers). On successful issue, ownership transfers
-  // to the reclaim ring. On failure/cancel, released directly.
+  // executables, command buffers). On successful issue, these refs either
+  // transfer to reclaim or are released after the submit helper takes its own
+  // completion-lifetime refs. On failure/cancel, released directly.
   iree_hal_resource_t** retained_resources;
 
   // Number of entries currently owned in |retained_resources|.
@@ -298,7 +299,7 @@ struct iree_hal_amdgpu_pending_op_t {
       // Arena-owned copy of the binding table prefix used by command_buffer.
       iree_hal_buffer_binding_table_t binding_table;
 
-      // Queue-owned binding resources retained until execute completion.
+      // Binding resources captured until the deferred execute operation issues.
       iree_hal_resource_set_t* binding_resource_set;
 
       // HAL execute flags captured from queue_execute.
@@ -390,9 +391,9 @@ static inline void iree_hal_amdgpu_pending_op_retain(
   }
 }
 
-// Releases all retained HAL resources in the flat array. Used on failure
-// and cancellation paths. On success, retained_resources are transferred
-// to the reclaim ring instead (no release here).
+// Releases all retained HAL resources in the flat array. Used on failure,
+// cancellation, and success paths where the submit helper retained the
+// resources it needs instead of consuming this pending op's refs.
 static void iree_hal_amdgpu_pending_op_release_retained(
     iree_hal_amdgpu_pending_op_t* op) {
   for (uint16_t i = 0; i < op->retained_resource_count; ++i) {
@@ -1016,10 +1017,9 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
           status = iree_hal_amdgpu_host_queue_submit_command_buffer(
               queue, &resolution, op->signal_semaphore_list,
               op->execute.command_buffer, op->execute.binding_table,
-              op->execute.flags, &op->execute.binding_resource_set,
-              IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
+              op->execute.flags, &op->execute.binding_resource_set);
           if (iree_status_is_ok(status)) {
-            op->retained_resource_count = 0;
+            iree_hal_amdgpu_pending_op_release_retained(op);
           }
         } else {
           status = iree_hal_amdgpu_host_queue_submit_barrier(
@@ -1098,10 +1098,9 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
     iree_hal_amdgpu_pending_op_release_retained(op);
   }
 
-  // Clean up the pending op. Wait semaphore list is released (the clone
-  // holds separate retains). Signal semaphore list is NOT released — the
-  // semaphore pointers are in retained_resources (either transferred to
-  // reclaim or released above).
+  // Clean up the pending op. Wait semaphore list is released (the clone holds
+  // separate retains). Remaining retained_resources entries are either
+  // transferred to reclaim or were released by the success path above.
   iree_hal_semaphore_list_release(op->wait_semaphore_list);
   iree_hal_amdgpu_pending_op_unlink(op);
   iree_notification_deinitialize(&op->callback_notification);
@@ -1222,21 +1221,18 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 
 static void iree_hal_amdgpu_host_queue_run_post_drain_actions(
     iree_hal_amdgpu_host_queue_t* queue) {
-  for (;;) {
-    iree_slim_mutex_lock(&queue->post_drain_mutex);
-    iree_hal_amdgpu_host_queue_post_drain_action_t* action =
-        queue->post_drain_head;
-    if (action) {
-      queue->post_drain_head = action->next;
-      if (!queue->post_drain_head) {
-        queue->post_drain_tail = NULL;
-      }
-      action->next = NULL;
-    }
-    iree_slim_mutex_unlock(&queue->post_drain_mutex);
+  iree_slim_mutex_lock(&queue->post_drain_mutex);
+  iree_hal_amdgpu_host_queue_post_drain_action_t* action =
+      queue->post_drain_head;
+  queue->post_drain_head = NULL;
+  queue->post_drain_tail = NULL;
+  iree_slim_mutex_unlock(&queue->post_drain_mutex);
 
-    if (!action) break;
+  while (action) {
+    iree_hal_amdgpu_host_queue_post_drain_action_t* next_action = action->next;
+    action->next = NULL;
     action->fn(action->user_data);
+    action = next_action;
   }
 }
 
@@ -2597,8 +2593,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
     iree_hal_resource_set_t* binding_resource_set = NULL;
     status = iree_hal_amdgpu_host_queue_submit_command_buffer(
         queue, &resolution, signal_semaphore_list, command_buffer,
-        binding_table, flags, &binding_resource_set,
-        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
+        binding_table, flags, &binding_resource_set);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
 
