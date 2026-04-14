@@ -55,29 +55,11 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              // Packet-bearing command buffers: requires command recording and
-              // replay for the corresponding queue operation.
-              {"CommandBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
+              // Command-buffer transient allocations require recording-time
+              // alloca/dealloca support.
               {"TransientBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
-
-              // Command-buffer dispatch suites. Direct queue_dispatch coverage
-              // is enabled through QueueDispatchTest.
-              {"DispatchTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchMultiEntrypointTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchMultiWorkgroupTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchConstantsTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchConstantsBindingsTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchPipelineTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
-              {"DispatchReuseTest.*",
-               "AMDGPU command-buffer dispatch not yet implemented"},
+               "AMDGPU command-buffer transient allocations not yet "
+               "implemented"},
 
               // Features and API surface not currently implemented.
               {"EventTest.*", "AMDGPU does not implement HAL events"},

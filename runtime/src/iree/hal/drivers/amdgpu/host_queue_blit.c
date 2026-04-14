@@ -288,16 +288,16 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
       /*kernarg_block_count=*/1, &submission));
-  memcpy(submission.kernarg_blocks->data, &kernargs, sizeof(kernargs));
+  memcpy(submission.kernel.kernarg_blocks->data, &kernargs, sizeof(kernargs));
   submission.dispatch_setup =
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
           &submission.dispatch_slot->dispatch, &dispatch_packet,
-          submission.kernarg_blocks->data,
+          submission.kernel.kernarg_blocks->data,
           iree_hal_amdgpu_notification_ring_epoch_signal(
               &queue->notification_ring));
   submission.minimum_acquire_scope = minimum_acquire_scope;
   submission.minimum_release_scope = minimum_release_scope;
-  submission.pre_signal_action = pre_signal_action;
+  submission.kernel.pre_signal_action = pre_signal_action;
   iree_hal_amdgpu_host_queue_finish_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resources,
       operation_resource_count, submission_flags, &submission);
@@ -442,16 +442,16 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
       &submission));
 
   uint8_t* staged_source_bytes =
-      (uint8_t*)submission.kernarg_blocks + source_payload_offset;
-  memcpy(submission.kernarg_blocks->data, &kernargs, sizeof(kernargs));
+      (uint8_t*)submission.kernel.kernarg_blocks + source_payload_offset;
+  memcpy(submission.kernel.kernarg_blocks->data, &kernargs, sizeof(kernargs));
   ((iree_hal_amdgpu_device_buffer_copy_kernargs_t*)
-       submission.kernarg_blocks->data)
+       submission.kernel.kernarg_blocks->data)
       ->source_ptr = staged_source_bytes;
   memcpy(staged_source_bytes, source_bytes, source_length);
   submission.dispatch_setup =
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
           &submission.dispatch_slot->dispatch, &dispatch_packet,
-          submission.kernarg_blocks->data,
+          submission.kernel.kernarg_blocks->data,
           iree_hal_amdgpu_notification_ring_epoch_signal(
               &queue->notification_ring));
 

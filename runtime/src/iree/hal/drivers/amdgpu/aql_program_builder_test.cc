@@ -48,14 +48,14 @@ static const iree_hal_amdgpu_command_buffer_command_header_t* LastCommand(
 
 TEST(CommandBufferAbiTest, CoreRecordSizes) {
   EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_block_header_t), 64u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_command_header_t), 16u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_fixup_t), 24u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t), 56u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_fill_command_t), 48u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_copy_command_t), 56u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_update_command_t), 48u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_branch_command_t), 24u);
-  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_return_command_t), 16u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_command_header_t), 8u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_binding_source_t), 16u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t), 64u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_fill_command_t), 40u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_copy_command_t), 48u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_update_command_t), 40u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_branch_command_t), 16u);
+  EXPECT_EQ(sizeof(iree_hal_amdgpu_command_buffer_return_command_t), 8u);
 }
 
 TEST(CommandBufferAbiTest, BlockPoolRejectsNonPowerOfTwoBlockSize) {
@@ -104,7 +104,7 @@ TEST_F(AqlProgramBuilderTest, EmptyProgramRecordsReturnBlock) {
   EXPECT_EQ(block->block_length, block_pool()->usable_block_size);
   EXPECT_EQ(block->command_offset, 64u);
   EXPECT_EQ(block->command_count, 1u);
-  EXPECT_EQ(block->fixup_count, 0u);
+  EXPECT_EQ(block->binding_source_count, 0u);
   EXPECT_EQ(block->aql_packet_count, 0u);
   EXPECT_EQ(block->kernarg_length, 0u);
 
@@ -117,36 +117,35 @@ TEST_F(AqlProgramBuilderTest, EmptyProgramRecordsReturnBlock) {
   iree_hal_amdgpu_aql_program_release(&program);
 }
 
-TEST_F(AqlProgramBuilderTest, AppendsCommandAndFixups) {
+TEST_F(AqlProgramBuilderTest, AppendsCommandAndBindingSources) {
   iree_hal_amdgpu_aql_program_builder_t builder;
   iree_hal_amdgpu_aql_program_builder_initialize(block_pool(), &builder);
   IREE_ASSERT_OK(iree_hal_amdgpu_aql_program_builder_begin(&builder));
 
   iree_hal_amdgpu_command_buffer_command_header_t* command = nullptr;
-  iree_hal_amdgpu_command_buffer_fixup_t* fixups = nullptr;
+  iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources = nullptr;
   IREE_ASSERT_OK(iree_hal_amdgpu_aql_program_builder_append_command(
       &builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH,
       IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_HAS_BARRIER,
       sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t),
-      /*fixup_count=*/2, /*aql_packet_count=*/1, /*kernarg_length=*/128,
-      &command, &fixups));
+      /*binding_source_count=*/2, /*aql_packet_count=*/1,
+      /*kernarg_length=*/128, &command, &binding_sources));
 
   ASSERT_NE(command, nullptr);
-  ASSERT_NE(fixups, nullptr);
+  ASSERT_NE(binding_sources, nullptr);
   EXPECT_EQ(command->opcode, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH);
   EXPECT_EQ(command->flags,
             IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_HAS_BARRIER);
   EXPECT_EQ(command->command_index, 0u);
-  EXPECT_EQ(command->fixup_count, 2u);
 
-  fixups[0].kind = IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_DYNAMIC_BINDING;
-  fixups[0].ordinal = 3;
-  fixups[0].source_offset = 64;
-  fixups[0].patch_offset = 8;
-  fixups[1].kind = IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_STATIC_BINDING;
-  fixups[1].ordinal = 4;
-  fixups[1].source_offset = 128;
-  fixups[1].patch_offset = 16;
+  binding_sources[0].flags =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC;
+  binding_sources[0].slot = 3;
+  binding_sources[0].offset_or_pointer = 64;
+  binding_sources[1].flags =
+      IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_NONE;
+  binding_sources[1].slot = 0;
+  binding_sources[1].offset_or_pointer = 0x12345678u;
 
   iree_hal_amdgpu_aql_program_t program = {};
   IREE_ASSERT_OK(iree_hal_amdgpu_aql_program_builder_end(&builder, &program));
@@ -155,25 +154,22 @@ TEST_F(AqlProgramBuilderTest, AppendsCommandAndFixups) {
   const iree_hal_amdgpu_command_buffer_block_header_t* block =
       program.first_block;
   EXPECT_EQ(block->command_count, 2u);
-  EXPECT_EQ(block->fixup_count, 2u);
+  EXPECT_EQ(block->binding_source_count, 2u);
   EXPECT_EQ(block->aql_packet_count, 1u);
   EXPECT_EQ(block->kernarg_length, 128u);
   EXPECT_EQ(program.max_block_aql_packet_count, 1u);
   EXPECT_EQ(program.max_block_kernarg_length, 128u);
 
-  const iree_hal_amdgpu_command_buffer_fixup_t* block_fixups =
-      reinterpret_cast<const iree_hal_amdgpu_command_buffer_fixup_t*>(
-          reinterpret_cast<const uint8_t*>(block) + command->fixup_offset);
-  EXPECT_EQ(block_fixups[0].kind,
-            IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_DYNAMIC_BINDING);
-  EXPECT_EQ(block_fixups[0].ordinal, 3u);
-  EXPECT_EQ(block_fixups[0].source_offset, 64u);
-  EXPECT_EQ(block_fixups[0].patch_offset, 8u);
-  EXPECT_EQ(block_fixups[1].kind,
-            IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_STATIC_BINDING);
-  EXPECT_EQ(block_fixups[1].ordinal, 4u);
-  EXPECT_EQ(block_fixups[1].source_offset, 128u);
-  EXPECT_EQ(block_fixups[1].patch_offset, 16u);
+  const iree_hal_amdgpu_command_buffer_binding_source_t* block_binding_sources =
+      iree_hal_amdgpu_command_buffer_block_binding_sources_const(block);
+  EXPECT_EQ(block_binding_sources[0].flags,
+            IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC);
+  EXPECT_EQ(block_binding_sources[0].slot, 3u);
+  EXPECT_EQ(block_binding_sources[0].offset_or_pointer, 64u);
+  EXPECT_EQ(block_binding_sources[1].flags,
+            IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_NONE);
+  EXPECT_EQ(block_binding_sources[1].slot, 0u);
+  EXPECT_EQ(block_binding_sources[1].offset_or_pointer, 0x12345678u);
 
   const iree_hal_amdgpu_command_buffer_command_header_t* return_command =
       LastCommand(block);
@@ -194,8 +190,8 @@ TEST_F(AqlProgramBuilderTest, SplitsBlocksWithBranchTerminator) {
         &builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH,
         IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
         sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t),
-        /*fixup_count=*/0, /*aql_packet_count=*/1, /*kernarg_length=*/32,
-        &command, /*out_fixups=*/nullptr));
+        /*binding_source_count=*/0, /*aql_packet_count=*/1,
+        /*kernarg_length=*/32, &command, /*out_binding_sources=*/nullptr));
     EXPECT_NE(command, nullptr);
   }
 
@@ -234,9 +230,9 @@ TEST_F(AqlProgramBuilderTest, RejectsOversizedCommand) {
       iree_hal_amdgpu_aql_program_builder_append_command(
           &builder, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH,
           IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_NONE,
-          block_pool()->usable_block_size, /*fixup_count=*/0,
+          block_pool()->usable_block_size, /*binding_source_count=*/0,
           /*aql_packet_count=*/1, /*kernarg_length=*/0, &command,
-          /*out_fixups=*/nullptr));
+          /*out_binding_sources=*/nullptr));
 
   iree_hal_amdgpu_aql_program_builder_deinitialize(&builder);
 }

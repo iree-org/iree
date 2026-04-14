@@ -245,11 +245,9 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
   SemaphoreList alloca_signal(device_, {0}, {1});
   SemaphoreList empty_wait;
   iree_hal_buffer_params_t alloca_params = {0};
-  alloca_params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  alloca_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                        IREE_HAL_BUFFER_USAGE_TRANSFER |
-                        IREE_HAL_BUFFER_USAGE_MAPPING;
+  alloca_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  alloca_params.usage =
+      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_t* raw = nullptr;
   IREE_ASSERT_OK(iree_hal_device_queue_alloca(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,

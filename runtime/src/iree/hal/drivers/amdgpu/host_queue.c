@@ -14,6 +14,7 @@
 #include "iree/base/threading/notification.h"
 #include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
+#include "iree/hal/drivers/amdgpu/host_queue_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/host_queue_dispatch.h"
 #include "iree/hal/drivers/amdgpu/host_queue_file.h"
 #include "iree/hal/drivers/amdgpu/host_queue_host_call.h"
