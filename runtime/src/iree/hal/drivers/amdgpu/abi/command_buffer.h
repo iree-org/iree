@@ -172,6 +172,10 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t export_ordinal;
   // Workgroup count along X, Y, and Z.
   uint32_t workgroup_count[3];
+  // Workgroup size override along X, Y, and Z, or all zero for export default.
+  uint16_t workgroup_size[3];
+  // Reserved bytes that must be zero in version 0.
+  uint16_t reserved0;
   // Dynamic workgroup local memory in bytes.
   uint32_t dynamic_shared_memory;
   // Byte offset to the kernarg template payload.
@@ -180,7 +184,7 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t kernarg_template_length;
 } iree_hal_amdgpu_command_buffer_dispatch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 48,
+    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 56,
     "dispatch command size must remain qword aligned");
 
 // Fill command record.
@@ -238,8 +242,8 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
     iree_hal_amdgpu_command_buffer_update_command_t {
   // Common command record header.
   iree_hal_amdgpu_command_buffer_command_header_t header;
-  // Byte offset into command-buffer rodata storage.
-  uint64_t rodata_offset;
+  // Command-buffer rodata segment ordinal containing the update payload.
+  uint64_t rodata_ordinal;
   // Byte offset into the target buffer reference.
   uint64_t target_offset;
   // Byte length of the update payload and target range.

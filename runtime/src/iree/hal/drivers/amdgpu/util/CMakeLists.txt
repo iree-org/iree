@@ -155,6 +155,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
+    iree::hal::utils::resource_set
   PUBLIC
 )
 
@@ -273,12 +274,40 @@ iree_cc_test(
     "iree-hal-drivers-amdgpu-tests"
 )
 if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
+add_custom_command(OUTPUT queue_benchmark_testdata_srcs.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch queue_benchmark_testdata_srcs.stamp
+  DEPENDS
+    "queue_benchmark_testdata.mlir"
+)
+
+add_custom_target(queue_benchmark_testdata_srcs
+    DEPENDS queue_benchmark_testdata_srcs.stamp
+)
+
+iree_hal_cts_testdata(
+  FORMAT_NAME
+    amdgpu_queue_benchmark
+  TARGET_DEVICE
+    "amdgpu"
+  IDENTIFIER
+    "iree_queue_benchmark_testdata_amdgpu"
+  BACKEND_NAME
+    "amdgpu"
+  FORMAT_STRING
+    [=["amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}"]=]
+  TESTDATA_DIR
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/drivers/amdgpu/util"
+  FLAGS
+    "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
+)
+
 iree_cc_binary_benchmark(
   NAME
     queue_benchmark
   SRCS
     "queue_benchmark.cc"
   DEPS
+    ::testdata_amdgpu_queue_benchmark
     benchmark
     iree::async
     iree::async::util::proactor_pool

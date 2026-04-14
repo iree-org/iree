@@ -218,6 +218,7 @@ static iree_status_t iree_hal_amdgpu_file_action_submit_signal_barrier(
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
       /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+      /*resource_set=*/NULL,
       IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   iree_slim_mutex_unlock(&state->queue->submission_mutex);
   return status;

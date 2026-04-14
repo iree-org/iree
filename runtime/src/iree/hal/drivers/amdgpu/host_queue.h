@@ -85,6 +85,18 @@ struct iree_hal_amdgpu_host_queue_post_drain_action_t {
 #define IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY \
   IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT
 
+// Maximum number of direct buffer bindings accepted by queue_dispatch.
+//
+// Command buffers support large binding tables through their own lifetime
+// tracking path. Direct dispatch keeps the submission path bounded and uses
+// queue-local scratch storage under submission_mutex.
+#define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY 256u
+
+// Maximum number of operation resources retained by one direct queue_dispatch:
+// the executable plus one resource per direct buffer binding.
+#define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_RESOURCE_CAPACITY \
+  (1u + IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY)
+
 // Host-driven queue with per-queue epoch signal and wait-backed
 // notification ring. Embeds iree_hal_amdgpu_virtual_queue_t at offset 0.
 //
@@ -213,6 +225,17 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Tail pointer for appending post-drain continuations. Protected by
   // post_drain_mutex.
   iree_hal_amdgpu_host_queue_post_drain_action_t* post_drain_tail;
+
+  // Queue-local resource channel used by queue_dispatch under
+  // submission_mutex before finish_dispatch_submission copies entries into the
+  // notification reclaim entry.
+  iree_hal_resource_t* dispatch_operation_resource_scratch
+      [IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_RESOURCE_CAPACITY];
+
+  // Queue-local resolved device-pointer channel used by queue_dispatch under
+  // submission_mutex before final kernargs are written to the kernarg ring.
+  uint64_t dispatch_binding_ptr_scratch
+      [IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY];
 
   // Set under submission_mutex when queue teardown begins. Deferred ops whose
   // waits race to completion after this point are failed with CANCELLED instead

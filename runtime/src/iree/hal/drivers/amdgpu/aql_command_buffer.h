@@ -41,7 +41,7 @@ iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
 
 // Returns command-buffer-owned rodata referenced by |command_buffer|.
 const uint8_t* iree_hal_amdgpu_aql_command_buffer_rodata(
-    iree_hal_command_buffer_t* command_buffer, uint64_t offset,
+    iree_hal_command_buffer_t* command_buffer, uint64_t ordinal,
     uint32_t length);
 
 #ifdef __cplusplus

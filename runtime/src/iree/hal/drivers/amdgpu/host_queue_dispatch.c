@@ -10,8 +10,20 @@
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 
-#define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_STACK_BINDING_CAPACITY 16
-#define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_STACK_RESOURCE_CAPACITY 17
+typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
+  // Executable dispatch descriptor selected for the queue's physical device.
+  const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor;
+  // Kernel arguments used for packet and kernarg emission.
+  const iree_hal_amdgpu_device_kernel_args_t* kernel_args;
+  // Storage for a workgroup-size override when dispatch config provides one.
+  iree_hal_amdgpu_device_kernel_args_t override_kernel_args;
+  // Device ABI layout describing the kernarg bytes to emit.
+  const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* layout;
+  // Number of queue-owned kernarg blocks required for the dispatch.
+  uint32_t kernarg_block_count;
+  // Number of operation resources retained until dispatch completion.
+  iree_host_size_t operation_resource_count;
+} iree_hal_amdgpu_host_queue_dispatch_plan_t;
 
 static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_flags(
     iree_hal_dispatch_flags_t flags) {
@@ -198,15 +210,20 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
           "dispatch binding count mismatch; expected %u but got %" PRIhsz,
           (uint32_t)descriptor->kernel_args.binding_count, bindings.count);
     }
+    if (IREE_UNLIKELY(
+            bindings.count >
+            IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "queue_dispatch supports at most %u direct buffer bindings but got "
+          "%" PRIhsz,
+          IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY,
+          bindings.count);
+    }
     if (IREE_UNLIKELY(bindings.count > 0 && !bindings.values)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "dispatch bindings must be non-null when count is non-zero");
-    }
-    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-      IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch_binding(
-                               &bindings.values[i]),
-                           "binding[%" PRIhsz "]", i);
     }
     operation_resource_count = 1 + bindings.count;
     *out_layout = &descriptor->hal_kernarg_layout;
@@ -225,32 +242,29 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_dispatch_plan(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
-    iree_host_size_t* out_operation_resource_count) {
-  *out_operation_resource_count = 0;
+    iree_hal_amdgpu_host_queue_dispatch_plan_t* out_plan) {
+  memset(out_plan, 0, sizeof(*out_plan));
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_validate_dispatch_flags(flags));
 
-  const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_lookup_dispatch_descriptor(
-      queue, executable, export_ordinal, &descriptor));
-  iree_hal_amdgpu_device_kernel_args_t override_kernel_args;
-  const iree_hal_amdgpu_device_kernel_args_t* kernel_args = NULL;
+      queue, executable, export_ordinal, &out_plan->descriptor));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_select_dispatch_kernel_args(
-      descriptor, config, &override_kernel_args, &kernel_args));
+      out_plan->descriptor, config, &out_plan->override_kernel_args,
+      &out_plan->kernel_args));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch_shape(
-      descriptor, kernel_args, config));
+      out_plan->descriptor, out_plan->kernel_args, config));
 
-  const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* layout = NULL;
-  uint32_t kernarg_block_count = 0;
   return iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
-      queue, descriptor, constants, bindings, flags, &layout,
-      &kernarg_block_count, out_operation_resource_count);
+      queue, out_plan->descriptor, constants, bindings, flags,
+      &out_plan->layout, &out_plan->kernarg_block_count,
+      &out_plan->operation_resource_count);
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_resolve_validated_binding_ptr(
@@ -282,6 +296,55 @@ static iree_status_t iree_hal_amdgpu_host_queue_resolve_validated_binding_ptr(
   return iree_ok_status();
 }
 
+// Validates direct dispatch bindings and optionally fills the submit-time
+// channels used to retain resources and write final kernargs. The arrays are
+// caller-owned scratch; passing NULL runs only the corresponding validation.
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_resource_t** operation_resources, uint64_t* binding_ptrs) {
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < bindings.count && iree_status_is_ok(status);
+       ++i) {
+    const iree_hal_buffer_ref_t* binding = &bindings.values[i];
+    status = iree_hal_amdgpu_host_queue_validate_dispatch_binding(binding);
+    if (iree_status_is_ok(status) && binding_ptrs) {
+      status = iree_hal_amdgpu_host_queue_resolve_validated_binding_ptr(
+          binding, &binding_ptrs[i]);
+    }
+    if (iree_status_is_ok(status) && operation_resources) {
+      operation_resources[i + 1] = (iree_hal_resource_t*)binding->buffer;
+    }
+    if (!iree_status_is_ok(status)) {
+      status = iree_status_annotate_f(status, "binding[%" PRIhsz "]", i);
+    }
+  }
+  return status;
+}
+
+iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
+    const iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
+    iree_host_size_t* out_operation_resource_count) {
+  *out_operation_resource_count = 0;
+  iree_hal_amdgpu_host_queue_dispatch_plan_t plan;
+  iree_status_t status = iree_hal_amdgpu_host_queue_prepare_dispatch_plan(
+      queue, executable, export_ordinal, config, constants, bindings, flags,
+      &plan);
+  if (iree_status_is_ok(status) &&
+      !iree_any_bit_set(flags,
+                        IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS)) {
+    status = iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
+        bindings, /*operation_resources=*/NULL, /*binding_ptrs=*/NULL);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_operation_resource_count = plan.operation_resource_count;
+  }
+  return status;
+}
+
 iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
@@ -294,96 +357,42 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
   if (IREE_UNLIKELY(queue->is_shutting_down)) {
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
-  IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_host_queue_validate_dispatch_flags(flags));
+  iree_hal_amdgpu_host_queue_dispatch_plan_t plan;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_dispatch_plan(
+      queue, executable, export_ordinal, config, constants, bindings, flags,
+      &plan));
 
-  const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_lookup_dispatch_descriptor(
-      queue, executable, export_ordinal, &descriptor));
-  iree_hal_amdgpu_device_kernel_args_t override_kernel_args;
-  const iree_hal_amdgpu_device_kernel_args_t* kernel_args = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_select_dispatch_kernel_args(
-      descriptor, config, &override_kernel_args, &kernel_args));
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch_shape(
-      descriptor, kernel_args, config));
-
-  const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* layout = NULL;
-  uint32_t kernarg_block_count = 0;
-  iree_host_size_t operation_resource_count = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
-      queue, descriptor, constants, bindings, flags, &layout,
-      &kernarg_block_count, &operation_resource_count));
-
-  iree_hal_resource_t* stack_operation_resources
-      [IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_STACK_RESOURCE_CAPACITY];
-  iree_hal_resource_t** operation_resources = stack_operation_resources;
-  uint64_t stack_binding_ptrs
-      [IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_STACK_BINDING_CAPACITY];
-  uint64_t* binding_ptrs = stack_binding_ptrs;
-
-  iree_status_t status = iree_ok_status();
-  if (operation_resource_count > IREE_ARRAYSIZE(stack_operation_resources)) {
-    iree_host_size_t byte_length = 0;
-    if (iree_host_size_checked_mul(operation_resource_count,
-                                   sizeof(*operation_resources),
-                                   &byte_length)) {
-      status = iree_allocator_malloc(queue->host_allocator, byte_length,
-                                     (void**)&operation_resources);
-    } else {
-      status = iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "dispatch operation resource list overflows host size");
-    }
-  }
+  iree_hal_resource_t** operation_resources =
+      queue->dispatch_operation_resource_scratch;
+  uint64_t* binding_ptrs = queue->dispatch_binding_ptr_scratch;
 
   const bool uses_custom_direct_arguments =
       iree_any_bit_set(flags, IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS);
-  if (iree_status_is_ok(status) && !uses_custom_direct_arguments &&
-      bindings.count > IREE_ARRAYSIZE(stack_binding_ptrs)) {
-    iree_host_size_t byte_length = 0;
-    if (iree_host_size_checked_mul(bindings.count, sizeof(*binding_ptrs),
-                                   &byte_length)) {
-      status = iree_allocator_malloc(queue->host_allocator, byte_length,
-                                     (void**)&binding_ptrs);
-    } else {
-      status =
-          iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                           "dispatch binding pointer list overflows host size");
-    }
-  }
+  operation_resources[0] = (iree_hal_resource_t*)executable;
 
-  if (iree_status_is_ok(status)) {
-    operation_resources[0] = (iree_hal_resource_t*)executable;
-    if (!uses_custom_direct_arguments) {
-      for (iree_host_size_t i = 0;
-           i < bindings.count && iree_status_is_ok(status); ++i) {
-        status = iree_hal_amdgpu_host_queue_resolve_validated_binding_ptr(
-            &bindings.values[i], &binding_ptrs[i]);
-        if (iree_status_is_ok(status)) {
-          operation_resources[i + 1] =
-              (iree_hal_resource_t*)bindings.values[i].buffer;
-        }
-      }
-    }
+  iree_status_t status = iree_ok_status();
+  if (!uses_custom_direct_arguments) {
+    status = iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
+        bindings, operation_resources, binding_ptrs);
   }
 
   if (iree_status_is_ok(status)) {
     iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
     status = iree_hal_amdgpu_host_queue_begin_dispatch_submission(
-        queue, resolution, signal_semaphore_list, operation_resource_count,
-        kernarg_block_count, &submission);
+        queue, resolution, signal_semaphore_list, plan.operation_resource_count,
+        plan.kernarg_block_count, &submission);
     if (iree_status_is_ok(status)) {
       if (uses_custom_direct_arguments) {
         iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
-            layout, constants.data, submission.kernarg_blocks->data);
+            plan.layout, constants.data, submission.kernarg_blocks->data);
       } else {
         iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
-            kernel_args, config.workgroup_count,
-            config.dynamic_workgroup_local_memory, layout, binding_ptrs,
+            plan.kernel_args, config.workgroup_count,
+            config.dynamic_workgroup_local_memory, plan.layout, binding_ptrs,
             (const uint32_t*)constants.data, submission.kernarg_blocks->data);
       }
       iree_hal_amdgpu_device_dispatch_emplace_packet(
-          kernel_args, config.workgroup_count,
+          plan.kernel_args, config.workgroup_count,
           config.dynamic_workgroup_local_memory,
           &submission.dispatch_slot->dispatch, submission.kernarg_blocks->data);
       submission.dispatch_slot->dispatch.completion_signal =
@@ -392,15 +401,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
       submission.dispatch_setup = submission.dispatch_slot->dispatch.setup;
       iree_hal_amdgpu_host_queue_finish_dispatch_submission(
           queue, resolution, signal_semaphore_list, operation_resources,
-          operation_resource_count, submission_flags, &submission);
+          plan.operation_resource_count, submission_flags, &submission);
     }
   }
 
-  if (binding_ptrs != stack_binding_ptrs) {
-    iree_allocator_free(queue->host_allocator, binding_ptrs);
-  }
-  if (operation_resources != stack_operation_resources) {
-    iree_allocator_free(queue->host_allocator, operation_resources);
-  }
   return status;
 }

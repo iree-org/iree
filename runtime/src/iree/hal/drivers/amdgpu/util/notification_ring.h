@@ -42,6 +42,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_resource_set_t iree_hal_resource_set_t;
+
 // Initial value for the epoch signal. The CP decrements by 1 on each
 // submission's last packet completion. The epoch (number of completed
 // submissions) is: INITIAL_VALUE - hsa_signal_load(epoch_signal).
@@ -170,6 +172,8 @@ struct iree_hal_amdgpu_reclaim_entry_t {
   // Pointer to the retained-resource pointer array. Points to inline_resources
   // when count <= INLINE_CAPACITY, otherwise to a block-pool-allocated array.
   iree_hal_resource_t** resources;
+  // Optional resource set released with this entry after user signals publish.
+  iree_hal_resource_set_t* resource_set;
   // One bounded pre-signal action for this epoch. Executed before any
   // user-visible signal publication for the epoch when drain observes normal
   // completion, and during fail_all with the failure status before resources
