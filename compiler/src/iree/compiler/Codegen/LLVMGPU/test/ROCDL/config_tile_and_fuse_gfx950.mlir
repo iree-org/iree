@@ -499,9 +499,8 @@ func.func @matmul_large_very_tall_m_f16(
 
 // -----
 
-// Small M*N matmul: M=8, N=8, K=5000. Both M and N need padding.
-// Without the M*N utilization rule, this picks MFMA_F32_32x32x8_F16
-// (6.25% util). With it, picks MFMA_F32_16x16x16_F16 (25% util, 4x better).
+// Skinny M=8 F16 matmul: M=8, N=8, K=5000. Total M product,
+// so VDMFMA is selected. VDMFMA uses the sparse trick instead of padding.
 func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %out: tensor<8x8xf32>) -> tensor<8x8xf32> {
   %result = linalg.matmul ins(%lhs, %rhs : tensor<8x5000xf16>, tensor<5000x8xf16>) outs(%out : tensor<8x8xf32>) -> tensor<8x8xf32>
   return %result : tensor<8x8xf32>
@@ -512,6 +511,19 @@ func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %
 // CHECK-SAME:      padding = [8, 16, 64]
 // CHECK-SAME:      subgroup = [1, 1, 0]
 // CHECK-SAME:      workgroup = [8, 16, 0]
+
+// -----
+
+func.func @skinny_m8_bf16_matmul(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096xbf16>, %out: tensor<8x4096xf32>) -> tensor<8x4096xf32> {
+  %result = linalg.matmul ins(%lhs, %rhs : tensor<8x4096xbf16>, tensor<4096x4096xbf16>) outs(%out : tensor<8x4096xf32>) -> tensor<8x4096xf32>
+  return %result : tensor<8x4096xf32>
+}
+// CHECK-LABEL: func.func @skinny_m8_bf16_matmul
+// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_BF16>
+// CHECK-SAME:      subgroup = [1, 2, 0]
+// CHECK-SAME:      workgroup = [8, 64, 0]
+
 
 // -----
 

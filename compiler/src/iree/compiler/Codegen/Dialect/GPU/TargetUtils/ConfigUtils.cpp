@@ -350,17 +350,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
         auto [mSize, nSize, kSize] = mma.getMNKShape();
         intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
 
-        // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
-        // use the sparse trick (smfmac) and are only efficient when the
-        // problem's total M product fits within the VDMFMA's M tile size (8).
-        // Without the M-size guard below, compareIntrinsics would prefer
-        // VDMFMA for all M sizes due to its larger intrinsic area
-        // ((8+16)*64=1536 vs (16+16)*16=512), which is incorrect for M>8.
-        //
-        // Note: VMFMA intrinsics are intentionally excluded here. Adding
-        // them would change MMA selection for all problems (VMFMA's larger
-        // area wins over concrete MFMA in compareIntrinsics). That should
-        // be a separate change with benchmarking.
+        // VDMFMAs use the sparse trick (smfmac) and are efficient for skinny
+        // GEMMS (M=8).
         for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
           if (!isVDMFMAIntrinsic(vi)) {
             continue;
