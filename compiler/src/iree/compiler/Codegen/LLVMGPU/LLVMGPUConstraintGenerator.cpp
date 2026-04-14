@@ -52,10 +52,10 @@ static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
 /// Uses the same filtering as KernelConfig.cpp: subgroup size and
 /// distribution mapping kind, plus element type compatibility.
 /// Returns unique Attribute objects (MMAAttr and VirtualMMAAttr).
-static SmallVector<Attribute>
-getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget, Type lhsElemType,
-                      Type rhsElemType, Type accElemType, MLIRContext *ctx,
-                      bool includeVirtual = false) {
+SmallVector<Attribute> getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget,
+                                             Type lhsElemType, Type rhsElemType,
+                                             Type accElemType, MLIRContext *ctx,
+                                             bool includeVirtual) {
   const int64_t targetSubgroupSize = gpuTarget.getPreferredSubgroupSize();
 
   SmallVector<Attribute> attrs;
@@ -111,16 +111,9 @@ getCompatibleMMAAttrsForLinalgOp(IREE::GPU::TargetAttr gpuTarget,
                                linalgOp.getContext());
 }
 
-/// Contraction-like dimension classification used by both matmul and conv.
-struct ContractionLikeDims {
-  SmallVector<unsigned> m;
-  SmallVector<unsigned> n;
-  SmallVector<unsigned> k;
-};
-
 /// Get contraction-like (m,n,k) dims for a linalg op.
 /// Only supports contraction and convolution today.
-static FailureOr<ContractionLikeDims>
+FailureOr<ContractionLikeDims>
 inferContractionLikeDims(linalg::LinalgOp linalgOp) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
     auto contractionDims = linalg::inferContractionDims(linalgOp);
@@ -150,15 +143,8 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
   return failure();
 }
 
-/// Problem size, loop count, and indexing maps for a root op.
-struct RootOpLoopInfo {
-  SmallVector<int64_t> staticLoopRanges;
-  unsigned numLoops;
-  SmallVector<AffineMap> indexingMaps;
-};
-
 /// Returns loop info for supported root ops.
-static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
+std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     return RootOpLoopInfo{linalgOp.getStaticLoopRanges(),
                           linalgOp.getNumLoops(),
@@ -168,7 +154,7 @@ static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
 }
 
 /// Build the VectorDistribute knobs dict for contraction-like dims.
-static DictionaryAttr
+DictionaryAttr
 buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
                                const ContractionLikeDims &dims,
                                ArrayRef<Attribute> compatibleMMAs) {

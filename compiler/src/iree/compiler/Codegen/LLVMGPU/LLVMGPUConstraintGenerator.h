@@ -7,10 +7,47 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUCONSTRAINTGENERATOR_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUCONSTRAINTGENERATOR_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir::iree_compiler {
+
+/// Contraction-like dimension classification used by both matmul and conv.
+struct ContractionLikeDims {
+  SmallVector<unsigned> m;
+  SmallVector<unsigned> n;
+  SmallVector<unsigned> k;
+};
+
+/// Problem size, loop count, and indexing maps for a root op.
+struct RootOpLoopInfo {
+  SmallVector<int64_t> staticLoopRanges;
+  unsigned numLoops;
+  SmallVector<AffineMap> indexingMaps;
+};
+
+/// Get compatible MMA attrs for the given target and element types.
+SmallVector<Attribute> getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget,
+                                             Type lhsElemType, Type rhsElemType,
+                                             Type accElemType, MLIRContext *ctx,
+                                             bool includeVirtual = false);
+
+/// Get contraction-like (m,n,k) dims for a linalg op.
+FailureOr<ContractionLikeDims>
+inferContractionLikeDims(linalg::LinalgOp linalgOp);
+
+/// Returns loop info for supported root ops.
+std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp);
+
+/// Build the VectorDistribute knobs dict for contraction-like dims.
+DictionaryAttr
+buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                               const ContractionLikeDims &dims,
+                               ArrayRef<Attribute> compatibleMMAs);
 
 /// LLVMGPU constraint emitter callback. Suitable for use as a
 /// GPUConstraintEmitter registered via registerGPUPipelineCallbacks.
