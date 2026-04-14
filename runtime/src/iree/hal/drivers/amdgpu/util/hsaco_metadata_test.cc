@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/amdgpu/util/amdgpu_metadata.h"
+#include "iree/hal/drivers/amdgpu/util/hsaco_metadata.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -278,11 +278,11 @@ static std::string ToString(iree_string_view_t value) {
   return std::string(value.data, value.size);
 }
 
-TEST(AmdgpuMetadataTest, ParsesValidMetadata) {
+TEST(HsacoMetadataTest, ParsesValidMetadata) {
   std::vector<uint8_t> elf = BuildElfWithMetadata(BuildKernelMetadata());
 
-  iree_hal_amdgpu_metadata_t metadata;
-  IREE_ASSERT_OK(iree_hal_amdgpu_metadata_initialize_from_elf(
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
+  IREE_ASSERT_OK(iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
       ByteSpan(elf), iree_allocator_system(), &metadata));
 
   ASSERT_EQ(metadata.kernel_count, 1);
@@ -291,7 +291,7 @@ TEST(AmdgpuMetadataTest, ParsesValidMetadata) {
   ASSERT_NE(metadata.kernels, nullptr);
   ASSERT_NE(metadata.args, nullptr);
 
-  const iree_hal_amdgpu_metadata_kernel_t& kernel = metadata.kernels[0];
+  const iree_hal_amdgpu_hsaco_metadata_kernel_t& kernel = metadata.kernels[0];
   EXPECT_EQ(ToString(kernel.name), "vector_add");
   EXPECT_EQ(ToString(kernel.symbol_name), "vector_add.kd");
   EXPECT_EQ(kernel.kernarg_segment_size, 24);
@@ -309,7 +309,7 @@ TEST(AmdgpuMetadataTest, ParsesValidMetadata) {
   EXPECT_EQ(kernel.args[0].size, 8);
   EXPECT_EQ(kernel.args[0].alignment, 8);
   EXPECT_EQ(kernel.args[0].kind,
-            IREE_HAL_AMDGPU_METADATA_ARG_KIND_GLOBAL_BUFFER);
+            IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_GLOBAL_BUFFER);
   EXPECT_EQ(ToString(kernel.args[0].value_kind), "global_buffer");
   EXPECT_EQ(ToString(kernel.args[0].address_space), "global");
   EXPECT_EQ(ToString(kernel.args[0].access), "read_only");
@@ -320,102 +320,104 @@ TEST(AmdgpuMetadataTest, ParsesValidMetadata) {
 
   EXPECT_EQ(kernel.args[2].offset, 16);
   EXPECT_EQ(kernel.args[2].size, 4);
-  EXPECT_EQ(kernel.args[2].kind, IREE_HAL_AMDGPU_METADATA_ARG_KIND_BY_VALUE);
+  EXPECT_EQ(kernel.args[2].kind,
+            IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE);
 
   EXPECT_EQ(kernel.args[3].offset, 20);
   EXPECT_EQ(kernel.args[3].size, 4);
-  EXPECT_EQ(kernel.args[3].kind, IREE_HAL_AMDGPU_METADATA_ARG_KIND_BY_VALUE);
+  EXPECT_EQ(kernel.args[3].kind,
+            IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE);
 
-  iree_hal_amdgpu_metadata_deinitialize(&metadata);
+  iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
 }
 
-TEST(AmdgpuMetadataTest, FindsKernelBySymbol) {
+TEST(HsacoMetadataTest, FindsKernelBySymbol) {
   std::vector<uint8_t> elf = BuildElfWithMetadata(BuildKernelMetadata());
 
-  iree_hal_amdgpu_metadata_t metadata;
-  IREE_ASSERT_OK(iree_hal_amdgpu_metadata_initialize_from_elf(
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
+  IREE_ASSERT_OK(iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
       ByteSpan(elf), iree_allocator_system(), &metadata));
 
-  const iree_hal_amdgpu_metadata_kernel_t* kernel = nullptr;
-  IREE_EXPECT_OK(iree_hal_amdgpu_metadata_find_kernel_by_symbol(
+  const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel = nullptr;
+  IREE_EXPECT_OK(iree_hal_amdgpu_hsaco_metadata_find_kernel_by_symbol(
       &metadata, IREE_SV("vector_add.kd"), &kernel));
   ASSERT_NE(kernel, nullptr);
   EXPECT_EQ(ToString(kernel->name), "vector_add");
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND,
-                        iree_hal_amdgpu_metadata_find_kernel_by_symbol(
+                        iree_hal_amdgpu_hsaco_metadata_find_kernel_by_symbol(
                             &metadata, IREE_SV("missing.kd"), &kernel));
 
-  iree_hal_amdgpu_metadata_deinitialize(&metadata);
+  iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
 }
 
-TEST(AmdgpuMetadataTest, AllowsUnknownValueKindAsOpaqueMetadata) {
+TEST(HsacoMetadataTest, AllowsUnknownValueKindAsOpaqueMetadata) {
   std::vector<uint8_t> elf =
       BuildElfWithMetadata(BuildKernelMetadata(/*out_of_range_arg=*/false,
                                                /*unknown_value_kind=*/true));
 
-  iree_hal_amdgpu_metadata_t metadata;
-  IREE_ASSERT_OK(iree_hal_amdgpu_metadata_initialize_from_elf(
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
+  IREE_ASSERT_OK(iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
       ByteSpan(elf), iree_allocator_system(), &metadata));
 
   ASSERT_EQ(metadata.kernel_count, 1);
   ASSERT_EQ(metadata.kernels[0].arg_count, 4);
   EXPECT_EQ(metadata.kernels[0].args[0].kind,
-            IREE_HAL_AMDGPU_METADATA_ARG_KIND_UNKNOWN);
+            IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_UNKNOWN);
   EXPECT_EQ(ToString(metadata.kernels[0].args[0].value_kind), "made_up_kind");
 
-  iree_hal_amdgpu_metadata_deinitialize(&metadata);
+  iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
 }
 
-TEST(AmdgpuMetadataTest, RejectsOutOfRangeArgument) {
+TEST(HsacoMetadataTest, RejectsOutOfRangeArgument) {
   std::vector<uint8_t> elf =
       BuildElfWithMetadata(BuildKernelMetadata(/*out_of_range_arg=*/true));
 
-  iree_hal_amdgpu_metadata_t metadata;
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_hal_amdgpu_metadata_initialize_from_elf(
+                        iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
                             ByteSpan(elf), iree_allocator_system(), &metadata));
 }
 
-TEST(AmdgpuMetadataTest, RejectsMissingMetadataNote) {
+TEST(HsacoMetadataTest, RejectsMissingMetadataNote) {
   std::vector<uint8_t> elf =
       BuildElfWithNote(BuildKernelMetadata(), IREE_SV("OTHER"), 32);
 
-  iree_hal_amdgpu_metadata_t metadata;
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND,
-                        iree_hal_amdgpu_metadata_initialize_from_elf(
+                        iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
                             ByteSpan(elf), iree_allocator_system(), &metadata));
 }
 
-TEST(AmdgpuMetadataTest, RejectsMalformedMessagePackMetadata) {
+TEST(HsacoMetadataTest, RejectsMalformedMessagePackMetadata) {
   std::vector<uint8_t> elf =
       BuildElfWithMetadata(BuildMalformedMissingKernelFieldsMetadata());
 
-  iree_hal_amdgpu_metadata_t metadata;
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_hal_amdgpu_metadata_initialize_from_elf(
+                        iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
                             ByteSpan(elf), iree_allocator_system(), &metadata));
 }
 
-TEST(AmdgpuMetadataTest, RejectsDuplicateArgumentField) {
+TEST(HsacoMetadataTest, RejectsDuplicateArgumentField) {
   std::vector<uint8_t> elf =
       BuildElfWithMetadata(BuildDuplicateArgumentFieldMetadata());
 
-  iree_hal_amdgpu_metadata_t metadata;
+  iree_hal_amdgpu_hsaco_metadata_t metadata;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
-                        iree_hal_amdgpu_metadata_initialize_from_elf(
+                        iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
                             ByteSpan(elf), iree_allocator_system(), &metadata));
 }
 
-TEST(AmdgpuMetadataTest, TruncatedElfPrefixesNeverSucceed) {
+TEST(HsacoMetadataTest, TruncatedElfPrefixesNeverSucceed) {
   std::vector<uint8_t> elf = BuildElfWithMetadata(BuildKernelMetadata());
   for (size_t length = 0; length < elf.size(); ++length) {
-    iree_hal_amdgpu_metadata_t metadata;
-    iree_status_t status = iree_hal_amdgpu_metadata_initialize_from_elf(
+    iree_hal_amdgpu_hsaco_metadata_t metadata;
+    iree_status_t status = iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
         iree_make_const_byte_span(elf.data(), length), iree_allocator_system(),
         &metadata);
     if (iree_status_is_ok(status)) {
-      iree_hal_amdgpu_metadata_deinitialize(&metadata);
+      iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
       ADD_FAILURE() << "unexpected success for truncated ELF prefix " << length;
       return;
     }

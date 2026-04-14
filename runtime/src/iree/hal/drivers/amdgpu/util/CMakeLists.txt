@@ -78,11 +78,11 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    amdgpu_metadata
+    hsaco_metadata
   HDRS
-    "amdgpu_metadata.h"
+    "hsaco_metadata.h"
   SRCS
-    "amdgpu_metadata.c"
+    "hsaco_metadata.c"
   DEPS
     iree::base
   PUBLIC
@@ -90,11 +90,11 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    amdgpu_metadata_test
+    hsaco_metadata_test
   SRCS
-    "amdgpu_metadata_test.cc"
+    "hsaco_metadata_test.cc"
   DEPS
-    ::amdgpu_metadata
+    ::hsaco_metadata
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -107,11 +107,11 @@ iree_cc_test(
 
 iree_cc_fuzz(
   NAME
-    amdgpu_metadata_fuzz
+    hsaco_metadata_fuzz
   SRCS
-    "amdgpu_metadata_fuzz.cc"
+    "hsaco_metadata_fuzz.cc"
   DEPS
-    ::amdgpu_metadata
+    ::hsaco_metadata
     iree::base
 )
 
