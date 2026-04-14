@@ -1015,7 +1015,7 @@ func.func @batch_mmt4d(%17: tensor<128x10x32x8x1xf32>, %18: tensor<128x80x32x4x1
   return %21 : tensor<128x10x80x8x4xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 10, 80, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 0, 8, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 10, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 0, 8, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 1]>
 //      CHECK: func.func @batch_mmt4d(
 //      CHECK:   linalg.batch_mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

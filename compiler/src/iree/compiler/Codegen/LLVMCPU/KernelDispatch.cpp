@@ -1894,20 +1894,21 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(M1);
   const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(N1);
 
-  // Helper to associate a cost to a candidate pair or tile sizes along the M
-  // and N dimensions.
-  auto evalTraversalCost = [=](int64_t numTilesM,
-                               int64_t numTilesN) -> int64_t {
-    // The cost model is a lower bound on the amount of data
-    // that will need to be loaded over the entire matmul. Note that each matrix
-    // (LHS, RHS) is traversed a number of times equal to the number of tiles
-    // of the opposite (RHS, LHS) matrix.
-    return numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
+  // Cost model.
+  auto evalCost = [=](int64_t numTilesM, int64_t numTilesN) -> int64_t {
+    // Note that each matrix (LHS, RHS) is traversed a number of times equal to
+    // the number of tiles of the opposite (RHS, LHS) matrix.
+    int64_t traversalCost =
+        numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
+    // Penalize failing to use the requested number of threads due to few tiles.
+    int64_t underutilizationCost = std::max<int64_t>(
+        1, clNumberOfRuntimeThreads / (numTilesM * numTilesN));
+    return traversalCost * underutilizationCost;
   };
 
   int64_t selectedTileM = 1;
   int64_t selectedTileN = 1;
-  int64_t selectedCost = evalTraversalCost(M1, N1);
+  int64_t selectedCost = evalCost(M1, N1);
 
   // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
   for (auto [tileM, numTilesM] : divisorsOfM1) {
@@ -1931,7 +1932,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
         continue;
       }
       // Evaluate the cost model and retain the better candidate.
-      int64_t candidateCost = evalTraversalCost(numTilesM, numTilesN);
+      int64_t candidateCost = evalCost(numTilesM, numTilesN);
       if (candidateCost < selectedCost) {
         selectedCost = candidateCost;
         selectedTileM = tileM;
