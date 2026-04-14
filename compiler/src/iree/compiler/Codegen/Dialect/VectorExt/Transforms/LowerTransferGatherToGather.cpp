@@ -37,6 +37,11 @@ struct LowerTransferGatherToVectorGather final
       return rewriter.notifyMatchFailure(op, "expected exactly one index vec");
     }
 
+    // Scalar index types become broadcasts, not gathers, skip them.
+    if (!isa<VectorType>(op.getIndexVecs()[0].getType())) {
+      return rewriter.notifyMatchFailure(op, "index vec must be a vector type");
+    }
+
     SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
     AffineMap sourceMap = indexingMaps[0];
 
@@ -57,7 +62,7 @@ struct LowerTransferGatherToVectorGather final
     // Check that all non-symbol source dims are constants or dim exprs.
     for (unsigned i = 0; i < numResults - 1; ++i) {
       AffineExpr expr = sourceMap.getResult(i);
-      if (!isa<AffineConstantExpr>(expr) && !isa<AffineDimExpr>(expr)) {
+      if (!isa<AffineConstantExpr>(expr)) {
         return rewriter.notifyMatchFailure(
             op, "non-gathered source dims must be constants or dim exprs");
       }

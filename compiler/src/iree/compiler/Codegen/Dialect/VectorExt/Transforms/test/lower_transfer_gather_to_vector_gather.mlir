@@ -33,3 +33,118 @@ module {
 // CHECK:         %[[INDICES:.+]] = arith.muli %[[STEP]], %[[STRIDE]] : vector<16xindex>
 // CHECK:         %[[GATHER:.+]] = vector.gather %[[SRC]][%[[C0]], %[[C0]], %[[C0]]] [%[[INDICES]]], %[[MASK]], %[[PASS_THRU]]
 // CHECK-SAME:      : tensor<1x1x31xf32>, vector<16xindex>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+
+// -----
+
+// Non-trivial leading dims: non-zero base offsets must be passed through
+// unchanged to the vector.gather base.
+func.func @lower_gather_nontrivial_leading_dims(
+    %src: tensor<4x16xf32>, %idx: vector<8xindex>) -> vector<8xf32> {
+  %pad = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %out = iree_vector_ext.transfer_gather %src[%c2, %c0]
+    [%idx : vector<8xindex>], %pad {
+      indexing_maps = [affine_map<(d0)[s0] -> (0, s0)>,
+                       affine_map<(d0)[s0] -> (d0)>]
+    } : tensor<4x16xf32>, vector<8xf32>
+  return %out : vector<8xf32>
+}
+// CHECK-LABEL: @lower_gather_nontrivial_leading_dims
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK:     vector.gather %{{.+}}[%[[C2]], %[[C0]]]
+
+// -----
+
+// Multiple index vecs not lowered.
+func.func @no_lower_multiple_index_vecs(
+    %src: tensor<8x16xf16>,
+    %i0: vector<8xindex>, %i1: vector<16xindex>) -> vector<8x16xf16> {
+  %pad = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %src[%c0, %c0]
+    [%i0, %i1 : vector<8xindex>, vector<16xindex>], %pad {
+      indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                       affine_map<(d0, d1)[s0, s1] -> (d0)>,
+                       affine_map<(d0, d1)[s0, s1] -> (d1)>]
+    } : tensor<8x16xf16>, vector<8x16xf16>
+  return %out : vector<8x16xf16>
+}
+// CHECK-LABEL: @no_lower_multiple_index_vecs
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Scalar index type not lowered.
+func.func @no_lower_scalar_index(
+    %src: memref<8x16xf16>, %idx: index) -> vector<8xf16> {
+  %pad = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %src[%c0, %c0]
+    [%idx : index], %pad {
+      indexing_maps = [affine_map<(d0)[s0] -> (0, s0)>,
+                       affine_map<(d0)[s0] -> ()>]
+    } : memref<8x16xf16>, vector<8xf16>
+  return %out : vector<8xf16>
+}
+// CHECK-LABEL: @no_lower_scalar_index
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Symbol appears in a non-last source dim is not lowered.
+func.func @no_lower_symbol_in_leading_dim(
+    %src: tensor<8x16xf16>, %idx: vector<8xindex>) -> vector<8x16xf16> {
+  %pad = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %src[%c0, %c0]
+    [%idx : vector<8xindex>], %pad {
+      indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                       affine_map<(d0, d1)[s0] -> (d0)>]
+    } : tensor<8x16xf16>, vector<8x16xf16>
+  return %out : vector<8x16xf16>
+}
+// CHECK-LABEL: @no_lower_symbol_in_leading_dim
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Non-constant leading source dim (dim expr) is not lowered.
+func.func @no_lower_nonconstant_leading_dim(
+    %src: tensor<16x16xf16>, %idx: vector<16xindex>) -> vector<16xf16> {
+  %pad = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %src[%c0, %c0]
+    [%idx : vector<16xindex>], %pad {
+      indexing_maps = [affine_map<(d0)[s0] -> (d0, s0)>,
+                       affine_map<(d0)[s0] -> (d0)>]
+    } : tensor<16x16xf16>, vector<16xf16>
+  return %out : vector<16xf16>
+}
+// CHECK-LABEL: @no_lower_nonconstant_leading_dim
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Masked transfer_gather is not lowered.
+func.func @no_lower_masked(
+    %src: tensor<8x16xf16>, %idx: vector<16xindex>,
+    %mask: vector<16xi1>) -> vector<16xf16> {
+  %pad = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %src[%c0, %c0]
+    [%idx : vector<16xindex>], %pad, %mask {
+      indexing_maps = [affine_map<(d0)[s0] -> (0, s0)>,
+                       affine_map<(d0)[s0] -> (d0)>,
+                       affine_map<(d0)[s0] -> (d0)>]
+    } : tensor<8x16xf16>, vector<16xf16>, vector<16xi1>
+  return %out : vector<16xf16>
+}
+// CHECK-LABEL: @no_lower_masked
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-NOT: vector.gather
