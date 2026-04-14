@@ -325,6 +325,15 @@ iree_status_t iree_hal_amdgpu_notification_ring_reserve(
     const iree_hal_amdgpu_notification_ring_t* ring,
     iree_host_size_t entry_count, iree_host_size_t frontier_snapshot_count);
 
+// Returns true if reserve() would currently succeed for the requested counts.
+//
+// This is intended for continuation-style submissions that can park and retry
+// after drain instead of treating temporary ring pressure as an error. Callers
+// must still use reserve() on paths where exhaustion is a terminal status.
+bool iree_hal_amdgpu_notification_ring_can_reserve(
+    const iree_hal_amdgpu_notification_ring_t* ring,
+    iree_host_size_t entry_count, iree_host_size_t frontier_snapshot_count);
+
 // Returns the reclaim entry for the next submission. Reclaim entries are
 // indexed by the zero-based completion interval, so callers must fill this
 // before calling advance_epoch.

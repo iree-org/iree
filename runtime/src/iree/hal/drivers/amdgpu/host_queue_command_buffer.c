@@ -15,6 +15,52 @@
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/utils/resource_set.h"
 
+typedef uint8_t iree_hal_amdgpu_command_buffer_block_terminator_kind_t;
+enum iree_hal_amdgpu_command_buffer_block_terminator_kind_e {
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_RETURN = 0,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_BRANCH = 1,
+};
+
+typedef struct iree_hal_amdgpu_command_buffer_block_terminator_t {
+  // Terminator opcode class from
+  // iree_hal_amdgpu_command_buffer_block_terminator_kind_t.
+  iree_hal_amdgpu_command_buffer_block_terminator_kind_t kind;
+  // Reserved padding.
+  uint8_t reserved0[3];
+  // Target block ordinal for BRANCH terminators.
+  uint32_t target_block_ordinal;
+} iree_hal_amdgpu_command_buffer_block_terminator_t;
+
+typedef struct iree_hal_amdgpu_command_buffer_replay_t {
+  // Reference-counted replay continuation resource.
+  iree_hal_resource_t resource;
+  // Host queue borrowed for the replay lifetime.
+  iree_hal_amdgpu_host_queue_t* queue;
+  // Host allocator used for this continuation allocation.
+  iree_allocator_t host_allocator;
+  // Command buffer retained for the replay lifetime.
+  iree_hal_command_buffer_t* command_buffer;
+  // Final user-visible signal semaphore list retained for the replay lifetime.
+  iree_hal_semaphore_list_t signal_semaphore_list;
+  // Dynamic binding table snapshot used after queue_execute returns.
+  iree_hal_buffer_binding_table_t binding_table;
+  // Resource set retaining binding-table buffers for the replay lifetime.
+  iree_hal_resource_set_t* binding_resource_set;
+  // Immutable recorded AQL program borrowed from |command_buffer|.
+  const iree_hal_amdgpu_aql_program_t* program;
+  // Next command-buffer block to evaluate or submit.
+  const iree_hal_amdgpu_command_buffer_block_header_t* current_block;
+  // Wait resolution that prefixes the next packet submission.
+  iree_hal_amdgpu_wait_resolution_t wait_resolution;
+  // Failure status cloned by a completed intermediate block before replay
+  // resumes after drain.
+  iree_status_t failure_status;
+  // Intrusive continuation used to retry replay after notification drain.
+  iree_hal_amdgpu_host_queue_post_drain_action_t post_drain_action;
+} iree_hal_amdgpu_command_buffer_replay_t;
+
+static void iree_hal_amdgpu_command_buffer_replay_post_drain(void* user_data);
+
 static iree_status_t iree_hal_amdgpu_host_queue_resolve_buffer_ref_ptr(
     iree_hal_buffer_ref_t buffer_ref, iree_hal_buffer_usage_t required_usage,
     iree_hal_memory_access_t required_access, uint8_t** out_device_ptr) {
@@ -459,6 +505,61 @@ static uint32_t iree_hal_amdgpu_host_queue_update_kernarg_block_count(
       sizeof(iree_hal_amdgpu_kernarg_block_t));
 }
 
+static iree_status_t
+iree_hal_amdgpu_host_queue_read_command_buffer_block_terminator(
+    const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    iree_hal_amdgpu_command_buffer_block_terminator_t* out_terminator) {
+  memset(out_terminator, 0, sizeof(*out_terminator));
+  const iree_hal_amdgpu_command_buffer_command_header_t* command =
+      iree_hal_amdgpu_command_buffer_block_commands_const(block);
+  for (uint16_t i = 0; i < block->command_count; ++i) {
+    switch (command->opcode) {
+      case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BRANCH: {
+        const iree_hal_amdgpu_command_buffer_branch_command_t* branch_command =
+            (const iree_hal_amdgpu_command_buffer_branch_command_t*)command;
+        out_terminator->kind =
+            IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_BRANCH;
+        out_terminator->target_block_ordinal =
+            branch_command->target_block_ordinal;
+        return iree_ok_status();
+      }
+      case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COND_BRANCH:
+        return iree_make_status(
+            IREE_STATUS_UNIMPLEMENTED,
+            "conditional AQL command-buffer branch replay not yet wired");
+      case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_RETURN:
+        out_terminator->kind =
+            IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_RETURN;
+        return iree_ok_status();
+      default:
+        command = iree_hal_amdgpu_command_buffer_command_next_const(command);
+        break;
+    }
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "AQL command-buffer block %" PRIu32
+                          " has no terminator",
+                          block->block_ordinal);
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_next_linear_block(
+    const iree_hal_amdgpu_aql_program_t* program,
+    const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    uint32_t target_block_ordinal,
+    const iree_hal_amdgpu_command_buffer_block_header_t** out_next_block) {
+  *out_next_block = NULL;
+  const iree_hal_amdgpu_command_buffer_block_header_t* next_block =
+      iree_hal_amdgpu_aql_program_block_next(program->block_pool, block);
+  if (IREE_UNLIKELY(!next_block ||
+                    next_block->block_ordinal != target_block_ordinal)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "non-linear AQL command-buffer branch replay not yet wired");
+  }
+  *out_next_block = next_block;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_amdgpu_host_queue_resolve_update_packet_operands(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
@@ -679,12 +780,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_check_packet_commands(
 
   const iree_hal_amdgpu_command_buffer_command_header_t* command =
       iree_hal_amdgpu_command_buffer_block_commands_const(block);
-  bool reached_return = false;
+  bool reached_terminator = false;
   uint32_t packet_count = 0;
   uint32_t kernarg_block_count = 0;
   iree_status_t status = iree_ok_status();
-  for (uint16_t i = 0;
-       i < block->command_count && iree_status_is_ok(status) && !reached_return;
+  for (uint16_t i = 0; i < block->command_count && iree_status_is_ok(status) &&
+                       !reached_terminator;
        ++i) {
     uint16_t setup = 0;
     switch (command->opcode) {
@@ -746,13 +847,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_check_packet_commands(
         break;
       }
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_RETURN:
-        reached_return = true;
+        reached_terminator = true;
         break;
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BRANCH:
-        status = iree_make_status(
-            IREE_STATUS_UNIMPLEMENTED,
-            "multi-block packet-bearing AQL command-buffer replay not yet "
-            "wired");
+        reached_terminator = true;
         break;
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_PROFILE_MARKER:
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COND_BRANCH:
@@ -767,14 +865,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_check_packet_commands(
                                   command->opcode);
         break;
     }
-    if (iree_status_is_ok(status) && !reached_return) {
+    if (iree_status_is_ok(status) && !reached_terminator) {
       command = iree_hal_amdgpu_command_buffer_command_next_const(command);
     }
   }
-  if (iree_status_is_ok(status) && !reached_return) {
+  if (iree_status_is_ok(status) && !reached_terminator) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "AQL command-buffer block %" PRIu32
-                              " has no return terminator",
+                              " has no terminator",
                               block->block_ordinal);
   }
   if (iree_status_is_ok(status) && packet_count != block->aql_packet_count) {
@@ -812,12 +910,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
     uint16_t* packet_setups) {
   const iree_hal_amdgpu_command_buffer_command_header_t* command =
       iree_hal_amdgpu_command_buffer_block_commands_const(block);
-  bool reached_return = false;
+  bool reached_terminator = false;
   uint32_t packet_index = 0;
   uint32_t kernarg_block_index = 0;
   iree_status_t status = iree_ok_status();
-  for (uint16_t i = 0;
-       i < block->command_count && iree_status_is_ok(status) && !reached_return;
+  for (uint16_t i = 0; i < block->command_count && iree_status_is_ok(status) &&
+                       !reached_terminator;
        ++i) {
     switch (command->opcode) {
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BARRIER:
@@ -922,13 +1020,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
         break;
       }
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_RETURN:
-        reached_return = true;
+        reached_terminator = true;
         break;
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BRANCH:
-        status = iree_make_status(
-            IREE_STATUS_UNIMPLEMENTED,
-            "multi-block packet-bearing AQL command-buffer replay not yet "
-            "wired");
+        reached_terminator = true;
         break;
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_PROFILE_MARKER:
       case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COND_BRANCH:
@@ -943,14 +1038,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
                                   command->opcode);
         break;
     }
-    if (iree_status_is_ok(status) && !reached_return) {
+    if (iree_status_is_ok(status) && !reached_terminator) {
       command = iree_hal_amdgpu_command_buffer_command_next_const(command);
     }
   }
-  if (iree_status_is_ok(status) && !reached_return) {
+  if (iree_status_is_ok(status) && !reached_terminator) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "AQL command-buffer block %" PRIu32
-                              " has no return terminator",
+                              " has no terminator",
                               block->block_ordinal);
   }
   if (iree_status_is_ok(status) && packet_index != block->aql_packet_count) {
@@ -977,22 +1072,22 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_command_buffer_t* command_buffer,
     const iree_hal_amdgpu_command_buffer_block_header_t* block,
     iree_hal_resource_set_t** inout_binding_resource_set,
+    iree_hal_amdgpu_reclaim_action_t pre_signal_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_kernel_submission_t* submission,
     const uint16_t* packet_headers, const uint16_t* packet_setups,
     uint32_t extra_noop_packet_count) {
-  iree_hal_resource_t* operation_resources[1] = {
-      (iree_hal_resource_t*)command_buffer,
-  };
+  submission->pre_signal_action = pre_signal_action;
   iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
                                                            submission);
   iree_hal_amdgpu_host_queue_finish_kernel_submission(
       queue, resolution, signal_semaphore_list, operation_resources,
-      IREE_ARRAYSIZE(operation_resources), inout_binding_resource_set,
-      submission_flags, submission);
+      operation_resource_count, inout_binding_resource_set, submission_flags,
+      submission);
 
   for (uint32_t i = 0; i < block->aql_packet_count; ++i) {
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
@@ -1016,7 +1111,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_amdgpu_command_buffer_block_header_t* block,
     iree_hal_resource_set_t** inout_binding_resource_set,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_reclaim_action_t pre_signal_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool allow_park, bool* out_ready) {
+  *out_ready = false;
   const uint32_t kernarg_block_count = (uint32_t)iree_host_size_ceil_div(
       block->kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
   if (IREE_UNLIKELY(kernarg_block_count < block->aql_packet_count)) {
@@ -1046,13 +1146,20 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
   iree_hal_amdgpu_host_queue_kernel_submission_t submission;
   memset(&submission, 0, sizeof(submission));
   if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_host_queue_begin_kernel_submission(
-        queue, resolution, signal_semaphore_list,
-        /*operation_resource_count=*/1,
-        /*payload_packet_count=*/block->aql_packet_count, kernarg_block_count,
-        &submission);
+    if (allow_park) {
+      status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
+          queue, resolution, signal_semaphore_list, operation_resource_count,
+          /*payload_packet_count=*/block->aql_packet_count, kernarg_block_count,
+          out_ready, &submission);
+    } else {
+      status = iree_hal_amdgpu_host_queue_begin_kernel_submission(
+          queue, resolution, signal_semaphore_list, operation_resource_count,
+          /*payload_packet_count=*/block->aql_packet_count, kernarg_block_count,
+          &submission);
+      if (iree_status_is_ok(status)) *out_ready = true;
+    }
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && *out_ready) {
     uint16_t* packet_headers = NULL;
     uint16_t* packet_setups = NULL;
     status = iree_hal_amdgpu_host_queue_prepare_command_buffer_packet_metadata(
@@ -1067,8 +1174,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
     }
     if (iree_status_is_ok(status)) {
       iree_hal_amdgpu_host_queue_finish_command_buffer_block(
-          queue, resolution, signal_semaphore_list, command_buffer, block,
-          inout_binding_resource_set, submission_flags, &submission,
+          queue, resolution, signal_semaphore_list, block,
+          inout_binding_resource_set, pre_signal_action, operation_resources,
+          operation_resource_count, submission_flags, &submission,
           packet_headers, packet_setups, extra_noop_packet_count);
     } else {
       iree_hal_amdgpu_host_queue_fail_kernel_submission(queue, &submission);
@@ -1146,7 +1254,32 @@ iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
   return status;
 }
 
-iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
+static void iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(
+    iree_hal_amdgpu_command_buffer_replay_t* replay) {
+  memset(&replay->wait_resolution, 0, sizeof(replay->wait_resolution));
+}
+
+static void iree_hal_amdgpu_command_buffer_replay_destroy(
+    iree_hal_resource_t* resource) {
+  iree_hal_amdgpu_command_buffer_replay_t* replay =
+      (iree_hal_amdgpu_command_buffer_replay_t*)resource;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (!iree_status_is_ok(replay->failure_status)) {
+    iree_status_free(replay->failure_status);
+  }
+  iree_hal_resource_set_free(replay->binding_resource_set);
+  iree_hal_semaphore_list_release(replay->signal_semaphore_list);
+  iree_hal_command_buffer_release(replay->command_buffer);
+  iree_allocator_free(replay->host_allocator, replay);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static const iree_hal_resource_vtable_t
+    iree_hal_amdgpu_command_buffer_replay_vtable = {
+        .destroy = iree_hal_amdgpu_command_buffer_replay_destroy,
+};
+
+static iree_status_t iree_hal_amdgpu_command_buffer_replay_create(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -1154,7 +1287,289 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_execute_flags_t execute_flags,
     iree_hal_resource_set_t** inout_binding_resource_set,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_command_buffer_replay_t** out_replay) {
+  *out_replay = NULL;
+
+  if (!*inout_binding_resource_set) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
+            queue, command_buffer, binding_table, execute_flags,
+            inout_binding_resource_set));
+  }
+
+  const iree_host_size_t signal_count = signal_semaphore_list.count;
+  const iree_host_size_t binding_count = command_buffer->binding_count;
+
+  iree_host_size_t semaphore_offset = 0;
+  iree_host_size_t payload_offset = 0;
+  iree_host_size_t binding_offset = 0;
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_amdgpu_command_buffer_replay_t), &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(signal_count, iree_hal_semaphore_t*, 1,
+                                &semaphore_offset),
+      IREE_STRUCT_FIELD_ALIGNED(signal_count, uint64_t, 1, &payload_offset),
+      IREE_STRUCT_FIELD_ALIGNED(binding_count, iree_hal_buffer_binding_t, 1,
+                                &binding_offset)));
+
+  iree_hal_amdgpu_command_buffer_replay_t* replay = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator, total_size,
+                                             (void**)&replay));
+  memset(replay, 0, total_size);
+  iree_hal_resource_initialize(&iree_hal_amdgpu_command_buffer_replay_vtable,
+                               &replay->resource);
+  replay->queue = queue;
+  replay->host_allocator = queue->host_allocator;
+  replay->command_buffer = command_buffer;
+  replay->binding_resource_set = *inout_binding_resource_set;
+  *inout_binding_resource_set = NULL;
+  replay->program = iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+  replay->current_block = replay->program->first_block;
+  replay->wait_resolution = *resolution;
+  replay->failure_status = iree_ok_status();
+  iree_hal_command_buffer_retain(command_buffer);
+
+  uint8_t* storage = (uint8_t*)replay;
+  if (signal_count > 0) {
+    replay->signal_semaphore_list.count = signal_count;
+    replay->signal_semaphore_list.semaphores =
+        (iree_hal_semaphore_t**)(storage + semaphore_offset);
+    replay->signal_semaphore_list.payload_values =
+        (uint64_t*)(storage + payload_offset);
+    memcpy(replay->signal_semaphore_list.semaphores,
+           signal_semaphore_list.semaphores,
+           signal_count * sizeof(*signal_semaphore_list.semaphores));
+    memcpy(replay->signal_semaphore_list.payload_values,
+           signal_semaphore_list.payload_values,
+           signal_count * sizeof(*signal_semaphore_list.payload_values));
+  }
+  iree_hal_semaphore_list_retain(replay->signal_semaphore_list);
+  if (binding_count > 0) {
+    iree_hal_buffer_binding_t* binding_storage =
+        (iree_hal_buffer_binding_t*)(storage + binding_offset);
+    replay->binding_table.count = binding_count;
+    replay->binding_table.bindings = binding_storage;
+    memcpy(binding_storage, binding_table.bindings,
+           binding_count * sizeof(*binding_table.bindings));
+  }
+
+  *out_replay = replay;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_command_buffer_replay_clone_queue_error(
+    iree_hal_amdgpu_command_buffer_replay_t* replay) {
+  if (IREE_UNLIKELY(replay->queue->is_shutting_down)) {
+    return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
+  }
+  iree_status_t error = (iree_status_t)iree_atomic_load(
+      &replay->queue->error_status, iree_memory_order_acquire);
+  return iree_status_is_ok(error) ? iree_ok_status() : iree_status_clone(error);
+}
+
+static void iree_hal_amdgpu_command_buffer_replay_record_failure(
+    iree_hal_amdgpu_command_buffer_replay_t* replay, iree_status_t status) {
+  if (iree_status_is_ok(status)) return;
+  if (iree_status_is_ok(replay->failure_status)) {
+    replay->failure_status = status;
+  } else {
+    iree_status_free(status);
+  }
+}
+
+static void iree_hal_amdgpu_command_buffer_replay_fail_signals(
+    iree_hal_amdgpu_command_buffer_replay_t* replay, iree_status_t status) {
+  if (iree_status_is_ok(status)) return;
+  if (iree_hal_semaphore_list_is_empty(replay->signal_semaphore_list)) {
+    iree_status_free(status);
+    return;
+  }
+  iree_hal_semaphore_list_fail(replay->signal_semaphore_list, status);
+}
+
+static iree_status_t iree_hal_amdgpu_command_buffer_replay_park(
+    iree_hal_amdgpu_command_buffer_replay_t* replay) {
+  iree_hal_resource_retain(&replay->resource);
+  iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+      replay->queue, &replay->post_drain_action,
+      iree_hal_amdgpu_command_buffer_replay_post_drain, replay);
+  return iree_ok_status();
+}
+
+static iree_status_t
+iree_hal_amdgpu_command_buffer_replay_submit_completion_packet(
+    iree_hal_amdgpu_command_buffer_replay_t* replay,
+    const iree_hal_amdgpu_wait_resolution_t* resolution, bool* out_ready) {
+  *out_ready = false;
+
+  iree_hal_amdgpu_host_queue_kernel_submission_t submission;
+  iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
+      replay->queue, resolution, replay->signal_semaphore_list,
+      /*operation_resource_count=*/1, /*payload_packet_count=*/1,
+      /*kernarg_block_count=*/1, out_ready, &submission);
+  if (iree_status_is_ok(status) && *out_ready) {
+    iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
+        replay->queue, resolution, &submission);
+    iree_hal_resource_t* replay_resource = &replay->resource;
+    iree_hal_amdgpu_host_queue_finish_kernel_submission(
+        replay->queue, resolution, replay->signal_semaphore_list,
+        &replay_resource, /*operation_resource_count=*/1,
+        /*inout_resource_set=*/NULL,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
+        &submission);
+
+    iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
+        &replay->queue->aql_ring,
+        submission.first_packet_id + submission.packet_count - 1);
+    uint16_t header = iree_hal_amdgpu_aql_emit_nop(
+        &packet->barrier_and,
+        iree_hal_amdgpu_aql_packet_control_barrier(
+            resolution->inline_acquire_scope,
+            iree_hal_amdgpu_host_queue_signal_list_release_scope(
+                replay->queue, replay->signal_semaphore_list)),
+        iree_hal_amdgpu_notification_ring_epoch_signal(
+            &replay->queue->notification_ring));
+    iree_hal_amdgpu_aql_ring_commit(packet, header, /*setup=*/0);
+    iree_hal_amdgpu_aql_ring_doorbell(
+        &replay->queue->aql_ring,
+        submission.first_packet_id + submission.packet_count - 1);
+    memset(&submission, 0, sizeof(submission));
+    replay->current_block = NULL;
+    iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
+  }
+  return status;
+}
+
+static void iree_hal_amdgpu_command_buffer_replay_block_pre_signal(
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status) {
+  (void)entry;
+  iree_hal_amdgpu_command_buffer_replay_t* replay =
+      (iree_hal_amdgpu_command_buffer_replay_t*)user_data;
+  iree_hal_amdgpu_command_buffer_replay_record_failure(
+      replay,
+      iree_status_is_ok(status) ? iree_ok_status() : iree_status_clone(status));
+  iree_hal_resource_retain(&replay->resource);
+  iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+      replay->queue, &replay->post_drain_action,
+      iree_hal_amdgpu_command_buffer_replay_post_drain, replay);
+}
+
+static iree_status_t iree_hal_amdgpu_command_buffer_replay_resume_under_lock(
+    iree_hal_amdgpu_command_buffer_replay_t* replay) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_command_buffer_replay_clone_queue_error(replay));
+
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) && replay->current_block) {
+    iree_hal_amdgpu_command_buffer_block_terminator_t terminator;
+    status = iree_hal_amdgpu_host_queue_read_command_buffer_block_terminator(
+        replay->current_block, &terminator);
+    if (!iree_status_is_ok(status)) break;
+
+    if (replay->current_block->aql_packet_count == 0) {
+      if (terminator.kind ==
+          IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_RETURN) {
+        const iree_hal_amdgpu_wait_resolution_t* current_resolution =
+            &replay->wait_resolution;
+        bool ready = false;
+        status = iree_hal_amdgpu_command_buffer_replay_submit_completion_packet(
+            replay, current_resolution, &ready);
+        if (iree_status_is_ok(status) && !ready) {
+          status = iree_hal_amdgpu_command_buffer_replay_park(replay);
+        }
+        break;
+      }
+
+      const iree_hal_amdgpu_command_buffer_block_header_t* next_block = NULL;
+      status = iree_hal_amdgpu_host_queue_next_linear_block(
+          replay->program, replay->current_block,
+          terminator.target_block_ordinal, &next_block);
+      if (iree_status_is_ok(status)) {
+        replay->current_block = next_block;
+      }
+      continue;
+    }
+
+    const iree_hal_amdgpu_wait_resolution_t* current_resolution =
+        &replay->wait_resolution;
+
+    if (terminator.kind ==
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_BLOCK_TERMINATOR_RETURN) {
+      iree_hal_resource_t* replay_resource = &replay->resource;
+      bool ready = false;
+      status = iree_hal_amdgpu_host_queue_submit_command_buffer_block(
+          replay->queue, current_resolution, replay->signal_semaphore_list,
+          replay->command_buffer, replay->binding_table, replay->current_block,
+          /*inout_binding_resource_set=*/NULL,
+          (iree_hal_amdgpu_reclaim_action_t){0}, &replay_resource,
+          /*operation_resource_count=*/1,
+          IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
+          /*allow_park=*/true, &ready);
+      if (iree_status_is_ok(status) && ready) {
+        replay->current_block = NULL;
+        iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
+      } else if (iree_status_is_ok(status)) {
+        status = iree_hal_amdgpu_command_buffer_replay_park(replay);
+      }
+      break;
+    }
+
+    const iree_hal_amdgpu_command_buffer_block_header_t* next_block = NULL;
+    status = iree_hal_amdgpu_host_queue_next_linear_block(
+        replay->program, replay->current_block, terminator.target_block_ordinal,
+        &next_block);
+    if (!iree_status_is_ok(status)) break;
+
+    iree_hal_resource_t* replay_resource = &replay->resource;
+    bool ready = false;
+    status = iree_hal_amdgpu_host_queue_submit_command_buffer_block(
+        replay->queue, current_resolution, iree_hal_semaphore_list_empty(),
+        replay->command_buffer, replay->binding_table, replay->current_block,
+        /*inout_binding_resource_set=*/NULL,
+        (iree_hal_amdgpu_reclaim_action_t){
+            .fn = iree_hal_amdgpu_command_buffer_replay_block_pre_signal,
+            .user_data = replay,
+        },
+        &replay_resource, /*operation_resource_count=*/1,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
+        /*allow_park=*/true, &ready);
+    if (iree_status_is_ok(status) && ready) {
+      replay->current_block = next_block;
+      iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
+    } else if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_command_buffer_replay_park(replay);
+    }
+    break;
+  }
+  return status;
+}
+
+static void iree_hal_amdgpu_command_buffer_replay_post_drain(void* user_data) {
+  iree_hal_amdgpu_command_buffer_replay_t* replay =
+      (iree_hal_amdgpu_command_buffer_replay_t*)user_data;
+  iree_status_t status = replay->failure_status;
+  replay->failure_status = iree_ok_status();
+
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&replay->queue->submission_mutex);
+    status = iree_hal_amdgpu_command_buffer_replay_resume_under_lock(replay);
+    iree_slim_mutex_unlock(&replay->queue->submission_mutex);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_amdgpu_command_buffer_replay_fail_signals(replay, status);
+  }
+  iree_hal_resource_release(&replay->resource);
+}
+
+iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t execute_flags,
+    iree_hal_resource_set_t** inout_binding_resource_set) {
   IREE_ASSERT_ARGUMENT(queue);
   IREE_ASSERT_ARGUMENT(resolution);
 
@@ -1208,7 +1623,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
         (iree_hal_amdgpu_reclaim_action_t){0}, &command_buffer_resource,
         /*operation_resource_count=*/1,
         /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
-        *inout_binding_resource_set, submission_flags);
+        *inout_binding_resource_set,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
     if (iree_status_is_ok(status)) {
       *inout_binding_resource_set = NULL;
     } else {
@@ -1218,10 +1634,19 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
     return status;
   }
 
-  if (IREE_UNLIKELY(program->block_count != 1)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "multi-block packet-bearing AQL command-buffer replay not yet wired");
+  if (program->block_count != 1) {
+    iree_hal_amdgpu_command_buffer_replay_t* replay = NULL;
+    iree_status_t status = iree_hal_amdgpu_command_buffer_replay_create(
+        queue, resolution, signal_semaphore_list, command_buffer, binding_table,
+        execute_flags, inout_binding_resource_set, &replay);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_command_buffer_replay_resume_under_lock(replay);
+      iree_hal_resource_release(&replay->resource);
+    } else {
+      iree_hal_resource_set_free(*inout_binding_resource_set);
+      *inout_binding_resource_set = NULL;
+    }
+    return status;
   }
   if (!*inout_binding_resource_set) {
     IREE_RETURN_IF_ERROR(
@@ -1229,9 +1654,16 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
             queue, command_buffer, binding_table, execute_flags,
             inout_binding_resource_set));
   }
+  iree_hal_resource_t* command_buffer_resource =
+      (iree_hal_resource_t*)command_buffer;
+  bool ready = false;
   iree_status_t status = iree_hal_amdgpu_host_queue_submit_command_buffer_block(
       queue, resolution, signal_semaphore_list, command_buffer, binding_table,
-      program->first_block, inout_binding_resource_set, submission_flags);
+      program->first_block, inout_binding_resource_set,
+      (iree_hal_amdgpu_reclaim_action_t){0}, &command_buffer_resource,
+      /*operation_resource_count=*/1,
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
+      /*allow_park=*/false, &ready);
   if (!iree_status_is_ok(status)) {
     iree_hal_resource_set_free(*inout_binding_resource_set);
     *inout_binding_resource_set = NULL;

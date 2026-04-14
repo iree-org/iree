@@ -125,24 +125,26 @@ typedef struct iree_hal_cmd_block_builder_t {
   // finalization with the actual dispatch_count. Set at begin() (entry barrier)
   // and after each barrier()/split.
   iree_hal_cmd_barrier_t* current_barrier;
-  // Number of work commands (DISPATCH, FILL, COPY) in the current region.
-  // Used for dispatch_index assignment and max_region_dispatch_count tracking.
-  // Reset to 0 at each region boundary.
+  // Number of work commands (DISPATCH, FILL, COPY, UPDATE) in the current
+  // region. This is split before reaching 256 because command indices and
+  // barrier dispatch counts are encoded as uint8_t.
   uint16_t region_dispatch_count;
-  // Total tiles accumulated in the current region (dispatches + fills +
-  // copies). Written to region_tiles_scratch at region finalization.
+  // Total tiles accumulated in the current region. Written to
+  // region_tiles_scratch at region finalization.
   uint32_t current_region_tiles;
 
   //=== Per-block accounting ===================================================
 
-  // These are reset when a new block is started and accumulated during
-  // recording. Written to the block header at finalization.
-  uint16_t region_count;               // Regions in the current block.
-  uint16_t max_region_dispatch_count;  // Highwater dispatches per region.
-  uint16_t total_binding_count;        // Sum of binding_count across all
-                                       // dispatches in the block.
-  uint16_t total_dispatch_count;       // Total dispatches in the block.
-  uint16_t fixup_count;                // Fixup entries written (backward).
+  // Number of regions in the current block.
+  uint16_t region_count;
+  // Highwater work-command count across regions in the current block.
+  uint16_t max_region_dispatch_count;
+  // Sum of binding_count across all work commands in the current block.
+  uint16_t total_binding_count;
+  // Total work-command count in the current block.
+  uint16_t total_dispatch_count;
+  // Number of fixup entries written backward from the end of the current block.
+  uint16_t fixup_count;
 
   // Per-region initial_remaining_tiles. Accumulated during recording and
   // memcpy'd to the end of the block at finalization. This is the only

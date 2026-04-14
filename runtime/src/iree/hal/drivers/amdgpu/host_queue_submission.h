@@ -90,6 +90,20 @@ iree_status_t iree_hal_amdgpu_host_queue_begin_kernel_submission(
     uint32_t kernarg_block_count,
     iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission);
 
+// Attempts to begin one kernel-shaped packet submission without waiting for
+// ring capacity. If temporary AQL/notification capacity is unavailable then
+// |out_ready| is set to false, no queue state is mutated, and OK is returned.
+// Any non-OK status is a real structural failure rather than retry state.
+//
+// Caller must hold submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
+    uint32_t kernarg_block_count, bool* out_ready,
+    iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission);
+
 // Publishes the software side of a kernel-shaped packet submission: transfers
 // operation resources and an optional resource set to the reclaim entry,
 // advances queue/frontier state, and records user-visible signal metadata.
