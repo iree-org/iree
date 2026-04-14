@@ -980,6 +980,10 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
     return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16};
   case MMAIntrinsic::MFMA_F32_16x16x32_BF16:
     return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
+  case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
+    return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ};
   default:
     return {};
   }
