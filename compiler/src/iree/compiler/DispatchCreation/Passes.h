@@ -9,7 +9,9 @@
 
 #include <functional>
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -18,6 +20,45 @@
 namespace mlir::iree_compiler::DispatchCreation {
 
 enum class EncodingOptions { Padding, Generic };
+
+// Custom cl::parser for IREE::Encoding::EncodingOpType. Enables use of enum
+// class in cl::list.
+struct EncodingOpTypeParser
+    : public llvm::cl::parser<IREE::Encoding::EncodingOpType> {
+  using llvm::cl::parser<IREE::Encoding::EncodingOpType>::parser;
+
+  void initialize() {
+    using OpType = IREE::Encoding::EncodingOpType;
+    llvm::cl::parser<OpType>::initialize();
+    addLiteralOption("matmul", OpType::matmul, "Contractions (matmul-like).");
+    addLiteralOption("scaled_matmul", OpType::scaled_matmul,
+                     "Scaled contractions.");
+    addLiteralOption("convolution", OpType::conv, "Convolutions.");
+  }
+
+  static void print(llvm::raw_ostream &os,
+                    const IREE::Encoding::EncodingOpType &value) {
+    using OpType = IREE::Encoding::EncodingOpType;
+    switch (value) {
+    case OpType::matmul:
+      os << "matmul";
+      break;
+    case OpType::scaled_matmul:
+      os << "scaled_matmul";
+      break;
+    case OpType::conv:
+      os << "convolution";
+      break;
+    }
+  }
+};
+
+struct AnnotateDataTilingHintsPassOptions {
+  llvm::SmallVector<IREE::Encoding::EncodingOpType> opTypes;
+};
+
+std::unique_ptr<mlir::Pass> createAnnotateDataTilingHintsPass(
+    const AnnotateDataTilingHintsPassOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -42,6 +83,18 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
+  ListOption<IREE::Encoding::EncodingOpType, EncodingOpTypeParser>
+      dataTilingOpTypes{
+          *this,
+          "data-tiling-op-types",
+          llvm::cl::desc(
+              "Op families eligible for data-tiling annotation. "
+              "Defaults to {matmul, scaled_matmul}; add 'convolution' to "
+              "enable convolution annotation."),
+          llvm::cl::list_init<IREE::Encoding::EncodingOpType>(
+              {IREE::Encoding::EncodingOpType::matmul,
+               IREE::Encoding::EncodingOpType::scaled_matmul}),
+      };
   Option<bool> enableSplitReduction{
       *this,
       "split-reduction",

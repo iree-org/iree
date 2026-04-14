@@ -261,7 +261,12 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
           options.cseConstants = false;
           return IREE::Flow::createCanonicalizePass(options);
         })
-        .addPass(createAnnotateDataTilingHintsPass)
+        .addPass([&]() {
+          AnnotateDataTilingHintsPassOptions passOpts;
+          passOpts.opTypes.assign(options.dataTilingOpTypes.begin(),
+                                  options.dataTilingOpTypes.end());
+          return createAnnotateDataTilingHintsPass(passOpts);
+        })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.

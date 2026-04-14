@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -27,9 +28,35 @@ namespace {
 struct AnnotateDataTilingHintsPass final
     : impl::AnnotateDataTilingHintsPassBase<AnnotateDataTilingHintsPass> {
   using Base::Base;
+
+  using OpType = IREE::Encoding::EncodingOpType;
+
+  Pass::ListOption<OpType, EncodingOpTypeParser> opTypes{
+      *this, "data-tiling-op-types",
+      llvm::cl::desc("Op families eligible for data-tiling annotation. "
+                     "Defaults to {matmul, scaled_matmul}."),
+      llvm::cl::list_init<OpType>({OpType::matmul, OpType::scaled_matmul})};
+
+  AnnotateDataTilingHintsPass() = default;
+
+  AnnotateDataTilingHintsPass(const AnnotateDataTilingHintsPass &other)
+      : Base(other) {
+    opTypes = ArrayRef<OpType>(other.opTypes);
+  }
+
+  explicit AnnotateDataTilingHintsPass(
+      const AnnotateDataTilingHintsPassOptions &options) {
+    opTypes = ArrayRef<OpType>(options.opTypes);
+  }
+
   void runOnOperation() override;
 };
 } // namespace
+
+std::unique_ptr<mlir::Pass> createAnnotateDataTilingHintsPass(
+    const AnnotateDataTilingHintsPassOptions &options) {
+  return std::make_unique<AnnotateDataTilingHintsPass>(options);
+}
 
 /// Returns true iff the linalgOp has a body like a regular matmul, i.e.
 /// yield(add(out, mul(cast(in0), cast(in1))))
@@ -184,17 +211,41 @@ static bool isSupportedScaledContractionOp(linalg::LinalgOp linalgOp) {
 
 void AnnotateDataTilingHintsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
+
+  using OpType = IREE::Encoding::EncodingOpType;
+
+  bool enableMatmul = false;
+  bool enableScaledMatmul = false;
+  bool enableConvolution = false;
+  for (OpType t : opTypes) {
+    switch (t) {
+    case OpType::matmul:
+      enableMatmul = true;
+      break;
+    case OpType::scaled_matmul:
+      enableScaledMatmul = true;
+      break;
+    case OpType::conv:
+      enableConvolution = true;
+      break;
+    }
+  }
+
   SmallVector<Operation *> candidates;
   WalkResult result = funcOp.walk([&](Operation *op) -> WalkResult {
     if (IREE::Encoding::hasDataTilingHint(op)) {
       return WalkResult::interrupt();
     }
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (linalgOp && (isSupportedContractionOp(linalgOp) ||
-                     isSupportedScaledContractionOp(linalgOp) ||
-                     isSupportedConvolutionOp(linalgOp))) {
-      candidates.push_back(op);
+    if (!linalgOp) {
       return WalkResult::advance();
+    }
+    const bool matches =
+        (enableMatmul && isSupportedContractionOp(linalgOp)) ||
+        (enableScaledMatmul && isSupportedScaledContractionOp(linalgOp)) ||
+        (enableConvolution && isSupportedConvolutionOp(linalgOp));
+    if (matches) {
+      candidates.push_back(op);
     }
     return WalkResult::advance();
   });

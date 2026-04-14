@@ -1,5 +1,7 @@
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints{data-tiling-op-types=matmul,scaled_matmul,convolution},iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK,CHECK-CONV
 // Test with `iree-dispatch-creation-annotate-data-tiling-hints` that adds the
 // data-tiling hint to all the available gemm ops. Otherwise, we have to add the
 // hint to all the gemm ops in the file.
@@ -1376,16 +1378,16 @@ util.func public @conv2d_nhwc_hwcf_f32(
          outs(%output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32>
   util.return %0 : tensor<1x14x14x8xf32>
 }
-//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
-//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-// CHECK-LABEL: util.func public @conv2d_nhwc_hwcf_f32
-//      CHECK:    iree_encoding.set_encoding
-//      CHECK:    linalg.conv_2d_nhwc_hwcf
-//      CHECK:    iree_encoding.unset_encoding
+//  CHECK-CONV-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+//  CHECK-CONV-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+//  CHECK-CONV-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-CONV-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-CONV-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-CONV-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+// CHECK-CONV-LABEL: util.func public @conv2d_nhwc_hwcf_f32
+//      CHECK-CONV:    iree_encoding.set_encoding
+//      CHECK-CONV:    linalg.conv_2d_nhwc_hwcf
+//      CHECK-CONV:    iree_encoding.unset_encoding
 
 // -----
 
@@ -1399,16 +1401,16 @@ util.func public @conv2d_nchw_fchw_f32(
          outs(%output : tensor<1x8x14x14xf32>) -> tensor<1x8x14x14xf32>
   util.return %0 : tensor<1x8x14x14xf32>
 }
-//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
-//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
-//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
-//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
-//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
-// CHECK-LABEL: util.func public @conv2d_nchw_fchw_f32
-//      CHECK:    iree_encoding.set_encoding
-//      CHECK:    linalg.conv_2d_nchw_fchw
-//      CHECK:    iree_encoding.unset_encoding
+//  CHECK-CONV-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>
+//  CHECK-CONV-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>
+//  CHECK-CONV-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-CONV-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+//  CHECK-CONV-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+//  CHECK-CONV-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 8, 14, 14, 4, 3, 3]>
+// CHECK-CONV-LABEL: util.func public @conv2d_nchw_fchw_f32
+//      CHECK-CONV:    iree_encoding.set_encoding
+//      CHECK-CONV:    linalg.conv_2d_nchw_fchw
+//      CHECK-CONV:    iree_encoding.unset_encoding
 
 // -----
 
@@ -1422,13 +1424,13 @@ util.func public @conv2d_nhwc_fhwc_f32(
          outs(%output : tensor<1x14x14x8xf32>) -> tensor<1x14x14x8xf32>
   util.return %0 : tensor<1x14x14x8xf32>
 }
-//  CHECK-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
-//  CHECK-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
-//  CHECK-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-//  CHECK-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-//  CHECK-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-//  CHECK-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
-// CHECK-LABEL: util.func public @conv2d_nhwc_fhwc_f32
-//      CHECK:    iree_encoding.set_encoding
-//      CHECK:    linalg.conv_2d_nhwc_fhwc
-//      CHECK:    iree_encoding.unset_encoding
+//  CHECK-CONV-DAG: #[[CMAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+//  CHECK-CONV-DAG: #[[CMAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+//  CHECK-CONV-DAG: #[[CMAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+//  CHECK-CONV-DAG: #[[INP_ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-CONV-DAG: #[[FLT_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+//  CHECK-CONV-DAG: #[[OUT_ENC:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#[[CMAP0]], #[[CMAP1]], #[[CMAP2]]], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+// CHECK-CONV-LABEL: util.func public @conv2d_nhwc_fhwc_f32
+//      CHECK-CONV:    iree_encoding.set_encoding
+//      CHECK-CONV:    linalg.conv_2d_nhwc_fhwc
+//      CHECK-CONV:    iree_encoding.unset_encoding
