@@ -8,6 +8,7 @@
 #define IREE_HAL_DRIVERS_AMDGPU_UTIL_HSACO_METADATA_H_
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +44,8 @@ typedef enum iree_hal_amdgpu_hsaco_metadata_arg_kind_e {
 
 // Decoded kernel argument metadata.
 typedef struct iree_hal_amdgpu_hsaco_metadata_arg_t {
+  // Source-level argument name from `.name`, if present.
+  iree_string_view_t name;
   // Byte offset in the kernel's kernarg segment.
   uint32_t offset;
   // Byte length of the kernarg storage for this argument.
@@ -66,6 +69,11 @@ typedef struct iree_hal_amdgpu_hsaco_metadata_kernel_t {
   iree_string_view_t name;
   // Kernel descriptor symbol name from `.symbol`, usually `foo.kd`.
   iree_string_view_t symbol_name;
+  // Export reflection name from `.name` or `.symbol` with a `.kd` suffix
+  // removed.
+  iree_string_view_t reflection_name;
+  // Bytes required to clone all argument names for this kernel.
+  iree_host_size_t arg_name_storage_size;
   // Kernel kernarg segment size from `.kernarg_segment_size`.
   uint32_t kernarg_segment_size;
   // Kernel kernarg segment alignment from `.kernarg_segment_align`.
@@ -95,6 +103,10 @@ typedef struct iree_hal_amdgpu_hsaco_metadata_t {
   iree_const_byte_span_t elf_data;
   // Borrowed AMDGPU MessagePack note descriptor payload.
   iree_const_byte_span_t message_pack_data;
+  // Bytes required to clone all kernel reflection names.
+  iree_host_size_t reflection_name_storage_size;
+  // Bytes required to clone all decoded argument names.
+  iree_host_size_t arg_name_storage_size;
   // Number of decoded kernels.
   iree_host_size_t kernel_count;
   // Decoded kernel records.
@@ -104,6 +116,18 @@ typedef struct iree_hal_amdgpu_hsaco_metadata_t {
   // Contiguous argument storage referenced by |kernels|.
   iree_hal_amdgpu_hsaco_metadata_arg_t* args;
 } iree_hal_amdgpu_hsaco_metadata_t;
+
+// Requirements for materializing default HAL export parameter reflection.
+typedef struct iree_hal_amdgpu_hsaco_metadata_export_parameter_requirements_t {
+  // Number of HAL-visible parameters after hidden ABI arguments are skipped.
+  uint16_t parameter_count;
+  // Number of 32-bit constants consumed by reflected by-value parameters.
+  uint16_t constant_count;
+  // Number of HAL bindings consumed by reflected global-buffer parameters.
+  uint16_t binding_count;
+  // Bytes required to clone all reflected parameter names for this kernel.
+  iree_host_size_t name_storage_size;
+} iree_hal_amdgpu_hsaco_metadata_export_parameter_requirements_t;
 
 // Initializes |out_metadata| from a raw AMDGPU ELF code object.
 //
@@ -119,6 +143,34 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
 // Releases storage owned by |metadata|.
 void iree_hal_amdgpu_hsaco_metadata_deinitialize(
     iree_hal_amdgpu_hsaco_metadata_t* metadata);
+
+// Calculates the storage and export-info counts required by the default HAL
+// reflection projection for |kernel|.
+//
+// This projection maps `.value_kind == "global_buffer"` arguments to bindings
+// in metadata argument order and `.value_kind == "by_value"` arguments to
+// constants in metadata argument order. Reflected by-value sizes must be
+// whole 32-bit constants. Hidden ABI arguments are skipped. Any
+// other visible argument kind fails with IREE_STATUS_INVALID_ARGUMENT so
+// callers do not accidentally publish partial reflection for unsupported ABIs.
+iree_status_t
+iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
+    const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel,
+    iree_hal_amdgpu_hsaco_metadata_export_parameter_requirements_t*
+        out_requirements);
+
+// Populates |out_parameters| using the default HAL reflection projection.
+//
+// |parameter_capacity| and |name_storage_capacity| must satisfy the
+// requirements returned by
+// iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements.
+// Reflected parameter names are cloned into |name_storage| and borrowed by the
+// returned parameter records. No NUL terminators are written or required.
+iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
+    const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel,
+    iree_host_size_t parameter_capacity,
+    iree_hal_executable_export_parameter_t* out_parameters,
+    iree_host_size_t name_storage_capacity, char* name_storage);
 
 // Finds a decoded kernel by its descriptor symbol name.
 iree_status_t iree_hal_amdgpu_hsaco_metadata_find_kernel_by_symbol(

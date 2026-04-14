@@ -90,6 +90,7 @@ iree_runtime_cc_library(
     hdrs = ["hsaco_metadata.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
     ],
 )
 

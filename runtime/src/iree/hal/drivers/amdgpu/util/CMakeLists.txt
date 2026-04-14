@@ -85,6 +85,7 @@ iree_cc_library(
     "hsaco_metadata.c"
   DEPS
     iree::base
+    iree::hal
   PUBLIC
 )
 
