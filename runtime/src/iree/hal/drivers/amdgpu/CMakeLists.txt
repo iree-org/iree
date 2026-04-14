@@ -18,6 +18,10 @@ iree_cc_library(
   SRCS
     "allocator.c"
     "allocator.h"
+    "aql_command_buffer.c"
+    "aql_command_buffer.h"
+    "aql_program_builder.c"
+    "aql_program_builder.h"
     "buffer.c"
     "buffer.h"
     "driver.c"
@@ -63,6 +67,7 @@ iree_cc_library(
     iree::async
     iree::async::util::proactor_pool
     iree::base
+    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
@@ -91,6 +96,8 @@ iree_cc_library(
   NAME
     headers
   HDRS
+    "aql_command_buffer.h"
+    "aql_program_builder.h"
     "buffer.h"
     "driver.h"
     "executable.h"
@@ -117,6 +124,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::hal
+    iree::hal::drivers::amdgpu::abi
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
@@ -125,6 +133,45 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::memory::slab_provider
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    aql_command_buffer_test
+  SRCS
+    "aql_command_buffer_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::base::internal::arena
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    aql_program_builder_test
+  SRCS
+    "aql_program_builder_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::base::internal::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(

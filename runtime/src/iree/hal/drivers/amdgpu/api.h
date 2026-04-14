@@ -44,14 +44,22 @@ typedef enum iree_hal_amdgpu_queue_placement_e {
 typedef struct iree_hal_amdgpu_logical_device_options_t {
   // Size of a block in each host block pool.
   struct {
+    // Small host block pool options.
     struct {
       // Size in bytes of a small host block. Must be a power of two.
       iree_host_size_t block_size;
     } small;
+    // Large host block pool options.
     struct {
       // Size in bytes of a large host block. Must be a power of two.
       iree_host_size_t block_size;
     } large;
+    // Command-buffer host block pool options.
+    struct {
+      // Usable byte capacity of a command-buffer recording block. Must be a
+      // power of two.
+      iree_host_size_t usable_block_size;
+    } command_buffer;
   } host_block_pools;
 
   // Size of a block in each device block pool.
