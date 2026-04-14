@@ -55,6 +55,13 @@ typedef enum iree_hal_amdgpu_command_buffer_fixup_kind_e {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_FIXUP_KIND_RODATA = 4,
 } iree_hal_amdgpu_command_buffer_fixup_kind_t;
 
+// Binding reference kinds embedded in command records.
+typedef enum iree_hal_amdgpu_command_buffer_binding_kind_e {
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_INVALID = 0,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_STATIC = 1,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_DYNAMIC = 2,
+} iree_hal_amdgpu_command_buffer_binding_kind_t;
+
 // Header stored at byte 0 of every command-buffer block.
 typedef struct IREE_AMDGPU_ALIGNAS(8)
     iree_hal_amdgpu_command_buffer_block_header_t {
@@ -181,17 +188,23 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
     iree_hal_amdgpu_command_buffer_fill_command_t {
   // Common command record header.
   iree_hal_amdgpu_command_buffer_command_header_t header;
+  // Byte offset into the target buffer reference.
+  uint64_t target_offset;
   // Byte length of the target range.
   uint64_t length;
   // Repeated fill pattern stored in the low bytes.
   uint64_t pattern;
+  // Static buffer ordinal or dynamic binding-table slot.
+  uint32_t target_ordinal;
+  // Binding reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
+  uint8_t target_kind;
   // Byte length of the fill pattern.
   uint8_t pattern_length;
   // Reserved bytes that must be zero in version 0.
-  uint8_t reserved0[7];
+  uint8_t reserved0[2];
 } iree_hal_amdgpu_command_buffer_fill_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_fill_command_t) == 40,
+    sizeof(iree_hal_amdgpu_command_buffer_fill_command_t) == 48,
     "fill command size must remain qword aligned");
 
 // Copy command record.
@@ -201,9 +214,23 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   iree_hal_amdgpu_command_buffer_command_header_t header;
   // Byte length of the copied range.
   uint64_t length;
+  // Byte offset into the source buffer reference.
+  uint64_t source_offset;
+  // Byte offset into the target buffer reference.
+  uint64_t target_offset;
+  // Static buffer ordinal or dynamic binding-table slot for the source.
+  uint32_t source_ordinal;
+  // Static buffer ordinal or dynamic binding-table slot for the target.
+  uint32_t target_ordinal;
+  // Source reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
+  uint8_t source_kind;
+  // Target reference kind from iree_hal_amdgpu_command_buffer_binding_kind_t.
+  uint8_t target_kind;
+  // Reserved bytes that must be zero in version 0.
+  uint8_t reserved0[6];
 } iree_hal_amdgpu_command_buffer_copy_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_copy_command_t) == 24,
+    sizeof(iree_hal_amdgpu_command_buffer_copy_command_t) == 56,
     "copy command size must remain qword aligned");
 
 // Update command record.

@@ -976,8 +976,13 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
         break;
       case IREE_HAL_AMDGPU_PENDING_OP_EXECUTE:
         if (op->execute.command_buffer) {
-          status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                    "AQL command-buffer replay not yet wired");
+          status = iree_hal_amdgpu_host_queue_submit_command_buffer(
+              queue, &resolution, op->signal_semaphore_list,
+              op->execute.command_buffer, op->execute.binding_table,
+              IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
+          if (iree_status_is_ok(status)) {
+            op->retained_resource_count = 0;
+          }
         } else {
           status = iree_hal_amdgpu_host_queue_submit_barrier(
               queue, &resolution, op->signal_semaphore_list,
@@ -2305,6 +2310,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_execute(
         "(count=%" PRIhsz ")",
         binding_table.count);
   }
+  if (command_buffer && command_buffer->binding_count == 0) {
+    binding_table = iree_hal_buffer_binding_table_empty();
+  }
 
   // Optional command buffer + up to binding_table.count buffers.
   iree_host_size_t operation_resource_count = command_buffer ? 1 : 0;
@@ -2529,8 +2537,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
           IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
     }
   } else {
-    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "AQL command-buffer replay not yet wired");
+    status = iree_hal_amdgpu_host_queue_submit_command_buffer(
+        queue, &resolution, signal_semaphore_list, command_buffer,
+        binding_table,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
   }
   iree_slim_mutex_unlock(&queue->submission_mutex);
 

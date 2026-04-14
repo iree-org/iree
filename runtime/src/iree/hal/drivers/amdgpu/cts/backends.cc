@@ -55,35 +55,11 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              // These semaphore-submission tests use command-buffer-backed
-              // queue_execute. The barrier-only queue_execute coverage remains
-              // enabled via SubmitWithNoCommandBuffers.
-              {"SemaphoreSubmissionTest.SubmitAndSignal",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-              {"SemaphoreSubmissionTest.SubmitWithWait",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-              {"SemaphoreSubmissionTest.SubmitWithMultipleSemaphores",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-              {"SemaphoreSubmissionTest.Wait*",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-              {"SemaphoreSubmissionTest.*Batch*",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-              {"SemaphoreSubmissionTest.PropagateFailSignal",
-               "AMDGPU command-buffer queue_execute not yet implemented"},
-
-              // Command buffers: requires command buffer recording and
-              // queue_execute.
-              {"CommandBufferBasicTest.*",
-               "AMDGPU command buffers not yet implemented"},
+              // Packet-bearing command buffers: requires command recording and
+              // replay for the corresponding queue operation.
               {"CommandBufferTest.*",
                "AMDGPU command buffers not yet implemented"},
-              {"CommandBufferCopyBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
-              {"CommandBufferFillBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
               {"CommandBufferUpdateBufferTest.*",
-               "AMDGPU command buffers not yet implemented"},
-              {"CommandBufferStressTest.*",
                "AMDGPU command buffers not yet implemented"},
               {"TransientBufferTest.*",
                "AMDGPU command buffers not yet implemented"},
