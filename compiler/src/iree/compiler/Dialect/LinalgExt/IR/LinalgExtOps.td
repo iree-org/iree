@@ -1485,8 +1485,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_low,
       Variadic<Index>:$output_pad_high,
       DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_output_pad_high,
-      Optional<AnyType>:$pad_value,
-      OptionalAttr<IREELinalgExt_Im2colDecomposeModeAttr>:$decompose_mode);
+      Optional<AnyType>:$pad_value);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -1593,17 +1592,22 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     // Returns true if the op has non-zero output padding.
     bool hasOutputPadding();
 
-    // Returns the decompose mode attribute value if set, otherwise
-    // returns Im2colDecomposeMode::StreamCopy as the default.
-    Im2colDecomposeMode getDecomposeModeOrDefault();
-
     // Returns true if *this satisfies every structural precondition for
-    // decomposeOperation in async-copy mode. See the design spec for the
-    // exact list of checks. Callers that intend to invoke decomposeOperation
-    // with decompose_mode = async_copy MUST call this first; the async
-    // branch itself also runs the same checks and returns failure() on
-    // mismatch, so this is a pure query with no side effects.
+    // async-copy decomposition. See the design spec for the exact list
+    // of checks. Callers that intend to invoke decomposeOperationAsyncCopy
+    // MUST call this first; the method itself also runs the same checks
+    // and returns failure() on mismatch, so this is a pure query with no
+    // side effects.
     bool canDecomposeAsyncCopy();
+
+    // Decomposes *this into the async-copy form (collapsed source +
+    // linalg.generic index tensor + iree_linalg_ext.gather + expand-shape).
+    // Precondition: canDecomposeAsyncCopy() returns true. This is NOT part
+    // of the AggregatedOpInterface; it is a direct entry point callers can
+    // use when they know async-copy is the right lowering (e.g. the
+    // GPUConvertToCoalescedDMA pass after it has checked the
+    // use_global_load_dma lowering_config).
+    FailureOr<SmallVector<Value>> decomposeOperationAsyncCopy(OpBuilder &b);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

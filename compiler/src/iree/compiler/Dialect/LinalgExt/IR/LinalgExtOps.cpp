@@ -2460,13 +2460,6 @@ bool Im2colOp::hasOutputPadding() {
   return false;
 }
 
-Im2colDecomposeMode Im2colOp::getDecomposeModeOrDefault() {
-  if (std::optional<Im2colDecomposeMode> mode = getDecomposeMode()) {
-    return *mode;
-  }
-  return Im2colDecomposeMode::StreamCopy;
-}
-
 SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
   SmallVector<int64_t> inverseOutPerm =
       invertPermutationVector(getOutputPerm());
@@ -2622,8 +2615,7 @@ void Im2colOp::build(
         builder.getDenseI64ArrayAttr(staticInputPadLow), dynamicInputPadHigh,
         builder.getDenseI64ArrayAttr(staticInputPadHigh), dynamicOutputPadLow,
         builder.getDenseI64ArrayAttr(staticOutputPadLow), dynamicOutputPadHigh,
-        builder.getDenseI64ArrayAttr(staticOutputPadHigh), padValue,
-        /*decompose_mode=*/Im2colDecomposeModeAttr{});
+        builder.getDenseI64ArrayAttr(staticOutputPadHigh), padValue);
 }
 
 LogicalResult Im2colOp::verify() {

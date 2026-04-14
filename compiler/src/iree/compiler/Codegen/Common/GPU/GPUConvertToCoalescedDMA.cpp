@@ -808,6 +808,32 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
       .has_value();
 }
 
+/// Decomposes an Im2colOp tagged with use_global_load_dma into the
+/// gather + extract_slice + insert form via Im2colOp::
+/// decomposeOperationAsyncCopy. The im2col pre-check downgrades any
+/// non-viable op's lowering config before this pattern runs, so by
+/// construction every matched op is DMA-viable. On the should-be-unreachable
+/// drift case where decomposition still fails, the op is left in place and
+/// the drift verifier in the pass emits the diagnostic.
+struct DecomposeIm2colToAsyncCopy
+    : OpRewritePattern<IREE::LinalgExt::Im2colOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::Im2colOp im2colOp,
+                                PatternRewriter &rewriter) const override {
+    if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+      return failure();
+    }
+    FailureOr<SmallVector<Value>> decomposed =
+        im2colOp.decomposeOperationAsyncCopy(rewriter);
+    if (failed(decomposed)) {
+      return failure();
+    }
+    rewriter.replaceOp(im2colOp, decomposed.value());
+    return success();
+  }
+};
+
 struct GPUConvertToCoalescedDMAPass final
     : impl::GPUConvertToCoalescedDMAPassBase<GPUConvertToCoalescedDMAPass> {
   using GPUConvertToCoalescedDMAPassBase::GPUConvertToCoalescedDMAPassBase;
@@ -815,88 +841,11 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
-    // Only activate when at least one copy already has use_global_load_dma
-    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
-    // direct-load). Collect all promoted copies (use_global_load_dma or
-    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
-    // use_global_load_dma. If ANY fails, downgrade them all to
-    // derived_thread_config.
-    // Note: GatherOps are excluded — they come from input IR (not from
-    // GPUPromoteMatmulOperands) and are handled independently by
-    // ConvertGatherToCoalescedDMA.
-    SmallVector<linalg::CopyOp> promotedCopies;
-    bool hasDMAIntent = false;
-    funcOp->walk([&](linalg::CopyOp copyOp) {
-      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
-        hasDMAIntent = true;
-        promotedCopies.push_back(copyOp);
-      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
-                     copyOp)) {
-        promotedCopies.push_back(copyOp);
-      }
-    });
+    // Phase 0a: coordinate linalg.copy DMA configs.
+    applyCopyDMAPreCheck(funcOp);
 
-    if (hasDMAIntent) {
-      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
-      LLVM_DEBUG({
-        if (!allConvertible) {
-          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
-                       << "downgrading " << promotedCopies.size()
-                       << " copies to derived_thread_config\n";
-        }
-      });
-      for (linalg::CopyOp copyOp : promotedCopies) {
-        if (allConvertible) {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
-        } else {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::DerivedThreadConfigAttr::get(context));
-        }
-      }
-    }
-
-    // Im2col pre-check + in-place decomposition (Phase 0).
-    //
-    // For each im2col op with a use_global_load_dma lowering config:
-    //   - If it is not DMA-viable (per isIm2colDMAConvertible), downgrade
-    //     the config to derived_thread_config and leave the op alone.
-    //   - Otherwise, set decompose_mode = async_copy and immediately call
-    //     decomposeOperation. Because isIm2colDMAConvertible gates on
-    //     canDecomposeAsyncCopy, decomposition MUST succeed; a failure
-    //     here means the precheck and the decomposition drifted apart,
-    //     which is a hard pass failure with a diagnostic.
-    IRRewriter im2colRewriter(context);
-    WalkResult walkResult =
-        funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) -> WalkResult {
-          if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
-            return WalkResult::advance();
-          }
-
-          if (!isIm2colDMAConvertible(im2colOp)) {
-            setLoweringConfig(im2colOp,
-                              IREE::GPU::DerivedThreadConfigAttr::get(context));
-            return WalkResult::advance();
-          }
-
-          im2colOp.setDecomposeModeAttr(
-              IREE::LinalgExt::Im2colDecomposeModeAttr::get(
-                  context, IREE::LinalgExt::Im2colDecomposeMode::AsyncCopy));
-          im2colRewriter.setInsertionPoint(im2colOp);
-          FailureOr<SmallVector<Value>> decomposed =
-              im2colOp.decomposeOperation(im2colRewriter);
-          if (failed(decomposed)) {
-            im2colOp.emitError(
-                "async_copy decomposition failed after isIm2colDMAConvertible "
-                "returned true — the DMA pass's viability predicate is out "
-                "of sync with Im2colOp::decomposeOperation");
-            return WalkResult::interrupt();
-          }
-          im2colRewriter.replaceOp(im2colOp, decomposed.value());
-          return WalkResult::advance();
-        });
-    if (walkResult.wasInterrupted()) {
+    // Phase 0b: pre-check + decomposition + drift verification for im2col.
+    if (failed(applyIm2colDMAHandling(funcOp))) {
       return signalPassFailure();
     }
 
@@ -915,6 +864,93 @@ struct GPUConvertToCoalescedDMAPass final
   }
 
 private:
+  /// Coordinate linalg.copy DMA configs across the function. Activates only
+  /// when at least one copy already carries use_global_load_dma (DMA intent
+  /// from upstream config, e.g. --iree-llvmgpu-use-direct-load). All promoted
+  /// copies (use_global_load_dma or derived_thread_config) are collected; if
+  /// every one is DMA-convertible they are upgraded to use_global_load_dma,
+  /// otherwise the whole group is downgraded to derived_thread_config.
+  /// GatherOps are excluded — they originate from input IR (not from
+  /// GPUPromoteMatmulOperands) and are handled by ConvertGatherToCoalescedDMA.
+  void applyCopyDMAPreCheck(FunctionOpInterface funcOp) {
+    MLIRContext *context = &getContext();
+
+    SmallVector<linalg::CopyOp> promotedCopies;
+    bool hasDMAIntent = false;
+    funcOp->walk([&](linalg::CopyOp copyOp) {
+      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+        hasDMAIntent = true;
+        promotedCopies.push_back(copyOp);
+      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
+                     copyOp)) {
+        promotedCopies.push_back(copyOp);
+      }
+    });
+
+    if (!hasDMAIntent) {
+      return;
+    }
+
+    bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+    LLVM_DEBUG({
+      if (!allConvertible) {
+        llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                     << "downgrading " << promotedCopies.size()
+                     << " copies to derived_thread_config\n";
+      }
+    });
+    for (linalg::CopyOp copyOp : promotedCopies) {
+      if (allConvertible) {
+        setLoweringConfig(copyOp,
+                          IREE::GPU::UseGlobalLoadDMAAttr::get(context));
+      } else {
+        setLoweringConfig(copyOp,
+                          IREE::GPU::DerivedThreadConfigAttr::get(context));
+      }
+    }
+  }
+
+  /// Pre-check, decompose, and verify im2col ops tagged use_global_load_dma.
+  ///
+  /// Step 1 (precheck walk): downgrade non-DMA-viable im2col ops to
+  /// derived_thread_config so the decomposition pattern only sees viable ops.
+  /// Step 2 (pattern application): DecomposeIm2colToAsyncCopy rewrites every
+  /// remaining viable im2col op via Im2colOp::decomposeOperationAsyncCopy.
+  /// Step 3 (drift verifier): if any im2col with use_global_load_dma survives
+  /// the pattern, isIm2colDMAConvertible (which gates on canDecomposeAsyncCopy)
+  /// drifted from decomposeOperationAsyncCopy — emit a diagnostic and fail.
+  LogicalResult applyIm2colDMAHandling(FunctionOpInterface funcOp) {
+    MLIRContext *context = &getContext();
+
+    funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) {
+      if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+        return;
+      }
+      if (!isIm2colDMAConvertible(im2colOp)) {
+        setLoweringConfig(im2colOp,
+                          IREE::GPU::DerivedThreadConfigAttr::get(context));
+      }
+    });
+
+    RewritePatternSet patterns(context);
+    patterns.add<DecomposeIm2colToAsyncCopy>(context);
+    walkAndApplyPatterns(funcOp, std::move(patterns));
+
+    WalkResult result =
+        funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) -> WalkResult {
+          if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+            return WalkResult::advance();
+          }
+          im2colOp.emitOpError(
+              "im2col op with use_global_load_dma config survived "
+              "decomposition pattern — isIm2colDMAConvertible (gating on "
+              "canDecomposeAsyncCopy) is out of sync with "
+              "Im2colOp::decomposeOperationAsyncCopy");
+          return WalkResult::interrupt();
+        });
+    return result.wasInterrupted() ? failure() : success();
+  }
+
   /// Compute tile sizes for subgroup-level distribution.
   /// Returns {tileSizes, numTiledDims}.
   ///

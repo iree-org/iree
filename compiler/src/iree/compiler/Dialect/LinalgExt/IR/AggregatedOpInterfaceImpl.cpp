@@ -626,7 +626,7 @@ static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
     return false;
   }
 
-  // Input shape must be static too: decomposeOperationAsyncCopy
+  // Input shape must be static too: decomposeOperationAsyncCopyImpl
   // linearizes per-input-dim offsets using inputShape as the basis,
   // and cannot emit correct IR when any outer input dim is dynamic.
   auto inputType = cast<RankedTensorType>(im2colOp.getInputType());
@@ -1003,7 +1003,7 @@ decomposeOperationStreamCopy(Im2colOp im2colOp, OpBuilder &b) {
 /// contiguous channel slice for every output row; the result is expanded
 /// back to the original output shape.
 static FailureOr<SmallVector<Value>>
-decomposeOperationAsyncCopy(Im2colOp im2colOp, OpBuilder &b) {
+decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
   if (!canDecomposeIm2colAsyncCopyImpl(im2colOp)) {
     return im2colOp.emitOpError(
         "async_copy decomposition preconditions not satisfied "
@@ -1120,14 +1120,13 @@ decomposeOperationAsyncCopy(Im2colOp im2colOp, OpBuilder &b) {
   return SmallVector<Value>{result};
 }
 
+FailureOr<SmallVector<Value>>
+Im2colOp::decomposeOperationAsyncCopy(OpBuilder &b) {
+  return decomposeOperationAsyncCopyImpl(*this, b);
+}
+
 FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
-  switch (getDecomposeModeOrDefault()) {
-  case Im2colDecomposeMode::StreamCopy:
-    return decomposeOperationStreamCopy(*this, b);
-  case Im2colDecomposeMode::AsyncCopy:
-    return decomposeOperationAsyncCopy(*this, b);
-  }
-  llvm_unreachable("unhandled Im2colDecomposeMode");
+  return decomposeOperationStreamCopy(*this, b);
 }
 
 //===----------------------------------------------------------------------===//

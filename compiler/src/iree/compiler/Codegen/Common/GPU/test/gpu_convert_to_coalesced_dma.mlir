@@ -915,7 +915,7 @@ func.func @im2col_small_k_no_dma(%input: tensor<1x6x6x4xf16>, %output: tensor<1x
     ins(%input : tensor<1x6x6x4xf16>)
     outs(%output : tensor<1x16x4xf16>) -> tensor<1x16x4xf16>
 
-  // Im2col remains with derived_thread_config, no decompose_mode was set.
+  // Im2col is not DMA-viable and is downgraded to derived_thread_config.
   // CHECK: iree_linalg_ext.im2col
   // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
   // CHECK-NOT: decompose_mode
@@ -1131,4 +1131,185 @@ func.func @im2col_mixed(%good_in: tensor<1x16x16x512xf16>, %good_out: tensor<1x1
   // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
   // CHECK-SAME: tensor<1x6x6x4xf16>
   return %good, %bad : tensor<1x196x512xf16>, tensor<1x16x4xf16>
+}
+
+// -----
+
+// Positive test: constant channel-aligned k_off (k_off = 512 = C).
+// canDecomposeAsyncCopy accepts a constant k_off that is a multiple of C.
+// Tensor shapes are identical to im2col_to_gather_dma so the DMA pipeline
+// produces the same warp/lane structure.
+
+#gpu_target_im2col_const_koff = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_const_koff = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_const_koff}>
+#translation_im2col_const_koff = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_async_constant_channel_aligned_koff
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x16x16x512xf16>
+func.func @im2col_async_constant_channel_aligned_koff(
+    %input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>)
+    -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_const_koff, translation_info = #translation_im2col_const_koff} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 512]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[INPUT]] {{\[}}[0, 1, 2], [3]{{\]}}
+  // CHECK-SAME: tensor<1x16x16x512xf16> into tensor<256x512xf16>
+  // CHECK: tensor.empty() : tensor<196xindex>
+  // CHECK: %[[INDICES:.+]] = linalg.generic
+  // CHECK: } -> tensor<196xindex>
+  // CHECK: scf.forall ({{.*}}) = (0, 0) to (196, 512) step (49, 512)
+  // CHECK:   scf.forall ({{.*}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma %[[COLLAPSED]][%{{.+}}]
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK: tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2]{{\]}}
+  // CHECK-NOT: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_linalg_ext.gather
+  return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Positive test: dynamic k_off guaranteed channel-aligned via affine.apply
+// with stride 512 = C. contiguousSize (512) <= C (512) so the dynamic-offset
+// branch in canDecomposeAsyncCopy accepts it.
+
+#map_koff = affine_map<(d0) -> (d0 * 512)>
+
+#gpu_target_im2col_dyn_koff = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_dyn_koff = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_dyn_koff}>
+#translation_im2col_dyn_koff = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_async_dynamic_koff_channel_aligned
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x16x16x512xf16>
+func.func @im2col_async_dynamic_koff_channel_aligned(
+    %input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>,
+    %k: index) -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_dyn_koff, translation_info = #translation_im2col_dyn_koff} {
+  %k_off = affine.apply #map_koff(%k)
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, %k_off]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[INPUT]] {{\[}}[0, 1, 2], [3]{{\]}}
+  // CHECK-SAME: tensor<1x16x16x512xf16> into tensor<256x512xf16>
+  // CHECK: tensor.empty() : tensor<196xindex>
+  // CHECK: %[[INDICES:.+]] = linalg.generic
+  // CHECK: } -> tensor<196xindex>
+  // CHECK: scf.forall ({{.*}}) = (0, 0) to (196, 512) step (49, 512)
+  // CHECK:   scf.forall ({{.*}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma %[[COLLAPSED]][%{{.+}}]
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK: tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2]{{\]}}
+  // CHECK-NOT: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_linalg_ext.gather
+  return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Negative test: constant k_off not channel-aligned (k_off = 17, C = 512).
+// canDecomposeAsyncCopy rejects this; the DMA pass downgrades to
+// derived_thread_config without decomposing.
+
+#gpu_target_im2col_unaligned_koff = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_unaligned_koff = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_unaligned_koff}>
+#translation_im2col_unaligned_koff = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_async_reject_unaligned_const_koff
+func.func @im2col_async_reject_unaligned_const_koff(
+    %input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>)
+    -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_unaligned_koff, translation_info = #translation_im2col_unaligned_koff} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 17]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // Constant k_off = 17 is not divisible by C = 512; canDecomposeAsyncCopy
+  // rejects it and the op is downgraded without decomposition.
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: decompose_mode
+  // CHECK-NOT: iree_linalg_ext.gather
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Negative test: non-identity input_k_perm. canDecomposeAsyncCopy requires
+// both output_perm and input_k_perm to be identity; this op is downgraded.
+
+#gpu_target_im2col_bad_kperm = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_bad_kperm = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_bad_kperm}>
+#translation_im2col_bad_kperm = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_async_reject_input_k_perm
+func.func @im2col_async_reject_input_k_perm(
+    %input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>)
+    -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_bad_kperm, translation_info = #translation_im2col_bad_kperm} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [2, 1, 0] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // Non-identity input_k_perm = [2, 1, 0] violates the canDecomposeAsyncCopy
+  // precondition; the op is downgraded without decomposition.
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: decompose_mode
+  // CHECK-NOT: iree_linalg_ext.gather
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  return %result : tensor<1x196x512xf16>
 }
