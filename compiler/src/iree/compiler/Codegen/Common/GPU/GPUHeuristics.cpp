@@ -698,7 +698,7 @@ static double computeMNUtilization(const GPUMatmulShapeType &problem,
 static bool compareIntrinsics(const GPUMatmulShapeType &problem,
                               const GPUIntrinsicType &lhs,
                               const GPUIntrinsicType &rhs,
-                              bool doCPromotion = false) {
+                              bool preferHighComputeIntrinsic = false) {
   // When both M and N need padding, prefer the intrinsic with better M*N
   // utilization. This targets grouped convolutions where per-group channels
   // are small (e.g., 8x8 problem: 16x16 at 25% util >> 32x32 at 6.25%).
@@ -776,9 +776,9 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if ((problem.gemmSize == GemmSizeKind::VeryLargeGemm ||
-       problem.gemmSize == GemmSizeKind::LargeGemm) &&
-      !doCPromotion) {
+  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm ||
+      (problem.gemmSize == GemmSizeKind::LargeGemm &&
+       preferHighComputeIntrinsic)) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -810,11 +810,11 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
 static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
                   ArrayRef<GPUIntrinsicType> intrinsics,
-                  bool doCPromotion = false) {
+                  bool preferHighComputeIntrinsic = false) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
   llvm::stable_sort(sortedIntrinsics, [&](const GPUIntrinsicType &lhs,
                                           const GPUIntrinsicType &rhs) {
-    return compareIntrinsics(problem, lhs, rhs, doCPromotion);
+    return compareIntrinsics(problem, lhs, rhs, preferHighComputeIntrinsic);
   });
   return sortedIntrinsics;
 }
@@ -941,16 +941,17 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
   }
 
   // Cap per-subgroup MN tile count based on output VGPR pressure from the
-  // selected intrinsic. With 32x32 intrinsic and 16+ MN tiles, each thread
-  // uses 256+ f32 VGPRs for output alone, maxing out the AGPR file and
-  // causing spilling. Capping at 128 output VGPRs per thread (8 MN tiles
-  // for 32x32, 32 for 16x16) prevents spilling while preserving the
-  // MNT boost for intrinsics that can handle higher tile counts.
-  constexpr int64_t kMaxOutputVGPRsPerThread = 128;
-  int64_t subgroupSize = target.getPreferredSubgroupSize();
-  int64_t outputVGPRsPerTile =
-      (intrinsic.mSizes[0] * intrinsic.nSizes[0]) / subgroupSize;
-  if (outputVGPRsPerTile > 0) {
+  // selected intrinsic. Only applies when the MNT boost (step 2) is
+  // configured, since the boost can push MN tile counts high enough to
+  // cause spilling with large-output intrinsics (32x32). Capping at 128
+  // output VGPRs per thread (8 MN tiles for 32x32, 32 for 16x16) prevents
+  // spilling while preserving the boost for intrinsics that can handle
+  // higher tile counts.
+  if (seeds.boostMNTileCountPerSubgroup) {
+    constexpr int64_t kMaxOutputVGPRsPerThread = 128;
+    int64_t subgroupSize = target.getPreferredSubgroupSize();
+    int64_t outputVGPRsPerTile =
+        (intrinsic.mSizes[0] * intrinsic.nSizes[0]) / subgroupSize;
     int64_t maxMNTiles = kMaxOutputVGPRsPerThread / outputVGPRsPerTile;
     if (seeds.bestMNTileCountPerSubgroup > maxMNTiles) {
       LDBG() << "VGPR cap: reducing bestMNTileCountPerSubgroup from "
@@ -970,8 +971,10 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
     bool doCPromotion, int64_t splitReductionTripCnt) {
 
+  bool preferHighComputeIntrinsic =
+      !doCPromotion && seeds.boostMNTileCountPerSubgroup.has_value();
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
-      sortMMAIntrinsics(problem, intrinsics, doCPromotion);
+      sortMMAIntrinsics(problem, intrinsics, preferHighComputeIntrinsic);
 
   // Compute product of M and N problem sizes to decide if block intrinsics
   // should be considered. If both M and N products exceed the threshold, skip
