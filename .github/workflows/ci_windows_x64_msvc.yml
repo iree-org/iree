@@ -17,7 +17,7 @@ jobs:
       BASE_BUILD_DIR_POWERSHELL: B:\tmpbuild
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
       SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
-      SCCACHE_CCACHE_ZSTD_LEVEL: 10
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
       SCCACHE_AZURE_KEY_PREFIX: "ci_windows_x64_msvc"
     steps:
       - name: "Checking out repository"
@@ -59,8 +59,10 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
+        shell: bash
         run: |
           echo "Building in ${{ env.BUILD_DIR_BASH }}"
+          source ./build_tools/cmake/setup_sccache.sh
           bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
