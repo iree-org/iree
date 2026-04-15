@@ -1314,7 +1314,11 @@ static hsa_signal_value_t iree_hal_amdgpu_host_queue_last_drained_signal_value(
 // signal changes or teardown/error signals the stop signal. Completion wakeups
 // drain normally; stop/error wakeups perform one final drain/fail before exit.
 static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(
+        z0, "iree_hal_amdgpu_host_queue_completion_thread_start");
+    IREE_TRACE_ZONE_END(z0);
+  }
   iree_hal_amdgpu_host_queue_t* queue =
       (iree_hal_amdgpu_host_queue_t*)entry_arg;
 
@@ -1351,34 +1355,46 @@ static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
         values, UINT64_MAX, HSA_WAIT_STATE_BLOCKED,
         /*satisfying_value=*/NULL);
 
-    if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_EPOCH_SIGNAL) {
-      iree_hal_amdgpu_host_queue_drain_completions(queue);
-      // Arm the next wait from the epoch we actually drained, not from a raw
-      // HSA signal load. A GPU completion can race with the drain and update
-      // the signal after drain() sampled it; observing that newer value here
-      // would mark an undrained epoch as already seen and could sleep forever
-      // with a user semaphore still pending.
-      last_epoch_value =
-          iree_hal_amdgpu_host_queue_last_drained_signal_value(queue);
-    }
+    {
+      IREE_TRACE_ZONE_BEGIN_NAMED(
+          z0, "iree_hal_amdgpu_host_queue_completion_thread_pump");
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, signal_index);
 
-    if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_STOP_SIGNAL ||
-        iree_hal_amdgpu_host_queue_has_error(queue)) {
-      iree_hal_amdgpu_host_queue_drain_completions(queue);
-      keep_running = false;
-    } else if (IREE_UNLIKELY(signal_index >=
-                             IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT)) {
-      iree_status_t error = iree_make_status(
-          IREE_STATUS_INTERNAL,
-          "hsa_amd_signal_wait_any returned invalid signal index %u",
-          signal_index);
-      iree_hal_amdgpu_host_queue_store_error(queue, error);
-      iree_hal_amdgpu_host_queue_drain_completions(queue);
-      keep_running = false;
+      if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_EPOCH_SIGNAL) {
+        iree_hal_amdgpu_host_queue_drain_completions(queue);
+        // Arm the next wait from the epoch we actually drained, not from a raw
+        // HSA signal load. A GPU completion can race with the drain and update
+        // the signal after drain() sampled it; observing that newer value here
+        // would mark an undrained epoch as already seen and could sleep forever
+        // with a user semaphore still pending.
+        last_epoch_value =
+            iree_hal_amdgpu_host_queue_last_drained_signal_value(queue);
+      }
+
+      if (signal_index == IREE_HAL_AMDGPU_COMPLETION_WAIT_STOP_SIGNAL ||
+          iree_hal_amdgpu_host_queue_has_error(queue)) {
+        iree_hal_amdgpu_host_queue_drain_completions(queue);
+        keep_running = false;
+      } else if (IREE_UNLIKELY(signal_index >=
+                               IREE_HAL_AMDGPU_COMPLETION_WAIT_SIGNAL_COUNT)) {
+        iree_status_t error = iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "hsa_amd_signal_wait_any returned invalid signal index %u",
+            signal_index);
+        iree_hal_amdgpu_host_queue_store_error(queue, error);
+        iree_hal_amdgpu_host_queue_drain_completions(queue);
+        keep_running = false;
+      }
+
+      IREE_TRACE_ZONE_END(z0);
     }
   }
 
-  IREE_TRACE_ZONE_END(z0);
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(
+        z0, "iree_hal_amdgpu_host_queue_completion_thread_exit");
+    IREE_TRACE_ZONE_END(z0);
+  }
   return 0;
 }
 
