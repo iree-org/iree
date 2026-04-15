@@ -776,9 +776,7 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm ||
-      (problem.gemmSize == GemmSizeKind::LargeGemm &&
-       preferHighComputeIntrinsic)) {
+  if (preferHighComputeIntrinsic) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -906,7 +904,8 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
              << " for balanced large gemm";
       // Halve subgroup count to offset the MNT boost, keeping the total
       // workgroup resource footprint (threads, LDS) in check for occupancy.
-      seeds.bestSubgroupCountPerWorkgroup /= 2;
+      seeds.bestSubgroupCountPerWorkgroup =
+          std::max<int64_t>(1, seeds.bestSubgroupCountPerWorkgroup / 2);
       LDBG() << "Halving subgroup count to "
              << seeds.bestSubgroupCountPerWorkgroup << " to offset MNT boost";
     }
@@ -947,12 +946,11 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
   // output VGPRs per thread (8 MN tiles for 32x32, 32 for 16x16) prevents
   // spilling while preserving the boost for intrinsics that can handle
   // higher tile counts.
-  if (seeds.boostMNTileCountPerSubgroup) {
-    constexpr int64_t kMaxOutputVGPRsPerThread = 128;
+  if (seeds.maxOutputVGPRsPerThread) {
     int64_t subgroupSize = target.getPreferredSubgroupSize();
     int64_t outputVGPRsPerTile =
         (intrinsic.mSizes[0] * intrinsic.nSizes[0]) / subgroupSize;
-    int64_t maxMNTiles = kMaxOutputVGPRsPerThread / outputVGPRsPerTile;
+    int64_t maxMNTiles = *seeds.maxOutputVGPRsPerThread / outputVGPRsPerTile;
     if (seeds.bestMNTileCountPerSubgroup > maxMNTiles) {
       LDBG() << "VGPR cap: reducing bestMNTileCountPerSubgroup from "
              << seeds.bestMNTileCountPerSubgroup << " to " << maxMNTiles
@@ -971,8 +969,17 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
     bool doCPromotion, int64_t splitReductionTripCnt) {
 
+  // Prefer higher-compute intrinsics (e.g., 32x32x16 over 16x16x32) for:
+  //  - VeryLargeGemm: always compute-bound, higher throughput wins.
+  //  - LargeGemm on architectures with MNT boost (e.g., CDNA4): the boost
+  //    indicates the target benefits from larger output tiles. Gated by
+  //    !doCPromotion to avoid regressing addmm shapes that need accumulator
+  //    promotion to shared memory.
+  bool isLargeGemmWithBoost = problem.gemmSize == GemmSizeKind::LargeGemm &&
+                              seeds.boostMNTileCountPerSubgroup.has_value() &&
+                              !doCPromotion;
   bool preferHighComputeIntrinsic =
-      !doCPromotion && seeds.boostMNTileCountPerSubgroup.has_value();
+      problem.gemmSize == GemmSizeKind::VeryLargeGemm || isLargeGemmWithBoost;
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics, preferHighComputeIntrinsic);
 
