@@ -336,3 +336,21 @@ func.func @transfer_read_2d(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: ind
 //       CHECK:   %[[OFF4:.+]] = arith.addi %[[IDX1]], %[[C4]] : index
 //       CHECK:   %[[V4:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF4]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
 //       CHECK:   return %[[V0]], %[[V1]], %[[V2]], %[[V3]], %[[V4]] : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 2-D mask: each unrolled read gets the corresponding 1-D mask slice.
+func.func @transfer_read_2d_masked(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %padding: f32, %mask: vector<2x4xi1>) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c], %padding, %mask {in_bounds = [false, false]} : memref<?x?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_2d_masked
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[PAD]], %[[M0]]
+//  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[PAD]], %[[M1]]
+//  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   return %[[V0]], %[[V1]] : vector<4xf32>, vector<4xf32>

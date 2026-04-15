@@ -760,6 +760,9 @@ struct ConvertTransferRead final
       newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
     }
 
+    ValueRange convertedMask = adaptor.getMask();
+
+    int32_t idx = 0;
     SmallVector<Value> results;
     SmallVector<int64_t> tileShape(numOuterDims, 1);
     for (SmallVector<int64_t> outerIdx :
@@ -777,10 +780,14 @@ struct ConvertTransferRead final
         newIndices[memrefDim] =
             arith::AddIOp::create(rewriter, loc, newIndices[memrefDim], offset);
       }
+
+      Value newMask = convertedMask.empty() ? Value{} : convertedMask[idx++];
+
       auto readOp = vector::TransferReadOp::create(
           rewriter, loc, vec1DType, op.getBase(), newIndices,
-          AffineMapAttr::get(newPermMap), op.getPadding(),
-          /*mask=*/Value{}, newInBoundsAttr);
+          AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
+          newInBoundsAttr);
+
       results.push_back(readOp);
     }
     rewriter.replaceOpWithMultiple(op, {results});
