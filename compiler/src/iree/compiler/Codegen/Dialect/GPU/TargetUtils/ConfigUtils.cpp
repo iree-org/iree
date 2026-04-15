@@ -358,7 +358,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           }
           auto vmma = VirtualMMAAttr::get(ctx, vi);
           auto [vm, vn, vk] = vmma.getMNKShape();
-          if (problem.mSizes.empty() || llvm::product_of(problem.mSizes) > vm) {
+          if (llvm::product_of(problem.mSizes) > vm) {
             continue;
           }
           auto [va, vb, vc] = vmma.getABCElementTypes();
