@@ -2149,9 +2149,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                             pipelineConfig));
 }
 
-template <typename AttentionOpType>
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   AttentionOpType attnOp) {
+                                   IREE::LinalgExt::AttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
           attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
