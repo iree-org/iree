@@ -297,6 +297,8 @@ def FormDispatchRegionsPass :
   let options = [
     Option<"aggressiveFusion", "aggressive-fusion", "bool",
            /*default=*/"false", "Aggressive mode enabling fusions not ready for all backends">,
+    Option<"fuseMultiUseProducers", "fuse-multi-use-producers", "bool",
+           /*default=*/"true", "Enable experimental fusion of producers with multiple non-dim uses">,
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
            /*default=*/"false", "Enable fusing pad with consumer">,
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",

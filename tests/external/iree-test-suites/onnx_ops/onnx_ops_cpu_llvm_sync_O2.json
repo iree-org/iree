@@ -105,7 +105,6 @@
     "onnx/node/generated/test_nllloss_NCd1d2_with_weight_reduction_sum_ii",
     "onnx/node/generated/test_nllloss_NCd1d2d3_none_no_weight_negative_ii",
     "onnx/node/generated/test_nllloss_NCd1d2d3d4d5_mean_weight",
-    "onnx/node/generated/test_nllloss_NCd1d2d3d4d5_mean_weight_expanded",
     "onnx/node/generated/test_nllloss_NCd1d2d3d4d5_none_no_weight",
     "onnx/node/generated/test_nonmaxsuppression_two_classes",
     "onnx/node/generated/test_nonzero_example",
