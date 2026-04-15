@@ -29,34 +29,9 @@ struct AnnotateDataTilingHintsPass final
     : impl::AnnotateDataTilingHintsPassBase<AnnotateDataTilingHintsPass> {
   using Base::Base;
 
-  using OpType = IREE::Encoding::EncodingOpType;
-
-  Pass::ListOption<OpType, EncodingOpTypeParser> opTypes{
-      *this, "data-tiling-op-types",
-      llvm::cl::desc("Op families eligible for data-tiling annotation. "
-                     "Defaults to {matmul, scaled_matmul}."),
-      llvm::cl::list_init<OpType>({OpType::matmul, OpType::scaled_matmul})};
-
-  AnnotateDataTilingHintsPass() = default;
-
-  AnnotateDataTilingHintsPass(const AnnotateDataTilingHintsPass &other)
-      : Base(other) {
-    opTypes = ArrayRef<OpType>(other.opTypes);
-  }
-
-  explicit AnnotateDataTilingHintsPass(
-      const AnnotateDataTilingHintsPassOptions &options) {
-    opTypes = ArrayRef<OpType>(options.opTypes);
-  }
-
   void runOnOperation() override;
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createAnnotateDataTilingHintsPass(
-    const AnnotateDataTilingHintsPassOptions &options) {
-  return std::make_unique<AnnotateDataTilingHintsPass>(options);
-}
 
 /// Returns true iff the linalgOp has a body like a regular matmul, i.e.
 /// yield(add(out, mul(cast(in0), cast(in1))))

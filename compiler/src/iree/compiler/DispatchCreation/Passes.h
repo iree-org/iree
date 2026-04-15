@@ -17,48 +17,39 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir::iree_compiler::DispatchCreation {
+// Specialize the default pass-option parser for `EncodingOpType` so TableGen-
+// emitted `Pass::(List)Option<EncodingOpType>` recognizes the enum literals
+// without a second template argument, which TableGen cannot supply.
+namespace mlir::detail {
+template <>
+struct PassOptions::GenericOptionParser<
+    ::mlir::iree_compiler::IREE::Encoding::EncodingOpType>
+    : public ::llvm::cl::parser<
+          ::mlir::iree_compiler::IREE::Encoding::EncodingOpType> {
+  using OpType = ::mlir::iree_compiler::IREE::Encoding::EncodingOpType;
+  using ::llvm::cl::parser<OpType>::parser;
 
-enum class EncodingOptions { Padding, Generic };
-
-// Custom cl::parser for IREE::Encoding::EncodingOpType. Enables use of enum
-// class in cl::list.
-struct EncodingOpTypeParser
-    : public llvm::cl::parser<IREE::Encoding::EncodingOpType> {
-  using llvm::cl::parser<IREE::Encoding::EncodingOpType>::parser;
-  using OpType = IREE::Encoding::EncodingOpType;
+  std::optional<::llvm::StringRef> findArgStrForValue(const OpType &value) {
+    for (auto &it : this->Values) {
+      if (it.V.compare(value)) {
+        return it.Name;
+      }
+    }
+    return std::nullopt;
+  }
 
   void initialize() {
-    llvm::cl::parser<OpType>::initialize();
     addLiteralOption("matmul", OpType::matmul, "Contractions (matmul-like).");
     addLiteralOption("scaled_matmul", OpType::scaled_matmul,
                      "Scaled contractions.");
     addLiteralOption("convolution", OpType::conv, "Convolutions.");
   }
-
-  static void print(llvm::raw_ostream &os,
-                    const IREE::Encoding::EncodingOpType &value) {
-    using OpType = IREE::Encoding::EncodingOpType;
-    switch (value) {
-    case OpType::matmul:
-      os << "matmul";
-      break;
-    case OpType::scaled_matmul:
-      os << "scaled_matmul";
-      break;
-    case OpType::conv:
-      os << "convolution";
-      break;
-    }
-  }
 };
+} // namespace mlir::detail
 
-struct AnnotateDataTilingHintsPassOptions {
-  llvm::SmallVector<IREE::Encoding::EncodingOpType> opTypes;
-};
+namespace mlir::iree_compiler::DispatchCreation {
 
-std::unique_ptr<mlir::Pass> createAnnotateDataTilingHintsPass(
-    const AnnotateDataTilingHintsPassOptions &options);
+enum class EncodingOptions { Padding, Generic };
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -83,18 +74,17 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
-  ListOption<IREE::Encoding::EncodingOpType, EncodingOpTypeParser>
-      dataTilingOpTypes{
-          *this,
-          "data-tiling-op-types",
-          llvm::cl::desc(
-              "Op families eligible for data-tiling annotation. "
-              "Defaults to {matmul, scaled_matmul}; add 'convolution' to "
-              "enable convolution annotation."),
-          llvm::cl::list_init<IREE::Encoding::EncodingOpType>(
-              {IREE::Encoding::EncodingOpType::matmul,
-               IREE::Encoding::EncodingOpType::scaled_matmul}),
-      };
+  ListOption<IREE::Encoding::EncodingOpType> dataTilingOpTypes{
+      *this,
+      "data-tiling-op-types",
+      llvm::cl::desc(
+          "Op families eligible for data-tiling annotation. "
+          "Defaults to {matmul, scaled_matmul}; add 'convolution' to "
+          "enable convolution annotation."),
+      llvm::cl::list_init<IREE::Encoding::EncodingOpType>(
+          {IREE::Encoding::EncodingOpType::matmul,
+           IREE::Encoding::EncodingOpType::scaled_matmul}),
+  };
   Option<bool> enableSplitReduction{
       *this,
       "split-reduction",

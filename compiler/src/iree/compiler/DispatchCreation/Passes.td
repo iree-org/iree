@@ -407,6 +407,17 @@ def AnnotateDataTilingHintsPass :
     attribute. Otherwise, it aggressively filters linalg ops and adds the
     data-tiling hint attribute to the operations.
   }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data-tiling annotation. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init<
+            mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
+            {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
+             mlir::iree_compiler::IREE::Encoding::EncodingOpType::scaled_matmul})}]>,
+  ];
 }
 
 def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
