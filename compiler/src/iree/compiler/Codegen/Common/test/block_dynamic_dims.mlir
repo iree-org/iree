@@ -26,7 +26,7 @@ func.func @block_attention_dims() {
   %mask_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags("ReadOnly|Indirect")
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2}
   %output_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) flags(Indirect)
-      : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
+      : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf32>>{%m}
   %q = iree_tensor_ext.dispatch.tensor.load %q_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%m} -> tensor<4x?x32x128xf16>
   %key = iree_tensor_ext.dispatch.tensor.load %key_in, offsets = [0, 0, 0, 0], sizes = [4, %k2, 32, 128], strides = [1, 1, 1, 1]
@@ -35,30 +35,39 @@ func.func @block_attention_dims() {
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2} -> tensor<4x?x32x128xf16>
   %mask = iree_tensor_ext.dispatch.tensor.load %mask_in, offsets = [0, 0, 0, 0], sizes = [4, 32, %m, %k2], strides = [1, 1, 1, 1]
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2} -> tensor<4x32x?x?xf16>
-  %1 = tensor.empty(%m) : tensor<4x?x32x128xf16>
-  %2 = tensor.empty(%m) : tensor<4x32x?x128xf16>
-  %attn = iree_linalg_ext.attention {
+  %1 = tensor.empty(%m) : tensor<4x?x32x128xf32>
+  %2 = tensor.empty(%m) : tensor<4x32x?x128xf32>
+  %3 = tensor.empty(%m) : tensor<4x32x?xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %4 = linalg.fill ins(%cst_0 : f32) outs(%2 : tensor<4x32x?x128xf32>) -> tensor<4x32x?x128xf32>
+  %5 = linalg.fill ins(%cst_1 : f32) outs(%3 : tensor<4x32x?xf32>) -> tensor<4x32x?xf32>
+  %6 = linalg.fill ins(%cst_2 : f32) outs(%3 : tensor<4x32x?xf32>) -> tensor<4x32x?xf32>
+  %attn:3 = iree_linalg_ext.online_attention {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]}
       ins(%q, %key, %value, %cst, %mask : tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, f16, tensor<4x32x?x?xf16>)
-      outs(%2 : tensor<4x32x?x128xf16>) {
-    ^bb0(%b0 : f16) :
-      iree_linalg_ext.yield %b0 : f16
-  }-> tensor<4x32x?x128xf16>
+      outs(%4, %5, %6 : tensor<4x32x?x128xf32>, tensor<4x32x?xf32>, tensor<4x32x?xf32>) {
+    ^bb0(%b0 : f32) :
+      iree_linalg_ext.yield %b0 : f32
+  }-> tensor<4x32x?x128xf32>, tensor<4x32x?xf32>, tensor<4x32x?xf32>
   %result = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-      ins(%attn : tensor<4x32x?x128xf16>) outs(%1 : tensor<4x?x32x128xf16>) {
-  ^bb0(%in: f16, %out: f16):
-    linalg.yield %in : f16
-  } -> tensor<4x?x32x128xf16>
+      ins(%attn#0 : tensor<4x32x?x128xf32>) outs(%1 : tensor<4x?x32x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<4x?x32x128xf32>
   iree_tensor_ext.dispatch.tensor.store %result, %output_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
-      : tensor<4x?x32x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
+      : tensor<4x?x32x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf32>>{%m}
   return
 }
 // CHECK-LABEL: func @block_attention_dims()
@@ -83,7 +92,7 @@ func.func @block_attention_dims() {
 //       CHECK:   %[[M_DYNAMIC2:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[M]]]
 //       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(4)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC2]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf32>>{%[[M_DYNAMIC2]]}
 //       CHECK:   %[[Q:.+]] = iree_tensor_ext.dispatch.tensor.load %[[Q_BINDING]]
 //  CHECK-SAME:       sizes = [4, %[[M_DYNAMIC]], 16, 32, 128]
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
@@ -96,7 +105,7 @@ func.func @block_attention_dims() {
 //       CHECK:   %[[MASK:.+]] = iree_tensor_ext.dispatch.tensor.load %[[MASK_BINDING]]
 //  CHECK-SAME:       sizes = [4, 32, %[[M_DYNAMIC]], 16, %[[K2_DYNAMIC]], 32]
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
-//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//       CHECK:   %[[ATTENTION:.+]]:3 = iree_linalg_ext.online_attention
 //       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK]] :
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
