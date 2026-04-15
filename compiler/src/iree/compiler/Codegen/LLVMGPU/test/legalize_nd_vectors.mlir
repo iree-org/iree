@@ -311,3 +311,28 @@ util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> 
 //       CHECK:   %[[R0:.+]] = arith.addf %[[A0]], %[[B0]] : vector<4xf32>
 //       CHECK:   %[[R1:.+]] = arith.addf %[[A1]], %[[B1]] : vector<4xf32>
 //       CHECK:   util.return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 2-D result: unrolled into rank-1 reads with adjusted offsets.
+func.func @transfer_read_2d(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %padding: f32) -> vector<5x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c], %padding : memref<?x?x?xf32>, vector<5x4xf32>
+  return %vec : vector<5x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_2d
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[OFF2:.+]] = arith.addi %[[IDX1]], %[[C2]] : index
+//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF2]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:   %[[OFF3:.+]] = arith.addi %[[IDX1]], %[[C3]] : index
+//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF3]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[C4:.+]] = arith.constant 4 : index
+//       CHECK:   %[[OFF4:.+]] = arith.addi %[[IDX1]], %[[C4]] : index
+//       CHECK:   %[[V4:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF4]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   return %[[V0]], %[[V1]], %[[V2]], %[[V3]], %[[V4]] : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
