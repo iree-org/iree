@@ -272,8 +272,41 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   return {builder.getIndexAttr(*subgroupSize)};
 }
 
-/// Check if a linalg.copy is viable for DMA conversion based on alignment and
-/// size constraints. This does NOT modify the IR.
+/// Check if a tensor.pad is valid for DMA conversion.
+/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
+static bool isValidPadForDMA(tensor::PadOp pad) {
+  // Verify pad constraints: low padding must be all zeros, pad value must be 0.
+  // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting a
+  // select on the loaded values from LDS to replace OOB zeros with the desired
+  // padding element.
+  for (OpFoldResult low : pad.getMixedLowPad()) {
+    if (!isConstantIntValue(low, 0)) {
+      return false;
+    }
+  }
+  Value padVal = pad.getConstantPaddingValue();
+  if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
+                   matchPattern(padVal, m_Zero()))) {
+    return false;
+  }
+
+  // Check if source tensor's innermost row size is DWORD (4-byte) aligned. On
+  // AMD CDNA, per-component range checking is performed for each DWORD. If a
+  // DWORD is partially out-of-bounds, the entire DWORD returns zero, causing
+  // incorrect results. Additionally, partial OOB triggers the slow path with
+  // multi-cycling and instruction issue penalties.
+  auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
+  int64_t innermostDim = sourceType.getShape().back();
+  if (ShapedType::isDynamic(innermostDim)) {
+    return false;
+  }
+  Type elemType = sourceType.getElementType();
+  int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
+  return rowBytes % 4 == 0;
+}
+
+/// Check if a linalg.copy is viable for DMA conversion based on alignment,
+/// size and padding constraints. This does NOT modify the IR.
 static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
@@ -296,6 +329,11 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   if (tracesToTensorEmpty(output) &&
       llvm::none_of(shape, ShapedType::isDynamic)) {
     availableElements = ShapedType::getNumElements(shape);
+  }
+
+  tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
+  if (pad && !isValidPadForDMA(pad)) {
+    return false;
   }
 
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
@@ -435,57 +473,15 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     // After tiling, the input is typically:
     //   tensor.extract_slice %padded[...] [...] [1, 1]
     // We need to trace through extract_slice to find if source is tensor.pad.
-    if (tensor::PadOp pad = traceToTensorPad(input)) {
-      // Verify pad constraints: low padding must be all zeros, pad value must
-      // be 0.
-      // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting
-      // a select on the loaded values from LDS to replace OOB zeros with the
-      // desired padding element.
-      bool validPad = true;
-      for (OpFoldResult low : pad.getMixedLowPad()) {
-        if (!isConstantIntValue(low, 0)) {
-          validPad = false;
-          break;
-        }
-      }
-      Value padVal = pad.getConstantPaddingValue();
-      if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
-                       matchPattern(padVal, m_Zero()))) {
-        validPad = false;
-      }
-
-      if (validPad) {
-        // Use pad.getSource() directly as the DMA source.
-        // This is the tensor.extract_slice result (e.g., tensor<?x64xf32>).
-        source = pad.getSource();
-
-        // Check if source tensor's innermost row size is DWORD (4-byte)
-        // aligned. On AMD CDNA, per-component range checking is performed for
-        // each DWORD. If a DWORD is partially out-of-bounds, the entire DWORD
-        // returns zero, causing incorrect results. Additionally, partial OOB
-        // triggers the slow path with multi-cycling and instruction issue
-        // penalties.
-        auto sourceType = cast<RankedTensorType>(source.getType());
-        int64_t innermostDim = sourceType.getShape().back();
-        if (!ShapedType::isDynamic(innermostDim)) {
-          Type elemType = sourceType.getElementType();
-          int64_t elemBytes = elemType.getIntOrFloatBitWidth() / 8;
-          int64_t rowBytes = innermostDim * elemBytes;
-          if (rowBytes % 4 != 0) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "Skipping DMA: row size " << rowBytes
-                       << " bytes not DWORD-aligned (slow path)\n");
-            return failure();
-          }
-        }
-
-        // Compute in_bounds based on whether padding was added per dimension.
-        for (auto [low, high] :
-             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
-          bool isInBounds =
-              isConstantIntValue(low, 0) && isConstantIntValue(high, 0);
-          inBoundsVec.push_back(isInBounds);
-        }
+    tensor::PadOp pad = traceToTensorPad(input);
+    if (pad && isValidPadForDMA(pad)) {
+      source = pad.getSource();
+      // Compute in_bounds based on whether padding was added per dimension.
+      for (auto [low, high] :
+           llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
+        bool isInBounds =
+            isConstantIntValue(low, 0) && isConstantIntValue(high, 0);
+        inBoundsVec.push_back(isInBounds);
       }
     }
 
