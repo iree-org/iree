@@ -181,6 +181,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    host_queue_command_buffer_test
+  SRCS
+    "host_queue_command_buffer_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal
+    iree::hal::cts::util::test_base
+    iree::hal::drivers::amdgpu::util
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     semaphore_test
   SRCS
     "semaphore_test.cc"

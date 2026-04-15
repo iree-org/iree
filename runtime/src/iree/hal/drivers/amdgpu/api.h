@@ -98,6 +98,22 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // during debugging/testing).
   iree_hal_amdgpu_queue_placement_t queue_placement;
 
+  // Per-physical-device host queue policy.
+  struct {
+    // HSA AQL ring capacity in packets for each host queue. Must be a power of
+    // two. Larger rings allow more in-flight packet work before submitters see
+    // AQL backpressure.
+    uint32_t aql_capacity;
+    // Completion/reclaim ring capacity for each host queue. Must be a power of
+    // two. This bounds in-flight host-visible completion epochs before replay
+    // must park and resume after drain.
+    uint32_t notification_capacity;
+    // Kernarg ring capacity in 64-byte blocks for each host queue. Must be a
+    // power of two and at least 2x |aql_capacity| so AQL reservation remains
+    // the sole hot-path backpressure gate.
+    uint32_t kernarg_capacity;
+  } host_queues;
+
   // Preallocates a reasonable number of resources in pools to reduce initial
   // execution latency.
   uint64_t preallocate_pools : 1;
