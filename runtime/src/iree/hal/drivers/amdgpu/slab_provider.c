@@ -10,6 +10,7 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
+#include "iree/hal/memory/tracing.h"
 
 typedef struct iree_hal_amdgpu_slab_provider_t {
   // Base slab-provider interface header.
@@ -30,8 +31,14 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
   // HSA pool this provider acquires slabs from.
   hsa_amd_memory_pool_t memory_pool;
 
+  // Borrowed wrapper pool used for materialized HAL buffer views.
+  iree_hal_amdgpu_buffer_pool_t* buffer_pool;
+
   // Queue affinities in this provider's physical memory domain.
   iree_hal_queue_affinity_t queue_affinity_mask;
+
+  // Stable named-memory stream for HSA backing allocations from this provider.
+  iree_hal_memory_trace_t trace;
 
   // Minimum runtime allocation granule reported by the HSA pool.
   iree_device_size_t allocation_granule;
@@ -54,6 +61,9 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
 
 static const iree_hal_slab_provider_vtable_t
     iree_hal_amdgpu_slab_provider_vtable;
+
+static const char* IREE_HAL_AMDGPU_SLAB_PROVIDER_TRACE_ID =
+    "iree-hal-amdgpu-slab-provider";
 
 static iree_hal_amdgpu_slab_provider_t* iree_hal_amdgpu_slab_provider_cast(
     iree_hal_slab_provider_t* base_provider) {
@@ -157,10 +167,12 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
     const iree_hal_amdgpu_topology_t* topology,
     hsa_amd_memory_pool_t memory_pool,
     iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_amdgpu_buffer_pool_t* buffer_pool, iree_string_view_t trace_name,
     iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(libhsa);
   IREE_ASSERT_ARGUMENT(topology);
+  IREE_ASSERT_ARGUMENT(buffer_pool);
   IREE_ASSERT_ARGUMENT(out_provider);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_provider = NULL;
@@ -184,14 +196,19 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
   provider->libhsa = libhsa;
   provider->topology = topology;
   provider->memory_pool = memory_pool;
+  provider->buffer_pool = buffer_pool;
   provider->queue_affinity_mask = queue_affinity_mask;
   provider->total_acquired = IREE_ATOMIC_VAR_INIT(0);
   provider->total_released = IREE_ATOMIC_VAR_INIT(0);
 
+  iree_status_t status = iree_hal_memory_trace_initialize(
+      trace_name, IREE_HAL_AMDGPU_SLAB_PROVIDER_TRACE_ID, host_allocator,
+      &provider->trace);
   iree_hal_amdgpu_slab_provider_memory_pool_properties_t properties;
-  iree_status_t status =
-      iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
-          libhsa, memory_pool, &properties);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
+        libhsa, memory_pool, &properties);
+  }
   if (iree_status_is_ok(status)) {
     provider->allocation_granule = properties.allocation_granule;
     provider->allocation_alignment = properties.allocation_alignment;
@@ -212,6 +229,7 @@ static void iree_hal_amdgpu_slab_provider_destroy(
       iree_hal_amdgpu_slab_provider_cast(base_provider);
   iree_allocator_t host_allocator = provider->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_memory_trace_deinitialize(&provider->trace);
   iree_allocator_free(host_allocator, provider);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -259,7 +277,8 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
     // be larger due to runtime granule rounding, but exposing that padding here
     // would incorrectly inflate HAL buffer byte lengths in pass-through pools.
     out_slab->length = min_length;
-    out_slab->provider_handle = 0;
+    out_slab->provider_handle = allocation_size;
+    iree_hal_memory_trace_alloc(&provider->trace, base_ptr, allocation_size);
     iree_atomic_fetch_add(&provider->total_acquired, 1,
                           iree_memory_order_relaxed);
   } else if (base_ptr) {
@@ -278,6 +297,7 @@ static void iree_hal_amdgpu_slab_provider_release_slab(
       iree_hal_amdgpu_slab_provider_cast(base_provider);
   IREE_TRACE_ZONE_BEGIN(z0);
   if (slab->base_ptr) {
+    iree_hal_memory_trace_free(&provider->trace, slab->base_ptr);
     IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
         IREE_LIBHSA(provider->libhsa), slab->base_ptr));
     iree_atomic_fetch_add(&provider->total_released, 1,
@@ -364,10 +384,11 @@ static iree_status_t iree_hal_amdgpu_slab_provider_wrap_buffer(
   if (!release_callback.fn) {
     release_callback.fn = iree_hal_amdgpu_slab_provider_borrowed_buffer_release;
   }
-  return iree_hal_amdgpu_buffer_create(
+  return iree_hal_amdgpu_buffer_create_pooled(
       provider->libhsa, placement, resolved_type, params.access, params.usage,
       allocation_size, allocation_size, slab->base_ptr + slab_offset,
-      release_callback, provider->host_allocator, out_buffer);
+      release_callback, provider->buffer_pool, provider->host_allocator,
+      out_buffer);
 }
 
 static void iree_hal_amdgpu_slab_provider_prefault(

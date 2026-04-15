@@ -229,6 +229,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
     iree_hal_amdgpu_transient_buffer_attach_reservation(
         buffer, allocation_pool, &alloca_reservation->reservation);
     iree_hal_amdgpu_transient_buffer_stage_backing(buffer, backing_buffer);
+    backing_buffer = NULL;
   }
   iree_hal_buffer_release(backing_buffer);
 

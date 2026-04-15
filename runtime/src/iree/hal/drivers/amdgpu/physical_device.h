@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_staging.h"
 #include "iree/hal/drivers/amdgpu/system.h"
@@ -185,6 +186,9 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 
   // Per-device pool of user-visible queue_alloca transient buffer wrappers.
   iree_hal_amdgpu_transient_buffer_pool_t transient_buffer_pool;
+
+  // Per-device pool of materialized slab-backed HAL buffer view wrappers.
+  iree_hal_amdgpu_buffer_pool_t materialized_buffer_pool;
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;

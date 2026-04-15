@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-static const char* IREE_HAL_AMDGPU_ALLOCATOR_ID = "AMDGPU unpooled";
+static const char* IREE_HAL_AMDGPU_ALLOCATOR_ID = "iree-hal-amdgpu-unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_amdgpu_allocator_t {

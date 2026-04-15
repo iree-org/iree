@@ -64,7 +64,8 @@ class QueueAllocaTest : public CtsTestBase<> {
           IREE_STATUS_FAILED_PRECONDITION,
           "queue pool backend query returned an incomplete backend bundle");
     }
-    return iree_hal_passthrough_pool_create(backend.slab_provider,
+    iree_hal_passthrough_pool_options_t options = {0};
+    return iree_hal_passthrough_pool_create(options, backend.slab_provider,
                                             backend.notification,
                                             iree_allocator_system(), out_pool);
   }

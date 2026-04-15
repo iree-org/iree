@@ -33,6 +33,10 @@ typedef struct iree_hal_fixed_block_pool_options_t {
   // This is checked before each reservation and can return
   // IREE_HAL_POOL_RESERVE_OVER_BUDGET without touching the allocator.
   iree_device_size_t budget_limit;
+
+  // Optional named-memory trace identifier for logical reservations returned by
+  // this pool. Empty uses a generic process-stable identifier.
+  iree_string_view_t trace_name;
 } iree_hal_fixed_block_pool_options_t;
 
 // Creates a fixed-block HAL pool backed by one slab from |slab_provider|.

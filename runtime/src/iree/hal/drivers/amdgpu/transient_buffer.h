@@ -94,8 +94,10 @@ void iree_hal_amdgpu_transient_buffer_attach_reservation(
     iree_hal_buffer_t* buffer, iree_hal_pool_t* pool,
     const iree_hal_pool_reservation_t* reservation);
 
-// Retains and stages a backing view for future queue packet emission and
-// commit.
+// Stages a backing view for future queue packet emission and commit.
+//
+// Takes ownership of one |backing_buffer| reference. The reference is released
+// by decommit or destroy.
 void iree_hal_amdgpu_transient_buffer_stage_backing(
     iree_hal_buffer_t* buffer, iree_hal_buffer_t* backing_buffer);
 

@@ -7,6 +7,7 @@
 #include "iree/hal/memory/passthrough_pool.h"
 
 #include "iree/async/notification.h"
+#include "iree/hal/memory/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Types
@@ -17,6 +18,9 @@ typedef struct iree_hal_passthrough_pool_t {
   iree_hal_slab_provider_t* slab_provider;
   iree_async_notification_t* notification;
   iree_allocator_t host_allocator;
+
+  // Stable named-memory stream for logical reservations from this pool.
+  iree_hal_memory_trace_t trace;
 
   // Cached from slab_provider at creation time.
   iree_hal_memory_type_t memory_type;
@@ -36,7 +40,10 @@ typedef struct iree_hal_passthrough_pool_reservation_state_t {
   // all reservations and buffers sourced from it are destroyed.
   iree_hal_pool_t* pool;
 
+  // Slab acquired from the pool's provider for this reservation.
   iree_hal_slab_t slab;
+
+  // Logical byte length reserved from the slab.
   iree_device_size_t reservation_length;
 
   // One reference for the live reservation token plus one reference for each
@@ -53,6 +60,9 @@ typedef struct iree_hal_passthrough_pool_reservation_state_t {
 
 static const iree_hal_pool_vtable_t iree_hal_passthrough_pool_vtable;
 static void iree_hal_passthrough_pool_destroy(iree_hal_pool_t* base_pool);
+
+static const char* IREE_HAL_PASSTHROUGH_POOL_TRACE_ID =
+    "iree-hal-passthrough-pool";
 
 //===----------------------------------------------------------------------===//
 // Reservation state helpers
@@ -80,6 +90,8 @@ static void iree_hal_passthrough_pool_reservation_state_release_reservation(
   const int32_t already_released = iree_atomic_exchange(
       &reservation_state->reservation_released, 1, iree_memory_order_acq_rel);
   IREE_ASSERT_EQ(already_released, 0);
+
+  iree_hal_memory_trace_free(&pool->trace, reservation_state->slab.base_ptr);
 
   iree_atomic_fetch_add(&pool->bytes_reserved,
                         -(int64_t)reservation_state->reservation_length,
@@ -118,6 +130,7 @@ static void iree_hal_passthrough_pool_owned_buffer_release(
 //===----------------------------------------------------------------------===//
 
 iree_status_t iree_hal_passthrough_pool_create(
+    iree_hal_passthrough_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification, iree_allocator_t host_allocator,
     iree_hal_pool_t** out_pool) {
@@ -143,15 +156,23 @@ iree_status_t iree_hal_passthrough_pool_create(
   iree_hal_slab_provider_query_properties(slab_provider, &pool->memory_type,
                                           &pool->supported_usage);
 
-  *out_pool = (iree_hal_pool_t*)pool;
+  iree_status_t status = iree_hal_memory_trace_initialize_pool(
+      options.trace_name, IREE_HAL_PASSTHROUGH_POOL_TRACE_ID, host_allocator,
+      &pool->trace);
+  if (iree_status_is_ok(status)) {
+    *out_pool = (iree_hal_pool_t*)pool;
+  } else {
+    iree_hal_passthrough_pool_destroy((iree_hal_pool_t*)pool);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_passthrough_pool_destroy(iree_hal_pool_t* base_pool) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_passthrough_pool_t* pool = (iree_hal_passthrough_pool_t*)base_pool;
   iree_allocator_t host_allocator = pool->host_allocator;
+  iree_hal_memory_trace_deinitialize(&pool->trace);
   iree_async_notification_release(pool->notification);
   iree_hal_slab_provider_release(pool->slab_provider);
   iree_allocator_free(host_allocator, pool);
@@ -205,6 +226,9 @@ static iree_status_t iree_hal_passthrough_pool_acquire_reservation(
   iree_atomic_fetch_add(&pool->reservation_count, 1, iree_memory_order_relaxed);
   iree_atomic_fetch_add(&pool->slab_count, 1, iree_memory_order_relaxed);
   iree_atomic_fetch_add(&pool->reserve_count, 1, iree_memory_order_relaxed);
+
+  iree_hal_memory_trace_alloc(&pool->trace, reservation_state->slab.base_ptr,
+                              reservation_state->reservation_length);
 
   memset(out_info, 0, sizeof(*out_info));
   *out_result = IREE_HAL_POOL_ACQUIRE_OK_FRESH;

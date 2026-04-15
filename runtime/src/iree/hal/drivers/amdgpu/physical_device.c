@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 
+#include <stdio.h>
+
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/notification.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
@@ -190,6 +192,19 @@ static bool iree_hal_amdgpu_physical_device_query_pool_epoch(
   const uint64_t current_epoch =
       (uint64_t)IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE - (uint64_t)current_value;
   return current_epoch >= epoch;
+}
+
+static iree_string_view_t iree_hal_amdgpu_format_pool_trace_name(
+    char* buffer, iree_host_size_t buffer_capacity, const char* pool_name,
+    iree_host_size_t device_ordinal) {
+  if (IREE_UNLIKELY(buffer_capacity == 0)) return iree_string_view_empty();
+  const int name_length =
+      snprintf(buffer, buffer_capacity, "iree-hal-amdgpu-l0p%" PRIhsz "-%s",
+               device_ordinal, pool_name);
+  if (IREE_UNLIKELY(name_length < 0)) return iree_string_view_empty();
+  iree_host_size_t safe_length = (iree_host_size_t)name_length;
+  if (safe_length >= buffer_capacity) safe_length = buffer_capacity - 1;
+  return iree_make_string_view(buffer, safe_length);
 }
 
 void iree_hal_amdgpu_physical_device_options_initialize(
@@ -385,6 +400,11 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   iree_status_t status = iree_hal_amdgpu_transient_buffer_pool_initialize(
       &out_physical_device->fine_host_block_pool,
       &out_physical_device->transient_buffer_pool);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_buffer_pool_initialize(
+        &out_physical_device->fine_host_block_pool,
+        &out_physical_device->materialized_buffer_pool);
+  }
 
   // Find the device memory pools and create block pools/allocators.
   hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
@@ -402,29 +422,46 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->fine_host_block_pool,
         options->host_block_pool_initial_capacity);
   }
+  char trace_name[64] = {0};
   if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_block_pool_options_t pool_options =
+        options->device_block_pools.small;
+    pool_options.trace_name = iree_hal_amdgpu_format_pool_trace_name(
+        trace_name, IREE_ARRAYSIZE(trace_name), "coarse-small-block",
+        device_ordinal);
     status = iree_hal_amdgpu_block_pool_initialize(
-        libhsa, options->device_block_pools.small, device_agent,
-        coarse_block_memory_pool, host_allocator,
-        &out_physical_device->coarse_block_pools.small);
+        libhsa, pool_options, device_agent, coarse_block_memory_pool,
+        host_allocator, &out_physical_device->coarse_block_pools.small);
   }
   if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_block_pool_options_t pool_options =
+        options->device_block_pools.large;
+    pool_options.trace_name = iree_hal_amdgpu_format_pool_trace_name(
+        trace_name, IREE_ARRAYSIZE(trace_name), "coarse-large-block",
+        device_ordinal);
     status = iree_hal_amdgpu_block_pool_initialize(
-        libhsa, options->device_block_pools.large, device_agent,
-        coarse_block_memory_pool, host_allocator,
-        &out_physical_device->coarse_block_pools.large);
+        libhsa, pool_options, device_agent, coarse_block_memory_pool,
+        host_allocator, &out_physical_device->coarse_block_pools.large);
   }
   if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_block_pool_options_t pool_options =
+        options->device_block_pools.small;
+    pool_options.trace_name = iree_hal_amdgpu_format_pool_trace_name(
+        trace_name, IREE_ARRAYSIZE(trace_name), "fine-small-block",
+        device_ordinal);
     status = iree_hal_amdgpu_block_pool_initialize(
-        libhsa, options->device_block_pools.small, device_agent,
-        fine_block_memory_pool, host_allocator,
-        &out_physical_device->fine_block_pools.small);
+        libhsa, pool_options, device_agent, fine_block_memory_pool,
+        host_allocator, &out_physical_device->fine_block_pools.small);
   }
   if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_block_pool_options_t pool_options =
+        options->device_block_pools.large;
+    pool_options.trace_name = iree_hal_amdgpu_format_pool_trace_name(
+        trace_name, IREE_ARRAYSIZE(trace_name), "fine-large-block",
+        device_ordinal);
     status = iree_hal_amdgpu_block_pool_initialize(
-        libhsa, options->device_block_pools.large, device_agent,
-        fine_block_memory_pool, host_allocator,
-        &out_physical_device->fine_block_pools.large);
+        libhsa, pool_options, device_agent, fine_block_memory_pool,
+        host_allocator, &out_physical_device->fine_block_pools.large);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_block_allocator_initialize(
@@ -468,9 +505,12 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         &out_physical_device->default_pool_notification);
   }
   if (iree_status_is_ok(status)) {
+    iree_string_view_t slab_trace_name = iree_hal_amdgpu_format_pool_trace_name(
+        trace_name, IREE_ARRAYSIZE(trace_name), "default-slab", device_ordinal);
     status = iree_hal_amdgpu_slab_provider_create(
         logical_device, libhsa, &system->topology, coarse_block_memory_pool,
-        queue_affinity_mask, host_allocator,
+        queue_affinity_mask, &out_physical_device->materialized_buffer_pool,
+        slab_trace_name, host_allocator,
         &out_physical_device->default_slab_provider);
   }
   if (iree_status_is_ok(status)) {
@@ -603,9 +643,14 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
   iree_hal_amdgpu_libhsa_t* libhsa = &system->libhsa;
   const uint8_t session_epoch = iree_async_axis_session(base_axis);
   const uint8_t machine_index = iree_async_axis_machine(base_axis);
+  char trace_name[64] = {0};
+  iree_hal_tlsf_pool_options_t default_pool_options =
+      physical_device->default_pool_options;
+  default_pool_options.trace_name = iree_hal_amdgpu_format_pool_trace_name(
+      trace_name, IREE_ARRAYSIZE(trace_name), "tlsf",
+      physical_device->device_ordinal);
   iree_status_t status = iree_hal_tlsf_pool_create(
-      physical_device->default_pool_options,
-      physical_device->default_slab_provider,
+      default_pool_options, physical_device->default_slab_provider,
       physical_device->default_pool_notification,
       (iree_hal_pool_epoch_query_t){
           .fn = iree_hal_amdgpu_physical_device_query_pool_epoch,
@@ -683,6 +728,8 @@ void iree_hal_amdgpu_physical_device_deinitialize(
 
   iree_hal_amdgpu_transient_buffer_pool_deinitialize(
       &physical_device->transient_buffer_pool);
+  iree_hal_amdgpu_buffer_pool_deinitialize(
+      &physical_device->materialized_buffer_pool);
 
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 

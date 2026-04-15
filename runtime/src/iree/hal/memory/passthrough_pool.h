@@ -17,6 +17,13 @@ extern "C" {
 
 typedef struct iree_async_notification_t iree_async_notification_t;
 
+// Options for creating a pass-through HAL pool.
+typedef struct iree_hal_passthrough_pool_options_t {
+  // Optional named-memory trace identifier for logical reservations returned by
+  // this pool. Empty uses a generic process-stable identifier.
+  iree_string_view_t trace_name;
+} iree_hal_passthrough_pool_options_t;
+
 // Creates a pass-through pool that delegates every allocation directly to the
 // slab provider. Each acquire_reservation() acquires a new slab and each
 // release_reservation() frees it. No suballocation, no offset management, and
@@ -32,6 +39,7 @@ typedef struct iree_async_notification_t iree_async_notification_t;
 // release_reservation(), and skips wake work when no waiter is observing it.
 // |host_allocator| is used for the pool struct and per-buffer release state.
 iree_status_t iree_hal_passthrough_pool_create(
+    iree_hal_passthrough_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification, iree_allocator_t host_allocator,
     iree_hal_pool_t** out_pool);

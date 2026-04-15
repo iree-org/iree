@@ -292,7 +292,6 @@ void iree_hal_amdgpu_transient_buffer_stage_backing(
   IREE_ASSERT_TRUE(buffer->staged_backing == NULL);
   IREE_ASSERT_TRUE(
       iree_hal_amdgpu_transient_buffer_load_committed_backing(buffer) == NULL);
-  iree_hal_buffer_retain(backing_buffer);
   buffer->staged_backing = backing_buffer;
 }
 

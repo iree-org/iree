@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "iree/async/frontier_tracker.h"
@@ -1633,7 +1634,12 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   if (iree_status_is_ok(status)) {
     iree_thread_create_params_t thread_params;
     memset(&thread_params, 0, sizeof(thread_params));
-    thread_params.name = iree_make_cstring_view("iree-hal-amdgpu-complete");
+    char thread_name[32] = {0};
+    snprintf(thread_name, IREE_ARRAYSIZE(thread_name),
+             "iree-hal-amdgpu-l0p%uq%u-complete",
+             (unsigned)iree_async_axis_device_index(axis),
+             (unsigned)iree_async_axis_queue_index(axis));
+    thread_params.name = iree_make_cstring_view(thread_name);
     thread_params.initial_affinity = completion_thread_affinity;
     status = iree_thread_create(
         iree_hal_amdgpu_host_queue_completion_thread_main, out_queue,
