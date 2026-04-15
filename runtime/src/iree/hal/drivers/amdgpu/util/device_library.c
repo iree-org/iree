@@ -66,6 +66,35 @@ static iree_status_t iree_hal_amdgpu_agent_available_isas_append_to_builder(
   return iree_ok_status();
 }
 
+// Strips any ISA feature suffix after the first `:`.
+// HSA may report ISAs like:
+//   amdgcn-amd-amdhsa--gfx942:sramecc+:xnack-
+// while the bundled runtime binaries are typically named without the feature
+// suffixes:
+//   amdgcn-amd-amdhsa--gfx942.so
+static iree_string_view_t iree_hal_amdgpu_isa_name_strip_features(
+    iree_string_view_t isa_name) {
+  for (iree_host_size_t i = 0; i < isa_name.size; ++i) {
+    if (isa_name.data[i] == ':') {
+      return iree_string_view_substr(isa_name, 0, i);
+    }
+  }
+  return isa_name;
+}
+
+static const iree_file_toc_t* iree_hal_amdgpu_find_device_library_file(
+    iree_string_view_t isa_name) {
+  for (iree_host_size_t i = 0; i < iree_hal_amdgpu_device_binaries_size();
+       ++i) {
+    const iree_file_toc_t* file_toc =
+        &iree_hal_amdgpu_device_binaries_create()[i];
+    if (iree_string_view_starts_with(IREE_SV(file_toc->name), isa_name)) {
+      return file_toc;
+    }
+  }
+  return NULL;
+}
+
 // Selects a device library binary file that supports the ISA of the provided
 // |agent|.
 static iree_status_t iree_hal_amdgpu_device_library_select_file(
@@ -109,15 +138,21 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
                                       HSA_ISA_INFO_NAME, isa_name_buffer));
     iree_string_view_t isa_name =
         iree_make_string_view(isa_name_buffer, isa_name_length - /*NUL*/ 1);
-    for (iree_host_size_t j = 0; j < iree_hal_amdgpu_device_binaries_size();
-         ++j) {
-      const iree_file_toc_t* file_toc =
-          &iree_hal_amdgpu_device_binaries_create()[j];
-      if (iree_string_view_starts_with(IREE_SV(file_toc->name), isa_name)) {
-        best_isa = isa;
-        best_file_toc = file_toc;
-        break;
+    // Prefer an exact ISA-name match when available, then retry with feature
+    // suffixes stripped. If neither match, the outer loop falls through to the
+    // next reported ISA, which is often a more generic fallback ISA.
+    best_file_toc = iree_hal_amdgpu_find_device_library_file(isa_name);
+    if (!best_file_toc) {
+      iree_string_view_t generic_isa_name =
+          iree_hal_amdgpu_isa_name_strip_features(isa_name);
+      if (!iree_string_view_equal(generic_isa_name, isa_name)) {
+        best_file_toc =
+            iree_hal_amdgpu_find_device_library_file(generic_isa_name);
       }
+    }
+    if (best_file_toc) {
+      best_isa = isa;
+      break;
     }
   }
 
