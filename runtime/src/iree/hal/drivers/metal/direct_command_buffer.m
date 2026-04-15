@@ -771,6 +771,60 @@ static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_metal_command_buffer_prepare_update_source(
+    iree_hal_metal_command_buffer_t* command_buffer, const void* source_buffer,
+    iree_host_size_t source_offset, iree_device_size_t source_length,
+    id<MTLBuffer>* out_source_buffer, iree_device_size_t* out_source_offset) {
+  if (source_length > (iree_device_size_t)(IREE_HOST_SIZE_MAX - source_offset)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "update source range overflows host address space (source_offset=%" PRIhsz
+        ", length=%" PRIdsz ")",
+        source_offset, source_length);
+  }
+
+  iree_const_byte_span_t source_data_span = iree_make_const_byte_span(
+      (const uint8_t*)source_buffer + source_offset, (iree_host_size_t)source_length);
+  uint32_t shared_staging_offset = 0;
+  iree_status_t status = iree_hal_metal_staging_buffer_append(
+      command_buffer->staging_buffer, source_data_span, /*alignment=*/4, &shared_staging_offset);
+  if (iree_status_is_ok(status)) {
+    *out_source_buffer = command_buffer->staging_buffer->metal_buffer;
+    *out_source_offset = shared_staging_offset;
+    return iree_ok_status();
+  }
+  if (!iree_status_is_resource_exhausted(status) && !iree_status_is_out_of_range(status)) {
+    return status;
+  }
+  if (!command_buffer->resource_set) {
+    return status;
+  }
+  iree_status_ignore(status);
+
+  const iree_hal_buffer_params_t source_params = {
+      .access = IREE_HAL_MEMORY_ACCESS_ALL,
+      .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+               IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE,
+  };
+  iree_hal_buffer_t* source_device_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(command_buffer->device),
+                                         source_params, source_length, &source_device_buffer));
+
+  status = iree_hal_buffer_map_write(source_device_buffer, /*target_offset=*/0,
+                                     source_data_span.data, source_data_span.data_length);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(command_buffer->resource_set, 1, &source_device_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_source_buffer = iree_hal_metal_buffer_handle(source_device_buffer);
+    *out_source_offset = 0;
+  }
+  iree_hal_buffer_release(source_device_buffer);
+  return status;
+}
+
 static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
@@ -779,15 +833,15 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // There are no direct corresponding APIs in Metal. We update the source buffer data to the
-  // staging buffer and then copy over.
+  // There are no direct corresponding APIs in Metal. We stage the source bytes into a GPU-visible
+  // buffer and then copy over.
 
-  iree_const_byte_span_t source_data_span =
-      iree_make_const_byte_span((uint8_t*)source_buffer + source_offset, target_ref.length);
-  uint32_t offset = 0;
+  id<MTLBuffer> source_device_buffer = nil;
+  iree_device_size_t source_device_offset = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_staging_buffer_append(command_buffer->staging_buffer, source_data_span,
-                                               /*alignment=*/4, &offset));
+      z0, iree_hal_metal_command_buffer_prepare_update_source(
+              command_buffer, source_buffer, source_offset, target_ref.length,
+              &source_device_buffer, &source_device_offset));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_ref.buffer));
@@ -798,7 +852,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
       iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
 
   iree_status_t status = iree_hal_metal_command_segment_create_copy_buffer(
-      command_buffer, command_buffer->staging_buffer->metal_buffer, offset, target_device_buffer,
+      command_buffer, source_device_buffer, source_device_offset, target_device_buffer,
       target_offset, target_ref.length);
 
   IREE_TRACE_ZONE_END(z0);
