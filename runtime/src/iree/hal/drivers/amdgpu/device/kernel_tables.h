@@ -61,3 +61,10 @@ IREE_HAL_AMDGPU_DEVICE_KERNEL(
     IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_X,
     IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Y,
     IREE_HAL_AMDGPU_BLIT_WORKGROUP_SIZE_Z)
+
+//===----------------------------------------------------------------------===//
+// Dispatch helpers (dispatch.h)
+//===----------------------------------------------------------------------===//
+
+IREE_HAL_AMDGPU_DEVICE_KERNEL(
+    iree_hal_amdgpu_device_dispatch_patch_indirect_params, 1, 1, 1)

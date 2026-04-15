@@ -93,6 +93,15 @@ static bool cuda_registered_ =
               {"EventTest.*", "CUDA does not implement HAL events"},
               {"ExecutableTest.*",
                "CUDA does not implement executable reflection"},
+              {"QueueDispatchIndirectParametersTest.*",
+               "CUDA queue_dispatch is implemented via one-shot command "
+               "buffer emulation, and CUDA stream/graph command buffers "
+               "require host-provided launch dimensions rather than "
+               "device-resident indirect workgroup counts."},
+              {"DispatchIndirectParametersTest.*",
+               "CUDA stream/graph command buffers explicitly reject indirect "
+               "workgroup count parameters; supporting them requires a "
+               "device-side launch or packet-patching mechanism."},
           }},
          {"async_queue"},
      }),

@@ -142,6 +142,66 @@ static void iree_hal_cmd_block_processor_resolve_bindings(
   }
 }
 
+static void iree_hal_cmd_dispatch_read_workgroup_count(
+    const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs,
+    uint32_t out_workgroup_count[3]) {
+  if (dispatch->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
+    const void* params_buffer =
+        binding_ptrs[dispatch->params.indirect.params_binding];
+    const iree_hal_dispatch_params_t* params =
+        (const iree_hal_dispatch_params_t*)((const uint8_t*)params_buffer +
+                                            dispatch->params.indirect
+                                                .params_offset);
+    out_workgroup_count[0] = params->workgroup_count[0];
+    out_workgroup_count[1] = params->workgroup_count[1];
+    out_workgroup_count[2] = params->workgroup_count[2];
+  } else {
+    out_workgroup_count[0] = dispatch->params.direct.workgroup_count[0];
+    out_workgroup_count[1] = dispatch->params.direct.workgroup_count[1];
+    out_workgroup_count[2] = dispatch->params.direct.workgroup_count[2];
+  }
+}
+
+static uint32_t iree_hal_cmd_dispatch_tile_count(
+    const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs) {
+  uint32_t workgroup_count[3];
+  iree_hal_cmd_dispatch_read_workgroup_count(dispatch, binding_ptrs,
+                                             workgroup_count);
+  return workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
+}
+
+static const iree_hal_cmd_header_t* iree_hal_cmd_region_end(
+    const iree_hal_cmd_barrier_t* barrier) {
+  const iree_hal_cmd_header_t* cmd = iree_hal_cmd_next(&barrier->header);
+  for (uint8_t d = 0; d < barrier->dispatch_count; ++d) {
+    cmd = iree_hal_cmd_next(cmd);
+  }
+  return cmd;
+}
+
+static uint32_t iree_hal_cmd_region_tile_count(
+    const iree_hal_cmd_barrier_t* barrier, void** binding_ptrs) {
+  uint32_t tile_count = 0;
+  const iree_hal_cmd_header_t* cmd = iree_hal_cmd_next(&barrier->header);
+  for (uint8_t d = 0; d < barrier->dispatch_count; ++d) {
+    switch (cmd->opcode) {
+      case IREE_HAL_CMD_DISPATCH:
+        tile_count += iree_hal_cmd_dispatch_tile_count(
+            (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs);
+        break;
+      case IREE_HAL_CMD_FILL:
+      case IREE_HAL_CMD_COPY:
+      case IREE_HAL_CMD_UPDATE:
+        tile_count += 1;
+        break;
+      default:
+        break;
+    }
+    cmd = iree_hal_cmd_next(cmd);
+  }
+  return tile_count;
+}
+
 //===----------------------------------------------------------------------===//
 // Per-command tile execution
 //===----------------------------------------------------------------------===//
@@ -184,30 +244,9 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
     uint32_t* out_tiles_completed) {
   *out_tiles_completed = 0;
 
-  // Resolve workgroup count: direct (inline) or indirect (from buffer).
   uint32_t workgroup_count[3];
-  if (dispatch->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
-    const void* params_buffer =
-        binding_ptrs[dispatch->params.indirect.params_binding];
-    const iree_hal_dispatch_params_t* params =
-        (const iree_hal_dispatch_params_t*)((const uint8_t*)params_buffer +
-                                            dispatch->params.indirect
-                                                .params_offset);
-    workgroup_count[0] = params->workgroup_count[0];
-    workgroup_count[1] = params->workgroup_count[1];
-    workgroup_count[2] = params->workgroup_count[2];
-  } else {
-    workgroup_count[0] = dispatch->params.direct.workgroup_count[0];
-    workgroup_count[1] = dispatch->params.direct.workgroup_count[1];
-    workgroup_count[2] = dispatch->params.direct.workgroup_count[2];
-  }
-
-  // Predicate check: skip if all workgroup counts are zero.
-  if ((dispatch->header.flags & IREE_HAL_CMD_FLAG_PREDICATED) &&
-      workgroup_count[0] == 0 && workgroup_count[1] == 0 &&
-      workgroup_count[2] == 0) {
-    return iree_ok_status();
-  }
+  iree_hal_cmd_dispatch_read_workgroup_count(dispatch, binding_ptrs,
+                                             workgroup_count);
 
   const uint32_t tile_count =
       workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
@@ -497,37 +536,6 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
   return tiles_completed;
 }
 
-// Walks the command stream to find the barrier at the given region index.
-// Returns NULL if not found. O(dispatches) per barrier — negligible for
-// typical blocks with 1-5 regions and 1-20 dispatches per region.
-static const iree_hal_cmd_barrier_t* iree_hal_cmd_find_barrier(
-    const iree_hal_cmd_block_header_t* block, uint16_t region_index) {
-  const iree_hal_cmd_header_t* cmd = iree_hal_cmd_block_commands(block);
-  const uint8_t* stream_end = (const uint8_t*)cmd + block->used_bytes;
-  uint16_t current_region = 0;
-  while ((const uint8_t*)cmd < stream_end) {
-    if (cmd->opcode == IREE_HAL_CMD_BARRIER) {
-      if (current_region == region_index) {
-        return (const iree_hal_cmd_barrier_t*)cmd;
-      }
-      // Skip past the barrier and its dispatch commands to find the next.
-      const iree_hal_cmd_barrier_t* barrier =
-          (const iree_hal_cmd_barrier_t*)cmd;
-      cmd = iree_hal_cmd_next(&barrier->header);
-      for (uint8_t d = 0; d < barrier->dispatch_count; ++d) {
-        cmd = iree_hal_cmd_next(cmd);
-      }
-      current_region++;
-    } else if (cmd->opcode == IREE_HAL_CMD_BRANCH ||
-               cmd->opcode == IREE_HAL_CMD_RETURN) {
-      break;
-    } else {
-      break;
-    }
-  }
-  return NULL;
-}
-
 // Walks past all regions to find the block terminator (BRANCH or RETURN).
 // Returns NULL if not found (malformed stream).
 static const iree_hal_cmd_header_t* iree_hal_cmd_find_terminator(
@@ -556,27 +564,16 @@ static const iree_hal_cmd_header_t* iree_hal_cmd_find_terminator(
 // memset; only binding pointers, active_region_index, tile_index epochs,
 // and remaining_tiles require non-zero initialization.
 //
-// active_region_index is set to the first non-empty region (the first
-// region with initial_remaining_tiles > 0). Workers skip empty regions;
-// active_region_index only gates non-empty regions. If all regions are
-// empty, active_region_index is set to region_count and the completer
-// must handle the block terminator.
+// active_region_index is set to the first non-empty region. Workers skip empty
+// regions; active_region_index only gates non-empty regions. If all regions
+// are empty, active_region_index is set to region_count and the completer must
+// handle the block terminator.
 //
 // remaining_tiles is set to the first active region's total tiles so
 // that workers can begin completer election immediately.
 static void iree_hal_cmd_block_processor_init_block(
     const iree_hal_cmd_block_header_t* block,
     iree_hal_cmd_block_processor_context_t* context) {
-  // Find the first non-empty region before modifying state (we need
-  // the epoch before setting tile_indices).
-  const uint32_t* initial_tiles =
-      iree_hal_cmd_block_initial_remaining_tiles(block);
-  uint16_t first_active = 0;
-  while (first_active < block->region_count &&
-         initial_tiles[first_active] == 0) {
-    first_active++;
-  }
-
   // Assign a unique global epoch for this block's first active region.
   // The epoch monotonically increases across block and region transitions,
   // ensuring that stale workers from a previous block CAS-fail immediately
@@ -597,45 +594,51 @@ static void iree_hal_cmd_block_processor_init_block(
                       epoch_value, iree_memory_order_relaxed);
   }
 
+  // Resolve bindings before computing active regions: indirect dispatch
+  // parameters are ordinary bindings and their tile counts are only known
+  // after .data is populated.
+  iree_hal_cmd_block_processor_resolve_bindings(
+      block, context->state, context->max_region_dispatch_count,
+      context->max_total_binding_count, context->binding_table,
+      context->binding_table_length);
+  void** binding_ptrs = iree_hal_cmd_block_state_binding_ptrs(
+      context->state, context->max_region_dispatch_count);
+
+  uint16_t first_active = 0;
+  uint32_t first_remaining_tiles = 0;
+  const iree_hal_cmd_header_t* walk = iree_hal_cmd_block_commands(block);
+  const iree_hal_cmd_barrier_t* first_barrier = NULL;
+  while (first_active < block->region_count) {
+    const iree_hal_cmd_barrier_t* barrier = (const iree_hal_cmd_barrier_t*)walk;
+    first_remaining_tiles =
+        iree_hal_cmd_region_tile_count(barrier, binding_ptrs);
+    if (first_remaining_tiles > 0) {
+      first_barrier = barrier;
+      break;
+    }
+    walk = iree_hal_cmd_region_end(barrier);
+    first_active++;
+  }
+
   // Set scheduling state for the new block.
   iree_atomic_store(&context->state->active_region_index, (int32_t)first_active,
                     iree_memory_order_relaxed);
   iree_atomic_store(&context->state->region_epoch, block_epoch,
                     iree_memory_order_relaxed);
   {
-    int64_t remaining_tagged = (int64_t)block_epoch << 32;
-    if (first_active < block->region_count) {
-      remaining_tagged |= (int64_t)(uint32_t)initial_tiles[first_active];
-    }
+    int64_t remaining_tagged =
+        ((int64_t)block_epoch << 32) | (int64_t)first_remaining_tiles;
     iree_atomic_store(&context->state->remaining_tiles, remaining_tagged,
                       iree_memory_order_relaxed);
   }
 
-  // Cache the barrier pointer for the first active region. If the first
-  // active region is not region 0 (empty leading regions were skipped),
-  // walk to find the barrier. Otherwise it's the first command.
   if (first_active < block->region_count) {
-    const iree_hal_cmd_barrier_t* first_barrier;
-    if (first_active == 0) {
-      first_barrier =
-          (const iree_hal_cmd_barrier_t*)iree_hal_cmd_block_commands(block);
-    } else {
-      first_barrier = iree_hal_cmd_find_barrier(block, first_active);
-    }
     iree_atomic_store(&context->state->cached_barrier, (intptr_t)first_barrier,
                       iree_memory_order_relaxed);
   } else {
     iree_atomic_store(&context->state->cached_barrier, 0,
                       iree_memory_order_relaxed);
   }
-
-  // Resolve bindings via fixup. Workers only dereference binding_ptrs
-  // after a successful CAS (which requires the new epoch), so stale
-  // workers from the previous block never access these values.
-  iree_hal_cmd_block_processor_resolve_bindings(
-      block, context->state, context->max_region_dispatch_count,
-      context->max_total_binding_count, context->binding_table,
-      context->binding_table_length);
 }
 
 // Prepares .data for the next region at a region transition. Called by the
@@ -872,23 +875,21 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
     int32_t completed_region_index, const iree_hal_cmd_header_t* next_cmd,
     iree_hal_cmd_block_processor_drain_result_t* out_result) {
   iree_hal_cmd_block_state_t* state = context->state;
-  const uint32_t* initial_tiles =
-      iree_hal_cmd_block_initial_remaining_tiles(block);
+  void** binding_ptrs = iree_hal_cmd_block_state_binding_ptrs(
+      state, context->max_region_dispatch_count);
 
   // Find next non-empty region, walking the command stream in parallel to
-  // locate its barrier. Each empty region's barrier is skipped with O(1)
-  // pointer arithmetic (empty barriers have dispatch_count=0).
+  // locate its barrier. Indirect dispatch regions read their parameter buffers
+  // here, after the completed region has produced any dynamic parameters.
   const iree_hal_cmd_header_t* walk = next_cmd;
   int32_t next_region = completed_region_index + 1;
-  while (next_region < (int32_t)block->region_count &&
-         initial_tiles[next_region] == 0) {
-    // Walk past this empty region's barrier (and any dispatches, though
-    // empty regions have dispatch_count=0).
-    const iree_hal_cmd_barrier_t* skip = (const iree_hal_cmd_barrier_t*)walk;
-    walk = iree_hal_cmd_next(&skip->header);
-    for (uint8_t d = 0; d < skip->dispatch_count; ++d) {
-      walk = iree_hal_cmd_next(walk);
-    }
+  uint32_t next_remaining_tiles = 0;
+  while (next_region < (int32_t)block->region_count) {
+    const iree_hal_cmd_barrier_t* barrier = (const iree_hal_cmd_barrier_t*)walk;
+    next_remaining_tiles =
+        iree_hal_cmd_region_tile_count(barrier, binding_ptrs);
+    if (next_remaining_tiles > 0) break;
+    walk = iree_hal_cmd_region_end(barrier);
     next_region++;
   }
 
@@ -906,9 +907,8 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
                       iree_memory_order_relaxed);
     iree_hal_cmd_block_processor_init_region(
         state, context->max_region_dispatch_count, region_epoch,
-        initial_tiles[next_region]);
-    iree_hal_cmd_block_processor_update_budget(context,
-                                               initial_tiles[next_region]);
+        next_remaining_tiles);
+    iree_hal_cmd_block_processor_update_budget(context, next_remaining_tiles);
     return;
   }
 
@@ -952,10 +952,10 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
                                               iree_memory_order_relaxed);
       if (first_active < (int32_t)next_block->region_count) {
         // Block has work. Update budget and signal ready (even → odd).
-        const uint32_t* next_tiles =
-            iree_hal_cmd_block_initial_remaining_tiles(next_block);
-        iree_hal_cmd_block_processor_update_budget(context,
-                                                   next_tiles[first_active]);
+        const int64_t remaining_tiles = iree_atomic_load(
+            &state->remaining_tiles, iree_memory_order_relaxed);
+        iree_hal_cmd_block_processor_update_budget(
+            context, (uint32_t)(remaining_tiles & 0xFFFFFFFFu));
         iree_atomic_fetch_add(&context->block_sequence, 1,
                               iree_memory_order_release);
         return;

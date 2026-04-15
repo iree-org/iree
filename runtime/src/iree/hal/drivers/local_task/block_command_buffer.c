@@ -398,16 +398,14 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
 
-  // Retain executable. For indirect CBs (binding_capacity > 0), buffers come
-  // from the binding table at submit time — skip the per-dispatch insert.
-  // For direct CBs, retain all buffer references (insert_strided skips NULLs).
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
-  if (base_command_buffer->binding_capacity == 0) {
-    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
-        command_buffer->resource_set, bindings.count, bindings.values,
-        offsetof(iree_hal_buffer_ref_t, buffer),
-        sizeof(iree_hal_buffer_ref_t)));
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, bindings.count, bindings.values,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &config.workgroup_count_ref.buffer));
   }
 
   iree_hal_cmd_fixup_t* fixups = NULL;
@@ -418,6 +416,12 @@ static iree_status_t iree_hal_block_command_buffer_dispatch(
 
   iree_status_t status = iree_hal_block_command_buffer_resolve_refs(
       command_buffer, bindings.count, bindings.values, fixups);
+  if (iree_status_is_ok(status) &&
+      iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    status = iree_hal_block_command_buffer_resolve_refs(
+        command_buffer, 1, &config.workgroup_count_ref,
+        &fixups[bindings.count]);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_cmd_build_rollback(&command_buffer->builder, token);
   }

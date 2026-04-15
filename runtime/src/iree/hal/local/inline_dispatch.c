@@ -14,6 +14,14 @@ iree_status_t iree_hal_local_executable_dispatch_inline(
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags) {
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "direct/indirect arguments are not supported on "
+                            "the inline CPU dispatch path");
+  }
+  const bool uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(flags);
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Stack-allocate mapping and pointer arrays for the bindings.
@@ -45,12 +53,25 @@ iree_status_t iree_hal_local_executable_dispatch_inline(
     }
   }
 
+  iree_hal_buffer_mapping_t parameter_mapping = {{0}};
+  bool has_parameter_mapping = false;
+  if (iree_status_is_ok(status) && uses_indirect_parameters) {
+    status = iree_hal_buffer_map_range(
+        config.workgroup_count_ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_READ, config.workgroup_count_ref.offset,
+        3 * sizeof(uint32_t), &parameter_mapping);
+    has_parameter_mapping = iree_status_is_ok(status);
+  }
+
   // Execute all workgroups inline.
   if (iree_status_is_ok(status)) {
     iree_hal_executable_dispatch_state_v0_t dispatch_state = {
-        .workgroup_size_x = config.workgroup_size[0],
-        .workgroup_size_y = config.workgroup_size[1],
-        .workgroup_size_z = (uint16_t)config.workgroup_size[2],
+        .workgroup_size_x =
+            config.workgroup_size[0] ? config.workgroup_size[0] : 1,
+        .workgroup_size_y =
+            config.workgroup_size[1] ? config.workgroup_size[1] : 1,
+        .workgroup_size_z =
+            (uint16_t)(config.workgroup_size[2] ? config.workgroup_size[2] : 1),
         .constant_count = (uint16_t)(constants.data_length / sizeof(uint32_t)),
         .workgroup_count_x = config.workgroup_count[0],
         .workgroup_count_y = config.workgroup_count[1],
@@ -61,14 +82,26 @@ iree_status_t iree_hal_local_executable_dispatch_inline(
         .binding_ptrs = binding_ptrs,
         .binding_lengths = binding_lengths,
     };
+    if (uses_indirect_parameters) {
+      const uint32_t* workgroup_count =
+          (const uint32_t*)parameter_mapping.contents.data;
+      dispatch_state.workgroup_count_x = workgroup_count[0];
+      dispatch_state.workgroup_count_y = workgroup_count[1];
+      dispatch_state.workgroup_count_z = (uint16_t)workgroup_count[2];
+    }
     status = iree_hal_local_executable_issue_dispatch_inline(
         iree_hal_local_executable_cast(executable), export_ordinal,
         &dispatch_state, /*processor_id=*/0, iree_byte_span_empty());
   }
 
-  // Unmap all binding buffers (even on failure — mappings hold refs).
+  // Unmap all buffers (even on failure — mappings hold refs).
+  if (has_parameter_mapping) {
+    status = iree_status_join(status,
+                              iree_hal_buffer_unmap_range(&parameter_mapping));
+  }
   for (iree_host_size_t i = 0; i < mapped_count; ++i) {
-    iree_status_ignore(iree_hal_buffer_unmap_range(&mappings[i]));
+    status =
+        iree_status_join(status, iree_hal_buffer_unmap_range(&mappings[i]));
   }
 
   IREE_TRACE_ZONE_END(z0);

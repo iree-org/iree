@@ -405,8 +405,11 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         config.workgroup_count_ref.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
         IREE_HAL_MEMORY_ACCESS_READ, config.workgroup_count_ref.offset,
         3 * sizeof(uint32_t), &buffer_mapping));
-    memcpy(&dispatch_state->workgroup_count_x, buffer_mapping.contents.data,
-           sizeof(uint32_t) * 3);
+    const uint32_t* workgroup_count =
+        (const uint32_t*)buffer_mapping.contents.data;
+    dispatch_state->workgroup_count_x = workgroup_count[0];
+    dispatch_state->workgroup_count_y = workgroup_count[1];
+    dispatch_state->workgroup_count_z = (uint16_t)workgroup_count[2];
   } else {
     dispatch_state->workgroup_count_x = config.workgroup_count[0];
     dispatch_state->workgroup_count_y = config.workgroup_count[1];

@@ -93,6 +93,11 @@ static bool hip_registered_ =
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},
+              {"QueueDispatchIndirectParametersTest.*",
+               "HIP queue_dispatch is implemented via one-shot command "
+               "buffer emulation, and HIP stream/graph command buffers "
+               "require host-provided launch dimensions rather than "
+               "device-resident indirect workgroup counts."},
               {"BufferMappingTest.*",
                "HIP graph command buffers lack memcpy node support"},
               {"CommandBufferCopyBufferTest.*",
@@ -115,6 +120,10 @@ static bool hip_registered_ =
               {"DispatchConstantsBindingsTest.*",
                "HIP CTS dispatch tests crash on GPU memory reservation "
                "failures"},
+              {"DispatchIndirectParametersTest.*",
+               "HIP stream/graph command buffers explicitly reject indirect "
+               "workgroup count parameters; supporting them requires a "
+               "device-side launch or packet-patching mechanism."},
           }},
          {"async_queue"},
      }),

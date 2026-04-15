@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 
+#include "iree/hal/drivers/amdgpu/device/support/kernel.h"
+
 //===----------------------------------------------------------------------===//
 // Dispatch packet emission
 //===----------------------------------------------------------------------===//
@@ -103,3 +105,63 @@ void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
                        layout->total_kernarg_size);
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Indirect dispatch parameter patching
+//===----------------------------------------------------------------------===//
+
+void iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
+    const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
+        patch_kernel_args,
+    const uint32_t* IREE_AMDGPU_RESTRICT workgroup_count,
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
+    iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args,
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT patch_packet,
+    void* IREE_AMDGPU_RESTRICT kernarg_ptr) {
+  iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t*
+      IREE_AMDGPU_RESTRICT kernargs =
+          (iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t*)
+              kernarg_ptr;
+  kernargs->workgroup_count = workgroup_count;
+  kernargs->dispatch_packet = dispatch_packet;
+  kernargs->implicit_args = implicit_args;
+
+  const uint32_t patch_workgroup_count[3] = {1, 1, 1};
+  iree_hal_amdgpu_device_dispatch_emplace_packet(
+      patch_kernel_args, patch_workgroup_count,
+      /*dynamic_workgroup_local_memory=*/0, patch_packet, kernarg_ptr);
+}
+
+#if defined(IREE_AMDGPU_TARGET_DEVICE)
+
+IREE_AMDGPU_ATTRIBUTE_KERNEL void
+iree_hal_amdgpu_device_dispatch_patch_indirect_params(
+    const uint32_t* IREE_AMDGPU_RESTRICT workgroup_count,
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
+    iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args) {
+  dispatch_packet->grid_size[0] =
+      workgroup_count[0] * dispatch_packet->workgroup_size[0];
+  dispatch_packet->grid_size[1] =
+      workgroup_count[1] * dispatch_packet->workgroup_size[1];
+  dispatch_packet->grid_size[2] =
+      workgroup_count[2] * dispatch_packet->workgroup_size[2];
+
+  if (implicit_args) {
+    implicit_args->block_count[0] = workgroup_count[0];
+    implicit_args->block_count[1] = workgroup_count[1];
+    implicit_args->block_count[2] = workgroup_count[2];
+  }
+
+  const uint16_t header =
+      (dispatch_packet->header &
+       ~(((1u << IREE_HSA_PACKET_HEADER_WIDTH_TYPE) - 1u)
+         << IREE_HSA_PACKET_HEADER_TYPE)) |
+      (IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH << IREE_HSA_PACKET_HEADER_TYPE);
+  const uint32_t header_setup =
+      (uint32_t)header | ((uint32_t)dispatch_packet->setup << 16);
+  iree_amdgpu_scoped_atomic_store(
+      (iree_amdgpu_scoped_atomic_uint32_t*)dispatch_packet, header_setup,
+      iree_amdgpu_memory_order_release, iree_amdgpu_memory_scope_system);
+}
+
+#endif  // IREE_AMDGPU_TARGET_DEVICE
