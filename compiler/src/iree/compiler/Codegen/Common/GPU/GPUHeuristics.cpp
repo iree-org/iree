@@ -697,7 +697,8 @@ static double computeMNUtilization(const GPUMatmulShapeType &problem,
 /// returns true if the lhs is ordered before rhs.
 static bool compareIntrinsics(const GPUMatmulShapeType &problem,
                               const GPUIntrinsicType &lhs,
-                              const GPUIntrinsicType &rhs) {
+                              const GPUIntrinsicType &rhs,
+                              bool doCPromotion = false) {
   // When both M and N need padding, prefer the intrinsic with better M*N
   // utilization. This targets grouped convolutions where per-group channels
   // are small (e.g., 8x8 problem: 16x16 at 25% util >> 32x32 at 6.25%).
@@ -775,7 +776,9 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm) {
+  if ((problem.gemmSize == GemmSizeKind::VeryLargeGemm ||
+       problem.gemmSize == GemmSizeKind::LargeGemm) &&
+      !doCPromotion) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -806,11 +809,12 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
 
 static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
-                  ArrayRef<GPUIntrinsicType> intrinsics) {
+                  ArrayRef<GPUIntrinsicType> intrinsics,
+                  bool doCPromotion = false) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
   llvm::stable_sort(sortedIntrinsics, [&](const GPUIntrinsicType &lhs,
                                           const GPUIntrinsicType &rhs) {
-    return compareIntrinsics(problem, lhs, rhs);
+    return compareIntrinsics(problem, lhs, rhs, doCPromotion);
   });
   return sortedIntrinsics;
 }
@@ -939,7 +943,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
-      sortMMAIntrinsics(problem, intrinsics);
+      sortMMAIntrinsics(problem, intrinsics, doCPromotion);
 
   // Compute product of M and N problem sizes to decide if block intrinsics
   // should be considered. If both M and N products exceed the threshold, skip
