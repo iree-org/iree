@@ -10,6 +10,7 @@
 #include <cstring>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/debug_reporter.h"
@@ -310,17 +311,24 @@ static iree_status_t iree_hal_vulkan_driver_enumerate_physical_devices(
     iree_allocator_t host_allocator, uint32_t* out_physical_device_count,
     VkPhysicalDevice** out_physical_devices) {
   uint32_t physical_device_count = 0;
-  VK_RETURN_IF_ERROR(instance_syms->vkEnumeratePhysicalDevices(
-                         instance, &physical_device_count, NULL),
-                     "vkEnumeratePhysicalDevices");
+  // Some Vulkan ICDs retain one-time internal enumeration state until process
+  // teardown. Bracket the external calls so LeakSanitizer reports stay focused
+  // on IREE-owned lifetimes.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  VkResult query_result = instance_syms->vkEnumeratePhysicalDevices(
+      instance, &physical_device_count, NULL);
+  IREE_LEAK_CHECK_DISABLE_POP();
+  VK_RETURN_IF_ERROR(query_result, "vkEnumeratePhysicalDevices");
   VkPhysicalDevice* physical_devices = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       host_allocator, physical_device_count * sizeof(physical_devices),
       (void**)&physical_devices));
-  iree_status_t status = VK_RESULT_TO_STATUS(
-      instance_syms->vkEnumeratePhysicalDevices(
-          instance, &physical_device_count, physical_devices),
-      "vkEnumeratePhysicalDevices");
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  VkResult enumerate_result = instance_syms->vkEnumeratePhysicalDevices(
+      instance, &physical_device_count, physical_devices);
+  IREE_LEAK_CHECK_DISABLE_POP();
+  iree_status_t status =
+      VK_RESULT_TO_STATUS(enumerate_result, "vkEnumeratePhysicalDevices");
   if (iree_status_is_ok(status)) {
     *out_physical_device_count = physical_device_count;
     *out_physical_devices = physical_devices;
