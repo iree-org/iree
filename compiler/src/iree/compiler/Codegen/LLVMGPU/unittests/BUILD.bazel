@@ -1,0 +1,26 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_test")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_test(
+    name = "LLVMGPUConstraintGeneratorTest",
+    testonly = True,
+    srcs = ["LLVMGPUConstraintGeneratorTest.cpp"],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:KnownTargets",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//mlir:IR",
+    ],
+)
