@@ -7249,9 +7249,10 @@ This blocks reshapes on the edge of the program from being propagated.</p>
 is created for each tiled loop nest. This pass only moves the root compute op
 into the dispatch region, allowing producers to be outside.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-aggressive-fusion       : Aggressive mode enabling fusions not ready for all backends
--fuse-pad-with-consumers : Enable fusing pad with consumer
--fuse-pad-with-producers : Enable fusion of pad with producers
+<div class="highlight"><pre><span></span><code>-aggressive-fusion        : Aggressive mode enabling fusions not ready for all backends
+-fuse-multi-use-producers : Enable experimental fusion of producers with multiple non-dim uses
+-fuse-pad-with-consumers  : Enable fusing pad with consumer
+-fuse-pad-with-producers  : Enable fusion of pad with producers
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-form-scalar-dispatches"><code>-iree-dispatch-creation-form-scalar-dispatches</code><a class="headerlink" href="#-iree-dispatch-creation-form-scalar-dispatches" title="Permanent link">link</a></h3>
 <p><em>Form Dispatch Regions for scalar computations.</em></p>
