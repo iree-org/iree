@@ -59,6 +59,42 @@ static iree_async_frontier_t* BuildFrontier(
   iree_async_frontier_t* name =                                         \
       BuildFrontier(name##_storage, sizeof(name##_storage), {__VA_ARGS__})
 
+typedef struct iree_hal_test_counting_allocator_t {
+  // Allocator that performs the actual memory operations.
+  iree_allocator_t backing_allocator;
+  // Number of allocation-like commands forwarded to the backing allocator.
+  iree_host_size_t allocation_call_count;
+  // Number of free commands forwarded to the backing allocator.
+  iree_host_size_t free_call_count;
+} iree_hal_test_counting_allocator_t;
+
+static iree_status_t iree_hal_test_counting_allocator_ctl(
+    void* self, iree_allocator_command_t command, const void* params,
+    void** inout_ptr) {
+  iree_hal_test_counting_allocator_t* allocator =
+      (iree_hal_test_counting_allocator_t*)self;
+  switch (command) {
+    case IREE_ALLOCATOR_COMMAND_MALLOC:
+    case IREE_ALLOCATOR_COMMAND_CALLOC:
+    case IREE_ALLOCATOR_COMMAND_REALLOC:
+      ++allocator->allocation_call_count;
+      break;
+    case IREE_ALLOCATOR_COMMAND_FREE:
+      ++allocator->free_call_count;
+      break;
+  }
+  return allocator->backing_allocator.ctl(allocator->backing_allocator.self,
+                                          command, params, inout_ptr);
+}
+
+static iree_allocator_t iree_hal_test_counting_allocator(
+    iree_hal_test_counting_allocator_t* allocator) {
+  return iree_allocator_t{
+      /*.self=*/allocator,
+      /*.ctl=*/iree_hal_test_counting_allocator_ctl,
+  };
+}
+
 typedef struct iree_hal_test_opaque_slab_provider_t {
   iree_hal_slab_provider_t base;
   iree_allocator_t host_allocator;
@@ -221,6 +257,61 @@ TEST_F(TLSFPoolTest, ReserveReleaseFresh) {
   EXPECT_EQ(reserve_info.flags, IREE_HAL_POOL_ACQUIRE_FLAG_NONE);
 
   iree_hal_pool_release_reservation(pool_, &reservation, NULL);
+}
+
+TEST(TLSFPool, ReleaseNodeReuseAvoidsRepeatedHostAllocation) {
+  iree_hal_test_counting_allocator_t allocator_state = {
+      /*.backing_allocator=*/iree_allocator_system(),
+      /*.allocation_call_count=*/0,
+      /*.free_call_count=*/0,
+  };
+  iree_allocator_t allocator =
+      iree_hal_test_counting_allocator(&allocator_state);
+
+  iree_hal_slab_provider_t* slab_provider = NULL;
+  IREE_ASSERT_OK(iree_hal_cpu_slab_provider_create(allocator, &slab_provider));
+  iree_async_notification_t* notification = NULL;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      test_proactor(), IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+
+  iree_hal_pool_t* pool = NULL;
+  IREE_ASSERT_OK(iree_hal_tlsf_pool_create(
+      DefaultOptions(), slab_provider, notification,
+      iree_hal_pool_epoch_query_null(), allocator, &pool));
+
+  const iree_host_size_t allocation_call_count_after_create =
+      allocator_state.allocation_call_count;
+
+  iree_hal_pool_reservation_t reservation;
+  iree_hal_pool_acquire_info_t reserve_info;
+  iree_hal_pool_acquire_result_t result;
+  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+      pool, 128, 16, /*requester_frontier=*/NULL,
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_GT(allocator_state.allocation_call_count,
+            allocation_call_count_after_create);
+
+  const iree_host_size_t allocation_call_count_after_first_reserve =
+      allocator_state.allocation_call_count;
+  iree_hal_pool_release_reservation(pool, &reservation, NULL);
+
+  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+      pool, 128, 16, /*requester_frontier=*/NULL,
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_EQ(allocator_state.allocation_call_count,
+            allocation_call_count_after_first_reserve);
+
+  iree_hal_pool_release_reservation(pool, &reservation, NULL);
+  const iree_host_size_t free_call_count_before_trim =
+      allocator_state.free_call_count;
+  IREE_ASSERT_OK(iree_hal_pool_trim(pool));
+  EXPECT_GT(allocator_state.free_call_count, free_call_count_before_trim);
+
+  iree_hal_pool_release(pool);
+  iree_async_notification_release(notification);
+  iree_hal_slab_provider_release(slab_provider);
 }
 
 TEST_F(TLSFPoolTest, ReserveReusesDominatedFrontier) {
