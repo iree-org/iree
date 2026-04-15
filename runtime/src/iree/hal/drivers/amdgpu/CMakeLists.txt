@@ -88,6 +88,7 @@ iree_cc_library(
     iree::hal::memory::slab_provider
     iree::hal::memory::tlsf_pool
     iree::hal::memory::tracing
+    iree::hal::utils::elf_format
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
     iree::hal::utils::files

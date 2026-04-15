@@ -92,6 +92,26 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "elf_format",
+    srcs = ["elf_format.c"],
+    hdrs = ["elf_format.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "elf_format_test",
+    srcs = ["elf_format_test.cc"],
+    deps = [
+        ":elf_format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "file_cache",
     srcs = ["file_cache.c"],
     hdrs = ["file_cache.h"],

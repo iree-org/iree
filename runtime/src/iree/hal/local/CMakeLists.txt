@@ -34,6 +34,7 @@ iree_cc_library(
     "executable_format.c"
   DEPS
     iree::base
+    iree::hal::utils::elf_format
   PUBLIC
 )
 
