@@ -311,12 +311,12 @@ func.func @conv_nchw_static(%3: tensor<1x128x30x30xf32>, %4: tensor<128x128x3x3x
   %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%3, %4 : tensor<1x128x30x30xf32>, tensor<128x128x3x3xf32>) outs(%6 : tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
   return %7 : tensor<1x128x28x28xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 28, 4, 0, 0, 0], vector_common_parallel = [1, 4, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 8, 1, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 16, 14, 28, 0, 0, 0], vector_common_parallel = [1, 4, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 8, 1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      CHECK: func.func @conv_nchw_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nchw_fchw
-//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 28, 4, 0, 0, 0], vector_common_parallel = [1, 4, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 8, 1, 1]>
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 16, 14, 28, 0, 0, 0], vector_common_parallel = [1, 4, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 8, 1, 1]>
 //  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      GENERIC: func.func @conv_nchw_static(
 // GENERIC-SAME:     translation_info = #[[TRANSLATION]]
@@ -333,13 +333,13 @@ func.func @depthwise_conv_static(%3: tensor<1x161x161x240xf32>, %4: tensor<3x3x2
   %7 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<1x161x161x240xf32>, tensor<3x3x240xf32>) outs(%6 : tensor<1x80x80x240xf32>) -> tensor<1x80x80x240xf32>
   return %7 : tensor<1x80x80x240xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 40, 40, 16, 0, 0], vector_common_parallel = [1, 1, 4, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 40, 40, 48, 0, 0], vector_common_parallel = [1, 1, 4, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      CHECK: func.func @depthwise_conv_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
-//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 40, 40, 16, 0, 0], vector_common_parallel = [1, 1, 4, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 40, 40, 48, 0, 0], vector_common_parallel = [1, 1, 4, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      GENERIC: func.func @depthwise_conv_static(
 // GENERIC-SAME:     translation_info = #[[TRANSLATION]]
@@ -380,13 +380,13 @@ func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf
   %6 = linalg.pooling_nchw_max {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%2, %4 : tensor<1x64x114x114xf32>, tensor<3x3xf32>) outs(%5 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
   return %6 : tensor<1x64x56x56xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 32, 56, 8, 0, 0], vector_common_parallel = [1, 8, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 8, 28, 56, 0, 0], vector_common_parallel = [1, 8, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      CHECK: func.func @pooling_nchw_max(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.pooling_nchw_max
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
-//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 32, 56, 8, 0, 0], vector_common_parallel = [1, 8, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 8, 28, 56, 0, 0], vector_common_parallel = [1, 8, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 //  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 //      GENERIC: func.func @pooling_nchw_max(
 // GENERIC-SAME:     translation_info = #[[TRANSLATION]]
@@ -713,7 +713,7 @@ func.func @pack_many_elements(%2: tensor<1200x500000xf32>) -> tensor<31250x1200x
   %pack = linalg.pack %2 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %3 : tensor<1200x500000xf32> -> tensor<31250x1200x16x1xf32>
   return %pack : tensor<31250x1200x16x1xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [50, 3], vector_common_parallel = [1, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [50, 48], vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
 //      CHECK: func.func @pack_many_elements(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -952,7 +952,7 @@ func.func @quant_model(%4: tensor<2304x24xi8>, %5: tensor<24x144xi8>, %6: tensor
   } -> tensor<2304x144xi8>
   return %11 : tensor<2304x144xi8>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 16, 0], distribution = [64, 16, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 48, 0], distribution = [64, 48, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @quant_model(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1015,7 +1015,7 @@ func.func @batch_mmt4d(%17: tensor<128x10x32x8x1xf32>, %18: tensor<128x80x32x4x1
   return %21 : tensor<128x10x80x8x4xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 10, 80, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 0, 8, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 10, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 0, 8, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 1]>
 //      CHECK: func.func @batch_mmt4d(
 //      CHECK:   linalg.batch_mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -1126,16 +1126,6 @@ func.func @winograd_filter_transform(%2: tensor<3x3x64x128xf32>) -> tensor<8x8x6
 #map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map7 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: #[[ATTN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16]>
-//      CHECK: #[[ATTN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
-//      CHECK: #[[ATTN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 1, 0, 0, 16], vector_reduction = [0, 0, 0, 1, 0]>
-//      CHECK: #[[ATTN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-//      CHECK: #[[ATTN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
-//      CHECK: #[[ATTN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
-//      CHECK: #[[ATTN_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
-//      CHECK: #[[ATTN_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
-//      CHECK: #[[ATTN_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
-//      CHECK: #[[ATTN_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6: tensor<20x4096x64xf16>) -> tensor<20x4096x64xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %scale = arith.constant 0.125 : f16
   %8 = tensor.empty() : tensor<20x4096x64xf32>
@@ -1154,6 +1144,16 @@ func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6:
     } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
   return %13#0 : tensor<20x4096x64xf32>
 }
+//      CHECK: #[[ATTN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16]>
+//      CHECK: #[[ATTN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+//      CHECK: #[[ATTN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 1, 0, 0, 16], vector_reduction = [0, 0, 0, 1, 0]>
+//      CHECK: #[[ATTN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//      CHECK: #[[ATTN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+//      CHECK: #[[ATTN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+//      CHECK: #[[ATTN_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
+//      CHECK: #[[ATTN_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+//      CHECK: #[[ATTN_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+//      CHECK: #[[ATTN_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //      CHECK: func.func @attention(
 // CHECK-SAME:     translation_info = #[[ATTN_TRANSLATION]]
 //     CHECK:   iree_linalg_ext.online_attention
@@ -1176,17 +1176,6 @@ func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6:
 #map7 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map8 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map9 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>
-//      CHECK: #[[ATTN4D_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1, 4]>
-//      CHECK: #[[ATTN4D_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1]>
-//      CHECK: #[[ATTN4D_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 64, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 4, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 1, 1]>
-//      CHECK: #[[ATTN4D_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>
-//      CHECK: #[[ATTN4D_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d4)>
-//      CHECK: #[[ATTN4D_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d3)>
-//      CHECK: #[[ATTN4D_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>
-//      CHECK: #[[ATTN4D_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d6, d7)>
-//      CHECK: #[[ATTN4D_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>
-//      CHECK: #[[ATTN4D_MAP6:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2)>
-//      CHECK: #[[ATTN4D_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 func.func @attention_transpose_distribute_4d(%29: index, %37: tensor<4x4x?x128xf16>, %38: tensor<4x4x?x1x1x128xf16>, %39: tensor<4x4x?x1x1x128xf16>, %40: tensor<4x4x?x?x1x1xf16>) -> tensor<4x?x4x128xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %cst = arith.constant 8.837890e-02 : f16
   %30 = util.assume.int %29<umin = 16, umax = 131056, udiv = 16> : index
@@ -1213,6 +1202,17 @@ func.func @attention_transpose_distribute_4d(%29: index, %37: tensor<4x4x?x128xf
   } -> tensor<4x?x4x128xf32>
   return %49 : tensor<4x?x4x128xf32>
 }
+//      CHECK: #[[ATTN4D_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1, 4]>
+//      CHECK: #[[ATTN4D_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1]>
+//      CHECK: #[[ATTN4D_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 64, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 4, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 1, 1]>
+//      CHECK: #[[ATTN4D_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>
+//      CHECK: #[[ATTN4D_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d4)>
+//      CHECK: #[[ATTN4D_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d3)>
+//      CHECK: #[[ATTN4D_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>
+//      CHECK: #[[ATTN4D_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d6, d7)>
+//      CHECK: #[[ATTN4D_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>
+//      CHECK: #[[ATTN4D_MAP6:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2)>
+//      CHECK: #[[ATTN4D_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //      CHECK: func.func @attention_transpose_distribute_4d
 // CHECK-SAME:     translation_info = #[[ATTN4D_TRANSLATION]]
 //     CHECK:   iree_linalg_ext.online_attention
@@ -1501,17 +1501,6 @@ func.func @decode_reduction_f32(%arg0: tensor<32x262144xf16>, %arg1: tensor<32xf
 #map7 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map8 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map9 = affine_map<(d0, d1, d2, d3) -> (d2, d0, d1, d3)>
-//      CHECK: #[[RESHAPE_GENERIC_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8, 16]>
-//      CHECK: #[[RESHAPE_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8]>
-//      CHECK: #[[RESHAPE_ROOT_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 16, 0, 0], vector_common_parallel = [1, 1, 8, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 16]>
-//      CHECK: #[[RESHAPE_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
-//      CHECK: #[[RESHAPE_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d4)>
-//      CHECK: #[[RESHAPE_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>
-//      CHECK: #[[RESHAPE_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
-//      CHECK: #[[RESHAPE_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
-//      CHECK: #[[RESHAPE_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-//      CHECK: #[[RESHAPE_MAP6:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
-//      CHECK: #[[RESHAPE_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %arg2: tensor<?x4x32xf16>, %arg3: tensor<?x4x32xf16>, %arg4: tensor<4x2x?x?xf16>) -> tensor<?x256x1x1xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 1.767580e-01 : f16
@@ -1539,6 +1528,17 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
   %pack = linalg.pack %collapsed padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %13 : tensor<?x256xf32> -> tensor<?x256x1x1xf32>
   return %pack : tensor<?x256x1x1xf32>
 }
+//      CHECK: #[[RESHAPE_GENERIC_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8, 16]>
+//      CHECK: #[[RESHAPE_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8]>
+//      CHECK: #[[RESHAPE_ROOT_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 32, 0, 0], vector_common_parallel = [1, 1, 8, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 16]>
+//      CHECK: #[[RESHAPE_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+//      CHECK: #[[RESHAPE_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d4)>
+//      CHECK: #[[RESHAPE_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>
+//      CHECK: #[[RESHAPE_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+//      CHECK: #[[RESHAPE_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//      CHECK: #[[RESHAPE_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//      CHECK: #[[RESHAPE_MAP6:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+//      CHECK: #[[RESHAPE_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //      CHECK: func.func @attention_reshape_pack
 // CHECK-SAME:     translation_info = #[[RESHAPE_TRANSLATION]]
 //      CHECK:   iree_linalg_ext.online_attention
@@ -1558,16 +1558,6 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
 #map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map7 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: #[[DYN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16, 16]>
-//      CHECK: #[[DYN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16]>
-//      CHECK: #[[DYN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 16, 16, 0]>
-//      CHECK: #[[DYN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-//      CHECK: #[[DYN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
-//      CHECK: #[[DYN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
-//      CHECK: #[[DYN_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
-//      CHECK: #[[DYN_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
-//      CHECK: #[[DYN_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
-//      CHECK: #[[DYN_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value: tensor<?x?x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<?x?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %scale = arith.constant 0.125 : f32
   %c0 = arith.constant 0 : index
@@ -1596,6 +1586,16 @@ func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf3
     } -> tensor<?x?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>
   return %6#0 : tensor<?x?x?xf32>
 }
+//      CHECK: #[[DYN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16, 16]>
+//      CHECK: #[[DYN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16]>
+//      CHECK: #[[DYN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 16, 16, 0]>
+//      CHECK: #[[DYN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//      CHECK: #[[DYN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+//      CHECK: #[[DYN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+//      CHECK: #[[DYN_MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
+//      CHECK: #[[DYN_MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+//      CHECK: #[[DYN_MAP5:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+//      CHECK: #[[DYN_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<LinalgExtTileAndVectorize>>
 //      CHECK: func.func @attention_dynamic_3d(
 // CHECK-SAME:     translation_info = #[[DYN_TRANSLATION]]
 //      CHECK:   iree_linalg_ext.online_attention

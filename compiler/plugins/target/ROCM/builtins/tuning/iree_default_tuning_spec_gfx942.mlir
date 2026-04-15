@@ -36,15 +36,18 @@ transform.named_sequence
   -> (!transform.any_op, !transform.any_param, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
-  %batch, %m, %k1, %k2, %n =
-    transform.iree.match.attention %attention,
-      query_type = f16, key_type = f16, value_type = f16, output_type = f16,
+  %batch, %m, %n, %k1, %k2 =
+    transform.iree.match.online_attention %attention,
+      query_type = f16, key_type = f16, value_type = f16, scale_type = f16,
+      output_type = f32, max_type = f32, sum_type = f32,
       indexing_maps = [
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
         affine_map<(B0, B1, M, N, K1, K2) -> ()>,
-        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M)>
       ] : !transform.any_op -> !transform.param<i64>
 
   %query = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value

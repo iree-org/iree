@@ -636,9 +636,6 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
-  FunctionLikeNest(modulePassManager)
-      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
-
   modulePassManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen configuration pass pipeline:\n";

@@ -1114,8 +1114,6 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(modulePassManager);
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-  FunctionLikeNest(modulePassManager)
-      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   if (shouldEmitPipelineConstraints()) {
     FunctionLikeNest(modulePassManager)

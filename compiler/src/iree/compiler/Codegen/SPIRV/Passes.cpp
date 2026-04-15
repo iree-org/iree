@@ -638,8 +638,6 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     addEncodingToNopPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
-  FunctionLikeNest(modulePassManager)
-      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
   modulePassManager.addPass(createSPIRVSelectLoweringStrategyPass());
 }
 
