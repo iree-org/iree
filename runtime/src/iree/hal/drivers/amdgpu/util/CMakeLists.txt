@@ -153,7 +153,8 @@ iree_cc_library(
     iree::base::threading
     iree::base::threading::thread
     iree::hal
-    iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::drivers::amdgpu::device::binaries::target_map
+    iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::utils::resource_set
   PUBLIC

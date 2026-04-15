@@ -14,12 +14,8 @@ include(CMakeParseArguments)
 # TARGET: LLVM `-target` flag.
 # ARCH: LLVM `-march` flag.
 # SRCS: source files to pass to clang.
-# INTERNAL_HDRS: all headers transitively included by the source files.
-#                Unlike typical Bazel `hdrs`, these are not exposed as
-#                interface headers. This would normally be part of `srcs`,
-#                but separating it was easier for `bazel_to_cmake`, as
-#                CMake does not need this, and making this explicitly
-#                Bazel-only allows using `filegroup` on the Bazel side.
+# INTERNAL_HDRS: headers that should invalidate device compilation but are not
+#                compiled as translation units or exposed as interface headers.
 # COPTS: additional flags to pass to clang.
 # LINKOPTS: additional flags to pass to lld.
 function(iree_amdgpu_binary)
@@ -74,7 +70,12 @@ function(iree_amdgpu_binary)
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
     get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
-    string(REGEX REPLACE "[.]c$" "--${_RULE_ARCH}.bc" _BITCODE_FILE ${_SRC})
+    set(_BITCODE_SRC_FRAGMENT "${_SRC}")
+    string(REPLACE "\\" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE "/" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE ":" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE "." "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    set(_BITCODE_FILE "${_RULE_NAME}_${_BITCODE_SRC_FRAGMENT}.bc")
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT

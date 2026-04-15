@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
-load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
-load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -14,27 +12,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-#===------------------------------------------------------------------------===#
-# Common sources
-#===------------------------------------------------------------------------===#
-
-# Keep this list explicit so legacy device-side scheduler/control-plane sources
-# moved under .notes/ cannot accidentally re-enter the embedded code object.
-BITCODE_SRCS = [
+DEVICE_SRCS = [
     "blit.c",
     "dispatch.c",
     "tracing.c",
 ]
 
-ABI_HDRS = [
-    "//runtime/src/iree/hal/drivers/amdgpu/abi:command_buffer.h",
-    "//runtime/src/iree/hal/drivers/amdgpu/abi:common.h",
-    "//runtime/src/iree/hal/drivers/amdgpu/abi:kernel_args.h",
-    "//runtime/src/iree/hal/drivers/amdgpu/abi:queue.h",
-    "//runtime/src/iree/hal/drivers/amdgpu/abi:signal.h",
-]
-
-BITCODE_HDRS = [
+DEVICE_HDRS = [
     "blit.h",
     "dispatch.h",
     "kernel_tables.h",
@@ -44,7 +28,19 @@ BITCODE_HDRS = [
     "support/queue.h",
     "support/signal.h",
     "tracing.h",
-] + ABI_HDRS
+]
+
+filegroup(
+    name = "bitcode_srcs",
+    srcs = DEVICE_SRCS,
+    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+)
+
+filegroup(
+    name = "bitcode_hdrs",
+    srcs = DEVICE_HDRS,
+    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+)
 
 #===------------------------------------------------------------------------===#
 # Exported Headers
@@ -52,7 +48,7 @@ BITCODE_HDRS = [
 
 iree_runtime_cc_library(
     name = "headers",
-    hdrs = BITCODE_HDRS,
+    hdrs = DEVICE_HDRS,
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
@@ -111,38 +107,4 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
-)
-
-#===------------------------------------------------------------------------===#
-# Architecture-specific Binaries
-#===------------------------------------------------------------------------===#
-# NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
-# match them at runtime without having to load and reflect each code object.
-
-# The architecture list is currently hand-picked for this backend. If we align
-# the naming scheme with TheRock's target families, this can become a user-facing
-# Bazel configuration surface fed by those command-line arguments:
-# https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake
-
-iree_amdgpu_binary(
-    name = "amdgcn-amd-amdhsa--gfx1100",
-    srcs = BITCODE_SRCS,
-    arch = "gfx1100",
-    internal_hdrs = BITCODE_HDRS,
-    target = "amdgcn-amd-amdhsa",
-)
-
-#===------------------------------------------------------------------------===#
-# Embedded Binary Table
-#===------------------------------------------------------------------------===#
-
-iree_c_embed_data(
-    name = "binaries",
-    srcs = [
-        ":amdgcn-amd-amdhsa--gfx1100.so",
-    ],
-    c_file_output = "binaries.c",
-    flatten = True,
-    h_file_output = "binaries.h",
-    identifier = "iree_hal_amdgpu_device_binaries",
 )
