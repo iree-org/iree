@@ -408,6 +408,54 @@ def MatchAttentionOp : Op<Transform_Dialect, "iree.match.attention",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchOnlineAttentionOp : Op<Transform_Dialect, "iree.match.online_attention",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims",
+                    "k1_dims", "k2_dims"]>
+     ]> {
+  let summary = [{Check whether the op is an online attention operation.}];
+  let description = [{
+    Matches iree_linalg_ext.online_attention operations. Same semantics as
+    `iree.match.attention` but for the online (flash-attention-v2) variant
+    which returns running max and sum alongside the accumulator.
+
+    The indexing maps should include maps for all operands: query, key, value,
+    scale, optional mask, output/acc, max, and sum.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$query_type,
+    TypeAttr:$key_type,
+    TypeAttr:$value_type,
+    TypeAttr:$output_type,
+    AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k1_dims,
+    TransformParamTypeInterface:$k2_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `query_type` `=` $query_type
+    `,` `key_type` `=` $key_type
+    `,` `value_type` `=` $value_type
+    `,` `output_type` `=` $output_type
+    `,` `indexing_maps` `=` $indexing_maps
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MatchOpInterface,
