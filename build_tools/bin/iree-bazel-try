@@ -48,7 +48,8 @@ LANGUAGE
 COMPILATION
     --config=NAME         Bazel config (debug, asan, msan, tsan)
     --features=NAME       Bazel feature (thin_lto, etc; repeatable)
-    --copt=FLAG           Compiler flag for all targets (repeatable)
+    --copt=FLAG           C/C++ compiler flag for all targets (repeatable)
+    --cxxopt=FLAG         C++ compiler flag for all targets (repeatable)
     --linkopt=FLAG        Linker flag for all targets (repeatable)
     --dep=LABEL           Add explicit Bazel dependency (repeatable)
     --no_infer            Disable automatic dependency inference
@@ -130,7 +131,7 @@ EXAMPLE: Multiple source files
     (exit code 0)
 
 EXAMPLE: C++ with custom flags (auto-detected from includes or use -x c++)
-    $ iree-bazel-try --copt=-std=c++17 -e '
+    $ iree-bazel-try --cxxopt=-std=c++17 -e '
     #include <optional>
     #include <stdio.h>
     int main() {
@@ -363,18 +364,19 @@ _cleanup_stale_locks() {
 # Hash is based on #includes + explicit deps + build options + language.
 # File inputs also include content hash to avoid stale builds.
 # This allows multiple runs with same deps config to share the cached BUILD.bazel.
-# Different build flags (copts, linkopts, features) get separate cache slots so Bazel's
+# Different build flags (copts, cxxopts, linkopts, features) get separate cache slots so Bazel's
 # action cache doesn't thrash when alternating between flag combinations.
-# Args: source_files array, extra_deps array, copts array, linkopts array, language,
-#       bazel_user_flags array, include_contents(0/1)
+# Args: source_files array, extra_deps array, copts array, cxxopts array, linkopts array,
+#       language, bazel_user_flags array, include_contents(0/1)
 compute_cache_hash() {
     local -n _source_files=${1}
     local -n _extra_deps=${2}
     local -n _copts=${3}
-    local -n _linkopts=${4}
-    local _language=${5:-c}
-    local -n _bazel_user_flags=${6}
-    local _include_contents=${7:-0}
+    local -n _cxxopts=${4}
+    local -n _linkopts=${5}
+    local _language=${6:-c}
+    local -n _bazel_user_flags=${7}
+    local _include_contents=${8:-0}
     {
         # Hash language (determines file extension and compilation mode).
         printf 'language:%s\n' "${_language}"
@@ -391,6 +393,8 @@ compute_cache_hash() {
         # Hash build flags that affect compilation output.
         printf 'copts:\n'
         printf '%s\n' "${_copts[@]}" | sort -u
+        printf 'cxxopts:\n'
+        printf '%s\n' "${_cxxopts[@]}" | sort -u
         printf 'linkopts:\n'
         printf '%s\n' "${_linkopts[@]}" | sort -u
         printf 'bazel_flags:\n'
@@ -514,7 +518,7 @@ show_cache_status() {
         local output_size
         output_size=$(du -sh "${output_base}" 2>/dev/null | cut -f1)
         echo "Bazel output_base: ${output_size}"
-        echo "  (This is used when --copt/--features are specified)"
+        echo "  (This is used when --copt/--cxxopt/--features are specified)"
     else
         echo "Bazel output_base: not created"
     fi
@@ -741,6 +745,7 @@ INLINE_CODE=""
 declare -a SOURCE_FILES=()
 declare -a EXTRA_DEPS=()
 declare -a COPTS=()
+declare -a CXXOPTS=()
 declare -a LINKOPTS=()
 declare -a BAZEL_ARGS=()
 declare -a BAZEL_USER_FLAGS=()
@@ -840,6 +845,14 @@ while [[ $# -gt 0 ]]; do
             COPTS+=("${1#--copt=}")
             shift
             ;;
+        --cxxopt)
+            CXXOPTS+=("${2}")
+            shift 2
+            ;;
+        --cxxopt=*)
+            CXXOPTS+=("${1#--cxxopt=}")
+            shift
+            ;;
         --linkopt)
             LINKOPTS+=("${2}")
             shift 2
@@ -883,10 +896,13 @@ iree_ensure_configured
 iree_bazel_build_default_configs
 BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
 
-# Propagate copts and linkopts to bazel command line so they apply to all
+# Propagate copts, cxxopts, and linkopts to bazel command line so they apply to all
 # transitive dependencies, not just the snippet target.
 for opt in "${COPTS[@]}"; do
     BAZEL_ARGS+=("--copt=${opt}")
+done
+for opt in "${CXXOPTS[@]}"; do
+    BAZEL_ARGS+=("--cxxopt=${opt}")
 done
 for opt in "${LINKOPTS[@]}"; do
     BAZEL_ARGS+=("--linkopt=${opt}")
@@ -903,13 +919,13 @@ for flag in "${BAZEL_USER_FLAGS[@]}"; do
         break
     fi
 done
-if [[ ${#COPTS[@]} -gt 0 || ${#LINKOPTS[@]} -gt 0 || ${#BAZEL_USER_FLAGS[@]} -gt 0 ]]; then
+if [[ ${#COPTS[@]} -gt 0 || ${#CXXOPTS[@]} -gt 0 || ${#LINKOPTS[@]} -gt 0 || ${#BAZEL_USER_FLAGS[@]} -gt 0 ]]; then
     HAS_CUSTOM_FLAGS=1
 fi
 
 # Use a separate output_base when custom flags are present to avoid polluting
 # the main Bazel server's analysis cache. This ensures that running
-# iree-bazel-try with --copt/--features doesn't cause config invalidation
+# iree-bazel-try with --copt/--cxxopt/--features doesn't cause config invalidation
 # for subsequent iree-bazel-build/test/run invocations.
 # Also redirect workspace symlinks to avoid overwriting the main bazel-bin.
 if [[ "${HAS_CUSTOM_FLAGS}" == "1" ]]; then
@@ -1044,7 +1060,7 @@ fi
 # Hash is based on #includes + explicit deps + build options + language.
 # File inputs also include content hash to avoid stale builds.
 # This allows runs with same deps config to share BUILD.bazel analysis cache.
-CACHE_HASH=$(compute_cache_hash HASH_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "${LANGUAGE}" BAZEL_USER_FLAGS "${HAS_FILE_INPUT}")
+CACHE_HASH=$(compute_cache_hash HASH_SOURCE_PATHS EXTRA_DEPS COPTS CXXOPTS LINKOPTS "${LANGUAGE}" BAZEL_USER_FLAGS "${HAS_FILE_INPUT}")
 SLOT_DIR="${CACHE_DIR}/${CACHE_HASH}"
 LOCK_FILE="${CACHE_DIR}/${CACHE_HASH}.lock"
 
