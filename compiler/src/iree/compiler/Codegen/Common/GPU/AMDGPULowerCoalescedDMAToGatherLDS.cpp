@@ -166,6 +166,37 @@ getDestSwizzleAttr(Value dest) {
   return std::nullopt;
 }
 
+/// Verifies that every transfer segment is compatible with the destination
+/// XOR swizzle's |accessWidth|.
+///
+/// `gather_to_lds` writes |elementsPerLane| contiguous elements per lane at
+/// `dstBase + laneId * elementsPerLane`, while the inverse XOR swizzle is
+/// applied only to each lane's base offset. The lane therefore reads
+/// `src[swizzle(perLaneBase) + k]` for k in [0, elementsPerLane). For this
+/// to match the swizzled LDS layout we need
+///   swizzle(perLaneBase) + k == swizzle(perLaneBase + k)   for all k.
+/// XOR-shuffle is identity within an access_width-sized chunk and permutes
+/// between chunks, so the equation holds iff every per-lane write stays
+/// inside one chunk:
+///   elementsPerLane <= accessWidth  AND
+///   accessWidth % elementsPerLane == 0.
+///
+/// Returns the offending segment's elementsPerLane on failure, std::nullopt
+/// on success.
+static std::optional<int64_t>
+findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
+                               int64_t accessWidth) {
+  for (const TransferSegment &seg : segments) {
+    // When elementsPerLane > accessWidth, accessWidth % elementsPerLane
+    // equals accessWidth (!= 0), so this single check covers both the
+    // "fits in one chunk" and "evenly divides" requirements.
+    if (accessWidth % seg.elementsPerLane != 0) {
+      return seg.elementsPerLane;
+    }
+  }
+  return std::nullopt;
+}
+
 /// Generates source and destination indices for a GatherToLDS operation.
 ///
 /// The gather_to_lds instruction requires:
@@ -312,6 +343,18 @@ struct LowerCoalescedGatherDMAPattern final
                  "of supported DMA transfer sizes");
     }
     SmallVector<TransferSegment> segments = std::move(*segmentsOrFailure);
+
+    if (destSwizzle) {
+      int64_t accessWidth = destSwizzle->getAccessElementCount();
+      if (std::optional<int64_t> badEpl =
+              findSwizzleIncompatibleSegment(segments, accessWidth)) {
+        return dmaOp.emitOpError()
+               << "DMA segment elementsPerLane=" << *badEpl
+               << " incompatible with swizzle access_width=" << accessWidth
+               << " (need elementsPerLane <= access_width and "
+                  "access_width % elementsPerLane == 0)";
+      }
+    }
 
     // OOB padding requires fat_raw_buffer for hardware OOB clamping.
     if (std::optional<ArrayAttr> inBounds = dmaOp.getInBounds()) {

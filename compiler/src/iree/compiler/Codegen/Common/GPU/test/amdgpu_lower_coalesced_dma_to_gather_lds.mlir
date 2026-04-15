@@ -1701,3 +1701,46 @@ func.func @lower_dma_with_chained_view_ops(
   } {mapping = [#iree_gpu.lane_id<0>]}
   return
 }
+
+// -----
+
+// Test: DMA lowering rejects swizzles where elementsPerLane > access_width.
+// f32 source + dma_sizes=[128] -> 128/32 = 4 elements/lane.
+// access_width=2, so the per-lane DMA write would span two swizzle chunks.
+// Per spec: require elementsPerLane <= access_width AND
+// access_width % elementsPerLane == 0.
+
+#executable_target_rocm_hsaco_fb_bad_swizzle = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [128]>>}>
+
+#translation_bad_swizzle = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+func.func @lower_dma_with_incompatible_swizzle(
+    %source: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_bad_swizzle,
+    translation_info = #translation_bad_swizzle} {
+  %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 2>]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+  %dest = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [4, 128]
+      : memref<512xf32, #gpu.address_space<workgroup>>
+      into memref<4x128xf32, #gpu.address_space<workgroup>>
+  scf.forall (%lane) in (64) {
+    // expected-error @+1 {{incompatible with swizzle access_width=2}}
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
