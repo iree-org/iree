@@ -354,3 +354,38 @@ func.func @transfer_read_2d_masked(%A: memref<?x?x?xf32>, %a: index, %b: index, 
 //       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[PAD]], %[[M1]]
 //  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
 //       CHECK:   return %[[V0]], %[[V1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_write with 2-D vector on memref: unrolled into rank-1 writes with adjusted offsets.
+func.func @transfer_write_2d(%vec: vector<3x4xf32>, %A: memref<?x?x?xf32>, %a: index, %b: index, %c: index) {
+  vector.transfer_write %vec, %A[%a, %b, %c] : vector<3x4xf32>, memref<?x?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @transfer_write_2d
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index)
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[OFF2:.+]] = arith.addi %[[IDX1]], %[[C2]] : index
+//       CHECK:   vector.transfer_write %[[V2]], %[[A]][%[[IDX0]], %[[OFF2]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   return
+
+// -----
+
+// transfer_write with 2-D mask: each unrolled write gets the corresponding 1-D mask slice.
+func.func @transfer_write_2d_masked(%vec: vector<2x4xf32>, %A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %mask: vector<2x4xi1>) {
+  vector.transfer_write %vec, %A[%a, %b, %c], %mask {in_bounds = [false, false]} : vector<2x4xf32>, memref<?x?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @transfer_write_2d_masked
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[M0]]
+//  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[M1]]
+//  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   return

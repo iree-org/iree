@@ -795,6 +795,77 @@ struct ConvertTransferRead final
   }
 };
 
+/// Convert transfer_write with an n-D vector into multiple rank-1 writes,
+/// one per outer-dim combination, with adjusted memref indices. For tensor
+/// semantics, sub-writes are chained via SSA results.
+struct ConvertTransferWrite final
+    : public OpConversionPattern<vector::TransferWriteOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::TransferWriteOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType vectorTy = op.getVectorType();
+    if (vectorTy.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    ArrayRef<int64_t> shape = vectorTy.getShape();
+    ArrayRef<int64_t> outerShape = shape.drop_back();
+    int64_t numOuterDims = outerShape.size();
+
+    AffineMap permMap = op.getPermutationMap();
+    AffineMap newPermMap =
+        AffineMap::get(permMap.getNumDims(), permMap.getNumSymbols(),
+                       {permMap.getResults().back()}, rewriter.getContext());
+
+    ArrayAttr newInBoundsAttr;
+    if (ArrayAttr inBounds = op.getInBoundsAttr()) {
+      newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
+    }
+
+    SmallVector<Value> vectorSlices(adaptor.getValueToStore());
+    ValueRange convertedMask = adaptor.getMask();
+    Value dest = op.getBase();
+
+    int64_t flatIdx = 0;
+    SmallVector<int64_t> tileShape(numOuterDims, 1);
+    for (SmallVector<int64_t> outerIdx :
+         StaticTileOffsetRange(outerShape, tileShape)) {
+      SmallVector<Value> newIndices(op.getIndices());
+      for (int64_t d = 0; d < numOuterDims; ++d) {
+        auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
+        if (!dimExpr || outerIdx[d] == 0) {
+          continue;
+        }
+        int64_t memrefDim = dimExpr.getPosition();
+        Value offset =
+            arith::ConstantIndexOp::create(rewriter, loc, outerIdx[d]);
+        newIndices[memrefDim] =
+            arith::AddIOp::create(rewriter, loc, newIndices[memrefDim], offset);
+      }
+
+      Value newMask = convertedMask.empty() ? Value{} : convertedMask[flatIdx];
+      Value vecSlice = vectorSlices[flatIdx++];
+
+      auto writeOp = vector::TransferWriteOp::create(
+          rewriter, loc, vecSlice, dest, newIndices,
+          AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
+      if (op.hasPureTensorSemantics()) {
+        dest = writeOp.getResult();
+      }
+    }
+
+    if (op.hasPureTensorSemantics()) {
+      rewriter.replaceOp(op, dest);
+    } else {
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
 struct LLVMGPULegalizeNDVectorsPass final
     : impl::LLVMGPULegalizeNDVectorsPassBase<LLVMGPULegalizeNDVectorsPass> {
 
@@ -816,7 +887,7 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast,
-	ConvertTransferRead>(typeConverter, ctx);
+	ConvertTransferRead, ConvertTransferWrite>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
