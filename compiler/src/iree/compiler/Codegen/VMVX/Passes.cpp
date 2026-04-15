@@ -7,6 +7,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
@@ -80,6 +81,27 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   }
 }
 
+void buildVMVXConfigurationPassPipeline(OpPassManager &modulePassManager) {
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
+  FunctionLikeNest(modulePassManager)
+      .addPass(createMaterializeDeviceEncodingPass)
+      // TODO: Remove the following pass the plumb support for
+      // #hal.descriptor_type memory space through the stack.
+      .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+  modulePassManager.addPass(createVMVXSelectLoweringStrategyPass());
+}
+
+void buildVMVXLoweringPassPipeline(OpPassManager &modulePassManager) {
+  FunctionLikeNest(modulePassManager)
+      .addPass(createVMVXLowerExecutableTargetPass);
+  modulePassManager.addPass(createReconcileTranslationInfoPass());
+  modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
+}
+
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
 void buildVMVXLinkingPassPipeline(OpPassManager &modulePassManager) {
@@ -108,6 +130,20 @@ namespace {
 void registerCodegenVMVXPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> VMVXConfigPipeline(
+      "iree-codegen-vmvx-configuration-pipeline",
+      "Runs the VMVX codegen configuration pipeline",
+      [](OpPassManager &modulePassManager) {
+        buildVMVXConfigurationPassPipeline(modulePassManager);
+      });
+
+  static PassPipelineRegistration<> VMVXLoweringPipeline(
+      "iree-codegen-vmvx-lowering-pipeline",
+      "Runs the VMVX codegen lowering pipeline",
+      [](OpPassManager &modulePassManager) {
+        buildVMVXLoweringPassPipeline(modulePassManager);
+      });
 
   static PassPipelineRegistration<> VMVXLinkingPipeline(
       "iree-codegen-vmvx-linking-pipeline",
