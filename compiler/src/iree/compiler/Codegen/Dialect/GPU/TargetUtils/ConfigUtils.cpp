@@ -944,20 +944,75 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (useDirectLoad) {
     Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
-    // innermost (contiguous reads) to avoid LDS bank conflicts.
-    if (lhsElemType.isBF16() && !transposedLhs) {
-      FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
-          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
-      if (succeeded(lhsSwizzleAttr)) {
-        lhsAttr = *lhsSwizzleAttr;
+
+    // Per-operand DMA eligibility: when a per-warp tile is too small for the
+    // widest available DMA transfer, that operand falls back to narrow DMA
+    // (e.g. 32-bit) which is significantly slower and adds address-computation
+    // overhead that bloats the loop body and prevents LLVM unrolling. For such
+    // operands, fall back to the standard vector-load path instead.
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+    if (!scaled && dmaSizes.size() > 1) {
+      int64_t maxDMABits = *llvm::max_element(dmaSizes);
+      auto mmaKindIface = cast<IREE::GPU::MmaInterfaceAttr>(kind);
+      int64_t kPackFactor = std::get<2>(mmaKindIface.getMNKShape());
+      int64_t totalWarps =
+          ShapedType::getNumElements(schedule->nSubgroupCounts) *
+          ShapedType::getNumElements(schedule->mSubgroupCounts);
+      int64_t innerK = reductionTileSizes[contractionK.back()] * kPackFactor;
+
+      auto canUseWideDMA = [&](int64_t spatialTile, Type elemType) {
+        int64_t elemBits = elemType.getIntOrFloatBitWidth();
+        if (maxDMABits % elemBits != 0) {
+          return true;
+        }
+        int64_t perWarp =
+            (spatialTile * innerK) / std::max(totalWarps, (int64_t)1);
+        int64_t maxTransferElems = targetSubgroupSize * (maxDMABits / elemBits);
+        return perWarp >= maxTransferElems;
+      };
+
+      int64_t innerM = workgroupTileSizes[contractionM.back()];
+      int64_t innerN = workgroupTileSizes[contractionN.back()];
+
+      if (!canUseWideDMA(innerM, lhsElemType)) {
+        LLVM_DEBUG(llvm::dbgs() << "LHS per-warp tile too small for "
+                                << maxDMABits << "-bit DMA (" << innerM << "x"
+                                << innerK << ", warps=" << totalWarps
+                                << "); using vector loads for LHS\n");
+        lhsAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+      }
+      if (!canUseWideDMA(innerN, rhsElemType)) {
+        LLVM_DEBUG(llvm::dbgs() << "RHS per-warp tile too small for "
+                                << maxDMABits << "-bit DMA (" << innerN << "x"
+                                << innerK << ", warps=" << totalWarps
+                                << "); using vector loads for RHS\n");
+        rhsAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
       }
     }
-    if (rhsElemType.isBF16() && transposedRhs) {
-      FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
-          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
-      if (succeeded(rhsSwizzleAttr)) {
-        rhsAttr = *rhsSwizzleAttr;
+
+    // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
+    // innermost (contiguous reads) to avoid LDS bank conflicts.
+    if (isa<IREE::GPU::UseGlobalLoadDMAAttr>(lhsAttr)) {
+      if (lhsElemType.isBF16() && !transposedLhs) {
+        FailureOr<Attribute> lhsSwizzleAttr =
+            getXorShuffleAttr(context, lhsAttr, target, kind,
+                              schedule->kTileSizes, kMMAOperandLhs);
+        if (succeeded(lhsSwizzleAttr)) {
+          lhsAttr = *lhsSwizzleAttr;
+        }
+      }
+    }
+    if (isa<IREE::GPU::UseGlobalLoadDMAAttr>(rhsAttr)) {
+      if (rhsElemType.isBF16() && transposedRhs) {
+        FailureOr<Attribute> rhsSwizzleAttr =
+            getXorShuffleAttr(context, rhsAttr, target, kind,
+                              schedule->kTileSizes, kMMAOperandRhs);
+        if (succeeded(rhsSwizzleAttr)) {
+          rhsAttr = *rhsSwizzleAttr;
+        }
       }
     }
     promotionArray = {lhsAttr, rhsAttr};
@@ -1204,11 +1259,24 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {configAndWgSize->second, 1, 1};
   LoweringConfigAttr loweringConfig = configAndWgSize->first;
 
+  // Check whether the returned config actually uses DMA for any operand.
+  // The inner function may have demoted some operands from DMA to vector
+  // loads if their per-warp tiles were too small for efficient wide DMA.
+  bool configUsesDMA = false;
+  if (auto promoTypes = GPU::getPromotionTypesList(loweringConfig)) {
+    for (Attribute a : *promoTypes) {
+      if (isa<IREE::GPU::UseGlobalLoadDMAAttr>(a)) {
+        configUsesDMA = true;
+        break;
+      }
+    }
+  }
+
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad || isScaled,
+      /*no_reduce_shared_memory_bank_conflicts=*/configUsesDMA || isScaled,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
