@@ -215,3 +215,43 @@ func.func @producer_has_direct_write(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5
 //  CHECK-SAME:     ins(%[[ELEM]]
 //   CHECK-DAG:   iree_tensor_ext.dispatch.tensor.store %[[REDUCTION]]
 //   CHECK-DAG:   iree_tensor_ext.dispatch.tensor.store %[[ELEM]]
+
+// -----
+
+// An elementwise producer has two users: a fusable `linalg.generic` and a
+// non-generic op (`linalg.pack`) that the pattern cannot absorb. Fusing into
+// one consumer would leave the producer alive for the other, so the pass
+// must leave the producer unchanged.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @producer_has_pack_sibling(%arg0: tensor<2x4xi8>) -> (tensor<2xi32>, tensor<1x2x2x2xi8>) {
+  %c0_i32 = arith.constant 0 : i32
+  %c-128_i8 = arith.constant -128 : i8
+  %init_red = tensor.empty() : tensor<2xi32>
+  %init_elem = tensor.empty() : tensor<2x4xi8>
+  %init_pack = tensor.empty() : tensor<1x2x2x2xi8>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%init_red : tensor<2xi32>) -> tensor<2xi32>
+  %elem = linalg.generic {
+      indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x4xi8>) outs(%init_elem : tensor<2x4xi8>) {
+    ^bb0(%in: i8, %out: i8):
+      %0 = arith.addi %in, %c-128_i8 : i8
+      linalg.yield %0 : i8
+  } -> tensor<2x4xi8>
+  %red = linalg.generic {
+      indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+      ins(%elem : tensor<2x4xi8>) outs(%fill : tensor<2xi32>) {
+    ^bb0(%in: i8, %out: i32):
+      %0 = arith.extsi %in : i8 to i32
+      %1 = arith.addi %0, %out : i32
+      linalg.yield %1 : i32
+  } -> tensor<2xi32>
+  %pack = linalg.pack %elem outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init_pack : tensor<2x4xi8> -> tensor<1x2x2x2xi8>
+  return %red, %pack : tensor<2xi32>, tensor<1x2x2x2xi8>
+}
+// CHECK-LABEL: func.func @producer_has_pack_sibling
+//       CHECK:   %[[ELEM:.+]] = linalg.generic
+//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[ELEM]]
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[ELEM]]
+//       CHECK:   return %[[REDUCTION]], %[[PACK]]
