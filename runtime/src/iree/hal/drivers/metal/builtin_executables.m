@@ -239,18 +239,7 @@ iree_status_t iree_hal_metal_builtin_executable_fill_buffer(
     workgroup_count = iree_device_size_ceil_div(length, workgroup_size * 4);
   } else {  // 1-byte aligned case
     pipeline_state = executable->pipelines[2].pipeline_state;
-    // We may potentially need to read some 32-bit scalars at unaligned addresses.
-    usage |= MTLResourceUsageRead;
-    // Calculate unaligned partial prefix/suffix byte count, and then get the middle aligned byte
-    // count for distributing threads. This logic MUST be consistent with the MSL source code.
-    iree_device_size_t left_byte_count = target_offset % 4;
-    iree_device_size_t right_byte_count = (target_offset + length) % 4;
-    int64_t middle_byte_count = length - left_byte_count - right_byte_count;
-    // Note that in the extreme case, we don't have aligned bytes in the middle (0), or actually
-    // prefix and suffix partial bytes are the same (< 0). We'd need one thread to handle the
-    // partial bytes at least.
-    if (middle_byte_count <= 0) middle_byte_count = 1;
-    workgroup_count = iree_device_size_ceil_div(middle_byte_count, workgroup_size * 4);
+    workgroup_count = iree_device_size_ceil_div(length, workgroup_size);
   }
   [encoder setComputePipelineState:pipeline_state];
 
@@ -303,7 +292,7 @@ iree_status_t iree_hal_metal_builtin_executable_copy_buffer(
 
   // Encode the dispatch.
   const iree_device_size_t workgroup_size = 32;
-  iree_device_size_t workgroup_count = iree_device_size_ceil_div(length, workgroup_size * 4);
+  iree_device_size_t workgroup_count = iree_device_size_ceil_div(length, workgroup_size);
   [encoder dispatchThreadgroups:MTLSizeMake(workgroup_count, 1, 1)
           threadsPerThreadgroup:MTLSizeMake(workgroup_size, 1, 1)];
 

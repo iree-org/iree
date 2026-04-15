@@ -1412,11 +1412,9 @@ static iree_status_t iree_hal_task_queue_drain_copy(
 }
 
 // Handles an UPDATE operation: maps the target buffer and copies the inline
-// source data directly. Queue-level updates are capped at
-// IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE (64KB) by the HAL contract, which is
-// small enough that multi-worker parallelism would be pure overhead — the
-// single memcpy completes faster than a cmd builder + processor dispatch
-// cycle.
+// source data directly. The queue op already captured the caller's source data,
+// so a single memcpy avoids extra command builder + processor dispatch
+// overhead.
 static iree_status_t iree_hal_task_queue_drain_update(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
   iree_hal_buffer_mapping_t mapping = {{0}};
