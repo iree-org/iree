@@ -32,13 +32,14 @@ iree_status_t iree_hal_amdgpu_verify_device_isa_commonality(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology);
 
-// Returns whether the canonical IREE HAL executable |format| is supported by
-// all GPU devices in |topology|. Some devices may support multiple ISAs.
+// Returns whether the IREE HAL executable |format| is supported by all GPU
+// devices in |topology|. Some devices may support multiple ISAs.
 //
-// To avoid creating yet another naming scheme we directly use the ISA names
-// reported by HSA, e.g. `amdgcn-amd-amdhsa--gfx1100`. It's not pretty, but it
-// is precise for this particular HAL and lets us avoid any potential runtime
-// changes if LLVM<->HSA naming changes with new code object versions.
+// Supports both the target architecture names used by the compiler
+// (`gfx1100`) and the canonical ISA names reported by HSA
+// (`amdgcn-amd-amdhsa--gfx1100`). The runtime normalizes executable flatbuffer
+// formats to the HSA ISA spelling, but device target matching queries use the
+// compiler target format directly during VM initialization.
 //
 // Optionally |out_isa| can be used to get the agent ISA for the given format.
 // Note that this will be from the first device but should match all other
