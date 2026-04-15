@@ -187,8 +187,10 @@ static std::optional<int64_t>
 findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
                                int64_t accessWidth) {
   for (const TransferSegment &seg : segments) {
-    if (seg.elementsPerLane > accessWidth ||
-        accessWidth % seg.elementsPerLane != 0) {
+    // When elementsPerLane > accessWidth, accessWidth % elementsPerLane
+    // equals accessWidth (!= 0), so this single check covers both the
+    // "fits in one chunk" and "evenly divides" requirements.
+    if (accessWidth % seg.elementsPerLane != 0) {
       return seg.elementsPerLane;
     }
   }
