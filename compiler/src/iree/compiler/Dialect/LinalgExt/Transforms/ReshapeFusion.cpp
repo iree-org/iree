@@ -1027,24 +1027,6 @@ getCollapsedOpIndexingMap(AffineMap indexingMap,
                         resultExprs, context);
 }
 
-/// Get the iterator types for the collapsed operation given the original
-/// iterator types and collapsed dimensions.
-static SmallVector<utils::IteratorType>
-getCollapsedOpIteratorTypes(ArrayRef<utils::IteratorType> iteratorTypes,
-                            const CollapsingInfo &collapsingInfo) {
-  SmallVector<utils::IteratorType> collapsedIteratorTypes;
-  for (ReassociationIndicesRef foldedIterDims :
-       collapsingInfo.getCollapsedOpToOrigOpMapping()) {
-    assert(!foldedIterDims.empty() &&
-           "reassociation indices expected to have non-empty sets");
-    // Just pick the iterator type of the first folded dim. Pre-condition checks
-    // expected to have checked that iterator types of all folded dimensions are
-    // the same.
-    collapsedIteratorTypes.push_back(iteratorTypes[foldedIterDims[0]]);
-  }
-  return collapsedIteratorTypes;
-}
-
 /// Returns a copy of `attentionOp` with collapsed iteration dimensions.
 static Operation *createCollapsedOp(AttentionOp origOp,
                                     const CollapsingInfo &collapsingInfo,
@@ -1058,18 +1040,9 @@ static Operation *createCollapsedOp(AttentionOp origOp,
         return getCollapsedOpIndexingMap(map, collapsingInfo);
       }));
 
-  SmallVector<utils::IteratorType> iteratorTypes(getCollapsedOpIteratorTypes(
-      origOp.getLoopIteratorTypes(), collapsingInfo));
-
-  Value maskOperand;
-  if (inputOperands.size() > 4) {
-    maskOperand = inputOperands[4];
-  }
-
   auto collapsedOp = AttentionOp::create(
-      rewriter, origOp.getLoc(), resultTypes, inputOperands[0],
-      inputOperands[1], inputOperands[2], inputOperands[3], outputOperands[0],
-      rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
+      rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
+      rewriter.getAffineMapArrayAttr(indexingMaps));
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
   return collapsedOp;
