@@ -9,6 +9,11 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Parser/Parser.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -67,8 +72,8 @@ TEST_F(GetCompatibleMMAAttrsTest, IncludesVirtualMMA) {
   Type f16 = Float16Type::get(ctx);
   Type f32 = Float32Type::get(ctx);
   auto withoutVirtual = getCompatibleMMAAttrs(target, f16, f16, f32, ctx);
-  auto withVirtual =
-      getCompatibleMMAAttrs(target, f16, f16, f32, ctx, /*includeVirtual=*/true);
+  auto withVirtual = getCompatibleMMAAttrs(target, f16, f16, f32, ctx,
+                                           /*includeVirtual=*/true);
   EXPECT_GE(withVirtual.size(), withoutVirtual.size());
 }
 
@@ -108,13 +113,165 @@ TEST_F(GetCompatibleMMAAttrsTest, NoDuplicates) {
 
   Type f16 = Float16Type::get(ctx);
   Type f32 = Float32Type::get(ctx);
-  auto result =
-      getCompatibleMMAAttrs(target, f16, f16, f32, ctx, /*includeVirtual=*/true);
+  auto result = getCompatibleMMAAttrs(target, f16, f16, f32, ctx,
+                                      /*includeVirtual=*/true);
   for (size_t i = 0; i < result.size(); ++i) {
     for (size_t j = i + 1; j < result.size(); ++j) {
       EXPECT_NE(result[i], result[j]);
     }
   }
+}
+
+class LinalgOpFixture : public ::testing::Test {
+protected:
+  LinalgOpFixture() {
+    DialectRegistry reg;
+    reg.insert<arith::ArithDialect, func::FuncDialect, linalg::LinalgDialect,
+               tensor::TensorDialect>();
+    ctx.appendDialectRegistry(reg);
+    ctx.loadAllAvailableDialects();
+  }
+
+  MLIRContext *getContext() { return &ctx; }
+
+  linalg::LinalgOp parseLinalgOp(StringRef mlirText) {
+    module = parseSourceString<ModuleOp>(mlirText, &ctx);
+    linalg::LinalgOp result;
+    module->walk([&](linalg::LinalgOp op) { result = op; });
+    return result;
+  }
+
+  linalg::LinalgOp getFillOp() {
+    return parseLinalgOp(R"(
+      func.func @test(%val: f32, %out: tensor<16x16xf32>)
+          -> tensor<16x16xf32> {
+        %0 = linalg.fill ins(%val : f32) outs(%out : tensor<16x16xf32>)
+            -> tensor<16x16xf32>
+        return %0 : tensor<16x16xf32>
+      }
+    )");
+  }
+
+  linalg::LinalgOp getContractionOp() {
+    return parseLinalgOp(R"(
+      func.func @test(%lhs: tensor<16x32xf16>, %rhs: tensor<32x16xf16>,
+                      %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+        %0 = linalg.matmul
+            ins(%lhs, %rhs : tensor<16x32xf16>, tensor<32x16xf16>)
+            outs(%acc : tensor<16x16xf32>) -> tensor<16x16xf32>
+        return %0 : tensor<16x16xf32>
+      }
+    )");
+  }
+
+  linalg::LinalgOp getConvOp() {
+    return parseLinalgOp(R"(
+      func.func @test(%input: tensor<1x18x18x4xf32>,
+                      %filter: tensor<3x3x4x8xf32>,
+                      %output: tensor<1x16x16x8xf32>)
+          -> tensor<1x16x16x8xf32> {
+        %0 = linalg.conv_2d_nhwc_hwcf
+            ins(%input, %filter
+                : tensor<1x18x18x4xf32>, tensor<3x3x4x8xf32>)
+            outs(%output : tensor<1x16x16x8xf32>)
+            -> tensor<1x16x16x8xf32>
+        return %0 : tensor<1x16x16x8xf32>
+      }
+    )");
+  }
+
+  // Pooling is a convolution interface op but has no outputChannel
+  // or inputChannel dims, so inferContractionLikeDims should fail.
+  linalg::LinalgOp getConvEmptyDimsOp() {
+    return parseLinalgOp(R"(
+      func.func @test(%input: tensor<1x4x4x1xf32>,
+                      %kernel: tensor<3x3xf32>,
+                      %output: tensor<1x2x2x1xf32>)
+          -> tensor<1x2x2x1xf32> {
+        %0 = linalg.pooling_nhwc_sum
+            ins(%input, %kernel
+                : tensor<1x4x4x1xf32>, tensor<3x3xf32>)
+            outs(%output : tensor<1x2x2x1xf32>)
+            -> tensor<1x2x2x1xf32>
+        return %0 : tensor<1x2x2x1xf32>
+      }
+    )");
+  }
+
+private:
+  MLIRContext ctx;
+  OwningOpRef<ModuleOp> module;
+};
+
+TEST_F(LinalgOpFixture, InferContractionDims_FillFails) {
+  auto op = getFillOp();
+  ASSERT_TRUE(!!op);
+  EXPECT_TRUE(failed(inferContractionLikeDims(op)));
+}
+
+TEST_F(LinalgOpFixture, InferContractionDims_Matmul) {
+  auto op = getContractionOp();
+  ASSERT_TRUE(!!op);
+
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+  EXPECT_EQ(dims->m, SmallVector<unsigned>({0}));
+  EXPECT_EQ(dims->n, SmallVector<unsigned>({1}));
+  EXPECT_EQ(dims->k, SmallVector<unsigned>({2}));
+}
+
+TEST_F(LinalgOpFixture, InferContractionDims_Conv) {
+  auto op = getConvOp();
+  ASSERT_TRUE(!!op);
+
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+  // conv_2d_nhwc_hwcf: outputImage={1,2}, outputChannel={3},
+  // inputChannel={6} (mapped to m, n, k).
+  EXPECT_EQ(dims->m, SmallVector<unsigned>({1, 2}));
+  EXPECT_EQ(dims->n, SmallVector<unsigned>({3}));
+  EXPECT_EQ(dims->k, SmallVector<unsigned>({6}));
+}
+
+TEST_F(LinalgOpFixture, InferContractionDims_ConvEmptyDimsFails) {
+  auto op = getConvEmptyDimsOp();
+  ASSERT_TRUE(!!op);
+  EXPECT_TRUE(failed(inferContractionLikeDims(op)));
+}
+
+TEST_F(LinalgOpFixture, GetRootOpLoopInfo_Matmul) {
+  auto op = getContractionOp();
+  ASSERT_TRUE(!!op);
+
+  auto info = getRootOpLoopInfo(op);
+  ASSERT_TRUE(info.has_value());
+  EXPECT_EQ(info->numLoops, 3u);
+  EXPECT_EQ(info->staticLoopRanges, SmallVector<int64_t>({16, 16, 32}));
+  EXPECT_EQ(info->indexingMaps.size(), 3u);
+}
+
+TEST_F(LinalgOpFixture, GetRootOpLoopInfo_Conv) {
+  auto op = getConvOp();
+  ASSERT_TRUE(!!op);
+
+  auto info = getRootOpLoopInfo(op);
+  ASSERT_TRUE(info.has_value());
+  // conv_2d_nhwc_hwcf: (n, oh, ow, oc, kh, kw, ic) = 7 loops.
+  EXPECT_EQ(info->numLoops, 7u);
+  EXPECT_EQ(info->indexingMaps.size(), 3u);
+}
+
+TEST_F(LinalgOpFixture, GetRootOpLoopInfo_NonLinalgFails) {
+  auto module = parseSourceString<ModuleOp>(R"(
+    func.func @test(%x: f32) -> f32 { return %x : f32 }
+  )",
+                                            getContext());
+  ASSERT_TRUE(!!module);
+
+  func::FuncOp func;
+  module->walk([&](func::FuncOp f) { func = f; });
+  ASSERT_TRUE(!!func);
+  EXPECT_FALSE(getRootOpLoopInfo(func).has_value());
 }
 
 } // namespace

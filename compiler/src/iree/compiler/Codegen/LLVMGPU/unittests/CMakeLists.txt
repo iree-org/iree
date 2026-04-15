@@ -16,7 +16,12 @@ iree_cc_test(
   SRCS
     "LLVMGPUConstraintGeneratorTest.cpp"
   DEPS
+    MLIRArithDialect
+    MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
+    MLIRParser
+    MLIRTensorDialect
     gmock
     gtest
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
