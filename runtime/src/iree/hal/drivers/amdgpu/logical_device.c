@@ -122,6 +122,12 @@ IREE_API_EXPORT void iree_hal_amdgpu_logical_device_options_initialize(
       IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT;
 
   out_options->queue_placement = IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY;
+  out_options->host_queues.aql_capacity =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_AQL_CAPACITY;
+  out_options->host_queues.notification_capacity =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_NOTIFICATION_CAPACITY;
+  out_options->host_queues.kernarg_capacity =
+      IREE_HAL_AMDGPU_PHYSICAL_DEVICE_DEFAULT_HOST_QUEUE_KERNARG_CAPACITY;
 
   out_options->preallocate_pools = 1;
 }
@@ -154,55 +160,85 @@ static iree_status_t iree_hal_amdgpu_logical_device_options_verify(
           IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_SMALL_HOST_BLOCK_SIZE ||
       !iree_host_size_is_power_of_two(
           options->host_block_pools.small.block_size)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "small host block pool size invalid, expected a "
-        "power-of-two greater than %d and got %" PRIhsz,
-        IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_SMALL_HOST_BLOCK_SIZE,
-        options->host_block_pools.small.block_size);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "small host block pool size invalid, expected a "
+                "power-of-two greater than %d and got %" PRIhsz,
+                IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_SMALL_HOST_BLOCK_SIZE,
+                options->host_block_pools.small.block_size));
   }
   if (options->host_block_pools.large.block_size <
           IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_LARGE_HOST_BLOCK_SIZE ||
       !iree_host_size_is_power_of_two(
           options->host_block_pools.large.block_size)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "large host block pool size invalid, expected a "
-        "power-of-two greater than %d and got %" PRIhsz,
-        IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_LARGE_HOST_BLOCK_SIZE,
-        options->host_block_pools.large.block_size);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "large host block pool size invalid, expected a "
+                "power-of-two greater than %d and got %" PRIhsz,
+                IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_LARGE_HOST_BLOCK_SIZE,
+                options->host_block_pools.large.block_size));
   }
   if (options->host_block_pools.command_buffer.usable_block_size <
           IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE ||
       options->host_block_pools.command_buffer.usable_block_size > UINT32_MAX ||
       !iree_host_size_is_power_of_two(
           options->host_block_pools.command_buffer.usable_block_size)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "command-buffer host block pool usable size invalid, expected a "
-        "power-of-two between %u and %u and got %" PRIhsz,
-        IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE, UINT32_MAX,
-        options->host_block_pools.command_buffer.usable_block_size);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "command-buffer host block pool usable size invalid, expected "
+                "a power-of-two between %u and %u and got %" PRIhsz,
+                IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE, UINT32_MAX,
+                options->host_block_pools.command_buffer.usable_block_size));
   }
 
   if (topology->gpu_agent_queue_count > UINT8_MAX) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "gpu_agent_queue_count=%" PRIhsz
-                            " exceeds the queue-axis encoding limit (%u)",
-                            topology->gpu_agent_queue_count, UINT8_MAX);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "gpu_agent_queue_count=%" PRIhsz
+                             " exceeds the queue-axis encoding limit (%u)",
+                             topology->gpu_agent_queue_count, UINT8_MAX));
   }
   iree_host_size_t total_queue_count = 0;
   if (!iree_host_size_checked_mul(topology->gpu_agent_count,
                                   topology->gpu_agent_queue_count,
                                   &total_queue_count) ||
       total_queue_count > IREE_HAL_MAX_QUEUES) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "topology queue space does not fit in iree_hal_queue_affinity_t "
-        "(gpu_agent_count=%" PRIhsz ", gpu_agent_queue_count=%" PRIhsz
-        ", max_total_queues=%" PRIhsz ")",
-        topology->gpu_agent_count, topology->gpu_agent_queue_count,
-        (iree_host_size_t)IREE_HAL_MAX_QUEUES);
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "topology queue space does not fit in iree_hal_queue_affinity_t "
+            "(gpu_agent_count=%" PRIhsz ", gpu_agent_queue_count=%" PRIhsz
+            ", max_total_queues=%" PRIhsz ")",
+            topology->gpu_agent_count, topology->gpu_agent_queue_count,
+            (iree_host_size_t)IREE_HAL_MAX_QUEUES));
+  }
+  if (!iree_host_size_is_power_of_two(options->host_queues.aql_capacity) ||
+      !iree_host_size_is_power_of_two(
+          options->host_queues.notification_capacity) ||
+      !iree_host_size_is_power_of_two(options->host_queues.kernarg_capacity)) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "host queue AQL, notification, and kernarg capacities must all "
+                "be powers of two (got aql=%u, notification=%u, "
+                "kernarg_blocks=%u)",
+                options->host_queues.aql_capacity,
+                options->host_queues.notification_capacity,
+                options->host_queues.kernarg_capacity));
+  }
+  if (options->host_queues.kernarg_capacity / 2u <
+      options->host_queues.aql_capacity) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "host queue kernarg capacity must be at least 2x the AQL queue "
+                "capacity (got kernarg_blocks=%u, aql_packets=%u)",
+                options->host_queues.kernarg_capacity,
+                options->host_queues.aql_capacity));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -461,6 +497,12 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   physical_device_options.host_block_pool_initial_capacity =
       options->preallocate_pools ? 16 : 0;
   physical_device_options.host_queue_count = topology->gpu_agent_queue_count;
+  physical_device_options.host_queue_aql_capacity =
+      options->host_queues.aql_capacity;
+  physical_device_options.host_queue_notification_capacity =
+      options->host_queues.notification_capacity;
+  physical_device_options.host_queue_kernarg_capacity =
+      options->host_queues.kernarg_capacity;
   physical_device_options.force_wait_barrier_defer =
       options->force_wait_barrier_defer;
 
