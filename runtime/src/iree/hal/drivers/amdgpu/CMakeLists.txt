@@ -77,7 +77,7 @@ iree_cc_library(
     iree::base::threading::thread
     iree::hal
     iree::hal::drivers::amdgpu::abi
-    iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::blit
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
@@ -130,7 +130,7 @@ iree_cc_library(
     iree::base::internal::arena
     iree::hal
     iree::hal::drivers::amdgpu::abi
-    iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::util

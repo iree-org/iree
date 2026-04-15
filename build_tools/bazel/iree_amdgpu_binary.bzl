@@ -21,13 +21,10 @@ def iree_amdgpu_binary(
         name: Name of the target.
         target: LLVM `-target` flag.
         arch: LLVM `-march` flag.
-        srcs: source files to pass to clang.
-        internal_hdrs: all headers transitively included by the source files.
-                       Unlike typical Bazel `hdrs`, these are not exposed as
-                       interface headers. This would normally be part of `srcs`,
-                       but separating it was easier for `bazel_to_cmake`, as
-                       CMake does not need this, and making this explicitly
-                       Bazel-only allows using `filegroup` on the Bazel side.
+        srcs: source files or filegroups to pass to clang.
+        internal_hdrs: headers that should invalidate device compilation but
+                       are not compiled as translation units or exposed as
+                       interface headers.
         copts: additional flags to pass to clang.
         linkopts: additional flags to pass to lld.
         **kwargs: any additional attributes to pass to the underlying rules.
@@ -71,43 +68,39 @@ def iree_amdgpu_binary(
         "-emit-llvm",
     ]
 
-    bitcode_files = []
-
-    for src in srcs:
-        bitcode_out = "%s_%s.bc" % (name, src)
-        bitcode_files.append(bitcode_out)
-        native.genrule(
-            name = "gen_%s" % (bitcode_out),
-            srcs = [src, builtin_headers_dep] + internal_hdrs,
-            outs = [bitcode_out],
-            cmd = " && ".join([
+    archive_out = "%s.a" % (name)
+    source_locations = " ".join(["$(locations %s)" % (src,) for src in srcs])
+    object_dir = "$(@D)/%s.objects" % (name,)
+    native.genrule(
+        name = "archive_%s" % (name),
+        srcs = srcs + [builtin_headers_dep] + internal_hdrs,
+        outs = [archive_out],
+        cmd = " && ".join([
+            "set -e",
+            "object_dir=\"%s\"" % (object_dir,),
+            "rm -rf \"$${object_dir}\"",
+            "mkdir -p \"$${object_dir}\"",
+            "object_index=0",
+            "for src in %s; do %s; object_index=$$((object_index + 1)); done" % (
+                source_locations,
                 " ".join([
                     "$(location %s)" % (clang_tool),
                     " ".join(base_copts + copts),
-                    "-o $(location %s)" % (bitcode_out),
-                    "$(location %s)" % (src),
+                    "-o \"$${object_dir}/$${object_index}.bc\"",
+                    "\"$${src}\"",
                 ]),
-            ]),
-            tools = [clang_tool],
-            message = "Compiling %s to %s..." % (src, bitcode_out),
-            output_to_bindir = 1,
-            **kwargs
-        )
-
-    archive_out = "%s.a" % (name)
-    native.genrule(
-        name = "archive_%s" % (name),
-        srcs = bitcode_files,
-        outs = [archive_out],
-        cmd = " && ".join([
+            ),
             " ".join([
                 "$(location %s)" % (link_tool),
-                " ".join(["$(locations %s)" % (src) for src in bitcode_files]),
+                "\"$${object_dir}\"/*.bc",
                 "-o $(location %s)" % (archive_out),
             ]),
         ]),
-        tools = [link_tool],
-        message = "Archiving bitcode libraries %s to %s..." % (bitcode_files, archive_out),
+        tools = [
+            clang_tool,
+            link_tool,
+        ],
+        message = "Compiling bitcode library %s to %s..." % (srcs, archive_out),
         output_to_bindir = 1,
         **kwargs
     )

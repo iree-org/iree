@@ -7,7 +7,7 @@
 #include "iree/hal/drivers/amdgpu/util/device_library.h"
 
 #include "iree/base/internal/debugging.h"
-#include "iree/hal/drivers/amdgpu/device/binaries.h"
+#include "iree/hal/drivers/amdgpu/device/binaries/toc.h"
 #include "iree/hal/drivers/amdgpu/device/kernels.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
@@ -66,6 +66,66 @@ static iree_status_t iree_hal_amdgpu_agent_available_isas_append_to_builder(
   return iree_ok_status();
 }
 
+typedef struct iree_hal_amdgpu_device_library_isa_mapping_t {
+  // Exact HSA ISA architecture suffix reported by the agent.
+  iree_string_view_t exact_arch;
+  // Embedded code object architecture suffix compatible with the exact ISA.
+  iree_string_view_t code_object_arch;
+} iree_hal_amdgpu_device_library_isa_mapping_t;
+
+static iree_string_view_t
+iree_hal_amdgpu_device_library_code_object_arch_for_exact_arch(
+    iree_string_view_t exact_arch) {
+  static const iree_hal_amdgpu_device_library_isa_mapping_t mappings[] = {
+#include "iree/hal/drivers/amdgpu/device/binaries/target_map.inl"
+  };
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(mappings); ++i) {
+    if (iree_string_view_equal(exact_arch, mappings[i].exact_arch)) {
+      return mappings[i].code_object_arch;
+    }
+  }
+  return iree_string_view_empty();
+}
+
+static bool iree_hal_amdgpu_device_library_file_arch_matches(
+    iree_string_view_t file_arch, iree_string_view_t arch) {
+  if (!iree_string_view_starts_with(file_arch, arch)) {
+    return false;
+  }
+  iree_string_view_t suffix =
+      iree_string_view_remove_prefix(file_arch, arch.size);
+  return iree_string_view_is_empty(suffix) ||
+         iree_string_view_starts_with(suffix, IREE_SV("."));
+}
+
+static bool iree_hal_amdgpu_device_library_file_matches_isa(
+    const iree_file_toc_t* file_toc, iree_string_view_t isa_name) {
+  iree_string_view_t file_name = iree_make_cstring_view(file_toc->name);
+  const iree_string_view_t isa_prefix = IREE_SVL("amdgcn-amd-amdhsa--");
+  if (!iree_string_view_starts_with(isa_name, isa_prefix) ||
+      !iree_string_view_starts_with(file_name, isa_prefix)) {
+    return false;
+  }
+
+  iree_string_view_t exact_arch =
+      iree_string_view_substr(isa_name, isa_prefix.size, IREE_STRING_VIEW_NPOS);
+  iree_string_view_t file_arch = iree_string_view_substr(
+      file_name, isa_prefix.size, IREE_STRING_VIEW_NPOS);
+  if (iree_hal_amdgpu_device_library_file_arch_matches(file_arch, exact_arch)) {
+    return true;
+  }
+
+  iree_string_view_t code_object_arch =
+      iree_hal_amdgpu_device_library_code_object_arch_for_exact_arch(
+          exact_arch);
+  if (iree_string_view_is_empty(code_object_arch)) {
+    return false;
+  }
+
+  return iree_hal_amdgpu_device_library_file_arch_matches(file_arch,
+                                                          code_object_arch);
+}
+
 // Selects a device library binary file that supports the ISA of the provided
 // |agent|.
 static iree_status_t iree_hal_amdgpu_device_library_select_file(
@@ -113,7 +173,7 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
          ++j) {
       const iree_file_toc_t* file_toc =
           &iree_hal_amdgpu_device_binaries_create()[j];
-      if (iree_string_view_starts_with(IREE_SV(file_toc->name), isa_name)) {
+      if (iree_hal_amdgpu_device_library_file_matches_isa(file_toc, isa_name)) {
         best_isa = isa;
         best_file_toc = file_toc;
         break;

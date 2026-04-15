@@ -107,6 +107,14 @@ repos:
         entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
         files: "^(compiler|runtime|samples|tests|tools)/(.*/)?(CMakeLists.txt)$"
 
+      - id: amdgpu_target_map
+        name: Check AMDGPU target map generated files
+        language: python
+        entry: ./build_tools/scripts/amdgpu_target_map.py --check
+        pass_filenames: false
+        files: >-
+          ^build_tools/scripts/amdgpu_target_map\.py$|^runtime/src/iree/hal/drivers/amdgpu/device/binaries/target_map\.(bzl|cmake|inl)$
+
       - id: check_path_lengths
         name: Check for excessively long path lengths
         language: fail
