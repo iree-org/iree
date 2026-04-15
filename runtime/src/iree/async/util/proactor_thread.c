@@ -63,7 +63,10 @@ static bool iree_async_proactor_thread_has_exited(void* user_data) {
 static int iree_async_proactor_thread_main(void* entry_arg) {
   iree_async_proactor_thread_t* thread =
       (iree_async_proactor_thread_t*)entry_arg;
-  IREE_TRACE_ZONE_BEGIN(z0);
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_async_proactor_thread_start");
+    IREE_TRACE_ZONE_END(z0);
+  }
 
   iree_status_t status = iree_ok_status();
   while (
@@ -76,12 +79,18 @@ static int iree_async_proactor_thread_main(void* entry_arg) {
       timeout = iree_make_timeout_ns(thread->poll_timeout);
     }
 
-    status = iree_async_proactor_poll(thread->proactor, timeout,
-                                      /*out_completed_count=*/NULL);
+    iree_host_size_t completed_count = 0;
+    status =
+        iree_async_proactor_poll(thread->proactor, timeout, &completed_count);
     if (iree_status_is_deadline_exceeded(status)) {
       iree_status_ignore(status);
       status = iree_ok_status();
       continue;
+    }
+    {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_async_proactor_thread_poll_wake");
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, completed_count);
+      IREE_TRACE_ZONE_END(z0);
     }
   }
 
@@ -100,7 +109,10 @@ static int iree_async_proactor_thread_main(void* entry_arg) {
   iree_atomic_store(&thread->stop_requested, 2, iree_memory_order_release);
   iree_notification_post(&thread->exited, IREE_ALL_WAITERS);
 
-  IREE_TRACE_ZONE_END(z0);
+  {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_async_proactor_thread_exit");
+    IREE_TRACE_ZONE_END(z0);
+  }
   return 0;
 }
 
