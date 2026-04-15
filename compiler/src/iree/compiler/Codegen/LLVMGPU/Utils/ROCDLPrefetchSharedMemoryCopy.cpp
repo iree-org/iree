@@ -1254,10 +1254,6 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
       LDBG() << "Async copy mode supports at most 3 stages, got " << numStages;
       return failure();
     }
-    // Apply multi-buffering: numStages buffers for N-stage pipelining
-    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
-      return failure();
-    }
   } else {
     // Stream copy: no buffering, just validate numStages
     // No prefetching needed for single-stage pipelining.
@@ -1274,7 +1270,25 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     }
   }
 
-  // Compute stage classification using the refactored approach
+  // Pre-flight: validate that pipelining will succeed before mutating the IR.
+  // computeStageClassification is pure analysis that checks loop iterations,
+  // identifies root operations, computes backward slices, and classifies
+  // operations into pipeline stages. If it fails, we bail out before
+  // multi-buffering touches the IR, preventing half-transformed state (e.g.,
+  // doubled LDS allocations with no actual pipelining).
+  if (failed(computeStageClassification(forOp, mode, numStages))) {
+    return forOp;
+  }
+
+  if (mode == PipelineMode::AsyncCopy) {
+    // Apply multi-buffering: numStages buffers for N-stage pipelining.
+    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
+      return failure();
+    }
+  }
+
+  // Re-run classification on the (potentially multi-buffered) IR to capture
+  // any new operations introduced by multi-buffering in the schedule.
   auto stagesOr = computeStageClassification(forOp, mode, numStages);
   if (failed(stagesOr)) {
     return failure();
