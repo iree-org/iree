@@ -332,6 +332,8 @@ TEST(HsacoMetadataTest, ParsesValidMetadata) {
   ASSERT_EQ(metadata.kernel_count, 1);
   ASSERT_EQ(metadata.arg_count, 4);
   ASSERT_GT(metadata.message_pack_data.data_length, 0);
+  EXPECT_TRUE(iree_string_view_starts_with(metadata.target,
+                                           IREE_SV("amdgcn-amd-amdhsa--gfx")));
   ASSERT_NE(metadata.kernels, nullptr);
   ASSERT_NE(metadata.args, nullptr);
 

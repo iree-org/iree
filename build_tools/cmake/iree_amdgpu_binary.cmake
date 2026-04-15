@@ -90,8 +90,6 @@ function(iree_amdgpu_binary)
         "${IREE_CLANG_BINARY}"
         "${_BITCODE_SRC_PATH}"
         "${_RULE_INTERNAL_HDRS}"
-      MAIN_DEPENDENCY
-        "${_BITCODE_SRC_PATH}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM

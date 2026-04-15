@@ -1047,12 +1047,21 @@ static iree_status_t iree_hal_amdgpu_hsaco_metadata_parse_message_pack(
   uint32_t root_field_count = 0;
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_msgpack_read_map_count(&reader, &root_field_count));
+  bool has_target = false;
   bool has_kernels = false;
   iree_host_size_t arg_index = 0;
   for (uint32_t i = 0; i < root_field_count; ++i) {
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_hal_amdgpu_msgpack_read_string(&reader, &key));
-    if (iree_string_view_equal(key, IREE_SV("amdhsa.kernels"))) {
+    if (iree_string_view_equal(key, IREE_SV("amdhsa.target"))) {
+      if (has_target) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "AMDGPU metadata repeats `amdhsa.target`");
+      }
+      IREE_RETURN_IF_ERROR(
+          iree_hal_amdgpu_msgpack_read_string(&reader, &metadata->target));
+      has_target = true;
+    } else if (iree_string_view_equal(key, IREE_SV("amdhsa.kernels"))) {
       if (has_kernels) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "AMDGPU metadata repeats `amdhsa.kernels`");

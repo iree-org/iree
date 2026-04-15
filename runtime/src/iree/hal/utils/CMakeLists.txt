@@ -111,6 +111,30 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    elf_format
+  HDRS
+    "elf_format.h"
+  SRCS
+    "elf_format.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    elf_format_test
+  SRCS
+    "elf_format_test.cc"
+  DEPS
+    ::elf_format
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     file_cache
   HDRS
     "file_cache.h"

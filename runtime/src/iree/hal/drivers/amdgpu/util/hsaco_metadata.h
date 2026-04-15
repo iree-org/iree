@@ -103,6 +103,8 @@ typedef struct iree_hal_amdgpu_hsaco_metadata_t {
   iree_const_byte_span_t elf_data;
   // Borrowed AMDGPU MessagePack note descriptor payload.
   iree_const_byte_span_t message_pack_data;
+  // Borrowed target ISA string from `amdhsa.target`, if present.
+  iree_string_view_t target;
   // Bytes required to clone all kernel reflection names.
   iree_host_size_t reflection_name_storage_size;
   // Bytes required to clone all decoded argument names.

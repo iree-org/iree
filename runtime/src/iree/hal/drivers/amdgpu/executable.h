@@ -91,7 +91,7 @@ typedef struct iree_hal_amdgpu_executable_dispatch_descriptor_t {
 iree_status_t iree_hal_amdgpu_executable_infer_format(
     iree_const_byte_span_t executable_data,
     iree_host_size_t executable_format_capacity, char* executable_format,
-    iree_host_size_t* out_inferred_size);
+    iree_allocator_t host_allocator, iree_host_size_t* out_inferred_size);
 
 // Creates a AMDGPU executable from a binary in memory. Each executable may
 // contain multiple entry points and be composed of several modules presented to
