@@ -1,17 +1,14 @@
-// RUN: iree-opt --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' \
+// RUN: iree-opt --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:     %s | FileCheck %s
 
 // Test that the vector distribute pipeline correctly handles the case where
 // dynamic shapes are involved, and as consequence padding is required.
-
-#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>, iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F32_16x16x16_BF16>, <MFMA_F32_32x32x8_BF16>, <MFMA_F32_16x16x32_F8E5M2FNUZ>, <MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>, <MFMA_F64_16x16x4_F64>, <MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>], subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, ukernels = "none"}>
 
 // Check the pipeline didn't fail.
 // CHECK-LABEL: func.func @kernel
 // CHECK: vector.transfer_read
 // CHECK: iree_codegen.dispatch_config @kernel workgroup_size = [512, 1, 1] subgroup_size = 64
 func.func @kernel() attributes {
-    hal.executable.target = #executable_target_rocm,
     translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [512, 1, 1] subgroup_size = 64, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>} {
   %cst = arith.constant 0.0721687824 : f32
   %c32 = arith.constant 32 : index
