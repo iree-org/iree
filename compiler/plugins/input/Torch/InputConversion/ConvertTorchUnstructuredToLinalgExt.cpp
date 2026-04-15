@@ -184,16 +184,18 @@ static Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
 }
 
 /// Inline a single-block torch function's body at the current insertion point.
-/// Returns the result value. Falls back to func.call for multi-block functions.
-static Value inlineTorchFunction(PatternRewriter &rewriter, Location loc,
-                                 FlatSymbolRefAttr funcSymbol, ValueRange args,
-                                 Operation *contextOp) {
+/// Falls back to func.call for multi-block or external functions.
+static SmallVector<Value> inlineTorchFunction(PatternRewriter &rewriter,
+                                              Location loc,
+                                              FlatSymbolRefAttr funcSymbol,
+                                              ValueRange args,
+                                              Operation *contextOp) {
   auto module = contextOp->getParentOfType<ModuleOp>();
   auto funcOp = module.lookupSymbol<func::FuncOp>(funcSymbol);
   if (!funcOp || funcOp.isExternal() || !funcOp.getBody().hasOneBlock()) {
     auto callOp = func::CallOp::create(rewriter, loc, funcSymbol,
                                        funcOp.getResultTypes(), args);
-    return callOp.getResult(0);
+    return SmallVector<Value>(callOp->getResults());
   }
 
   Block &entryBlock = funcOp.getBody().front();
@@ -207,7 +209,11 @@ static Value inlineTorchFunction(PatternRewriter &rewriter, Location loc,
   }
 
   auto returnOp = cast<func::ReturnOp>(entryBlock.getTerminator());
-  return mapper.lookupOrDefault(returnOp.getOperand(0));
+  SmallVector<Value> results;
+  for (Value operand : returnOp.getOperands()) {
+    results.push_back(mapper.lookupOrDefault(operand));
+  }
+  return results;
 }
 
 /// Build the score modification region inside the OnlineAttention op.
@@ -257,7 +263,7 @@ createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
   // Inline mask_mod: compute mask and apply select(mask, score, -inf).
   if (maskModSymbol) {
     Value maskResult = inlineTorchFunction(rewriter, loc, maskModSymbol,
-                                           torchIndices, contextOp);
+                                           torchIndices, contextOp)[0];
 
     auto boolType = rewriter.getIntegerType(1);
     Value builtinBool = torch::TorchConversion::ToBuiltinTensorOp::create(
@@ -286,7 +292,7 @@ createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
     SmallVector<Value> scoreArgs = {torchScore};
     scoreArgs.append(torchIndices.begin(), torchIndices.end());
     Value torchResult = inlineTorchFunction(rewriter, loc, scoreModSymbol,
-                                            scoreArgs, contextOp);
+                                            scoreArgs, contextOp)[0];
 
     Value builtinResult = torch::TorchConversion::ToBuiltinTensorOp::create(
         rewriter, loc, f32ScalarTensor, torchResult);
