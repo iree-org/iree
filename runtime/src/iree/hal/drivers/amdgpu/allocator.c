@@ -127,8 +127,15 @@ static bool iree_hal_amdgpu_allocator_resolve_placement(
 
   hsa_amd_memory_pool_t memory_pool = {0};
   iree_hal_memory_type_t memory_type = 0;
-  iree_hal_buffer_usage_t supported_usage =
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH;
+  // Sharing hints do not affect HSA pool selection. Export is omitted because
+  // it requires dedicated platform export support.
+  const iree_hal_buffer_usage_t sharing_usage =
+      IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE |
+      IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT |
+      IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE;
+  iree_hal_buffer_usage_t supported_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                                            IREE_HAL_BUFFER_USAGE_DISPATCH |
+                                            sharing_usage;
   if (requires_host_local) {
     if (requires_device_local) return false;
     memory_pool = allocator->host_fine_pools[device_ordinal];
@@ -269,9 +276,15 @@ static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
 
   memset(heaps, 0, heap_count * sizeof(*heaps));
 
+  // Sharing hints do not affect HSA pool selection. Export is omitted because
+  // it requires dedicated platform export support.
+  const iree_hal_buffer_usage_t sharing_usage =
+      IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE |
+      IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT |
+      IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE;
   const iree_hal_buffer_usage_t mappable_usage =
       IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH |
-      IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+      sharing_usage | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
       IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
       IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL |
       IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM |
@@ -279,8 +292,8 @@ static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
 
   // Heap 0: coarse-grained device-local memory.
   heaps[0].type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  heaps[0].allowed_usage =
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH;
+  heaps[0].allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                           IREE_HAL_BUFFER_USAGE_DISPATCH | sharing_usage;
   heaps[0].max_allocation_size = ~(iree_device_size_t)0;
   heaps[0].min_alignment = 256;
 

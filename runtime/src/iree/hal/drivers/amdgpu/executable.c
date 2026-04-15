@@ -134,13 +134,12 @@ iree_status_t iree_hal_amdgpu_executable_format_supported(
   *out_supported = false;
   if (out_isa) out_isa->handle = 0;
 
-  // Strip hsa-* prefix.
-  if (!iree_string_view_starts_with(
-          format, iree_make_cstring_view("amdgcn-amd-amdhsa-"))) {
-    // Not HSA-like.
-    *out_supported = false;
-    return iree_ok_status();
-  }
+  const iree_string_view_t hsa_triple_prefix =
+      iree_make_cstring_view("amdgcn-amd-amdhsa-");
+  const iree_string_view_t hsa_short_arch_prefix =
+      iree_make_cstring_view("amdgcn-amd-amdhsa--");
+  const bool format_is_hsa_isa =
+      iree_string_view_starts_with(format, hsa_triple_prefix);
 
   // Query all available ISAs supported by any GPU agent.
   // This list is ordered by descending priority.
@@ -172,8 +171,14 @@ iree_status_t iree_hal_amdgpu_executable_format_supported(
     iree_string_view_t isa_name =
         iree_make_string_view(isa_name_buffer, isa_name_length - /*NUL*/ 1);
 
-    // Compare exactly.
-    if (iree_string_view_equal(format, isa_name)) {
+    // Compare exact HSA ISA names or compiler target-architecture names.
+    iree_string_view_t comparable_isa_name = isa_name;
+    if (!format_is_hsa_isa &&
+        iree_string_view_starts_with(isa_name, hsa_short_arch_prefix)) {
+      comparable_isa_name = iree_string_view_substr(
+          isa_name, hsa_short_arch_prefix.size, IREE_STRING_VIEW_NPOS);
+    }
+    if (iree_string_view_equal(format, comparable_isa_name)) {
       *out_supported = true;
       if (out_isa) *out_isa = isa;
       return iree_ok_status();
