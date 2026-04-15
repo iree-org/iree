@@ -150,6 +150,169 @@ flow.executable private @ex1 {
 
 // -----
 
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32]>
+flow.executable private @ex_rhs {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_RHS_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_rhs>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_rhs>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_rhs> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_result {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_RESULT_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_result>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_result>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_result>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_result>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+
+// -----
+
+// Encoding ops for scaled matmul
+
+#encoding_sm_lhs = #iree_encoding.encoding<operand_index = 0, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
+#encoding_sm_rhs = #iree_encoding.encoding<operand_index = 1, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
+#encoding_sm_lhs_scales = #iree_encoding.encoding<operand_index = 2, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
+#encoding_sm_rhs_scales = #iree_encoding.encoding<operand_index = 3, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
+#encoding_sm_result = #iree_encoding.encoding<operand_index = 4, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
+flow.executable private @ex_sm_lhs {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_LHS_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_lhs>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_lhs>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_lhs>>{%arg1, %arg2} -> tensor<?x?xf4E2M1FN, #encoding_sm_lhs>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf4E2M1FN, #encoding_sm_lhs> -> tensor<?x?xf4E2M1FN>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf4E2M1FN> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_sm_rhs {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_RHS_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_rhs>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_rhs>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf4E2M1FN, #encoding_sm_rhs>>{%arg1, %arg2} -> tensor<?x?xf4E2M1FN, #encoding_sm_rhs>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf4E2M1FN, #encoding_sm_rhs> -> tensor<?x?xf4E2M1FN>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf4E2M1FN> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf4E2M1FN>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_sm_lhs_scales {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_LHS_SCALES_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_lhs_scales>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_lhs_scales>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_lhs_scales>>{%arg1, %arg2} -> tensor<?x?xf8E8M0FNU, #encoding_sm_lhs_scales>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf8E8M0FNU, #encoding_sm_lhs_scales> -> tensor<?x?xf8E8M0FNU>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf8E8M0FNU> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_sm_rhs_scales {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_RHS_SCALES_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_rhs_scales>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_rhs_scales>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E8M0FNU, #encoding_sm_rhs_scales>>{%arg1, %arg2} -> tensor<?x?xf8E8M0FNU, #encoding_sm_rhs_scales>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf8E8M0FNU, #encoding_sm_rhs_scales> -> tensor<?x?xf8E8M0FNU>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf8E8M0FNU> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf8E8M0FNU>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_sm_result {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_RESULT_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_sm_result>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_sm_result>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_sm_result>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_sm_result>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_sm_result> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+
+// -----
+
+// Encoding ops for convolutions
+
+#encoding_conv_in = #iree_encoding.encoding<operand_index = 0, op_type = conv, element_types = [f32, f32, f32]>
+#encoding_conv_filter = #iree_encoding.encoding<operand_index = 1, op_type = conv, element_types = [f32, f32, f32]>
+#encoding_conv_out = #iree_encoding.encoding<operand_index = 2, op_type = conv, element_types = [f32, f32, f32]>
+flow.executable private @ex_conv_in {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_CONV_IN_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_in>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_in>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_in>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_conv_in>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_conv_in> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_conv_filter {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_CONV_FILTER_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_filter>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_filter>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_filter>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_conv_filter>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_conv_filter> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+flow.executable private @ex_conv_out {
+  // CHECK: flow.executable.export public @dispatch_unset_encoding_CONV_OUT_DxD
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_out>>, %arg1: index, %arg2: index, %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_out>>{%arg1, %arg2}
+      %1 = flow.dispatch.tie_shape %arg3 : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32, #encoding_conv_out>>{%arg1, %arg2} -> tensor<?x?xf32, #encoding_conv_out>
+      %3 = iree_encoding.unset_encoding %2 : tensor<?x?xf32, #encoding_conv_out> -> tensor<?x?xf32>{%arg1, %arg2}
+      iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
+      return
+    }
+  }
+}
+
+// -----
+
 // Named root linalg ops get represented in the dispatch name.
 
 flow.executable private @ex {

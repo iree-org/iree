@@ -205,11 +205,11 @@ static std::string stringifyConvOperandIndex(IntegerAttr valueAttr) {
   uint64_t value = valueAttr.getValue().getZExtValue();
   switch (value) {
   case CONV_IN:
-    return "IN";
+    return "CONV_IN";
   case CONV_FILTER:
-    return "FILTER";
+    return "CONV_FILTER";
   case CONV_OUT:
-    return "OUT";
+    return "CONV_OUT";
   default:
     assert(false && "invalid index");
     return "";
