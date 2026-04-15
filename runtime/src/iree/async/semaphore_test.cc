@@ -746,6 +746,22 @@ TEST(MultiWaitTest, SingleSemaphoreTimesOut) {
   iree_async_semaphore_release(sem);
 }
 
+TEST(MultiWaitTest, SingleSemaphoreActiveWaitTimesOut) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  uint64_t value = 10;
+  iree_status_t status = iree_async_semaphore_multi_wait(
+      IREE_ASYNC_WAIT_MODE_ALL, &sem, &value, 1, iree_make_timeout_ms(1),
+      IREE_ASYNC_WAIT_FLAG_ACTIVE, iree_allocator_system());
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_DEADLINE_EXCEEDED);
+  iree_status_free(status);
+
+  iree_async_semaphore_release(sem);
+}
+
 TEST(MultiWaitTest, SingleSemaphoreImmediateTimeout) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(

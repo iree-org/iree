@@ -83,6 +83,45 @@ IREE_FLAG(int32_t, batch_size, 1,
 IREE_FLAG(int32_t, batch_concurrency, 1,
           "Number of invocations within a batch that should run concurrently.");
 
+static iree_status_t parse_completion_wait_flags(iree_string_view_t flag_name,
+                                                 void* storage,
+                                                 iree_string_view_t value) {
+  auto* wait_flags = (iree_async_wait_flags_t*)storage;
+  auto wait_flags_string = std::string(value.data, value.size);
+  if (wait_flags_string == "none") {
+    *wait_flags = IREE_ASYNC_WAIT_FLAG_NONE;
+    return iree_ok_status();
+  } else if (wait_flags_string == "yield") {
+    *wait_flags = IREE_ASYNC_WAIT_FLAG_YIELD;
+    return iree_ok_status();
+  } else if (wait_flags_string == "active") {
+    *wait_flags = IREE_ASYNC_WAIT_FLAG_ACTIVE;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unsupported completion wait flags");
+}
+static void print_completion_wait_flags(iree_string_view_t flag_name,
+                                        void* storage, FILE* file) {
+  auto* wait_flags = (iree_async_wait_flags_t*)storage;
+  const char* wait_flags_string = "none";
+  if (iree_any_bit_set(*wait_flags, IREE_ASYNC_WAIT_FLAG_ACTIVE)) {
+    wait_flags_string = "active";
+  } else if (iree_any_bit_set(*wait_flags, IREE_ASYNC_WAIT_FLAG_YIELD)) {
+    wait_flags_string = "yield";
+  }
+  fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+          wait_flags_string);
+}
+static iree_async_wait_flags_t FLAG_completion_wait_flags =
+    IREE_ASYNC_WAIT_FLAG_NONE;
+IREE_FLAG_CALLBACK(
+    parse_completion_wait_flags, print_completion_wait_flags,
+    &FLAG_completion_wait_flags, completion_wait_flags,
+    "Wait strategy used by async benchmark completion fence waits. One of "
+    "'none', 'yield', or 'active'. Active wait spins on the calling thread and "
+    "should only be used for latency-sensitive short waits.");
+
 IREE_FLAG(string, function, "",
           "Name of a function contained in the module specified by --module= "
           "to run. If this is not set, all the exported functions will be "
@@ -231,7 +270,8 @@ static void BenchmarkAsyncFunction(
     const std::string& benchmark_name, int32_t batch_size,
     int32_t batch_concurrency, iree_hal_device_t* device,
     iree_vm_context_t* context, iree_vm_function_t function,
-    iree_vm_list_t* common_inputs, benchmark::State& state) {
+    iree_vm_list_t* common_inputs,
+    iree_async_wait_flags_t completion_wait_flags, benchmark::State& state) {
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
                                       benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
@@ -321,7 +361,7 @@ static void BenchmarkAsyncFunction(
       }
       IREE_CHECK_OK(iree_hal_fence_wait(completion_fence.get(),
                                         iree_infinite_timeout(),
-                                        IREE_ASYNC_WAIT_FLAG_NONE));
+                                        completion_wait_flags));
     }
     state.PauseTiming();
 
@@ -355,11 +395,13 @@ void RegisterAsyncBenchmark(const std::string& function_name,
   auto benchmark_name = "BM_" + function_name;
   int32_t batch_size = FLAG_batch_size;
   int32_t batch_concurrency = FLAG_batch_concurrency;
+  iree_async_wait_flags_t completion_wait_flags = FLAG_completion_wait_flags;
   benchmark::RegisterBenchmark(
       benchmark_name.c_str(),
       [=](benchmark::State& state) -> void {
         BenchmarkAsyncFunction(benchmark_name, batch_size, batch_concurrency,
-                               device, context, function, inputs, state);
+                               device, context, function, inputs,
+                               completion_wait_flags, state);
       })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
