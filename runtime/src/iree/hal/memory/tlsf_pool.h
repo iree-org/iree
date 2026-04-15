@@ -34,8 +34,8 @@ typedef struct iree_hal_tlsf_pool_options_t {
 
 // Creates a TLSF-backed HAL pool over one slab from |slab_provider|.
 //
-// |notification| is signaled on every reservation release and is borrowed by
-// callers waiting in iree_hal_pool_allocate_buffer().
+// |notification| is published on reservation release and skips platform wake
+// work when no waiter is observing it.
 //
 // |epoch_query| is an optional host-side completion predicate used to recover
 // zero-sync reuse when a requester's frontier is stale but the producer queue

@@ -207,13 +207,13 @@ TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolSignalsNotification) {
 
   iree_async_notification_t* notification =
       iree_hal_pool_notification(default_pool);
-  const uint32_t before_release_epoch =
-      iree_async_notification_query_epoch(notification);
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification);
   iree_hal_pool_release_reservation(default_pool, &reservation,
                                     /*death_frontier=*/NULL);
-  const uint32_t after_release_epoch =
-      iree_async_notification_query_epoch(notification);
-  EXPECT_GT(after_release_epoch, before_release_epoch);
+  EXPECT_TRUE(iree_async_notification_wait_for_token(notification, wait_token,
+                                                     iree_make_timeout_ms(0)));
+  iree_async_notification_end_observe(notification);
 
   IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
       default_pool, capabilities.max_allocation_size,

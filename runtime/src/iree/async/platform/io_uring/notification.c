@@ -154,12 +154,9 @@ void iree_async_io_uring_notification_signal(
 
 bool iree_async_io_uring_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-
-  // Capture current epoch before waiting.
-  uint32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
 
   // Poll on eventfd, check epoch after wakeup.
   int fd = notification->platform.io_uring.primitive.value.fd;
@@ -167,7 +164,7 @@ bool iree_async_io_uring_notification_wait(
   while (iree_time_now() < deadline_ns) {
     uint32_t current_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-    if (current_epoch != wait_epoch) return true;
+    if (current_epoch != wait_token) return true;
 
     iree_duration_t remaining_ns = deadline_ns - iree_time_now();
     if (remaining_ns <= 0) break;
@@ -193,5 +190,5 @@ bool iree_async_io_uring_notification_wait(
 
   uint32_t final_epoch =
       iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-  return final_epoch != wait_epoch;
+  return final_epoch != wait_token;
 }

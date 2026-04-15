@@ -1115,27 +1115,37 @@ iree_hal_task_queue_drain_alloca_wait_for_pool_notification(
                             "notification");
   }
 
-  const uint32_t wait_token = iree_async_notification_query_epoch(notification);
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification);
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t acquire_info;
   iree_hal_pool_acquire_result_t acquire_result =
       IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
-  IREE_RETURN_IF_ERROR(iree_hal_task_queue_drain_alloca_acquire(
-      operation, &reservation, &acquire_info, &acquire_result));
-  switch (acquire_result) {
-    case IREE_HAL_POOL_ACQUIRE_OK:
-    case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
-    case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
-      return iree_hal_task_queue_drain_alloca_on_acquire_result(
-          operation, &reservation, &acquire_info, acquire_result);
-    case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
-    case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
-      return iree_hal_task_queue_alloca_wait_for_pool_notification(
-          operation, notification, wait_token);
+
+  iree_status_t status = iree_hal_task_queue_drain_alloca_acquire(
+      operation, &reservation, &acquire_info, &acquire_result);
+  if (iree_status_is_ok(status)) {
+    switch (acquire_result) {
+      case IREE_HAL_POOL_ACQUIRE_OK:
+      case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
+      case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
+        status = iree_hal_task_queue_drain_alloca_on_acquire_result(
+            operation, &reservation, &acquire_info, acquire_result);
+        break;
+      case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
+      case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
+        status = iree_hal_task_queue_alloca_wait_for_pool_notification(
+            operation, notification, wait_token);
+        break;
+      default:
+        status = iree_make_status(IREE_STATUS_INTERNAL,
+                                  "unrecognized pool acquire result %u",
+                                  acquire_result);
+        break;
+    }
   }
-  return iree_make_status(IREE_STATUS_INTERNAL,
-                          "unrecognized pool acquire result %u",
-                          acquire_result);
+  iree_async_notification_end_observe(notification);
+  return status;
 }
 
 static iree_status_t iree_hal_task_queue_drain_alloca_on_acquire_result(
