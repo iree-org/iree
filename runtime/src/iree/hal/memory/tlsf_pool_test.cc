@@ -259,6 +259,22 @@ TEST_F(TLSFPoolTest, ReserveReleaseFresh) {
   iree_hal_pool_release_reservation(pool_, &reservation, NULL);
 }
 
+TEST_F(TLSFPoolTest, ReleaseWithObserverSignalsNotification) {
+  iree_hal_pool_reservation_t reservation;
+  iree_hal_pool_acquire_info_t reserve_info;
+  iree_hal_pool_acquire_result_t result;
+  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+      pool_, 128, 16, /*requester_frontier=*/NULL,
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
+
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification_);
+  iree_hal_pool_release_reservation(pool_, &reservation, NULL);
+  EXPECT_TRUE(iree_async_notification_wait_for_token(notification_, wait_token,
+                                                     iree_make_timeout_ms(0)));
+  iree_async_notification_end_observe(notification_);
+}
+
 TEST(TLSFPool, ReleaseNodeReuseAvoidsRepeatedHostAllocation) {
   iree_hal_test_counting_allocator_t allocator_state = {
       /*.backing_allocator=*/iree_allocator_system(),

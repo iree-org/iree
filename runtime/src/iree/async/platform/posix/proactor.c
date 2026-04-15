@@ -1008,9 +1008,10 @@ static iree_status_t iree_async_proactor_posix_submit_handle_poll(
   return iree_ok_status();
 }
 
-// Submits a NOTIFICATION_WAIT by capturing the current epoch as the wait token
-// and deferring to the poll thread. push_pending retains the notification
-// reference; release_operation_resources releases it on completion.
+// Submits a NOTIFICATION_WAIT by ensuring a wait token is available and
+// deferring to the poll thread. push_pending retains the notification reference
+// and any submitted observation scope; release_operation_resources releases
+// them on completion.
 static iree_status_t iree_async_proactor_posix_submit_notification_wait(
     iree_async_proactor_posix_t* proactor,
     iree_async_notification_wait_operation_t* wait) {
@@ -3478,28 +3479,27 @@ static void iree_async_proactor_posix_notification_signal(
 
 static bool iree_async_proactor_posix_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   (void)base_proactor;
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   bool is_shared = iree_any_bit_set(notification->flags,
                                     IREE_ASYNC_NOTIFICATION_FLAG_SHARED);
-  uint32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   while (iree_time_now() < deadline_ns) {
     uint32_t current_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-    if (current_epoch != wait_epoch) return true;
+    if (current_epoch != wait_token) return true;
     iree_status_code_t wait_result =
         is_shared
-            ? iree_futex_wait_shared(notification->epoch_ptr, wait_epoch,
+            ? iree_futex_wait_shared(notification->epoch_ptr, wait_token,
                                      deadline_ns)
-            : iree_futex_wait(notification->epoch_ptr, wait_epoch, deadline_ns);
+            : iree_futex_wait(notification->epoch_ptr, wait_token, deadline_ns);
     if (wait_result == IREE_STATUS_DEADLINE_EXCEEDED) break;
     // IREE_STATUS_OK or IREE_STATUS_UNAVAILABLE (spurious) — re-check epoch.
   }
   uint32_t final_epoch =
       iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-  return final_epoch != wait_epoch;
+  return final_epoch != wait_token;
 }
 
 #else  // !IREE_ASYNC_POSIX_NOTIFICATION_USE_FUTEX
@@ -3552,15 +3552,14 @@ static bool iree_async_notification_epoch_advanced(void* arg) {
 // Sync wait for shared notifications on non-futex platforms (macOS).
 // Falls back to poll() on the wake fd since condvar is process-local.
 static bool iree_async_proactor_posix_notification_wait_shared(
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  uint32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   int fd = notification->platform.posix.primitive.value.fd;
   while (iree_time_now() < deadline_ns) {
     uint32_t current_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-    if (current_epoch != wait_epoch) return true;
+    if (current_epoch != wait_token) return true;
     iree_duration_t remaining_ns = deadline_ns - iree_time_now();
     if (remaining_ns <= 0) break;
     int timeout_ms = (int)(remaining_ns / 1000000);
@@ -3583,34 +3582,33 @@ static bool iree_async_proactor_posix_notification_wait_shared(
       // before reporting failure — the signal was already delivered.
       uint32_t current_epoch =
           iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-      return current_epoch != wait_epoch;
+      return current_epoch != wait_token;
     }
   }
   uint32_t final_epoch =
       iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-  return final_epoch != wait_epoch;
+  return final_epoch != wait_token;
 }
 
 static bool iree_async_proactor_posix_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   (void)base_proactor;
   // Shared notifications can't use condvar (process-local) — poll on wake fd.
   if (iree_any_bit_set(notification->flags,
                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
-    return iree_async_proactor_posix_notification_wait_shared(notification,
-                                                              timeout);
+    return iree_async_proactor_posix_notification_wait_shared(
+        notification, wait_token, timeout);
   }
-  uint32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   // Fast path: epoch already advanced.
   if (iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire) !=
-      wait_epoch) {
+      wait_token) {
     return true;
   }
   iree_async_notification_epoch_predicate_t predicate = {
       .epoch = notification->epoch_ptr,
-      .wait_epoch = wait_epoch,
+      .wait_epoch = wait_token,
   };
   return iree_notification_await(
       &notification->platform.posix.sync_notification,

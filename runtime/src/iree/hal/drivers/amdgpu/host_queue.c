@@ -192,6 +192,11 @@ typedef struct iree_hal_amdgpu_alloca_memory_wait_t {
     // Notification epoch observed before the reservation retry.
     uint32_t wait_token;
 
+    // Whether the pre-submit observation scope is still held. Once submit
+    // returns, the submitted wait operation owns its own observation scope and
+    // this bridge scope is released.
+    bool pre_submit_observation_held;
+
     // Wait operations rotated so a callback can arm a retry before returning.
     iree_async_notification_wait_operation_t wait_ops[2];
 
@@ -489,6 +494,14 @@ static void iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
                     iree_memory_order_release);
 }
 
+static void iree_hal_amdgpu_alloca_pool_notification_end_observe(
+    iree_hal_amdgpu_alloca_memory_wait_t* wait) {
+  if (wait->pool_notification.pre_submit_observation_held) {
+    wait->pool_notification.pre_submit_observation_held = false;
+    iree_async_notification_end_observe(wait->pool_notification.notification);
+  }
+}
+
 // Cancels any active alloca memory-readiness wait before destroying the op.
 static void iree_hal_amdgpu_pending_op_cancel_alloca_memory_wait(
     iree_hal_amdgpu_pending_op_t* op) {
@@ -509,6 +522,7 @@ static void iree_hal_amdgpu_pending_op_cancel_alloca_memory_wait(
       break;
     }
     case IREE_HAL_AMDGPU_ALLOCA_MEMORY_WAIT_POOL_NOTIFICATION: {
+      iree_hal_amdgpu_alloca_pool_notification_end_observe(wait);
       // Shutdown is allowed to prod the pool notification: it is a broad wake,
       // but prevents teardown from depending on a future dealloca. The callback
       // observes the CANCELLING lifecycle state and only publishes completion.
@@ -839,6 +853,7 @@ static void iree_hal_amdgpu_pending_op_enqueue_alloca_pool_notification_wait(
   iree_atomic_store(&wait->callback_complete, 0, iree_memory_order_relaxed);
   iree_status_t status =
       iree_async_proactor_submit_one(op->queue->proactor, &wait_op->base);
+  iree_hal_amdgpu_alloca_pool_notification_end_observe(wait);
   iree_hal_amdgpu_pending_op_finish_alloca_memory_wait_enqueue(op, status);
 }
 
@@ -1847,6 +1862,7 @@ iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
       iree_hal_amdgpu_pending_op_ensure_alloca_memory_wait(op, &wait));
   wait->pool_notification.notification = notification;
   wait->pool_notification.wait_token = wait_token;
+  wait->pool_notification.pre_submit_observation_held = true;
   wait->pool_notification.wait_slot =
       (uint8_t)((wait->pool_notification.wait_slot + 1u) & 1u);
   iree_hal_amdgpu_pending_op_begin_alloca_memory_wait_arming(
@@ -1951,42 +1967,59 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
         "queue_alloca exhausted pool did not provide a notification");
   }
 
-  const uint32_t wait_token = iree_async_notification_query_epoch(notification);
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification);
   iree_hal_amdgpu_alloca_reservation_t alloca_reservation;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
+  iree_status_t status = iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
       queue, resolution, allocation_pool, params, allocation_size, flags,
-      reserve_flags, &alloca_reservation));
-  switch (alloca_reservation.readiness) {
-    case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_READY:
-      return iree_hal_amdgpu_host_queue_submit_alloca_reservation(
-          queue, &alloca_reservation, signal_semaphore_list, allocation_pool,
-          params, buffer, submission_flags, out_ready);
-    case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_FRONTIER_WAIT:
-      return iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
-          queue, signal_semaphore_list, allocation_pool, params,
-          allocation_size, flags, reserve_flags, buffer, &alloca_reservation,
-          pending_op, out_memory_wait_op);
-    case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_POOL_NOTIFICATION:
-      break;
-    default:
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "unrecognized alloca reservation readiness %u",
-                              alloca_reservation.readiness);
+      reserve_flags, &alloca_reservation);
+
+  bool observation_transferred = false;
+  if (iree_status_is_ok(status)) {
+    switch (alloca_reservation.readiness) {
+      case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_READY:
+        status = iree_hal_amdgpu_host_queue_submit_alloca_reservation(
+            queue, &alloca_reservation, signal_semaphore_list, allocation_pool,
+            params, buffer, submission_flags, out_ready);
+        break;
+      case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_FRONTIER_WAIT:
+        status = iree_hal_amdgpu_host_queue_defer_alloca_frontier_wait(
+            queue, signal_semaphore_list, allocation_pool, params,
+            allocation_size, flags, reserve_flags, buffer, &alloca_reservation,
+            pending_op, out_memory_wait_op);
+        break;
+      case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_POOL_NOTIFICATION:
+        break;
+      default:
+        status =
+            iree_make_status(IREE_STATUS_INTERNAL,
+                             "unrecognized alloca reservation readiness %u",
+                             alloca_reservation.readiness);
+        break;
+    }
   }
 
   iree_hal_amdgpu_pending_op_t* memory_wait_op = pending_op;
-  iree_status_t status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
-      queue, signal_semaphore_list, allocation_pool, params, allocation_size,
-      flags, reserve_flags, buffer, pending_op, &memory_wait_op);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
-        memory_wait_op, notification, wait_token);
+  if (iree_status_is_ok(status) &&
+      alloca_reservation.readiness ==
+          IREE_HAL_AMDGPU_ALLOCA_RESERVATION_NEEDS_POOL_NOTIFICATION) {
+    status = iree_hal_amdgpu_host_queue_get_alloca_memory_wait_op(
+        queue, signal_semaphore_list, allocation_pool, params, allocation_size,
+        flags, reserve_flags, buffer, pending_op, &memory_wait_op);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_pending_op_prepare_alloca_pool_notification_wait(
+          memory_wait_op, notification, wait_token);
+      observation_transferred = iree_status_is_ok(status);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_memory_wait_op = memory_wait_op;
+    } else if (!pending_op && memory_wait_op) {
+      iree_hal_amdgpu_pending_op_destroy_under_lock(memory_wait_op,
+                                                    iree_status_clone(status));
+    }
   }
-  if (iree_status_is_ok(status)) {
-    *out_memory_wait_op = memory_wait_op;
-  } else if (!pending_op && memory_wait_op) {
-    iree_hal_amdgpu_pending_op_destroy_under_lock(memory_wait_op,
-                                                  iree_status_clone(status));
+  if (!observation_transferred) {
+    iree_async_notification_end_observe(notification);
   }
   return status;
 }

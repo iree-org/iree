@@ -46,8 +46,8 @@ typedef struct iree_hal_fixed_block_pool_options_t {
 // Tainted recycled blocks are never returned as NEEDS_WAIT because their death
 // frontier is not precise enough to construct a queue dependency.
 //
-// |notification| is signaled on every reservation release and is borrowed by
-// callers waiting in iree_hal_pool_allocate_buffer().
+// |notification| is published on reservation release and skips platform wake
+// work when no waiter is observing it.
 //
 // |epoch_query| is an optional host-side completion predicate used to recover
 // zero-sync reuse when a requester's frontier is stale but the producer queue

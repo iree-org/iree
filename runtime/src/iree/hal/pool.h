@@ -67,9 +67,9 @@ enum iree_hal_pool_acquire_result_e {
   // non-dominated death frontiers and the pool chose not to hand one out
   // as NEEDS_WAIT.
   //
-  // The caller should wait on the pool's notification (signaled when any
-  // release occurs) and retry, or trigger slab growth. No reservation was
-  // made — |out_reservation| is not modified.
+  // The caller should observe the pool's notification, retry the reservation,
+  // and wait on the observed token only if the pool remains exhausted. No
+  // reservation was made — |out_reservation| is not modified.
   IREE_HAL_POOL_ACQUIRE_EXHAUSTED = 3,
 
   // The pool's budget limit would be exceeded by this reservation. The
@@ -373,8 +373,9 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_acquire_reservation(
 // point forward, even though the GPU may still be executing prior work —
 // death frontier dominance checking gates actual reuse safety.
 //
-// Signals the pool's notification (wakes threads waiting in
-// iree_hal_pool_allocate_buffer).
+// Publishes the pool's notification epoch. Releases that occur with no known
+// waiter may skip platform wake work; waiters use an observe-check-wait
+// protocol so this cannot lose wakeups.
 IREE_API_EXPORT void iree_hal_pool_release_reservation(
     iree_hal_pool_t* pool, const iree_hal_pool_reservation_t* reservation,
     const iree_async_frontier_t* death_frontier);
@@ -425,9 +426,13 @@ IREE_API_EXPORT void iree_hal_pool_query_stats(
 // The pool remains valid after trimming — it can grow again on demand.
 IREE_API_EXPORT iree_status_t iree_hal_pool_trim(iree_hal_pool_t* pool);
 
-// Returns the pool's notification, signaled on every release_reservation().
-// Callers waiting for blocks to become available can use this to sleep
-// efficiently instead of polling.
+// Returns the pool's notification. Callers waiting for blocks to become
+// available can use this to sleep efficiently instead of polling.
+//
+// The notification is advisory over pool state. Callers must observe the
+// notification epoch before checking the pool state, and then wait on that
+// token only if the checked state still requires a wakeup. Releases may skip
+// platform wake work when no wait observer exists.
 IREE_API_EXPORT iree_async_notification_t* iree_hal_pool_notification(
     iree_hal_pool_t* pool);
 

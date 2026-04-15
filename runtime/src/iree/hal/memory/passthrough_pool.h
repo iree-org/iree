@@ -28,8 +28,8 @@ typedef struct iree_async_notification_t iree_async_notification_t;
 // serves as a baseline for benchmarking suballocating pool types.
 //
 // |slab_provider| is retained for the lifetime of the pool.
-// |notification| is retained for the lifetime of the pool; signaled on every
-// release_reservation() to wake threads blocked in allocate_buffer().
+// |notification| is retained for the lifetime of the pool, published on
+// release_reservation(), and skips wake work when no waiter is observing it.
 // |host_allocator| is used for the pool struct and per-buffer release state.
 iree_status_t iree_hal_passthrough_pool_create(
     iree_hal_slab_provider_t* slab_provider,

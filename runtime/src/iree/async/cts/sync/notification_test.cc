@@ -91,6 +91,34 @@ TEST_P(NotificationTest, SignalNoWaiters) {
   iree_async_notification_release(notification);
 }
 
+TEST_P(NotificationTest, SignalIfObservedNoWaitersSkipsWake) {
+  iree_async_notification_t* notification = nullptr;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+
+  const uint32_t epoch_before =
+      iree_async_notification_query_epoch(notification);
+  EXPECT_FALSE(iree_async_notification_signal_if_observed(notification, 1));
+  EXPECT_NE(iree_async_notification_query_epoch(notification), epoch_before);
+
+  iree_async_notification_release(notification);
+}
+
+TEST_P(NotificationTest, SignalIfObservedExplicitObservationAdvancesEpoch) {
+  iree_async_notification_t* notification = nullptr;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification);
+  EXPECT_TRUE(iree_async_notification_signal_if_observed(notification, 1));
+  EXPECT_TRUE(iree_async_notification_wait_for_token(notification, wait_token,
+                                                     iree_make_timeout_ms(0)));
+  iree_async_notification_end_observe(notification);
+
+  iree_async_notification_release(notification);
+}
+
 // Synchronous wait with signal from another thread.
 //
 // Epoch-based notifications coalesce signals that arrive before the waiter
@@ -316,6 +344,34 @@ TEST_P(NotificationTest, AsyncWait) {
             /*total_budget=*/iree_make_duration_ms(5000));
 
   signaler.join();
+
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_OK(tracker.ConsumeStatus());
+
+  iree_async_notification_release(notification);
+}
+
+TEST_P(NotificationTest, SignalIfObservedSubmittedAsyncWaitCompletes) {
+  iree_async_notification_t* notification = nullptr;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+
+  CompletionTracker tracker;
+  iree_async_notification_wait_operation_t wait_op;
+  InitNotificationWaitOp(&wait_op, notification, CompletionTracker::Callback,
+                         &tracker);
+  wait_op.wait_flags = IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN;
+  wait_op.wait_token = iree_async_notification_begin_observe(notification);
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+  iree_async_notification_end_observe(notification);
+  EXPECT_TRUE(iree_async_notification_signal_if_observed(notification, 1));
+
+  while (tracker.call_count < 1) {
+    iree_host_size_t completed = 0;
+    IREE_ASSERT_OK(iree_async_proactor_poll(proactor_, iree_infinite_timeout(),
+                                            &completed));
+  }
 
   EXPECT_EQ(tracker.call_count, 1);
   IREE_EXPECT_OK(tracker.ConsumeStatus());

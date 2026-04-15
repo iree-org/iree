@@ -113,6 +113,9 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_allocate_buffer(
   iree_status_t status = iree_ok_status();
   bool retry = true;
   while (retry) {
+    const uint32_t wait_token =
+        iree_async_notification_begin_observe(notification);
+
     iree_hal_pool_reservation_t reservation;
     iree_hal_pool_acquire_info_t acquire_info;
     iree_hal_pool_acquire_result_t result;
@@ -120,51 +123,57 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_allocate_buffer(
         pool, allocation_size, params.min_alignment ? params.min_alignment : 1,
         requester_frontier, IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation,
         &acquire_info, &result);
-    if (!iree_status_is_ok(status)) break;
-
-    switch (result) {
-      case IREE_HAL_POOL_ACQUIRE_OK:
-      case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
-        // Reservation succeeded; transfer ownership to the returned buffer.
-        status = iree_hal_pool_materialize_reservation(
-            pool, params, &reservation,
-            IREE_HAL_POOL_MATERIALIZE_FLAG_TRANSFER_RESERVATION_OWNERSHIP,
-            out_buffer);
-        if (!iree_status_is_ok(status)) {
-          // Wrapping failed — release the reservation to avoid leaking the
-          // offset back to the pool.
-          iree_hal_pool_release_reservation(pool, &reservation, NULL);
-        }
-        retry = false;
-        break;
-      case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
-        // Synchronous allocation cannot model a hidden queue wait edge. A pool
-        // used through this helper must skip non-dominated blocks and return
-        // EXHAUSTED/OVER_BUDGET until an immediately-usable reservation exists.
-        // Preserve the block's original frontier and report a pool
-        // implementation bug, not a caller precondition failure.
-        iree_hal_pool_release_reservation(pool, &reservation,
-                                          acquire_info.wait_frontier);
-        status = iree_make_status(
-            IREE_STATUS_INTERNAL,
-            "iree_hal_pool_allocate_buffer received an "
-            "IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT reservation from a pool that "
-            "must only return immediately-usable reservations in the "
-            "synchronous helper path");
-        retry = false;
-        break;
-      case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
-      case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
-        // Wait for a release to signal the notification, then retry.
-        if (!iree_async_notification_wait(notification, timeout)) {
-          status = iree_make_status(
-              IREE_STATUS_DEADLINE_EXCEEDED,
-              "pool allocate_buffer timed out waiting for a free block (%s)",
-              result == IREE_HAL_POOL_ACQUIRE_EXHAUSTED ? "exhausted"
-                                                        : "over budget");
+    if (iree_status_is_ok(status)) {
+      switch (result) {
+        case IREE_HAL_POOL_ACQUIRE_OK:
+        case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
+          // Reservation succeeded; transfer ownership to the returned buffer.
+          status = iree_hal_pool_materialize_reservation(
+              pool, params, &reservation,
+              IREE_HAL_POOL_MATERIALIZE_FLAG_TRANSFER_RESERVATION_OWNERSHIP,
+              out_buffer);
+          if (!iree_status_is_ok(status)) {
+            // Wrapping failed — release the reservation to avoid leaking the
+            // offset back to the pool.
+            iree_hal_pool_release_reservation(pool, &reservation, NULL);
+          }
           retry = false;
-        }
-        break;
+          break;
+        case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
+          // Synchronous allocation cannot model a hidden queue wait edge. A
+          // pool used through this helper must skip non-dominated blocks and
+          // return EXHAUSTED/OVER_BUDGET until an immediately-usable
+          // reservation exists. Preserve the block's original frontier and
+          // report a pool implementation bug, not a caller precondition
+          // failure.
+          iree_hal_pool_release_reservation(pool, &reservation,
+                                            acquire_info.wait_frontier);
+          status = iree_make_status(
+              IREE_STATUS_INTERNAL,
+              "iree_hal_pool_allocate_buffer received an "
+              "IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT reservation from a pool "
+              "that must only return immediately-usable reservations in the "
+              "synchronous helper path");
+          retry = false;
+          break;
+        case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
+        case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
+          // Wait for a release to advance the notification, then retry.
+          if (!iree_async_notification_wait_for_token(notification, wait_token,
+                                                      timeout)) {
+            status = iree_make_status(
+                IREE_STATUS_DEADLINE_EXCEEDED,
+                "pool allocate_buffer timed out waiting for a free block (%s)",
+                result == IREE_HAL_POOL_ACQUIRE_EXHAUSTED ? "exhausted"
+                                                          : "over budget");
+            retry = false;
+          }
+          break;
+      }
+    }
+    iree_async_notification_end_observe(notification);
+    if (!iree_status_is_ok(status)) {
+      retry = false;
     }
   }
 

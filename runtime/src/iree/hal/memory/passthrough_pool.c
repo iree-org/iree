@@ -87,7 +87,7 @@ static void iree_hal_passthrough_pool_reservation_state_release_reservation(
   iree_atomic_fetch_add(&pool->reservation_count, -1,
                         iree_memory_order_relaxed);
   iree_atomic_fetch_add(&pool->release_count, 1, iree_memory_order_relaxed);
-  iree_async_notification_signal(pool->notification, INT32_MAX);
+  iree_async_notification_signal_if_observed(pool->notification, INT32_MAX);
 
   iree_hal_passthrough_pool_reservation_state_release_reference(
       reservation_state);

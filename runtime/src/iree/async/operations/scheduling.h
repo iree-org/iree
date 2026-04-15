@@ -321,6 +321,11 @@ enum iree_async_notification_wait_flag_bits_e {
   // epoch at submit time. This supports the standard observe-check-wait
   // protocol: read the epoch, check the protected condition, then arm a wait
   // that completes if a signal raced between the check and the submit.
+  //
+  // The caller must keep its observation scope active until submit returns.
+  // The proactor holds its own observation while the submitted wait operation
+  // is live, allowing the caller to end its pre-submit observation after a
+  // successful submit handoff.
   IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN = 1u << 0,
 };
 

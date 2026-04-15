@@ -53,7 +53,8 @@ void iree_async_io_uring_notification_signal(
 // Called from the shared notification_wait().
 bool iree_async_io_uring_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout);
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"
