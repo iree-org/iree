@@ -681,6 +681,9 @@ struct ConvertGatherToCoalescedDMA
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
+    if (gatherOp.getMask()) {
+      return failure();
+    }
     auto forallOp = gatherOp->getParentOfType<scf::ForallOp>();
     if (!hasWarpMapping(forallOp)) {
       return failure();

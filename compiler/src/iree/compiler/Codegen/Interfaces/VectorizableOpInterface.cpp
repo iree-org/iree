@@ -58,6 +58,9 @@ struct GatherOpVectorizationModel
                       ArrayRef<bool> scalableDims,
                       DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    if (gatherOp.getMask()) {
+      return false;
+    }
     // TODO: Support indexDepth > 1 by splitting the innermost dim of
     // `indices` into `indexDepth` vectors so that each independent index can
     // be passed to the transfer_gather op.
@@ -72,6 +75,9 @@ struct GatherOpVectorizationModel
                                           ArrayRef<bool> scalableDims,
                                           DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    if (gatherOp.getMask()) {
+      return failure();
+    }
     int64_t batchRank = gatherOp.getBatchRank();
     Location loc = gatherOp.getLoc();
     RewriterBase::InsertionGuard g(rewriter);

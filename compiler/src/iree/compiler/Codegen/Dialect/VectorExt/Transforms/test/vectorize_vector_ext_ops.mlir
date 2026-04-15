@@ -173,6 +173,28 @@ func.func @linalg_ext_gather_no_vectorize_multi_index(%source : tensor<1024x64x6
 
 // -----
 
+func.func @linalg_ext_gather_no_vectorize_operand_mask(%source : tensor<1024x128xi32>,
+                                                       %indices : tensor<10xi32>,
+                                                       %mask : tensor<10xi1>,
+                                                       %seed : tensor<10x128xi32>)
+    -> tensor<10x128xi32> {
+  %result = iree_linalg_ext.gather dimension_map = [0]
+    ins(%source, %indices, %mask : tensor<1024x128xi32>, tensor<10xi32>, tensor<10xi1>)
+    outs(%seed : tensor<10x128xi32>) -> tensor<10x128xi32>
+  return %result : tensor<10x128xi32>
+}
+// CHECK-LABEL: @linalg_ext_gather_no_vectorize_operand_mask
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]]
+//  CHECK-SAME:     outs(%[[ARG3]]
+//       CHECK:   return %[[GATHER]]
+
+// -----
+
 func.func @linalg_ext_gather_unit_dim(%source : tensor<1024x128xi32>, %indices : tensor<10x1xi32>) -> (tensor<10x128xi32>) {
   %empty = tensor.empty() : tensor<10x128xi32>
   %result = iree_linalg_ext.gather dimension_map = [0]

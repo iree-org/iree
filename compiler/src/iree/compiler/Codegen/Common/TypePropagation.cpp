@@ -372,8 +372,7 @@ struct IREELinalgExtScatterTypePropagation
   LogicalResult
   matchAndRewrite(IREE::LinalgExt::ScatterOp scatterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    auto opOperands = scatterOp->getOpOperands();
-    Type inputType = opOperands[0].get().getType();
+    Type inputType = scatterOp.getUpdates().getType();
     Type legalizedInputType = this->getTypeConverter()->convertType(inputType);
 
     if (inputType == legalizedInputType) {
@@ -381,7 +380,7 @@ struct IREELinalgExtScatterTypePropagation
           "unexpected all types legal within conversion pattern");
     }
 
-    Type resultType = opOperands[2].get().getType();
+    Type resultType = scatterOp.getOriginal().getType();
     Type legalizedResultType =
         this->getTypeConverter()->convertType(resultType);
 
