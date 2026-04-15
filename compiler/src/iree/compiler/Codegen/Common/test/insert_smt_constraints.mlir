@@ -31,8 +31,7 @@ hal.executable @matmul_f32_ex {
         %lhs = tensor.empty() : tensor<128x64xf32>
         %rhs = tensor.empty() : tensor<64x256xf32>
         %empty = tensor.empty() : tensor<128x256xf32>
-        %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 0>}
-            ins(%cst : f32) outs(%empty : tensor<128x256xf32>) -> tensor<128x256xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<128x256xf32>) -> tensor<128x256xf32>
         %result = linalg.matmul {root_op = #iree_codegen.root_op<set = 0>}
             ins(%lhs, %rhs : tensor<128x64xf32>, tensor<64x256xf32>)
             outs(%fill : tensor<128x256xf32>) -> tensor<128x256xf32>
@@ -42,7 +41,7 @@ hal.executable @matmul_f32_ex {
   }
 }
 
-// The fill is in the same set but skipped; only the matmul gets constraints.
+// Only the root op matmul gets constraints.
 // CHECK-LABEL: hal.executable public @matmul_f32_ex
 // CHECK:         func.func @matmul_f32
 // CHECK:           linalg.fill
@@ -50,7 +49,7 @@ hal.executable @matmul_f32_ex {
 // CHECK:           linalg.matmul
 //
 // CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
-// CHECK-NEXT:          knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, #iree_codegen.smt.int_knob<"wg_2">]}
+// CHECK-NEXT:          knobs = {mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>, reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">], subgroup_basis = {counts = [#iree_codegen.smt.int_knob<"sg_m_cnt">, #iree_codegen.smt.int_knob<"sg_n_cnt">, 1], mapping = [0, 1, 2]}, subgroup_size = #iree_codegen.smt.int_knob<"sg_size">, workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0], workgroup_size = [#iree_codegen.smt.int_knob<"wg_x">, #iree_codegen.smt.int_knob<"wg_y">, #iree_codegen.smt.int_knob<"wg_z">]}
 // CHECK:           ^bb0(%[[M:.+]]: !smt.int, %[[N:.+]]: !smt.int, %[[K:.+]]: !smt.int):
 //
 // Common: static dims.
@@ -61,47 +60,7 @@ hal.executable @matmul_f32_ex {
 // Divisibility: dim % tile == 0.
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_0 must be divisible by wg_0 ({} % {} == 0)"
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_1 must be divisible by wg_1 ({} % {} == 0)"
-// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2 must be divisible by wg_2 ({} % {} == 0)"
-
-// -----
-
-// Test: Fill-only dispatch still gets constraints (fill is the sole root).
-
-#pipeline_layout2 = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>
-]>
-#gpu_target2 = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
-  compute = fp32, storage = b32, subgroup = shuffle,
-  mma = [<MFMA_F32_16x16x4_F32>],
-  subgroup_size_choices = [64],
-  max_load_instruction_bits = 128,
-  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
-  max_workgroup_memory_bytes = 65536,
-  max_workgroup_counts = [2147483647, 2147483647, 2147483647]
->>
-#exec_target2 = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-    {iree_codegen.target_info = #gpu_target2}>
-
-hal.executable @fill_only_ex {
-  hal.executable.variant public @rocm target(#exec_target2) {
-    hal.executable.export public @fill_only ordinal(0) layout(#pipeline_layout2)
-    builtin.module {
-      func.func @fill_only() {
-        %cst = arith.constant 0.0 : f32
-        %empty = tensor.empty() : tensor<64x64xf32>
-        %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 0>}
-            ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
-        return
-      }
-    }
-  }
-}
-
-// Fill is the only root, so it gets constraints (2 dims: M, N).
-// CHECK-LABEL: hal.executable public @fill_only_ex
-// CHECK:         linalg.fill
-// CHECK:         iree_codegen.smt.constraints target = <set = 0>
-// CHECK:         ^bb0(%{{.+}}: !smt.int, %{{.+}}: !smt.int):
+// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2 must be divisible by red_2 ({} % {} == 0)"
 
 // -----
 

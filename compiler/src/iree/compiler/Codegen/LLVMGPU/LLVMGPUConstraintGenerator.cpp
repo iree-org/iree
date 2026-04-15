@@ -213,26 +213,6 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   return DictionaryAttr::get(ctx, knobsEntries);
 }
 
-/// Emit divisibility constraints: dim % tile == 0 for each loop dimension.
-static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
-                                     ArrayRef<Value> smtDimArgs) {
-  Location loc = rootOp->getLoc();
-  unsigned numLoops = smtDimArgs.size();
-
-  SmallVector<Value> wgKnobs;
-  for (unsigned d = 0; d < numLoops; ++d) {
-    wgKnobs.push_back(mkKnob(builder, loc, ("wg_" + Twine(d)).str()));
-  }
-
-  for (unsigned d = 0; d < numLoops; ++d) {
-    assertDivisible(
-        builder, loc, smtDimArgs[d], wgKnobs[d],
-        llvm::formatv("dim_{} must be divisible by wg_{}", d, d).str());
-  }
-
-  return success();
-}
-
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
 /// TODO(#23535): Complete real constraint logics here.
 static LogicalResult
@@ -241,14 +221,21 @@ emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
                                 IREE::GPU::TargetAttr gpuTarget,
                                 ArrayRef<Value> smtDimArgs) {
   Location loc = linalgOp.getLoc();
-  DenseMap<unsigned, Value> wgKnobs;
-  for (unsigned d : dims.m) {
-    wgKnobs[d] = mkKnob(builder, loc, "wg_" + std::to_string(d));
+
+  // Problem size must be divisible by tiling size.
+  for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
+    for (unsigned d : dimSet) {
+      Value wgKnob = mkKnob(builder, loc, "wg_" + std::to_string(d));
+      assertDivisible(
+          builder, loc, smtDimArgs[d], wgKnob,
+          ("dim_" + Twine(d) + " must be divisible by wg_" + Twine(d)).str());
+    }
   }
-  for (unsigned d : dims.m) {
+  for (unsigned d : dims.k) {
+    Value redKnob = mkKnob(builder, loc, "red_" + std::to_string(d));
     assertDivisible(
-        builder, loc, smtDimArgs[d], wgKnobs[d],
-        ("dim_" + Twine(d) + " must be divisible by wg_" + Twine(d)).str());
+        builder, loc, smtDimArgs[d], redKnob,
+        ("dim_" + Twine(d) + " must be divisible by red_" + Twine(d)).str());
   }
 
   return success();
