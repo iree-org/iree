@@ -1,10 +1,8 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:   %s | FileCheck %s
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:   %s | FileCheck %s --check-prefix=MEMORY
 
