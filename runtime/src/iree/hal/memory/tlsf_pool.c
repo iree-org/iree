@@ -15,7 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_tlsf_pool_release_node_t {
-  // Intrusive next pointer in pool->pending_release_head.
+  // Intrusive next pointer in pool->pending_release_head or
+  // pool->release_node_free_head.
   struct iree_hal_tlsf_pool_release_node_t* next;
 
   // TLSF block handle owned by this reservation.
@@ -30,6 +31,8 @@ typedef struct iree_hal_tlsf_pool_t {
   iree_hal_memory_tlsf_t tlsf;
   iree_hal_slab_t slab;
   iree_atomic_intptr_t pending_release_head;
+  // Free list of release nodes ready for reuse. Protected by |mutex|.
+  iree_hal_tlsf_pool_release_node_t* release_node_free_head;
   iree_hal_pool_epoch_query_t epoch_query;
   iree_allocator_t host_allocator;
 
@@ -98,6 +101,46 @@ iree_hal_tlsf_pool_take_pending_releases(iree_hal_tlsf_pool_t* pool) {
       &pool->pending_release_head, 0, iree_memory_order_acquire);
 }
 
+static iree_status_t iree_hal_tlsf_pool_acquire_release_node(
+    iree_hal_tlsf_pool_t* pool, iree_hal_tlsf_pool_release_node_t** out_node)
+    IREE_THREAD_ANNOTATION_ATTRIBUTE(requires_capability(&pool->mutex)) {
+  iree_hal_tlsf_pool_release_node_t* node = pool->release_node_free_head;
+  if (node) {
+    pool->release_node_free_head = node->next;
+  } else {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_tlsf_pool_grow_release_nodes");
+    iree_status_t status = iree_allocator_malloc(
+        pool->host_allocator, pool->release_node_size, (void**)&node);
+    IREE_TRACE_ZONE_END(z0);
+    if (!iree_status_is_ok(status)) return status;
+  }
+  node->next = NULL;
+  node->block_index = 0;
+  iree_async_frontier_initialize(
+      iree_hal_tlsf_pool_release_node_frontier(pool, node), 0);
+  *out_node = node;
+  return iree_ok_status();
+}
+
+static void iree_hal_tlsf_pool_recycle_release_node(
+    iree_hal_tlsf_pool_t* pool, iree_hal_tlsf_pool_release_node_t* node)
+    IREE_THREAD_ANNOTATION_ATTRIBUTE(requires_capability(&pool->mutex)) {
+  if (!node) return;
+  node->next = pool->release_node_free_head;
+  pool->release_node_free_head = node;
+}
+
+static void iree_hal_tlsf_pool_free_release_nodes(iree_hal_tlsf_pool_t* pool)
+    IREE_THREAD_ANNOTATION_ATTRIBUTE(requires_capability(&pool->mutex)) {
+  iree_hal_tlsf_pool_release_node_t* node = pool->release_node_free_head;
+  pool->release_node_free_head = NULL;
+  while (node) {
+    iree_hal_tlsf_pool_release_node_t* next = node->next;
+    iree_allocator_free(pool->host_allocator, node);
+    node = next;
+  }
+}
+
 static void iree_hal_tlsf_pool_drain_pending_releases(
     iree_hal_tlsf_pool_t* pool)
     IREE_THREAD_ANNOTATION_ATTRIBUTE(requires_capability(&pool->mutex)) {
@@ -110,7 +153,7 @@ static void iree_hal_tlsf_pool_drain_pending_releases(
     iree_hal_memory_tlsf_free(
         &pool->tlsf, node->block_index,
         death_frontier->entry_count > 0 ? death_frontier : NULL);
-    iree_allocator_free(pool->host_allocator, node);
+    iree_hal_tlsf_pool_recycle_release_node(pool, node);
     node = next;
   }
 }
@@ -195,9 +238,8 @@ static iree_status_t iree_hal_tlsf_pool_return_allocation(
     iree_hal_pool_acquire_result_t* out_result)
     IREE_THREAD_ANNOTATION_ATTRIBUTE(requires_capability(&pool->mutex)) {
   iree_hal_tlsf_pool_release_node_t* release_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      pool->host_allocator, pool->release_node_size, (void**)&release_node));
-  release_node->next = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_tlsf_pool_acquire_release_node(pool, &release_node));
   release_node->block_index = allocation->block_index;
 
   const iree_async_frontier_t* wait_frontier = NULL;
@@ -205,7 +247,7 @@ static iree_status_t iree_hal_tlsf_pool_return_allocation(
     wait_frontier = iree_hal_memory_tlsf_block_death_frontier(
         &pool->tlsf, allocation->block_index);
     if (!wait_frontier) {
-      iree_allocator_free(pool->host_allocator, release_node);
+      iree_hal_tlsf_pool_recycle_release_node(pool, release_node);
       return iree_make_status(
           IREE_STATUS_INTERNAL,
           "TLSF OK_NEEDS_WAIT reservation has no wait frontier");
@@ -322,6 +364,7 @@ static void iree_hal_tlsf_pool_destroy(iree_hal_pool_t* base_pool) {
 
   iree_slim_mutex_lock(&pool->mutex);
   iree_hal_tlsf_pool_drain_pending_releases(pool);
+  iree_hal_tlsf_pool_free_release_nodes(pool);
   iree_slim_mutex_unlock(&pool->mutex);
 
   if (pool->tlsf.block_storage) {
@@ -599,6 +642,10 @@ static void iree_hal_tlsf_pool_query_stats(const iree_hal_pool_t* base_pool,
 
 static iree_status_t iree_hal_tlsf_pool_trim(iree_hal_pool_t* base_pool) {
   iree_hal_tlsf_pool_t* pool = (iree_hal_tlsf_pool_t*)base_pool;
+  iree_slim_mutex_lock(&pool->mutex);
+  iree_hal_tlsf_pool_drain_pending_releases(pool);
+  iree_hal_tlsf_pool_free_release_nodes(pool);
+  iree_slim_mutex_unlock(&pool->mutex);
   iree_hal_slab_provider_trim(pool->slab_provider,
                               IREE_HAL_SLAB_PROVIDER_TRIM_FLAG_EXCESS);
   return iree_ok_status();
