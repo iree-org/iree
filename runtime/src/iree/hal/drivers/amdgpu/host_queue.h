@@ -30,6 +30,8 @@ extern "C" {
 typedef struct iree_hal_amdgpu_pending_op_t iree_hal_amdgpu_pending_op_t;
 typedef struct iree_hal_amdgpu_pm4_ib_slot_t iree_hal_amdgpu_pm4_ib_slot_t;
 typedef struct iree_hal_amdgpu_staging_pool_t iree_hal_amdgpu_staging_pool_t;
+typedef struct iree_hal_amdgpu_transient_buffer_pool_t
+    iree_hal_amdgpu_transient_buffer_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 
 // Hardware mechanism used for cross-queue epoch waits after wait resolution
@@ -355,6 +357,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Borrowed default pool for this queue's physical device.
   iree_hal_pool_t* default_pool;
 
+  // Borrowed transient wrapper pool for queue_alloca results.
+  iree_hal_amdgpu_transient_buffer_pool_t* transient_buffer_pool;
+
   // Borrowed fixed-size staging pool used by queue_read/queue_write for
   // non-mappable file transfers.
   iree_hal_amdgpu_staging_pool_t* staging_pool;
@@ -466,7 +471,9 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_hal_pool_t* default_pool, iree_hal_amdgpu_staging_pool_t* staging_pool,
+    iree_hal_pool_t* default_pool,
+    iree_hal_amdgpu_transient_buffer_pool_t* transient_buffer_pool,
+    iree_hal_amdgpu_staging_pool_t* staging_pool,
     iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
     uint32_t notification_capacity, uint32_t kernarg_capacity_in_blocks,
     iree_allocator_t host_allocator, iree_hal_amdgpu_host_queue_t* out_queue);
