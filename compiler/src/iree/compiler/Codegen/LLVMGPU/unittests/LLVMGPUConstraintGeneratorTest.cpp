@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
 
 #include <gmock/gmock.h>
@@ -274,5 +275,140 @@ TEST_F(LinalgOpFixture, GetRootOpLoopInfo_NonLinalgFails) {
   EXPECT_FALSE(getRootOpLoopInfo(func).has_value());
 }
 
+class BuildVectorDistributeKnobsDictTest : public ::testing::Test {
+protected:
+  BuildVectorDistributeKnobsDictTest() {
+    DialectRegistry reg;
+    reg.insert<IREE::Codegen::IREECodegenDialect>();
+    ctx.appendDialectRegistry(reg);
+    ctx.loadAllAvailableDialects();
+  }
+
+  MLIRContext *getContext() { return &ctx; }
+
+  RootOpLoopInfo loopInfoForMatmul() {
+    AffineExpr d0 = getAffineDimExpr(0, &ctx);
+    AffineExpr d1 = getAffineDimExpr(1, &ctx);
+    AffineExpr d2 = getAffineDimExpr(2, &ctx);
+    return RootOpLoopInfo{
+        /*staticLoopRanges=*/{16, 16, 32},
+        /*numLoops=*/3,
+        /*indexingMaps=*/
+        {
+            AffineMap::get(3, 0, {d0, d2}, &ctx), // LHS: (m, k)
+            AffineMap::get(3, 0, {d2, d1}, &ctx), // RHS: (k, n)
+            AffineMap::get(3, 0, {d0, d1}, &ctx), // Out: (m, n)
+        }};
+  }
+
+  ContractionLikeDims matmulDims() {
+    return ContractionLikeDims{/*m=*/{0}, /*n=*/{1}, /*k=*/{2}};
+  }
+
+  // conv_2d_nhwc_hwcf with input=1x18x18x4, filter=3x3x4x8, output=1x16x16x8.
+  // 7 loops: (n, oh, ow, oc, kh, kw, ic).
+  RootOpLoopInfo loopInfoForConv() {
+
+    AffineExpr d0 = getAffineDimExpr(0, &ctx);
+    AffineExpr d1 = getAffineDimExpr(1, &ctx);
+    AffineExpr d2 = getAffineDimExpr(2, &ctx);
+    AffineExpr d3 = getAffineDimExpr(3, &ctx);
+    AffineExpr d4 = getAffineDimExpr(4, &ctx);
+    AffineExpr d5 = getAffineDimExpr(5, &ctx);
+    AffineExpr d6 = getAffineDimExpr(6, &ctx);
+    return RootOpLoopInfo{
+        /*staticLoopRanges=*/{1, 16, 16, 8, 3, 3, 4},
+        /*numLoops=*/7,
+        /*indexingMaps=*/
+        {
+            // Input: (n, oh+kh, ow+kw, ic)
+            AffineMap::get(7, 0, {d0, d1 + d4, d2 + d5, d6}, &ctx),
+            // Filter: (kh, kw, ic, oc)
+            AffineMap::get(7, 0, {d4, d5, d6, d3}, &ctx),
+            // Output: (n, oh, ow, oc)
+            AffineMap::get(7, 0, {d0, d1, d2, d3}, &ctx),
+        }};
+  }
+
+  ContractionLikeDims convDims() {
+    return ContractionLikeDims{SmallVector<unsigned>({1, 2}),
+                               SmallVector<unsigned>({3}),
+                               SmallVector<unsigned>({6})};
+  }
+
+  SmallVector<Attribute> compatibleMMAs() {
+    return SmallVector<Attribute>({
+        StringAttr::get(&ctx, "mma_0"),
+        StringAttr::get(&ctx, "mma_1"),
+        StringAttr::get(&ctx, "mma_2"),
+    });
+  }
+
+private:
+  MLIRContext ctx;
+};
+
+TEST_F(BuildVectorDistributeKnobsDictTest,
+       BuildVectorDistributeKnobs_Matmul_DictStr) {
+  MLIRContext *ctx = getContext();
+  DictionaryAttr matmulKnobDict = buildVectorDistributeKnobsDict(
+      ctx, loopInfoForMatmul(), matmulDims(), compatibleMMAs());
+
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  matmulKnobDict.print(os);
+
+  StringRef expected =
+      "{"
+      "mma_kind = #iree_codegen.smt.one_of_knob<\"mma_idx\", "
+      "[\"mma_0\", \"mma_1\", \"mma_2\"]>, "
+      "reduction = [0, 0, #iree_codegen.smt.int_knob<\"red_2\">], "
+      "subgroup_basis = {"
+      "counts = [#iree_codegen.smt.int_knob<\"sg_m_cnt\">, "
+      "#iree_codegen.smt.int_knob<\"sg_n_cnt\">, 1], "
+      "mapping = [0, 1, 2]}, "
+      "subgroup_size = #iree_codegen.smt.int_knob<\"sg_size\">, "
+      "workgroup = [#iree_codegen.smt.int_knob<\"wg_0\">, "
+      "#iree_codegen.smt.int_knob<\"wg_1\">, 0], "
+      "workgroup_size = [#iree_codegen.smt.int_knob<\"wg_x\">, "
+      "#iree_codegen.smt.int_knob<\"wg_y\">, "
+      "#iree_codegen.smt.int_knob<\"wg_z\">]"
+      "}";
+  EXPECT_EQ(result, expected);
+}
+
+TEST_F(BuildVectorDistributeKnobsDictTest,
+       BuildVectorDistributeKnobs_Conv_DictStr) {
+  MLIRContext *ctx = getContext();
+  DictionaryAttr convKnobDict = buildVectorDistributeKnobsDict(
+      ctx, loopInfoForConv(), convDims(), compatibleMMAs());
+
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  convKnobDict.print(os);
+
+  StringRef expected =
+      "{"
+      "mma_kind = #iree_codegen.smt.one_of_knob<\"mma_idx\", "
+      "[\"mma_0\", \"mma_1\", \"mma_2\"]>, "
+      "reduction = [0, 0, 0, 0, 0, 0, #iree_codegen.smt.int_knob<\"red_6\">], "
+      "subgroup_basis = {"
+      "counts = [1, 1, "
+      "#iree_codegen.smt.int_knob<\"sg_m_cnt\">, "
+      "#iree_codegen.smt.int_knob<\"sg_n_cnt\">, "
+      "1, 1, 1], "
+      "mapping = [0, 1, 2, 3, 4, 5, 6]}, "
+      "subgroup_size = #iree_codegen.smt.int_knob<\"sg_size\">, "
+      "workgroup = [0, "
+      "#iree_codegen.smt.int_knob<\"wg_1\">, "
+      "#iree_codegen.smt.int_knob<\"wg_2\">, "
+      "#iree_codegen.smt.int_knob<\"wg_3\">, "
+      "0, 0, 0], "
+      "workgroup_size = [#iree_codegen.smt.int_knob<\"wg_x\">, "
+      "#iree_codegen.smt.int_knob<\"wg_y\">, "
+      "#iree_codegen.smt.int_knob<\"wg_z\">]"
+      "}";
+  EXPECT_EQ(result, expected);
+}
 } // namespace
 } // namespace mlir::iree_compiler
