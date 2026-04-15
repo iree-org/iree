@@ -116,8 +116,6 @@
     "onnx/node/generated/test_pow_types_int32_int32",
     "onnx/node/generated/test_pow_types_int64_float32",
     "onnx/node/generated/test_pow_types_int64_int64",
-    "onnx/node/generated/test_qlinearmatmul_2D_uint8_float16",
-    "onnx/node/generated/test_qlinearmatmul_2D_uint8_float32",
     "onnx/node/generated/test_quantizelinear_axis",
     "onnx/node/generated/test_quantizelinear_blocked_asymmetric",
     "onnx/node/generated/test_quantizelinear_blocked_symmetric",
