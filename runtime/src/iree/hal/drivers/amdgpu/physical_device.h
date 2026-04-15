@@ -12,6 +12,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_staging.h"
 #include "iree/hal/drivers/amdgpu/system.h"
+#include "iree/hal/drivers/amdgpu/transient_buffer.h"
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/signal_pool.h"
@@ -181,6 +182,9 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // possible for queue entries to be allocated on one node and freed on another
   // the common case will be that the blocks are touched by the same device.
   iree_arena_block_pool_t fine_host_block_pool;
+
+  // Per-device pool of user-visible queue_alloca transient buffer wrappers.
+  iree_hal_amdgpu_transient_buffer_pool_t transient_buffer_pool;
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;

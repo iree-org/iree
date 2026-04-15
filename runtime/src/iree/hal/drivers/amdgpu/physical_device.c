@@ -382,12 +382,17 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   iree_arena_block_pool_initialize(options->host_block_pool_size,
                                    host_allocator,
                                    &out_physical_device->fine_host_block_pool);
+  iree_status_t status = iree_hal_amdgpu_transient_buffer_pool_initialize(
+      &out_physical_device->fine_host_block_pool,
+      &out_physical_device->transient_buffer_pool);
 
   // Find the device memory pools and create block pools/allocators.
   hsa_amd_memory_pool_t coarse_block_memory_pool = {0};
   hsa_amd_memory_pool_t fine_block_memory_pool = {0};
-  iree_status_t status = iree_hal_amdgpu_find_coarse_global_memory_pool(
-      libhsa, device_agent, &coarse_block_memory_pool);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_find_coarse_global_memory_pool(
+        libhsa, device_agent, &coarse_block_memory_pool);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_find_fine_global_memory_pool(
         libhsa, device_agent, &fine_block_memory_pool);
@@ -629,8 +634,8 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
         completion_thread_affinity, physical_device->wait_barrier_strategy,
         epoch_signal_table, &physical_device->fine_host_block_pool,
         &physical_device->buffer_transfer_context,
-        physical_device->default_pool, &physical_device->file_staging_pool,
-        physical_device->device_ordinal,
+        physical_device->default_pool, &physical_device->transient_buffer_pool,
+        &physical_device->file_staging_pool, physical_device->device_ordinal,
         physical_device->host_queue_aql_capacity,
         physical_device->host_queue_notification_capacity,
         physical_device->host_queue_kernarg_capacity, host_allocator,
@@ -675,6 +680,9 @@ void iree_hal_amdgpu_physical_device_deinitialize(
 
   iree_hal_amdgpu_staging_pool_deinitialize(
       &physical_device->file_staging_pool);
+
+  iree_hal_amdgpu_transient_buffer_pool_deinitialize(
+      &physical_device->transient_buffer_pool);
 
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 

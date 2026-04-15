@@ -121,7 +121,7 @@ iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
 
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_transient_buffer_create(
       placement, *params, allocation_size, allocation_size,
-      queue->host_allocator, out_buffer));
+      queue->transient_buffer_pool, out_buffer));
   *out_allocation_pool = allocation_pool;
   return iree_ok_status();
 }
