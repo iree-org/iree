@@ -26,9 +26,9 @@ enum class EncodingOptions { Padding, Generic };
 struct EncodingOpTypeParser
     : public llvm::cl::parser<IREE::Encoding::EncodingOpType> {
   using llvm::cl::parser<IREE::Encoding::EncodingOpType>::parser;
+  using OpType = IREE::Encoding::EncodingOpType;
 
   void initialize() {
-    using OpType = IREE::Encoding::EncodingOpType;
     llvm::cl::parser<OpType>::initialize();
     addLiteralOption("matmul", OpType::matmul, "Contractions (matmul-like).");
     addLiteralOption("scaled_matmul", OpType::scaled_matmul,

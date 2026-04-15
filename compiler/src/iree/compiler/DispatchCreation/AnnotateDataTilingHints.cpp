@@ -240,11 +240,9 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
     if (!linalgOp) {
       return WalkResult::advance();
     }
-    const bool matches =
-        (enableMatmul && isSupportedContractionOp(linalgOp)) ||
+    if ((enableMatmul && isSupportedContractionOp(linalgOp)) ||
         (enableScaledMatmul && isSupportedScaledContractionOp(linalgOp)) ||
-        (enableConvolution && isSupportedConvolutionOp(linalgOp));
-    if (matches) {
+        (enableConvolution && isSupportedConvolutionOp(linalgOp))) {
       candidates.push_back(op);
     }
     return WalkResult::advance();
