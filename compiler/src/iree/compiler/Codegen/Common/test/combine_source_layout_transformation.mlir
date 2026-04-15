@@ -392,29 +392,27 @@ func.func @complex_chain_reshape_and_transpose(%buffer : memref<4x8xf32>) -> ten
 
 // -----
 
-// Chain with a complex relayout op chain feeding into a tensor.insert_slice.
-func.func @complex_chain_into_insert_slice(%buffer : memref<4x8xf32>) -> tensor<16x4x4xf32> {
+// Chain with a complex relayout op chain where an op has a lowering_config.
+// Ops with lowering_config are roots for downstream transformations and should
+// not be folded into a MapLoad.
+func.func @complex_chain_with_lowering_config(%buffer : memref<4x8xf32>) -> tensor<2x2x8xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<4x8xf32> -> tensor<4x8xf32>
   %expanded = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 2, 8] : tensor<4x8xf32> into tensor<2x2x8xf32>
-  %init = tensor.empty() : tensor<8x2x2xf32>
-  %transposed = linalg.transpose ins(%expanded : tensor<2x2x8xf32>) outs(%init : tensor<8x2x2xf32>) permutation = [2, 0, 1]
-  %dest = tensor.empty() : tensor<16x4x4xf32>
-  %result = tensor.insert_slice %transposed into %dest[0, 0, 0] [8, 2, 2] [1, 1, 1] : tensor<8x2x2xf32> into tensor<16x4x4xf32>
-  return %result : tensor<16x4x4xf32>
+  %init = tensor.empty() : tensor<2x2x8xf32>
+  %copy = linalg.copy {lowering_config = #iree_gpu.derived_thread_config} ins(%expanded : tensor<2x2x8xf32>) outs(%init : tensor<2x2x8xf32>) -> tensor<2x2x8xf32>
+  return %copy : tensor<2x2x8xf32>
 }
-// CHECK-LABEL: @complex_chain_into_insert_slice
+// CHECK-LABEL: @complex_chain_with_lowering_config
 //  CHECK-SAME:   %[[BUFFER:.+]]:
 //       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
 //       CHECK:   tensor.expand_shape
-//       CHECK:   linalg.transpose
+//       CHECK:   linalg.copy
 //   CHECK-NOT:   iree_linalg_ext.map_load
-//       CHECK:   tensor.insert_slice
-// FOLD-LABEL: @complex_chain_into_insert_slice
+// FOLD-LABEL: @complex_chain_with_lowering_config
 //  FOLD-SAME:   %[[BUFFER:.+]]:
 //       FOLD:   iree_codegen.load_from_buffer
 //       FOLD:   iree_linalg_ext.map_load
-//       FOLD:   } : tensor<4x8xf32> into tensor<8x2x2xf32> -> tensor<8x2x2xf32>
-//       FOLD:   tensor.insert_slice
+//       FOLD:   } : tensor<4x8xf32> into tensor<2x2x8xf32> -> tensor<2x2x8xf32>
 
 // -----
 
