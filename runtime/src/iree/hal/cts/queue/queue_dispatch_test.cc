@@ -7,6 +7,7 @@
 // Tests for HAL queue_dispatch operations.
 
 #include <cstdint>
+#include <numeric>
 #include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
@@ -233,5 +234,124 @@ TEST_P(QueueDispatchTest, DeferredWaitBeforeSignalDispatch) {
 }
 
 CTS_REGISTER_EXECUTABLE_TEST_SUITE(QueueDispatchTest);
+
+class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
+ protected:
+  static constexpr iree_host_size_t kDispatchedWorkgroupCount = 4;
+  static constexpr iree_host_size_t kOutputElementCount = 32;
+  static constexpr iree_device_size_t kOutputByteLength =
+      kOutputElementCount * sizeof(uint32_t);
+  static constexpr iree_device_size_t kParameterByteLength =
+      3 * sizeof(uint32_t);
+  static constexpr uint32_t kSentinelValue = 0xCDCDCDCDu;
+
+  void SetUp() override {
+    CtsTestBase::SetUp();
+    if (HasFatalFailure() || IsSkipped()) return;
+
+    IREE_ASSERT_OK(iree_hal_executable_cache_create(
+        device_, iree_make_cstring_view("default"), &executable_cache_));
+
+    iree_hal_executable_params_t executable_params;
+    iree_hal_executable_params_initialize(&executable_params);
+    executable_params.caching_mode =
+        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+    executable_params.executable_format =
+        iree_make_cstring_view(executable_format());
+    executable_params.executable_data = executable_data(iree_make_cstring_view(
+        "command_buffer_dispatch_multi_workgroup_test.bin"));
+
+    IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
+        executable_cache_, &executable_params, &executable_));
+  }
+
+  void TearDown() override {
+    iree_hal_executable_release(executable_);
+    executable_ = nullptr;
+    iree_hal_executable_cache_release(executable_cache_);
+    executable_cache_ = nullptr;
+    CtsTestBase::TearDown();
+  }
+
+  void CreateIndirectParameterBuffer(iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_params_t params = {0};
+    params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER;
+    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+        device_allocator_, params, kParameterByteLength, out_buffer));
+  }
+
+  void RunIndirectQueueDispatch(
+      iree_hal_dispatch_flags_t flags,
+      iree_device_size_t parameter_ref_length = kParameterByteLength) {
+    Ref<iree_hal_buffer_t> output_buffer;
+    CreateFilledDeviceBuffer(kOutputByteLength, kSentinelValue,
+                             output_buffer.out());
+
+    Ref<iree_hal_buffer_t> parameter_buffer;
+    CreateIndirectParameterBuffer(parameter_buffer.out());
+
+    const uint32_t parameter_data[3] = {
+        kDispatchedWorkgroupCount,
+        1,
+        1,
+    };
+    SemaphoreList update_signal(device_, {0}, {1});
+    SemaphoreList empty_wait;
+    IREE_ASSERT_OK(iree_hal_device_queue_update(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, update_signal,
+        parameter_data, /*source_offset=*/0, parameter_buffer,
+        /*target_offset=*/0, sizeof(parameter_data),
+        IREE_HAL_UPDATE_FLAG_NONE));
+
+    iree_hal_buffer_ref_t binding_refs[1] = {
+        iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                                 kOutputByteLength),
+    };
+    iree_hal_buffer_ref_list_t bindings = {
+        /*.count=*/IREE_ARRAYSIZE(binding_refs),
+        /*.values=*/binding_refs,
+    };
+
+    iree_hal_dispatch_config_t config = iree_hal_make_static_dispatch_config(
+        /*workgroup_count_x=*/kOutputElementCount, /*workgroup_count_y=*/1,
+        /*workgroup_count_z=*/1);
+    config.workgroup_count_ref = iree_hal_make_buffer_ref(
+        parameter_buffer, /*offset=*/0, parameter_ref_length);
+
+    SemaphoreList dispatch_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, update_signal, dispatch_signal,
+        executable_, /*export_ordinal=*/0, config, iree_const_byte_span_empty(),
+        bindings, flags));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+    std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+    std::vector<uint32_t> expected(kOutputElementCount, kSentinelValue);
+    std::iota(expected.begin(), expected.begin() + kDispatchedWorkgroupCount,
+              0u);
+    EXPECT_THAT(output_data, ContainerEq(expected));
+  }
+
+  iree_hal_executable_cache_t* executable_cache_ = nullptr;
+  iree_hal_executable_t* executable_ = nullptr;
+};
+
+TEST_P(QueueDispatchIndirectParametersTest, StaticParameters) {
+  RunIndirectQueueDispatch(IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS);
+}
+
+TEST_P(QueueDispatchIndirectParametersTest, DynamicParameters) {
+  RunIndirectQueueDispatch(IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS);
+}
+
+TEST_P(QueueDispatchIndirectParametersTest, WholeBufferParameterRef) {
+  RunIndirectQueueDispatch(IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS,
+                           IREE_HAL_WHOLE_BUFFER);
+}
+
+CTS_REGISTER_EXECUTABLE_TEST_SUITE(QueueDispatchIndirectParametersTest);
 
 }  // namespace iree::hal::cts

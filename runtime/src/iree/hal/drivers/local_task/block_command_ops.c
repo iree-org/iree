@@ -162,16 +162,26 @@ iree_status_t iree_hal_cmd_build_dispatch(
   IREE_ASSERT_ARGUMENT(out_fixups);
   IREE_ASSERT_ARGUMENT(out_token);
 
-  // Reject features not yet supported in the block ISA.
   if (iree_hal_dispatch_uses_custom_arguments(flags)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "direct/indirect arguments are not supported in the block ISA");
   }
-  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+  const bool uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(flags);
+  if (uses_indirect_parameters &&
+      (config.workgroup_count_ref.offset % sizeof(uint32_t)) != 0) {
     return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "indirect dispatch not yet supported in the block ISA");
+        IREE_STATUS_INVALID_ARGUMENT,
+        "workgroup count offset does not match the required natural alignment "
+        "of uint32_t");
+  }
+  if (uses_indirect_parameters &&
+      config.workgroup_count_ref.length < sizeof(iree_hal_dispatch_params_t)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "workgroup count buffer does not have the capacity to store the "
+        "required 3 uint32_t values");
   }
 
   iree_hal_local_executable_t* local_executable =
@@ -212,20 +222,30 @@ iree_status_t iree_hal_cmd_build_dispatch(
                           dispatch_attrs.constant_count * sizeof(uint32_t),
                       8);
 
-  // Compute tile count from static workgroup count.
-  uint32_t tile_count = config.workgroup_count[0] * config.workgroup_count[1] *
-                        config.workgroup_count[2];
+  // Compute tile count from static workgroup count. Indirect dispatches compute
+  // the exact region tile count when the processor reaches the command and can
+  // read the resolved parameter buffer; use a non-zero hint so old metadata
+  // consumers still treat the region as potentially active.
+  uint32_t tile_count = uses_indirect_parameters
+                            ? 1
+                            : config.workgroup_count[0] *
+                                  config.workgroup_count[1] *
+                                  config.workgroup_count[2];
+  const uint16_t total_binding_count =
+      (uint16_t)(binding_count + (uses_indirect_parameters ? 1 : 0));
 
   // Append the command and reserve fixup storage for all bindings.
   iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->cmd_bytes = cmd_bytes;
-  out_token->fixup_count = (uint16_t)binding_count;
-  out_token->binding_count = (uint16_t)binding_count;
+  out_token->fixup_count = total_binding_count;
+  out_token->binding_count = total_binding_count;
   out_token->tile_count = tile_count;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      builder, IREE_HAL_CMD_DISPATCH, IREE_HAL_CMD_FLAG_NONE, cmd_bytes,
-      (uint16_t)binding_count, (uint16_t)binding_count, tile_count,
+      builder, IREE_HAL_CMD_DISPATCH,
+      uses_indirect_parameters ? IREE_HAL_CMD_FLAG_INDIRECT
+                               : IREE_HAL_CMD_FLAG_NONE,
+      cmd_bytes, total_binding_count, total_binding_count, tile_count,
       (void**)&cmd, &fixups));
 
   // Fill dispatch command fields.
@@ -241,9 +261,17 @@ iree_status_t iree_hal_cmd_build_dispatch(
   cmd->workgroup_size[0] = config.workgroup_size[0];
   cmd->workgroup_size[1] = config.workgroup_size[1];
   cmd->workgroup_size[2] = config.workgroup_size[2];
-  cmd->params.direct.workgroup_count[0] = config.workgroup_count[0];
-  cmd->params.direct.workgroup_count[1] = config.workgroup_count[1];
-  cmd->params.direct.workgroup_count[2] = config.workgroup_count[2];
+  if (uses_indirect_parameters) {
+    cmd->params.indirect.params_binding =
+        (uint16_t)(binding_data_base + binding_count);
+    cmd->params.indirect.reserved = 0;
+    cmd->params.indirect.params_offset = 0;
+    cmd->params.indirect.tile_count_hint = tile_count;
+  } else {
+    cmd->params.direct.workgroup_count[0] = config.workgroup_count[0];
+    cmd->params.direct.workgroup_count[1] = config.workgroup_count[1];
+    cmd->params.direct.workgroup_count[2] = config.workgroup_count[2];
+  }
   cmd->tile_count = tile_count;
   cmd->tiles_per_reservation = 1;
   cmd->local_memory_size =
@@ -260,6 +288,10 @@ iree_status_t iree_hal_cmd_build_dispatch(
   // Pre-fill fixup data_indices. Caller resolves bindings.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     fixups[i].data_index = (uint16_t)(binding_data_base + i);
+  }
+  if (uses_indirect_parameters) {
+    fixups[binding_count].data_index =
+        (uint16_t)(binding_data_base + binding_count);
   }
 
   *out_fixups = fixups;

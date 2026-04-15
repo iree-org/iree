@@ -50,7 +50,15 @@ typedef enum iree_hal_amdgpu_command_buffer_command_flag_bits_e {
 typedef enum iree_hal_amdgpu_command_buffer_binding_source_flag_bits_e {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_NONE = 0u,
   IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC = 1u << 0,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_INDIRECT_PARAMETERS = 1u
+                                                                           << 1,
 } iree_hal_amdgpu_command_buffer_binding_source_flag_bits_t;
+
+// Dispatch command flags.
+typedef enum iree_hal_amdgpu_command_buffer_dispatch_flag_bits_e {
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE = 0u,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS = 1u << 0,
+} iree_hal_amdgpu_command_buffer_dispatch_flag_bits_t;
 
 // Kernarg formation strategy for a dispatch command.
 typedef enum iree_hal_amdgpu_command_buffer_kernarg_strategy_e {
@@ -180,14 +188,14 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint16_t tail_length_qwords;
   // Kernarg strategy from iree_hal_amdgpu_command_buffer_kernarg_strategy_t.
   uint8_t kernarg_strategy;
-  // Reserved bytes that must be zero in version 0.
-  uint8_t reserved0;
+  // Dispatch flags from iree_hal_amdgpu_command_buffer_dispatch_flag_bits_t.
+  uint8_t dispatch_flags;
   // AQL dispatch packet setup field.
   uint16_t setup;
   // AQL dispatch packet workgroup size fields.
   uint16_t workgroup_size[3];
-  // Reserved bytes that must be zero in version 0.
-  uint16_t reserved1;
+  // Kernarg qword offset of implicit args, or UINT16_MAX when absent.
+  uint16_t implicit_args_offset_qwords;
   // AQL dispatch packet grid size fields.
   uint32_t grid_size[3];
   // AQL dispatch packet private segment size field.

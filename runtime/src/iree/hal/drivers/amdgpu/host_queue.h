@@ -93,9 +93,10 @@ struct iree_hal_amdgpu_host_queue_post_drain_action_t {
 #define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY 256u
 
 // Maximum number of operation resources retained by one direct queue_dispatch:
-// the executable plus one resource per direct buffer binding.
+// the executable, one optional indirect-parameter buffer, plus one resource per
+// direct buffer binding.
 #define IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_RESOURCE_CAPACITY \
-  (1u + IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY)
+  (2u + IREE_HAL_AMDGPU_HOST_QUEUE_DISPATCH_SCRATCH_BINDING_CAPACITY)
 
 // Queue_execute binding table prefix cached inline as raw device pointers under
 // submission_mutex while replaying an AQL command buffer. Larger tables use a

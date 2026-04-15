@@ -865,7 +865,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     resources[resource_count++] = config.workgroup_count_ref.buffer;
   }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_insert(command_buffer->resource_set, resource_count, &executable));
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, resource_count, resources));
 
   const iree_hal_metal_pipeline_t* pipeline = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

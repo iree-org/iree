@@ -9,6 +9,8 @@
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
+#include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
 typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
   // Executable dispatch descriptor selected for the queue's physical device.
@@ -23,16 +25,12 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
   uint32_t kernarg_block_count;
   // Number of operation resources retained until dispatch completion.
   iree_host_size_t operation_resource_count;
+  // True when workgroup counts are read from a device buffer before dispatch.
+  bool uses_indirect_parameters;
 } iree_hal_amdgpu_host_queue_dispatch_plan_t;
 
 static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_flags(
     iree_hal_dispatch_flags_t flags) {
-  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "indirect workgroup parameters are not supported by AMDGPU "
-        "queue_dispatch yet");
-  }
   if (iree_hal_dispatch_uses_indirect_arguments(flags)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
@@ -41,6 +39,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_flags(
   }
 
   const iree_hal_dispatch_flags_t supported_flags =
+      IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS |
+      IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS |
       IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS |
       IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION;
   if (IREE_UNLIKELY(iree_any_bit_set(flags, ~supported_flags))) {
@@ -100,12 +100,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_select_dispatch_kernel_args(
 static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_shape(
     const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor,
     const iree_hal_amdgpu_device_kernel_args_t* kernel_args,
-    const iree_hal_dispatch_config_t config) {
+    const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
+  const bool uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(flags);
   if (iree_hal_amdgpu_dispatch_config_has_workgroup_size_override(config)) {
     for (iree_host_size_t i = 0; i < 3; ++i) {
       const uint64_t grid_size =
           (uint64_t)config.workgroup_count[i] * kernel_args->workgroup_size[i];
-      if (IREE_UNLIKELY(grid_size > UINT32_MAX)) {
+      if (!uses_indirect_parameters && IREE_UNLIKELY(grid_size > UINT32_MAX)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "dispatch grid dimension %" PRIhsz
@@ -113,7 +115,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_shape(
             i, config.workgroup_count[i], kernel_args->workgroup_size[i]);
       }
     }
-  } else {
+  } else if (!uses_indirect_parameters) {
     for (iree_host_size_t i = 0; i < 3; ++i) {
       if (IREE_UNLIKELY(config.workgroup_count[i] >
                         descriptor->max_workgroup_count[i])) {
@@ -157,6 +159,45 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_binding(
                                         binding->length);
 }
 
+static iree_status_t
+iree_hal_amdgpu_host_queue_validate_dispatch_indirect_parameters(
+    const iree_hal_buffer_ref_t* workgroup_count_ref) {
+  const iree_device_size_t workgroup_count_length = sizeof(uint32_t[3]);
+  if (IREE_UNLIKELY(workgroup_count_ref->reserved != 0 ||
+                    workgroup_count_ref->buffer_slot != 0 ||
+                    !workgroup_count_ref->buffer)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue_dispatch indirect workgroup parameters must use a direct "
+        "non-null buffer reference");
+  }
+  if (IREE_UNLIKELY((workgroup_count_ref->offset % sizeof(uint32_t)) != 0)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue_dispatch indirect workgroup parameter offset must be 4-byte "
+        "aligned");
+  }
+  if (IREE_UNLIKELY(workgroup_count_ref->length != IREE_HAL_WHOLE_BUFFER &&
+                    workgroup_count_ref->length < workgroup_count_length)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "queue_dispatch indirect workgroup parameter buffer must contain at "
+        "least uint32_t[3]");
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(workgroup_count_ref->buffer),
+      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
+      iree_hal_buffer_allowed_usage(workgroup_count_ref->buffer),
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
+      iree_hal_buffer_allowed_access(workgroup_count_ref->buffer),
+      IREE_HAL_MEMORY_ACCESS_READ));
+  return iree_hal_buffer_validate_range(workgroup_count_ref->buffer,
+                                        workgroup_count_ref->offset,
+                                        workgroup_count_length);
+}
+
 static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
     const iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_executable_dispatch_descriptor_t* descriptor,
@@ -186,7 +227,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
           "non-zero");
     }
     *out_layout = &descriptor->custom_kernarg_layout;
-    *out_kernarg_block_count = descriptor->custom_kernarg_block_count;
+    *out_kernarg_block_count =
+        iree_max(1u, descriptor->custom_kernarg_block_count);
   } else {
     if (IREE_UNLIKELY(constants.data_length > 0 && !constants.data)) {
       return iree_make_status(
@@ -227,7 +269,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
     }
     operation_resource_count = 1 + bindings.count;
     *out_layout = &descriptor->hal_kernarg_layout;
-    *out_kernarg_block_count = descriptor->hal_kernarg_block_count;
+    *out_kernarg_block_count =
+        iree_max(1u, descriptor->hal_kernarg_block_count);
+  }
+
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    ++operation_resource_count;
   }
 
   if (IREE_UNLIKELY(*out_kernarg_block_count > queue->kernarg_ring.capacity)) {
@@ -259,7 +306,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_dispatch_plan(
       out_plan->descriptor, config, &out_plan->override_kernel_args,
       &out_plan->kernel_args));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_validate_dispatch_shape(
-      out_plan->descriptor, out_plan->kernel_args, config));
+      out_plan->descriptor, out_plan->kernel_args, config, flags));
+  out_plan->uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(flags);
 
   return iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
       queue, out_plan->descriptor, constants, bindings, flags,
@@ -321,6 +370,23 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
   return status;
 }
 
+static iree_status_t
+iree_hal_amdgpu_host_queue_prepare_dispatch_indirect_parameters(
+    const iree_hal_dispatch_config_t config,
+    iree_hal_resource_t** operation_resources,
+    iree_host_size_t operation_resource_index,
+    uint64_t* out_workgroup_count_ptr) {
+  *out_workgroup_count_ptr = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_validate_dispatch_indirect_parameters(
+          &config.workgroup_count_ref));
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_resolve_validated_binding_ptr(
+      &config.workgroup_count_ref, out_workgroup_count_ptr));
+  operation_resources[operation_resource_index] =
+      (iree_hal_resource_t*)config.workgroup_count_ref.buffer;
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
@@ -339,10 +405,142 @@ iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
     status = iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
         bindings, /*operation_resources=*/NULL, /*binding_ptrs=*/NULL);
   }
+  if (iree_status_is_ok(status) && plan.uses_indirect_parameters) {
+    status = iree_hal_amdgpu_host_queue_validate_dispatch_indirect_parameters(
+        &config.workgroup_count_ref);
+  }
   if (iree_status_is_ok(status)) {
     *out_operation_resource_count = plan.operation_resource_count;
   }
   return status;
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const uint64_t* binding_ptrs,
+    iree_hal_resource_t* const* operation_resources,
+    bool uses_custom_direct_arguments,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+  iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+      queue, resolution, signal_semaphore_list, plan->operation_resource_count,
+      plan->kernarg_block_count, &submission));
+
+  if (uses_custom_direct_arguments) {
+    iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+        plan->layout, constants.data, submission.kernel.kernarg_blocks->data);
+  } else {
+    iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
+        plan->kernel_args, config.workgroup_count,
+        config.dynamic_workgroup_local_memory, plan->layout, binding_ptrs,
+        (const uint32_t*)constants.data,
+        submission.kernel.kernarg_blocks->data);
+  }
+  iree_hal_amdgpu_device_dispatch_emplace_packet(
+      plan->kernel_args, config.workgroup_count,
+      config.dynamic_workgroup_local_memory,
+      &submission.dispatch_slot->dispatch,
+      submission.kernel.kernarg_blocks->data);
+  submission.dispatch_slot->dispatch.completion_signal =
+      iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring);
+  submission.dispatch_setup = submission.dispatch_slot->dispatch.setup;
+  iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      plan->operation_resource_count, submission_flags, &submission);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const uint64_t* binding_ptrs, uint64_t workgroup_count_ptr,
+    iree_hal_resource_t* const* operation_resources,
+    bool uses_custom_direct_arguments,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+  const uint32_t target_kernarg_block_count = plan->kernarg_block_count;
+  const uint32_t patch_kernarg_block_count = 1;
+  iree_hal_amdgpu_host_queue_kernel_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_kernel_submission(
+      queue, resolution, signal_semaphore_list, plan->operation_resource_count,
+      /*payload_packet_count=*/2,
+      patch_kernarg_block_count + target_kernarg_block_count, &submission));
+
+  const uint32_t extra_noop_packet_count = target_kernarg_block_count - 1;
+  iree_hal_amdgpu_aql_packet_t* patch_packet = iree_hal_amdgpu_aql_ring_packet(
+      &queue->aql_ring, submission.first_packet_id + resolution->barrier_count +
+                            extra_noop_packet_count);
+  iree_hal_amdgpu_aql_packet_t* dispatch_packet =
+      iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring,
+                                      submission.first_packet_id +
+                                          resolution->barrier_count +
+                                          extra_noop_packet_count + 1);
+  uint8_t* patch_kernarg_data = submission.kernarg_blocks[0].data;
+  uint8_t* dispatch_kernarg_data = submission.kernarg_blocks[1].data;
+  const uint32_t placeholder_workgroup_count[3] = {0, 0, 0};
+  if (uses_custom_direct_arguments) {
+    iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+        plan->layout, constants.data, dispatch_kernarg_data);
+  } else {
+    iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
+        plan->kernel_args, placeholder_workgroup_count,
+        config.dynamic_workgroup_local_memory, plan->layout, binding_ptrs,
+        (const uint32_t*)constants.data, dispatch_kernarg_data);
+  }
+  iree_hal_amdgpu_device_dispatch_emplace_packet(
+      plan->kernel_args, placeholder_workgroup_count,
+      config.dynamic_workgroup_local_memory, &dispatch_packet->dispatch,
+      dispatch_kernarg_data);
+  dispatch_packet->dispatch.completion_signal =
+      iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring);
+
+  iree_amdgpu_kernel_implicit_args_t* implicit_args =
+      plan->layout->has_implicit_args
+          ? (iree_amdgpu_kernel_implicit_args_t*)(dispatch_kernarg_data +
+                                                  plan->layout
+                                                      ->implicit_args_offset)
+          : NULL;
+  iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
+      &queue->transfer_context->kernels
+           ->iree_hal_amdgpu_device_dispatch_patch_indirect_params,
+      (const uint32_t*)(uintptr_t)workgroup_count_ptr,
+      &dispatch_packet->dispatch, implicit_args, &patch_packet->dispatch,
+      patch_kernarg_data);
+
+  iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
+                                                           &submission);
+  iree_hal_amdgpu_host_queue_finish_kernel_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      plan->operation_resource_count, /*inout_resource_set=*/NULL,
+      submission_flags, &submission);
+  const uint16_t dispatch_setup = dispatch_packet->dispatch.setup;
+  const uint16_t patch_setup = patch_packet->dispatch.setup;
+  const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
+      IREE_HSA_PACKET_TYPE_INVALID,
+      iree_hal_amdgpu_aql_packet_control_barrier(
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+          iree_hal_amdgpu_host_queue_signal_list_release_scope(
+              queue, signal_semaphore_list)));
+  const uint16_t patch_header = iree_hal_amdgpu_aql_make_header(
+      IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+      iree_hal_amdgpu_aql_packet_control_barrier(
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+          IREE_HSA_FENCE_SCOPE_AGENT));
+  iree_hal_amdgpu_aql_ring_commit(dispatch_packet, dispatch_header,
+                                  dispatch_setup);
+  iree_hal_amdgpu_aql_ring_commit(patch_packet, patch_header, patch_setup);
+  iree_hal_amdgpu_aql_ring_doorbell(
+      &queue->aql_ring,
+      submission.first_packet_id + submission.packet_count - 1);
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
@@ -375,36 +573,25 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     status = iree_hal_amdgpu_host_queue_prepare_dispatch_bindings(
         bindings, operation_resources, binding_ptrs);
   }
+  uint64_t workgroup_count_ptr = 0;
+  if (iree_status_is_ok(status) && plan.uses_indirect_parameters) {
+    const iree_host_size_t resource_index =
+        uses_custom_direct_arguments ? 1 : 1 + bindings.count;
+    status = iree_hal_amdgpu_host_queue_prepare_dispatch_indirect_parameters(
+        config, operation_resources, resource_index, &workgroup_count_ptr);
+  }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
-    status = iree_hal_amdgpu_host_queue_begin_dispatch_submission(
-        queue, resolution, signal_semaphore_list, plan.operation_resource_count,
-        plan.kernarg_block_count, &submission);
-    if (iree_status_is_ok(status)) {
-      if (uses_custom_direct_arguments) {
-        iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
-            plan.layout, constants.data,
-            submission.kernel.kernarg_blocks->data);
-      } else {
-        iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
-            plan.kernel_args, config.workgroup_count,
-            config.dynamic_workgroup_local_memory, plan.layout, binding_ptrs,
-            (const uint32_t*)constants.data,
-            submission.kernel.kernarg_blocks->data);
-      }
-      iree_hal_amdgpu_device_dispatch_emplace_packet(
-          plan.kernel_args, config.workgroup_count,
-          config.dynamic_workgroup_local_memory,
-          &submission.dispatch_slot->dispatch,
-          submission.kernel.kernarg_blocks->data);
-      submission.dispatch_slot->dispatch.completion_signal =
-          iree_hal_amdgpu_notification_ring_epoch_signal(
-              &queue->notification_ring);
-      submission.dispatch_setup = submission.dispatch_slot->dispatch.setup;
-      iree_hal_amdgpu_host_queue_finish_dispatch_submission(
-          queue, resolution, signal_semaphore_list, operation_resources,
-          plan.operation_resource_count, submission_flags, &submission);
+    if (plan.uses_indirect_parameters) {
+      status = iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
+          queue, resolution, signal_semaphore_list, &plan, config, constants,
+          binding_ptrs, workgroup_count_ptr, operation_resources,
+          uses_custom_direct_arguments, submission_flags);
+    } else {
+      status = iree_hal_amdgpu_host_queue_submit_direct_dispatch(
+          queue, resolution, signal_semaphore_list, &plan, config, constants,
+          binding_ptrs, operation_resources, uses_custom_direct_arguments,
+          submission_flags);
     }
   }
 

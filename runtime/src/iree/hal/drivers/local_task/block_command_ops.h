@@ -123,9 +123,11 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
 // constants and binding count. Resolves the function pointer and environment
 // at build time (baked into .text for zero-indirection execution).
 //
-// Returns |binding_count| fixup entries via |out_fixups|:
+// Returns fixup entries via |out_fixups|:
 //   fixups[0..binding_count-1]: binding buffers (data_index pre-filled,
 //                                caller resolves binding for each)
+//   fixups[binding_count]: indirect workgroup-count buffer when
+//                          _INDIRECT_PARAMETERS is used
 iree_status_t iree_hal_cmd_build_dispatch(
     iree_hal_cmd_block_builder_t* builder, iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,

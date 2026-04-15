@@ -518,7 +518,7 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // dispatch state.
 //
 // Initialization at block entry:
-//   memset(state, 0, state_size) + fixup loop + set remaining_tiles.
+//   memset(state, 0, state_size) + fixup loop + compute remaining_tiles.
 //   All counters (active_region_index, tile_indices) are zero-initialized.
 //   If the first active region is not region 0, tile_index epochs are set
 //   to the first active region's index.
@@ -527,7 +527,7 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 //
 // At region boundary (completer only, immediate — no arrival wait):
 //   - Set tile_index epochs for the next region (cache-line-strided stores).
-//   - Set remaining_tiles from .text initial_remaining_tiles.
+//   - Set remaining_tiles from the next region's current tile counts.
 //   - Store active_region_index (release) to unlock workers.
 
 // Cache-line stride for tile_index entries. Each tile_index is padded to

@@ -2909,6 +2909,30 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores) {
+  const bool uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(flags);
+  if (uses_indirect_parameters && !config.workgroup_count_ref.buffer) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue_dispatch requires a direct workgroup count buffer when using "
+        "indirect parameters");
+  }
+  if (uses_indirect_parameters &&
+      (config.workgroup_count_ref.offset % sizeof(uint32_t)) != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "workgroup count offset does not match the required natural alignment "
+        "of uint32_t");
+  }
+  if (uses_indirect_parameters &&
+      config.workgroup_count_ref.length != IREE_HAL_WHOLE_BUFFER &&
+      config.workgroup_count_ref.length < sizeof(iree_hal_dispatch_params_t)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "workgroup count buffer does not have the capacity to store the "
+        "required 3 uint32_t values");
+  }
+
   iree_hal_task_queue_op_t* operation = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_task_queue_submit_op_begin(
       queue, IREE_HAL_TASK_QUEUE_OP_DISPATCH, &signal_semaphores, &operation));
@@ -2954,6 +2978,11 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
         operation->resource_set, binding_count, bindings,
         offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t));
   }
+  if (iree_status_is_ok(status) &&
+      iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    status = iree_hal_resource_set_insert(operation->resource_set, 1,
+                                          &config.workgroup_count_ref.buffer);
+  }
 
   if (!iree_status_is_ok(status)) {
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
@@ -2972,6 +3001,8 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
   const bool allow_inline = iree_any_bit_set(
       operation->dispatch.flags, IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION);
+  const bool uses_indirect_parameters =
+      iree_hal_dispatch_uses_indirect_parameters(operation->dispatch.flags);
   const iree_host_size_t binding_count = operation->dispatch.binding_count;
 
   // For inline execution, track mappings on the stack so we can unmap after.
@@ -3021,6 +3052,23 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
       if (mappings) mappings[i] = mapping;
     }
   }
+  iree_hal_buffer_mapping_t parameter_mapping = {{0}};
+  bool has_parameter_mapping = false;
+  void* parameter_host_ptr = NULL;
+  size_t parameter_host_length = 0;
+  if (iree_status_is_ok(status) && uses_indirect_parameters) {
+    const iree_hal_buffer_ref_t* parameter_ref =
+        &operation->dispatch.config.workgroup_count_ref;
+    status = iree_hal_buffer_map_range(
+        parameter_ref->buffer, mapping_mode, IREE_HAL_MEMORY_ACCESS_READ,
+        parameter_ref->offset, sizeof(iree_hal_dispatch_params_t),
+        &parameter_mapping);
+    if (iree_status_is_ok(status)) {
+      parameter_host_ptr = parameter_mapping.contents.data;
+      parameter_host_length = parameter_mapping.contents.data_length;
+      has_parameter_mapping = allow_inline;
+    }
+  }
 
   // Build a single-dispatch recording.
   iree_hal_cmd_block_builder_t builder;
@@ -3050,6 +3098,13 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
       fixups[i].slot = 0;
       fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     }
+    if (uses_indirect_parameters) {
+      fixups[binding_count].host_ptr = parameter_host_ptr;
+      fixups[binding_count].offset = 0;
+      fixups[binding_count].length = parameter_host_length;
+      fixups[binding_count].slot = 0;
+      fixups[binding_count].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
+    }
   }
 
   iree_hal_cmd_block_recording_t recording;
@@ -3068,7 +3123,12 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
       iree_hal_task_queue_execute_recording_inline(queue, operation,
                                                    &recording);
       for (iree_host_size_t i = 0; i < binding_count; ++i) {
-        iree_hal_buffer_unmap_range(&mappings[i]);
+        status =
+            iree_status_join(status, iree_hal_buffer_unmap_range(&mappings[i]));
+      }
+      if (has_parameter_mapping) {
+        status = iree_status_join(
+            status, iree_hal_buffer_unmap_range(&parameter_mapping));
       }
       return status;
     }
@@ -3087,8 +3147,13 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
     // Unmap any scoped bindings that were mapped before the error.
     if (mappings) {
       for (iree_host_size_t i = 0; i < binding_count; ++i) {
-        iree_hal_buffer_unmap_range(&mappings[i]);
+        status =
+            iree_status_join(status, iree_hal_buffer_unmap_range(&mappings[i]));
       }
+    }
+    if (has_parameter_mapping) {
+      status = iree_status_join(
+          status, iree_hal_buffer_unmap_range(&parameter_mapping));
     }
   }
 
