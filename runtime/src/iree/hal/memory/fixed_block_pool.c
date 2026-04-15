@@ -8,6 +8,7 @@
 
 #include "iree/async/frontier.h"
 #include "iree/async/notification.h"
+#include "iree/hal/memory/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Types
@@ -21,6 +22,9 @@ typedef struct iree_hal_fixed_block_pool_t {
   iree_hal_slab_t slab;
   iree_hal_pool_epoch_query_t epoch_query;
   iree_allocator_t host_allocator;
+
+  // Stable named-memory stream for logical reservations from this pool.
+  iree_hal_memory_trace_t trace;
 
   // Cached from slab_provider and allocator options at creation time.
   iree_hal_memory_type_t memory_type;
@@ -54,6 +58,9 @@ typedef struct iree_hal_fixed_block_pool_buffer_state_t {
 
 static const iree_hal_pool_vtable_t iree_hal_fixed_block_pool_vtable;
 static void iree_hal_fixed_block_pool_destroy(iree_hal_pool_t* base_pool);
+
+static const char* IREE_HAL_FIXED_BLOCK_POOL_TRACE_ID =
+    "iree-hal-fixed-block-pool";
 
 //===----------------------------------------------------------------------===//
 // Frontier helpers
@@ -163,6 +170,9 @@ static iree_status_t iree_hal_fixed_block_pool_return_allocation(
                   result);
       break;
   }
+  iree_hal_memory_trace_alloc(
+      &pool->trace, (uint8_t*)pool->slab.base_ptr + allocation->offset,
+      pool->block_size);
   *out_result = result;
   return iree_ok_status();
 }
@@ -215,9 +225,14 @@ IREE_API_EXPORT iree_status_t iree_hal_fixed_block_pool_create(
   iree_hal_slab_provider_query_properties(slab_provider, &pool->memory_type,
                                           &pool->supported_usage);
 
-  iree_status_t status = iree_hal_memory_fixed_block_allocator_allocate(
-      options.block_allocator_options, pool->host_allocator,
-      &pool->block_allocator);
+  iree_status_t status = iree_hal_memory_trace_initialize_pool(
+      options.trace_name, IREE_HAL_FIXED_BLOCK_POOL_TRACE_ID, host_allocator,
+      &pool->trace);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_memory_fixed_block_allocator_allocate(
+        options.block_allocator_options, pool->host_allocator,
+        &pool->block_allocator);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_slab_provider_acquire_slab(pool->slab_provider,
                                                  slab_length, &pool->slab);
@@ -241,6 +256,7 @@ static void iree_hal_fixed_block_pool_destroy(iree_hal_pool_t* base_pool) {
   if (pool->slab.length > 0) {
     iree_hal_slab_provider_release_slab(pool->slab_provider, &pool->slab);
   }
+  iree_hal_memory_trace_deinitialize(&pool->trace);
   iree_async_notification_release(pool->notification);
   iree_hal_slab_provider_release(pool->slab_provider);
   iree_allocator_free(host_allocator, pool);
@@ -395,6 +411,9 @@ static void iree_hal_fixed_block_pool_release_reservation(
     iree_hal_pool_t* base_pool, const iree_hal_pool_reservation_t* reservation,
     const iree_async_frontier_t* death_frontier) {
   iree_hal_fixed_block_pool_t* pool = (iree_hal_fixed_block_pool_t*)base_pool;
+
+  iree_hal_memory_trace_free(
+      &pool->trace, (uint8_t*)pool->slab.base_ptr + reservation->offset);
 
   iree_hal_memory_fixed_block_allocator_release(
       pool->block_allocator, (uint32_t)reservation->block_handle,

@@ -9,6 +9,7 @@
 #include "iree/async/frontier.h"
 #include "iree/async/notification.h"
 #include "iree/base/threading/mutex.h"
+#include "iree/hal/memory/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Types
@@ -35,6 +36,9 @@ typedef struct iree_hal_tlsf_pool_t {
   iree_hal_tlsf_pool_release_node_t* release_node_free_head;
   iree_hal_pool_epoch_query_t epoch_query;
   iree_allocator_t host_allocator;
+
+  // Stable named-memory stream for logical reservations from this pool.
+  iree_hal_memory_trace_t trace;
 
   // Cached from slab_provider and TLSF options at creation time.
   iree_hal_memory_type_t memory_type;
@@ -73,6 +77,8 @@ typedef struct iree_hal_tlsf_pool_buffer_state_t {
 
 static const iree_hal_pool_vtable_t iree_hal_tlsf_pool_vtable;
 static void iree_hal_tlsf_pool_destroy(iree_hal_pool_t* base_pool);
+
+static const char* IREE_HAL_TLSF_POOL_TRACE_ID = "iree-hal-tlsf-pool";
 
 //===----------------------------------------------------------------------===//
 // Internal helpers
@@ -286,6 +292,9 @@ static iree_status_t iree_hal_tlsf_pool_return_allocation(
       iree_atomic_fetch_add(&pool->wait_count, 1, iree_memory_order_relaxed);
       break;
   }
+  iree_hal_memory_trace_alloc(
+      &pool->trace, (uint8_t*)pool->slab.base_ptr + allocation->offset,
+      allocation->length);
   *out_result = result;
   return iree_ok_status();
 }
@@ -324,8 +333,13 @@ IREE_API_EXPORT iree_status_t iree_hal_tlsf_pool_create(
   iree_hal_slab_provider_query_properties(slab_provider, &pool->memory_type,
                                           &pool->supported_usage);
 
-  iree_status_t status = iree_hal_memory_tlsf_initialize(
-      options.tlsf_options, pool->host_allocator, &pool->tlsf);
+  iree_status_t status = iree_hal_memory_trace_initialize_pool(
+      options.trace_name, IREE_HAL_TLSF_POOL_TRACE_ID, host_allocator,
+      &pool->trace);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_memory_tlsf_initialize(options.tlsf_options,
+                                             pool->host_allocator, &pool->tlsf);
+  }
   if (iree_status_is_ok(status)) {
     status = IREE_STRUCT_LAYOUT(
         sizeof(iree_hal_tlsf_pool_release_node_t), &pool->release_node_size,
@@ -375,6 +389,7 @@ static void iree_hal_tlsf_pool_destroy(iree_hal_pool_t* base_pool) {
   }
   iree_slim_mutex_deinitialize(&pool->mutex);
   iree_allocator_free(pool->host_allocator, pool->rejected_block_indices);
+  iree_hal_memory_trace_deinitialize(&pool->trace);
   iree_async_notification_release(pool->notification);
   iree_hal_slab_provider_release(pool->slab_provider);
   iree_allocator_t host_allocator = pool->host_allocator;
@@ -548,6 +563,9 @@ static void iree_hal_tlsf_pool_release_reservation(
   } else {
     iree_async_frontier_initialize(release_frontier, 0);
   }
+
+  iree_hal_memory_trace_free(
+      &pool->trace, (uint8_t*)pool->slab.base_ptr + reservation->offset);
 
   iree_hal_tlsf_pool_push_pending_release(pool, release_node);
 

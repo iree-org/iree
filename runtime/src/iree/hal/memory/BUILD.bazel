@@ -71,6 +71,7 @@ iree_runtime_cc_library(
     deps = [
         ":fixed_block_allocator",
         ":slab_provider",
+        ":tracing",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
@@ -133,6 +134,7 @@ iree_runtime_cc_library(
     hdrs = ["passthrough_pool.h"],
     deps = [
         ":slab_provider",
+        ":tracing",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
@@ -198,11 +200,22 @@ iree_runtime_cc_library(
     deps = [
         ":slab_provider",
         ":tlsf",
+        ":tracing",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "tracing",
+    srcs = ["tracing.c"],
+    hdrs = ["tracing.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
     ],
 )
 

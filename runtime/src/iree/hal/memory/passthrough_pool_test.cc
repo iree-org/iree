@@ -150,8 +150,9 @@ class PassthroughPoolTest : public ::testing::Test {
         iree_hal_cpu_slab_provider_create(allocator_, &slab_provider_));
     IREE_ASSERT_OK(iree_async_notification_create(
         test_proactor(), IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification_));
+    iree_hal_passthrough_pool_options_t options = {0};
     IREE_ASSERT_OK(iree_hal_passthrough_pool_create(
-        slab_provider_, notification_, allocator_, &pool_));
+        options, slab_provider_, notification_, allocator_, &pool_));
   }
 
   void TearDown() override {
@@ -294,8 +295,9 @@ TEST(PassthroughPool, WrapReservationUsesProviderHook) {
       test_proactor(), IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
 
   iree_hal_pool_t* pool = NULL;
-  IREE_ASSERT_OK(iree_hal_passthrough_pool_create(slab_provider, notification,
-                                                  allocator, &pool));
+  iree_hal_passthrough_pool_options_t options = {0};
+  IREE_ASSERT_OK(iree_hal_passthrough_pool_create(
+      options, slab_provider, notification, allocator, &pool));
 
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t reserve_info;

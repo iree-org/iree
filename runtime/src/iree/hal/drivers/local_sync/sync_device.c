@@ -96,8 +96,9 @@ static iree_status_t iree_hal_sync_device_create_default_pool(
   iree_status_t status = iree_async_notification_create(
       proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_passthrough_pool_create(slab_provider, notification,
-                                              host_allocator, out_pool);
+    iree_hal_passthrough_pool_options_t options = {0};
+    status = iree_hal_passthrough_pool_create(
+        options, slab_provider, notification, host_allocator, out_pool);
   }
   if (iree_status_is_ok(status)) {
     *out_slab_provider = slab_provider;

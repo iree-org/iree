@@ -30,6 +30,10 @@ typedef struct iree_hal_tlsf_pool_options_t {
 
   // Logical byte budget for live reservations in this pool. 0 means unlimited.
   iree_device_size_t budget_limit;
+
+  // Optional named-memory trace identifier for logical reservations returned by
+  // this pool. Empty uses a generic process-stable identifier.
+  iree_string_view_t trace_name;
 } iree_hal_tlsf_pool_options_t;
 
 // Creates a TLSF-backed HAL pool over one slab from |slab_provider|.

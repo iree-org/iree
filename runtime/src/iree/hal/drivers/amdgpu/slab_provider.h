@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/memory/slab_provider.h"
 
@@ -50,14 +51,17 @@ iree_status_t iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
 // queues in this physical memory domain; wrap_buffer() replaces
 // IREE_HAL_QUEUE_AFFINITY_ANY with that mask and rejects explicit affinities
 // outside it so placement metadata always routes PREFER_ORIGIN dealloca back
-// into the provider's domain. The provider borrows |device|, |libhsa|, and
-// |topology|; the owning physical/logical device must outlive the provider and
-// every pool/buffer created from it.
+// into the provider's domain. Materialized buffer view wrappers are allocated
+// from |buffer_pool|, which must be in the same physical-device lifetime domain
+// as the backing HSA memory. The provider borrows |device|, |libhsa|,
+// |topology|, and |buffer_pool|; the owning physical/logical device must
+// outlive the provider and every pool/buffer created from it.
 iree_status_t iree_hal_amdgpu_slab_provider_create(
     iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     hsa_amd_memory_pool_t memory_pool,
     iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_amdgpu_buffer_pool_t* buffer_pool, iree_string_view_t trace_name,
     iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider);
 
 #ifdef __cplusplus

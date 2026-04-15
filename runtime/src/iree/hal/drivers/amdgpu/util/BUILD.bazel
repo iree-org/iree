@@ -168,6 +168,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:target_map",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:toc",
+        "//runtime/src/iree/hal/memory:tracing",
         "//runtime/src/iree/hal/utils:resource_set",
     ],
 )

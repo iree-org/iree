@@ -75,6 +75,7 @@ iree_cc_library(
   DEPS
     ::fixed_block_allocator
     ::slab_provider
+    ::tracing
     iree::async
     iree::base
     iree::base::internal
@@ -147,6 +148,7 @@ iree_cc_library(
     "passthrough_pool.c"
   DEPS
     ::slab_provider
+    ::tracing
     iree::async
     iree::base
     iree::base::internal
@@ -225,11 +227,25 @@ iree_cc_library(
   DEPS
     ::slab_provider
     ::tlsf
+    ::tracing
     iree::async
     iree::base
     iree::base::internal
     iree::base::threading
     iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    tracing
+  HDRS
+    "tracing.h"
+  SRCS
+    "tracing.c"
+  DEPS
+    iree::base
+    iree::base::internal
   PUBLIC
 )
 

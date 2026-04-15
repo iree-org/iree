@@ -87,6 +87,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::memory::slab_provider
     iree::hal::memory::tlsf_pool
+    iree::hal::memory::tracing
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
     iree::hal::utils::files
@@ -137,6 +138,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::memory::slab_provider
+    iree::hal::memory::tracing
   PUBLIC
 )
 
