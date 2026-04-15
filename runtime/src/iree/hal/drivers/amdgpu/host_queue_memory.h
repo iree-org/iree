@@ -62,7 +62,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
     iree_hal_buffer_t* buffer,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready);
 
 // Submits the queue barrier that decommits a transient buffer on completion.
 iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
@@ -70,7 +71,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready);
 
 #ifdef __cplusplus
 }  // extern "C"

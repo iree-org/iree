@@ -118,6 +118,20 @@ static iree_status_t CreateHostVisibleTransferBuffer(
                                             out_buffer);
 }
 
+static iree_status_t QueueTransientTransferBuffer(
+    iree_hal_device_t* device, const iree_hal_semaphore_list_t signal_list,
+    iree_device_size_t buffer_size, iree_hal_buffer_t** out_buffer) {
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  return iree_hal_device_queue_alloca(device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                      iree_hal_semaphore_list_empty(),
+                                      signal_list,
+                                      /*pool=*/NULL, params, buffer_size,
+                                      IREE_HAL_ALLOCA_FLAG_NONE, out_buffer);
+}
+
 static iree_status_t EnqueueRawBlockingBarrier(
     iree_hal_amdgpu_host_queue_t* queue, hsa_signal_t blocker_signal) {
   const uint64_t packet_id =
@@ -146,6 +160,393 @@ static iree_status_t CreateSemaphore(iree_hal_device_t* device,
   return iree_hal_semaphore_create(
       device, IREE_HAL_QUEUE_AFFINITY_ANY,
       /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, out_semaphore);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       SingleBlockCommandBufferParksAndResumesUnderNotificationPressure) {
+  static constexpr uint32_t kAqlCapacity = 64;
+  static constexpr uint32_t kNotificationCapacity = 1;
+  static constexpr uint32_t kKernargCapacity = 2 * kAqlCapacity;
+
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.host_block_pools.command_buffer.usable_block_size =
+      IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE;
+  options.host_queues.aql_capacity = kAqlCapacity;
+  options.host_queues.notification_capacity = kNotificationCapacity;
+  options.host_queues.kernarg_capacity = kKernargCapacity;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(queue, nullptr);
+
+  Ref<iree_hal_buffer_t> pressure_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), pressure_buffer.out()));
+
+  Ref<iree_hal_buffer_t> target_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), target_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(target_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/1, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  const uint32_t expected = 0xBD3A0001u;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*binding=*/0, /*offset=*/0,
+                                        sizeof(expected)),
+      &expected, sizeof(expected), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  const iree_hal_amdgpu_aql_program_t* program =
+      iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+  ASSERT_EQ(program->block_count, 1u);
+  ASSERT_GT(program->max_block_aql_packet_count, 0u);
+
+  Ref<iree_hal_semaphore_t> pressure_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), pressure_signal.out()));
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+
+  hsa_signal_t blocker_signal = iree_hsa_signal_null();
+  IREE_ASSERT_OK(iree_hsa_amd_signal_create(
+      IREE_LIBHSA(&libhsa_), /*initial_value=*/1, /*num_consumers=*/0,
+      /*consumers=*/NULL, /*attributes=*/0, &blocker_signal));
+  IREE_ASSERT_OK(EnqueueRawBlockingBarrier(queue, blocker_signal));
+
+  uint64_t pressure_signal_value = 1;
+  iree_hal_semaphore_t* pressure_signal_ptr = pressure_signal.get();
+  iree_hal_semaphore_list_t pressure_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&pressure_signal_ptr,
+      /*payload_values=*/&pressure_signal_value,
+  };
+  const uint32_t pressure_pattern = 0xABCD1234u;
+  iree_status_t status = iree_hal_device_queue_fill(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), pressure_signal_list, pressure_buffer,
+      /*target_offset=*/0, sizeof(pressure_pattern), &pressure_pattern,
+      sizeof(pressure_pattern), IREE_HAL_FILL_FLAG_NONE);
+
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  iree_hal_buffer_binding_t binding = {
+      /*buffer=*/target_buffer.get(),
+      /*offset=*/0,
+      /*length=*/IREE_HAL_WHOLE_BUFFER,
+  };
+  const iree_hal_buffer_binding_table_t binding_table = {
+      /*count=*/1,
+      /*bindings=*/&binding,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_execute(
+        test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+        command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+  const bool replay_parked =
+      iree_status_is_ok(status) && HostQueueHasPostDrainAction(queue);
+
+  iree_hsa_signal_store_screlease(IREE_LIBHSA(&libhsa_), blocker_signal, 0);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_wait(
+        command_buffer_signal, command_buffer_signal_value,
+        iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  }
+  IREE_EXPECT_OK(
+      iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), blocker_signal));
+
+  IREE_ASSERT_OK(status);
+  EXPECT_TRUE(replay_parked);
+
+  uint32_t actual = 0;
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(target_buffer, /*offset=*/0, &actual,
+                                          sizeof(actual)));
+  EXPECT_EQ(actual, expected);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       MetadataOnlyCommandBufferParksAndResumesUnderNotificationPressure) {
+  static constexpr uint32_t kAqlCapacity = 64;
+  static constexpr uint32_t kNotificationCapacity = 1;
+  static constexpr uint32_t kKernargCapacity = 2 * kAqlCapacity;
+
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.host_block_pools.command_buffer.usable_block_size =
+      IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE;
+  options.host_queues.aql_capacity = kAqlCapacity;
+  options.host_queues.notification_capacity = kNotificationCapacity;
+  options.host_queues.kernarg_capacity = kKernargCapacity;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(queue, nullptr);
+
+  Ref<iree_hal_buffer_t> pressure_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), pressure_buffer.out()));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  const iree_hal_amdgpu_aql_program_t* program =
+      iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+  ASSERT_EQ(program->max_block_aql_packet_count, 0u);
+
+  Ref<iree_hal_semaphore_t> pressure_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), pressure_signal.out()));
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+
+  hsa_signal_t blocker_signal = iree_hsa_signal_null();
+  IREE_ASSERT_OK(iree_hsa_amd_signal_create(
+      IREE_LIBHSA(&libhsa_), /*initial_value=*/1, /*num_consumers=*/0,
+      /*consumers=*/NULL, /*attributes=*/0, &blocker_signal));
+  IREE_ASSERT_OK(EnqueueRawBlockingBarrier(queue, blocker_signal));
+
+  uint64_t pressure_signal_value = 1;
+  iree_hal_semaphore_t* pressure_signal_ptr = pressure_signal.get();
+  iree_hal_semaphore_list_t pressure_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&pressure_signal_ptr,
+      /*payload_values=*/&pressure_signal_value,
+  };
+  const uint32_t pressure_pattern = 0xABCD1234u;
+  iree_status_t status = iree_hal_device_queue_fill(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), pressure_signal_list, pressure_buffer,
+      /*target_offset=*/0, sizeof(pressure_pattern), &pressure_pattern,
+      sizeof(pressure_pattern), IREE_HAL_FILL_FLAG_NONE);
+
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_execute(
+        test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+        command_buffer, iree_hal_buffer_binding_table_empty(),
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+  const bool replay_parked =
+      iree_status_is_ok(status) && HostQueueHasPostDrainAction(queue);
+
+  iree_hsa_signal_store_screlease(IREE_LIBHSA(&libhsa_), blocker_signal, 0);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_wait(
+        command_buffer_signal, command_buffer_signal_value,
+        iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
+  }
+  IREE_EXPECT_OK(
+      iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), blocker_signal));
+
+  IREE_ASSERT_OK(status);
+  EXPECT_TRUE(replay_parked);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       DeferredTransientBindingSurvivesQueuedDealloca) {
+  static constexpr uint32_t kAqlCapacity = 64;
+  static constexpr uint32_t kNotificationCapacity = 1;
+  static constexpr uint32_t kKernargCapacity = 2 * kAqlCapacity;
+
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.host_block_pools.command_buffer.usable_block_size =
+      IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE;
+  options.host_queues.aql_capacity = kAqlCapacity;
+  options.host_queues.notification_capacity = kNotificationCapacity;
+  options.host_queues.kernarg_capacity = kKernargCapacity;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(queue, nullptr);
+
+  Ref<iree_hal_buffer_t> pressure_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), pressure_buffer.out()));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), output_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  Ref<iree_hal_semaphore_t> alloca_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), alloca_signal.out()));
+  uint64_t alloca_signal_value = 1;
+  iree_hal_semaphore_t* alloca_signal_ptr = alloca_signal.get();
+  iree_hal_semaphore_list_t alloca_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&alloca_signal_ptr,
+      /*payload_values=*/&alloca_signal_value,
+  };
+  iree_hal_buffer_t* transient_raw = NULL;
+  IREE_ASSERT_OK(QueueTransientTransferBuffer(
+      test_device.base_device(), alloca_signal_list, sizeof(uint32_t),
+      &transient_raw));
+  Ref<iree_hal_buffer_t> transient_buffer(transient_raw);
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(alloca_signal, alloca_signal_value,
+                                         iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/2, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  const uint32_t expected = 0xBD3A0002u;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*binding=*/0, /*offset=*/0,
+                                        sizeof(expected)),
+      &expected, sizeof(expected), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*binding=*/0, /*offset=*/0,
+                                        sizeof(expected)),
+      iree_hal_make_indirect_buffer_ref(/*binding=*/1, /*offset=*/0,
+                                        sizeof(expected)),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  Ref<iree_hal_semaphore_t> pressure_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), pressure_signal.out()));
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  Ref<iree_hal_semaphore_t> dealloca_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), dealloca_signal.out()));
+
+  hsa_signal_t blocker_signal = iree_hsa_signal_null();
+  IREE_ASSERT_OK(iree_hsa_amd_signal_create(
+      IREE_LIBHSA(&libhsa_), /*initial_value=*/1, /*num_consumers=*/0,
+      /*consumers=*/NULL, /*attributes=*/0, &blocker_signal));
+  IREE_ASSERT_OK(EnqueueRawBlockingBarrier(queue, blocker_signal));
+
+  uint64_t pressure_signal_value = 1;
+  iree_hal_semaphore_t* pressure_signal_ptr = pressure_signal.get();
+  iree_hal_semaphore_list_t pressure_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&pressure_signal_ptr,
+      /*payload_values=*/&pressure_signal_value,
+  };
+  const uint32_t pressure_pattern = 0xABCD1234u;
+  iree_status_t status = iree_hal_device_queue_fill(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), pressure_signal_list, pressure_buffer,
+      /*target_offset=*/0, sizeof(pressure_pattern), &pressure_pattern,
+      sizeof(pressure_pattern), IREE_HAL_FILL_FLAG_NONE);
+
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  iree_hal_buffer_binding_t bindings[2] = {
+      {
+          /*buffer=*/transient_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/output_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+  };
+  const iree_hal_buffer_binding_table_t binding_table = {
+      /*count=*/IREE_ARRAYSIZE(bindings),
+      /*bindings=*/bindings,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_execute(
+        test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+        command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE);
+  }
+  const bool replay_parked =
+      iree_status_is_ok(status) && HostQueueHasPostDrainAction(queue);
+
+  uint64_t dealloca_signal_value = 1;
+  iree_hal_semaphore_t* dealloca_signal_ptr = dealloca_signal.get();
+  iree_hal_semaphore_list_t dealloca_wait_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  iree_hal_semaphore_list_t dealloca_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&dealloca_signal_ptr,
+      /*payload_values=*/&dealloca_signal_value,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_dealloca(
+        test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        dealloca_wait_list, dealloca_signal_list, transient_buffer,
+        IREE_HAL_DEALLOCA_FLAG_NONE);
+  }
+
+  iree_hsa_signal_store_screlease(IREE_LIBHSA(&libhsa_), blocker_signal, 0);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_wait(dealloca_signal, dealloca_signal_value,
+                                     iree_infinite_timeout(),
+                                     IREE_ASYNC_WAIT_FLAG_NONE);
+  }
+  IREE_EXPECT_OK(
+      iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), blocker_signal));
+
+  IREE_ASSERT_OK(status);
+  EXPECT_TRUE(replay_parked);
+
+  uint32_t actual = 0;
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(output_buffer, /*offset=*/0, &actual,
+                                          sizeof(actual)));
+  EXPECT_EQ(actual, expected);
 }
 
 TEST_F(HostQueueCommandBufferTest,

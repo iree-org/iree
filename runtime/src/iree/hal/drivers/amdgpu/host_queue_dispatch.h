@@ -32,7 +32,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -53,6 +53,23 @@ typedef struct iree_hal_amdgpu_host_queue_kernel_submission_t {
   iree_hal_amdgpu_reclaim_action_t pre_signal_action;
 } iree_hal_amdgpu_host_queue_kernel_submission_t;
 
+// One in-flight barrier-shaped packet submission assembled under
+// submission_mutex. Owns the generic notification/reclaim and AQL reservation
+// state for submissions that complete with a barrier or no-op packet and do not
+// require queue-owned kernarg storage.
+typedef struct iree_hal_amdgpu_host_queue_barrier_submission_t {
+  // Reclaim entry reserved from the notification ring for this submission.
+  iree_hal_amdgpu_reclaim_entry_t* reclaim_entry;
+  // Reclaim resource slots owned by |reclaim_entry|.
+  iree_hal_resource_t** reclaim_resources;
+  // First AQL packet id reserved for this submission.
+  uint64_t first_packet_id;
+  // Number of AQL packets reserved starting at |first_packet_id|.
+  uint32_t packet_count;
+  // Number of valid entries in |reclaim_resources|.
+  uint16_t reclaim_resource_count;
+} iree_hal_amdgpu_host_queue_barrier_submission_t;
+
 // One in-flight single-dispatch submission assembled under submission_mutex.
 // Operation implementations populate the dispatch packet and kernargs directly
 // while generic ownership and publication stay in |kernel|.
@@ -77,19 +94,6 @@ iree_status_t iree_hal_amdgpu_host_queue_count_reclaim_resources(
     iree_host_size_t operation_resource_count,
     uint16_t* out_reclaim_resource_count);
 
-// Begins one kernel-shaped packet submission by reserving notification/reclaim
-// state, AQL slots, and queue-owned kernarg blocks. |payload_packet_count|
-// packets will be written by the caller after any padding packets required to
-// keep kernarg-block and AQL-packet positions aligned. Caller must hold
-// submission_mutex.
-iree_status_t iree_hal_amdgpu_host_queue_begin_kernel_submission(
-    iree_hal_amdgpu_host_queue_t* queue,
-    const iree_hal_amdgpu_wait_resolution_t* resolution,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
-    uint32_t kernarg_block_count,
-    iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission);
-
 // Attempts to begin one kernel-shaped packet submission without waiting for
 // ring capacity. If temporary AQL/notification capacity is unavailable then
 // |out_ready| is set to false, no queue state is mutated, and OK is returned.
@@ -103,6 +107,40 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
     iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
     uint32_t kernarg_block_count, bool* out_ready,
     iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission);
+
+// Attempts to begin one barrier-shaped packet submission without waiting for
+// ring capacity. If temporary AQL/notification capacity is unavailable then
+// |out_ready| is set to false, no queue state is mutated, and OK is returned.
+// Any non-OK status is a structural failure rather than retry state.
+//
+// Caller must hold submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, bool* out_ready,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* out_submission);
+
+// Publishes a barrier-shaped packet submission. Caller must hold
+// submission_mutex.
+void iree_hal_amdgpu_host_queue_finish_barrier_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_amdgpu_reclaim_action_t pre_signal_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
+    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* submission);
+
+// Emits no-op packets for a barrier-shaped submission whose AQL slots were
+// reserved but whose payload could not be published. User signal semaphores are
+// not signaled.
+void iree_hal_amdgpu_host_queue_fail_barrier_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* submission);
 
 // Publishes the software side of a kernel-shaped packet submission: transfers
 // operation resources and an optional resource set to the reclaim entry,
@@ -134,14 +172,14 @@ void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
 
-// Begins one kernel-dispatch submission by reserving notification/reclaim
-// state, AQL slots, and |kernarg_block_count| queue-owned kernarg blocks.
-// Caller must hold submission_mutex.
-iree_status_t iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+// Attempts to begin one kernel-dispatch submission without waiting for ring
+// capacity. Caller must hold submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count, uint32_t kernarg_block_count,
+    bool* out_ready,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission);
 
 // Writes one final dispatch packet body into an AQL slot in forward field
@@ -174,13 +212,13 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     const void* kernargs, iree_host_size_t kernarg_length,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready);
 
-// Submits a barrier-only operation using the notification/reclaim path. If
-// |resource_set| is provided, ownership transfers to the reclaim entry on
-// success and the set is released after user-visible signals publish. Caller
-// must hold submission_mutex.
-iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
+// Attempts to submit a barrier-only operation without waiting for temporary
+// ring capacity. On not-ready, no queue state or ownership is mutated.
+// Caller must hold submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -189,7 +227,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
     void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags);
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready);
 
 #ifdef __cplusplus
 }  // extern "C"

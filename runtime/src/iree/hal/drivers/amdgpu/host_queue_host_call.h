@@ -24,7 +24,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_host_call_t call, const uint64_t args[4],
-    iree_hal_host_call_flags_t flags);
+    iree_hal_host_call_flags_t flags, bool* out_ready);
 
 #ifdef __cplusplus
 }  // extern "C"

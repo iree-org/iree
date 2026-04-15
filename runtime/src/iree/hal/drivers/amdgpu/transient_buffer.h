@@ -67,11 +67,14 @@ void iree_hal_amdgpu_transient_buffer_release_reservation(
     iree_hal_buffer_t* buffer, const iree_async_frontier_t* death_frontier);
 
 // Returns a backing buffer suitable for queue packet emission, or NULL if the
-// wrapper has no staged backing or has already been queued for deallocation.
+// wrapper has no staged backing.
 //
 // This is intentionally more permissive than map/flush/invalidate: queue packet
 // builders need the staged backing before user-visible alloca commit so
-// same-queue and cross-queue submissions can be chained by semaphore waits.
+// same-queue and cross-queue submissions can be chained by semaphore waits. The
+// same rule applies after a dealloca has been queued but before its decommit
+// action runs; HAL queue operations are semaphore-ordered, not
+// submission-order-ordered.
 iree_hal_buffer_t* iree_hal_amdgpu_transient_buffer_backing_buffer(
     iree_hal_buffer_t* buffer);
 

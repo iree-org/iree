@@ -66,6 +66,10 @@ typedef struct iree_hal_amdgpu_file_action_state_t {
   // Cloned signal list published by a final queue barrier after file I/O.
   iree_hal_semaphore_list_t signal_semaphore_list;
 
+  // Completion-thread retry queued when the final signal barrier is blocked by
+  // temporary queue capacity pressure.
+  iree_hal_amdgpu_host_queue_post_drain_action_t signal_capacity_retry;
+
   // Async read operation reused across partial completions.
   iree_async_file_read_operation_t read_op;
 
@@ -203,11 +207,23 @@ static void iree_hal_amdgpu_file_action_fail_with_borrowed_status(
                                iree_status_clone(status));
 }
 
+static iree_status_t iree_hal_amdgpu_file_action_clone_queue_error(
+    iree_hal_amdgpu_file_action_state_t* state) {
+  iree_status_t error = (iree_status_t)iree_atomic_load(
+      &state->queue->error_status, iree_memory_order_acquire);
+  return iree_status_is_ok(error) ? iree_ok_status() : iree_status_clone(error);
+}
+
+static void iree_hal_amdgpu_file_action_signal_capacity_post_drain(
+    void* user_data);
+
 static iree_status_t iree_hal_amdgpu_file_action_submit_signal_barrier(
     iree_hal_amdgpu_file_action_state_t* state) {
   if (iree_hal_semaphore_list_is_empty(state->signal_semaphore_list)) {
     return iree_ok_status();
   }
+
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_file_action_clone_queue_error(state));
 
   iree_hal_amdgpu_wait_resolution_t resolution;
   memset(&resolution, 0, sizeof(resolution));
@@ -215,15 +231,34 @@ static iree_status_t iree_hal_amdgpu_file_action_submit_signal_barrier(
   resolution.barrier_acquire_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
 
   iree_slim_mutex_lock(&state->queue->submission_mutex);
-  iree_status_t status = iree_hal_amdgpu_host_queue_submit_barrier(
+  bool ready = false;
+  iree_status_t status = iree_hal_amdgpu_host_queue_try_submit_barrier(
       state->queue, &resolution, state->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
       /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
       /*resource_set=*/NULL,
-      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+  if (iree_status_is_ok(status) && !ready) {
+    iree_hal_resource_retain(&state->resource);
+    iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+        state->queue, &state->signal_capacity_retry,
+        iree_hal_amdgpu_file_action_signal_capacity_post_drain, state);
+  }
   iree_slim_mutex_unlock(&state->queue->submission_mutex);
   return status;
+}
+
+static void iree_hal_amdgpu_file_action_signal_capacity_post_drain(
+    void* user_data) {
+  iree_hal_amdgpu_file_action_state_t* state =
+      (iree_hal_amdgpu_file_action_state_t*)user_data;
+  iree_status_t status =
+      iree_hal_amdgpu_file_action_submit_signal_barrier(state);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_semaphore_list_fail(state->signal_semaphore_list, status);
+  }
+  iree_hal_resource_release(&state->resource);
 }
 
 static void iree_hal_amdgpu_file_action_complete(
