@@ -191,7 +191,7 @@ func.func @scatter_dim_mismatch(
 func.func @scatter_mask_wrong_element_type(
     %update : tensor<4xf32>, %indices : tensor<4x1xi32>,
     %mask : tensor<4xi32>, %original : tensor<8xf32>) -> tensor<8xf32> {
-  // expected-error @below {{'iree_linalg_ext.scatter' op expected mask to have i1 element type}}
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected mask to have i1 or storage-legalized i8 element type}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%update, %indices, %mask : tensor<4xf32>, tensor<4x1xi32>, tensor<4xi32>)
     outs(%original : tensor<8xf32>) {

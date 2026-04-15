@@ -153,6 +153,11 @@ static AffineMap getLeadingDimsProjectionMap(MLIRContext *ctx, int64_t dimCount,
   return AffineMap::get(dimCount, /*symbolCount=*/0, exprs, ctx);
 }
 
+static bool isSupportedMaskElementType(Type type) {
+  auto intType = dyn_cast<IntegerType>(type);
+  return intType && (intType.getWidth() == 1 || intType.getWidth() == 8);
+}
+
 /// Helper function to verify both `scatter` and `gather`. Since both ops share
 /// the same semantics, we can use the same function to verify them. Note: this
 /// is written from the perspective of `scatter` op. For gather, `updateType`
@@ -231,8 +236,9 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
 
   if (Value mask = op.getMask()) {
     auto maskType = cast<ShapedType>(mask.getType());
-    if (!maskType.getElementType().isInteger(1)) {
-      return op->emitOpError("expected mask to have i1 element type");
+    if (!isSupportedMaskElementType(maskType.getElementType())) {
+      return op->emitOpError(
+          "expected mask to have i1 or storage-legalized i8 element type");
     }
     if (maskType.getRank() != static_cast<int64_t>(batchRank)) {
       return op->emitOpError("expected mask rank to match batch rank");

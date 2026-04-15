@@ -153,6 +153,25 @@ func.func @scatter_update_scalar_1D_masked(
 
 // -----
 
+func.func @scatter_update_scalar_1D_masked_i8(
+    %original: memref<8xi32>, %indices: memref<3x1xi32>,
+    %mask: memref<3xi8>, %updates: memref<3xi32>) {
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%updates, %indices, %mask : memref<3xi32>, memref<3x1xi32>, memref<3xi8>)
+    outs(%original : memref<8xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):
+    iree_linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func.func @scatter_update_scalar_1D_masked_i8
+// CHECK:         scf.for
+// CHECK:           %[[MASK_VAL:.+]] = memref.load %{{.+}}[%{{.+}}] : memref<3xi8>
+// CHECK:           %[[MASK_I1:.+]] = arith.trunci %[[MASK_VAL]] : i8 to i1
+// CHECK:           scf.if %[[MASK_I1]] {
+
+// -----
+
 func.func @scatter_batch_2D(
     %original: memref<8xi32>, %indices: memref<1x3x1xi32>,
     %updates: memref<1x3xi32>) {
@@ -1055,6 +1074,22 @@ func.func @gather_1d_indices_masked(%arg0 : memref<10x10xi32>, %arg1 : memref<1x
 // CHECK:             scf.if %[[MASK_VAL]] {
 // CHECK:               %[[LOAD:.+]] = memref.load %[[ARG0]][%[[CAST]], %[[J]]] : memref<10x10xi32>
 // CHECK:               memref.store %[[LOAD]], %[[ARG3]][%[[I]], %[[J]]] : memref<1x10xi32>
+
+// -----
+
+func.func @gather_1d_indices_masked_i8(%arg0 : memref<10x10xi32>, %arg1 : memref<1xi32>, %arg2 : memref<1xi8>, %arg3 : memref<1x10xi32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%arg0, %arg1, %arg2 : memref<10x10xi32>, memref<1xi32>, memref<1xi8>)
+    outs(%arg3: memref<1x10xi32>)
+  return
+}
+// CHECK-LABEL: func @gather_1d_indices_masked_i8
+// CHECK:         scf.for
+// CHECK:           scf.for
+// CHECK:             %[[MASK_VAL:.+]] = memref.load %{{.+}}[%{{.+}}] : memref<1xi8>
+// CHECK:             %[[MASK_I1:.+]] = arith.trunci %[[MASK_VAL]] : i8 to i1
+// CHECK:             scf.if %[[MASK_I1]] {
 
 // -----
 

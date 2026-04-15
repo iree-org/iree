@@ -77,6 +77,14 @@ static int64_t getRank(Value v) {
   return 0;
 }
 
+static Value normalizeMaskValue(OpBuilder &builder, Location loc, Value mask) {
+  auto intType = dyn_cast<IntegerType>(mask.getType());
+  if (!intType || intType.getWidth() == 1) {
+    return mask;
+  }
+  return arith::TruncIOp::create(builder, loc, builder.getI1Type(), mask);
+}
+
 /// Method similar to `LinalgOp`s that concatenates shapes of all operands.
 static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
@@ -339,6 +347,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   if (Value mask = getMask()) {
     SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
     Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
+    maskValue = normalizeMaskValue(b, loc, maskValue);
     scf::IfOp::create(b, loc, maskValue,
                       [&](OpBuilder &thenBuilder, Location thenLoc) {
                         emitScatterUpdate(thenBuilder, thenLoc);
@@ -515,6 +524,7 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
   if (Value mask = getMask()) {
     SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
     Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
+    maskValue = normalizeMaskValue(b, loc, maskValue);
     scf::IfOp::create(b, loc, maskValue,
                       [&](OpBuilder &thenBuilder, Location thenLoc) {
                         emitGatherStore(thenBuilder, thenLoc);

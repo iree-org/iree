@@ -89,10 +89,10 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     `update` gets scattered to.
     Where `rank(original) = rank(update_slice) + index_depth`
 
-    If the optional operand `mask` is present, it must have `i1` element type
-    and shape equal to the batch shape. A `false` mask value suppresses the
-    corresponding scatter update, leaving `original` unchanged for that batch
-    element.
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding scatter
+    update, leaving `original` unchanged for that batch element.
 
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
@@ -203,10 +203,10 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
     semantics.
 
-    If the optional operand `mask` is present, it must have `i1` element type
-    and shape equal to the batch shape. A `false` mask value suppresses the
-    corresponding gather update, leaving `output` unchanged for that batch
-    element.
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding gather
+    update, leaving `output` unchanged for that batch element.
   }];
   let arguments = (ins
       AnyRankedTensorOrMemRef:$source,

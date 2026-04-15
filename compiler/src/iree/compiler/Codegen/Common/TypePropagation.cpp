@@ -374,15 +374,19 @@ struct IREELinalgExtScatterTypePropagation
                   ConversionPatternRewriter &rewriter) const final {
     Type inputType = scatterOp.getUpdates().getType();
     Type legalizedInputType = this->getTypeConverter()->convertType(inputType);
-
-    if (inputType == legalizedInputType) {
-      return scatterOp.emitOpError(
-          "unexpected all types legal within conversion pattern");
-    }
-
+    Type maskType =
+        scatterOp.getMask() ? scatterOp.getMask().getType() : Type();
+    Type legalizedMaskType =
+        maskType ? this->getTypeConverter()->convertType(maskType) : Type();
     Type resultType = scatterOp.getOriginal().getType();
     Type legalizedResultType =
         this->getTypeConverter()->convertType(resultType);
+
+    if (inputType == legalizedInputType && maskType == legalizedMaskType &&
+        resultType == legalizedResultType) {
+      return scatterOp.emitOpError(
+          "unexpected all types legal within conversion pattern");
+    }
 
     // Create a clone of the operation without cloning its regions.
     auto modifiedOp =
