@@ -226,81 +226,6 @@ uint16_t iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
   return dispatch_packet_template->setup;
 }
 
-iree_status_t iree_hal_amdgpu_host_queue_begin_kernel_submission(
-    iree_hal_amdgpu_host_queue_t* queue,
-    const iree_hal_amdgpu_wait_resolution_t* resolution,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t operation_resource_count, uint32_t payload_packet_count,
-    uint32_t kernarg_block_count,
-    iree_hal_amdgpu_host_queue_kernel_submission_t* out_submission) {
-  IREE_ASSERT_ARGUMENT(queue);
-  IREE_ASSERT_ARGUMENT(resolution);
-  IREE_ASSERT_ARGUMENT(out_submission);
-  memset(out_submission, 0, sizeof(*out_submission));
-
-  if (IREE_UNLIKELY(payload_packet_count == 0 || kernarg_block_count == 0)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "kernel submission requires at least one payload "
-                            "packet and one kernarg block");
-  }
-  if (IREE_UNLIKELY(kernarg_block_count < payload_packet_count)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "kernel submission requires at least as many "
-                            "kernarg blocks as payload packets");
-  }
-
-  const uint64_t packet_count =
-      (uint64_t)resolution->barrier_count + kernarg_block_count;
-  const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
-  if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
-                    packet_count > UINT32_MAX)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "kernel submission requires %" PRIu64
-        " AQL packets (%u barriers + %u kernarg blocks) but queue capacity is "
-        "%" PRIu64,
-        packet_count, resolution->barrier_count, kernarg_block_count,
-        aql_queue_capacity);
-  }
-
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
-      signal_semaphore_list.count, operation_resource_count,
-      &out_submission->reclaim_resource_count));
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_notification_ring_reserve(
-      &queue->notification_ring, signal_semaphore_list.count,
-      iree_hal_amdgpu_host_queue_count_frontier_snapshots(
-          queue, signal_semaphore_list)));
-
-  out_submission->reclaim_entry =
-      iree_hal_amdgpu_notification_ring_reclaim_entry(
-          &queue->notification_ring);
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_reclaim_entry_prepare(
-      out_submission->reclaim_entry, queue->block_pool,
-      out_submission->reclaim_resource_count,
-      &out_submission->reclaim_resources));
-
-  out_submission->packet_count = (uint32_t)packet_count;
-  out_submission->payload_packet_count = payload_packet_count;
-  out_submission->first_packet_id = iree_hal_amdgpu_aql_ring_reserve(
-      &queue->aql_ring, out_submission->packet_count);
-  out_submission->kernarg_blocks = iree_hal_amdgpu_kernarg_ring_allocate(
-      &queue->kernarg_ring, kernarg_block_count,
-      &out_submission->kernarg_write_position);
-  if (IREE_UNLIKELY(!out_submission->kernarg_blocks)) {
-    iree_hal_amdgpu_host_queue_emit_noop_packets(
-        queue, out_submission->first_packet_id, out_submission->packet_count);
-    iree_hal_amdgpu_reclaim_entry_release(out_submission->reclaim_entry,
-                                          queue->block_pool);
-    memset(out_submission, 0, sizeof(*out_submission));
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "kernarg ring allocation failed after AQL reservation; queue sizing "
-        "invariant was violated");
-  }
-
-  return iree_ok_status();
-}
-
 iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
@@ -403,6 +328,86 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
   return status;
 }
 
+static uint32_t iree_hal_amdgpu_host_queue_barrier_packet_count(
+    const iree_hal_amdgpu_wait_resolution_t* resolution) {
+  return resolution->barrier_count > 0 ? resolution->barrier_count : 1u;
+}
+
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, bool* out_ready,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* out_submission) {
+  IREE_ASSERT_ARGUMENT(queue);
+  IREE_ASSERT_ARGUMENT(resolution);
+  IREE_ASSERT_ARGUMENT(out_ready);
+  IREE_ASSERT_ARGUMENT(out_submission);
+  *out_ready = false;
+  memset(out_submission, 0, sizeof(*out_submission));
+
+  if (IREE_UNLIKELY(queue->is_shutting_down)) {
+    return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
+  }
+
+  const uint64_t packet_count =
+      iree_hal_amdgpu_host_queue_barrier_packet_count(resolution);
+  const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
+  if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
+                    packet_count > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "barrier submission requires %" PRIu64
+        " AQL packets (%u wait barriers) but queue capacity is %" PRIu64,
+        packet_count, resolution->barrier_count, aql_queue_capacity);
+  }
+  if (IREE_UNLIKELY(signal_semaphore_list.count >
+                    queue->notification_ring.capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "barrier submission requires %" PRIhsz
+                            " notification entries but ring capacity is %u",
+                            signal_semaphore_list.count,
+                            queue->notification_ring.capacity);
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
+      signal_semaphore_list.count, operation_resource_count,
+      &out_submission->reclaim_resource_count));
+
+  const iree_host_size_t frontier_snapshot_count =
+      iree_hal_amdgpu_host_queue_count_frontier_snapshots(
+          queue, signal_semaphore_list);
+  if (!iree_hal_amdgpu_notification_ring_can_reserve(
+          &queue->notification_ring, signal_semaphore_list.count,
+          frontier_snapshot_count)) {
+    return iree_ok_status();
+  }
+
+  uint64_t first_packet_id = 0;
+  if (!iree_hal_amdgpu_aql_ring_try_reserve(
+          &queue->aql_ring, (uint32_t)packet_count, &first_packet_id)) {
+    return iree_ok_status();
+  }
+
+  out_submission->reclaim_entry =
+      iree_hal_amdgpu_notification_ring_reclaim_entry(
+          &queue->notification_ring);
+  iree_status_t status = iree_hal_amdgpu_reclaim_entry_prepare(
+      out_submission->reclaim_entry, queue->block_pool,
+      out_submission->reclaim_resource_count,
+      &out_submission->reclaim_resources);
+  if (iree_status_is_ok(status)) {
+    out_submission->packet_count = (uint32_t)packet_count;
+    out_submission->first_packet_id = first_packet_id;
+    *out_ready = true;
+  } else {
+    iree_hal_amdgpu_host_queue_emit_noop_packets(queue, first_packet_id,
+                                                 (uint32_t)packet_count);
+    memset(out_submission, 0, sizeof(*out_submission));
+  }
+  return status;
+}
+
 void iree_hal_amdgpu_host_queue_fail_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_host_queue_kernel_submission_t* submission) {
@@ -429,23 +434,27 @@ void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
   }
 }
 
-iree_status_t iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count, uint32_t kernarg_block_count,
+    bool* out_ready,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission) {
+  IREE_ASSERT_ARGUMENT(out_ready);
   IREE_ASSERT_ARGUMENT(out_submission);
   memset(out_submission, 0, sizeof(*out_submission));
 
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_kernel_submission(
+  iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      /*payload_packet_count=*/1, kernarg_block_count,
-      &out_submission->kernel));
-  out_submission->dispatch_slot = iree_hal_amdgpu_aql_ring_packet(
-      &queue->aql_ring, out_submission->kernel.first_packet_id +
-                            out_submission->kernel.packet_count - 1);
-  return iree_ok_status();
+      /*payload_packet_count=*/1, kernarg_block_count, out_ready,
+      &out_submission->kernel);
+  if (iree_status_is_ok(status) && *out_ready) {
+    out_submission->dispatch_slot = iree_hal_amdgpu_aql_ring_packet(
+        &queue->aql_ring, out_submission->kernel.first_packet_id +
+                              out_submission->kernel.packet_count - 1);
+  }
+  return status;
 }
 
 // Commits the signal/frontier side of an AQL submission. Called after all
@@ -627,17 +636,22 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     const void* kernargs, iree_host_size_t kernarg_length,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
   IREE_ASSERT_ARGUMENT(queue);
   IREE_ASSERT_ARGUMENT(resolution);
   IREE_ASSERT_ARGUMENT(dispatch_packet_template);
   IREE_ASSERT_ARGUMENT(kernargs);
+  IREE_ASSERT_ARGUMENT(out_ready);
   IREE_ASSERT_LE(kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
+  *out_ready = false;
 
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      /*kernarg_block_count=*/1, &submission));
+      /*kernarg_block_count=*/1, out_ready, &submission));
+  if (!*out_ready) return iree_ok_status();
+
   memcpy(submission.kernel.kernarg_blocks->data, kernargs, kernarg_length);
   submission.dispatch_setup =
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
@@ -651,7 +665,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
+void iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -660,52 +674,23 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
     void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* submission) {
   IREE_ASSERT_ARGUMENT(queue);
   IREE_ASSERT_ARGUMENT(resolution);
+  IREE_ASSERT_ARGUMENT(submission);
   const bool retain_submission_resources = iree_any_bit_set(
       submission_flags,
       IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
 
-  if (IREE_UNLIKELY(queue->is_shutting_down)) {
-    return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
-  }
-
   const bool complete_with_wait_barrier = resolution->barrier_count > 0;
-  const uint64_t packet_count =
-      complete_with_wait_barrier ? (uint64_t)resolution->barrier_count : 1ull;
-  const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
-  if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
-                    packet_count > UINT32_MAX)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "barrier submission requires %" PRIu64
-        " AQL packets (%u wait barriers) but queue capacity is %" PRIu64,
-        packet_count, resolution->barrier_count, aql_queue_capacity);
-  }
-
-  uint16_t reclaim_resource_count = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
-      signal_semaphore_list.count, operation_resource_count,
-      &reclaim_resource_count));
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_notification_ring_reserve(
-      &queue->notification_ring, signal_semaphore_list.count,
-      iree_hal_amdgpu_host_queue_count_frontier_snapshots(
-          queue, signal_semaphore_list)));
-
-  iree_hal_amdgpu_reclaim_entry_t* reclaim_entry =
-      iree_hal_amdgpu_notification_ring_reclaim_entry(
-          &queue->notification_ring);
-  iree_hal_resource_t** reclaim_resources = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_reclaim_entry_prepare(
-      reclaim_entry, queue->block_pool, reclaim_resource_count,
-      &reclaim_resources));
+  iree_hal_amdgpu_reclaim_entry_t* reclaim_entry = submission->reclaim_entry;
+  iree_hal_resource_t** reclaim_resources = submission->reclaim_resources;
   reclaim_entry->pre_signal_action = pre_signal_action;
   reclaim_entry->resource_set = resource_set;
 
-  const uint32_t aql_packet_count = (uint32_t)packet_count;
-  const uint64_t first_packet_id =
-      iree_hal_amdgpu_aql_ring_reserve(&queue->aql_ring, aql_packet_count);
+  const uint32_t aql_packet_count = submission->packet_count;
+  const uint64_t first_packet_id = submission->first_packet_id;
 
   uint16_t completion_header = 0;
   uint16_t completion_setup = 0;
@@ -744,7 +729,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
   }
   reclaim_entry->kernarg_write_position = (uint64_t)iree_atomic_load(
       &queue->kernarg_ring.write_position, iree_memory_order_relaxed);
-  reclaim_entry->count = reclaim_resource_count;
+  reclaim_entry->count = submission->reclaim_resource_count;
 
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
   iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
@@ -776,5 +761,42 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_barrier(
                                   completion_setup);
   iree_hal_amdgpu_aql_ring_doorbell(&queue->aql_ring,
                                     first_packet_id + aql_packet_count - 1);
+  memset(submission, 0, sizeof(*submission));
+}
+
+void iree_hal_amdgpu_host_queue_fail_barrier_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_barrier_submission_t* submission) {
+  iree_hal_amdgpu_host_queue_emit_noop_packets(
+      queue, submission->first_packet_id, submission->packet_count);
+  iree_hal_amdgpu_reclaim_entry_release(submission->reclaim_entry,
+                                        queue->block_pool);
+  memset(submission, 0, sizeof(*submission));
+}
+
+iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_amdgpu_reclaim_action_t pre_signal_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
+    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
+  IREE_ASSERT_ARGUMENT(out_ready);
+  *out_ready = false;
+
+  iree_hal_amdgpu_host_queue_barrier_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
+      queue, resolution, signal_semaphore_list, operation_resource_count,
+      out_ready, &submission));
+  if (!*out_ready) return iree_ok_status();
+
+  iree_hal_amdgpu_host_queue_finish_barrier_submission(
+      queue, resolution, signal_semaphore_list, pre_signal_action,
+      operation_resources, operation_resource_count, post_commit_fn,
+      post_commit_user_data, resource_set, submission_flags, &submission);
   return iree_ok_status();
 }

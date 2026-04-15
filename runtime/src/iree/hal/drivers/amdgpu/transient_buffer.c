@@ -27,8 +27,9 @@ typedef struct iree_hal_amdgpu_transient_buffer_t {
   iree_hal_pool_reservation_t reservation;
   iree_atomic_int32_t reservation_armed;
 
-  // Once set, no future queue packet emission or host map path may treat the
-  // staged/committed backing as valid.
+  // Set when one dealloca has been accepted for this wrapper. This is
+  // single-owner bookkeeping for reservation release/decommit, not a queue-use
+  // lifetime validator; queue operation order is expressed by semaphores.
   iree_atomic_int32_t dealloca_queued;
 } iree_hal_amdgpu_transient_buffer_t;
 
@@ -185,9 +186,6 @@ iree_hal_buffer_t* iree_hal_amdgpu_transient_buffer_backing_buffer(
   IREE_ASSERT_ARGUMENT(base_buffer);
   iree_hal_amdgpu_transient_buffer_t* buffer =
       iree_hal_amdgpu_transient_buffer_cast(base_buffer);
-  if (iree_atomic_load(&buffer->dealloca_queued, iree_memory_order_acquire)) {
-    return NULL;
-  }
   return buffer->staged_backing;
 }
 

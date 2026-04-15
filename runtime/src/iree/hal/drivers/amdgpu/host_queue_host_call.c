@@ -188,7 +188,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_host_call_t call, const uint64_t args[4],
-    iree_hal_host_call_flags_t flags) {
+    iree_hal_host_call_flags_t flags, bool* out_ready) {
+  IREE_ASSERT_ARGUMENT(out_ready);
+  *out_ready = false;
   if (IREE_UNLIKELY(queue->is_shutting_down)) {
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
@@ -214,16 +216,24 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
   iree_hal_resource_t* operation_resources[1] = {
       &state->resource,
   };
-  iree_status_t status = iree_hal_amdgpu_host_queue_submit_barrier(
-      queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
-      (iree_hal_amdgpu_reclaim_action_t){
-          .fn = iree_hal_amdgpu_host_call_execute,
-          .user_data = state,
-      },
-      operation_resources, IREE_ARRAYSIZE(operation_resources),
-      /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
-      /*resource_set=*/NULL, IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE);
-  if (!iree_status_is_ok(status)) {
+  iree_hal_amdgpu_host_queue_barrier_submission_t submission;
+  iree_status_t status =
+      iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
+          queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
+          IREE_ARRAYSIZE(operation_resources), out_ready, &submission);
+  if (iree_status_is_ok(status) && *out_ready) {
+    iree_hal_amdgpu_host_queue_finish_barrier_submission(
+        queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
+        (iree_hal_amdgpu_reclaim_action_t){
+            .fn = iree_hal_amdgpu_host_call_execute,
+            .user_data = state,
+        },
+        operation_resources, IREE_ARRAYSIZE(operation_resources),
+        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        /*resource_set=*/NULL, IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE,
+        &submission);
+  }
+  if (!iree_status_is_ok(status) || !*out_ready) {
     iree_hal_resource_release(&state->resource);
   }
   return status;

@@ -1233,10 +1233,17 @@ class QueueBenchmark : public benchmark::Fixture {
           (iree_hal_resource_t*)target_buffer_,
       };
       iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
-      status = iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+      bool ready = false;
+      status = iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
           host_queue, &resolution, signal_semaphore_list,
           IREE_ARRAYSIZE(operation_resources),
-          pre_resolved_dispatch_kernarg_block_count_, &submission);
+          pre_resolved_dispatch_kernarg_block_count_, &ready, &submission);
+      if (iree_status_is_ok(status) && !ready) {
+        status = iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "pre-resolved dispatch benchmark path hit temporary queue "
+            "capacity");
+      }
       if (iree_status_is_ok(status)) {
         std::memcpy(submission.kernel.kernarg_blocks->data,
                     pre_resolved_dispatch_kernargs_,

@@ -424,11 +424,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     const uint64_t* binding_ptrs,
     iree_hal_resource_t* const* operation_resources,
     bool uses_custom_direct_arguments,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_dispatch_submission(
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, plan->operation_resource_count,
-      plan->kernarg_block_count, &submission));
+      plan->kernarg_block_count, out_ready, &submission));
+  if (!*out_ready) return iree_ok_status();
 
   if (uses_custom_direct_arguments) {
     iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
@@ -463,14 +465,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     const uint64_t* binding_ptrs, uint64_t workgroup_count_ptr,
     iree_hal_resource_t* const* operation_resources,
     bool uses_custom_direct_arguments,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
   const uint32_t target_kernarg_block_count = plan->kernarg_block_count;
   const uint32_t patch_kernarg_block_count = 1;
   iree_hal_amdgpu_host_queue_kernel_submission_t submission;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_begin_kernel_submission(
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       queue, resolution, signal_semaphore_list, plan->operation_resource_count,
       /*payload_packet_count=*/2,
-      patch_kernarg_block_count + target_kernarg_block_count, &submission));
+      patch_kernarg_block_count + target_kernarg_block_count, out_ready,
+      &submission));
+  if (!*out_ready) return iree_ok_status();
 
   const uint32_t extra_noop_packet_count = target_kernarg_block_count - 1;
   iree_hal_amdgpu_aql_packet_t* patch_packet = iree_hal_amdgpu_aql_ring_packet(
@@ -551,7 +556,10 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
-    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags) {
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
+  IREE_ASSERT_ARGUMENT(out_ready);
+  *out_ready = false;
   if (IREE_UNLIKELY(queue->is_shutting_down)) {
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
@@ -586,12 +594,12 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
       status = iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
           queue, resolution, signal_semaphore_list, &plan, config, constants,
           binding_ptrs, workgroup_count_ptr, operation_resources,
-          uses_custom_direct_arguments, submission_flags);
+          uses_custom_direct_arguments, submission_flags, out_ready);
     } else {
       status = iree_hal_amdgpu_host_queue_submit_direct_dispatch(
           queue, resolution, signal_semaphore_list, &plan, config, constants,
           binding_ptrs, operation_resources, uses_custom_direct_arguments,
-          submission_flags);
+          submission_flags, out_ready);
     }
   }
 

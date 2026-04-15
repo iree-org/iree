@@ -558,6 +558,9 @@ struct iree_hal_amdgpu_staging_transfer_t {
   iree_status_t failure_status;
   // Waiter queued when all staging slots are temporarily unavailable.
   iree_hal_amdgpu_staging_pool_waiter_t slot_waiter;
+  // Completion-thread retry queued when the final signal barrier is blocked by
+  // temporary queue capacity pressure.
+  iree_hal_amdgpu_host_queue_post_drain_action_t signal_capacity_retry;
   // Cloned signal list published after the transfer completes.
   iree_hal_semaphore_list_t signal_semaphore_list;
   // Chunk records used to pipeline file I/O and GPU copies.
@@ -568,6 +571,8 @@ static void iree_hal_amdgpu_staging_transfer_pump(
     iree_hal_amdgpu_staging_transfer_t* transfer);
 
 static void iree_hal_amdgpu_staging_copy_post_drain(void* user_data);
+static void iree_hal_amdgpu_staging_copy_capacity_post_drain(void* user_data);
+static void iree_hal_amdgpu_staging_signal_capacity_post_drain(void* user_data);
 
 static void iree_hal_amdgpu_staging_transfer_destroy(
     iree_hal_resource_t* resource) {
@@ -625,13 +630,20 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_submit_signal_barrier(
   resolution.barrier_acquire_scope = IREE_HSA_FENCE_SCOPE_SYSTEM;
 
   iree_slim_mutex_lock(&transfer->queue->submission_mutex);
-  iree_status_t status = iree_hal_amdgpu_host_queue_submit_barrier(
+  bool ready = false;
+  iree_status_t status = iree_hal_amdgpu_host_queue_try_submit_barrier(
       transfer->queue, &resolution, transfer->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
       /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
       /*resource_set=*/NULL,
-      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+  if (iree_status_is_ok(status) && !ready) {
+    iree_hal_resource_retain(&transfer->resource);
+    iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+        transfer->queue, &transfer->signal_capacity_retry,
+        iree_hal_amdgpu_staging_signal_capacity_post_drain, transfer);
+  }
   iree_slim_mutex_unlock(&transfer->queue->submission_mutex);
   return status;
 }
@@ -663,6 +675,12 @@ static void iree_hal_amdgpu_staging_transfer_complete(
   }
   iree_hal_amdgpu_staging_transfer_fail_signals(transfer, status);
   iree_hal_resource_release(&transfer->resource);
+}
+
+static void iree_hal_amdgpu_staging_signal_capacity_post_drain(
+    void* user_data) {
+  iree_hal_amdgpu_staging_transfer_complete(
+      (iree_hal_amdgpu_staging_transfer_t*)user_data, iree_ok_status());
 }
 
 static void iree_hal_amdgpu_staging_transfer_try_finish(
@@ -783,6 +801,7 @@ static iree_status_t iree_hal_amdgpu_staging_chunk_submit_copy(
 
   iree_hal_resource_t* extra_resources[1] = {&transfer->resource};
   iree_slim_mutex_lock(&transfer->queue->submission_mutex);
+  bool ready = false;
   iree_status_t status = iree_hal_amdgpu_host_queue_submit_copy_with_action(
       transfer->queue, &resolution, iree_hal_semaphore_list_empty(),
       source_buffer, source_offset, target_buffer, target_offset, chunk->length,
@@ -792,7 +811,13 @@ static iree_status_t iree_hal_amdgpu_staging_chunk_submit_copy(
           .user_data = chunk,
       },
       extra_resources, IREE_ARRAYSIZE(extra_resources),
-      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES);
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+  if (iree_status_is_ok(status) && !ready) {
+    iree_hal_resource_retain(&transfer->resource);
+    iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
+        transfer->queue, &chunk->post_drain_action,
+        iree_hal_amdgpu_staging_copy_capacity_post_drain, chunk);
+  }
   iree_slim_mutex_unlock(&transfer->queue->submission_mutex);
   return status;
 }
@@ -935,6 +960,16 @@ static void iree_hal_amdgpu_staging_copy_post_drain(void* user_data) {
     iree_hal_amdgpu_staging_chunk_fail(chunk, status);
   } else {
     iree_hal_amdgpu_staging_chunk_finish(chunk, /*did_transfer_bytes=*/true);
+  }
+  iree_hal_resource_release(&chunk->transfer->resource);
+}
+
+static void iree_hal_amdgpu_staging_copy_capacity_post_drain(void* user_data) {
+  iree_hal_amdgpu_staging_chunk_t* chunk =
+      (iree_hal_amdgpu_staging_chunk_t*)user_data;
+  iree_status_t status = iree_hal_amdgpu_staging_chunk_submit_copy(chunk);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_amdgpu_staging_chunk_fail(chunk, status);
   }
   iree_hal_resource_release(&chunk->transfer->resource);
 }
