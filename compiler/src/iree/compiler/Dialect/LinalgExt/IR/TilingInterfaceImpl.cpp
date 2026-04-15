@@ -1752,14 +1752,83 @@ FailureOr<TilingResult>
 TopkV2Op::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
-  return failure();
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  int64_t kDim = getDimension();
+  Value outputValues = getOutputValues();
+  Value outputIndices = getOutputIndices();
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return {};
+  }
+
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> slices;
+
+  // Input values.
+  Operation *valuesSlice =
+      getSlice(builder, loc, getValues(), offsets, sizes, strides);
+  tiledOperands.emplace_back(valuesSlice->getResult(0));
+  slices.push_back(valuesSlice);
+
+  // Optional input indices.
+  Value inputIndices = getInputIndices();
+  if (inputIndices) {
+    Operation *indicesSlice =
+        getSlice(builder, loc, inputIndices, offsets, sizes, strides);
+    tiledOperands.emplace_back(indicesSlice->getResult(0));
+    slices.push_back(indicesSlice);
+  }
+
+  // Replace the tile size for the K dimension to use the output size instead of
+  // the input size.
+  Value kSize = getDimValue(builder, loc, outputValues, kDim);
+  outputSizes[kDim] = getAsOpFoldResult(kSize);
+
+  // Output values.
+  Operation *outputValuesSlice =
+      getSlice(builder, loc, outputValues, outputOffsets, outputSizes, strides);
+  tiledOperands.emplace_back(outputValuesSlice->getResult(0));
+  slices.push_back(outputValuesSlice);
+
+  // Optional output indices.
+  Operation *outputIndicesSlice = nullptr;
+  if (outputIndices) {
+    outputIndicesSlice = getSlice(builder, loc, outputIndices, outputOffsets,
+                                  outputSizes, strides);
+    tiledOperands.emplace_back(outputIndicesSlice->getResult(0));
+    slices.push_back(outputIndicesSlice);
+  }
+
+  SmallVector<Type, 2> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValuesSlice->getResult(0).getType());
+    if (outputIndicesSlice) {
+      resultTypes.push_back(outputIndicesSlice->getResult(0).getType());
+    }
+  }
+
+  Operation *tiledTopkV2Op =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  return TilingResult{
+      {tiledTopkV2Op}, SmallVector<Value>(tiledTopkV2Op->getResults()), slices};
 }
 
 LogicalResult TopkV2Op::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  return failure();
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
+                            getDimension());
+  resultSizes[getDimension()] = getAsOpFoldResult(kSize);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
