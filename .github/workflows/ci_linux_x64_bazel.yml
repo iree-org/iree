@@ -40,7 +40,7 @@ jobs:
           python3 -m pip install azure-storage-blob
       - name: Restore Bazel disk cache
         run: |
-          # wget https://ireebuildcache.blob.core.windows.net/ccache-container/bazel-disk-cache.tar.gz -O /tmp/cache.tar.gz
+          wget https://ireebuildcache.blob.core.windows.net/ccache-container/bazel-disk-cache.tar.gz -O /tmp/cache.tar.gz
           mkdir -p "${BAZEL_DISK_CACHE_DIR}"
           if [ -f /tmp/cache.tar.gz ]; then
             tar -xzf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}"
@@ -68,7 +68,7 @@ jobs:
           # bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc shutdown
 
       - name: Save Bazel disk cache
-        if: always()
+        if: always() && github.ref == 'refs/heads/main'
         run: |
 
           # Prune cache to ~10G using LRU (oldest access time first).
