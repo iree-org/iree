@@ -1013,6 +1013,44 @@ struct FoldOnlineAttentionWithProducerReshapeByExpansion final
   linalg::ControlFusionFn controlFoldingReshapes;
 };
 
+struct FoldOnlineAttentionWithConsumerReshapeByExpansion final
+    : OpRewritePattern<tensor::ExpandShapeOp> {
+  FoldOnlineAttentionWithConsumerReshapeByExpansion(
+      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
+      PatternBenefit benefit = 1)
+      : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
+        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto producerResult = dyn_cast<OpResult>(expandOp.getSrc());
+    if (!producerResult) {
+      return rewriter.notifyMatchFailure(expandOp,
+                                         "source not produced by an operation");
+    }
+
+    auto op = expandOp.getSrc().getDefiningOp<OnlineAttentionOp>();
+    if (!op || !op.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    if (!controlFoldingReshapes(&expandOp.getSrcMutable())) {
+      return failure();
+    }
+
+    std::optional<SmallVector<Value>> replacementValues =
+        fuseOnlineAttentionWithProducerReshapeByExpansion(
+            op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
+    if (!replacementValues) {
+      return failure();
+    }
+    rewriter.replaceOp(op, *replacementValues);
+    return success();
+  }
+
+  linalg::ControlFusionFn controlFoldingReshapes;
+};
+
 template <typename OpTy>
 struct FoldWithConsumerReshapeByExpansion final
     : OpRewritePattern<tensor::ExpandShapeOp> {
@@ -1242,6 +1280,7 @@ void populateFoldReshapeOpsByExpansionPatterns(
     const linalg::ControlFusionFn &controlFoldingReshapes) {
   patterns.add<FoldWithProducerReshapeByExpansion<AttentionOp>,
                FoldOnlineAttentionWithProducerReshapeByExpansion,
+               FoldOnlineAttentionWithConsumerReshapeByExpansion,
                FoldWithConsumerReshapeByExpansion<AttentionOp>,
                FoldWithProducerReshapeByExpansion<ScatterOp>,
                FoldWithConsumerReshapeByExpansion<ScatterOp>,
