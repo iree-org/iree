@@ -1811,6 +1811,18 @@ static Value createConstSparseIndex(OpBuilder &builder, Location loc,
   return vector::InsertOp::create(builder, loc, selector, zero, 0);
 }
 
+// Returns the number of native intrinsics chained along K per virtual
+// intrinsic.
+//
+// For VDMFMA this matches the trailing `x<U>` suffix in the
+// intrinsic name (e.g. `VDMFMA_F32_8x16x64x2_F16` -> 2,
+// `VDMFMA_F32_8x16x64x1_F16` -> 1), such that `nativeK * U` covers the
+// semantic K in the `MxNxK` triple of the name.
+//
+// On gfx942 (CDNA3), the native smfmac K-depth is narrower, so 2 intrinsics
+// are chained per virtual intrinsic to cover the semantic K (-> `x2`
+// variants). On gfx950 (CDNA4), the native smfmac K-depth is doubled, so a
+// single intrinsic already covers it (-> `x1` variants).
 int64_t VirtualMMAAttr::getIntrinsicsK() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
