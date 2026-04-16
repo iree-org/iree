@@ -26,6 +26,32 @@ iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
     iree_hal_execute_flags_t execute_flags,
     iree_hal_resource_set_t** out_resource_set);
 
+#if !defined(NDEBUG)
+typedef struct iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t {
+  // Total payload packets represented by the summarized block.
+  uint32_t packet_count;
+  // Payload packets with the AQL BARRIER bit set.
+  uint32_t barrier_packet_count;
+  // Payload packets with SYSTEM acquire scope.
+  uint32_t system_acquire_packet_count;
+  // Payload packets with SYSTEM release scope.
+  uint32_t system_release_packet_count;
+  // Header word for the first payload packet, or 0 for empty blocks.
+  uint16_t first_packet_header;
+  // Header word for the last payload packet, or 0 for empty blocks.
+  uint16_t last_packet_header;
+} iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t;
+
+// Summarizes the AQL payload packet headers a command-buffer block would emit.
+// This is a debug/test helper and does not replay packet bodies or touch rings.
+iree_status_t iree_hal_amdgpu_host_queue_summarize_command_buffer_block_packets(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t* out_summary);
+#endif  // !defined(NDEBUG)
+
 // Replays an AMDGPU AQL command buffer program onto the host queue.
 // Caller must hold submission_mutex.
 iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(

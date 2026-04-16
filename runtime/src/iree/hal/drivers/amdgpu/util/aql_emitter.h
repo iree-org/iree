@@ -17,13 +17,12 @@
 // All emitters zero reserved fields to prevent undefined behavior from stale
 // ring data.
 //
-// Current host-queue policy sets the BARRIER bit on every packet so one AQL
-// queue behaves as a single in-order dependency chain. That is intentionally
-// stronger than HAL queue semantics, where user-visible ordering is expressed
-// by semaphore signal->wait edges, not queue submission order. If packet
-// barrier bits become conditional for independent HIP streams, the same-queue
-// wait-elision/frontier logic in host_queue.c must be updated to materialize
-// the required AQL dependency edges explicitly.
+// Direct host-queue submissions currently set the BARRIER bit on every packet
+// so one AQL queue behaves as a single in-order dependency chain.
+// Command-buffer replay is more precise: it sets the BARRIER bit only at
+// wait-prefix, execution-barrier, and final-completion boundaries. HAL queue
+// submission order alone is not user-visible ordering; semaphore signal->wait
+// edges define the visible DAG.
 //
 // Submission ordering contract (from kernarg_ring.h):
 //   1. Reserve AQL ring slots (backpressure gate)
@@ -60,16 +59,25 @@ typedef struct iree_hal_amdgpu_aql_packet_control_t {
   iree_hsa_fence_scope_t release_fence_scope;
 } iree_hal_amdgpu_aql_packet_control_t;
 
+// Returns packet control with caller-selected barrier policy and scopes.
+static inline iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_aql_packet_control(bool has_barrier,
+                                   iree_hsa_fence_scope_t acquire_fence_scope,
+                                   iree_hsa_fence_scope_t release_fence_scope) {
+  iree_hal_amdgpu_aql_packet_control_t packet_control;
+  packet_control.has_barrier = has_barrier;
+  packet_control.acquire_fence_scope = acquire_fence_scope;
+  packet_control.release_fence_scope = release_fence_scope;
+  return packet_control;
+}
+
 // Returns packet control for a barrier packet with caller-selected scopes.
 static inline iree_hal_amdgpu_aql_packet_control_t
 iree_hal_amdgpu_aql_packet_control_barrier(
     iree_hsa_fence_scope_t acquire_fence_scope,
     iree_hsa_fence_scope_t release_fence_scope) {
-  iree_hal_amdgpu_aql_packet_control_t packet_control;
-  packet_control.has_barrier = true;
-  packet_control.acquire_fence_scope = acquire_fence_scope;
-  packet_control.release_fence_scope = release_fence_scope;
-  return packet_control;
+  return iree_hal_amdgpu_aql_packet_control(
+      /*has_barrier=*/true, acquire_fence_scope, release_fence_scope);
 }
 
 // Returns the current host-queue packet policy: barrier + system-scope fences.
