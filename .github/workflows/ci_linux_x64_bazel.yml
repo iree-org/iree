@@ -55,7 +55,7 @@ jobs:
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
           # Run shutdown before saving disk to cache, as it is optional depending on the branch.
-          bazel shutdown
+          bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc shutdown
 
       - name: Save Bazel disk cache
         if: always()
