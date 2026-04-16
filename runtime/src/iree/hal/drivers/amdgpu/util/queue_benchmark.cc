@@ -13,7 +13,9 @@
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/aql_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
@@ -1427,6 +1429,92 @@ class QueueBenchmark : public benchmark::Fixture {
                         "failed to record binding-count command buffer");
   }
 
+  iree_status_t RecordBindingCountDispatchChainCommandBuffer(
+      int64_t operation_count, int64_t binding_count,
+      iree_hal_command_buffer_t** out_command_buffer) {
+    *out_command_buffer = nullptr;
+    if (operation_count <= 0) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "operation count must be positive");
+    }
+
+    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    IREE_RETURN_IF_ERROR(
+        BindingCountExportOrdinal(binding_count, &export_ordinal));
+
+    iree_hal_command_buffer_t* command_buffer = nullptr;
+    iree_status_t status = iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+        IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*binding_capacity=*/0, &command_buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_begin(command_buffer);
+    }
+    for (int64_t i = 0; i < operation_count && iree_status_is_ok(status); ++i) {
+      status = iree_hal_command_buffer_dispatch(
+          command_buffer, binding_count_executable_, export_ordinal,
+          iree_hal_make_static_dispatch_config(1, 1, 1),
+          iree_const_byte_span_empty(),
+          BindingCountDispatchBindings(binding_count),
+          IREE_HAL_DISPATCH_FLAG_NONE);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_end(command_buffer);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_command_buffer = command_buffer;
+    } else {
+      iree_hal_command_buffer_release(command_buffer);
+    }
+    return status;
+  }
+
+  void SetCommandBufferProgramCounters(
+      benchmark::State& state, iree_hal_command_buffer_t* command_buffer,
+      int64_t operation_count, int64_t binding_count) {
+    const iree_hal_amdgpu_aql_program_t* program =
+        iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+    uint64_t payload_block_count = 0;
+    uint64_t total_aql_packet_count = 0;
+    uint64_t total_block_bytes = 0;
+    uint64_t total_used_bytes = 0;
+    for (const iree_hal_amdgpu_command_buffer_block_header_t* block =
+             program->first_block;
+         block; block = iree_hal_amdgpu_aql_program_block_next(
+                    program->block_pool, block)) {
+      const uint64_t binding_source_length =
+          (uint64_t)block->binding_source_count *
+          sizeof(iree_hal_amdgpu_command_buffer_binding_source_t);
+      const uint64_t used_bytes = block->header_length + block->command_length +
+                                  binding_source_length + block->rodata_length;
+      if (block->aql_packet_count > 0) ++payload_block_count;
+      total_aql_packet_count += block->aql_packet_count;
+      total_block_bytes += block->block_length;
+      total_used_bytes += used_bytes;
+    }
+
+    state.counters["operation_count"] = static_cast<double>(operation_count);
+    state.counters["binding_count"] = static_cast<double>(binding_count);
+    state.counters["command_buffer_blocks"] =
+        static_cast<double>(program->block_count);
+    state.counters["command_buffer_payload_blocks"] =
+        static_cast<double>(payload_block_count);
+    state.counters["command_buffer_block_bytes"] =
+        static_cast<double>(program->first_block->block_length);
+    state.counters["command_buffer_occupancy_pct"] =
+        total_block_bytes
+            ? 100.0 * (double)total_used_bytes / (double)total_block_bytes
+            : 0.0;
+    state.counters["aql_packets_per_sync"] =
+        static_cast<double>(total_aql_packet_count);
+    state.counters["max_block_aql_packets"] =
+        static_cast<double>(program->max_block_aql_packet_count);
+    state.counters["max_block_kernarg_bytes"] =
+        static_cast<double>(program->max_block_kernarg_length);
+    state.counters["queue_submissions_per_sync"] = 1.0;
+    state.SetItemsProcessed(state.iterations() * operation_count);
+  }
+
   iree_status_t BindingCountDispatchSubmitPublicFinalInline(
       int64_t binding_count, SubmittedCompletion* out_completion) {
     uint64_t completion_payload_value = ++completion_payload_value_;
@@ -1455,6 +1543,24 @@ class QueueBenchmark : public benchmark::Fixture {
     IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
         device_, kQueue0, iree_hal_semaphore_list_empty(),
         signal_semaphore_list, binding_count_command_buffers_[binding_count],
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
+    *out_completion = {completion_semaphore_, completion_payload_value};
+    return iree_ok_status();
+  }
+
+  iree_status_t BindingCountDispatchChainCommandBufferSubmitPublicFinalInline(
+      iree_hal_command_buffer_t* command_buffer,
+      SubmittedCompletion* out_completion) {
+    uint64_t completion_payload_value = ++completion_payload_value_;
+    iree_hal_semaphore_t* signal_semaphore = completion_semaphore_;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        /*count=*/1,
+        /*semaphores=*/&signal_semaphore,
+        /*payload_values=*/&completion_payload_value,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+        device_, kQueue0, iree_hal_semaphore_list_empty(),
+        signal_semaphore_list, command_buffer,
         iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
     *out_completion = {completion_semaphore_, completion_payload_value};
     return iree_ok_status();
@@ -2587,6 +2693,76 @@ BENCHMARK_DEFINE_F(
 }
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
+                   SameQueueCommandBufferDispatchChainStaticPublicFinalInline)(
+    benchmark::State& state) {
+  const int64_t operation_count = state.range(0);
+  const int64_t binding_count = state.range(1);
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, binding_count)) return;
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  if (!HandleStatus(state,
+                    RecordBindingCountDispatchChainCommandBuffer(
+                        operation_count, binding_count, &command_buffer),
+                    "failed to record command-buffer dispatch chain")) {
+    return;
+  }
+  for (auto _ : state) {
+    SubmittedCompletion completion;
+    if (!HandleStatus(
+            state,
+            BindingCountDispatchChainCommandBufferSubmitPublicFinalInline(
+                command_buffer, &completion),
+            "command-buffer dispatch chain submit failed")) {
+      break;
+    }
+    if (!HandleStatus(state,
+                      Wait(completion.semaphore, completion.payload_value),
+                      "command-buffer dispatch chain wait failed")) {
+      break;
+    }
+  }
+  SetCommandBufferProgramCounters(state, command_buffer, operation_count,
+                                  binding_count);
+  iree_hal_command_buffer_release(command_buffer);
+}
+
+BENCHMARK_DEFINE_F(
+    QueueBenchmark,
+    SameQueueCommandBufferDispatchChainStaticPublicFinalInlineSubmitOnly)(
+    benchmark::State& state) {
+  const int64_t operation_count = state.range(0);
+  const int64_t binding_count = state.range(1);
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, binding_count)) return;
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  if (!HandleStatus(state,
+                    RecordBindingCountDispatchChainCommandBuffer(
+                        operation_count, binding_count, &command_buffer),
+                    "failed to record command-buffer dispatch chain")) {
+    return;
+  }
+  for (auto _ : state) {
+    SubmittedCompletion completion;
+    if (!HandleStatus(
+            state,
+            BindingCountDispatchChainCommandBufferSubmitPublicFinalInline(
+                command_buffer, &completion),
+            "command-buffer dispatch chain submit failed")) {
+      break;
+    }
+    if (!WaitWithTimingPaused(state, completion,
+                              "command-buffer dispatch chain wait failed")) {
+      break;
+    }
+  }
+  SetCommandBufferProgramCounters(state, command_buffer, operation_count,
+                                  binding_count);
+  iree_hal_command_buffer_release(command_buffer);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
                    WaitBeforeSignalChain)(benchmark::State& state) {
   if (!EnsureQueueAvailable(state, kQueue1)) return;
   for (auto _ : state) {
@@ -2964,6 +3140,27 @@ BENCHMARK_REGISTER_F(
     ->ArgName("binding_count")
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark,
+                     SameQueueCommandBufferDispatchChainStaticPublicFinalInline)
+    ->Args({1, 8})
+    ->Args({10, 8})
+    ->Args({100, 8})
+    ->Args({1000, 8})
+    ->Args({5000, 8})
+    ->ArgNames({"operation_count", "binding_count"})
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(
+    QueueBenchmark,
+    SameQueueCommandBufferDispatchChainStaticPublicFinalInlineSubmitOnly)
+    ->Args({1, 8})
+    ->Args({10, 8})
+    ->Args({100, 8})
+    ->Args({1000, 8})
+    ->Args({5000, 8})
+    ->ArgNames({"operation_count", "binding_count"})
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark, WaitBeforeSignalChain)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
@@ -2971,7 +3168,11 @@ BENCHMARK_REGISTER_F(QueueBenchmark, WaitBeforeSignalChain)
 }  // namespace
 
 int main(int argc, char** argv) {
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   benchmark::Initialize(&argc, argv);
+  if (benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
   benchmark::RunSpecifiedBenchmarks();
   benchmark::Shutdown();
   QueueBenchmark::DeinitializeOnce();
