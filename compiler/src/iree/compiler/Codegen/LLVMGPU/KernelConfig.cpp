@@ -332,21 +332,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
-    // TODO: Add block intrinsic support for vector distribute convolutions.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
+  // Skip adding any virtual intrinsics since they are not tested for
+  // convolutions.
+  // TODO: Add block intrinsic support for vector distribute convolutions.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/false, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Skip adding any virtual intrinsics since they are not tested for
-    // convolutions.
   }
 
   if (intrinsics.empty()) {
@@ -575,20 +566,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // We currently dont use block intrinsics for GEMMs.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
+  // Skip adding any virtual intrinsics since they are not tested for matmuls.
+  // We currently dont use block intrinsics for GEMMs.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/false, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Skip adding any virtual intrinsics since they are not tested for matmuls.
   }
 
   if (intrinsics.empty()) {
@@ -834,26 +816,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
-    // TODO: Enable block intrinsics for attention.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
+  // TODO: Enable block intrinsics for attention.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/true, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
   }
 
   if (intrinsics.empty()) {

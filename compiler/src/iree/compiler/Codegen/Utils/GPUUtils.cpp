@@ -1437,6 +1437,56 @@ Operation *GetRootOperation(ArrayRef<Operation *> computeOps) {
       }
     }
   }
+  return rootOperation;
+}
+
+/// Returns the available scaled MMA attributes for the given target,
+/// filtered by subgroup size and distribution mapping support.
+SmallVector<IREE::GPU::ScaledMMAAttr>
+getScaledMMAAttrs(IREE::GPU::TargetAttr target) {
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  SmallVector<IREE::GPU::ScaledMMAAttr> smmaAttrs;
+  for (IREE::GPU::ScaledMMAAttr smma : target.getWgp().getScaledMma()) {
+    if (smma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    if (!smma.getDistributionMappingKind()) {
+      continue;
+    }
+    smmaAttrs.push_back(smma);
+  }
+  return smmaAttrs;
+}
+
+/// Returns the available MMA attributes for the given target, filtered by
+/// subgroup size and distribution mapping support. When `includeVirtual` is
+/// true, virtual MMAs derived from each base MMA are also included.
+SmallVector<IREE::GPU::MmaInterfaceAttr>
+getMMAAttrs(IREE::GPU::TargetAttr target, bool includeVirtual,
+            bool includeBlockIntrinsic) {
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  MLIRContext *context = target.getContext();
+  SmallVector<IREE::GPU::MmaInterfaceAttr> result;
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    if (!mma.getDistributionMappingKind()) {
+      continue;
+    }
+    if (!includeBlockIntrinsic && mma.isBlockIntrinsic()) {
+      continue;
+    }
+    result.push_back(mma);
+    if (includeVirtual) {
+      for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
+           mma.getVirtualIntrinsics()) {
+        result.push_back(
+            IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic));
+      }
+    }
+  }
+  return result;
 }
 
 } // namespace mlir::iree_compiler

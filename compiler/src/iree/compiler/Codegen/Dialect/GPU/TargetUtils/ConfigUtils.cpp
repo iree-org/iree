@@ -307,16 +307,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
-    for (IREE::GPU::ScaledMMAAttr smma : target.getWgp().getScaledMma()) {
-      // Intrinsics that do not specify a distribution kind cannot be
-      // distributed.
-      if (!smma.getDistributionMappingKind()) {
-        continue;
-      }
-      if (smma.getSubgroupSize() != targetSubgroupSize) {
-        continue;
-      }
-
+    for (IREE::GPU::ScaledMMAAttr smma : getScaledMMAAttrs(target)) {
       auto [m, n, k, kB] = smma.getScaledMNKShape();
       SmallVector<Type> elementTypes;
       smma.getElementTypes(elementTypes);
@@ -326,16 +317,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
-    for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-      // Intrinsics that do not specify a distribution kind cannot be
-      // distributed.
-      if (!mma.getDistributionMappingKind()) {
-        continue;
-      }
-      if (mma.getSubgroupSize() != targetSubgroupSize) {
-        continue;
-      }
-
+    for (IREE::GPU::MmaInterfaceAttr mma :
+         getMMAAttrs(target, /*includeVirtual=*/false)) {
+      auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
       // Only group convolutions show a clear gain from block intrinsics.
       if (mma.isBlockIntrinsic() && isGemm) {
