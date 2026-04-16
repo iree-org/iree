@@ -77,6 +77,18 @@ typedef struct iree_profile_summary_t {
   uint64_t device_chunk_count;
   // Queue metadata chunks parsed.
   uint64_t queue_chunk_count;
+  // Executable metadata chunks parsed.
+  uint64_t executable_chunk_count;
+  // Executable records parsed.
+  uint64_t executable_record_count;
+  // Executable export metadata chunks parsed.
+  uint64_t executable_export_chunk_count;
+  // Executable export records parsed.
+  uint64_t executable_export_record_count;
+  // Command-buffer metadata chunks parsed.
+  uint64_t command_buffer_chunk_count;
+  // Command-buffer records parsed.
+  uint64_t command_buffer_record_count;
   // Clock-correlation chunks parsed.
   uint64_t clock_correlation_chunk_count;
   // Dispatch event chunks parsed.
@@ -383,6 +395,63 @@ static iree_status_t iree_profile_summary_process_queue_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_executable_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_executable_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      ++summary->executable_record_count;
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_summary_process_executable_export_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_executable_export_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      ++summary->executable_export_record_count;
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_summary_process_command_buffer_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_command_buffer_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      ++summary->command_buffer_record_count;
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_clock_correlation_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -472,6 +541,22 @@ static iree_status_t iree_profile_summary_process_record(
     return iree_profile_summary_process_queue_records(summary, record);
   } else if (iree_string_view_equal(
                  record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
+    ++summary->executable_chunk_count;
+    return iree_profile_summary_process_executable_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+    ++summary->executable_export_chunk_count;
+    return iree_profile_summary_process_executable_export_records(summary,
+                                                                  record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
+    ++summary->command_buffer_chunk_count;
+    return iree_profile_summary_process_command_buffer_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
     ++summary->clock_correlation_chunk_count;
     return iree_profile_summary_process_clock_correlation_records(summary,
@@ -551,13 +636,23 @@ static void iree_profile_print_summary_text(
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
   fprintf(file,
-          "chunks: devices=%" PRIu64 " queues=%" PRIu64
+          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
           " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
           " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
           summary->device_chunk_count, summary->queue_chunk_count,
+          summary->executable_chunk_count,
+          summary->executable_export_chunk_count,
+          summary->command_buffer_chunk_count,
           summary->clock_correlation_chunk_count,
           summary->dispatch_event_chunk_count, summary->unknown_chunk_count,
           summary->truncated_chunk_count);
+  fprintf(file,
+          "metadata_records: executables=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64 "\n",
+          summary->executable_record_count,
+          summary->executable_export_record_count,
+          summary->command_buffer_record_count);
   fprintf(file, "devices:\n");
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
@@ -629,20 +724,30 @@ static void iree_profile_print_summary_text(
 
 static void iree_profile_print_summary_jsonl(
     const iree_profile_summary_t* summary, FILE* file) {
-  fprintf(file,
-          "{\"type\":\"summary\",\"file_records\":%" PRIu64
-          ",\"session_begin_records\":%" PRIu64 ",\"chunk_records\":%" PRIu64
-          ",\"session_end_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
-          ",\"device_chunks\":%" PRIu64 ",\"queue_chunks\":%" PRIu64
-          ",\"clock_correlation_chunks\":%" PRIu64
-          ",\"dispatch_event_chunks\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
-          ",\"truncated_chunks\":%" PRIu64 "}\n",
-          summary->file_record_count, summary->session_begin_count,
-          summary->chunk_count, summary->session_end_count,
-          summary->unknown_record_count, summary->device_chunk_count,
-          summary->queue_chunk_count, summary->clock_correlation_chunk_count,
-          summary->dispatch_event_chunk_count, summary->unknown_chunk_count,
-          summary->truncated_chunk_count);
+  fprintf(
+      file,
+      "{\"type\":\"summary\",\"file_records\":%" PRIu64
+      ",\"session_begin_records\":%" PRIu64 ",\"chunk_records\":%" PRIu64
+      ",\"session_end_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
+      ",\"device_chunks\":%" PRIu64 ",\"queue_chunks\":%" PRIu64
+      ",\"executable_chunks\":%" PRIu64 ",\"executable_records\":%" PRIu64
+      ",\"executable_export_chunks\":%" PRIu64
+      ",\"executable_export_records\":%" PRIu64
+      ",\"command_buffer_chunks\":%" PRIu64
+      ",\"command_buffer_records\":%" PRIu64
+      ",\"clock_correlation_chunks\":%" PRIu64
+      ",\"dispatch_event_chunks\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
+      ",\"truncated_chunks\":%" PRIu64 "}\n",
+      summary->file_record_count, summary->session_begin_count,
+      summary->chunk_count, summary->session_end_count,
+      summary->unknown_record_count, summary->device_chunk_count,
+      summary->queue_chunk_count, summary->executable_chunk_count,
+      summary->executable_record_count, summary->executable_export_chunk_count,
+      summary->executable_export_record_count,
+      summary->command_buffer_chunk_count, summary->command_buffer_record_count,
+      summary->clock_correlation_chunk_count,
+      summary->dispatch_event_chunk_count, summary->unknown_chunk_count,
+      summary->truncated_chunk_count);
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
     const iree_profile_device_summary_t* device = &summary->devices[i];

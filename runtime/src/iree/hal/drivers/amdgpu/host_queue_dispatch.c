@@ -393,7 +393,7 @@ iree_hal_amdgpu_host_queue_prepare_dispatch_indirect_parameters(
 static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
     iree_hal_amdgpu_profile_dispatch_event_t* event,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_ordinal_t export_ordinal, uint64_t executable_id,
     const iree_hal_dispatch_config_t config,
     iree_hal_amdgpu_profile_dispatch_event_flags_t flags) {
   const uint64_t event_id = event->event_id;
@@ -403,6 +403,7 @@ static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
   event->event_id = event_id;
   event->command_index = UINT32_MAX;
   event->export_ordinal = export_ordinal;
+  event->executable_id = executable_id;
   if (!iree_any_bit_set(
           flags,
           IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS)) {
@@ -447,6 +448,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
+    iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const uint64_t* binding_ptrs,
@@ -492,7 +494,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
         iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
             queue, profile_events.first_event_position);
     iree_hal_amdgpu_host_queue_initialize_dispatch_event(
-        event, plan, export_ordinal, config,
+        event, plan, export_ordinal,
+        iree_hal_amdgpu_executable_profile_id(executable), config,
         IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_NONE);
     iree_hal_amdgpu_profile_dispatch_harvest_source_t* sources =
         iree_hal_amdgpu_device_profile_emplace_dispatch_harvest(
@@ -519,6 +522,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
+    iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const uint64_t* binding_ptrs, uint64_t workgroup_count_ptr,
@@ -631,7 +635,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
         iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
             queue, profile_events.first_event_position);
     iree_hal_amdgpu_host_queue_initialize_dispatch_event(
-        event, plan, export_ordinal, config,
+        event, plan, export_ordinal,
+        iree_hal_amdgpu_executable_profile_id(executable), config,
         IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS);
     iree_hal_amdgpu_profile_dispatch_harvest_source_t* sources =
         iree_hal_amdgpu_device_profile_emplace_dispatch_harvest(
@@ -731,14 +736,14 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
   if (iree_status_is_ok(status)) {
     if (plan.uses_indirect_parameters) {
       status = iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
-          queue, resolution, signal_semaphore_list, &plan, export_ordinal,
-          config, constants, binding_ptrs, workgroup_count_ptr,
+          queue, resolution, signal_semaphore_list, &plan, executable,
+          export_ordinal, config, constants, binding_ptrs, workgroup_count_ptr,
           operation_resources, uses_custom_direct_arguments, submission_flags,
           out_ready);
     } else {
       status = iree_hal_amdgpu_host_queue_submit_direct_dispatch(
-          queue, resolution, signal_semaphore_list, &plan, export_ordinal,
-          config, constants, binding_ptrs, operation_resources,
+          queue, resolution, signal_semaphore_list, &plan, executable,
+          export_ordinal, config, constants, binding_ptrs, operation_resources,
           uses_custom_direct_arguments, submission_flags, out_ready);
     }
   }

@@ -11,6 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/abi/kernel_args.h"
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
+#include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
@@ -104,7 +105,12 @@ iree_status_t iree_hal_amdgpu_executable_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
+
+// Returns the producer-local profile executable id assigned at creation.
+uint64_t iree_hal_amdgpu_executable_profile_id(
+    iree_hal_executable_t* executable);
 
 // Returns metadata about an exported kernel function in host memory.
 // The returned pointers will remain valid for the lifetime of the executable.

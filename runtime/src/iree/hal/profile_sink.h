@@ -54,6 +54,18 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES \
   IREE_SV("application/vnd.iree.hal.profile.queues")
 
+// Content type for an array of iree_hal_profile_executable_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES \
+  IREE_SV("application/vnd.iree.hal.profile.executables")
+
+// Content type for packed iree_hal_profile_executable_export_record_t records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS \
+  IREE_SV("application/vnd.iree.hal.profile.executable-exports")
+
+// Content type for an array of iree_hal_profile_command_buffer_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS \
+  IREE_SV("application/vnd.iree.hal.profile.command-buffers")
+
 // Content type for an array of iree_hal_profile_clock_correlation_record_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS \
   IREE_SV("application/vnd.iree.hal.profile.clock-correlations")
@@ -127,6 +139,122 @@ iree_hal_profile_queue_record_default(void) {
   record.record_length = sizeof(record);
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying which executable record fields are populated.
+typedef uint32_t iree_hal_profile_executable_flags_t;
+enum iree_hal_profile_executable_flag_bits_t {
+  IREE_HAL_PROFILE_EXECUTABLE_FLAG_NONE = 0u,
+};
+
+// Session-level executable description.
+//
+// Producers should emit executable records before dispatch event records that
+// reference |executable_id|. The id is a compact producer-local key; consumers
+// should use code-object hashes when present for cross-process correlation.
+typedef struct iree_hal_profile_executable_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags specifying which optional executable fields are populated.
+  iree_hal_profile_executable_flags_t flags;
+  // Producer-local executable identifier referenced by dispatch events.
+  uint64_t executable_id;
+  // Number of export records associated with this executable.
+  uint32_t export_count;
+  // Reserved for future executable record fields; must be zero.
+  uint32_t reserved0;
+  // Strong code-object hash words when a future flag marks them populated.
+  uint64_t code_object_hash[2];
+} iree_hal_profile_executable_record_t;
+
+// Returns a default executable record.
+static inline iree_hal_profile_executable_record_t
+iree_hal_profile_executable_record_default(void) {
+  iree_hal_profile_executable_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  return record;
+}
+
+// Bitfield specifying which executable export fields are populated.
+typedef uint32_t iree_hal_profile_executable_export_flags_t;
+enum iree_hal_profile_executable_export_flag_bits_t {
+  IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_NONE = 0u,
+};
+
+// Session-level executable export description followed by |name_length| bytes.
+//
+// Producers should emit export records before dispatch event records that
+// reference the pair of |executable_id| and |export_ordinal|. The trailing name
+// is not NUL-terminated.
+typedef struct iree_hal_profile_executable_export_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags specifying which optional export fields are populated.
+  iree_hal_profile_executable_export_flags_t flags;
+  // Producer-local executable identifier owning this export.
+  uint64_t executable_id;
+  // Export ordinal used by dispatch events.
+  uint32_t export_ordinal;
+  // Number of constant words expected by the HAL ABI export.
+  uint32_t constant_count;
+  // Number of binding pointer slots expected by the HAL ABI export.
+  uint32_t binding_count;
+  // Number of reflected export parameters.
+  uint32_t parameter_count;
+  // Static workgroup size for each dimension, or the minimum dynamic size.
+  uint32_t workgroup_size[3];
+  // Byte length of the trailing export name.
+  uint32_t name_length;
+} iree_hal_profile_executable_export_record_t;
+
+// Returns a default executable export record.
+static inline iree_hal_profile_executable_export_record_t
+iree_hal_profile_executable_export_record_default(void) {
+  iree_hal_profile_executable_export_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.export_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying which command-buffer record fields are populated.
+typedef uint32_t iree_hal_profile_command_buffer_flags_t;
+enum iree_hal_profile_command_buffer_flag_bits_t {
+  IREE_HAL_PROFILE_COMMAND_BUFFER_FLAG_NONE = 0u,
+};
+
+// Session-level reusable command-buffer description.
+//
+// Producers should emit command-buffer records before dispatch event records
+// that reference |command_buffer_id|.
+typedef struct iree_hal_profile_command_buffer_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags specifying which optional command-buffer fields are populated.
+  iree_hal_profile_command_buffer_flags_t flags;
+  // Producer-local command-buffer identifier referenced by dispatch events.
+  uint64_t command_buffer_id;
+  // HAL command-buffer mode bits used to create the command buffer.
+  uint64_t mode;
+  // HAL command categories supported by the command buffer.
+  uint64_t command_categories;
+  // Queue affinity normalized at command-buffer creation.
+  uint64_t queue_affinity;
+  // Physical device ordinal selected for recorded device-specific packets.
+  uint32_t physical_device_ordinal;
+  // Reserved for future command-buffer record fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_command_buffer_record_t;
+
+// Returns a default command-buffer record.
+static inline iree_hal_profile_command_buffer_record_t
+iree_hal_profile_command_buffer_record_default(void) {
+  iree_hal_profile_command_buffer_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
   return record;
 }
 

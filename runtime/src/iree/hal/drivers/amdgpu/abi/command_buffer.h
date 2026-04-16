@@ -209,8 +209,8 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t private_segment_size;
   // AQL dispatch packet group segment size field.
   uint32_t group_segment_size;
-  // Reserved bytes that must be zero in version 0.
-  uint32_t reserved0;
+  // Producer-local profile executable id used for event attribution.
+  uint32_t executable_id;
 } iree_hal_amdgpu_command_buffer_dispatch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 72,

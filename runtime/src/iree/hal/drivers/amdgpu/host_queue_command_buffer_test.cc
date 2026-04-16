@@ -293,8 +293,26 @@ struct CommandBufferProfileSink {
   // Number of queue metadata chunks observed.
   int queue_metadata_count = 0;
 
+  // Number of executable metadata chunks observed.
+  int executable_metadata_count = 0;
+
+  // Number of executable export metadata chunks observed.
+  int executable_export_metadata_count = 0;
+
+  // Number of command-buffer metadata chunks observed.
+  int command_buffer_metadata_count = 0;
+
   // Number of clock correlation chunks observed.
   int clock_correlation_count = 0;
+
+  // Executable identifiers copied from EXECUTABLES chunks.
+  std::vector<uint64_t> executable_ids;
+
+  // Executable identifiers copied from EXECUTABLE_EXPORTS chunks.
+  std::vector<uint64_t> executable_export_ids;
+
+  // Command-buffer identifiers copied from COMMAND_BUFFERS chunks.
+  std::vector<uint64_t> command_buffer_ids;
 
   // Clock correlation records copied from CLOCK_CORRELATIONS chunks.
   std::vector<iree_hal_profile_clock_correlation_record_t> clock_correlations;
@@ -354,6 +372,70 @@ static iree_status_t CommandBufferProfileSinkWrite(
   } else if (iree_string_view_equal(metadata->content_type,
                                     IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
     ++test_sink->queue_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_executable_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_executable_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_executable_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_executable_record_t),
+                records[i].record_length);
+      EXPECT_NE(0u, records[i].executable_id);
+      EXPECT_GT(records[i].export_count, 0u);
+      test_sink->executable_ids.push_back(records[i].executable_id);
+    }
+    ++test_sink->executable_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+    iree_host_size_t payload_offset = 0;
+    while (payload_offset < iovecs[0].data_length) {
+      if (iovecs[0].data_length - payload_offset <
+          sizeof(iree_hal_profile_executable_export_record_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "truncated executable export profile record");
+      }
+      iree_hal_profile_executable_export_record_t record;
+      memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
+      if (record.record_length < sizeof(record) ||
+          record.record_length > iovecs[0].data_length - payload_offset) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "invalid executable export profile record");
+      }
+      EXPECT_NE(0u, record.executable_id);
+      EXPECT_NE(UINT32_MAX, record.export_ordinal);
+      EXPECT_EQ(record.name_length,
+                record.record_length - (uint32_t)sizeof(record));
+      test_sink->executable_export_ids.push_back(record.executable_id);
+      payload_offset += record.record_length;
+    }
+    ++test_sink->executable_export_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_buffer_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_buffer_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_buffer_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_buffer_record_t),
+                records[i].record_length);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      test_sink->command_buffer_ids.push_back(records[i].command_buffer_id);
+    }
+    ++test_sink->command_buffer_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
@@ -1051,6 +1133,8 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
       command_buffer_signal, command_buffer_signal_value,
       iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
   IREE_ASSERT_OK(profiling.End());
 
   const uint32_t expected_values[4] = {13, 16, 19, 22};
@@ -1069,6 +1153,9 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   EXPECT_EQ(1, sink.end_count);
   EXPECT_EQ(1, sink.device_metadata_count);
   EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_EQ(1, sink.executable_metadata_count);
+  EXPECT_EQ(1, sink.executable_export_metadata_count);
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
   EXPECT_GE(sink.clock_correlation_count, 2);
   EXPECT_FALSE(sink.write_after_end);
   ASSERT_EQ(2u, sink.dispatch_events.size());
@@ -1078,6 +1165,18 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_EQ(IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER, event.flags);
     EXPECT_NE(0u, event.event_id);
     EXPECT_NE(0u, event.submission_id);
+    EXPECT_NE(0u, event.command_buffer_id);
+    EXPECT_NE(
+        sink.command_buffer_ids.end(),
+        std::find(sink.command_buffer_ids.begin(),
+                  sink.command_buffer_ids.end(), event.command_buffer_id));
+    EXPECT_NE(0u, event.executable_id);
+    EXPECT_NE(sink.executable_ids.end(),
+              std::find(sink.executable_ids.begin(), sink.executable_ids.end(),
+                        event.executable_id));
+    EXPECT_NE(sink.executable_export_ids.end(),
+              std::find(sink.executable_export_ids.begin(),
+                        sink.executable_export_ids.end(), event.executable_id));
     EXPECT_EQ((uint32_t)i, event.command_index);
     EXPECT_EQ(0u, event.export_ordinal);
     EXPECT_EQ(1u, event.workgroup_count[0]);
