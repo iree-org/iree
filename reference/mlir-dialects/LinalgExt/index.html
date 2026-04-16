@@ -7244,12 +7244,13 @@ context, they will be the second and third inputs.</p>
 <p><em>Gathers slices from a source based on a tensor of indices.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.gather` attr-dict `dimension_map` `=` $dimension_map
-              `ins` `(` $source `,` $indices `:` type($source) `,` type($indices) `)`
+              `ins` `(` $source `,` $indices (`,` $mask^)? `:` type($source) `,` type($indices) (`,` type($mask)^)? `)`
               `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>Takes two inputs (<code>source</code> and <code>indices</code>) and outputs value (<code>output</code>).
-The operation returns the value at the slices specified by <code>indices</code>.</p>
+<p>Takes two or three inputs (<code>source</code>, <code>indices</code>, and optional <code>mask</code>) and
+one output value (<code>output</code>). The operation returns the value at the slices
+specified by <code>indices</code>.</p>
 <p>The size of the <code>dimension_map</code> attribute is used to determine how many
 indices are used to index into <code>source</code>, i.e. <code>index_depth</code>. The
 <code>dimension_map</code> attribute describes which index value maps to which dimension
@@ -7259,6 +7260,10 @@ Instead of scattering <code>updates</code> into <code>original</code>, it gather
 <code>source</code> into <code>output</code> using the indices in <code>indices</code>. See the documentation
 on <code>iree_linalg_ext.scatter</code> for more details regarding the indexing/shape
 semantics.</p>
+<p>If the optional operand <code>mask</code> is present, it must have batch shape and a
+boolean element type (<code>i1</code>, or storage-legalized <code>i8</code> in backend
+pipelines). A <code>false</code> mask value suppresses the corresponding gather
+update, leaving <code>output</code> unchanged for that batch element.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
@@ -7282,6 +7287,10 @@ semantics.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>mask</code></td>
 <td>ranked tensor or memref of any type</td>
 </tr>
 <tr>
@@ -7792,11 +7801,12 @@ this operation is decomposed into lower-level operations. It supports:
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.scatter` attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
-              `ins` `(` $updates `,` $indices `:` type($updates) `,` type($indices) `)`
+              `ins` `(` $updates `,` $indices (`,` $mask^)? `:` type($updates) `,` type($indices) (`,` type($mask)^)? `)`
               `outs` `(` $original `:` type($original) `)`
               $region (`-&gt;` type($results)^)?
 </code></pre></div>
-<p>Takes two <code>inputs</code> (<code>update</code> and <code>indices</code>) and <code>outputs</code> value (<code>original</code>).
+<p>Takes two or three <code>inputs</code> (<code>update</code>, <code>indices</code>, and optional <code>mask</code>) and
+one <code>outputs</code> value (<code>original</code>).
 The operation updates the value at the slices specified by <code>indices</code> by
 combining the current value with the value in <code>updates</code> using the computation
 specified in <code>region</code>. The <code>region</code> specifies a binary operation
@@ -7820,6 +7830,10 @@ represents a contiguous slice to be inserted into <code>original</code>.</p>
 <p>The operand <code>original</code> is a DPS init representing the destination that
 <code>update</code> gets scattered to.
 Where <code>rank(original) = rank(update_slice) + index_depth</code></p>
+<p>If the optional operand <code>mask</code> is present, it must have batch shape and a
+boolean element type (<code>i1</code>, or storage-legalized <code>i8</code> in backend
+pipelines). A <code>false</code> mask value suppresses the corresponding scatter
+update, leaving <code>original</code> unchanged for that batch element.</p>
 <p>The unique_indices attribute carries the information whether all the
 indices are unique. If <code>unique_indices</code> is <code>true</code> and two or more updates
 scatter to the same location in <code>original</code> the final value in <code>original</code> is
@@ -7851,6 +7865,10 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>mask</code></td>
 <td>ranked tensor or memref of any type</td>
 </tr>
 <tr>
