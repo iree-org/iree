@@ -17,6 +17,26 @@ extern "C" {
 typedef void(IREE_API_PTR* iree_hal_amdgpu_host_queue_post_commit_fn_t)(
     void* user_data, const iree_async_frontier_t* queue_frontier);
 
+// Optional callback invoked after queue frontier state has advanced and before
+// the completion packet is published.
+typedef struct iree_hal_amdgpu_host_queue_post_commit_callback_t {
+  // Function invoked with the queue frontier visible after commit.
+  iree_hal_amdgpu_host_queue_post_commit_fn_t fn;
+
+  // Opaque user data passed to |fn|.
+  void* user_data;
+} iree_hal_amdgpu_host_queue_post_commit_callback_t;
+
+// Returns a null post-commit callback.
+static inline iree_hal_amdgpu_host_queue_post_commit_callback_t
+iree_hal_amdgpu_host_queue_post_commit_callback_null(void) {
+  iree_hal_amdgpu_host_queue_post_commit_callback_t callback = {
+      .fn = NULL,
+      .user_data = NULL,
+  };
+  return callback;
+}
+
 // Flags controlling submission helper ownership transfers.
 typedef uint32_t iree_hal_amdgpu_host_queue_submission_flags_t;
 enum iree_hal_amdgpu_host_queue_submission_flag_bits_t {
@@ -128,8 +148,8 @@ void iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
-    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
+    iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_barrier_submission_t* submission);
 
@@ -223,8 +243,8 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
-    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
+    iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready);
 

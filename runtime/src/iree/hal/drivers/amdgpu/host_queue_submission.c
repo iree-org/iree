@@ -674,8 +674,8 @@ void iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
-    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
+    iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_barrier_submission_t* submission) {
   IREE_ASSERT_ARGUMENT(queue);
@@ -735,9 +735,9 @@ void iree_hal_amdgpu_host_queue_finish_barrier_submission(
 
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
   iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
-  if (post_commit_fn) {
-    post_commit_fn(post_commit_user_data,
-                   iree_hal_amdgpu_host_queue_const_frontier(queue));
+  if (post_commit_callback.fn) {
+    post_commit_callback.fn(post_commit_callback.user_data,
+                            iree_hal_amdgpu_host_queue_const_frontier(queue));
   }
   if (complete_with_wait_barrier) {
     const iree_hsa_fence_scope_t release_scope =
@@ -783,8 +783,8 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
-    iree_hal_amdgpu_host_queue_post_commit_fn_t post_commit_fn,
-    void* post_commit_user_data, iree_hal_resource_set_t* resource_set,
+    iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
+    iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready) {
   IREE_ASSERT_ARGUMENT(out_ready);
@@ -798,7 +798,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
 
   iree_hal_amdgpu_host_queue_finish_barrier_submission(
       queue, resolution, signal_semaphore_list, pre_signal_action,
-      operation_resources, operation_resource_count, post_commit_fn,
-      post_commit_user_data, resource_set, submission_flags, &submission);
+      operation_resources, operation_resource_count, post_commit_callback,
+      resource_set, submission_flags, &submission);
   return iree_ok_status();
 }

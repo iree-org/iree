@@ -635,7 +635,7 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_submit_signal_barrier(
       transfer->queue, &resolution, transfer->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
-      /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+      iree_hal_amdgpu_host_queue_post_commit_callback_null(),
       /*resource_set=*/NULL,
       IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
   if (iree_status_is_ok(status) && !ready) {

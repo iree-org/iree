@@ -229,7 +229,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
             .user_data = state,
         },
         operation_resources, IREE_ARRAYSIZE(operation_resources),
-        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL, IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE,
         &submission);
   }
