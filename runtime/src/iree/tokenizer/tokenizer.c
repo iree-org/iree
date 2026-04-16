@@ -2606,10 +2606,15 @@ static iree_status_t iree_tokenizer_encode_state_pump(
         state->segmenter_view_start = state->read_position;
       }
     }
-    // When a forced-complete drains the ring, exit partial mode so fresh
-    // text after the special token goes through the normal segmenter path.
-    if (force_complete && segment_complete &&
-        state->read_position >= state->write_position) {
+    // When a forced-complete segment finishes, retire the entire ring region
+    // that was just fed directly to the model. Unlike the partial reclaim path
+    // above, a non-partial completion resets the model to SEGMENT_START, so
+    // state_reclaim() returns 0 even though all bytes were fully processed.
+    // If we leave the ring positions unchanged, the same bytes are re-encoded
+    // on the next pump iteration and a pending special token can never flush.
+    if (force_complete && segment_complete) {
+      state->read_position = state->write_position;
+      state->segmenter_view_start = state->write_position;
       state->has_partial_segment = false;
     }
     if (reclaimed > 0 || tokens_written > 0) {
