@@ -58,6 +58,27 @@ jobs:
         if: always() && github.ref == 'refs/heads/main'
         run: |
           bazel shutdown
+
+          # Prune cache to ~10G using LRU (oldest access time first).
+          # Otherwise, cache grows. We can't use --experimental_disk_cache_gc_max_size=10G
+          # as that would make bazel shutdown to trigger the cache and we would have to wait
+          # a long time for it to compact and compress and it seems that
+          # it also will shutdown in a bad state?
+          #
+          # So we handle everything here manually.
+          MAX_BYTES=$((10 * 1024 * 1024 * 1024))
+          current_size=$(du -sb "$BAZEL_DISK_CACHE_DIR" | cut -f1)
+          if (( current_size > MAX_BYTES )); then
+            overshoot=$((current_size - MAX_BYTES))
+            # Delete oldest-accessed files first
+            find "$CACHE_DIR" -type f -printf '%A@ %s %p\n' | \
+              sort -n | \
+              awk -v target="$overshoot" '{
+                sum += $2;
+                print $3;
+                if (sum >= target) exit
+              }' | xargs rm
+          fi
           tar -czf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}" .
           python3 ./build_tools/bazel/azure_cache.py upload /tmp/cache.tar.gz
 
