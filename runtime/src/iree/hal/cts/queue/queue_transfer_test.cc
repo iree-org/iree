@@ -185,6 +185,8 @@ TEST_P(QueueTransferTest, FillSizeAlignmentAndPatternClasses) {
   const FillCase cases[] = {
       {/*.pattern_length=*/1, /*.target_offset=*/0,
        /*.fill_length=*/4, /*.pattern=*/0x000000A5u},
+      {/*.pattern_length=*/1, /*.target_offset=*/0,
+       /*.fill_length=*/8, /*.pattern=*/0x0000005Bu},
       {/*.pattern_length=*/1, /*.target_offset=*/3,
        /*.fill_length=*/31, /*.pattern=*/0x0000005Au},
       {/*.pattern_length=*/1, /*.target_offset=*/17,
@@ -199,6 +201,8 @@ TEST_P(QueueTransferTest, FillSizeAlignmentAndPatternClasses) {
        /*.fill_length=*/64 * 1024, /*.pattern=*/0x000000E1u},
       {/*.pattern_length=*/2, /*.target_offset=*/0,
        /*.fill_length=*/4, /*.pattern=*/0x0000BEEFu},
+      {/*.pattern_length=*/2, /*.target_offset=*/0,
+       /*.fill_length=*/8, /*.pattern=*/0x00001234u},
       {/*.pattern_length=*/2, /*.target_offset=*/2,
        /*.fill_length=*/30, /*.pattern=*/0x0000CAFEu},
       {/*.pattern_length=*/2, /*.target_offset=*/6,
@@ -211,6 +215,8 @@ TEST_P(QueueTransferTest, FillSizeAlignmentAndPatternClasses) {
        /*.fill_length=*/64 * 1024, /*.pattern=*/0x000055AAu},
       {/*.pattern_length=*/4, /*.target_offset=*/0,
        /*.fill_length=*/4, /*.pattern=*/0xDEADCAFEu},
+      {/*.pattern_length=*/4, /*.target_offset=*/0,
+       /*.fill_length=*/8, /*.pattern=*/0xF00DCAFEu},
       {/*.pattern_length=*/4, /*.target_offset=*/4,
        /*.fill_length=*/28, /*.pattern=*/0xCAFEF00Du},
       {/*.pattern_length=*/4, /*.target_offset=*/8,
@@ -312,6 +318,45 @@ TEST_P(QueueTransferTest, UpdateWithSourceOffset) {
   std::vector<uint8_t> expected(source.begin() + source_offset,
                                 source.begin() + source_offset + buffer_size);
   EXPECT_THAT(readback, ContainerEq(expected));
+}
+
+TEST_P(QueueTransferTest, UpdateSizeAndAlignmentClasses) {
+  struct UpdateCase {
+    iree_host_size_t source_offset = 0;
+    iree_device_size_t target_offset = 0;
+    iree_device_size_t update_length = 0;
+  };
+  const UpdateCase cases[] = {
+      {/*.source_offset=*/0, /*.target_offset=*/0, /*.update_length=*/4},
+      {/*.source_offset=*/3, /*.target_offset=*/0, /*.update_length=*/8},
+      {/*.source_offset=*/5, /*.target_offset=*/4, /*.update_length=*/8},
+      {/*.source_offset=*/1, /*.target_offset=*/1, /*.update_length=*/4},
+      {/*.source_offset=*/0, /*.target_offset=*/0, /*.update_length=*/16},
+  };
+
+  for (const UpdateCase& test_case : cases) {
+    SCOPED_TRACE(::testing::Message()
+                 << "source_offset=" << test_case.source_offset
+                 << " target_offset=" << test_case.target_offset
+                 << " update_length=" << test_case.update_length);
+    const iree_host_size_t source_size =
+        test_case.source_offset + test_case.update_length + 8;
+    const iree_device_size_t buffer_size =
+        test_case.target_offset + test_case.update_length + 8;
+    std::vector<uint8_t> source = MakeDeterministicBytes(source_size);
+
+    Ref<iree_hal_buffer_t> buffer;
+    CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+
+    QueueUpdateAndWait(source.data(), test_case.source_offset, buffer,
+                       test_case.target_offset, test_case.update_length);
+
+    std::vector<uint8_t> expected(buffer_size, 0);
+    memcpy(expected.data() + test_case.target_offset,
+           source.data() + test_case.source_offset, test_case.update_length);
+    auto readback = ReadBufferBytes(buffer, 0, buffer_size);
+    EXPECT_THAT(readback, ContainerEq(expected));
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -11,6 +11,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 
 // Returns true if |semaphore| has the strict private stream contract that lets
 // the signal path publish only a producer queue epoch instead of accumulating a
@@ -196,6 +197,21 @@ iree_hal_amdgpu_host_queue_final_barrier_packet_control(
     const iree_hal_semaphore_list_t signal_semaphore_list) {
   return iree_hal_amdgpu_aql_packet_control_barrier(
       resolution->inline_acquire_scope,
+      iree_hal_amdgpu_host_queue_signal_list_release_scope(
+          queue, signal_semaphore_list));
+}
+
+// Returns the packet control for a final PM4-IB payload packet. PM4 IB payloads
+// are host-populated memory consumed by the CP, so they carry the same minimum
+// AGENT acquire as dispatch packets.
+static iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_host_queue_final_pm4_ib_packet_control(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  return iree_hal_amdgpu_aql_packet_control_barrier(
+      iree_hal_amdgpu_host_queue_max_fence_scope(
+          IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
       iree_hal_amdgpu_host_queue_signal_list_release_scope(
           queue, signal_semaphore_list));
 }
@@ -459,6 +475,37 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
   return status;
 }
 
+iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t operation_resource_count, bool* out_ready,
+    iree_hal_amdgpu_host_queue_pm4_ib_submission_t* out_submission) {
+  IREE_ASSERT_ARGUMENT(out_ready);
+  IREE_ASSERT_ARGUMENT(out_submission);
+  *out_ready = false;
+  memset(out_submission, 0, sizeof(*out_submission));
+
+  if (IREE_UNLIKELY(!queue->pm4_ib_slots)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "PM4 IB slots are not available");
+  }
+
+  iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
+      queue, resolution, signal_semaphore_list, operation_resource_count,
+      /*payload_packet_count=*/1, /*kernarg_block_count=*/0, out_ready,
+      &out_submission->kernel);
+  if (iree_status_is_ok(status) && *out_ready) {
+    const uint64_t packet_id = out_submission->kernel.first_packet_id +
+                               out_submission->kernel.packet_count - 1;
+    out_submission->pm4_ib_packet_slot =
+        iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, packet_id);
+    out_submission->pm4_ib_slot =
+        &queue->pm4_ib_slots[packet_id & queue->aql_ring.mask];
+  }
+  return status;
+}
+
 // Commits the signal/frontier side of an AQL submission. Called after all
 // dispatch packet fields, kernargs, and any prefix barrier headers are written,
 // but before the final dispatch header is committed and the doorbell is rung.
@@ -624,6 +671,37 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
           submission->minimum_release_scope));
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
+  iree_hal_amdgpu_aql_ring_doorbell(
+      &queue->aql_ring,
+      submission->kernel.first_packet_id + submission->kernel.packet_count - 1);
+  memset(submission, 0, sizeof(*submission));
+}
+
+void iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission) {
+  iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
+                                                           &submission->kernel);
+  iree_hal_amdgpu_host_queue_finish_kernel_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      operation_resource_count, /*inout_resource_set=*/NULL, submission_flags,
+      &submission->kernel);
+
+  uint16_t pm4_ib_setup = 0;
+  uint16_t pm4_ib_header = iree_hal_amdgpu_aql_emit_pm4_ib(
+      &submission->pm4_ib_packet_slot->pm4_ib, submission->pm4_ib_slot,
+      submission->ib_dword_count,
+      iree_hal_amdgpu_host_queue_final_pm4_ib_packet_control(
+          queue, resolution, signal_semaphore_list),
+      iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring),
+      &pm4_ib_setup);
+  iree_hal_amdgpu_aql_ring_commit(submission->pm4_ib_packet_slot, pm4_ib_header,
+                                  pm4_ib_setup);
   iree_hal_amdgpu_aql_ring_doorbell(
       &queue->aql_ring,
       submission->kernel.first_packet_id + submission->kernel.packet_count - 1);
