@@ -269,6 +269,20 @@ endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
 iree_cc_binary(
   NAME
+    iree-profile
+  SRCS
+    "iree-profile-main.c"
+  DEPS
+    iree::base
+    iree::base::tooling::flags
+    iree::hal::utils::profile_file
+    iree::io::file_handle
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-run-module
   SRCS
     "iree-run-module-main.c"

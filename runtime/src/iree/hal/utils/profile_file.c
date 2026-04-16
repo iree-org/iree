@@ -7,6 +7,7 @@
 #include "iree/hal/utils/profile_file.h"
 
 #include <stddef.h>
+#include <string.h>
 
 #include "iree/io/stream.h"
 
@@ -171,6 +172,128 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_sink_create(
   iree_io_stream_release(stream);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_profile_file_parse_header(iree_const_byte_span_t file_contents,
+                                   iree_hal_profile_file_header_t* out_header,
+                                   iree_host_size_t* out_record_offset) {
+  IREE_ASSERT_ARGUMENT(out_header);
+  IREE_ASSERT_ARGUMENT(out_record_offset);
+  memset(out_header, 0, sizeof(*out_header));
+  *out_record_offset = 0;
+
+  if (IREE_UNLIKELY(file_contents.data_length > 0 && !file_contents.data)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "profile file contents data is required");
+  }
+  if (IREE_UNLIKELY(file_contents.data_length <
+                    sizeof(iree_hal_profile_file_header_t))) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file is too small for header");
+  }
+
+  iree_hal_profile_file_header_t header;
+  memcpy(&header, file_contents.data, sizeof(header));
+  if (IREE_UNLIKELY(header.magic != IREE_HAL_PROFILE_FILE_MAGIC)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid IREE HAL profile file magic");
+  }
+  if (IREE_UNLIKELY(header.version_major !=
+                    IREE_HAL_PROFILE_FILE_VERSION_MAJOR)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported IREE HAL profile file version");
+  }
+  if (IREE_UNLIKELY(header.header_length < sizeof(header))) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file header length is too small");
+  }
+  if (IREE_UNLIKELY(header.header_length > file_contents.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file header extends past file end");
+  }
+
+  *out_header = header;
+  *out_record_offset = header.header_length;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_profile_file_parse_record(
+    iree_const_byte_span_t file_contents, iree_host_size_t record_offset,
+    iree_hal_profile_file_record_t* out_record,
+    iree_host_size_t* out_next_record_offset) {
+  IREE_ASSERT_ARGUMENT(out_record);
+  IREE_ASSERT_ARGUMENT(out_next_record_offset);
+  memset(out_record, 0, sizeof(*out_record));
+  *out_next_record_offset = record_offset;
+
+  if (IREE_UNLIKELY(file_contents.data_length > 0 && !file_contents.data)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "profile file contents data is required");
+  }
+  if (IREE_UNLIKELY(record_offset >= file_contents.data_length)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profile record offset is outside the file");
+  }
+
+  iree_host_size_t remaining_file_length =
+      file_contents.data_length - record_offset;
+  if (IREE_UNLIKELY(remaining_file_length <
+                    sizeof(iree_hal_profile_file_record_header_t))) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record is too small for header");
+  }
+
+  const uint8_t* record_base = file_contents.data + record_offset;
+  iree_hal_profile_file_record_header_t header;
+  memcpy(&header, record_base, sizeof(header));
+  if (IREE_UNLIKELY(header.record_length > IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record length exceeds host size");
+  }
+  iree_host_size_t record_length = (iree_host_size_t)header.record_length;
+  if (IREE_UNLIKELY(record_length > remaining_file_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record extends past file end");
+  }
+  if (IREE_UNLIKELY(header.header_length < sizeof(header) ||
+                    header.header_length > record_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record header length is invalid");
+  }
+  if (IREE_UNLIKELY(header.payload_length > IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record payload length exceeds host size");
+  }
+
+  iree_host_size_t content_type_length =
+      (iree_host_size_t)header.content_type_length;
+  iree_host_size_t name_length = (iree_host_size_t)header.name_length;
+  iree_host_size_t payload_length = (iree_host_size_t)header.payload_length;
+  iree_host_size_t string_length = 0;
+  iree_host_size_t expected_data_length = 0;
+  bool data_length_valid =
+      iree_host_size_checked_add(content_type_length, name_length,
+                                 &string_length) &&
+      iree_host_size_checked_add(string_length, payload_length,
+                                 &expected_data_length);
+  if (IREE_UNLIKELY(!data_length_valid ||
+                    expected_data_length !=
+                        record_length - header.header_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record data lengths do not match");
+  }
+
+  const char* content_type = (const char*)(record_base + header.header_length);
+  const char* name = content_type + content_type_length;
+  const uint8_t* payload = (const uint8_t*)name + name_length;
+  out_record->header = header;
+  out_record->content_type =
+      iree_make_string_view(content_type, content_type_length);
+  out_record->name = iree_make_string_view(name, name_length);
+  out_record->payload = iree_make_const_byte_span(payload, payload_length);
+  *out_next_record_offset = record_offset + record_length;
+  return iree_ok_status();
 }
 
 static void iree_hal_profile_file_sink_destroy(

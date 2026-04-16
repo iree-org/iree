@@ -188,6 +188,17 @@ iree_runtime_cc_binary(
     ],
 )
 
+iree_runtime_cc_binary(
+    name = "iree-profile",
+    srcs = ["iree-profile-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/utils:profile_file",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
 iree_compiler_cc_binary(
     name = "iree-opt",
     srcs = ["iree-opt-main.cc"],
