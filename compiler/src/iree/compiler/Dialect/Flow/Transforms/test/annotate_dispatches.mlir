@@ -183,7 +183,7 @@ flow.executable private @ex_result {
 
 // -----
 
-// Encoding ops for scaled matmul
+// Encoding ops for scaled matmul.
 
 #encoding_sm_lhs = #iree_encoding.encoding<operand_index = 0, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
 #encoding_sm_rhs = #iree_encoding.encoding<operand_index = 1, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]>
@@ -263,7 +263,7 @@ flow.executable private @ex_sm_result {
 
 // -----
 
-// Encoding ops for convolutions
+// Encoding ops for convolutions.
 
 #encoding_conv_in = #iree_encoding.encoding<operand_index = 0, op_type = conv, element_types = [f32, f32, f32]>
 #encoding_conv_filter = #iree_encoding.encoding<operand_index = 1, op_type = conv, element_types = [f32, f32, f32]>

@@ -202,10 +202,7 @@ void buildGlobalOptimizationPassPipeline(
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.dataTiling) {
     FunctionLikeNest(mainPassManager)
-        .addPass([]() {
-          return DispatchCreation::createAnnotateDataTilingHintsPass(
-              DispatchCreation::AnnotateDataTilingHintsPassOptions{});
-        })
+        .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
         .addPass([&]() {
           return DispatchCreation::createSetEncodingPass(
               DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});

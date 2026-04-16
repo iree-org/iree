@@ -74,17 +74,6 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
-  ListOption<IREE::Encoding::EncodingOpType> dataTilingOpTypes{
-      *this,
-      "data-tiling-op-types",
-      llvm::cl::desc(
-          "Op families eligible for data-tiling annotation. "
-          "Defaults to {matmul, scaled_matmul}; add 'convolution' to "
-          "enable convolution annotation."),
-      llvm::cl::list_init<IREE::Encoding::EncodingOpType>(
-          {IREE::Encoding::EncodingOpType::matmul,
-           IREE::Encoding::EncodingOpType::scaled_matmul}),
-  };
   Option<bool> enableSplitReduction{
       *this,
       "split-reduction",

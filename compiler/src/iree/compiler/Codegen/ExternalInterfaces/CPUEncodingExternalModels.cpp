@@ -760,14 +760,6 @@ struct CPUEncodingResolverMaterializerAttr final
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
     }
-    // Convolution is not yet supported, so we drop the encoding and clone the
-    // op as-is.
-    if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      int64_t numInputs = linalgOp.getNumDpsInputs();
-      return dropEncodingAndCloneOp(b, linalgOp,
-                                    convertedOperands.take_front(numInputs),
-                                    convertedOperands.drop_front(numInputs));
-    }
     // Scaled contraction (MX matmul) is not yet supported on CPU, so we drop
     // the encoding and clone the op as-is.
     if (IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
@@ -943,14 +935,6 @@ struct VMVXEncodingResolverMaterializerAttr final
     if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
-    }
-    // Convolution is not yet supported, so we drop the encoding and clone the
-    // op as-is.
-    if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      int64_t numInputs = linalgOp.getNumDpsInputs();
-      return dropEncodingAndCloneOp(b, linalgOp,
-                                    convertedOperands.take_front(numInputs),
-                                    convertedOperands.drop_front(numInputs));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       return lowerContractionOpWithEncoding(

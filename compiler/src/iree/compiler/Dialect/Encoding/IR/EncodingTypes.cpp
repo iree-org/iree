@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
-#include "EncodingTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

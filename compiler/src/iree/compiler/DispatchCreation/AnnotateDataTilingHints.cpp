@@ -22,11 +22,6 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
-static llvm::cl::opt<bool> clEnableConvDataTiling(
-    "iree-dispatch-creation-experimental-enable-conv-data-tiling",
-    llvm::cl::desc("Enable experimental convolution data tiling support."),
-    llvm::cl::init(false));
-
 #define GEN_PASS_DEF_ANNOTATEDATATILINGHINTSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
@@ -197,7 +192,7 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
 
   bool enableMatmul = false;
   bool enableScaledMatmul = false;
-  bool enableConvolution = clEnableConvDataTiling;
+  bool enableConvolution = false;
   for (OpType t : opTypes) {
     switch (t) {
     case OpType::matmul:

@@ -18,9 +18,11 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir::iree_compiler::IREE::Encoding {
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.h.inc" // IWYU pragma: export
+// clang-format on
 
-enum class EncodingOpType : uint32_t;
+namespace mlir::iree_compiler::IREE::Encoding {
 
 static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
 
@@ -136,7 +138,6 @@ struct BitcastEncodingInfo {
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 // clang-format off
-#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.h.inc" // IWYU pragma: export
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.h.inc" // IWYU pragma: export
