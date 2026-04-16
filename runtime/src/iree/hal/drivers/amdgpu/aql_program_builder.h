@@ -21,7 +21,7 @@ extern "C" {
 
 enum {
   // Default usable bytes per command-buffer block.
-  IREE_HAL_AMDGPU_AQL_PROGRAM_DEFAULT_BLOCK_SIZE = 16 * 1024,
+  IREE_HAL_AMDGPU_AQL_PROGRAM_DEFAULT_BLOCK_SIZE = 128 * 1024,
   // Minimum usable bytes per command-buffer block.
   IREE_HAL_AMDGPU_AQL_PROGRAM_MIN_BLOCK_SIZE = 256,
 };
