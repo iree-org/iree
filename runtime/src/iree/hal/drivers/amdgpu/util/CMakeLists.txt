@@ -161,17 +161,35 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    benchmark_flags
+  HDRS
+    "benchmark_flags.h"
+  SRCS
+    "benchmark_flags.cc"
+  DEPS
+    benchmark
+    iree::async
+    iree::base
+    iree::base::tooling::flags
+  TESTONLY
+  PUBLIC
+)
+
 iree_cc_binary_benchmark(
   NAME
     blit_benchmark
   SRCS
     "blit_benchmark.cc"
   DEPS
+    ::benchmark_flags
     benchmark
     iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
+    iree::base::tooling::flags
     iree::hal
     iree::hal::drivers::amdgpu::registration
   TESTONLY
@@ -309,6 +327,7 @@ iree_cc_binary_benchmark(
   SRCS
     "queue_benchmark.cc"
   DEPS
+    ::benchmark_flags
     ::testdata_amdgpu_queue_benchmark
     benchmark
     iree::async

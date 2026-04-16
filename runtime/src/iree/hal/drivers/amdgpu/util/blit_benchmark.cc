@@ -14,8 +14,10 @@
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
+#include "iree/hal/drivers/amdgpu/util/benchmark_flags.h"
 
 namespace {
 
@@ -268,9 +270,9 @@ class BlitBenchmark : public benchmark::Fixture {
   }
 
   iree_status_t WaitForCompletion(uint64_t payload_value) {
-    return iree_hal_semaphore_wait(completion_semaphore_, payload_value,
-                                   iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE);
+    return iree_hal_semaphore_wait(
+        completion_semaphore_, payload_value, iree_infinite_timeout(),
+        iree_hal_amdgpu_benchmark_completion_wait_flags());
   }
 
   bool HandleStatus(benchmark::State& state, iree_status_t status,
@@ -283,6 +285,7 @@ class BlitBenchmark : public benchmark::Fixture {
   }
 
   void SetBytesProcessed(benchmark::State& state) {
+    iree_hal_amdgpu_benchmark_set_completion_wait_counters(state);
     state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
                             batch_count_ * static_cast<int64_t>(length_));
   }
@@ -534,7 +537,11 @@ BENCHMARK_REGISTER_F(BlitBenchmark, QueueFillBatch20SubmitOnly)
 }  // namespace
 
 int main(int argc, char** argv) {
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
   benchmark::Initialize(&argc, argv);
+  if (benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
   benchmark::RunSpecifiedBenchmarks();
   benchmark::Shutdown();
   BlitBenchmark::DeinitializeOnce();

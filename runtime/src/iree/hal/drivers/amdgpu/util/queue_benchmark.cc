@@ -24,6 +24,7 @@
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
+#include "iree/hal/drivers/amdgpu/util/benchmark_flags.h"
 #include "runtime/src/iree/hal/drivers/amdgpu/cts/testdata_amdgpu.h"
 #include "runtime/src/iree/hal/drivers/amdgpu/util/testdata_amdgpu_queue_benchmark.h"
 
@@ -477,9 +478,9 @@ class QueueBenchmark : public benchmark::Fixture {
   }
 
   iree_status_t Wait(iree_hal_semaphore_t* semaphore, uint64_t payload_value) {
-    return iree_hal_semaphore_wait(semaphore, payload_value,
-                                   iree_infinite_timeout(),
-                                   IREE_ASYNC_WAIT_FLAG_NONE);
+    return iree_hal_semaphore_wait(
+        semaphore, payload_value, iree_infinite_timeout(),
+        iree_hal_amdgpu_benchmark_completion_wait_flags());
   }
 
   iree_status_t FillBufferAndWait(iree_hal_buffer_t* target_buffer,
@@ -977,6 +978,7 @@ class QueueBenchmark : public benchmark::Fixture {
                                     int64_t queue_submissions_per_sync) {
     state.counters["queue_submissions_per_sync"] =
         static_cast<double>(queue_submissions_per_sync);
+    iree_hal_amdgpu_benchmark_set_completion_wait_counters(state);
     state.SetItemsProcessed(state.iterations() * queue_submissions_per_sync);
   }
 
@@ -1512,6 +1514,7 @@ class QueueBenchmark : public benchmark::Fixture {
     state.counters["max_block_kernarg_bytes"] =
         static_cast<double>(program->max_block_kernarg_length);
     state.counters["queue_submissions_per_sync"] = 1.0;
+    iree_hal_amdgpu_benchmark_set_completion_wait_counters(state);
     state.SetItemsProcessed(state.iterations() * operation_count);
   }
 
