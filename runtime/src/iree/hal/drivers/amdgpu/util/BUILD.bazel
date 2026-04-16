@@ -173,6 +173,19 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "benchmark_flags",
+    testonly = True,
+    srcs = ["benchmark_flags.cc"],
+    hdrs = ["benchmark_flags.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
 cc_binary_benchmark(
     name = "blit_benchmark",
     srcs = ["blit_benchmark.cc"],
@@ -182,11 +195,13 @@ cc_binary_benchmark(
         "nodocker",
     ],
     deps = [
+        ":benchmark_flags",
         "//runtime/src:runtime_defines",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/amdgpu/registration",
         "@com_google_benchmark//:benchmark",
@@ -320,6 +335,7 @@ cc_binary_benchmark(
         "nodocker",
     ],
     deps = [
+        ":benchmark_flags",
         ":testdata_amdgpu_queue_benchmark",
         "//runtime/src:runtime_defines",
         "//runtime/src/iree/async",
