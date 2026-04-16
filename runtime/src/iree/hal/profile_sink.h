@@ -54,6 +54,10 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES \
   IREE_SV("application/vnd.iree.hal.profile.queues")
 
+// Content type for an array of iree_hal_profile_clock_correlation_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS \
+  IREE_SV("application/vnd.iree.hal.profile.clock-correlations")
+
 // Content type for an array of iree_hal_profile_dispatch_event_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.dispatch-events")
@@ -123,6 +127,66 @@ iree_hal_profile_queue_record_default(void) {
   record.record_length = sizeof(record);
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying which clock correlation fields are populated.
+typedef uint32_t iree_hal_profile_clock_correlation_flags_t;
+enum iree_hal_profile_clock_correlation_flag_bits_t {
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_NONE = 0u,
+
+  // |device_tick| contains a timestamp in the physical device's clock domain.
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK = 1u << 0,
+
+  // |host_cpu_timestamp_ns| contains a host CPU counter sampled by the driver.
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP = 1u << 1,
+
+  // |host_system_timestamp| and |host_system_frequency_hz| are populated.
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_SYSTEM_TIMESTAMP = 1u << 2,
+
+  // |host_time_begin_ns| and |host_time_end_ns| bracket the driver sample.
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET = 1u << 3,
+};
+
+// Correlates a physical device clock-domain tick with host clock domains.
+//
+// Producers should emit at least two records per physical device in a profiling
+// session when device-timestamped event records are present. Consumers should
+// treat the host bracket as uncertainty around the driver-provided sample and
+// should not assume one sample is sufficient to determine clock drift.
+typedef struct iree_hal_profile_clock_correlation_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags specifying which optional fields are populated.
+  iree_hal_profile_clock_correlation_flags_t flags;
+  // Session-local physical device ordinal owning |device_tick|.
+  uint32_t physical_device_ordinal;
+  // Reserved for future clock correlation record fields; must be zero.
+  uint32_t reserved0;
+  // Producer-defined sample identifier unique within the profiling session.
+  uint64_t sample_id;
+  // Device timestamp in the same domain as dispatch event start/end ticks.
+  uint64_t device_tick;
+  // Driver-sampled host CPU timestamp in nanoseconds, when available. This may
+  // be a different clock domain than the IREE monotonic host time bracket.
+  uint64_t host_cpu_timestamp_ns;
+  // Driver-sampled host system timestamp in |host_system_frequency_hz| units.
+  uint64_t host_system_timestamp;
+  // Frequency in Hz for |host_system_timestamp|.
+  uint64_t host_system_frequency_hz;
+  // IREE monotonic host timestamp immediately before the driver sample.
+  int64_t host_time_begin_ns;
+  // IREE monotonic host timestamp immediately after the driver sample.
+  int64_t host_time_end_ns;
+} iree_hal_profile_clock_correlation_record_t;
+
+// Returns a default clock correlation record.
+static inline iree_hal_profile_clock_correlation_record_t
+iree_hal_profile_clock_correlation_record_default(void) {
+  iree_hal_profile_clock_correlation_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
   return record;
 }
 

@@ -20,6 +20,7 @@
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
+#include "iree/hal/drivers/amdgpu/util/kfd.h"
 #include "iree/hal/drivers/amdgpu/util/notification_ring.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
@@ -281,6 +282,46 @@ static uint64_t iree_hal_amdgpu_logical_device_profile_queue_stream_id(
   return ((uint64_t)physical_device_ordinal << 32) | (uint64_t)queue_ordinal;
 }
 
+static iree_status_t
+iree_hal_amdgpu_logical_device_sample_profile_clock_correlation(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_amdgpu_physical_device_t* physical_device,
+    iree_hal_profile_clock_correlation_record_t* out_record) {
+  if (IREE_UNLIKELY(physical_device->device_ordinal > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile clock correlation physical device ordinal out of range: "
+        "%" PRIhsz,
+        physical_device->device_ordinal);
+  }
+
+  iree_hal_amdgpu_clock_counters_t counters = {0};
+  const iree_time_t host_time_begin_ns = iree_time_now();
+  iree_status_t status = iree_hal_amdgpu_kfd_get_clock_counters(
+      logical_device->system->kfd_fd, physical_device->kfd_gpu_uid, &counters);
+  const iree_time_t host_time_end_ns = iree_time_now();
+
+  if (iree_status_is_ok(status)) {
+    *out_record = iree_hal_profile_clock_correlation_record_default();
+    out_record->flags =
+        IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+        IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP |
+        IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_SYSTEM_TIMESTAMP |
+        IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET;
+    out_record->physical_device_ordinal =
+        (uint32_t)physical_device->device_ordinal;
+    out_record->sample_id =
+        logical_device->profiling.next_clock_correlation_sample_id++;
+    out_record->device_tick = counters.gpu_clock_counter;
+    out_record->host_cpu_timestamp_ns = counters.cpu_clock_counter;
+    out_record->host_system_timestamp = counters.system_clock_counter;
+    out_record->host_system_frequency_hz = counters.system_clock_freq;
+    out_record->host_time_begin_ns = host_time_begin_ns;
+    out_record->host_time_end_ns = host_time_end_ns;
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_write_profile_devices(
     iree_hal_amdgpu_logical_device_t* logical_device,
     iree_hal_profile_sink_t* sink, uint64_t session_id) {
@@ -434,13 +475,65 @@ static iree_status_t iree_hal_amdgpu_logical_device_write_profile_queues(
   return status;
 }
 
+static iree_status_t
+iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+  if (!sink) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  const iree_host_size_t record_count = logical_device->physical_device_count;
+  if (record_count == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "logical device has no physical devices (initialization incomplete)");
+  }
+
+  iree_host_size_t records_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &records_size,
+              IREE_STRUCT_FIELD(record_count,
+                                iree_hal_profile_clock_correlation_record_t,
+                                NULL)));
+  iree_hal_profile_clock_correlation_record_t* records = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(logical_device->host_allocator, records_size,
+                                (void**)&records));
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < record_count && iree_status_is_ok(status);
+       ++i) {
+    status = iree_hal_amdgpu_logical_device_sample_profile_clock_correlation(
+        logical_device, logical_device->physical_devices[i], &records[i]);
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS;
+    metadata.name = logical_device->identifier;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec =
+        iree_make_const_byte_span(records, records_size);
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  iree_allocator_free(logical_device->host_allocator, records);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_write_profile_metadata(
     iree_hal_amdgpu_logical_device_t* logical_device,
     iree_hal_profile_sink_t* sink, uint64_t session_id) {
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_devices(
       logical_device, sink, session_id));
-  return iree_hal_amdgpu_logical_device_write_profile_queues(logical_device,
-                                                             sink, session_id);
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_queues(
+      logical_device, sink, session_id));
+  return iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
+      logical_device, sink, session_id);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_write_profile_events(
@@ -1795,6 +1888,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_amdgpu_logical_device_profile_session_metadata(logical_device,
                                                               session_id);
+  logical_device->profiling.next_clock_correlation_sample_id = 1;
 
   bool sink_session_begun = false;
   iree_status_t status = iree_ok_status();
@@ -1823,6 +1917,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
           status, iree_hal_profile_sink_end_session(sink, &metadata,
                                                     iree_status_code(status)));
     }
+    logical_device->profiling.next_clock_correlation_sample_id = 0;
     iree_hal_profile_sink_release(sink);
   }
   return status;
@@ -1836,7 +1931,10 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_flush(
   if (logical_device->profiling.mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
     return iree_ok_status();
   }
-  return iree_hal_amdgpu_logical_device_write_profile_events(
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_events(
+      logical_device, logical_device->profiling.sink,
+      logical_device->profiling.session_id));
+  return iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
       logical_device, logical_device->profiling.sink,
       logical_device->profiling.session_id);
 }
@@ -1861,6 +1959,10 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   if (sink) {
     status = iree_hal_amdgpu_logical_device_write_profile_events(
         logical_device, sink, session_id);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
+          logical_device, sink, session_id);
+    }
   }
   if (iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(mode)) {
     status = iree_status_join(
@@ -1875,6 +1977,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
 
   logical_device->profiling.mode = IREE_HAL_DEVICE_PROFILING_MODE_NONE;
   logical_device->profiling.session_id = 0;
+  logical_device->profiling.next_clock_correlation_sample_id = 0;
   logical_device->profiling.sink = NULL;
   iree_hal_profile_sink_release(sink);
   return status;
