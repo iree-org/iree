@@ -28,25 +28,31 @@ using CommandBufferPtr =
 class AqlCommandBufferTest : public ::testing::Test {
  protected:
   void SetUp() override {
+    iree_hal_amdgpu_profile_metadata_initialize(iree_allocator_system(),
+                                                &profile_metadata_);
     IREE_ASSERT_OK(iree_hal_amdgpu_aql_program_block_pool_initialize(
         block_size_, iree_allocator_system(), &block_pool_));
   }
 
-  void TearDown() override { iree_arena_block_pool_deinitialize(&block_pool_); }
+  void TearDown() override {
+    iree_arena_block_pool_deinitialize(&block_pool_);
+    iree_hal_amdgpu_profile_metadata_deinitialize(&profile_metadata_);
+  }
 
   CommandBufferPtr CreateCommandBuffer(iree_host_size_t binding_capacity = 0) {
     iree_hal_command_buffer_t* command_buffer = nullptr;
     IREE_EXPECT_OK(iree_hal_amdgpu_aql_command_buffer_create(
         /*device_allocator=*/nullptr, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
         IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-        binding_capacity, /*device_ordinal=*/0, &block_pool_,
-        iree_allocator_system(), &command_buffer));
+        binding_capacity, /*device_ordinal=*/0, &profile_metadata_,
+        &block_pool_, iree_allocator_system(), &command_buffer));
     return CommandBufferPtr(command_buffer);
   }
 
  private:
   iree_host_size_t block_size_ = 256;
   iree_arena_block_pool_t block_pool_;
+  iree_hal_amdgpu_profile_metadata_registry_t profile_metadata_;
 };
 
 TEST_F(AqlCommandBufferTest, UnrecordedCommandBufferHasNoProgram) {

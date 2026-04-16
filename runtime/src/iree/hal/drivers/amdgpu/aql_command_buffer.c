@@ -78,6 +78,8 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   iree_hal_allocator_t* device_allocator;
   // Block pool used for durable command-buffer program blocks.
   iree_arena_block_pool_t* block_pool;
+  // Producer-local profile command-buffer id assigned at creation.
+  uint64_t profile_id;
   // Physical device ordinal selected from the command buffer's queue affinity.
   uint32_t device_ordinal;
   // Reserved bytes for stable layout.
@@ -522,8 +524,9 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_host_size_t device_ordinal, iree_arena_block_pool_t* block_pool,
-    iree_allocator_t host_allocator,
+    iree_host_size_t device_ordinal,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -573,9 +576,17 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
   iree_hal_amdgpu_aql_program_builder_initialize(block_pool,
                                                  &command_buffer->builder);
 
-  *out_command_buffer = &command_buffer->base;
+  iree_status_t status =
+      iree_hal_amdgpu_profile_metadata_register_command_buffer(
+          profile_metadata, mode, command_categories, queue_affinity,
+          device_ordinal, &command_buffer->profile_id);
+  if (iree_status_is_ok(status)) {
+    *out_command_buffer = &command_buffer->base;
+  } else {
+    iree_hal_amdgpu_aql_command_buffer_destroy(&command_buffer->base);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_amdgpu_aql_command_buffer_destroy(
@@ -612,6 +623,13 @@ iree_host_size_t iree_hal_amdgpu_aql_command_buffer_device_ordinal(
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
   return command_buffer->device_ordinal;
+}
+
+uint64_t iree_hal_amdgpu_aql_command_buffer_profile_id(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  return command_buffer->profile_id;
 }
 
 iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
@@ -1661,6 +1679,8 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
   dispatch_command->private_segment_size = kernel_args->private_segment_size;
   dispatch_command->group_segment_size =
       kernel_args->group_segment_size + config.dynamic_workgroup_local_memory;
+  dispatch_command->executable_id =
+      (uint32_t)iree_hal_amdgpu_executable_profile_id(executable);
 
   if (binding_sources && !uses_custom_direct_arguments) {
     IREE_RETURN_IF_ERROR(

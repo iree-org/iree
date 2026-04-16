@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
@@ -26,8 +27,9 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 // the lifetime of the cache.
 iree_status_t iree_hal_amdgpu_executable_cache_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_topology_t* topology, iree_string_view_t identifier,
-    iree_allocator_t host_allocator,
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_EXECUTABLE_CACHE_H_

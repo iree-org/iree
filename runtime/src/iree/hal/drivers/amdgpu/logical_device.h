@@ -12,6 +12,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
@@ -73,6 +74,10 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Next process-local profile session identifier allocated by this device.
   uint64_t next_profile_session_id;
 
+  // Durable profiling metadata registered by cold executable/command-buffer
+  // construction paths.
+  iree_hal_amdgpu_profile_metadata_registry_t profile_metadata;
+
   // Stable device identifier string stored inline after this struct.
   iree_string_view_t identifier;
 
@@ -112,6 +117,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     uint64_t session_id;
     // Next process-local clock-correlation sample identifier.
     uint64_t next_clock_correlation_sample_id;
+    // Cursor tracking metadata side-table chunks emitted in this session.
+    iree_hal_amdgpu_profile_metadata_cursor_t metadata_cursor;
     // Retained programmatic sink receiving HAL-native profiling chunks.
     iree_hal_profile_sink_t* sink;
   } profiling;

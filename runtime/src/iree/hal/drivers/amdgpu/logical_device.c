@@ -532,6 +532,9 @@ static iree_status_t iree_hal_amdgpu_logical_device_write_profile_metadata(
       logical_device, sink, session_id));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_queues(
       logical_device, sink, session_id));
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_write(
+      &logical_device->profile_metadata, sink, session_id,
+      logical_device->identifier, &logical_device->profiling.metadata_cursor));
   return iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
       logical_device, sink, session_id);
 }
@@ -889,6 +892,8 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
   logical_device->next_profile_session_id = 1;
+  iree_hal_amdgpu_profile_metadata_initialize(
+      host_allocator, &logical_device->profile_metadata);
 
   // Setup physical device table.
   // We need to initialize this first so that any failure cleanup has a valid
@@ -1013,6 +1018,9 @@ static void iree_hal_amdgpu_logical_device_destroy(
 
   // This may unload HSA; must come after all resources are released.
   iree_hal_amdgpu_system_free(logical_device->system);
+
+  iree_hal_amdgpu_profile_metadata_deinitialize(
+      &logical_device->profile_metadata);
 
   // Note that these may be used by other child data types and must be freed
   // last.
@@ -1565,6 +1573,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_command_buffer(
   return iree_hal_amdgpu_aql_command_buffer_create(
       iree_hal_device_allocator(base_device), mode, command_categories,
       effective_queue_affinity, binding_capacity, device_ordinal,
+      &logical_device->profile_metadata,
       &logical_device->host_block_pools.command_buffer,
       logical_device->host_allocator, out_command_buffer);
 }
@@ -1583,8 +1592,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_executable_cache(
       iree_hal_amdgpu_logical_device_cast(base_device);
   return iree_hal_amdgpu_executable_cache_create(
       &logical_device->system->libhsa, &logical_device->system->topology,
-      identifier, iree_hal_device_host_allocator(base_device),
-      out_executable_cache);
+      &logical_device->profile_metadata, identifier,
+      iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_import_file(
@@ -1889,6 +1898,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
       iree_hal_amdgpu_logical_device_profile_session_metadata(logical_device,
                                                               session_id);
   logical_device->profiling.next_clock_correlation_sample_id = 1;
+  memset(&logical_device->profiling.metadata_cursor, 0,
+         sizeof(logical_device->profiling.metadata_cursor));
 
   bool sink_session_begun = false;
   iree_status_t status = iree_ok_status();
@@ -1918,6 +1929,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
                                                     iree_status_code(status)));
     }
     logical_device->profiling.next_clock_correlation_sample_id = 0;
+    memset(&logical_device->profiling.metadata_cursor, 0,
+           sizeof(logical_device->profiling.metadata_cursor));
     iree_hal_profile_sink_release(sink);
   }
   return status;
@@ -1931,6 +1944,10 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_flush(
   if (logical_device->profiling.mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
     return iree_ok_status();
   }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_write(
+      &logical_device->profile_metadata, logical_device->profiling.sink,
+      logical_device->profiling.session_id, logical_device->identifier,
+      &logical_device->profiling.metadata_cursor));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_events(
       logical_device, logical_device->profiling.sink,
       logical_device->profiling.session_id));
@@ -1957,12 +1974,17 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
                                                               session_id);
 
   if (sink) {
+    status = iree_hal_amdgpu_profile_metadata_write(
+        &logical_device->profile_metadata, sink, session_id,
+        logical_device->identifier, &logical_device->profiling.metadata_cursor);
+  }
+  if (iree_status_is_ok(status) && sink) {
     status = iree_hal_amdgpu_logical_device_write_profile_events(
         logical_device, sink, session_id);
-    if (iree_status_is_ok(status)) {
-      status = iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
-          logical_device, sink, session_id);
-    }
+  }
+  if (iree_status_is_ok(status) && sink) {
+    status = iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
+        logical_device, sink, session_id);
   }
   if (iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(mode)) {
     status = iree_status_join(
@@ -1978,6 +2000,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   logical_device->profiling.mode = IREE_HAL_DEVICE_PROFILING_MODE_NONE;
   logical_device->profiling.session_id = 0;
   logical_device->profiling.next_clock_correlation_sample_id = 0;
+  memset(&logical_device->profiling.metadata_cursor, 0,
+         sizeof(logical_device->profiling.metadata_cursor));
   logical_device->profiling.sink = NULL;
   iree_hal_profile_sink_release(sink);
   return status;

@@ -944,6 +944,9 @@ typedef struct iree_hal_amdgpu_executable_t {
   // Loaded HSA executable with a code object for each device.
   hsa_executable_t handle;
 
+  // Producer-local profile executable id assigned at creation.
+  uint64_t profile_id;
+
   // Total number of exports in the executable.
   iree_host_size_t kernel_count;
   // Host-resident reflection information for each export.
@@ -1773,8 +1776,10 @@ iree_status_t iree_hal_amdgpu_executable_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
+  IREE_ASSERT_ARGUMENT(profile_metadata);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1827,8 +1832,27 @@ iree_status_t iree_hal_amdgpu_executable_create(
         libhsa, topology, executable_params, &limits, any_device_agent,
         host_allocator, out_executable);
   }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_executable_t* executable =
+        iree_hal_amdgpu_executable_cast(*out_executable);
+    status = iree_hal_amdgpu_profile_metadata_register_executable(
+        profile_metadata, executable->kernel_count, executable->export_infos,
+        executable->export_parameter_offsets, executable->host_kernel_args,
+        &executable->profile_id);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_executable_release(*out_executable);
+    *out_executable = NULL;
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+uint64_t iree_hal_amdgpu_executable_profile_id(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_amdgpu_executable_t* executable =
+      iree_hal_amdgpu_executable_cast(base_executable);
+  return executable->profile_id;
 }
 
 static void iree_hal_amdgpu_executable_destroy(

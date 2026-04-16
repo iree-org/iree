@@ -56,6 +56,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "profile_metadata.c"
+    "profile_metadata.h"
     "semaphore.c"
     "semaphore.h"
     "slab_provider.c"
@@ -122,6 +124,7 @@ iree_cc_library(
     "host_queue_waits.h"
     "logical_device.h"
     "physical_device.h"
+    "profile_metadata.h"
     "semaphore.h"
     "slab_provider.h"
     "system.h"
@@ -131,6 +134,7 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::arena
+    iree::base::threading
     iree::hal
     iree::hal::drivers::amdgpu::abi
     iree::hal::drivers::amdgpu::device::binaries::toc

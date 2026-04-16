@@ -344,13 +344,15 @@ iree_hal_amdgpu_host_queue_command_buffer_profile_dispatch_event_count(
 }
 
 static void iree_hal_amdgpu_host_queue_initialize_command_buffer_dispatch_event(
-    iree_hal_amdgpu_profile_dispatch_event_t* event,
+    iree_hal_amdgpu_profile_dispatch_event_t* event, uint64_t command_buffer_id,
     const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command) {
   const uint64_t event_id = event->event_id;
   memset(event, 0, sizeof(*event));
   event->record_length = sizeof(*event);
   event->flags = IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
   event->event_id = event_id;
+  event->command_buffer_id = command_buffer_id;
+  event->executable_id = dispatch_command->executable_id;
   if (iree_hal_amdgpu_host_queue_dispatch_uses_indirect_parameters(
           dispatch_command)) {
     event->flags |=
@@ -1302,6 +1304,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
     iree_hal_amdgpu_profile_dispatch_harvest_source_t*
         profile_harvest_sources) {
   const bool profile_dispatch_packets = profile_events.event_count != 0;
+  const uint64_t command_buffer_id =
+      profile_dispatch_packets
+          ? iree_hal_amdgpu_aql_command_buffer_profile_id(command_buffer)
+          : 0;
   const iree_hal_amdgpu_command_buffer_command_header_t* command =
       iree_hal_amdgpu_command_buffer_block_commands_const(block);
   bool reached_terminator = false;
@@ -1367,7 +1373,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
                   iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
                       queue, profile_event_position);
               iree_hal_amdgpu_host_queue_initialize_command_buffer_dispatch_event(
-                  event, dispatch_command);
+                  event, command_buffer_id, dispatch_command);
               profile_harvest_sources[profile_event_index].completion_signal =
                   iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
                       queue, dispatch_packet_id);
@@ -1423,7 +1429,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
                   iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
                       queue, profile_event_position);
               iree_hal_amdgpu_host_queue_initialize_command_buffer_dispatch_event(
-                  event, dispatch_command);
+                  event, command_buffer_id, dispatch_command);
               profile_harvest_sources[profile_event_index].completion_signal =
                   iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
                       queue, dispatch_packet_id);
