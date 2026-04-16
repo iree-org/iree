@@ -8,23 +8,32 @@
 
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 
 static_assert(IREE_HAL_AMDGPU_DEVICE_BUFFER_FILL_KERNARG_SIZE <=
                   sizeof(iree_hal_amdgpu_kernarg_block_t),
               "fill kernargs must fit in one kernarg ring block");
 
-// Prepares a fill dispatch packet and kernargs in stack-local storage without
-// touching queue rings. All user-input validation must happen here so the
-// caller can avoid reserving AQL slots before the packet shape is known-valid.
-static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_dispatch(
-    const iree_hal_amdgpu_host_queue_t* queue, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length,
-    uint64_t pattern_bits, iree_host_size_t pattern_length,
-    iree_hal_fill_flags_t flags,
-    iree_hsa_kernel_dispatch_packet_t* out_dispatch_packet,
-    iree_hal_amdgpu_device_buffer_fill_kernargs_t* out_kernargs) {
+// PM4 WRITE_DATA payload for tiny queue_fill/queue_update operations.
+typedef struct iree_hal_amdgpu_host_queue_pm4_write_data_t {
+  // Device-visible target pointer written by PM4 WRITE_DATA.
+  void* target_device_ptr;
+  // Immediate value written to |target_device_ptr|.
+  uint64_t value;
+  // Byte length written from |value|; currently 4 or 8.
+  uint8_t length;
+} iree_hal_amdgpu_host_queue_pm4_write_data_t;
+
+// Validates a queue_fill target and resolves the target device pointer.
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_target(
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_host_size_t pattern_length,
+    iree_hal_fill_flags_t flags, uint8_t** out_target_device_ptr) {
+  *out_target_device_ptr = NULL;
+
   if (IREE_UNLIKELY(!target_buffer)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "target buffer must be non-null");
@@ -62,6 +71,119 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_dispatch(
   target_device_ptr +=
       iree_hal_buffer_byte_offset(target_buffer) + target_offset;
 
+  *out_target_device_ptr = target_device_ptr;
+  return iree_ok_status();
+}
+
+// Returns the low-byte fill pattern extended to a full 64-bit repetition.
+static uint64_t iree_hal_amdgpu_host_queue_extend_fill_pattern_x8(
+    uint64_t pattern_bits, iree_host_size_t pattern_length) {
+  switch (pattern_length) {
+    case 1: {
+      const uint64_t pattern = pattern_bits & 0xFFu;
+      return pattern * 0x0101010101010101ull;
+    }
+    case 2: {
+      const uint64_t pattern = pattern_bits & 0xFFFFu;
+      return pattern | (pattern << 16) | (pattern << 32) | (pattern << 48);
+    }
+    default: {
+      const uint64_t pattern = pattern_bits & 0xFFFFFFFFull;
+      return pattern | (pattern << 32);
+    }
+  }
+}
+
+static bool iree_hal_amdgpu_host_queue_can_use_pm4_write_data(
+    const iree_hal_amdgpu_host_queue_t* queue, const void* target_device_ptr,
+    iree_host_size_t length) {
+  return queue->pm4_ib_slots && (length == 4 || length == 8) &&
+         iree_host_ptr_has_alignment(target_device_ptr, sizeof(uint32_t));
+}
+
+static bool iree_hal_amdgpu_host_queue_prepare_pm4_fill_write_data(
+    const iree_hal_amdgpu_host_queue_t* queue, void* target_device_ptr,
+    iree_device_size_t length, uint64_t pattern_bits,
+    iree_host_size_t pattern_length,
+    iree_hal_amdgpu_host_queue_pm4_write_data_t* out_write_data) {
+  if (length != 4 && length != 8) {
+    return false;
+  }
+  if (!iree_hal_amdgpu_host_queue_can_use_pm4_write_data(
+          queue, target_device_ptr, (iree_host_size_t)length)) {
+    return false;
+  }
+  if (!iree_host_ptr_has_alignment(target_device_ptr, pattern_length) ||
+      !iree_device_size_has_alignment(length, pattern_length)) {
+    return false;
+  }
+
+  out_write_data->target_device_ptr = target_device_ptr;
+  out_write_data->value = iree_hal_amdgpu_host_queue_extend_fill_pattern_x8(
+      pattern_bits, pattern_length);
+  out_write_data->length = (uint8_t)length;
+  return true;
+}
+
+static bool iree_hal_amdgpu_host_queue_prepare_pm4_update_write_data(
+    const iree_hal_amdgpu_host_queue_t* queue, const uint8_t* source_bytes,
+    iree_host_size_t source_length, void* target_device_ptr,
+    iree_hal_amdgpu_host_queue_pm4_write_data_t* out_write_data) {
+  if (!iree_hal_amdgpu_host_queue_can_use_pm4_write_data(
+          queue, target_device_ptr, source_length)) {
+    return false;
+  }
+
+  out_write_data->target_device_ptr = target_device_ptr;
+  out_write_data->value = 0;
+  out_write_data->length = (uint8_t)source_length;
+  memcpy(&out_write_data->value, source_bytes, source_length);
+  return true;
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_write_data(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer,
+    const iree_hal_amdgpu_host_queue_pm4_write_data_t* write_data,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
+  iree_hal_resource_t* operation_resources[1] = {
+      (iree_hal_resource_t*)target_buffer,
+  };
+
+  iree_hal_amdgpu_host_queue_pm4_ib_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list,
+      IREE_ARRAYSIZE(operation_resources), out_ready, &submission));
+  if (!*out_ready) return iree_ok_status();
+
+  if (write_data->length == 4) {
+    uint32_t value = 0;
+    memcpy(&value, &write_data->value, sizeof(value));
+    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_write_data32(
+        submission.pm4_ib_slot, write_data->target_device_ptr, value);
+  } else {
+    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_write_data64(
+        submission.pm4_ib_slot, write_data->target_device_ptr,
+        write_data->value);
+  }
+  iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      IREE_ARRAYSIZE(operation_resources), submission_flags, &submission);
+  return iree_ok_status();
+}
+
+// Prepares a fill dispatch packet and kernargs in stack-local storage without
+// touching queue rings. All user-input validation must happen before this so
+// the caller can avoid reserving AQL slots before the packet shape is known.
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_dispatch(
+    const iree_hal_amdgpu_host_queue_t* queue, uint8_t* target_device_ptr,
+    iree_device_size_t length, uint64_t pattern_bits,
+    iree_host_size_t pattern_length,
+    iree_hsa_kernel_dispatch_packet_t* out_dispatch_packet,
+    iree_hal_amdgpu_device_buffer_fill_kernargs_t* out_kernargs) {
   iree_hsa_kernel_dispatch_packet_t dispatch_packet;
   memset(&dispatch_packet, 0, sizeof(dispatch_packet));
   iree_hal_amdgpu_device_buffer_fill_kernargs_t kernargs;
@@ -69,11 +191,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_dispatch(
   if (IREE_UNLIKELY(!iree_hal_amdgpu_device_buffer_fill_emplace(
           queue->transfer_context, &dispatch_packet, target_device_ptr, length,
           pattern_bits, (uint8_t)pattern_length, &kernargs))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "unsupported fill dispatch shape (target_offset=%" PRIdsz
-        ", length=%" PRIdsz ", pattern_length=%" PRIhsz ")",
-        target_offset, length, pattern_length);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported fill dispatch shape (length=%" PRIdsz
+                            ", pattern_length=%" PRIhsz ")",
+                            length, pattern_length);
   }
   dispatch_packet.kernarg_address = NULL;
 
@@ -97,11 +218,25 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_fill(
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
 
+  uint8_t* target_device_ptr = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_fill_target(
+      target_buffer, target_offset, length, pattern_length, flags,
+      &target_device_ptr));
+
+  iree_hal_amdgpu_host_queue_pm4_write_data_t pm4_write_data;
+  if (iree_hal_amdgpu_host_queue_prepare_pm4_fill_write_data(
+          queue, target_device_ptr, length, pattern_bits, pattern_length,
+          &pm4_write_data)) {
+    return iree_hal_amdgpu_host_queue_submit_pm4_write_data(
+        queue, resolution, signal_semaphore_list, target_buffer,
+        &pm4_write_data, submission_flags, out_ready);
+  }
+
   iree_hsa_kernel_dispatch_packet_t dispatch_packet;
   iree_hal_amdgpu_device_buffer_fill_kernargs_t kernargs;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_fill_dispatch(
-      queue, target_buffer, target_offset, length, pattern_bits, pattern_length,
-      flags, &dispatch_packet, &kernargs));
+      queue, target_device_ptr, length, pattern_bits, pattern_length,
+      &dispatch_packet, &kernargs));
 
   iree_hal_resource_t* operation_resources[1] = {
       (iree_hal_resource_t*)target_buffer,
@@ -407,6 +542,15 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_update_copy(
       target_buffer, target_offset, source_buffer, source_offset, length, flags,
       &source_bytes, &source_length, &target_device_ptr));
+
+  iree_hal_amdgpu_host_queue_pm4_write_data_t pm4_write_data;
+  if (iree_hal_amdgpu_host_queue_prepare_pm4_update_write_data(
+          queue, source_bytes, source_length, target_device_ptr,
+          &pm4_write_data)) {
+    return iree_hal_amdgpu_host_queue_submit_pm4_write_data(
+        queue, resolution, signal_semaphore_list, target_buffer,
+        &pm4_write_data, submission_flags, out_ready);
+  }
 
   const iree_host_size_t source_payload_offset =
       IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_STAGED_SOURCE_OFFSET;

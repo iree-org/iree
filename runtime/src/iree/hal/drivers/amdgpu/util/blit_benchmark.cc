@@ -9,6 +9,7 @@
 #include <benchmark/benchmark.h>
 
 #include <cstdint>
+#include <vector>
 
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
@@ -157,6 +158,29 @@ class BlitBenchmark : public benchmark::Fixture {
     return true;
   }
 
+  bool PrepareUpdate(benchmark::State& state) {
+    if (!available_) return false;
+    length_ = static_cast<iree_device_size_t>(state.range(0));
+    source_offset_ = static_cast<iree_device_size_t>(state.range(1));
+    target_offset_ = static_cast<iree_device_size_t>(state.range(2));
+    batch_count_ = 1;
+
+    allocation_size_ =
+        iree_device_align(target_offset_ + length_ + kBenchmarkBufferAlignment,
+                          kBenchmarkBufferAlignment);
+    update_source_.resize(source_offset_ + length_ + kBenchmarkBufferAlignment);
+    for (size_t i = 0; i < update_source_.size(); ++i) {
+      update_source_[i] = static_cast<uint8_t>(0xA0u + (i & 0x3Fu));
+    }
+    return AllocateBenchmarkBuffers(state, /*needs_source=*/false);
+  }
+
+  bool PrepareUpdateBatch(benchmark::State& state, int64_t batch_count) {
+    if (!PrepareUpdate(state)) return false;
+    batch_count_ = batch_count;
+    return true;
+  }
+
   iree_status_t QueueCopyAndWait() {
     iree_hal_semaphore_t* semaphore = completion_semaphore_;
     uint64_t payload_value = ++completion_payload_value_;
@@ -269,6 +293,60 @@ class BlitBenchmark : public benchmark::Fixture {
     return iree_ok_status();
   }
 
+  iree_status_t QueueUpdateAndWait() {
+    iree_hal_semaphore_t* semaphore = completion_semaphore_;
+    uint64_t payload_value = ++completion_payload_value_;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        /*count=*/1,
+        /*semaphores=*/&semaphore,
+        /*payload_values=*/&payload_value,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_update(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+        signal_semaphore_list, update_source_.data(),
+        (iree_host_size_t)source_offset_, target_buffer_, target_offset_,
+        length_, IREE_HAL_UPDATE_FLAG_NONE));
+    return WaitForCompletion(payload_value);
+  }
+
+  iree_status_t QueueUpdateBatchAndWait() {
+    uint64_t payload_value = 0;
+    IREE_RETURN_IF_ERROR(QueueUpdateBatchSubmit(&payload_value));
+    return WaitForCompletion(payload_value);
+  }
+
+  iree_status_t QueueUpdateBatchSubmit(uint64_t* out_payload_value) {
+    iree_hal_semaphore_t* semaphore = completion_semaphore_;
+    uint64_t payload_value = completion_payload_value_;
+    for (int64_t i = 0; i < batch_count_; ++i) {
+      uint64_t wait_payload_value = payload_value;
+      uint64_t signal_payload_value = payload_value + 1;
+      iree_hal_semaphore_list_t wait_semaphore_list =
+          iree_hal_semaphore_list_empty();
+      if (i > 0) {
+        wait_semaphore_list = {
+            /*count=*/1,
+            /*semaphores=*/&semaphore,
+            /*payload_values=*/&wait_payload_value,
+        };
+      }
+      iree_hal_semaphore_list_t signal_semaphore_list = {
+          /*count=*/1,
+          /*semaphores=*/&semaphore,
+          /*payload_values=*/&signal_payload_value,
+      };
+      IREE_RETURN_IF_ERROR(iree_hal_device_queue_update(
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
+          signal_semaphore_list, update_source_.data(),
+          (iree_host_size_t)source_offset_, target_buffer_, target_offset_,
+          length_, IREE_HAL_UPDATE_FLAG_NONE));
+      payload_value = signal_payload_value;
+    }
+    completion_payload_value_ = payload_value;
+    *out_payload_value = payload_value;
+    return iree_ok_status();
+  }
+
   iree_status_t WaitForCompletion(uint64_t payload_value) {
     return iree_hal_semaphore_wait(
         completion_semaphore_, payload_value, iree_infinite_timeout(),
@@ -348,6 +426,7 @@ class BlitBenchmark : public benchmark::Fixture {
     target_buffer_ = nullptr;
     completion_semaphore_ = nullptr;
     completion_payload_value_ = 0;
+    update_source_.clear();
   }
 
   static bool initialized_;
@@ -368,6 +447,7 @@ class BlitBenchmark : public benchmark::Fixture {
   iree_host_size_t pattern_length_ = 1;
   int64_t batch_count_ = 1;
   uint32_t fill_pattern_ = 0xDEADBEEFu;
+  std::vector<uint8_t> update_source_;
 };
 
 bool BlitBenchmark::initialized_ = false;
@@ -452,6 +532,44 @@ BENCHMARK_DEFINE_F(BlitBenchmark,
   SetBytesProcessed(state);
 }
 
+BENCHMARK_DEFINE_F(BlitBenchmark, QueueUpdate)(benchmark::State& state) {
+  if (!PrepareUpdate(state)) return;
+  for (auto _ : state) {
+    if (!HandleStatus(state, QueueUpdateAndWait(), "queue_update failed")) {
+      break;
+    }
+  }
+  SetBytesProcessed(state);
+}
+
+BENCHMARK_DEFINE_F(BlitBenchmark, QueueUpdateBatch20)(benchmark::State& state) {
+  if (!PrepareUpdateBatch(state, kBatchCount)) return;
+  for (auto _ : state) {
+    if (!HandleStatus(state, QueueUpdateBatchAndWait(),
+                      "queue_update batch failed")) {
+      break;
+    }
+  }
+  SetBytesProcessed(state);
+}
+
+BENCHMARK_DEFINE_F(BlitBenchmark,
+                   QueueUpdateBatch20SubmitOnly)(benchmark::State& state) {
+  if (!PrepareUpdateBatch(state, kBatchCount)) return;
+  for (auto _ : state) {
+    uint64_t payload_value = 0;
+    if (!HandleStatus(state, QueueUpdateBatchSubmit(&payload_value),
+                      "queue_update batch submit failed")) {
+      break;
+    }
+    state.PauseTiming();
+    iree_status_t status = WaitForCompletion(payload_value);
+    state.ResumeTiming();
+    if (!HandleStatus(state, status, "queue_update batch wait failed")) break;
+  }
+  SetBytesProcessed(state);
+}
+
 void ApplyCopyArguments(benchmark::Benchmark* benchmark) {
   benchmark->ArgNames({"length", "source_offset", "target_offset"});
   const int64_t common_sizes[] = {
@@ -507,6 +625,32 @@ void ApplyFillSubmitOnlyArguments(benchmark::Benchmark* benchmark) {
   benchmark->Args({4096, 0, 4});
 }
 
+void ApplyUpdateArguments(benchmark::Benchmark* benchmark) {
+  benchmark->ArgNames({"length", "source_offset", "target_offset"});
+  const int64_t common_sizes[] = {
+      4, 8, 16, 31, 32, 33, 64, 128, 256, 1024, 4 * 1024, 16 * 1024, 64 * 1024,
+  };
+  const int64_t alignment_cases[][2] = {
+      {0, 0},
+      {3, 0},
+      {5, 4},
+      {1, 1},
+  };
+  for (int64_t length : common_sizes) {
+    for (const auto& alignment_case : alignment_cases) {
+      benchmark->Args({length, alignment_case[0], alignment_case[1]});
+    }
+  }
+}
+
+void ApplyUpdateSubmitOnlyArguments(benchmark::Benchmark* benchmark) {
+  benchmark->ArgNames({"length", "source_offset", "target_offset"});
+  benchmark->Args({4, 0, 0});
+  benchmark->Args({8, 3, 0});
+  benchmark->Args({64, 0, 0});
+  benchmark->Args({4096, 0, 0});
+}
+
 BENCHMARK_REGISTER_F(BlitBenchmark, QueueCopy)
     ->Apply(ApplyCopyArguments)
     ->UseRealTime()
@@ -530,6 +674,19 @@ BENCHMARK_REGISTER_F(BlitBenchmark, QueueFillBatch20)
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(BlitBenchmark, QueueFillBatch20SubmitOnly)
     ->Apply(ApplyFillSubmitOnlyArguments)
+    ->Iterations(kSubmitOnlyIterations)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(BlitBenchmark, QueueUpdate)
+    ->Apply(ApplyUpdateArguments)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(BlitBenchmark, QueueUpdateBatch20)
+    ->Apply(ApplyUpdateArguments)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(BlitBenchmark, QueueUpdateBatch20SubmitOnly)
+    ->Apply(ApplyUpdateSubmitOnlyArguments)
     ->Iterations(kSubmitOnlyIterations)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);

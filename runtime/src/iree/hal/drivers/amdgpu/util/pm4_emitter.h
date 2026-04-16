@@ -23,9 +23,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Queue-private PM4 IB slot. These are allocated only for queues using the PM4
-// WAIT_REG_MEM64 fallback. The slot count always matches the AQL ring capacity,
-// so AQL packet id N uses pm4_ib_slots[N & aql_ring.mask].
+// Queue-private PM4 IB slot. The slot count always matches the AQL ring
+// capacity, so AQL packet id N uses pm4_ib_slots[N & aql_ring.mask].
 typedef struct IREE_AMDGPU_ALIGNAS(64) iree_hal_amdgpu_pm4_ib_slot_t {
   // Encoded PM4 packet words consumed by a PM4-IB AQL packet.
   uint32_t dwords[16];
@@ -34,8 +33,11 @@ IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
                           "PM4 IB slot must be exactly one cache line");
 
 enum {
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
+  IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 = 2 << 8,
+  IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY = 1,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM = 0,
@@ -93,6 +95,37 @@ static inline uint32_t iree_hal_amdgpu_pm4_emit_wait_reg_mem64(
   dword[7] = (uint32_t)((uint64_t)mask >> 32);
   dword[8] = 4 | IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE;
   return 9;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_emit_write_data32(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot, void* target, uint32_t value) {
+  memset(slot, 0, sizeof(*slot));
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = slot->dwords;
+  dword[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 5);
+  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[4] = value;
+  return 5;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_emit_write_data64(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot, void* target, uint64_t value) {
+  memset(slot, 0, sizeof(*slot));
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = slot->dwords;
+  dword[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 6);
+  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[4] = (uint32_t)value;
+  dword[5] = (uint32_t)(value >> 32);
+  return 6;
 }
 
 static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib(

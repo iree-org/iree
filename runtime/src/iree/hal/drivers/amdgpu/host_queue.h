@@ -155,10 +155,10 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Per-queue kernarg bump allocator backed by HSA kernarg-init memory.
   iree_hal_amdgpu_kernarg_ring_t kernarg_ring;
 
-  // Optional per-AQL-slot PM4 IB buffer used when the agent lacks BARRIER_VALUE
-  // but supports PM4 WAIT_REG_MEM64. This is not an independent scheduling
-  // ring: each slot is indexed by the matching AQL packet id and inherits the
-  // AQL ring's lifetime/backpressure.
+  // Optional per-AQL-slot PM4 IB buffer used by PM4-backed wait and transfer
+  // strategies. This is not an independent scheduling ring: each slot is
+  // indexed by the matching AQL packet id and inherits the AQL ring's
+  // lifetime/backpressure.
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots;
 
   // Epoch-driven notification ring mapping submission completions to
