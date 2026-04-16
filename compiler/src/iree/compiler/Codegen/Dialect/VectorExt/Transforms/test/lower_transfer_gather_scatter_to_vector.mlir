@@ -200,6 +200,25 @@ func.func @lower_masked_scatter(
 
 // -----
 
+func.func @lower_scatter_memref(
+    %src: vector<8xf32>, %dest: memref<4x16xf32>,
+    %idx: vector<8xindex>) {
+  %c0 = arith.constant 0 : index
+  iree_vector_ext.transfer_scatter %src into %dest[%c0, %c0]
+    [%idx : vector<8xindex>] {
+      indexing_maps = [affine_map<(d0)[s0] -> (0, s0)>,
+                       affine_map<(d0)[s0] -> (d0)>]
+    } : vector<8xf32>, memref<4x16xf32>
+  return
+}
+// CHECK-LABEL: @lower_scatter_memref
+// CHECK-DAG:   %[[MASK:.+]] = arith.constant dense<true> : vector<8xi1>
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       vector.scatter
+// CHECK-NOT:   iree_vector_ext.transfer_scatter
+
+// -----
+
 func.func @negative_lower_scatter_multiple_index_vecs(
     %src: vector<8x16xf16>, %dest: tensor<8x16xf16>,
     %i0: vector<8xindex>, %i1: vector<16xindex>) -> tensor<8x16xf16> {
@@ -265,3 +284,5 @@ func.func @negative_lower_scatter_nonconstant_leading_dim(
 // CHECK-LABEL: @negative_lower_scatter_nonconstant_leading_dim
 // CHECK: iree_vector_ext.transfer_scatter
 // CHECK-NOT: vector.scatter
+
+// -----

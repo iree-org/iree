@@ -116,10 +116,15 @@ struct LowerTransferScatterToVectorScatter final
                                        DenseElementsAttr::get(maskType, true));
     }
 
-    auto scatterOp = vector::ScatterOp::create(
-        rewriter, loc, op.getBase().getType(), op.getBase(), op.getOffsets(),
-        indexVec, mask, op.getVector());
-    rewriter.replaceOp(op, scatterOp.getResult());
+    Type resultType = op.hasTensorSemantics() ? op.getBase().getType() : Type{};
+    auto scatterOp = vector::ScatterOp::create(rewriter, loc, resultType,
+                                               op.getBase(), op.getOffsets(),
+                                               indexVec, mask, op.getVector());
+    if (op.hasTensorSemantics()) {
+      rewriter.replaceOp(op, scatterOp.getResult());
+    } else {
+      rewriter.eraseOp(op);
+    }
     return success();
   }
 };
