@@ -50,7 +50,9 @@ typedef struct iree_hal_amdgpu_host_block_pools_t {
 // implementation does not currently handle taking the minimum capabilities and
 // limits.
 typedef struct iree_hal_amdgpu_logical_device_t {
+  // HAL resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for logical-device-owned host allocations.
   iree_allocator_t host_allocator;
 
   // Proactor pool retained from create_params; provides async I/O proactors.
@@ -68,6 +70,10 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Logical-device epoch counter for frontier tracking.
   iree_atomic_int64_t epoch;
 
+  // Next process-local profile session identifier allocated by this device.
+  uint64_t next_profile_session_id;
+
+  // Stable device identifier string stored inline after this struct.
   iree_string_view_t identifier;
 
   // Block pools for host memory blocks of various sizes.
@@ -97,6 +103,18 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // loss" trigger.
   iree_atomic_intptr_t failure_status;
 
+  // Active profiling session state. Mutated only by the HAL profiling
+  // begin/end API while its idle-device precondition is held.
+  struct {
+    // Active profiling modes, or NONE when profiling is disabled.
+    iree_hal_device_profiling_mode_t mode;
+    // Process-local profiling session identifier assigned at begin.
+    uint64_t session_id;
+    // Retained programmatic sink receiving HAL-native profiling chunks.
+    iree_hal_profile_sink_t* sink;
+  } profiling;
+
+  // Topology metadata assigned by the device group after construction.
   iree_hal_device_topology_info_t topology_info;
 
   // Count of physical devices.

@@ -282,6 +282,13 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // of issuing new AQL packets.
   bool is_shutting_down;
 
+  // Profiling mode state for this queue. Mutated only by device profiling
+  // begin/end while the profiling API's idle-device precondition is held.
+  struct {
+    // True when ROCR should populate dispatch completion signal timestamps.
+    uint32_t hsa_queue_timestamps_enabled : 1;
+  } profiling;
+
   // False once this queue's accumulated frontier overflows while merging waited
   // axes. After that, the frontier remains a safe lower bound for resolving
   // this queue's own waits, but it is no longer a conservative summary that can
@@ -502,6 +509,14 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
 // The caller must ensure no concurrent access to the queue during deinit.
 void iree_hal_amdgpu_host_queue_deinitialize(
     iree_hal_amdgpu_host_queue_t* queue);
+
+// Enables or disables HSA dispatch timestamp population for this queue.
+//
+// This toggles the ROCR queue profiler bit. It is a cold profiling-session
+// operation and must only be called while the device is idle, matching the HAL
+// profiling API contract.
+iree_status_t iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
+    iree_hal_amdgpu_host_queue_t* queue, bool enabled);
 
 #ifdef __cplusplus
 }  // extern "C"

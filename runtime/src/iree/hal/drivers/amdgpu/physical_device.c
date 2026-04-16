@@ -736,6 +736,43 @@ void iree_hal_amdgpu_physical_device_deassign_frontier(
   IREE_TRACE_ZONE_END(z0);
 }
 
+iree_status_t iree_hal_amdgpu_physical_device_set_hsa_profiling_enabled(
+    iree_hal_amdgpu_physical_device_t* physical_device, bool enabled) {
+  IREE_ASSERT_ARGUMENT(physical_device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, enabled ? 1 : 0);
+
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t changed_count = 0;
+  for (iree_host_size_t i = 0;
+       i < physical_device->host_queue_count && iree_status_is_ok(status);
+       ++i) {
+    status = iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
+        &physical_device->host_queues[i], enabled);
+    if (iree_status_is_ok(status)) {
+      ++changed_count;
+    }
+  }
+
+  if (!iree_status_is_ok(status) && enabled) {
+    for (iree_host_size_t i = 0; i < changed_count; ++i) {
+      status = iree_status_join(
+          status, iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
+                      &physical_device->host_queues[i], false));
+    }
+  } else if (!enabled) {
+    for (iree_host_size_t i = changed_count;
+         i < physical_device->host_queue_count; ++i) {
+      status = iree_status_join(
+          status, iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
+                      &physical_device->host_queues[i], false));
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 void iree_hal_amdgpu_physical_device_deinitialize(
     iree_hal_amdgpu_physical_device_t* physical_device) {
   IREE_ASSERT_ARGUMENT(physical_device);
