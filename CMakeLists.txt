@@ -50,6 +50,8 @@ option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the R
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
+# Enables POSIX API support. When disabled, tools requiring POSIX (e.g., iree-flatcc-cli) will not be built.
+option(IREE_ENABLE_POSIX "Builds IREE in with POSIX support." ON)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
 set(IREE_TRACING_PROVIDER ${IREE_TRACING_PROVIDER_DEFAULT} CACHE STRING "Chooses which built-in tracing implementation is used when tracing is enabled.")
