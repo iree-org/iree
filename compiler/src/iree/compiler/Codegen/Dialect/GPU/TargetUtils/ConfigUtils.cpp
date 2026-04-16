@@ -319,7 +319,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   } else {
     for (IREE::GPU::MmaInterfaceAttr mma :
          getMMAAttrs(target, /*includeVirtual=*/false)) {
-      auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
       // Only group convolutions show a clear gain from block intrinsics.
       if (mma.isBlockIntrinsic() && isGemm) {
