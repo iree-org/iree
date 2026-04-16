@@ -17,6 +17,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -1363,6 +1364,79 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   });
 
   return rootOps;
+}
+
+// Find the root operation. linalg.generic, linalg.fill, linalg.pack,
+// linalg.unpack, and scatter are not root operations if there are other
+// compute operations present. Also, construct a set of generic ops that
+// are to be skipped. These generic ops that are used to compute scatter
+// indices are not root operations.
+Operation *GetRootOperation(ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
+
+  llvm::SmallDenseSet<Operation *, 4> genericToSkip;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (!isa<linalg::CopyOp, linalg::GenericOp, linalg::FillOp,
+             IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapStoreOp,
+             linalg::PackOp, linalg::UnPackOp>(op)) {
+      rootOperation = op;
+      break;
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      // linalg.generic with `reduction` iterator types are roots as well.
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+        rootOperation = op;
+        break;
+      }
+    }
+
+    if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
+      Value indices = scatterOp.getIndices();
+      if (!indices.getDefiningOp()) {
+        continue;
+      }
+
+      // Mark scatter's backward slices(inclusive) as to skip.
+      BackwardSliceOptions options;
+      options.inclusive = true;
+      SetVector<Operation *> slices;
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(indices, &slices, options);
+      assert(result.succeeded());
+      genericToSkip.insert(slices.begin(), slices.end());
+    }
+  }
+
+  // Generic ops take priority over pack, unpack, scatter, and fill ops as the
+  // root op.
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  // Pack and unpack ops take priority over scatter and fill ops as the root op.
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::PackOp, linalg::UnPackOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapStoreOp,
+              linalg::CopyOp, linalg::FillOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
 }
 
 } // namespace mlir::iree_compiler
