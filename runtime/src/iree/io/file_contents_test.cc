@@ -130,6 +130,41 @@ TEST(FileContents, ReadWriteContentsMmap) {
   iree_io_file_contents_free(read_contents);
 }
 
+// Tests that a file opened for reading can be opened again concurrently.
+// Validates FILE_SHARE_READ behavior on Windows — without it, the second
+// open fails with ERROR_SHARING_VIOLATION.
+TEST(FileContents, ConcurrentReadOpens) {
+  constexpr const char* kUniqueName = "ConcurrentReadOpens";
+  auto path = GetUniquePath(kUniqueName);
+
+  // Write a file to open.
+  auto contents = GetUniqueContents(kUniqueName, 4096);
+  IREE_ASSERT_OK(iree_io_file_contents_write(
+      iree_make_string_view(path.data(), path.size()),
+      iree_make_const_byte_span(contents.data(), contents.size()),
+      iree_allocator_system()));
+
+  // Open the file twice for reading — both should succeed.
+  iree_io_file_contents_t* read1 = NULL;
+  IREE_ASSERT_OK(iree_io_file_contents_map(
+      iree_make_string_view(path.data(), path.size()), IREE_IO_FILE_ACCESS_READ,
+      iree_allocator_system(), &read1));
+
+  iree_io_file_contents_t* read2 = NULL;
+  IREE_ASSERT_OK(iree_io_file_contents_map(
+      iree_make_string_view(path.data(), path.size()), IREE_IO_FILE_ACCESS_READ,
+      iree_allocator_system(), &read2));
+
+  // Both should have the same contents.
+  EXPECT_EQ(read1->const_buffer.data_length, read2->const_buffer.data_length);
+  EXPECT_EQ(memcmp(read1->const_buffer.data, read2->const_buffer.data,
+                   read1->const_buffer.data_length),
+            0);
+
+  iree_io_file_contents_free(read2);
+  iree_io_file_contents_free(read1);
+}
+
 }  // namespace
 }  // namespace io
 }  // namespace iree
