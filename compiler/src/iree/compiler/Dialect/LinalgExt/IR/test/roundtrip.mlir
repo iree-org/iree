@@ -652,10 +652,10 @@ func.func @gather_static_masked(
   return %0 : tensor<1xf32>
 }
 // CHECK-LABEL: func.func @gather_static_masked(
-// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
-// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]
-// CHECK-SAME:   %[[MASK:[a-zA-Z0-9_]+]]
-// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]: tensor<10xf32>
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]: tensor<1xi32>
+// CHECK-SAME:   %[[MASK:[a-zA-Z0-9_]+]]: tensor<1xi1>
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]: tensor<1xf32>
 //      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
 // CHECK-SAME:     dimension_map = [0]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]], %[[MASK]]

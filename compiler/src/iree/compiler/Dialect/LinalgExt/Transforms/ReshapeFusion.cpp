@@ -394,7 +394,7 @@ getReshapeInfo(LinalgExt::ScatterOp scatterOp) {
   ReshapeOperandInfo indicesInfo;
   indicesInfo.originalShape = getDimSizes(scatterOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
-                     llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+                     llvm::seq<int64_t>(scatterOp.getBatchRank()));
   if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
@@ -405,7 +405,7 @@ getReshapeInfo(LinalgExt::ScatterOp scatterOp) {
     ReshapeOperandInfo maskInfo;
     maskInfo.originalShape = getDimSizes(mask);
     llvm::append_range(maskInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+                       llvm::seq<int64_t>(scatterOp.getBatchRank()));
     infos.push_back(std::move(maskInfo));
   }
 
@@ -436,7 +436,7 @@ getReshapeInfo(LinalgExt::GatherOp gatherOp) {
   ReshapeOperandInfo indicesInfo;
   indicesInfo.originalShape = getDimSizes(gatherOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
-                     llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
+                     llvm::seq<int64_t>(gatherOp.getBatchRank()));
   if (gatherOp.getBatchRank() != gatherOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
@@ -447,7 +447,7 @@ getReshapeInfo(LinalgExt::GatherOp gatherOp) {
     ReshapeOperandInfo maskInfo;
     maskInfo.originalShape = getDimSizes(mask);
     llvm::append_range(maskInfo.operandToIterationSpace,
-                       llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
+                       llvm::seq<int64_t>(gatherOp.getBatchRank()));
     infos.push_back(std::move(maskInfo));
   }
 

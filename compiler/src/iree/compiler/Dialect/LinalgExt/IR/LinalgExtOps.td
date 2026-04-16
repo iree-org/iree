@@ -60,7 +60,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
     Takes two or three `inputs` (`update`, `indices`, and optional `mask`) and
-    `outputs` value (`original`).
+    one `outputs` value (`original`).
     The operation updates the value at the slices specified by `indices` by
     combining the current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
@@ -189,7 +189,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
     Takes two or three inputs (`source`, `indices`, and optional `mask`) and
-    outputs value (`output`). The operation returns the value at the slices
+    one output value (`output`). The operation returns the value at the slices
     specified by `indices`.
 
     The size of the `dimension_map` attribute is used to determine how many

@@ -79,7 +79,8 @@ static int64_t getRank(Value v) {
 
 static Value normalizeMaskValue(OpBuilder &builder, Location loc, Value mask) {
   auto intType = dyn_cast<IntegerType>(mask.getType());
-  if (!intType || intType.getWidth() == 1) {
+  assert(intType && "expected integer mask type");
+  if (intType.getWidth() == 1) {
     return mask;
   }
   return arith::TruncIOp::create(builder, loc, builder.getI1Type(), mask);
@@ -176,13 +177,13 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
 
   Value tiledMask;
   if (Value mask = getMask()) {
-    auto maskType = cast<ShapedType>(mask.getType());
-    if (maskType.getRank() == 0) {
+    std::optional<ShapedType> maskType = getMaskType();
+    if (maskType->getRank() == 0) {
       tiledMask = mask;
     } else {
       SmallVector<OpFoldResult> maskOffsets(offsets.take_front(getBatchRank()));
       SmallVector<OpFoldResult> maskSizes(sizes.take_front(getBatchRank()));
-      SmallVector<OpFoldResult> maskStrides(maskType.getRank(), oneAttr);
+      SmallVector<OpFoldResult> maskStrides(maskType->getRank(), oneAttr);
       Operation *maskSlice =
           getSlice(builder, loc, mask, maskOffsets, maskSizes, maskStrides);
       tiledMask = maskSlice->getResult(0);
@@ -414,13 +415,13 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
 
   Value tiledMask;
   if (Value mask = getMask()) {
-    auto maskType = cast<ShapedType>(mask.getType());
-    if (maskType.getRank() == 0) {
+    std::optional<ShapedType> maskType = getMaskType();
+    if (maskType->getRank() == 0) {
       tiledMask = mask;
     } else {
       SmallVector<OpFoldResult> maskOffsets(offsets.take_front(getBatchRank()));
       SmallVector<OpFoldResult> maskSizes(sizes.take_front(getBatchRank()));
-      SmallVector<OpFoldResult> maskStrides(maskType.getRank(), oneAttr);
+      SmallVector<OpFoldResult> maskStrides(maskType->getRank(), oneAttr);
       Operation *maskSlice =
           getSlice(builder, loc, mask, maskOffsets, maskSizes, maskStrides);
       tiledMask = maskSlice->getResult(0);

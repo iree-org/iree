@@ -58,6 +58,7 @@ struct GatherOpVectorizationModel
                       ArrayRef<bool> scalableDims,
                       DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    // TODO: Support operand masks by plumbing them through transfer_gather.
     if (gatherOp.getMask()) {
       return false;
     }
@@ -75,6 +76,7 @@ struct GatherOpVectorizationModel
                                           ArrayRef<bool> scalableDims,
                                           DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    // TODO: Support operand masks by plumbing them through transfer_gather.
     if (gatherOp.getMask()) {
       return failure();
     }

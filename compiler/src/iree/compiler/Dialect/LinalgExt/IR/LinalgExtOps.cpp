@@ -234,8 +234,7 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
         "size of dimension map must match the last dimension of indices");
   }
 
-  if (Value mask = op.getMask()) {
-    auto maskType = cast<ShapedType>(mask.getType());
+  if (std::optional<ShapedType> maskType = op.getMaskType()) {
     if (!isSupportedMaskElementType(maskType.getElementType())) {
       return op->emitOpError(
           "expected mask to have i1 or storage-legalized i8 element type");
