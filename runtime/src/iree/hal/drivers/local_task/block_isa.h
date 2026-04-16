@@ -133,12 +133,6 @@ enum iree_hal_cmd_fixup_flag_bits_e {
   // Used for async-backed buffers where the pointer may not be available
   // at recording time (registered I/O regions, etc.). Rare.
   IREE_HAL_CMD_FIXUP_FLAG_SPAN = 1u << 0,
-  // The buffer field is an iree_hal_buffer_t* requiring map_range at drain
-  // time. Used for buffers that cannot be mapped at recording time (e.g.
-  // transient buffers from queue_alloca that are not yet committed). The
-  // buffer is retained by the CB's resource_set and will be mappable by
-  // the time the block is drained (semaphore ordering guarantees this).
-  IREE_HAL_CMD_FIXUP_FLAG_DEFERRED = 1u << 1,
 };
 
 // Unified fixup entry: resolves one .data binding_ptrs[] slot at block entry.
@@ -154,11 +148,6 @@ enum iree_hal_cmd_fixup_flag_bits_e {
 //     buffers where buffer pointers are known at recording time. The buffer
 //     is persistently mapped and retained by the CB's resource_set.
 //
-//   flags & DEFERRED (deferred direct): buffer is mapped via map_range at
-//     drain time. Used for buffers that cannot be mapped at recording time
-//     (transient buffers from queue_alloca). The buffer is retained by the
-//     CB's resource_set and committed by drain time.
-//
 //   flags & SPAN (span): binding resolved via span dereference. Used for
 //     async-backed buffers (registered I/O regions). Rare.
 typedef struct iree_hal_cmd_fixup_t {
@@ -167,8 +156,6 @@ typedef struct iree_hal_cmd_fixup_t {
     void* host_ptr;
     // Span: pointer to iree_async_span_t (flags & SPAN).
     const iree_async_span_t* span;
-    // Deferred: buffer to map at drain time (flags & DEFERRED).
-    iree_hal_buffer_t* buffer;
   };
   // Byte offset within the buffer (64-bit for >4GB buffers).
   // For indirect fixups: per-reference offset within the binding.

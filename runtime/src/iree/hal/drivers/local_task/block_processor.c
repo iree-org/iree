@@ -109,19 +109,7 @@ static void iree_hal_cmd_block_processor_resolve_bindings(
   const iree_hal_cmd_fixup_t* fixups = iree_hal_cmd_block_fixups(block);
   for (uint16_t i = 0; i < block->fixup_count; ++i) {
     const iree_hal_cmd_fixup_t* fixup = &fixups[i];
-    if (iree_any_bit_set(fixup->flags, IREE_HAL_CMD_FIXUP_FLAG_DEFERRED)) {
-      // Deferred direct: map the buffer now (it was not mappable at recording
-      // time but is guaranteed to be committed by drain time).
-      iree_hal_buffer_mapping_t mapping = {{0}};
-      iree_status_t status = iree_hal_buffer_map_range(
-          fixup->buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, fixup->offset, fixup->length, &mapping);
-      IREE_ASSERT(iree_status_is_ok(status),
-                  "deferred fixup map_range must succeed at drain time");
-      iree_status_ignore(status);
-      binding_ptrs[fixup->data_index] = mapping.contents.data;
-      binding_lengths[fixup->data_index] = mapping.contents.data_length;
-    } else if (!fixup->host_ptr) {
+    if (!fixup->host_ptr) {
       // Indirect fixup (fast path): look up in the binding table.
       IREE_ASSERT(fixup->slot < binding_table_length);
       binding_ptrs[fixup->data_index] =
