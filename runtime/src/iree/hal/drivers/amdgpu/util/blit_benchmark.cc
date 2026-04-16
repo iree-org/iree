@@ -614,6 +614,7 @@ void ApplyFillArguments(benchmark::Benchmark* benchmark) {
 void ApplyCopySubmitOnlyArguments(benchmark::Benchmark* benchmark) {
   benchmark->ArgNames({"length", "source_offset", "target_offset"});
   benchmark->Args({4, 0, 0});
+  benchmark->Args({8, 0, 0});
   benchmark->Args({64, 0, 0});
   benchmark->Args({4096, 0, 0});
 }

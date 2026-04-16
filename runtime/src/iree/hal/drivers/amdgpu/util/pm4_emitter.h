@@ -35,7 +35,12 @@ IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
 enum {
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 = 2 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 = 2 << 8,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS = 1 << 16,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
@@ -125,6 +130,43 @@ static inline uint32_t iree_hal_amdgpu_pm4_emit_write_data64(
   dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
   dword[4] = (uint32_t)value;
   dword[5] = (uint32_t)(value >> 32);
+  return 6;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_emit_copy_data32(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot, const void* source, void* target) {
+  memset(slot, 0, sizeof(*slot));
+  const uintptr_t source_address = (uintptr_t)source;
+  const uintptr_t target_address = (uintptr_t)target;
+  uint32_t* dword = slot->dwords;
+  dword[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(source_address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo(target_address);
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
+  return 6;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_emit_copy_data64(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot, const void* source, void* target) {
+  memset(slot, 0, sizeof(*slot));
+  const uintptr_t source_address = (uintptr_t)source;
+  const uintptr_t target_address = (uintptr_t)target;
+  uint32_t* dword = slot->dwords;
+  dword[0] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo_8(source_address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo_8(target_address);
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
   return 6;
 }
 
