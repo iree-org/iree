@@ -27,6 +27,16 @@ typedef struct iree_hal_amdgpu_host_queue_pm4_write_data_t {
   uint8_t length;
 } iree_hal_amdgpu_host_queue_pm4_write_data_t;
 
+// PM4 COPY_DATA payload for tiny queue_copy operations.
+typedef struct iree_hal_amdgpu_host_queue_pm4_copy_data_t {
+  // Device-visible source pointer read by PM4 COPY_DATA.
+  const void* source_device_ptr;
+  // Device-visible target pointer written by PM4 COPY_DATA.
+  void* target_device_ptr;
+  // Byte length copied from source to target; currently 4 or 8.
+  uint8_t length;
+} iree_hal_amdgpu_host_queue_pm4_copy_data_t;
+
 // Validates a queue_fill target and resolves the target device pointer.
 static iree_status_t iree_hal_amdgpu_host_queue_prepare_fill_target(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
@@ -175,6 +185,70 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_write_data(
   return iree_ok_status();
 }
 
+static bool iree_hal_amdgpu_host_queue_prepare_pm4_copy_data(
+    const iree_hal_amdgpu_host_queue_t* queue, const void* source_device_ptr,
+    void* target_device_ptr, iree_device_size_t length,
+    iree_hal_amdgpu_host_queue_pm4_copy_data_t* out_copy_data) {
+  if (!queue->pm4_ib_slots) {
+    return false;
+  }
+  switch (length) {
+    case 4:
+      if (!iree_host_ptr_has_alignment(source_device_ptr, sizeof(uint32_t)) ||
+          !iree_host_ptr_has_alignment(target_device_ptr, sizeof(uint32_t))) {
+        return false;
+      }
+      break;
+    case 8:
+      if (!iree_host_ptr_has_alignment(source_device_ptr, sizeof(uint64_t)) ||
+          !iree_host_ptr_has_alignment(target_device_ptr, sizeof(uint64_t))) {
+        return false;
+      }
+      break;
+    default:
+      return false;
+  }
+
+  out_copy_data->source_device_ptr = source_device_ptr;
+  out_copy_data->target_device_ptr = target_device_ptr;
+  out_copy_data->length = (uint8_t)length;
+  return true;
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_copy_data(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_hal_buffer_t* target_buffer,
+    const iree_hal_amdgpu_host_queue_pm4_copy_data_t* copy_data,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready) {
+  iree_hal_resource_t* operation_resources[2] = {
+      (iree_hal_resource_t*)source_buffer,
+      (iree_hal_resource_t*)target_buffer,
+  };
+
+  iree_hal_amdgpu_host_queue_pm4_ib_submission_t submission;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list,
+      IREE_ARRAYSIZE(operation_resources), out_ready, &submission));
+  if (!*out_ready) return iree_ok_status();
+
+  if (copy_data->length == 4) {
+    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_copy_data32(
+        submission.pm4_ib_slot, copy_data->source_device_ptr,
+        copy_data->target_device_ptr);
+  } else {
+    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_copy_data64(
+        submission.pm4_ib_slot, copy_data->source_device_ptr,
+        copy_data->target_device_ptr);
+  }
+  iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      IREE_ARRAYSIZE(operation_resources), submission_flags, &submission);
+  return iree_ok_status();
+}
+
 // Prepares a fill dispatch packet and kernargs in stack-local storage without
 // touching queue rings. All user-input validation must happen before this so
 // the caller can avoid reserving AQL slots before the packet shape is known.
@@ -251,17 +325,17 @@ static_assert(IREE_HAL_AMDGPU_DEVICE_BUFFER_COPY_KERNARG_SIZE <=
                   sizeof(iree_hal_amdgpu_kernarg_block_t),
               "copy kernargs must fit in one kernarg ring block");
 
-// Prepares a copy dispatch packet and kernargs in stack-local storage without
-// touching queue rings. Overlapping ranges within the same buffer are rejected
-// here because the builtin copy kernels implement memcpy semantics, not
-// memmove.
-static iree_status_t iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
-    const iree_hal_amdgpu_host_queue_t* queue, iree_hal_buffer_t* source_buffer,
-    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length,
-    iree_hal_copy_flags_t flags,
-    iree_hsa_kernel_dispatch_packet_t* out_dispatch_packet,
-    iree_hal_amdgpu_device_buffer_copy_kernargs_t* out_kernargs) {
+// Validates a queue_copy request and resolves device pointers. Overlapping
+// ranges within the same buffer are rejected here because both PM4 COPY_DATA
+// and the builtin copy kernels implement memcpy semantics, not memmove.
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_copy_ranges(
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags,
+    const uint8_t** out_source_device_ptr, uint8_t** out_target_device_ptr) {
+  *out_source_device_ptr = NULL;
+  *out_target_device_ptr = NULL;
+
   if (IREE_UNLIKELY(!source_buffer)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "source buffer must be non-null");
@@ -325,6 +399,20 @@ static iree_status_t iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
   target_device_ptr +=
       iree_hal_buffer_byte_offset(target_buffer) + target_offset;
 
+  *out_source_device_ptr = source_device_ptr;
+  *out_target_device_ptr = target_device_ptr;
+  return iree_ok_status();
+}
+
+// Prepares a copy dispatch packet and kernargs in stack-local storage without
+// touching queue rings. All user-input validation must happen before this so
+// the caller can avoid reserving AQL slots before the packet shape is known.
+static iree_status_t iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
+    const iree_hal_amdgpu_host_queue_t* queue, const uint8_t* source_device_ptr,
+    iree_device_size_t source_offset, uint8_t* target_device_ptr,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hsa_kernel_dispatch_packet_t* out_dispatch_packet,
+    iree_hal_amdgpu_device_buffer_copy_kernargs_t* out_kernargs) {
   iree_hsa_kernel_dispatch_packet_t dispatch_packet;
   memset(&dispatch_packet, 0, sizeof(dispatch_packet));
   iree_hal_amdgpu_device_buffer_copy_kernargs_t kernargs;
@@ -360,11 +448,26 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy(
     return iree_make_status(IREE_STATUS_CANCELLED, "queue shutting down");
   }
 
+  const uint8_t* source_device_ptr = NULL;
+  uint8_t* target_device_ptr = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_copy_ranges(
+      source_buffer, source_offset, target_buffer, target_offset, length, flags,
+      &source_device_ptr, &target_device_ptr));
+
+  iree_hal_amdgpu_host_queue_pm4_copy_data_t pm4_copy_data;
+  if (iree_hal_amdgpu_host_queue_prepare_pm4_copy_data(
+          queue, source_device_ptr, target_device_ptr, length,
+          &pm4_copy_data)) {
+    return iree_hal_amdgpu_host_queue_submit_pm4_copy_data(
+        queue, resolution, signal_semaphore_list, source_buffer, target_buffer,
+        &pm4_copy_data, submission_flags, out_ready);
+  }
+
   iree_hsa_kernel_dispatch_packet_t dispatch_packet;
   iree_hal_amdgpu_device_buffer_copy_kernargs_t kernargs;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
-      queue, source_buffer, source_offset, target_buffer, target_offset, length,
-      flags, &dispatch_packet, &kernargs));
+      queue, source_device_ptr, source_offset, target_device_ptr, target_offset,
+      length, &dispatch_packet, &kernargs));
 
   iree_hal_resource_t* operation_resources[2] = {
       (iree_hal_resource_t*)source_buffer,
@@ -401,11 +504,17 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
                             "extra operation resources must be non-null");
   }
 
+  const uint8_t* source_device_ptr = NULL;
+  uint8_t* target_device_ptr = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_copy_ranges(
+      source_buffer, source_offset, target_buffer, target_offset, length, flags,
+      &source_device_ptr, &target_device_ptr));
+
   iree_hsa_kernel_dispatch_packet_t dispatch_packet;
   iree_hal_amdgpu_device_buffer_copy_kernargs_t kernargs;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_prepare_copy_dispatch(
-      queue, source_buffer, source_offset, target_buffer, target_offset, length,
-      flags, &dispatch_packet, &kernargs));
+      queue, source_device_ptr, source_offset, target_device_ptr, target_offset,
+      length, &dispatch_packet, &kernargs));
 
   iree_host_size_t operation_resource_count = 0;
   if (!iree_host_size_checked_add(2, extra_operation_resource_count,
