@@ -54,8 +54,18 @@ jobs:
           cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
-          # Run shutdown before saving disk to cache, as it is optional depending on the branch.
-          bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc shutdown
+          # TODO: Find out why calling shutdown leads to the following kind of errors:
+          #
+          # WARNING: Waiting for server process to terminate (waited 10 seconds, waiting at most 10)
+          # INFO: Waited 10 seconds for server process (pid=1661) to terminate.
+          # FATAL: Attempted to kill stale server process (pid=1661) using SIGKILL, but it did not die in a timely fashion.
+          #
+          # Until then, do not shutdown manually.
+          # This could in theory be bad, but it is believed that with a high value for
+          # --experimental_disk_cache_gc_idle_delay the cache is not being compressed / collected
+          # by bazel.
+          #
+          # bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc shutdown
 
       - name: Save Bazel disk cache
         if: always()
