@@ -447,6 +447,11 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
 
   out_physical_device->device_agent = device_agent;
   out_physical_device->device_ordinal = device_ordinal;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
+                              (hsa_agent_info_t)HSA_AMD_AGENT_INFO_DRIVER_UID,
+                              &out_physical_device->kfd_gpu_uid));
   bool has_physical_device_uuid = false;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_query_agent_uuid(

@@ -110,6 +110,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     iree_hal_device_profiling_mode_t mode;
     // Process-local profiling session identifier assigned at begin.
     uint64_t session_id;
+    // Next process-local clock-correlation sample identifier.
+    uint64_t next_clock_correlation_sample_id;
     // Retained programmatic sink receiving HAL-native profiling chunks.
     iree_hal_profile_sink_t* sink;
   } profiling;

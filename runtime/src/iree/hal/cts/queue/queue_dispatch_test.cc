@@ -6,6 +6,7 @@
 
 // Tests for HAL queue_dispatch operations.
 
+#include <algorithm>
 #include <cstdint>
 #include <numeric>
 #include <vector>
@@ -107,8 +108,16 @@ struct TestProfileSink {
   int device_metadata_count = 0;
   // Number of queue metadata chunks observed.
   int queue_metadata_count = 0;
+  // Number of clock correlation chunks observed.
+  int clock_correlation_count = 0;
   // Number of dispatch event chunks observed.
   int dispatch_event_count = 0;
+  // Clock correlation records copied from CLOCK_CORRELATIONS chunks.
+  std::vector<iree_hal_profile_clock_correlation_record_t> clock_correlations;
+  // Dispatch event records copied from DISPATCH_EVENTS chunks.
+  std::vector<iree_hal_profile_dispatch_event_t> dispatch_events;
+  // Physical device ordinals for entries in |dispatch_events|.
+  std::vector<uint32_t> dispatch_event_physical_device_ordinals;
   // Dispatch event flags expected for every event record.
   iree_hal_profile_dispatch_event_flags_t expected_dispatch_flags =
       IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_NONE;
@@ -201,6 +210,40 @@ static iree_status_t TestProfileSinkWrite(
     ++test_sink->queue_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_TRUE(test_sink->saw_queue_metadata);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_clock_correlation_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_clock_correlation_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_clock_correlation_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_clock_correlation_record_t),
+                records[i].record_length);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(0u, records[i].sample_id);
+      EXPECT_TRUE(iree_all_bits_set(
+          records[i].flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP |
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_SYSTEM_TIMESTAMP |
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET));
+      EXPECT_NE(0u, records[i].device_tick);
+      EXPECT_NE(0u, records[i].host_cpu_timestamp_ns);
+      EXPECT_NE(0u, records[i].host_system_timestamp);
+      EXPECT_NE(0u, records[i].host_system_frequency_hz);
+      EXPECT_LE(records[i].host_time_begin_ns, records[i].host_time_end_ns);
+    }
+    test_sink->clock_correlations.insert(test_sink->clock_correlations.end(),
+                                         records, records + record_count);
+    ++test_sink->clock_correlation_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
     EXPECT_TRUE(test_sink->saw_device_metadata);
     EXPECT_TRUE(test_sink->saw_queue_metadata);
@@ -231,9 +274,15 @@ static iree_status_t TestProfileSinkWrite(
                   records[i].workgroup_count[2]);
       }
       EXPECT_NE(0u, records[i].workgroup_size[0]);
+      EXPECT_NE(0u, records[i].start_tick);
       EXPECT_NE(0u, records[i].end_tick);
       EXPECT_GE(records[i].end_tick, records[i].start_tick);
     }
+    test_sink->dispatch_events.insert(test_sink->dispatch_events.end(), records,
+                                      records + record_count);
+    test_sink->dispatch_event_physical_device_ordinals.insert(
+        test_sink->dispatch_event_physical_device_ordinals.end(), record_count,
+        metadata->physical_device_ordinal);
     ++test_sink->dispatch_event_count;
   }
 
@@ -268,6 +317,36 @@ static void TestProfileSinkInitialize(TestProfileSink* sink) {
 
 static iree_hal_profile_sink_t* TestProfileSinkAsBase(TestProfileSink* sink) {
   return reinterpret_cast<iree_hal_profile_sink_t*>(sink);
+}
+
+static void ExpectDispatchEventsWithinClockCorrelationRange(
+    const TestProfileSink& sink) {
+  ASSERT_GE(sink.clock_correlations.size(), 2u);
+  ASSERT_EQ(sink.dispatch_events.size(),
+            sink.dispatch_event_physical_device_ordinals.size());
+  for (iree_host_size_t event_index = 0;
+       event_index < sink.dispatch_events.size(); ++event_index) {
+    const uint32_t physical_device_ordinal =
+        sink.dispatch_event_physical_device_ordinals[event_index];
+    uint64_t min_device_tick = UINT64_MAX;
+    uint64_t max_device_tick = 0;
+    for (const iree_hal_profile_clock_correlation_record_t& correlation :
+         sink.clock_correlations) {
+      if (correlation.physical_device_ordinal != physical_device_ordinal ||
+          !iree_any_bit_set(
+              correlation.flags,
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
+        continue;
+      }
+      min_device_tick = std::min(min_device_tick, correlation.device_tick);
+      max_device_tick = std::max(max_device_tick, correlation.device_tick);
+    }
+    ASSERT_NE(UINT64_MAX, min_device_tick);
+    ASSERT_NE(0u, max_device_tick);
+    ASSERT_LT(min_device_tick, max_device_tick);
+    EXPECT_GE(sink.dispatch_events[event_index].start_tick, min_device_tick);
+    EXPECT_LE(sink.dispatch_events[event_index].end_tick, max_device_tick);
+  }
 }
 
 static bool IsProfilingUnsupported(iree_status_t status) {
@@ -364,11 +443,13 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
   std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
 
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
   IREE_ASSERT_OK(profiling.End());
   if (sink.begin_count == 0) {
     EXPECT_EQ(0, sink.end_count);
     EXPECT_EQ(0, sink.device_metadata_count);
     EXPECT_EQ(0, sink.queue_metadata_count);
+    EXPECT_EQ(0, sink.clock_correlation_count);
     EXPECT_EQ(0, sink.dispatch_event_count);
     EXPECT_FALSE(sink.saw_device_metadata);
     EXPECT_FALSE(sink.saw_queue_metadata);
@@ -378,10 +459,12 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
     EXPECT_EQ(1, sink.end_count);
     EXPECT_EQ(1, sink.device_metadata_count);
     EXPECT_EQ(1, sink.queue_metadata_count);
+    EXPECT_GE(sink.clock_correlation_count, 3);
     EXPECT_GE(sink.dispatch_event_count, 1);
     EXPECT_TRUE(sink.saw_device_metadata);
     EXPECT_TRUE(sink.saw_queue_metadata);
     EXPECT_FALSE(sink.write_after_end);
+    ExpectDispatchEventsWithinClockCorrelationRange(sink);
   }
 }
 
@@ -646,6 +729,7 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
       EXPECT_EQ(0, sink.end_count);
       EXPECT_EQ(0, sink.device_metadata_count);
       EXPECT_EQ(0, sink.queue_metadata_count);
+      EXPECT_EQ(0, sink.clock_correlation_count);
       EXPECT_EQ(0, sink.dispatch_event_count);
       EXPECT_FALSE(sink.saw_device_metadata);
       EXPECT_FALSE(sink.saw_queue_metadata);
@@ -655,10 +739,12 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
       EXPECT_EQ(1, sink.end_count);
       EXPECT_EQ(1, sink.device_metadata_count);
       EXPECT_EQ(1, sink.queue_metadata_count);
+      EXPECT_GE(sink.clock_correlation_count, 2);
       EXPECT_GE(sink.dispatch_event_count, 1);
       EXPECT_TRUE(sink.saw_device_metadata);
       EXPECT_TRUE(sink.saw_queue_metadata);
       EXPECT_FALSE(sink.write_after_end);
+      ExpectDispatchEventsWithinClockCorrelationRange(sink);
     }
   }
 
