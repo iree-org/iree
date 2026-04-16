@@ -1083,7 +1083,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
               (iree_hal_amdgpu_reclaim_action_t){0},
               /*operation_resources=*/NULL,
               /*operation_resource_count=*/0,
-              /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+              iree_hal_amdgpu_host_queue_post_commit_callback_null(),
               /*resource_set=*/NULL,
               IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready);
           if (iree_status_is_ok(status) && ready) {
@@ -1131,7 +1131,7 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             queue, &resolution, iree_hal_semaphore_list_empty(),
             op->host_action.action, op->retained_resources,
             op->retained_resource_count,
-            /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+            iree_hal_amdgpu_host_queue_post_commit_callback_null(),
             /*resource_set=*/NULL,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready);
         if (iree_status_is_ok(status) && ready) {
@@ -2678,7 +2678,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
         (iree_hal_amdgpu_reclaim_action_t){0},
         /*operation_resources=*/NULL,
         /*operation_resource_count=*/0,
-        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
     if (iree_status_is_ok(status) && !ready) {
@@ -2758,7 +2758,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
           (iree_hal_amdgpu_reclaim_action_t){0},
           /*operation_resources=*/NULL,
           /*operation_resource_count=*/0,
-          /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+          iree_hal_amdgpu_host_queue_post_commit_callback_null(),
           /*resource_set=*/NULL,
           IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
       if (iree_status_is_ok(status) && !ready) {
@@ -2878,7 +2878,7 @@ iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
     status = iree_hal_amdgpu_host_queue_try_submit_barrier(
         queue, &resolution, iree_hal_semaphore_list_empty(), action,
         operation_resources, operation_resource_count,
-        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
     if (iree_status_is_ok(status) && !ready) {

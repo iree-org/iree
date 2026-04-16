@@ -241,7 +241,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
             .user_data = buffer,
         },
         operation_resources, IREE_ARRAYSIZE(operation_resources),
-        /*post_commit_fn=*/NULL, /*post_commit_user_data=*/NULL,
+        iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL, submission_flags, &submission);
   }
 
@@ -279,7 +279,10 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
           .user_data = buffer,
       },
       operation_resources, IREE_ARRAYSIZE(operation_resources),
-      iree_hal_amdgpu_host_queue_release_transient_buffer_reservation, buffer,
+      (iree_hal_amdgpu_host_queue_post_commit_callback_t){
+          .fn = iree_hal_amdgpu_host_queue_release_transient_buffer_reservation,
+          .user_data = buffer,
+      },
       /*resource_set=*/NULL, submission_flags, &submission);
   return iree_ok_status();
 }
