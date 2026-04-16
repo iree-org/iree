@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/amdgpu/device/profiling.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
@@ -341,13 +342,6 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
   if (iree_status_is_ok(status)) {
     out_submission->packet_count = (uint32_t)packet_count;
     out_submission->first_packet_id = first_packet_id;
-    if (queue->profiling.hsa_queue_timestamps_enabled) {
-      out_submission->reclaim_entry->profile_packet_first_id = first_packet_id;
-      out_submission->reclaim_entry->profile_packet_count =
-          (uint32_t)packet_count;
-      iree_hal_amdgpu_host_queue_clear_profile_packet_events(
-          queue, first_packet_id, (uint32_t)packet_count);
-    }
     if (kernarg_block_count > 0) {
       out_submission->kernarg_blocks = iree_hal_amdgpu_kernarg_ring_allocate(
           &queue->kernarg_ring, kernarg_block_count,
@@ -481,6 +475,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count, uint32_t kernarg_block_count,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events,
     bool* out_ready,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission) {
   IREE_ASSERT_ARGUMENT(out_ready);
@@ -488,13 +483,20 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
   *out_ready = false;
   memset(out_submission, 0, sizeof(*out_submission));
 
-  const bool use_profiling_completion_signal =
-      queue->profiling.hsa_queue_timestamps_enabled;
+  const bool use_profiling_completion_signal = profile_events.event_count != 0;
   const uint32_t payload_packet_count =
       use_profiling_completion_signal ? 2u : 1u;
+  const uint32_t profile_harvest_kernarg_block_count =
+      use_profiling_completion_signal
+          ? (uint32_t)iree_host_size_ceil_div(
+                iree_hal_amdgpu_device_profile_dispatch_harvest_kernarg_length(
+                    profile_events.event_count),
+                sizeof(iree_hal_amdgpu_kernarg_block_t))
+          : 0u;
   iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      payload_packet_count, kernarg_block_count, out_ready,
+      payload_packet_count,
+      kernarg_block_count + profile_harvest_kernarg_block_count, out_ready,
       &out_submission->kernel);
   if (iree_status_is_ok(status) && *out_ready) {
     const uint64_t dispatch_packet_id = out_submission->kernel.first_packet_id +
@@ -507,13 +509,19 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
         iree_hal_amdgpu_notification_ring_epoch_signal(
             &queue->notification_ring);
     if (use_profiling_completion_signal) {
+      out_submission->profile_events = profile_events;
       out_submission->dispatch_completion_signal =
           iree_hal_amdgpu_host_queue_profiling_completion_signal(
               queue, dispatch_packet_id);
-      out_submission->trailing_completion_slot =
-          iree_hal_amdgpu_aql_ring_packet(
-              &queue->aql_ring, out_submission->kernel.first_packet_id +
-                                    out_submission->kernel.packet_count - 1);
+      out_submission->profile_harvest_slot = iree_hal_amdgpu_aql_ring_packet(
+          &queue->aql_ring, out_submission->kernel.first_packet_id +
+                                out_submission->kernel.packet_count - 1);
+      out_submission->profile_harvest_kernarg_blocks =
+          &out_submission->kernel.kernarg_blocks[kernarg_block_count];
+      out_submission->minimum_release_scope =
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              out_submission->minimum_release_scope,
+              IREE_HSA_FENCE_SCOPE_AGENT);
     }
   }
   return status;
@@ -555,7 +563,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
 // but before the final dispatch header is committed and the doorbell is rung.
 // The caller must reserve notification-ring space and prepare the next reclaim
 // entry before this call. Caller must hold submission_mutex.
-static void iree_hal_amdgpu_host_queue_commit_signals(
+static uint64_t iree_hal_amdgpu_host_queue_commit_signals(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t signal_semaphore_list) {
   // Advance epoch and merge this queue's axis into the accumulated frontier.
@@ -586,7 +594,7 @@ static void iree_hal_amdgpu_host_queue_commit_signals(
   // any intervening zero-signal epochs are conservatively included in that
   // frontier snapshot.
   if (signal_semaphore_list.count == 0) {
-    return;
+    return epoch;
   }
 
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
@@ -649,9 +657,10 @@ static void iree_hal_amdgpu_host_queue_commit_signals(
       continue;
     }
   }
+  return epoch;
 }
 
-void iree_hal_amdgpu_host_queue_finish_kernel_submission(
+uint64_t iree_hal_amdgpu_host_queue_finish_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -688,7 +697,8 @@ void iree_hal_amdgpu_host_queue_finish_kernel_submission(
   submission->reclaim_entry->count = submission->reclaim_resource_count;
   submission->reclaim_entry->pre_signal_action = submission->pre_signal_action;
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
-  iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
+  return iree_hal_amdgpu_host_queue_commit_signals(queue,
+                                                   signal_semaphore_list);
 }
 
 void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
@@ -701,35 +711,49 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
     iree_hal_amdgpu_host_queue_dispatch_submission_t* submission) {
   iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
                                                            &submission->kernel);
-  iree_hal_amdgpu_host_queue_finish_kernel_submission(
-      queue, resolution, signal_semaphore_list, operation_resources,
-      operation_resource_count, /*inout_resource_set=*/NULL, submission_flags,
-      &submission->kernel);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_finish_kernel_submission(
+          queue, resolution, signal_semaphore_list, operation_resources,
+          operation_resource_count, /*inout_resource_set=*/NULL,
+          submission_flags, &submission->kernel);
 
-  uint16_t queue_completion_header = 0;
+  uint16_t profile_harvest_header = 0;
   iree_hal_amdgpu_aql_packet_control_t dispatch_packet_control =
       iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
           queue, resolution, signal_semaphore_list,
           submission->minimum_acquire_scope, submission->minimum_release_scope);
-  if (submission->trailing_completion_slot) {
+  if (submission->profile_harvest_slot) {
+    submission->kernel.reclaim_entry->profile_event_first_position =
+        submission->profile_events.first_event_position;
+    submission->kernel.reclaim_entry->profile_event_count =
+        submission->profile_events.event_count;
+    for (uint32_t i = 0; i < submission->profile_events.event_count; ++i) {
+      iree_hal_amdgpu_profile_dispatch_event_t* event =
+          iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
+              queue, submission->profile_events.first_event_position + i);
+      event->submission_id = submission_epoch;
+    }
     dispatch_packet_control =
         iree_hal_amdgpu_host_queue_payload_dispatch_packet_control(
             resolution, submission->minimum_acquire_scope,
             submission->minimum_release_scope);
-    queue_completion_header = iree_hal_amdgpu_aql_emit_nop(
-        &submission->trailing_completion_slot->barrier_and,
-        iree_hal_amdgpu_host_queue_final_barrier_packet_control(
-            queue, resolution, signal_semaphore_list),
+    submission->profile_harvest_slot->dispatch.completion_signal =
         iree_hal_amdgpu_notification_ring_epoch_signal(
-            &queue->notification_ring));
+            &queue->notification_ring);
+    profile_harvest_header = iree_hal_amdgpu_aql_make_header(
+        IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+        iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
+            queue, resolution, signal_semaphore_list,
+            IREE_HSA_FENCE_SCOPE_AGENT, IREE_HSA_FENCE_SCOPE_SYSTEM));
   }
   const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH, dispatch_packet_control);
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
-  if (submission->trailing_completion_slot) {
-    iree_hal_amdgpu_aql_ring_commit(submission->trailing_completion_slot,
-                                    queue_completion_header, /*setup=*/0);
+  if (submission->profile_harvest_slot) {
+    iree_hal_amdgpu_aql_ring_commit(submission->profile_harvest_slot,
+                                    profile_harvest_header,
+                                    submission->profile_harvest_setup);
   }
   iree_hal_amdgpu_aql_ring_doorbell(
       &queue->aql_ring,
@@ -789,7 +813,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      /*kernarg_block_count=*/1, out_ready, &submission));
+      /*kernarg_block_count=*/1,
+      (iree_hal_amdgpu_profile_dispatch_event_reservation_t){0}, out_ready,
+      &submission));
   if (!*out_ready) return iree_ok_status();
 
   memcpy(submission.kernel.kernarg_blocks->data, kernargs, kernarg_length);

@@ -15,6 +15,7 @@ package(
 DEVICE_SRCS = [
     "blit.c",
     "dispatch.c",
+    "profiling.c",
     "tracing.c",
 ]
 
@@ -23,6 +24,7 @@ DEVICE_HDRS = [
     "dispatch.h",
     "kernel_tables.h",
     "kernels.h",
+    "profiling.h",
     "support/common.h",
     "support/kernel.h",
     "support/queue.h",
@@ -71,6 +73,16 @@ iree_runtime_cc_library(
     name = "dispatch",
     srcs = [
         "dispatch.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "profiling",
+    srcs = [
+        "profiling.c",
     ],
     deps = [
         ":headers",

@@ -21,6 +21,7 @@ ABI_HDRS = [
     "//runtime/src/iree/hal/drivers/amdgpu/abi:command_buffer.h",
     "//runtime/src/iree/hal/drivers/amdgpu/abi:common.h",
     "//runtime/src/iree/hal/drivers/amdgpu/abi:kernel_args.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:profile.h",
     "//runtime/src/iree/hal/drivers/amdgpu/abi:queue.h",
     "//runtime/src/iree/hal/drivers/amdgpu/abi:signal.h",
 ]
