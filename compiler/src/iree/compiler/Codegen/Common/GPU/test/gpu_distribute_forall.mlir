@@ -183,3 +183,66 @@ func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
 //       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store {{.*}}[%[[TX]]]
 //       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
+
+// -----
+
+// Verify that a thread-mapped forall nested inside a warp-mapped forall uses
+// warp-local (lane) IDs instead of global thread IDs.
+//
+// With workgroup_size=[256,1,1] and subgroup_size=64, there are 4 warps.
+// The outer warp forall distributes across 4 warps.  The inner thread forall
+// has 8 iterations and should use lane IDs (0-63) with step=64, so that in
+// each warp, lanes 0-7 execute the body independently.
+//
+// BUG (before fix): the inner loop used global thread ID (0-255) with step=256,
+// meaning only global threads 0-7 (all in warp 0) would ever execute.
+
+#translation_info_nested = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+func.func @distribute_thread_in_warp_forall(%out : memref<32xi32, #gpu.address_space<workgroup>>)
+    attributes {translation_info = #translation_info_nested} {
+  %c0 = arith.constant 0 : i32
+  scf.forall (%warp_id) in (4) {
+    scf.forall (%tid) in (8) {
+      %idx = affine.apply affine_map<(d0, d1) -> (d0 * 8 + d1)>(%warp_id, %tid)
+      memref.store %c0, %out[%idx] : memref<32xi32, #gpu.address_space<workgroup>>
+    } {mapping = [#gpu.thread<linear_dim_0>]}
+  } {mapping = [#gpu.warp<linear_dim_0>]}
+  return
+}
+
+// The inner thread loop should use lane ID (subgroup-local) with step=64,
+// NOT global thread ID with step=256.
+// CHECK-LABEL: func @distribute_thread_in_warp_forall
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//       CHECK:   %[[TX:.+]] = gpu.thread_id x
+//       CHECK:   %[[WARPSPLIT:.+]]:2 = affine.delinearize_index %[[TX]] into (4, 64)
+//       CHECK:   scf.for %[[IV:.+]] = %[[WARPSPLIT]]#1 to %[[C8]] step %[[C64]]
+//       CHECK:     memref.store
+
+// -----
+
+// Similar test but with fewer threads than the subgroup size and a
+// multi-dimensional warp forall.  Thread forall has 3 iterations nested inside
+// a 2D warp forall (2x2 = 4 warps).
+
+#translation_info_nested2 = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+func.func @distribute_thread_in_2d_warp_forall(%out : memref<4x3xi32, #gpu.address_space<workgroup>>)
+    attributes {translation_info = #translation_info_nested2} {
+  %c0 = arith.constant 0 : i32
+  scf.forall (%wy, %wx) in (2, 2) {
+    scf.forall (%tid) in (3) {
+      memref.store %c0, %out[%wy, %tid] : memref<4x3xi32, #gpu.address_space<workgroup>>
+    } {mapping = [#gpu.thread<linear_dim_0>]}
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  return
+}
+
+// CHECK-LABEL: func @distribute_thread_in_2d_warp_forall
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:   %[[TX:.+]] = gpu.thread_id x
+//       CHECK:   %[[WARPSPLIT:.+]]:2 = affine.delinearize_index %[[TX]] into (4, 64)
+//       CHECK:   scf.for {{.*}} to %[[C3]] step %[[C64]]

@@ -87,6 +87,25 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   // subgroups.
   assert(!(hasThreadMapping && hasWarpMapping));
   Value flatId = linearThreadId;
+
+  // Check if this thread-mapped forall is nested inside a warp-mapped forall.
+  // If so, the thread distribution must be warp-local: use lane IDs (0..63)
+  // with step = subgroupSize, not global thread IDs (0..255) with step =
+  // flatWorkgroupSize.  Otherwise only warp-0's lanes would execute the body.
+  bool isNestedInWarpForall = false;
+  if (hasThreadMapping) {
+    for (auto parent = forallOp->getParentOfType<scf::ForallOp>(); parent;
+         parent = parent->getParentOfType<scf::ForallOp>()) {
+      if (auto parentMapping = parent.getMappingAttr()) {
+        if (llvm::all_of(parentMapping,
+                         llvm::IsaPred<gpu::GPUWarpMappingAttr>)) {
+          isNestedInWarpForall = true;
+          break;
+        }
+      }
+    }
+  }
+
   if (hasWarpMapping) {
     if (flatWorkgroupSize % subgroupSize != 0) {
       return forallOp->emitOpError(
@@ -97,6 +116,12 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
             rewriter, loc, flatId,
             ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize, subgroupSize})
             .getResult(0);
+  } else if (isNestedInWarpForall) {
+    flatId =
+        affine::AffineDelinearizeIndexOp::create(
+            rewriter, loc, flatId,
+            ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize, subgroupSize})
+            .getResult(1);
   }
 
   SmallVector<Value> delinSizes;
@@ -108,8 +133,10 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
         rewriter, loc, d0 * d1, {totalLoopTripCount, workerCount});
   }
 
-  int64_t flatTotalNumWorkers =
-      hasWarpMapping ? flatWorkgroupSize / subgroupSize : flatWorkgroupSize;
+  int64_t flatTotalNumWorkers = hasWarpMapping
+                                    ? flatWorkgroupSize / subgroupSize
+                                : isNestedInWarpForall ? subgroupSize
+                                                       : flatWorkgroupSize;
   std::optional<int64_t> staticProducerCount =
       getConstantIntValue(totalLoopTripCount);
   bool perfectlyDivides =
