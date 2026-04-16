@@ -17,6 +17,7 @@
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "runtime/src/iree/hal/drivers/amdgpu/cts/testdata_amdgpu.h"
 
 namespace iree::hal::amdgpu {
 namespace {
@@ -118,6 +119,82 @@ static iree_status_t CreateHostVisibleTransferBuffer(
                                             out_buffer);
 }
 
+static iree_status_t CreateHostVisibleDispatchBuffer(
+    iree_hal_allocator_t* allocator, iree_device_size_t buffer_size,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                 IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+  return iree_hal_allocator_allocate_buffer(allocator, params, buffer_size,
+                                            out_buffer);
+}
+
+static iree_const_byte_span_t FindCtsExecutableData(
+    iree_string_view_t file_name) {
+  const iree_file_toc_t* toc = iree_cts_testdata_amdgpu_create();
+  for (iree_host_size_t i = 0; toc[i].name != nullptr; ++i) {
+    if (iree_string_view_equal(file_name,
+                               iree_make_cstring_view(toc[i].name))) {
+      return iree_make_const_byte_span(
+          reinterpret_cast<const uint8_t*>(toc[i].data), toc[i].size);
+    }
+  }
+  return iree_const_byte_span_empty();
+}
+
+static iree_status_t LoadCtsExecutable(
+    iree_hal_device_t* device, iree_string_view_t file_name,
+    iree_hal_executable_cache_t** out_executable_cache,
+    iree_hal_executable_t** out_executable) {
+  *out_executable_cache = NULL;
+  *out_executable = NULL;
+
+  iree_const_byte_span_t executable_data = FindCtsExecutableData(file_name);
+  if (IREE_UNLIKELY(executable_data.data_length == 0)) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "AMDGPU CTS executable not found");
+  }
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  iree_status_t status = iree_hal_executable_cache_create(
+      device, iree_make_cstring_view("default"), &executable_cache);
+
+  char executable_format[128] = {0};
+  iree_host_size_t inferred_size = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_executable_cache_infer_format(
+        executable_cache, IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA,
+        executable_data, IREE_ARRAYSIZE(executable_format), executable_format,
+        &inferred_size);
+  }
+  (void)inferred_size;
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_executable_params_t executable_params;
+    iree_hal_executable_params_initialize(&executable_params);
+    executable_params.caching_mode =
+        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+    executable_params.executable_format =
+        iree_make_cstring_view(executable_format);
+    executable_params.executable_data = executable_data;
+    status = iree_hal_executable_cache_prepare_executable(
+        executable_cache, &executable_params, &executable);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_executable_cache = executable_cache;
+    *out_executable = executable;
+  } else {
+    iree_hal_executable_release(executable);
+    iree_hal_executable_cache_release(executable_cache);
+  }
+  return status;
+}
+
 static iree_status_t QueueTransientTransferBuffer(
     iree_hal_device_t* device, const iree_hal_semaphore_list_t signal_list,
     iree_device_size_t buffer_size, iree_hal_buffer_t** out_buffer) {
@@ -160,6 +237,111 @@ static iree_status_t CreateSemaphore(iree_hal_device_t* device,
   return iree_hal_semaphore_create(
       device, IREE_HAL_QUEUE_AFFINITY_ANY,
       /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, out_semaphore);
+}
+
+TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      input_buffer.out()));
+  const uint32_t input_values[4] = {1, 2, 3, 4};
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
+                                           input_values, sizeof(input_values)));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer)),
+      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(output_buffer)),
+  };
+  const iree_hal_buffer_ref_list_t bindings = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs),
+      /*values=*/binding_refs,
+  };
+  const uint32_t constant_values[2] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_values, sizeof(constant_values));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  const iree_hal_amdgpu_aql_program_t* program =
+      iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+  ASSERT_NE(program->first_block, nullptr);
+  EXPECT_EQ(program->max_block_kernarg_length, 0u);
+  const iree_hal_amdgpu_command_buffer_command_header_t* command =
+      iree_hal_amdgpu_command_buffer_block_commands_const(program->first_block);
+  ASSERT_EQ(command->opcode, IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH);
+  const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command =
+      (const iree_hal_amdgpu_command_buffer_dispatch_command_t*)command;
+  EXPECT_EQ(dispatch_command->kernarg_strategy,
+            IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_PREPUBLISHED);
+  const uint32_t kernarg_length =
+      (uint32_t)dispatch_command->kernarg_length_qwords * 8u;
+  EXPECT_NE(
+      iree_hal_amdgpu_aql_command_buffer_prepublished_kernarg(
+          command_buffer, dispatch_command->payload_reference, kernarg_length),
+      nullptr);
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint32_t output_values[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
+      output_buffer, /*offset=*/0, output_values, sizeof(output_values)));
+  const uint32_t expected_values[4] = {13, 16, 19, 22};
+  EXPECT_EQ(0, memcmp(output_values, expected_values, sizeof(expected_values)));
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
 }
 
 TEST_F(HostQueueCommandBufferTest,

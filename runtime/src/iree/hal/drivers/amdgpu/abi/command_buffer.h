@@ -65,6 +65,7 @@ typedef enum iree_hal_amdgpu_command_buffer_kernarg_strategy_e {
   IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_HAL = 0,
   IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT = 1,
   IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_INDIRECT = 2,
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_PREPUBLISHED = 3,
 } iree_hal_amdgpu_command_buffer_kernarg_strategy_t;
 
 // Binding reference kind constants embedded in command records.
@@ -178,8 +179,12 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint64_t kernel_object;
   // Byte offset from the block header to this dispatch's first binding source.
   uint32_t binding_source_offset;
-  // Byte offset from this command record to constants/implicit tail bytes.
-  uint32_t tail_payload_offset;
+  // Strategy-specific payload reference.
+  // HAL/CUSTOM_DIRECT/INDIRECT: byte offset from this command record to
+  // constants/implicit tail bytes.
+  // PREPUBLISHED: command-buffer rodata segment ordinal containing the final
+  // kernargs.
+  uint32_t payload_reference;
   // Number of HAL ABI binding pointer slots emitted before the tail payload.
   uint16_t binding_count;
   // Total kernarg reservation size in 8-byte qwords.

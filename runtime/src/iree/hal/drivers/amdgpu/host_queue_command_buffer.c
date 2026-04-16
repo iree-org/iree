@@ -332,8 +332,24 @@ static bool iree_hal_amdgpu_host_queue_dispatch_uses_indirect_parameters(
       IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS);
 }
 
+static bool iree_hal_amdgpu_host_queue_dispatch_uses_prepublished_kernargs(
+    const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command) {
+  return dispatch_command->kernarg_strategy ==
+         IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_PREPUBLISHED;
+}
+
+static bool iree_hal_amdgpu_host_queue_dispatch_uses_queue_kernargs(
+    const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command) {
+  return !iree_hal_amdgpu_host_queue_dispatch_uses_prepublished_kernargs(
+      dispatch_command);
+}
+
 static uint32_t iree_hal_amdgpu_host_queue_dispatch_target_kernarg_block_count(
     const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command) {
+  if (iree_hal_amdgpu_host_queue_dispatch_uses_prepublished_kernargs(
+          dispatch_command)) {
+    return 0;
+  }
   const uint32_t kernarg_length =
       (uint32_t)dispatch_command->kernarg_length_qwords * 8u;
   return iree_max(1u,
@@ -381,7 +397,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_dispatch_kernargs(
     uint8_t* kernarg_data) {
   const uint8_t* command_base = (const uint8_t*)dispatch_command;
   const uint8_t* tail_payload =
-      command_base + dispatch_command->tail_payload_offset;
+      command_base + dispatch_command->payload_reference;
   const iree_host_size_t tail_length =
       (iree_host_size_t)dispatch_command->tail_length_qwords * 8u;
 
@@ -429,6 +445,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_dispatch_kernargs(
           IREE_STATUS_UNIMPLEMENTED,
           "indirect dispatch arguments are not supported by AMDGPU command "
           "buffers yet");
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_PREPUBLISHED:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "prepublished command-buffer dispatch should not rewrite kernargs");
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "malformed AQL command-buffer kernarg strategy "
@@ -482,12 +502,25 @@ iree_hal_amdgpu_host_queue_dispatch_implicit_args_ptr(
 
 static iree_status_t iree_hal_amdgpu_host_queue_replay_dispatch_packet_body(
     const iree_hal_amdgpu_command_buffer_block_header_t* block,
-    const uint64_t* binding_ptrs,
+    iree_hal_command_buffer_t* command_buffer, const uint64_t* binding_ptrs,
     const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command,
     iree_hal_amdgpu_aql_packet_t* packet, uint8_t* kernarg_data,
     iree_hsa_signal_t completion_signal, uint16_t* out_setup) {
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_replay_dispatch_kernargs(
-      block, binding_ptrs, dispatch_command, kernarg_data));
+  if (iree_hal_amdgpu_host_queue_dispatch_uses_prepublished_kernargs(
+          dispatch_command)) {
+    const uint32_t kernarg_length =
+        (uint32_t)dispatch_command->kernarg_length_qwords * 8u;
+    kernarg_data = iree_hal_amdgpu_aql_command_buffer_prepublished_kernarg(
+        command_buffer, dispatch_command->payload_reference, kernarg_length);
+    if (IREE_UNLIKELY(!kernarg_data)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "AQL command-buffer prepublished kernarg range is invalid");
+    }
+  } else {
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_replay_dispatch_kernargs(
+        block, binding_ptrs, dispatch_command, kernarg_data));
+  }
   iree_hal_amdgpu_host_queue_write_command_buffer_dispatch_packet_body(
       dispatch_command, packet, kernarg_data, completion_signal, out_setup);
   return iree_ok_status();
@@ -497,6 +530,7 @@ static iree_status_t
 iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table, const uint64_t* binding_ptrs,
     const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command,
     iree_hal_amdgpu_aql_packet_t* patch_packet,
@@ -505,7 +539,7 @@ iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
     uint16_t dispatch_header, uint16_t* out_patch_setup,
     uint16_t* out_dispatch_setup) {
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_replay_dispatch_packet_body(
-      block, binding_ptrs, dispatch_command, dispatch_packet,
+      block, command_buffer, binding_ptrs, dispatch_command, dispatch_packet,
       dispatch_kernarg_data, completion_signal, out_dispatch_setup));
 
   const iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources =
@@ -925,22 +959,25 @@ static iree_status_t iree_hal_amdgpu_host_queue_check_packet_commands(
           if (iree_status_is_ok(status)) {
             status =
                 iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
-                    queue, block, binding_table, binding_ptrs, dispatch_command,
-                    &packet, &dispatch_packet, patch_kernarg_block.data,
-                    dispatch_kernarg_data, iree_hsa_signal_null(), &patch_setup,
-                    &dispatch_setup);
+                    queue, block, command_buffer, binding_table, binding_ptrs,
+                    dispatch_command, &packet, &dispatch_packet,
+                    patch_kernarg_block.data, dispatch_kernarg_data,
+                    iree_hsa_signal_null(), &patch_setup, &dispatch_setup);
           }
           if (iree_status_is_ok(status)) packet_count += 2;
         } else {
           uint8_t* kernarg_data = NULL;
-          status =
-              iree_hal_amdgpu_host_queue_prepare_check_dispatch_kernarg_data(
-                  scratch_arena, dispatch_command, &kernarg_block,
-                  &kernarg_data);
+          if (iree_hal_amdgpu_host_queue_dispatch_uses_queue_kernargs(
+                  dispatch_command)) {
+            status =
+                iree_hal_amdgpu_host_queue_prepare_check_dispatch_kernarg_data(
+                    scratch_arena, dispatch_command, &kernarg_block,
+                    &kernarg_data);
+          }
           if (iree_status_is_ok(status)) {
             status = iree_hal_amdgpu_host_queue_replay_dispatch_packet_body(
-                block, binding_ptrs, dispatch_command, &packet, kernarg_data,
-                iree_hsa_signal_null(), &setup);
+                block, command_buffer, binding_ptrs, dispatch_command, &packet,
+                kernarg_data, iree_hsa_signal_null(), &setup);
           }
           if (iree_status_is_ok(status)) ++packet_count;
         }
@@ -1087,8 +1124,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
                   is_final_packet));
           status =
               iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
-                  queue, block, binding_table, binding_ptrs, dispatch_command,
-                  patch_packet, dispatch_packet,
+                  queue, block, command_buffer, binding_table, binding_ptrs,
+                  dispatch_command, patch_packet, dispatch_packet,
                   kernarg_blocks[kernarg_block_index].data,
                   kernarg_blocks[kernarg_block_index + 1].data,
                   completion_signal, dispatch_header,
@@ -1119,10 +1156,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
               is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                     &queue->notification_ring)
                               : iree_hsa_signal_null();
+          uint8_t* kernarg_data = NULL;
+          if (iree_hal_amdgpu_host_queue_dispatch_uses_queue_kernargs(
+                  dispatch_command)) {
+            kernarg_data = kernarg_blocks[kernarg_block_index].data;
+          }
           status = iree_hal_amdgpu_host_queue_replay_dispatch_packet_body(
-              block, binding_ptrs, dispatch_command, packet,
-              kernarg_blocks[kernarg_block_index].data, completion_signal,
-              &packet_setups[packet_index]);
+              block, command_buffer, binding_ptrs, dispatch_command, packet,
+              kernarg_data, completion_signal, &packet_setups[packet_index]);
           if (iree_status_is_ok(status)) {
             packet_headers[packet_index] = iree_hal_amdgpu_aql_make_header(
                 IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
