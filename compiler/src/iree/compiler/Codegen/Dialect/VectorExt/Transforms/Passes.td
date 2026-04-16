@@ -18,9 +18,9 @@ def VectorExtFoldUnitExtentDimsPass :
   ];
 }
 
-def LowerTransferGatherToGatherPass :
-    Pass<"iree-vector-ext-lower-transfer-gather-to-gather", "func::FuncOp"> {
-  let summary = "Lower iree_vector_ext.transfer_gather to vector.gather";
+def LowerTransferGatherScatterToVectorPass :
+    Pass<"iree-vector-ext-lower-transfer-gather-scatter-to-vector", "func::FuncOp"> {
+  let summary = "Lower transfer_gather/transfer_scatter to vector.gather/vector.scatter";
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
     "::mlir::vector::VectorDialect",
