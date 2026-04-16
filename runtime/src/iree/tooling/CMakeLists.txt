@@ -119,6 +119,8 @@ iree_cc_library(
     iree::hal::drivers
     iree::hal::utils::allocators
     iree::hal::utils::mpi_channel_provider
+    iree::hal::utils::profile_file
+    iree::io::file_handle
   PUBLIC
 )
 

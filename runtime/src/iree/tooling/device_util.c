@@ -11,6 +11,8 @@
 #include "iree/hal/drivers/init.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/hal/utils/mpi_channel_provider.h"
+#include "iree/hal/utils/profile_file.h"
+#include "iree/io/file_handle.h"
 
 //===----------------------------------------------------------------------===//
 // Shared driver registry
@@ -446,6 +448,32 @@ IREE_FLAG(
     "Optional file path/prefix for profiling file output. Some\n"
     "implementations may require a file name in order to capture profiling\n"
     "information.");
+IREE_FLAG(
+    string, device_profiling_output, "",
+    "Optional path for a raw IREE HAL profiling bundle. The output is written\n"
+    "by tooling using a generic profile sink and does not change the\n"
+    "implementation-specific meaning of --device_profiling_file.");
+
+static iree_status_t iree_hal_profile_sink_create_from_flags(
+    iree_allocator_t host_allocator, iree_hal_profile_sink_t** out_sink) {
+  IREE_ASSERT_ARGUMENT(out_sink);
+  *out_sink = NULL;
+
+  if (strlen(FLAG_device_profiling_output) == 0) return iree_ok_status();
+
+  iree_io_file_handle_t* file_handle = NULL;
+  iree_status_t status = iree_io_file_handle_create(
+      IREE_IO_FILE_MODE_WRITE | IREE_IO_FILE_MODE_SEQUENTIAL_SCAN |
+          IREE_IO_FILE_MODE_SHARE_READ,
+      iree_make_cstring_view(FLAG_device_profiling_output),
+      /*initial_size=*/0, host_allocator, &file_handle);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_profile_file_sink_create(file_handle, host_allocator,
+                                               out_sink);
+  }
+  iree_io_file_handle_release(file_handle);
+  return status;
+}
 
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   if (!device) return iree_ok_status();
@@ -470,7 +498,15 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   // We don't validate the file path as each tool has their own style.
   options.file_path = FLAG_device_profiling_file;
 
-  return iree_hal_device_profiling_begin(device, &options);
+  iree_hal_profile_sink_t* sink = NULL;
+  iree_status_t status =
+      iree_hal_profile_sink_create_from_flags(iree_allocator_system(), &sink);
+  if (iree_status_is_ok(status)) {
+    options.sink = sink;
+    status = iree_hal_device_profiling_begin(device, &options);
+  }
+  iree_hal_profile_sink_release(sink);
+  return status;
 }
 
 iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device) {
