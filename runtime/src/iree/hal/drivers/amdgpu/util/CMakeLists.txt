@@ -315,6 +315,7 @@ iree_cc_binary_benchmark(
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading
+    iree::base::tooling::flags
     iree::hal
     iree::hal::drivers::amdgpu
     iree::hal::drivers::amdgpu::cts::testdata_amdgpu

@@ -53,9 +53,6 @@ typedef struct iree_hal_amdgpu_command_buffer_replay_t {
   const iree_hal_amdgpu_command_buffer_block_header_t* current_block;
   // Wait resolution that prefixes the next packet submission.
   iree_hal_amdgpu_wait_resolution_t wait_resolution;
-  // Failure status cloned by a completed intermediate block before replay
-  // resumes after drain.
-  iree_status_t failure_status;
   // Intrusive continuation used to retry replay after notification drain.
   iree_hal_amdgpu_host_queue_post_drain_action_t post_drain_action;
 } iree_hal_amdgpu_command_buffer_replay_t;
@@ -1653,9 +1650,6 @@ static void iree_hal_amdgpu_command_buffer_replay_destroy(
   iree_hal_amdgpu_command_buffer_replay_t* replay =
       (iree_hal_amdgpu_command_buffer_replay_t*)resource;
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (!iree_status_is_ok(replay->failure_status)) {
-    iree_status_free(replay->failure_status);
-  }
   iree_hal_resource_set_free(replay->binding_resource_set);
   iree_hal_semaphore_list_release(replay->signal_semaphore_list);
   iree_hal_command_buffer_release(replay->command_buffer);
@@ -1715,7 +1709,6 @@ static iree_status_t iree_hal_amdgpu_command_buffer_replay_create(
   replay->program = iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
   replay->current_block = replay->program->first_block;
   replay->wait_resolution = *resolution;
-  replay->failure_status = iree_ok_status();
   iree_hal_command_buffer_retain(command_buffer);
 
   uint8_t* storage = (uint8_t*)replay;
@@ -1754,16 +1747,6 @@ static iree_status_t iree_hal_amdgpu_command_buffer_replay_clone_queue_error(
   iree_status_t error = (iree_status_t)iree_atomic_load(
       &replay->queue->error_status, iree_memory_order_acquire);
   return iree_status_is_ok(error) ? iree_ok_status() : iree_status_clone(error);
-}
-
-static void iree_hal_amdgpu_command_buffer_replay_record_failure(
-    iree_hal_amdgpu_command_buffer_replay_t* replay, iree_status_t status) {
-  if (iree_status_is_ok(status)) return;
-  if (iree_status_is_ok(replay->failure_status)) {
-    replay->failure_status = status;
-  } else {
-    iree_status_free(status);
-  }
 }
 
 static void iree_hal_amdgpu_command_buffer_replay_fail_signals(
@@ -1827,21 +1810,6 @@ iree_hal_amdgpu_command_buffer_replay_submit_completion_packet(
     iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
   }
   return status;
-}
-
-static void iree_hal_amdgpu_command_buffer_replay_block_pre_signal(
-    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
-    iree_status_t status) {
-  (void)entry;
-  iree_hal_amdgpu_command_buffer_replay_t* replay =
-      (iree_hal_amdgpu_command_buffer_replay_t*)user_data;
-  iree_hal_amdgpu_command_buffer_replay_record_failure(
-      replay,
-      iree_status_is_ok(status) ? iree_ok_status() : iree_status_clone(status));
-  iree_hal_resource_retain(&replay->resource);
-  iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
-      replay->queue, &replay->post_drain_action,
-      iree_hal_amdgpu_command_buffer_replay_post_drain, replay);
 }
 
 static iree_status_t iree_hal_amdgpu_command_buffer_replay_resume_under_lock(
@@ -1915,15 +1883,13 @@ static iree_status_t iree_hal_amdgpu_command_buffer_replay_resume_under_lock(
         replay->queue, current_resolution, iree_hal_semaphore_list_empty(),
         replay->command_buffer, replay->binding_table, replay->current_block,
         /*inout_binding_resource_set=*/NULL,
-        (iree_hal_amdgpu_reclaim_action_t){
-            .fn = iree_hal_amdgpu_command_buffer_replay_block_pre_signal,
-            .user_data = replay,
-        },
-        &replay_resource, /*operation_resource_count=*/1,
+        (iree_hal_amdgpu_reclaim_action_t){0}, &replay_resource,
+        /*operation_resource_count=*/1,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
     if (iree_status_is_ok(status) && ready) {
       replay->current_block = next_block;
       iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
+      continue;
     } else if (iree_status_is_ok(status)) {
       status = iree_hal_amdgpu_command_buffer_replay_park(replay);
     }
@@ -1935,14 +1901,10 @@ static iree_status_t iree_hal_amdgpu_command_buffer_replay_resume_under_lock(
 static void iree_hal_amdgpu_command_buffer_replay_post_drain(void* user_data) {
   iree_hal_amdgpu_command_buffer_replay_t* replay =
       (iree_hal_amdgpu_command_buffer_replay_t*)user_data;
-  iree_status_t status = replay->failure_status;
-  replay->failure_status = iree_ok_status();
-
-  if (iree_status_is_ok(status)) {
-    iree_slim_mutex_lock(&replay->queue->submission_mutex);
-    status = iree_hal_amdgpu_command_buffer_replay_resume_under_lock(replay);
-    iree_slim_mutex_unlock(&replay->queue->submission_mutex);
-  }
+  iree_slim_mutex_lock(&replay->queue->submission_mutex);
+  iree_status_t status =
+      iree_hal_amdgpu_command_buffer_replay_resume_under_lock(replay);
+  iree_slim_mutex_unlock(&replay->queue->submission_mutex);
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_command_buffer_replay_fail_signals(replay, status);
   }
