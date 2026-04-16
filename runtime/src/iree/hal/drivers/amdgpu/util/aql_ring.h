@@ -118,10 +118,12 @@ static inline void iree_hal_amdgpu_aql_ring_initialize(
 // and commits each via iree_hal_amdgpu_aql_ring_commit(). The doorbell
 // should be rung once after all packets in a batch are committed.
 //
-// IMPORTANT: The returned packet slots have INVALID headers (zero) from the
-// CP's perspective. The CP will not process them until the caller commits
-// valid headers. Callers MUST populate all reserved slots and commit them;
-// leaving a slot with an INVALID header stalls the CP at that point.
+// IMPORTANT: The returned packet slots have INVALID headers from the CP's
+// perspective. The CP will not process them until a valid header is published.
+// Normal host submissions commit every reserved slot before ringing the
+// doorbell; device-side patching may intentionally leave a later slot invalid
+// only when an earlier packet is guaranteed to publish it before the CP reaches
+// that slot.
 static inline uint64_t iree_hal_amdgpu_aql_ring_reserve(
     iree_hal_amdgpu_aql_ring_t* ring, uint32_t count) {
   // Atomically claim |count| slots. Each concurrent thread gets a unique,

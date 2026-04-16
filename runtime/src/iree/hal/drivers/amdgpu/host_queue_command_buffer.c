@@ -502,7 +502,8 @@ iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
     iree_hal_amdgpu_aql_packet_t* patch_packet,
     iree_hal_amdgpu_aql_packet_t* dispatch_packet, uint8_t* patch_kernarg_data,
     uint8_t* dispatch_kernarg_data, iree_hsa_signal_t completion_signal,
-    uint16_t* out_patch_setup, uint16_t* out_dispatch_setup) {
+    uint16_t dispatch_header, uint16_t* out_patch_setup,
+    uint16_t* out_dispatch_setup) {
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_replay_dispatch_packet_body(
       block, binding_ptrs, dispatch_command, dispatch_packet,
       dispatch_kernarg_data, completion_signal, out_dispatch_setup));
@@ -526,8 +527,9 @@ iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
   iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
       &queue->transfer_context->kernels
            ->iree_hal_amdgpu_device_dispatch_patch_indirect_params,
-      workgroup_count_ptr, &dispatch_packet->dispatch, implicit_args,
-      &patch_packet->dispatch, patch_kernarg_data);
+      workgroup_count_ptr, &dispatch_packet->dispatch, dispatch_header,
+      *out_dispatch_setup, implicit_args, &patch_packet->dispatch,
+      patch_kernarg_data);
   *out_patch_setup = patch_packet->dispatch.setup;
   return iree_ok_status();
 }
@@ -1078,13 +1080,19 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
               is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                     &queue->notification_ring)
                               : iree_hsa_signal_null();
+          const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
+              IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+              iree_hal_amdgpu_host_queue_command_buffer_packet_control(
+                  queue, resolution, signal_semaphore_list, packet_index + 1,
+                  is_final_packet));
           status =
               iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
                   queue, block, binding_table, binding_ptrs, dispatch_command,
                   patch_packet, dispatch_packet,
                   kernarg_blocks[kernarg_block_index].data,
                   kernarg_blocks[kernarg_block_index + 1].data,
-                  completion_signal, &packet_setups[packet_index],
+                  completion_signal, dispatch_header,
+                  &packet_setups[packet_index],
                   &packet_setups[packet_index + 1]);
           if (iree_status_is_ok(status)) {
             packet_headers[packet_index] = iree_hal_amdgpu_aql_make_header(
@@ -1092,11 +1100,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
                 iree_hal_amdgpu_host_queue_command_buffer_packet_control(
                     queue, resolution, signal_semaphore_list, packet_index,
                     /*is_final_packet=*/false));
-            packet_headers[packet_index + 1] = iree_hal_amdgpu_aql_make_header(
-                IREE_HSA_PACKET_TYPE_INVALID,
-                iree_hal_amdgpu_host_queue_command_buffer_packet_control(
-                    queue, resolution, signal_semaphore_list, packet_index + 1,
-                    is_final_packet));
+            // The patch dispatch publishes the target dispatch header after it
+            // has updated dynamic workgroup counts on device.
+            packet_headers[packet_index + 1] = IREE_HSA_PACKET_TYPE_INVALID;
             packet_index += 2;
             kernarg_block_index +=
                 iree_hal_amdgpu_host_queue_dispatch_kernarg_block_count(
@@ -1268,16 +1274,6 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
       operation_resource_count, inout_binding_resource_set, submission_flags,
       submission);
 
-  for (uint32_t i = 0; i < block->aql_packet_count; ++i) {
-    iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
-        &queue->aql_ring,
-        submission->first_packet_id + resolution->barrier_count + i);
-    if (iree_hal_amdgpu_host_queue_aql_packet_header_type(packet_headers[i]) ==
-        IREE_HSA_PACKET_TYPE_INVALID) {
-      iree_hal_amdgpu_aql_ring_commit(packet, packet_headers[i],
-                                      packet_setups[i]);
-    }
-  }
   for (uint32_t i = 0; i < block->aql_packet_count; ++i) {
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
         &queue->aql_ring,

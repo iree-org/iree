@@ -508,12 +508,20 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
                                                   plan->layout
                                                       ->implicit_args_offset)
           : NULL;
+  const uint16_t dispatch_setup = dispatch_packet->dispatch.setup;
+  const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
+      IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+      iree_hal_amdgpu_aql_packet_control_barrier(
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+          iree_hal_amdgpu_host_queue_signal_list_release_scope(
+              queue, signal_semaphore_list)));
   iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
       &queue->transfer_context->kernels
            ->iree_hal_amdgpu_device_dispatch_patch_indirect_params,
       (const uint32_t*)(uintptr_t)workgroup_count_ptr,
-      &dispatch_packet->dispatch, implicit_args, &patch_packet->dispatch,
-      patch_kernarg_data);
+      &dispatch_packet->dispatch, dispatch_header, dispatch_setup,
+      implicit_args, &patch_packet->dispatch, patch_kernarg_data);
 
   iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
                                                            &submission);
@@ -521,23 +529,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
       queue, resolution, signal_semaphore_list, operation_resources,
       plan->operation_resource_count, /*inout_resource_set=*/NULL,
       submission_flags, &submission);
-  const uint16_t dispatch_setup = dispatch_packet->dispatch.setup;
   const uint16_t patch_setup = patch_packet->dispatch.setup;
-  const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
-      IREE_HSA_PACKET_TYPE_INVALID,
-      iree_hal_amdgpu_aql_packet_control_barrier(
-          iree_hal_amdgpu_host_queue_max_fence_scope(
-              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
-          iree_hal_amdgpu_host_queue_signal_list_release_scope(
-              queue, signal_semaphore_list)));
   const uint16_t patch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
       iree_hal_amdgpu_aql_packet_control_barrier(
           iree_hal_amdgpu_host_queue_max_fence_scope(
               IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
           IREE_HSA_FENCE_SCOPE_AGENT));
-  iree_hal_amdgpu_aql_ring_commit(dispatch_packet, dispatch_header,
-                                  dispatch_setup);
   iree_hal_amdgpu_aql_ring_commit(patch_packet, patch_header, patch_setup);
   iree_hal_amdgpu_aql_ring_doorbell(
       &queue->aql_ring,
