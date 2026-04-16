@@ -603,6 +603,7 @@ VER_0 {
     mlirLLVMDIBasicTypeAttrGetName;
     mlirLLVMDICompileUnitAttrGet;
     mlirLLVMDICompileUnitAttrGetName;
+    mlirLLVMDICompileUnitAttrGetRecSelf;
     mlirLLVMDICompositeTypeAttrGet;
     mlirLLVMDICompositeTypeAttrGetName;
     mlirLLVMDICompositeTypeAttrGetRecSelf;
