@@ -46,6 +46,17 @@ typedef enum iree_hal_amdgpu_wait_barrier_strategy_e {
   IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64 = 2,
 } iree_hal_amdgpu_wait_barrier_strategy_t;
 
+// AMD vendor-packet capabilities available on a physical device.
+enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
+  // AMD vendor AQL PM4-IB packets can jump to device-visible PM4 programs.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB = 1u << 0,
+  // AMD vendor AQL BARRIER_VALUE packets can wait on arbitrary signal values.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE = 1u << 1,
+  // PM4 WAIT_REG_MEM64 packets can perform 64-bit memory comparisons.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 = 1u << 2,
+};
+typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
+
 typedef struct iree_hal_amdgpu_host_queue_post_drain_action_t
     iree_hal_amdgpu_host_queue_post_drain_action_t;
 
@@ -155,9 +166,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Per-queue kernarg bump allocator backed by HSA kernarg-init memory.
   iree_hal_amdgpu_kernarg_ring_t kernarg_ring;
 
-  // Optional per-AQL-slot PM4 IB buffer used by PM4-backed wait and transfer
-  // strategies. This is not an independent scheduling ring: each slot is
-  // indexed by the matching AQL packet id and inherits the AQL ring's
+  // Optional per-AQL-slot PM4 IB buffer used by PM4-backed wait, transfer, and
+  // profiling snippets. This is not an independent scheduling ring: each slot
+  // is indexed by the matching AQL packet id and inherits the AQL ring's
   // lifetime/backpressure.
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots;
 
@@ -288,6 +299,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
 
   // Device-side wait strategy selected once from the GPU ISA at initialization.
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy;
+
+  // AMD vendor-packet capabilities selected from the GPU ISA.
+  iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities;
 
   // One-bit logical queue affinity identifying this queue in HAL buffer
   // placements. queue_alloca uses this as the transient wrapper's origin so
@@ -457,6 +471,11 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 // 64-byte blocks, at least 2x |aql_queue_capacity| to cover one tail-padding
 // gap at wrap. Submission admission proves space in both the AQL and kernarg
 // rings before publishing packets.
+//
+// |vendor_packet_capabilities| describes the AQL/PM4 vendor-packet support
+// selected from the physical device ISA. Queues allocate dynamic PM4 IB slots
+// when AQL_PM4_IB is available so BARRIER_VALUE-based CDNA queues can still use
+// PM4 snippets for profiling or tiny operations.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
@@ -465,6 +484,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_queue_affinity_t queue_affinity,
     iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
+    iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,

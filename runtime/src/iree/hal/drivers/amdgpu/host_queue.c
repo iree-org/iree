@@ -1490,6 +1490,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_queue_affinity_t queue_affinity,
     iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
+    iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
@@ -1540,6 +1541,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   iree_slim_mutex_initialize(&out_queue->post_drain_mutex);
   out_queue->axis = axis;
   out_queue->wait_barrier_strategy = wait_barrier_strategy;
+  out_queue->vendor_packet_capabilities = vendor_packet_capabilities;
   out_queue->queue_affinity = queue_affinity;
   out_queue->last_signal.semaphore = NULL;
   out_queue->last_signal.epoch = 0;
@@ -1602,12 +1604,14 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
         &out_queue->kernarg_ring);
   }
 
-  // Initialize the optional PM4 IB slot buffer. The buffer is indexed by AQL
-  // packet id and inherits AQL ring backpressure/reuse; there is no separate
-  // PM4 producer or reclaim position.
+  // Initialize the optional PM4 IB slot buffer. Capability-driven allocation
+  // keeps dynamic PM4 storage available on CDNA queues that use BARRIER_VALUE
+  // for waits but still support AQL PM4-IB snippets for other features. The
+  // buffer is indexed by AQL packet id and inherits AQL ring
+  // backpressure/reuse; there is no separate PM4 producer or reclaim position.
   if (iree_status_is_ok(status) &&
-      wait_barrier_strategy ==
-          IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64) {
+      (vendor_packet_capabilities &
+       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB)) {
     status = iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
         libhsa, gpu_agent, pm4_ib_pool, aql_queue_capacity, out_queue);
   }
