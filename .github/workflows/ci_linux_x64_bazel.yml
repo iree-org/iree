@@ -54,10 +54,12 @@ jobs:
           cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh
-      - name: Save Bazel disk cache
-        if: always() && github.ref == 'refs/heads/main'
-        run: |
+          # Run shutdown before saving disk to cache, as it is optional depending on the branch.
           bazel shutdown
+
+      - name: Save Bazel disk cache
+        if: always()
+        run: |
 
           # Prune cache to ~10G using LRU (oldest access time first).
           # Otherwise, cache grows. We can't use --experimental_disk_cache_gc_max_size=10G
