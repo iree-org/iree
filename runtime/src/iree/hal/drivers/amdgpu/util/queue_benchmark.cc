@@ -32,6 +32,8 @@ constexpr uint32_t kFrontierAxisTableCapacity = 256;
 constexpr iree_device_size_t kPayloadBufferAlignment = 16;
 constexpr iree_device_size_t kPayloadLength = sizeof(uint32_t);
 constexpr iree_host_size_t kDispatchBindingBenchmarkMaxCount = 256;
+constexpr iree_host_size_t kDispatchBindingBenchmarkVariantCapacity =
+    kDispatchBindingBenchmarkMaxCount + 1;
 constexpr iree_hal_queue_affinity_t kQueue0 = ((iree_hal_queue_affinity_t)1ull)
                                               << 0;
 constexpr iree_hal_queue_affinity_t kQueue1 = ((iree_hal_queue_affinity_t)1ull)
@@ -144,6 +146,11 @@ class QueueBenchmark : public benchmark::Fixture {
 
   void TearDown(benchmark::State& state) override {
     ReleasePreResolvedDispatch();
+    for (iree_host_size_t i = 0; i < kDispatchBindingBenchmarkVariantCapacity;
+         ++i) {
+      iree_hal_command_buffer_release(binding_count_command_buffers_[i]);
+      binding_count_command_buffers_[i] = nullptr;
+    }
     for (iree_host_size_t i = 0; i < kDispatchBindingBenchmarkMaxCount; ++i) {
       iree_hal_buffer_release(binding_count_buffers_[i]);
       binding_count_buffers_[i] = nullptr;
@@ -1371,6 +1378,55 @@ class QueueBenchmark : public benchmark::Fixture {
         IREE_HAL_DISPATCH_FLAG_NONE);
   }
 
+  iree_status_t RecordBindingCountCommandBuffer(
+      int64_t binding_count, iree_hal_command_buffer_t** out_command_buffer) {
+    *out_command_buffer = nullptr;
+    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    IREE_RETURN_IF_ERROR(
+        BindingCountExportOrdinal(binding_count, &export_ordinal));
+
+    iree_hal_command_buffer_t* command_buffer = nullptr;
+    iree_status_t status = iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+        IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*binding_capacity=*/0, &command_buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_begin(command_buffer);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_dispatch(
+          command_buffer, binding_count_executable_, export_ordinal,
+          iree_hal_make_static_dispatch_config(1, 1, 1),
+          iree_const_byte_span_empty(),
+          BindingCountDispatchBindings(binding_count),
+          IREE_HAL_DISPATCH_FLAG_NONE);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_end(command_buffer);
+    }
+    if (iree_status_is_ok(status)) {
+      *out_command_buffer = command_buffer;
+    } else {
+      iree_hal_command_buffer_release(command_buffer);
+    }
+    return status;
+  }
+
+  bool EnsureBindingCountCommandBuffer(benchmark::State& state,
+                                       int64_t binding_count) {
+    if (!EnsureBindingCountExecutable(state) ||
+        !EnsureBindingCountBuffers(state, binding_count)) {
+      return false;
+    }
+    iree_hal_command_buffer_t** command_buffer_slot =
+        &binding_count_command_buffers_[binding_count];
+    if (*command_buffer_slot) return true;
+    iree_status_t status =
+        RecordBindingCountCommandBuffer(binding_count, command_buffer_slot);
+    return HandleStatus(state, status,
+                        "failed to record binding-count command buffer");
+  }
+
   iree_status_t BindingCountDispatchSubmitPublicFinalInline(
       int64_t binding_count, SubmittedCompletion* out_completion) {
     uint64_t completion_payload_value = ++completion_payload_value_;
@@ -1383,6 +1439,23 @@ class QueueBenchmark : public benchmark::Fixture {
     IREE_RETURN_IF_ERROR(SubmitBindingCountDispatchWithLists(
         kQueue0, iree_hal_semaphore_list_empty(), signal_semaphore_list,
         binding_count));
+    *out_completion = {completion_semaphore_, completion_payload_value};
+    return iree_ok_status();
+  }
+
+  iree_status_t BindingCountCommandBufferSubmitPublicFinalInline(
+      int64_t binding_count, SubmittedCompletion* out_completion) {
+    uint64_t completion_payload_value = ++completion_payload_value_;
+    iree_hal_semaphore_t* signal_semaphore = completion_semaphore_;
+    iree_hal_semaphore_list_t signal_semaphore_list = {
+        /*count=*/1,
+        /*semaphores=*/&signal_semaphore,
+        /*payload_values=*/&completion_payload_value,
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+        device_, kQueue0, iree_hal_semaphore_list_empty(),
+        signal_semaphore_list, binding_count_command_buffers_[binding_count],
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
     *out_completion = {completion_semaphore_, completion_payload_value};
     return iree_ok_status();
   }
@@ -1503,6 +1576,10 @@ class QueueBenchmark : public benchmark::Fixture {
   // Queue_dispatch binding refs assembled from |binding_count_buffers_|.
   iree_hal_buffer_ref_t
       binding_count_binding_ref_scratch_[kDispatchBindingBenchmarkMaxCount] =
+          {};
+  // Static direct command buffers for binding-count dispatch benchmark rows.
+  iree_hal_command_buffer_t*
+      binding_count_command_buffers_[kDispatchBindingBenchmarkVariantCapacity] =
           {};
   // Public semaphore used for final host-observable completion.
   iree_hal_semaphore_t* completion_semaphore_ = nullptr;
@@ -2486,6 +2563,29 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
   SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
 }
 
+BENCHMARK_DEFINE_F(
+    QueueBenchmark,
+    SameQueueCommandBufferBindingCountStaticPublicFinalInlineSubmitOnly)(
+    benchmark::State& state) {
+  const int64_t binding_count = state.range(0);
+  if (!EnsureBindingCountCommandBuffer(state, binding_count)) return;
+  for (auto _ : state) {
+    SubmittedCompletion completion;
+    if (!HandleStatus(state,
+                      BindingCountCommandBufferSubmitPublicFinalInline(
+                          binding_count, &completion),
+                      "binding-count command-buffer submit failed")) {
+      break;
+    }
+    if (!WaitWithTimingPaused(state, completion,
+                              "binding-count command-buffer wait failed")) {
+      break;
+    }
+  }
+  state.counters["binding_count"] = static_cast<double>(binding_count);
+  SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
+}
+
 BENCHMARK_DEFINE_F(QueueBenchmark,
                    WaitBeforeSignalChain)(benchmark::State& state) {
   if (!EnsureQueueAvailable(state, kQueue1)) return;
@@ -2837,6 +2937,21 @@ BENCHMARK_REGISTER_F(QueueBenchmark, DispatchBindingCountValidateOnly)
     ->Unit(benchmark::kNanosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark,
                      SameQueueDispatchBindingCountPublicFinalInlineSubmitOnly)
+    ->Arg(0)
+    ->Arg(1)
+    ->Arg(8)
+    ->Arg(9)
+    ->Arg(16)
+    ->Arg(17)
+    ->Arg(24)
+    ->Arg(25)
+    ->Arg(256)
+    ->ArgName("binding_count")
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(
+    QueueBenchmark,
+    SameQueueCommandBufferBindingCountStaticPublicFinalInlineSubmitOnly)
     ->Arg(0)
     ->Arg(1)
     ->Arg(8)
