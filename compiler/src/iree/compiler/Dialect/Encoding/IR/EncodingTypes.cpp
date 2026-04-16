@@ -225,7 +225,7 @@ std::string stringifyOperandIndex(EncodingOpType opType,
   case EncodingOpType::conv:
     return stringifyConvOperandIndex(valueAttr);
   default:
-    assert(false && "invalid index");
+    assert(false && "invalid opType");
     return "";
   }
 }
