@@ -40,7 +40,7 @@ jobs:
           python3 -m pip install azure-storage-blob
       - name: Restore Bazel disk cache
         run: |
-          wget https://ireebuildcache.blob.core.windows.net/ccache-container/bazel-disk-cache.tar.gz -O /tmp/cache.tar.gz
+          # wget https://ireebuildcache.blob.core.windows.net/ccache-container/bazel-disk-cache.tar.gz -O /tmp/cache.tar.gz
           mkdir -p "${BAZEL_DISK_CACHE_DIR}"
           if [ -f /tmp/cache.tar.gz ]; then
             tar -xzf /tmp/cache.tar.gz -C "${BAZEL_DISK_CACHE_DIR}"
