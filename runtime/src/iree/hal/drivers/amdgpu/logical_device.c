@@ -270,10 +270,199 @@ iree_hal_amdgpu_logical_device_profile_session_metadata(
     iree_hal_amdgpu_logical_device_t* logical_device, uint64_t session_id) {
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_profile_chunk_metadata_default();
-  metadata.content_type = IREE_SV("application/vnd.iree.hal.profile.session");
+  metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_SESSION;
   metadata.name = logical_device->identifier;
   metadata.session_id = session_id;
   return metadata;
+}
+
+static uint64_t iree_hal_amdgpu_logical_device_profile_queue_stream_id(
+    uint32_t physical_device_ordinal, uint32_t queue_ordinal) {
+  return ((uint64_t)physical_device_ordinal << 32) | (uint64_t)queue_ordinal;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_write_profile_devices(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  const iree_host_size_t record_count = logical_device->physical_device_count;
+  if (record_count == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "logical device has no physical devices (initialization incomplete)");
+  }
+
+  iree_host_size_t records_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &records_size,
+              IREE_STRUCT_FIELD(record_count, iree_hal_profile_device_record_t,
+                                NULL)));
+  iree_hal_profile_device_record_t* records = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(logical_device->host_allocator, records_size,
+                                (void**)&records));
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < record_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    if (IREE_UNLIKELY(physical_device->device_ordinal > UINT32_MAX ||
+                      physical_device->host_queue_count > UINT32_MAX)) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "profile device metadata ordinals out of range: device=%" PRIhsz
+          ", queue_count=%" PRIhsz,
+          physical_device->device_ordinal, physical_device->host_queue_count);
+      break;
+    }
+
+    records[i] = iree_hal_profile_device_record_default();
+    records[i].physical_device_ordinal =
+        (uint32_t)physical_device->device_ordinal;
+    records[i].queue_count = (uint32_t)physical_device->host_queue_count;
+    if (physical_device->has_physical_device_uuid) {
+      records[i].flags |= IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID;
+      memcpy(records[i].physical_device_uuid,
+             physical_device->physical_device_uuid,
+             sizeof(records[i].physical_device_uuid));
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES;
+    metadata.name = logical_device->identifier;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec =
+        iree_make_const_byte_span(records, records_size);
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  iree_allocator_free(logical_device->host_allocator, records);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_write_profile_queues(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_host_size_t record_count = 0;
+  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            record_count, physical_device->host_queue_count, &record_count))) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "profile queue metadata count overflow");
+    }
+  }
+  if (record_count == 0) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "logical device has no host queues (initialization incomplete)");
+  }
+
+  iree_host_size_t records_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &records_size,
+              IREE_STRUCT_FIELD(record_count, iree_hal_profile_queue_record_t,
+                                NULL)));
+  iree_hal_profile_queue_record_t* records = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(logical_device->host_allocator, records_size,
+                                (void**)&records));
+
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t record_ordinal = 0;
+  for (iree_host_size_t i = 0;
+       i < logical_device->physical_device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    if (IREE_UNLIKELY(physical_device->device_ordinal > UINT32_MAX)) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "profile queue metadata physical device "
+                                "ordinal out of range: %" PRIhsz,
+                                physical_device->device_ordinal);
+      break;
+    }
+    const uint32_t physical_device_ordinal =
+        (uint32_t)physical_device->device_ordinal;
+    for (iree_host_size_t j = 0;
+         j < physical_device->host_queue_count && iree_status_is_ok(status);
+         ++j) {
+      if (IREE_UNLIKELY(j > UINT32_MAX)) {
+        status = iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "profile queue metadata queue ordinal out of range: %" PRIhsz, j);
+        break;
+      }
+      const uint32_t queue_ordinal = (uint32_t)j;
+      records[record_ordinal] = iree_hal_profile_queue_record_default();
+      records[record_ordinal].physical_device_ordinal = physical_device_ordinal;
+      records[record_ordinal].queue_ordinal = queue_ordinal;
+      records[record_ordinal].stream_id =
+          iree_hal_amdgpu_logical_device_profile_queue_stream_id(
+              physical_device_ordinal, queue_ordinal);
+      ++record_ordinal;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES;
+    metadata.name = logical_device->identifier;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec =
+        iree_make_const_byte_span(records, records_size);
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  iree_allocator_free(logical_device->host_allocator, records);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_write_profile_metadata(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_devices(
+      logical_device, sink, session_id));
+  return iree_hal_amdgpu_logical_device_write_profile_queues(logical_device,
+                                                             sink, session_id);
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_write_profile_events(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+  if (!sink) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       i < logical_device->physical_device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    for (iree_host_size_t j = 0;
+         j < physical_device->host_queue_count && iree_status_is_ok(status);
+         ++j) {
+      status = iree_hal_amdgpu_host_queue_write_profile_events(
+          &physical_device->host_queues[j], sink, session_id);
+    }
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_set_hsa_profiling_enabled(
@@ -561,11 +750,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   physical_device_options.force_wait_barrier_defer =
       options->force_wait_barrier_defer;
 
-  // Verify all GPU agents meet the required physical device options.
-  // If they verify OK we are able to compute their total size used to allocate
-  // the logical device that embeds their data
-  // structures.
-  iree_host_size_t total_physical_device_size = 0;
+  // Verify all GPU agents meet the required physical device options. Each
+  // embedded physical device has the same layout because all physical devices
+  // in one logical device share the same host-queue options.
+  const iree_host_size_t physical_device_size =
+      iree_hal_amdgpu_physical_device_calculate_size(&physical_device_options);
   for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
     hsa_agent_t gpu_agent = topology->gpu_agents[i];
     hsa_agent_t cpu_agent = topology->cpu_agents[topology->gpu_cpu_map[i]];
@@ -574,28 +763,30 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
         iree_hal_amdgpu_physical_device_options_verify(
             &physical_device_options, libhsa, cpu_agent, gpu_agent),
         "verifying GPU agent %" PRIhsz " meets required options", i);
-    total_physical_device_size +=
-        iree_hal_amdgpu_physical_device_calculate_size(
-            &physical_device_options);
   }
 
   // Allocate the logical device and all nested physical device data structures.
   iree_hal_amdgpu_logical_device_t* logical_device = NULL;
-  const iree_host_size_t total_size =
-      sizeof(*logical_device) +
-      iree_host_align(sizeof(logical_device->physical_devices[0]) *
-                          topology->gpu_agent_count,
-                      iree_max_align_t) +
-      total_physical_device_size + identifier.size;
+  iree_host_size_t physical_device_data_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(*logical_device), &total_size,
+              IREE_STRUCT_FIELD(topology->gpu_agent_count,
+                                iree_hal_amdgpu_physical_device_t*, NULL),
+              IREE_STRUCT_ARRAY_FIELD_ALIGNED(
+                  topology->gpu_agent_count, physical_device_size, uint8_t,
+                  iree_max_align_t, &physical_device_data_offset),
+              IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size,
                                 (void**)&logical_device));
   memset(logical_device, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_amdgpu_logical_device_vtable,
                                &logical_device->resource);
-  iree_string_view_append_to_buffer(
-      identifier, &logical_device->identifier,
-      (char*)logical_device + total_size - identifier.size);
+  iree_string_view_append_to_buffer(identifier, &logical_device->identifier,
+                                    (char*)logical_device + identifier_offset);
   logical_device->host_allocator = host_allocator;
   logical_device->failure_status = IREE_ATOMIC_VAR_INIT(0);
 
@@ -611,16 +802,12 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   // table.
   logical_device->physical_device_count = topology->gpu_agent_count;
   uint8_t* physical_device_base =
-      (uint8_t*)logical_device + sizeof(*logical_device) +
-      iree_host_align(sizeof(logical_device->physical_devices[0]) *
-                          topology->gpu_agent_count,
-                      iree_max_align_t);
+      (uint8_t*)logical_device + physical_device_data_offset;
   for (iree_host_size_t i = 0, queue_index = 0;
        i < logical_device->physical_device_count; ++i) {
     logical_device->physical_devices[i] =
         (iree_hal_amdgpu_physical_device_t*)physical_device_base;
-    physical_device_base += iree_hal_amdgpu_physical_device_calculate_size(
-        &physical_device_options);
+    physical_device_base += physical_device_size;
     for (iree_host_size_t j = 0; j < topology->gpu_agent_queue_count;
          ++j, ++queue_index) {
       iree_hal_queue_affinity_or_into(logical_device->queue_affinity_mask,
@@ -883,32 +1070,14 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_capabilities(
   hsa_agent_t gpu_agent = physical_device->device_agent;
   const iree_hal_amdgpu_libhsa_t* libhsa = &logical_device->system->libhsa;
 
-  // Query device UUID. HSA returns an ASCII string: "GPU-" followed by the
-  // 64-bit UniqueID as 16 hex digits, plus NUL (21 chars total). Devices
-  // without UUID support (GFX8 and older) return "GPU-XX" instead.
-  // We parse the hex body into 8 binary bytes for the HAL's 16-byte UUID
-  // field (remaining bytes zeroed).
-  char uuid_string[24];
-  memset(uuid_string, 0, sizeof(uuid_string));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), gpu_agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_UUID,
-      uuid_string));
   memset(out_capabilities->physical_device_uuid, 0,
          sizeof(out_capabilities->physical_device_uuid));
-  iree_string_view_t uuid_hex = iree_make_cstring_view(uuid_string);
-  // Strip the "GPU-"/"CPU-"/"DSP-" header to get the hex body.
-  if (!iree_string_view_consume_prefix(&uuid_hex, IREE_SV("GPU-")) &&
-      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("CPU-")) &&
-      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("DSP-")) &&
-      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("AIE-"))) {
-    uuid_hex = iree_string_view_empty();
+  if (physical_device->has_physical_device_uuid) {
+    memcpy(out_capabilities->physical_device_uuid,
+           physical_device->physical_device_uuid,
+           sizeof(out_capabilities->physical_device_uuid));
+    out_capabilities->has_physical_device_uuid = true;
   }
-  // Parse hex digits into binary bytes. The "XX" fallback for unsupported
-  // devices will fail to parse and leave the UUID zeroed.
-  iree_string_view_parse_hex_bytes(
-      uuid_hex, sizeof(out_capabilities->physical_device_uuid),
-      out_capabilities->physical_device_uuid);
-  out_capabilities->has_physical_device_uuid = true;
 
   // Query NUMA node from HSA.
   uint32_t numa_node;
@@ -1633,6 +1802,10 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     status = iree_hal_profile_sink_begin_session(sink, &metadata);
     sink_session_begun = iree_status_is_ok(status);
   }
+  if (iree_status_is_ok(status) && sink) {
+    status = iree_hal_amdgpu_logical_device_write_profile_metadata(
+        logical_device, sink, session_id);
+  }
   if (iree_status_is_ok(status) &&
       iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
           options->mode)) {
@@ -1660,8 +1833,12 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_flush(
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
 
-  (void)logical_device;
-  return iree_ok_status();
+  if (logical_device->profiling.mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
+    return iree_ok_status();
+  }
+  return iree_hal_amdgpu_logical_device_write_profile_events(
+      logical_device, logical_device->profiling.sink,
+      logical_device->profiling.session_id);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
@@ -1681,9 +1858,14 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
       iree_hal_amdgpu_logical_device_profile_session_metadata(logical_device,
                                                               session_id);
 
+  if (sink) {
+    status = iree_hal_amdgpu_logical_device_write_profile_events(
+        logical_device, sink, session_id);
+  }
   if (iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(mode)) {
-    status = iree_hal_amdgpu_logical_device_set_hsa_profiling_enabled(
-        logical_device, false);
+    status = iree_status_join(
+        status, iree_hal_amdgpu_logical_device_set_hsa_profiling_enabled(
+                    logical_device, false));
   }
   if (sink) {
     status = iree_status_join(

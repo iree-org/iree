@@ -60,13 +60,18 @@ iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
   IREE_ASSERT_ARGUMENT(out_resources);
   entry->pre_signal_action.fn = NULL;
   entry->pre_signal_action.user_data = NULL;
+  entry->profile_packet_first_id = 0;
+  entry->profile_packet_count = 0;
   entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
   if (count <= IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY) {
     entry->resources = entry->inline_resources;
   } else {
-    iree_host_size_t required_size = count * sizeof(iree_hal_resource_t*);
+    iree_host_size_t required_size = 0;
+    IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+        0, &required_size,
+        IREE_STRUCT_FIELD(count, iree_hal_resource_t*, NULL)));
     if (required_size > block_pool->usable_block_size) {
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "reclaim overflow (%" PRIhsz
@@ -104,6 +109,8 @@ void iree_hal_amdgpu_reclaim_entry_release(
   entry->resources = NULL;
   entry->pre_signal_action.fn = NULL;
   entry->pre_signal_action.user_data = NULL;
+  entry->profile_packet_first_id = 0;
+  entry->profile_packet_count = 0;
   entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
@@ -541,6 +548,7 @@ iree_hal_amdgpu_notification_ring_read_span_frontier(
 iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
     iree_hal_amdgpu_notification_ring_t* ring,
     const iree_async_frontier_t* fallback_frontier,
+    iree_hal_amdgpu_reclaim_retire_fn_t retire_fn, void* retire_user_data,
     uint64_t* out_kernarg_reclaim_position) {
   IREE_ASSERT_ARGUMENT(ring);
   IREE_ASSERT_ARGUMENT(out_kernarg_reclaim_position);
@@ -569,6 +577,13 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
     uint32_t reclaim_index = (uint32_t)(epoch & (ring->capacity - 1));
     iree_hal_amdgpu_reclaim_entry_execute_pre_signal_action(
         &ring->reclaim_entries[reclaim_index], iree_ok_status());
+  }
+  if (retire_fn) {
+    for (uint64_t epoch = previous_drained; epoch < current_epoch; ++epoch) {
+      uint32_t reclaim_index = (uint32_t)(epoch & (ring->capacity - 1));
+      retire_fn(&ring->reclaim_entries[reclaim_index], epoch + 1,
+                retire_user_data);
+    }
   }
 
   // Single-slot coalescing: accumulate consecutive same-semaphore entries

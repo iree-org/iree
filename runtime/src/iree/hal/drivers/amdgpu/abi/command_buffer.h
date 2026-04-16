@@ -197,6 +197,8 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint8_t dispatch_flags;
   // AQL dispatch packet setup field.
   uint16_t setup;
+  // Executable export ordinal used for profiling and diagnostics.
+  uint32_t export_ordinal;
   // AQL dispatch packet workgroup size fields.
   uint16_t workgroup_size[3];
   // Kernarg qword offset of implicit args, or UINT16_MAX when absent.
@@ -207,9 +209,11 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t private_segment_size;
   // AQL dispatch packet group segment size field.
   uint32_t group_segment_size;
+  // Reserved bytes that must be zero in version 0.
+  uint32_t reserved0;
 } iree_hal_amdgpu_command_buffer_dispatch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 64,
+    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 72,
     "dispatch command size must remain qword aligned");
 
 // Fill command record.

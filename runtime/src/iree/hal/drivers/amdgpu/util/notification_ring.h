@@ -127,6 +127,7 @@ typedef struct iree_hal_amdgpu_frontier_snapshot_t {
   // Number of frontier entries following this header. 0xFF is a sentinel
   // indicating the reader should wrap to byte 0 (not a real snapshot).
   uint8_t entry_count;
+  // Reserved padding that makes the trailing frontier entries 8-byte aligned.
   uint8_t reserved[7];
   // Followed by entry_count x iree_async_frontier_entry_t.
 } iree_hal_amdgpu_frontier_snapshot_t;
@@ -157,9 +158,16 @@ typedef void(IREE_API_PTR* iree_hal_amdgpu_reclaim_action_fn_t)(
     iree_status_t status);
 
 typedef struct iree_hal_amdgpu_reclaim_action_t {
+  // Callback invoked with |user_data| when the epoch is retired or failed.
   iree_hal_amdgpu_reclaim_action_fn_t fn;
+  // Opaque callback state retained through another reclaim resource if needed.
   void* user_data;
 } iree_hal_amdgpu_reclaim_action_t;
+
+// Optional callback invoked for one completed epoch after pre-signal actions
+// execute and before user-visible semaphore signals publish.
+typedef void(IREE_API_PTR* iree_hal_amdgpu_reclaim_retire_fn_t)(
+    iree_hal_amdgpu_reclaim_entry_t* entry, uint64_t epoch, void* user_data);
 
 // Per-epoch resource reclaim entry. Stores retained HAL resource pointers
 // that are released when the epoch completes (drain time). One entry per
@@ -179,12 +187,20 @@ struct iree_hal_amdgpu_reclaim_entry_t {
   // completion, and during fail_all with the failure status before resources
   // are released.
   iree_hal_amdgpu_reclaim_action_t pre_signal_action;
+  // First AQL packet id whose queue-local profiling metadata may be harvested.
+  // Valid only when |profile_packet_count| is non-zero.
+  uint64_t profile_packet_first_id;
   // Kernarg ring write position at the time of this submission. Drain/fail_all
   // report the highest position across retired epochs so the caller can reclaim
   // kernarg blocks. 0 means no kernarg was allocated.
   uint64_t kernarg_write_position;
+  // Number of AQL packets in the profiling metadata range.
+  uint32_t profile_packet_count;
+  // Number of retained resources stored in |resources|.
   uint16_t count;
-  uint16_t reserved[3];
+  // Reserved padding for stable layout.
+  uint16_t reserved[1];
+  // Inline retained-resource storage for common small submissions.
   iree_hal_resource_t*
       inline_resources[IREE_HAL_AMDGPU_RECLAIM_INLINE_CAPACITY];
 };
@@ -218,6 +234,7 @@ void iree_hal_amdgpu_reclaim_entry_release(
 typedef struct iree_hal_amdgpu_notification_ring_t {
   // HSA API handle for signal operations. Not retained.
   const iree_hal_amdgpu_libhsa_t* libhsa;
+  // Host allocator used for the ring's contiguous storage allocation.
   iree_allocator_t host_allocator;
 
   // Monotonic completion counter.
@@ -383,10 +400,15 @@ void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
 // Stores the highest kernarg_write_position across all retired epochs in
 // |out_kernarg_reclaim_position|. Set to 0 if no epochs were retired.
 //
+// |retire_fn|, when provided, is called once per retired epoch before
+// user-visible semaphore publication. It must not publish user-visible
+// completion itself.
+//
 // Returns the number of entries drained.
 iree_host_size_t iree_hal_amdgpu_notification_ring_drain(
     iree_hal_amdgpu_notification_ring_t* ring,
     const iree_async_frontier_t* fallback_frontier,
+    iree_hal_amdgpu_reclaim_retire_fn_t retire_fn, void* retire_user_data,
     uint64_t* out_kernarg_reclaim_position);
 
 // Fails all pending notification entries with |error_status|.

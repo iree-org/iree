@@ -1352,11 +1352,11 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_update_buffer(
   const iree_host_size_t kernarg_block_count = iree_host_size_ceil_div(
       kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
   iree_host_size_t kernarg_block_length = 0;
-  if (IREE_UNLIKELY(
-          !iree_host_size_checked_mul(kernarg_block_count,
-                                      sizeof(iree_hal_amdgpu_kernarg_block_t),
-                                      &kernarg_block_length) ||
-          kernarg_block_length > UINT32_MAX)) {
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      0, &kernarg_block_length,
+      IREE_STRUCT_FIELD(kernarg_block_count, iree_hal_amdgpu_kernarg_block_t,
+                        NULL)));
+  if (IREE_UNLIKELY(kernarg_block_length > UINT32_MAX)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "command-buffer update staging payload requires too many kernarg "
@@ -1583,12 +1583,11 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
       prepublish_kernargs ? 0 : kernarg_block_length;
 
   iree_host_size_t command_length = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_add(
-          sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t),
-          prepublish_kernargs ? 0 : tail_padded_length, &command_length))) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "dispatch command record size overflow");
-  }
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t),
+      &command_length,
+      IREE_STRUCT_FIELD(prepublish_kernargs ? 0 : tail_padded_length, uint8_t,
+                        NULL)));
 
   const uint16_t binding_source_count =
       prepublish_kernargs
@@ -1642,6 +1641,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
           ? IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS
           : IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE;
   dispatch_command->setup = kernel_args->setup;
+  dispatch_command->export_ordinal = export_ordinal;
   dispatch_command->workgroup_size[0] = kernel_args->workgroup_size[0];
   dispatch_command->workgroup_size[1] = kernel_args->workgroup_size[1];
   dispatch_command->workgroup_size[2] = kernel_args->workgroup_size[2];

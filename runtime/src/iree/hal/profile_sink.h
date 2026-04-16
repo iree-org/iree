@@ -42,6 +42,145 @@ enum iree_hal_profile_chunk_flag_bits_t {
   IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED = 1ull << 0,
 };
 
+// Content type for a profiling session boundary metadata chunk.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_SESSION \
+  IREE_SV("application/vnd.iree.hal.profile.session")
+
+// Content type for an array of iree_hal_profile_device_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES \
+  IREE_SV("application/vnd.iree.hal.profile.devices")
+
+// Content type for an array of iree_hal_profile_queue_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES \
+  IREE_SV("application/vnd.iree.hal.profile.queues")
+
+// Content type for an array of iree_hal_profile_dispatch_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.dispatch-events")
+
+// Bitfield specifying which optional device record fields are populated.
+typedef uint32_t iree_hal_profile_device_flags_t;
+enum iree_hal_profile_device_flag_bits_t {
+  IREE_HAL_PROFILE_DEVICE_FLAG_NONE = 0u,
+
+  // |physical_device_uuid| contains a stable physical device identifier.
+  IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID = 1u << 0,
+};
+
+// Session-level physical device description.
+//
+// Producers should emit device records before event records that reference the
+// corresponding |physical_device_ordinal|. The ordinal is a compact
+// session-local key; consumers that need hermetic identity should use
+// |physical_device_uuid| when present.
+typedef struct iree_hal_profile_device_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags specifying which optional fields are populated.
+  iree_hal_profile_device_flags_t flags;
+  // Session-local physical device ordinal used by compact event records.
+  uint32_t physical_device_ordinal;
+  // Number of queues described for this physical device.
+  uint32_t queue_count;
+  // Stable physical device UUID when
+  // IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID is set.
+  uint8_t physical_device_uuid[16];
+} iree_hal_profile_device_record_t;
+
+// Returns a default physical device record.
+static inline iree_hal_profile_device_record_t
+iree_hal_profile_device_record_default(void) {
+  iree_hal_profile_device_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Session-level queue description.
+//
+// Producers should emit queue records before event records that reference the
+// corresponding |stream_id| or |queue_ordinal|. Queue ordinals are only scoped
+// to their physical device within a profiling session.
+typedef struct iree_hal_profile_queue_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Session-local physical device ordinal owning this queue.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal within |physical_device_ordinal|.
+  uint32_t queue_ordinal;
+  // Reserved for future queue record flags; must be zero.
+  uint32_t reserved0;
+  // Producer-defined stream identifier used in chunk/event metadata.
+  uint64_t stream_id;
+} iree_hal_profile_queue_record_t;
+
+// Returns a default queue record.
+static inline iree_hal_profile_queue_record_t
+iree_hal_profile_queue_record_default(void) {
+  iree_hal_profile_queue_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one dispatch event record.
+typedef uint32_t iree_hal_profile_dispatch_event_flags_t;
+enum iree_hal_profile_dispatch_event_flag_bits_t {
+  IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_NONE = 0u,
+
+  // Dispatch was enqueued through a reusable command buffer.
+  IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER = 1u << 0,
+
+  // Workgroup counts were loaded from device memory before dispatch.
+  IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS = 1u << 1,
+};
+
+// Device-timestamped dispatch execution event.
+//
+// Producers emit dispatch events after the device and queue metadata chunks
+// that define the chunk's physical_device_ordinal, queue_ordinal, and
+// stream_id. Times are raw device ticks in the producer's clock domain.
+typedef struct iree_hal_profile_dispatch_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing how the dispatch was produced.
+  iree_hal_profile_dispatch_event_flags_t flags;
+  // Producer-defined event identifier unique within the chunk stream.
+  uint64_t event_id;
+  // Queue submission epoch containing this dispatch.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 for direct queue dispatch.
+  uint64_t command_buffer_id;
+  // Process-local executable identifier, or 0 when unavailable.
+  uint64_t executable_id;
+  // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
+  uint32_t command_index;
+  // Executable export ordinal dispatched.
+  uint32_t export_ordinal;
+  // Workgroup counts submitted for each dimension.
+  uint32_t workgroup_count[3];
+  // Workgroup sizes submitted for each dimension.
+  uint32_t workgroup_size[3];
+  // Device timestamp captured when dispatch execution started.
+  uint64_t start_tick;
+  // Device timestamp captured when dispatch execution completed.
+  uint64_t end_tick;
+} iree_hal_profile_dispatch_event_t;
+
+// Returns a default dispatch event record.
+static inline iree_hal_profile_dispatch_event_t
+iree_hal_profile_dispatch_event_default(void) {
+  iree_hal_profile_dispatch_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.command_index = UINT32_MAX;
+  record.export_ordinal = UINT32_MAX;
+  return record;
+}
+
 // Metadata describing one profiling chunk.
 typedef struct iree_hal_profile_chunk_metadata_t {
   // MIME-like content type of the chunk payload.

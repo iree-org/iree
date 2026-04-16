@@ -548,8 +548,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
           &submission.dispatch_slot->dispatch, &dispatch_packet,
           submission.kernel.kernarg_blocks->data,
-          iree_hal_amdgpu_notification_ring_epoch_signal(
-              &queue->notification_ring));
+          submission.dispatch_completion_signal);
   submission.minimum_acquire_scope = minimum_acquire_scope;
   submission.minimum_release_scope = minimum_release_scope;
   submission.kernel.pre_signal_action = pre_signal_action;
@@ -720,8 +719,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
           &submission.dispatch_slot->dispatch, &dispatch_packet,
           submission.kernel.kernarg_blocks->data,
-          iree_hal_amdgpu_notification_ring_epoch_signal(
-              &queue->notification_ring));
+          submission.dispatch_completion_signal);
 
   iree_hal_resource_t* operation_resources[1] = {
       (iree_hal_resource_t*)target_buffer,

@@ -165,6 +165,10 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   hsa_agent_t device_agent;
   // Ordinal of the GPU agent within the topology.
   iree_host_size_t device_ordinal;
+  // Stable physical device UUID bytes reported by HSA when available.
+  uint8_t physical_device_uuid[16];
+  // True when |physical_device_uuid| contains a stable HSA device identifier.
+  uint32_t has_physical_device_uuid : 1;
   // NUMA node of the CPU agent nearest to |device_agent|.
   uint32_t host_numa_node;
 

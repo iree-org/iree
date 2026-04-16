@@ -1296,8 +1296,7 @@ class QueueBenchmark : public benchmark::Fixture {
                 &submission.dispatch_slot->dispatch,
                 &pre_resolved_dispatch_packet_template_,
                 submission.kernel.kernarg_blocks->data,
-                iree_hal_amdgpu_notification_ring_epoch_signal(
-                    &host_queue->notification_ring));
+                submission.dispatch_completion_signal);
         iree_hal_amdgpu_host_queue_finish_dispatch_submission(
             host_queue, &resolution, signal_semaphore_list, operation_resources,
             IREE_ARRAYSIZE(operation_resources),
