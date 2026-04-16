@@ -454,12 +454,9 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 // |aql_queue_capacity| is the power-of-two hardware AQL queue size in packets.
 // |notification_capacity| is the power-of-two notification ring size.
 // |kernarg_capacity_in_blocks| is the power-of-two kernarg ring size in
-// 64-byte blocks. Must satisfy the backpressure invariant:
-//   kernarg_capacity >= 2 * aql_queue_capacity
-// because the queue reserves one AQL packet for each staged kernarg block in a
-// variable-size dispatch submission, and the non-VMEM kernarg ring may skip one
-// tail fragment at wrap to preserve contiguous multi-block allocations. That
-// keeps AQL-slot reservation as the sole hot-path backpressure gate.
+// 64-byte blocks, at least 2x |aql_queue_capacity| to cover one tail-padding
+// gap at wrap. Submission admission proves space in both the AQL and kernarg
+// rings before publishing packets.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,

@@ -109,8 +109,9 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
     // must park and resume after drain.
     uint32_t notification_capacity;
     // Kernarg ring capacity in 64-byte blocks for each host queue. Must be a
-    // power of two and at least 2x |aql_capacity| so AQL reservation remains
-    // the sole hot-path backpressure gate.
+    // power of two and at least 2x |aql_capacity| to cover one tail-padding
+    // gap at wrap. Submission admission checks kernarg and AQL capacity
+    // together before publishing packets.
     uint32_t kernarg_capacity;
   } host_queues;
 
