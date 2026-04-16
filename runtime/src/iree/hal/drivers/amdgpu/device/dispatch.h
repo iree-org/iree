@@ -101,13 +101,15 @@ iree_hal_amdgpu_device_dispatch_make_custom_kernarg_layout(
 typedef struct iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t {
   // Device pointer to a uint32_t[3] workgroup-count parameter buffer.
   const uint32_t* workgroup_count;
-  // Device pointer to the AQL dispatch packet whose header is still INVALID.
+  // Device pointer to the AQL dispatch packet to publish after patching.
   iree_hsa_kernel_dispatch_packet_t* dispatch_packet;
   // Optional device pointer to the dispatch's implicit args suffix.
   iree_amdgpu_kernel_implicit_args_t* implicit_args;
+  // Final 32-bit header/setup word to publish with a release store.
+  uint32_t dispatch_header_setup;
 } iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t) == 24,
+    sizeof(iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t) == 32,
     "indirect dispatch patch args must match the kernel ABI");
 
 // Populates a kernel dispatch packet body in already-reserved storage.
@@ -175,16 +177,16 @@ void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
 // Populates the builtin patch dispatch that updates an indirect-parameter
 // dispatch packet and then publishes its header.
 //
-// The target dispatch packet must already contain every non-header field and
-// must have been committed with an INVALID packet type preserving the final
-// setup/control bits. The patch dispatch reads |workgroup_count| on device,
-// updates the target packet's grid-size fields and optional implicit args, then
-// atomically switches the target packet type to KERNEL_DISPATCH.
+// The target dispatch packet must already contain every non-header field. The
+// patch dispatch reads |workgroup_count| on device, updates the target packet's
+// grid-size fields and optional implicit args, then atomically publishes the
+// provided final dispatch header/setup word.
 void iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
     const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
         patch_kernel_args,
     const uint32_t* IREE_AMDGPU_RESTRICT workgroup_count,
     iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
+    uint16_t dispatch_header, uint16_t dispatch_setup,
     iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args,
     iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT patch_packet,
     void* IREE_AMDGPU_RESTRICT kernarg_ptr);
@@ -197,7 +199,8 @@ IREE_AMDGPU_ATTRIBUTE_KERNEL void
 iree_hal_amdgpu_device_dispatch_patch_indirect_params(
     const uint32_t* IREE_AMDGPU_RESTRICT workgroup_count,
     iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
-    iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args);
+    iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args,
+    uint32_t dispatch_header_setup);
 
 #endif  // IREE_AMDGPU_TARGET_DEVICE
 
