@@ -394,12 +394,20 @@ getReshapeInfo(LinalgExt::ScatterOp scatterOp) {
   ReshapeOperandInfo indicesInfo;
   indicesInfo.originalShape = getDimSizes(scatterOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
-                     llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
+                     llvm::seq<int64_t>(scatterOp.getBatchRank()));
   if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
   }
   infos.push_back(std::move(indicesInfo));
+
+  if (Value mask = scatterOp.getMask()) {
+    ReshapeOperandInfo maskInfo;
+    maskInfo.originalShape = getDimSizes(mask);
+    llvm::append_range(maskInfo.operandToIterationSpace,
+                       llvm::seq<int64_t>(scatterOp.getBatchRank()));
+    infos.push_back(std::move(maskInfo));
+  }
 
   ReshapeOperandInfo originalInfo;
   originalInfo.originalShape = getDimSizes(scatterOp.getOriginal());
@@ -428,12 +436,20 @@ getReshapeInfo(LinalgExt::GatherOp gatherOp) {
   ReshapeOperandInfo indicesInfo;
   indicesInfo.originalShape = getDimSizes(gatherOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
-                     llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
+                     llvm::seq<int64_t>(gatherOp.getBatchRank()));
   if (gatherOp.getBatchRank() != gatherOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
   }
   infos.push_back(std::move(indicesInfo));
+
+  if (Value mask = gatherOp.getMask()) {
+    ReshapeOperandInfo maskInfo;
+    maskInfo.originalShape = getDimSizes(mask);
+    llvm::append_range(maskInfo.operandToIterationSpace,
+                       llvm::seq<int64_t>(gatherOp.getBatchRank()));
+    infos.push_back(std::move(maskInfo));
+  }
 
   ReshapeOperandInfo outputInfo;
   outputInfo.originalShape = getDimSizes(gatherOp.getOutput());
@@ -716,6 +732,7 @@ struct DropGatherUnitDims final : OpRewritePattern<GatherOp> {
     // Drop batch dimensions.
     Value reducedSource = gatherOp.getSource();
     Value reducedIndices = gatherOp.getIndices();
+    Value reducedMask = gatherOp.getMask();
     Value reducedOutput = gatherOp.getOutput();
     if (gatherOp.getBatchRank() > 1) {
       // The only reaason we have to do these rank reductions separate is
@@ -728,9 +745,20 @@ struct DropGatherUnitDims final : OpRewritePattern<GatherOp> {
       FailureOr<Value> newOutput = rankReduceOperand(
           rewriter, loc, /*startDim=*/0, /*numDims=*/gatherOp.getBatchRank(),
           gatherOp.getOutput(), gatherOp.getOutputType(), options);
-      if (succeeded(newIndices) && succeeded(newOutput)) {
+      FailureOr<Value> newMask = failure();
+      if (reducedMask) {
+        newMask =
+            rankReduceOperand(rewriter, loc, /*startDim=*/0,
+                              /*numDims=*/gatherOp.getBatchRank(), reducedMask,
+                              cast<ShapedType>(reducedMask.getType()), options);
+      }
+      if (succeeded(newIndices) && succeeded(newOutput) &&
+          (!reducedMask || succeeded(newMask))) {
         reducedIndices = newIndices.value();
         reducedOutput = newOutput.value();
+        if (reducedMask) {
+          reducedMask = newMask.value();
+        }
         changed = true;
       }
     }
@@ -758,7 +786,8 @@ struct DropGatherUnitDims final : OpRewritePattern<GatherOp> {
     auto newGather = GatherOp::create(
         rewriter, gatherOp.getLoc(), TypeRange{reducedOutput.getType()},
         /*source=*/reducedSource, /*indices=*/reducedIndices,
-        /*output=*/reducedOutput, gatherOp.getDimensionMap());
+        /*mask=*/reducedMask, /*output=*/reducedOutput,
+        gatherOp.getDimensionMap());
     rewriter.replaceOp(gatherOp,
                        rankExpandValue(rewriter, loc, gatherOp.getOutput(),
                                        newGather.getResult(0), options));
@@ -787,6 +816,7 @@ struct DropScatterUnitDims final : OpRewritePattern<ScatterOp> {
     // Drop batch dimensions.
     Value original = scatterOp.getOriginal();
     Value indices = scatterOp.getIndices();
+    Value mask = scatterOp.getMask();
     Value updates = scatterOp.getUpdates();
     if (scatterOp.getBatchRank() > 1) {
       FailureOr<Value> newIndices = rankReduceOperand(
@@ -795,9 +825,19 @@ struct DropScatterUnitDims final : OpRewritePattern<ScatterOp> {
       FailureOr<Value> newOutput = rankReduceOperand(
           rewriter, loc, /*startDim=*/0, /*numDims=*/scatterOp.getBatchRank(),
           updates, cast<ShapedType>(updates.getType()), options);
-      if (succeeded(newIndices) && succeeded(newOutput)) {
+      FailureOr<Value> newMask = failure();
+      if (mask) {
+        newMask = rankReduceOperand(rewriter, loc, /*startDim=*/0,
+                                    /*numDims=*/scatterOp.getBatchRank(), mask,
+                                    cast<ShapedType>(mask.getType()), options);
+      }
+      if (succeeded(newIndices) && succeeded(newOutput) &&
+          (!mask || succeeded(newMask))) {
         indices = newIndices.value();
         updates = newOutput.value();
+        if (mask) {
+          mask = newMask.value();
+        }
         changed = true;
       }
     }
@@ -824,7 +864,7 @@ struct DropScatterUnitDims final : OpRewritePattern<ScatterOp> {
 
     auto newScatter = ScatterOp::create(
         rewriter, scatterOp.getLoc(), TypeRange{original.getType()}, updates,
-        indices, original, scatterOp.getDimensionMap(),
+        indices, mask, original, scatterOp.getDimensionMap(),
         scatterOp.getUniqueIndices());
     rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                                 newScatter.getRegion().begin());

@@ -137,6 +137,7 @@ public:
     // Create the LinalgExt scatter operation.
     auto scatter = IREE::LinalgExt::ScatterOp::create(
         builder, TypeRange{values.getType()}, updates, indices,
+        /*mask=*/Value(),
         /*original=*/values, builder.getDenseI64ArrayAttr({0, 1}),
         builder.getBoolAttr(true));
 

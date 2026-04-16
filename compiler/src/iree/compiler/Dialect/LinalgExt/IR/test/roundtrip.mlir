@@ -101,6 +101,35 @@ func.func @scatter_tensor_dynamic(
 
 // -----
 
+func.func @scatter_tensor_masked(
+    %original: tensor<8xi32>, %indices: tensor<3x1xi32>,
+    %mask: tensor<3xi1>, %update: tensor<3xi32>) -> tensor<8xi32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%update, %indices, %mask : tensor<3xi32>, tensor<3x1xi32>, tensor<3xi1>)
+    outs(%original: tensor<8xi32>) {
+    ^bb0(%arg1: i32, %arg2: i32):
+      %1 = arith.addi %arg1, %arg2 : i32
+      iree_linalg_ext.yield %1 : i32
+    } -> tensor<8xi32>
+  return %0 : tensor<8xi32>
+}
+// CHECK-LABEL: func.func @scatter_tensor_masked(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<8xi32>
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<3x1xi32>
+//  CHECK-SAME:   %[[MASK:[a-zA-Z0-9_]+]]: tensor<3xi1>
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]: tensor<3xi32>
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]], %[[MASK]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @scatter_tensor_partial_dynamic(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update: tensor<?x10xf32>) -> tensor<?x?xf32> {
@@ -608,6 +637,28 @@ func.func @gather_static(
 //      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
 // CHECK-SAME:     dimension_map = [0]
 // CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
+// CHECK-SAME:     outs(%[[RESULT]]
+//      CHECK:   return %[[VAL]]
+
+// -----
+
+func.func @gather_static_masked(
+    %source : tensor<10xf32>, %idx : tensor<1xi32>,
+    %mask : tensor<1xi1>, %result : tensor<1xf32>) -> tensor<1xf32> {
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx, %mask : tensor<10xf32>, tensor<1xi32>, tensor<1xi1>)
+    outs(%result : tensor<1xf32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+// CHECK-LABEL: func.func @gather_static_masked(
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]: tensor<10xf32>
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]: tensor<1xi32>
+// CHECK-SAME:   %[[MASK:[a-zA-Z0-9_]+]]: tensor<1xi1>
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]: tensor<1xf32>
+//      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
+// CHECK-SAME:     dimension_map = [0]
+// CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]], %[[MASK]]
 // CHECK-SAME:     outs(%[[RESULT]]
 //      CHECK:   return %[[VAL]]
 
