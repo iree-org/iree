@@ -18,39 +18,8 @@
 
 namespace {
 
-struct ParsedRecord {
-  // Parsed profile file record header.
-  const iree_hal_profile_file_record_header_t* header = nullptr;
-  // Content type string following |header|.
-  std::string content_type;
-  // Record name string following |content_type|.
-  std::string name;
-  // Payload bytes following |name|.
-  std::string payload;
-};
-
-ParsedRecord ParseRecord(const std::vector<uint8_t>& storage,
-                         iree_host_size_t* offset) {
-  ParsedRecord record;
-  const uint8_t* base = storage.data() + *offset;
-  record.header =
-      reinterpret_cast<const iree_hal_profile_file_record_header_t*>(base);
-  EXPECT_EQ(sizeof(*record.header), record.header->header_length);
-  EXPECT_GE(record.header->record_length, record.header->header_length);
-  EXPECT_LE(*offset + record.header->record_length, storage.size());
-
-  const char* content_type =
-      reinterpret_cast<const char*>(base + record.header->header_length);
-  record.content_type.assign(content_type, record.header->content_type_length);
-
-  const char* name = content_type + record.header->content_type_length;
-  record.name.assign(name, record.header->name_length);
-
-  const char* payload = name + record.header->name_length;
-  record.payload.assign(payload, record.header->payload_length);
-
-  *offset += record.header->record_length;
-  return record;
+bool StringViewEqual(iree_string_view_t lhs, const char* rhs) {
+  return iree_string_view_equal(lhs, iree_make_cstring_view(rhs));
 }
 
 TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
@@ -98,55 +67,113 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
                                                    IREE_STATUS_CANCELLED));
   iree_hal_profile_sink_release(sink);
 
-  const auto* file_header =
-      reinterpret_cast<const iree_hal_profile_file_header_t*>(storage.data());
-  EXPECT_EQ(IREE_HAL_PROFILE_FILE_MAGIC, file_header->magic);
-  EXPECT_EQ(IREE_HAL_PROFILE_FILE_VERSION_MAJOR, file_header->version_major);
-  EXPECT_EQ(IREE_HAL_PROFILE_FILE_VERSION_MINOR, file_header->version_minor);
-  EXPECT_EQ(sizeof(*file_header), file_header->header_length);
-  EXPECT_EQ(0u, file_header->flags);
+  iree_hal_profile_file_header_t file_header;
+  iree_host_size_t offset = 0;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_header(
+      iree_make_const_byte_span(storage.data(), storage.size()), &file_header,
+      &offset));
+  EXPECT_EQ(IREE_HAL_PROFILE_FILE_MAGIC, file_header.magic);
+  EXPECT_EQ(IREE_HAL_PROFILE_FILE_VERSION_MAJOR, file_header.version_major);
+  EXPECT_EQ(IREE_HAL_PROFILE_FILE_VERSION_MINOR, file_header.version_minor);
+  EXPECT_EQ(sizeof(file_header), file_header.header_length);
+  EXPECT_EQ(0u, file_header.flags);
 
-  iree_host_size_t offset = sizeof(*file_header);
-  ParsedRecord begin_record = ParseRecord(storage, &offset);
+  iree_hal_profile_file_record_t begin_record;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_record(
+      iree_make_const_byte_span(storage.data(), storage.size()), offset,
+      &begin_record, &offset));
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_BEGIN,
-            begin_record.header->record_type);
-  EXPECT_EQ(42u, begin_record.header->session_id);
-  EXPECT_EQ("application/vnd.iree.hal.profile.session",
-            begin_record.content_type);
-  EXPECT_EQ("test-session", begin_record.name);
-  EXPECT_TRUE(begin_record.payload.empty());
+            begin_record.header.record_type);
+  EXPECT_EQ(42u, begin_record.header.session_id);
+  EXPECT_TRUE(StringViewEqual(begin_record.content_type,
+                              "application/vnd.iree.hal.profile.session"));
+  EXPECT_TRUE(StringViewEqual(begin_record.name, "test-session"));
+  EXPECT_EQ(0u, begin_record.payload.data_length);
 
-  ParsedRecord chunk_record = ParseRecord(storage, &offset);
+  iree_hal_profile_file_record_t chunk_record;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_record(
+      iree_make_const_byte_span(storage.data(), storage.size()), offset,
+      &chunk_record, &offset));
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK,
-            chunk_record.header->record_type);
-  EXPECT_EQ(42u, chunk_record.header->session_id);
-  EXPECT_EQ(7u, chunk_record.header->stream_id);
-  EXPECT_EQ(8u, chunk_record.header->event_id);
-  EXPECT_EQ(9u, chunk_record.header->executable_id);
-  EXPECT_EQ(10u, chunk_record.header->command_buffer_id);
-  EXPECT_EQ(11u, chunk_record.header->physical_device_ordinal);
-  EXPECT_EQ(12u, chunk_record.header->queue_ordinal);
+            chunk_record.header.record_type);
+  EXPECT_EQ(42u, chunk_record.header.session_id);
+  EXPECT_EQ(7u, chunk_record.header.stream_id);
+  EXPECT_EQ(8u, chunk_record.header.event_id);
+  EXPECT_EQ(9u, chunk_record.header.executable_id);
+  EXPECT_EQ(10u, chunk_record.header.command_buffer_id);
+  EXPECT_EQ(11u, chunk_record.header.physical_device_ordinal);
+  EXPECT_EQ(12u, chunk_record.header.queue_ordinal);
   EXPECT_EQ(IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED,
-            chunk_record.header->chunk_flags);
-  EXPECT_EQ("application/vnd.iree.test", chunk_record.content_type);
-  EXPECT_EQ("test-chunk", chunk_record.name);
+            chunk_record.header.chunk_flags);
+  EXPECT_TRUE(
+      StringViewEqual(chunk_record.content_type, "application/vnd.iree.test"));
+  EXPECT_TRUE(StringViewEqual(chunk_record.name, "test-chunk"));
   ASSERT_EQ(sizeof(first_payload) + sizeof(second_payload),
-            chunk_record.payload.size());
-  EXPECT_EQ(0, memcmp(chunk_record.payload.data(), &first_payload,
+            chunk_record.payload.data_length);
+  EXPECT_EQ(0, memcmp(chunk_record.payload.data, &first_payload,
                       sizeof(first_payload)));
-  EXPECT_EQ(0, memcmp(chunk_record.payload.data() + sizeof(first_payload),
+  EXPECT_EQ(0, memcmp(chunk_record.payload.data + sizeof(first_payload),
                       &second_payload, sizeof(second_payload)));
 
-  ParsedRecord end_record = ParseRecord(storage, &offset);
+  iree_hal_profile_file_record_t end_record;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_record(
+      iree_make_const_byte_span(storage.data(), storage.size()), offset,
+      &end_record, &offset));
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END,
-            end_record.header->record_type);
-  EXPECT_EQ(42u, end_record.header->session_id);
+            end_record.header.record_type);
+  EXPECT_EQ(42u, end_record.header.session_id);
   EXPECT_EQ((uint32_t)IREE_STATUS_CANCELLED,
-            end_record.header->session_status_code);
-  EXPECT_EQ("application/vnd.iree.hal.profile.session",
-            end_record.content_type);
-  EXPECT_EQ("test-session", end_record.name);
-  EXPECT_TRUE(end_record.payload.empty());
+            end_record.header.session_status_code);
+  EXPECT_TRUE(StringViewEqual(end_record.content_type,
+                              "application/vnd.iree.hal.profile.session"));
+  EXPECT_TRUE(StringViewEqual(end_record.name, "test-session"));
+  EXPECT_EQ(0u, end_record.payload.data_length);
+}
+
+TEST(ProfileFileParseTest, RejectsBadMagic) {
+  std::vector<uint8_t> storage(sizeof(iree_hal_profile_file_header_t), 0);
+  iree_hal_profile_file_header_t file_header;
+  iree_host_size_t offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_profile_file_parse_header(
+          iree_make_const_byte_span(storage.data(), storage.size()),
+          &file_header, &offset));
+}
+
+TEST(ProfileFileParseTest, RejectsTruncatedRecord) {
+  std::vector<uint8_t> storage(
+      sizeof(iree_hal_profile_file_header_t) +
+          sizeof(iree_hal_profile_file_record_header_t),
+      0);
+  auto* file_header =
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
+  file_header->magic = IREE_HAL_PROFILE_FILE_MAGIC;
+  file_header->version_major = IREE_HAL_PROFILE_FILE_VERSION_MAJOR;
+  file_header->version_minor = IREE_HAL_PROFILE_FILE_VERSION_MINOR;
+  file_header->header_length = sizeof(*file_header);
+
+  auto* record_header =
+      reinterpret_cast<iree_hal_profile_file_record_header_t*>(
+          storage.data() + sizeof(*file_header));
+  record_header->record_length = sizeof(*record_header) + 1;
+  record_header->payload_length = 1;
+  record_header->header_length = sizeof(*record_header);
+  record_header->record_type = IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK;
+
+  iree_hal_profile_file_header_t parsed_header;
+  iree_host_size_t offset = 0;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_header(
+      iree_make_const_byte_span(storage.data(), storage.size()), &parsed_header,
+      &offset));
+
+  iree_hal_profile_file_record_t record;
+  iree_host_size_t next_offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_hal_profile_file_parse_record(
+          iree_make_const_byte_span(storage.data(), storage.size()), offset,
+          &record, &next_offset));
 }
 
 }  // namespace
