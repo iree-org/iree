@@ -44,8 +44,6 @@ typedef struct iree_hal_amdgpu_host_queue_kernel_submission_t {
   uint64_t kernarg_write_position;
   // Number of AQL packets reserved starting at |first_packet_id|.
   uint32_t packet_count;
-  // Number of caller-authored payload packets after wait barriers and padding.
-  uint32_t payload_packet_count;
   // Number of valid entries in |reclaim_resources|.
   uint16_t reclaim_resource_count;
   // Optional action executed before user signals are published when this
@@ -164,9 +162,9 @@ void iree_hal_amdgpu_host_queue_fail_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
 
-// Publishes wait-barrier and no-op padding packets for a successful
-// kernel-shaped submission. Caller must have already populated payload packet
-// bodies but not committed payload packet headers.
+// Publishes wait-barrier packets for a successful kernel-shaped submission.
+// Caller must have already populated payload packet bodies but not committed
+// payload packet headers.
 void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
