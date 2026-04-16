@@ -2150,7 +2150,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   IREE::LinalgExt::AttentionOp attnOp) {
+                                   IREE::LinalgExt::OnlineAttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
           attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
@@ -2161,7 +2161,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> lbs, ubs;
   getRangeBounds(attnOp, lbs, ubs);
 
-  LDBG() << "Attention Detail:";
+  LDBG() << "Online Attention Detail:";
   LDBG() << "Batch: " << llvm::interleaved_array(opInfo.getBatchDims());
   LDBG() << "M: " << llvm::interleaved_array(opInfo.getMDims());
   LDBG() << "K1: " << llvm::interleaved_array(opInfo.getK1Dims());
@@ -2271,7 +2271,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG() << "Set lowering_config for attnOp: " << loweringConfig;
+  LDBG() << "Set lowering_config for online attnOp: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, loweringConfig,
       getCPUTranslationInfo(attnOp.getContext(),
@@ -3030,7 +3030,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
             return setDefaultCustomOpLoweringConfig(entryPointFn, op,
                                                     initCPULaunchConfig);
           })
-          .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
+          .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
                 IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
                 linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })

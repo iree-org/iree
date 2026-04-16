@@ -1066,7 +1066,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [IndexingMapOpInterface,
+    [DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1193,6 +1196,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+    int64_t getNumLoops() { return getIterationDomainRank(); }
 
     /* Decomposition control attributes */
 
