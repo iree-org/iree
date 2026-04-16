@@ -9,6 +9,7 @@
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -258,6 +259,10 @@ bool isPureBatchMatmul(Operation *op);
 
 /// Returns true if the given linalg op represents a transpose.
 bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
+
+/// Match the body of a scan region to a vector::CombiningKind.
+/// Returns std::nullopt if the region doesn't match a known pattern.
+std::optional<mlir::vector::CombiningKind> matchScanCombiner(Region &region);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

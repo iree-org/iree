@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -1342,6 +1343,140 @@ struct Im2colOpVectorizationModel
     return SmallVector<Value>{result};
   }
 };
+
+struct ScanOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<ScanOpVectorizationModel,
+                                             IREE::LinalgExt::ScanOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+
+    // Must be able to match region to CombiningKind.
+    if (!IREE::LinalgExt::matchScanCombiner(scanOp.getRegion())) {
+      return false;
+    }
+
+    // Scalable vectors not yet supported.
+    if (llvm::any_of(scalableDims, [](bool b) { return b; })) {
+      return false;
+    }
+
+    // Without vector sizes, require static shapes.
+    if (vectorSizes.empty()) {
+      auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+      return inputTy.hasStaticShape();
+    }
+
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+    Location loc = scanOp.getLoc();
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(scanOp);
+
+    // Match combiner to CombiningKind.
+    auto kind = IREE::LinalgExt::matchScanCombiner(scanOp.getRegion());
+    if (!kind) {
+      return failure();
+    }
+
+    // Determine vector shapes.
+    auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+    auto accumTy = cast<ShapedType>(scanOp.getAccumulator().getType());
+    Type elemType = inputTy.getElementType();
+    int64_t inputRank = inputTy.getRank();
+    int64_t scanDim = scanOp.getDimension();
+
+    SmallVector<int64_t> inputVecShape =
+        vectorSizes.empty() ? llvm::to_vector(inputTy.getShape())
+                            : llvm::to_vector(vectorSizes);
+
+    // Accumulator shape = input shape with scan dimension dropped.
+    SmallVector<int64_t> accumVecShape = inputVecShape;
+    accumVecShape.erase(accumVecShape.begin() + scanDim);
+
+    auto inputVecTy = VectorType::get(inputVecShape, elemType);
+    auto accumVecTy = VectorType::get(accumVecShape, elemType);
+
+    // Determine if masking is needed (dynamic shapes or vector > tensor).
+    bool needsInputMasking =
+        !inputTy.hasStaticShape() ||
+        (llvm::to_vector(inputTy.getShape()) != inputVecShape);
+    bool needsAccumMasking =
+        !accumTy.hasStaticShape() ||
+        (llvm::to_vector(accumTy.getShape()) != accumVecShape);
+
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> inputIndices(inputRank, zero);
+    SmallVector<Value> accumIndices(accumTy.getRank(), zero);
+
+    // Read input tensor to vector.
+    Value padding = ub::PoisonOp::create(rewriter, loc, elemType);
+    Value inputVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getInput(), inputVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsInputMasking);
+    if (needsInputMasking) {
+      SmallVector<OpFoldResult> inputDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getInput());
+      auto inputMaskTy = VectorType::get(inputVecShape, rewriter.getI1Type());
+      Value inputMask = vector::CreateMaskOp::create(
+          rewriter, loc, inputMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, inputDims));
+
+      // Replace masked-off lanes with identity value.
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, inputVecTy);
+      inputVec =
+          arith::SelectOp::create(rewriter, loc, inputMask, inputVec, identity);
+    }
+
+    // Read accumulator (initial value) to vector.
+    Value accumVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getAccumulator(), accumVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsAccumMasking);
+    if (needsAccumMasking) {
+      SmallVector<OpFoldResult> accumDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getAccumulator());
+      auto accumMaskTy = VectorType::get(accumVecShape, rewriter.getI1Type());
+      Value accumMask = vector::CreateMaskOp::create(
+          rewriter, loc, accumMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, accumDims));
+
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, accumVecTy);
+      accumVec =
+          arith::SelectOp::create(rewriter, loc, accumMask, accumVec, identity);
+    }
+
+    // Create vector.scan.
+    auto vectorScanOp =
+        vector::ScanOp::create(rewriter, loc, *kind, inputVec, accumVec,
+                               scanDim, scanOp.getInclusive());
+
+    // Write results back to tensors.
+    Value output = vector::createWriteOrMaskedWrite(
+                       rewriter, loc, vectorScanOp.getDest(),
+                       scanOp.getOutput(), inputIndices,
+                       /*useInBoundsInsteadOfMasking=*/!needsInputMasking)
+                       ->getResult(0);
+
+    Value accum = vector::createWriteOrMaskedWrite(
+                      rewriter, loc, vectorScanOp.getAccumulatedValue(),
+                      scanOp.getAccumulator(), accumIndices,
+                      /*useInBoundsInsteadOfMasking=*/!needsAccumMasking)
+                      ->getResult(0);
+
+    return SmallVector<Value>{output, accum};
+  }
+};
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -1355,6 +1490,7 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         *ctx);
     IREE::LinalgExt::Im2colOp::attachInterface<Im2colOpVectorizationModel>(
         *ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<ScanOpVectorizationModel>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {

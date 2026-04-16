@@ -142,6 +142,7 @@ iree_lit_test_suite(
     "vector_layout_analysis.mlir"
     "vector_layout_analysis_chain_cloning.mlir"
     "vectorize_memref_copy.mlir"
+    "vectorize_scan.mlir"
     "vectorize_tensor_pad.mlir"
     "verify_smt_constraints.mlir"
     "verify_smt_constraints_violation.mlir"
