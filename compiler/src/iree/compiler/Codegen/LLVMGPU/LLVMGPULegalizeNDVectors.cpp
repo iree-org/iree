@@ -6,8 +6,11 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -730,6 +733,87 @@ struct ConvertReturnLike final
   }
 };
 
+/// Determine which outer dims of a transfer op's permutation map have
+/// in_bounds = false and map to a real source dimension (not a broadcast).
+/// Returns true if any outer dim needs a bounds check.
+static bool getOuterBoundsInfo(ArrayAttr inBoundsAttr, AffineMap permMap,
+                               int64_t numOuterDims,
+                               SmallVectorImpl<bool> &outerInBounds) {
+  outerInBounds.assign(numOuterDims, false);
+  if (inBoundsAttr) {
+    for (int64_t d = 0; d < numOuterDims; ++d) {
+      outerInBounds[d] = cast<BoolAttr>(inBoundsAttr[d]).getValue();
+    }
+  }
+  for (int64_t d = 0; d < numOuterDims; ++d) {
+    if (!outerInBounds[d] && isa<AffineDimExpr>(permMap.getResult(d))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Pre-compute source dimension sizes for dims that need bounds checking.
+/// Only computes sizes for memref/tensor dims referenced by OOB outer dims.
+static void precomputeSourceDimSizes(OpBuilder &builder, Location loc,
+                                     Value source, AffineMap permMap,
+                                     ArrayRef<bool> outerInBounds,
+                                     SmallVectorImpl<Value> &sourceDimSizes) {
+  auto sourceType = cast<ShapedType>(source.getType());
+  int64_t numOuterDims = outerInBounds.size();
+  sourceDimSizes.assign(sourceType.getRank(), Value{});
+  for (int64_t d = 0; d < numOuterDims; ++d) {
+    if (outerInBounds[d]) {
+      continue;
+    }
+    auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
+    if (!dimExpr) {
+      continue;
+    }
+    int64_t memrefDim = dimExpr.getPosition();
+    if (sourceDimSizes[memrefDim]) {
+      continue;
+    }
+    int64_t staticSize = sourceType.getDimSize(memrefDim);
+    if (staticSize != ShapedType::kDynamic) {
+      sourceDimSizes[memrefDim] =
+          arith::ConstantIndexOp::create(builder, loc, staticSize);
+    } else if (isa<MemRefType>(sourceType)) {
+      sourceDimSizes[memrefDim] =
+          memref::DimOp::create(builder, loc, source, memrefDim);
+    } else {
+      sourceDimSizes[memrefDim] =
+          tensor::DimOp::create(builder, loc, source, memrefDim);
+    }
+  }
+}
+
+/// Build an i1 condition that is true iff all OOB outer dims are within the
+/// source bounds for the given `newIndices`. Returns nullptr if no check is
+/// needed (all outer dims are in-bounds or are broadcasts).
+static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
+                                  AffineMap permMap,
+                                  ArrayRef<bool> outerInBounds,
+                                  ValueRange newIndices,
+                                  ArrayRef<Value> sourceDimSizes) {
+  Value cond;
+  for (int64_t d = 0, e = outerInBounds.size(); d < e; ++d) {
+    if (outerInBounds[d]) {
+      continue;
+    }
+    auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
+    if (!dimExpr) {
+      continue;
+    }
+    int64_t memrefDim = dimExpr.getPosition();
+    Value cmp =
+        arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::slt,
+                              newIndices[memrefDim], sourceDimSizes[memrefDim]);
+    cond = cond ? Value(arith::AndIOp::create(builder, loc, cond, cmp)) : cmp;
+  }
+  return cond;
+}
+
 struct ConvertTransferRead final
     : public OpConversionPattern<vector::TransferReadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -748,16 +832,27 @@ struct ConvertTransferRead final
     int64_t numOuterDims = outerShape.size();
     auto vec1DType = VectorType::get({shape.back()}, resultTy.getElementType());
 
-    // New permutation map: keep only the last result (innermost vector dim).
     AffineMap permMap = op.getPermutationMap();
     AffineMap newPermMap =
         AffineMap::get(permMap.getNumDims(), permMap.getNumSymbols(),
                        {permMap.getResults().back()}, rewriter.getContext());
 
-    // New in_bounds: keep only the innermost entry.
     ArrayAttr newInBoundsAttr;
     if (ArrayAttr inBounds = op.getInBoundsAttr()) {
       newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
+    }
+
+    SmallVector<bool> outerInBounds;
+    bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
+                                               numOuterDims, outerInBounds);
+
+    SmallVector<Value> sourceDimSizes;
+    Value paddingVec;
+    if (needsBoundsCheck) {
+      precomputeSourceDimSizes(rewriter, loc, op.getBase(), permMap,
+                               outerInBounds, sourceDimSizes);
+      paddingVec = vector::BroadcastOp::create(rewriter, loc, vec1DType,
+                                               op.getPadding());
     }
 
     ValueRange convertedMask = adaptor.getMask();
@@ -767,7 +862,6 @@ struct ConvertTransferRead final
     SmallVector<int64_t> tileShape(numOuterDims, 1);
     for (SmallVector<int64_t> outerIdx :
          StaticTileOffsetRange(outerShape, tileShape)) {
-      // Copy the original indices so we can adjust per-iteration.
       SmallVector<Value> newIndices(op.getIndices());
       for (int64_t d = 0; d < numOuterDims; ++d) {
         auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
@@ -783,12 +877,37 @@ struct ConvertTransferRead final
 
       Value newMask = convertedMask.empty() ? Value{} : convertedMask[idx++];
 
-      auto readOp = vector::TransferReadOp::create(
-          rewriter, loc, vec1DType, op.getBase(), newIndices,
-          AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
-          newInBoundsAttr);
+      Value inBoundsCond =
+          needsBoundsCheck
+              ? buildOuterBoundsCond(rewriter, loc, permMap, outerInBounds,
+                                     newIndices, sourceDimSizes)
+              : Value{};
 
-      results.push_back(readOp);
+      Value result;
+      if (inBoundsCond) {
+        auto ifOp = scf::IfOp::create(rewriter, loc, TypeRange{vec1DType},
+                                      inBoundsCond, /*addThenBlock=*/true,
+                                      /*addElseBlock=*/true);
+        {
+          auto thenBuilder = ifOp.getThenBodyBuilder();
+          auto readOp = vector::TransferReadOp::create(
+              thenBuilder, loc, vec1DType, op.getBase(), newIndices,
+              AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
+              newInBoundsAttr);
+          scf::YieldOp::create(thenBuilder, loc, readOp.getResult());
+        }
+        {
+          auto elseBuilder = ifOp.getElseBodyBuilder();
+          scf::YieldOp::create(elseBuilder, loc, paddingVec);
+        }
+        result = ifOp.getResult(0);
+      } else {
+        result = vector::TransferReadOp::create(
+            rewriter, loc, vec1DType, op.getBase(), newIndices,
+            AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
+            newInBoundsAttr);
+      }
+      results.push_back(result);
     }
     rewriter.replaceOpWithMultiple(op, {results});
     return success();
@@ -825,9 +944,20 @@ struct ConvertTransferWrite final
       newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
     }
 
+    SmallVector<bool> outerInBounds;
+    bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
+                                               numOuterDims, outerInBounds);
+
+    SmallVector<Value> sourceDimSizes;
+    if (needsBoundsCheck) {
+      precomputeSourceDimSizes(rewriter, loc, op.getBase(), permMap,
+                               outerInBounds, sourceDimSizes);
+    }
+
     SmallVector<Value> vectorSlices(adaptor.getValueToStore());
     ValueRange convertedMask = adaptor.getMask();
     Value dest = op.getBase();
+    bool isTensor = op.hasPureTensorSemantics();
 
     int64_t flatIdx = 0;
     SmallVector<int64_t> tileShape(numOuterDims, 1);
@@ -849,15 +979,51 @@ struct ConvertTransferWrite final
       Value newMask = convertedMask.empty() ? Value{} : convertedMask[flatIdx];
       Value vecSlice = vectorSlices[flatIdx++];
 
-      auto writeOp = vector::TransferWriteOp::create(
-          rewriter, loc, vecSlice, dest, newIndices,
-          AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
-      if (op.hasPureTensorSemantics()) {
-        dest = writeOp.getResult();
+      Value inBoundsCond =
+          needsBoundsCheck
+              ? buildOuterBoundsCond(rewriter, loc, permMap, outerInBounds,
+                                     newIndices, sourceDimSizes)
+              : Value{};
+
+      if (inBoundsCond) {
+        if (isTensor) {
+          auto ifOp =
+              scf::IfOp::create(rewriter, loc, TypeRange{dest.getType()},
+                                inBoundsCond, /*addThenBlock=*/true,
+                                /*addElseBlock=*/true);
+          {
+            auto thenBuilder = ifOp.getThenBodyBuilder();
+            auto writeOp = vector::TransferWriteOp::create(
+                thenBuilder, loc, vecSlice, dest, newIndices,
+                AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
+            scf::YieldOp::create(thenBuilder, loc, writeOp.getResult());
+          }
+          {
+            auto elseBuilder = ifOp.getElseBodyBuilder();
+            scf::YieldOp::create(elseBuilder, loc, dest);
+          }
+          dest = ifOp.getResult(0);
+        } else {
+          scf::IfOp::create(rewriter, loc, inBoundsCond,
+                            [&](OpBuilder &thenBuilder, Location thenLoc) {
+                              vector::TransferWriteOp::create(
+                                  thenBuilder, thenLoc, vecSlice, dest,
+                                  newIndices, AffineMapAttr::get(newPermMap),
+                                  newMask, newInBoundsAttr);
+                              scf::YieldOp::create(thenBuilder, thenLoc);
+                            });
+        }
+      } else {
+        auto writeOp = vector::TransferWriteOp::create(
+            rewriter, loc, vecSlice, dest, newIndices,
+            AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
+        if (isTensor) {
+          dest = writeOp.getResult();
+        }
       }
     }
 
-    if (op.hasPureTensorSemantics()) {
+    if (isTensor) {
       rewriter.replaceOp(op, dest);
     } else {
       rewriter.eraseOp(op);
