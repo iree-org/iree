@@ -303,9 +303,9 @@ iree_status_t iree_hal_amdgpu_physical_device_options_verify(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "host queue kernarg capacity must be at least 2x the AQL queue "
-        "capacity because each staged kernarg block consumes one reserved "
-        "AQL slot and wrap padding may skip one tail fragment (got "
-        "kernarg_blocks=%u, aql_packets=%u)",
+        "capacity to cover one tail-padding gap at wrap (got "
+        "kernarg_blocks=%u, "
+        "aql_packets=%u)",
         options->host_queue_kernarg_capacity, options->host_queue_aql_capacity);
   }
 

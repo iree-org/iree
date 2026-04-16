@@ -109,8 +109,8 @@ iree_status_t iree_hal_amdgpu_host_queue_count_reclaim_resources(
 }
 
 // Writes |packet_count| no-op barrier packets into already-reserved AQL slots.
-// The caller controls doorbell timing so these packets can be used either as
-// normal submission padding or as failure-path slot plugging.
+// The caller controls doorbell timing so these packets can plug failure-path
+// reservations without leaving INVALID packets visible to the CP.
 static void iree_hal_amdgpu_host_queue_fill_noop_packets(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t first_packet_id,
     uint32_t packet_count) {
