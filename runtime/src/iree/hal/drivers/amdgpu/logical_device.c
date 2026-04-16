@@ -81,7 +81,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_from_ordinal(
 #define IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_SMALL_HOST_BLOCK_SIZE (4 * 1024)
 
 // Power-of-two size for the shared host large block pool in bytes.
-// Used for resource tracking and command buffer recording.
+// Used for resource tracking and other larger host-side transients.
 #define IREE_HAL_AMDGPU_LOGICAL_DEVICE_DEFAULT_LARGE_HOST_BLOCK_SIZE (64 * 1024)
 
 // Minimum size of a large host block (some structures require at least this

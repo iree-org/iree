@@ -20,6 +20,9 @@ IREE_FLAG(int64_t, amdgpu_host_block_pool_small_size, 0,
 IREE_FLAG(int64_t, amdgpu_host_block_pool_large_size, 0,
           "Size in bytes of a large host block in the pool. Must be a power of "
           "two or 0 for the default.");
+IREE_FLAG(int64_t, amdgpu_host_block_pool_command_buffer_size, 0,
+          "Usable size in bytes of a command-buffer recording block in the "
+          "host block pool. Must be a power of two or 0 for the default.");
 
 IREE_FLAG(int64_t, amdgpu_device_block_pool_small_size, 0,
           "Size in bytes of a small device block in the pool. Must be a power "
@@ -106,6 +109,10 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   if (FLAG_amdgpu_host_block_pool_large_size) {
     device_options->host_block_pools.large.block_size =
         FLAG_amdgpu_host_block_pool_large_size;
+  }
+  if (FLAG_amdgpu_host_block_pool_command_buffer_size) {
+    device_options->host_block_pools.command_buffer.usable_block_size =
+        FLAG_amdgpu_host_block_pool_command_buffer_size;
   }
 
   if (FLAG_amdgpu_device_block_pool_small_size) {
