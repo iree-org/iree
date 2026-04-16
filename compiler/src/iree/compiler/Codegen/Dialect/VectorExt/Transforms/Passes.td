@@ -18,4 +18,14 @@ def VectorExtFoldUnitExtentDimsPass :
   ];
 }
 
+def LowerTransferGatherScatterToVectorPass :
+    Pass<"iree-vector-ext-lower-transfer-gather-scatter-to-vector", "func::FuncOp"> {
+  let summary = "Lower transfer_gather/transfer_scatter to vector.gather/vector.scatter";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_PASSES
