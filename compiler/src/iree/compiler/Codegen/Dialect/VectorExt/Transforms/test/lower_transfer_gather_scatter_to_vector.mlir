@@ -284,5 +284,3 @@ func.func @negative_lower_scatter_nonconstant_leading_dim(
 // CHECK-LABEL: @negative_lower_scatter_nonconstant_leading_dim
 // CHECK: iree_vector_ext.transfer_scatter
 // CHECK-NOT: vector.scatter
-
-// -----
