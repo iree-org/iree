@@ -14,6 +14,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/abi/profile.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
 #include "iree/hal/drivers/amdgpu/util/aql_ring.h"
@@ -36,6 +37,16 @@ typedef struct iree_hal_amdgpu_staging_pool_t iree_hal_amdgpu_staging_pool_t;
 typedef struct iree_hal_amdgpu_transient_buffer_pool_t
     iree_hal_amdgpu_transient_buffer_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+
+// Queue-local reservation of dispatch profiling event records.
+typedef struct iree_hal_amdgpu_profile_dispatch_event_reservation_t {
+  // Logical ring position of the first reserved dispatch event.
+  uint64_t first_event_position;
+  // Number of reserved dispatch events.
+  uint32_t event_count;
+  // Reserved padding.
+  uint32_t reserved0;
+} iree_hal_amdgpu_profile_dispatch_event_reservation_t;
 
 // Hardware mechanism used for cross-queue epoch waits after wait resolution
 // proves that a dependency has already been submitted by a local peer queue.
@@ -300,22 +311,26 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     uint32_t signal_block_count;
     // Number of iree_amd_signal_t records in each signal block.
     uint32_t signals_per_block;
-    // Allocation backing dispatch event batches and AQL-slot templates.
+    // Allocation backing the queue-local dispatch event ring.
     void* event_storage;
-    // Buffered dispatch event records waiting for a sink flush.
-    iree_hal_profile_dispatch_event_t* dispatch_events;
-    // Number of valid records in |dispatch_events|.
-    iree_host_size_t dispatch_event_count;
-    // Capacity of |dispatch_events| in records.
-    iree_host_size_t dispatch_event_capacity;
+    // Byte length of |event_storage|.
+    iree_host_size_t event_storage_size;
+    // Device-visible dispatch event records waiting for a sink flush.
+    iree_hal_amdgpu_profile_dispatch_event_t* dispatch_events;
+    // Power-of-two capacity of |dispatch_events| in records.
+    uint32_t dispatch_event_capacity;
+    // Capacity minus one, for mapping logical positions to physical slots.
+    uint32_t dispatch_event_mask;
+    // Logical ring position of the next event to write to the sink.
+    uint64_t dispatch_event_read_position;
+    // Logical ring position one past the last event ready to write.
+    uint64_t dispatch_event_ready_position;
+    // Logical ring position one past the last reserved event.
+    uint64_t dispatch_event_write_position;
     // Number of events dropped because |dispatch_events| was full.
     uint64_t dropped_dispatch_event_count;
-    // Next queue-local dispatch event id assigned on completion drain.
+    // Next queue-local dispatch event id assigned during submission.
     uint64_t next_dispatch_event_id;
-    // AQL-slot-indexed dispatch event templates for in-flight profiled packets.
-    iree_hal_profile_dispatch_event_t* dispatch_event_templates;
-    // Number of entries in |dispatch_event_templates|.
-    uint32_t dispatch_event_template_capacity;
   } profiling;
 
   // False once this queue's accumulated frontier overflows while merging waited
@@ -585,21 +600,31 @@ void iree_hal_amdgpu_host_queue_deinitialize(
 iree_status_t iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
     iree_hal_amdgpu_host_queue_t* queue, bool enabled);
 
-// Clears queue-local profiling metadata for an AQL packet range.
+// Reserves queue-local dispatch profile event records.
 //
-// Caller must hold submission_mutex. Only used when HSA timestamp profiling is
-// enabled.
-void iree_hal_amdgpu_host_queue_clear_profile_packet_events(
-    iree_hal_amdgpu_host_queue_t* queue, uint64_t first_packet_id,
-    uint32_t packet_count);
+// Caller must hold submission_mutex. If the ring is full the returned
+// reservation has event_count 0 and the dropped-event counter is incremented.
+iree_hal_amdgpu_profile_dispatch_event_reservation_t
+iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
+    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count);
 
-// Records a dispatch event template for |packet_id|'s AQL slot.
+// Cancels a tail reservation before its packets have been published.
 //
-// Caller must hold submission_mutex. The matching raw completion signal must
-// be the packet's completion signal.
-void iree_hal_amdgpu_host_queue_record_profile_dispatch_packet(
-    iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id,
-    const iree_hal_profile_dispatch_event_t* event);
+// Caller must hold submission_mutex. Only valid for the most recent successful
+// reservation on a path that is failing before AQL publication.
+void iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation);
+
+// Returns the dispatch event record at |event_position|.
+iree_hal_amdgpu_profile_dispatch_event_t*
+iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position);
+
+// Marks a completed event reservation ready for sink flush.
+void iree_hal_amdgpu_host_queue_retire_profile_dispatch_events(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation);
 
 // Writes and clears any buffered dispatch profile events for this queue.
 //

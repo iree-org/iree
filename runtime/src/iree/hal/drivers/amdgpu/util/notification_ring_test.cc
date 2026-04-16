@@ -714,8 +714,8 @@ TEST_F(NotificationRingTest, RetireCallbackRunsBeforeSemaphorePublication) {
 
   iree_hal_amdgpu_reclaim_entry_t* reclaim_entry =
       ReclaimEntryForNextEpoch(ring.get());
-  reclaim_entry->profile_packet_first_id = 42;
-  reclaim_entry->profile_packet_count = 3;
+  reclaim_entry->profile_event_first_position = 42;
+  reclaim_entry->profile_event_count = 3;
   uint64_t epoch = iree_hal_amdgpu_notification_ring_advance_epoch(ring.get());
   PushNotification(ring.get(), epoch, semaphore, 1);
 

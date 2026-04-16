@@ -81,6 +81,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::device::blit
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
+    iree::hal::drivers::amdgpu::device::profiling
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::hsaco_metadata
     iree::hal::drivers::amdgpu::util::libhsa

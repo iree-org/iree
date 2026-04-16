@@ -540,7 +540,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_copy_with_action(
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      /*kernarg_block_count=*/1, out_ready, &submission));
+      /*kernarg_block_count=*/1,
+      (iree_hal_amdgpu_profile_dispatch_event_reservation_t){0}, out_ready,
+      &submission));
   if (!*out_ready) return iree_ok_status();
 
   memcpy(submission.kernel.kernarg_blocks->data, &kernargs, sizeof(kernargs));
@@ -704,7 +706,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_update(
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list,
-      /*operation_resource_count=*/1, (uint32_t)kernarg_block_count, out_ready,
+      /*operation_resource_count=*/1, (uint32_t)kernarg_block_count,
+      (iree_hal_amdgpu_profile_dispatch_event_reservation_t){0}, out_ready,
       &submission));
   if (!*out_ready) return iree_ok_status();
 

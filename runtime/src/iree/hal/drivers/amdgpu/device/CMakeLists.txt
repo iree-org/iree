@@ -15,6 +15,7 @@ add_custom_command(OUTPUT bitcode_srcs.stamp
   DEPENDS
     "blit.c"
     "dispatch.c"
+    "profiling.c"
     "tracing.c"
 )
 
@@ -29,6 +30,7 @@ add_custom_command(OUTPUT bitcode_hdrs.stamp
     "dispatch.h"
     "kernel_tables.h"
     "kernels.h"
+    "profiling.h"
     "support/common.h"
     "support/kernel.h"
     "support/queue.h"
@@ -48,6 +50,7 @@ iree_cc_library(
     "dispatch.h"
     "kernel_tables.h"
     "kernels.h"
+    "profiling.h"
     "support/common.h"
     "support/kernel.h"
     "support/queue.h"
@@ -76,6 +79,16 @@ iree_cc_library(
     dispatch
   SRCS
     "dispatch.c"
+  DEPS
+    ::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    profiling
+  SRCS
+    "profiling.c"
   DEPS
     ::headers
   PUBLIC

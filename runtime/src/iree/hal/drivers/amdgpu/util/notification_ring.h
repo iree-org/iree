@@ -187,15 +187,15 @@ struct iree_hal_amdgpu_reclaim_entry_t {
   // completion, and during fail_all with the failure status before resources
   // are released.
   iree_hal_amdgpu_reclaim_action_t pre_signal_action;
-  // First AQL packet id whose queue-local profiling metadata may be harvested.
-  // Valid only when |profile_packet_count| is non-zero.
-  uint64_t profile_packet_first_id;
+  // First dispatch profiling event position reserved by this epoch.
+  // Valid only when |profile_event_count| is non-zero.
+  uint64_t profile_event_first_position;
   // Kernarg ring write position at the time of this submission. Drain/fail_all
   // report the highest position across retired epochs so the caller can reclaim
   // kernarg blocks. 0 means no kernarg was allocated.
   uint64_t kernarg_write_position;
-  // Number of AQL packets in the profiling metadata range.
-  uint32_t profile_packet_count;
+  // Number of dispatch profiling events reserved by this epoch.
+  uint32_t profile_event_count;
   // Number of retained resources stored in |resources|.
   uint16_t count;
   // Reserved padding for stable layout.

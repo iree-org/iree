@@ -98,13 +98,19 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   uint64_t dispatch_packet_id;
   // Uncommitted dispatch payload AQL slot.
   iree_hal_amdgpu_aql_packet_t* dispatch_slot;
-  // Optional trailing queue-completion slot used when |dispatch_slot| completes
-  // with a profiling-owned signal instead of the queue epoch signal.
-  iree_hal_amdgpu_aql_packet_t* trailing_completion_slot;
+  // Optional trailing harvest slot used when |dispatch_slot| completes with a
+  // profiling-owned signal instead of the queue epoch signal.
+  iree_hal_amdgpu_aql_packet_t* profile_harvest_slot;
+  // Queue-owned kernarg blocks reserved for |profile_harvest_slot|.
+  iree_hal_amdgpu_kernarg_block_t* profile_harvest_kernarg_blocks;
+  // Dispatch profile event reservation harvested by |profile_harvest_slot|.
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events;
   // Completion signal to write into |dispatch_slot|.
   iree_hsa_signal_t dispatch_completion_signal;
   // Setup bits published with |dispatch_slot|'s final header.
   uint16_t dispatch_setup;
+  // Setup bits published with |profile_harvest_slot|'s final header.
+  uint16_t profile_harvest_setup;
   // Minimum acquire fence scope required by operation-local data visibility.
   iree_hsa_fence_scope_t minimum_acquire_scope;
   // Minimum release fence scope required by operation-local data visibility.
@@ -186,7 +192,7 @@ void iree_hal_amdgpu_host_queue_fail_barrier_submission(
 // advances queue/frontier state, and records user-visible signal metadata.
 // Payload packet headers remain uncommitted when this returns. Caller must hold
 // submission_mutex.
-void iree_hal_amdgpu_host_queue_finish_kernel_submission(
+uint64_t iree_hal_amdgpu_host_queue_finish_kernel_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -218,6 +224,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count, uint32_t kernarg_block_count,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events,
     bool* out_ready,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission);
 
