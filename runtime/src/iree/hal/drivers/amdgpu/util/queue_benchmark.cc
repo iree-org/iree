@@ -1302,11 +1302,23 @@ class QueueBenchmark : public benchmark::Fixture {
       case 8:
         *out_export_ordinal = 2;
         return iree_ok_status();
-      case 16:
+      case 9:
         *out_export_ordinal = 3;
         return iree_ok_status();
-      case 256:
+      case 16:
         *out_export_ordinal = 4;
+        return iree_ok_status();
+      case 17:
+        *out_export_ordinal = 5;
+        return iree_ok_status();
+      case 24:
+        *out_export_ordinal = 6;
+        return iree_ok_status();
+      case 25:
+        *out_export_ordinal = 7;
+        return iree_ok_status();
+      case 256:
+        *out_export_ordinal = 8;
         return iree_ok_status();
       default:
         return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
@@ -2814,7 +2826,11 @@ BENCHMARK_REGISTER_F(QueueBenchmark, DispatchBindingCountValidateOnly)
     ->Arg(0)
     ->Arg(1)
     ->Arg(8)
+    ->Arg(9)
     ->Arg(16)
+    ->Arg(17)
+    ->Arg(24)
+    ->Arg(25)
     ->Arg(256)
     ->ArgName("binding_count")
     ->UseRealTime()
@@ -2824,7 +2840,11 @@ BENCHMARK_REGISTER_F(QueueBenchmark,
     ->Arg(0)
     ->Arg(1)
     ->Arg(8)
+    ->Arg(9)
     ->Arg(16)
+    ->Arg(17)
+    ->Arg(24)
+    ->Arg(25)
     ->Arg(256)
     ->ArgName("binding_count")
     ->UseRealTime()
