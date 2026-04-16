@@ -40,3 +40,40 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 // CHECK: arith.mulf
 // CHECK: arith.truncf
 // CHECK: linalg.yield
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d3)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+
+func.func @attention_causal(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16>, %v: tensor<2x10x4096x128xf16>)
+                     -> tensor<2x10x4096x128xf16> {
+  %scale = arith.constant 0.125 : f16
+  %acc = tensor.empty() : tensor<2x10x4096x128xf16>
+  %out = iree_linalg_ext.attention
+         {indexing_maps = [#map, #map1, #map2, #map3, #map4]}
+         ins(%q, %k, %v, %scale : tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, f16)
+         outs(%acc : tensor<2x10x4096x128xf16>) {
+              ^bb0(%score: f32):
+                %m = iree_linalg_ext.index 2 : index
+                %k2 = iree_linalg_ext.index 5 : index
+                %cmp = arith.cmpi ugt, %k2, %m : index
+                %neg_inf = arith.constant 0xFF800000 : f32
+                %masked = arith.select %cmp, %neg_inf, %score : f32
+                iree_linalg_ext.yield %masked : f32
+         } -> tensor<2x10x4096x128xf16>
+  func.return %out : tensor<2x10x4096x128xf16>
+}
+
+// CHECK-LABEL: func.func @attention_causal
+// CHECK: iree_linalg_ext.online_attention
+// CHECK-NEXT:             ^{{.+}}(%[[SCORE:.+]]: f32):
+// CHECK-NEXT:               %[[M:.+]] = iree_linalg_ext.index 2 : index
+// CHECK-NEXT:               %[[K2:.+]] = iree_linalg_ext.index 5 : index
+// CHECK-NEXT:               %[[CMP:.+]] = arith.cmpi ugt, %[[K2]], %[[M]] : index
+// CHECK-NEXT:               %[[NEG_INF:.+]] = arith.constant 0xFF800000 : f32
+// CHECK-NEXT:               %[[MASKED:.+]] = arith.select %[[CMP]], %[[NEG_INF]], %[[SCORE]] : f32
+// CHECK-NEXT:               iree_linalg_ext.yield %[[MASKED]] : f32

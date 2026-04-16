@@ -187,7 +187,8 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
 }
 
 static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
-                                          Region &region, Value value) {
+                                          Region &region, AffineMap sMap,
+                                          Value value) {
   auto rank = cast<RankedTensorType>(value.getType()).getRank();
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
@@ -199,6 +200,34 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
                                 value, indexingMaps, iteratorTypes);
   auto &dstRegion = genericOp.getRegion();
   builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
+
+  // Build a mapping from attention iteration domain dim -> S tensor dim.
+  // The linalg.generic uses an identity map over S, so linalg iteration
+  // dim i == S tensor dim i.
+  DenseMap<int64_t, int64_t> attentionDimToSDim;
+  for (auto [sIdx, expr] : llvm::enumerate(sMap.getResults())) {
+    attentionDimToSDim[cast<AffineDimExpr>(expr).getPosition()] = sIdx;
+  }
+
+  // Replace iree_linalg_ext.index ops with linalg.index ops.
+  SmallVector<IREE::LinalgExt::IndexOp> indexOps;
+  for (auto indexOp : dstRegion.back().getOps<IREE::LinalgExt::IndexOp>()) {
+    indexOps.push_back(indexOp);
+  }
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    for (auto indexOp : indexOps) {
+      auto it = attentionDimToSDim.find(indexOp.getDim());
+      assert(it != attentionDimToSDim.end() &&
+             "index op dim not found in S map");
+      builder.setInsertionPoint(indexOp);
+      Value linalgIdx =
+          linalg::IndexOp::create(builder, loc, it->second)->getResult(0);
+      indexOp.replaceAllUsesWith(linalgIdx);
+      indexOp.erase();
+    }
+  }
+
   {
     OpBuilder::InsertionGuard withinRegion(builder);
     builder.setInsertionPoint(dstRegion.back().getTerminator());
@@ -350,7 +379,7 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
     s.getDefiningOp()->setAttrs(qkAttrs);
   }
 
-  s = applyPostQKMatmulElementwise(b, loc, elementwiseRegion, s);
+  s = applyPostQKMatmulElementwise(b, loc, elementwiseRegion, sMap, s);
 
   if (lowPrecision) {
     // For low bit-depth types we perform post Q @ K scaling. This is to avoid

@@ -3199,19 +3199,25 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
   auto parentOp = getOperation()->getParentOp();
-  if (!isa<CustomOp, AttentionOp>(parentOp)) {
+  if (!isa<CustomOp, AttentionOp, OnlineAttentionOp>(parentOp)) {
     return emitOpError(
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
-        "`iree_linalg_ext.attention`");
+        "`iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`");
   }
-  auto customOp = dyn_cast<CustomOp>(parentOp);
-  auto attentionOp = dyn_cast<AttentionOp>(parentOp);
   int64_t numLoops =
-      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+      TypeSwitch<Operation *, int64_t>(parentOp)
+          .Case<CustomOp>(
+              [](CustomOp op) -> int64_t { return op.getNumLoops(); })
+          .Case<AttentionOp>([](AttentionOp op) -> int64_t {
+            return op.getIterationDomainRank();
+          })
+          .Case<OnlineAttentionOp>([](OnlineAttentionOp op) -> int64_t {
+            return op.getIterationDomainRank();
+          });
   if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
            << getDim() << ") to be lower than the number of loops (" << numLoops
-           << ") of the enclosing CustomOp/AttentionOp";
+           << ") of the enclosing operation";
   }
   return success();
 }

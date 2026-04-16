@@ -1999,9 +1999,37 @@ func.func @custom_op_yield_type_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<1
 // -----
 
 func.func @index_op_outside_custom_op() -> index {
-  // expected-error @+1 {{expected parent op to be one of `iree_linalg_ext.custom_op`, `iree_linalg_ext.attention`}}
+  // expected-error @+1 {{expected parent op to be one of `iree_linalg_ext.custom_op`, `iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`}}
   %0 = iree_linalg_ext.index 0 : index
   return %0 : index
+}
+
+// -----
+
+func.func @index_op_invalid_dim_online_attention(
+    %query: tensor<192x1024x64xf16>,
+    %key: tensor<192x1024x64xf16>,
+    %value: tensor<192x1024x64xf16>,
+    %output: tensor<192x1024x64xf32>,
+    %max: tensor<192x1024xf32>,
+    %sum: tensor<192x1024xf32>) -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+  %scale = arith.constant 1.0 : f32
+  %out:3 = iree_linalg_ext.online_attention
+      {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]}
+      ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f32)
+      outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+    ^bb0(%score: f32):
+      // expected-error @+1 {{expected dim (5) to be lower than the number of loops (5) of the enclosing operation}}
+      %idx = iree_linalg_ext.index 5 : index
+      iree_linalg_ext.yield %score : f32
+  } -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+  return %out#0, %out#1, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
 }
 
 // -----
@@ -2012,7 +2040,7 @@ func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
       iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
       outs(%arg0: tensor<?xindex>) {
     ^bb0(%b0 : tensor<?xindex>):
-      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing CustomOp}}
+      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing operation}}
       %1 = iree_linalg_ext.index 1 : index
       %2 = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>],

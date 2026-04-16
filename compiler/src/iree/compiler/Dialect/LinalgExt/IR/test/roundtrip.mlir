@@ -2318,6 +2318,40 @@ module {
 
 // -----
 
+func.func @attention_causal(%arg0: tensor<192x1024x64xf32>, %arg1: tensor<192x1024x64xf32>, %arg2: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32> {
+  %cst = arith.constant dense<0.000000e+00> : tensor<192x1024x64xf32>
+  %scale = arith.constant 1.000000e+00 : f32
+  %0 = iree_linalg_ext.attention {indexing_maps = [
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+    affine_map<(d0, d1, d2, d3, d4) -> ()>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+    ]
+  } ins(%arg0, %arg1, %arg2, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%cst : tensor<192x1024x64xf32>) {
+  ^bb0(%score: f32):
+    %m = iree_linalg_ext.index 1 : index
+    %k2 = iree_linalg_ext.index 3 : index
+    %cmp = arith.cmpi ugt, %k2, %m : index
+    %neg_inf = arith.constant 0xFF800000 : f32
+    %masked = arith.select %cmp, %neg_inf, %score : f32
+    iree_linalg_ext.yield %masked : f32
+  } -> tensor<192x1024x64xf32>
+  return %0 : tensor<192x1024x64xf32>
+}
+
+// CHECK-LABEL: func.func @attention_causal(
+// CHECK:         iree_linalg_ext.attention
+// CHECK:         ^bb0(%[[SCORE:.+]]: f32):
+// CHECK:           %[[M:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:           %[[K2:.+]] = iree_linalg_ext.index 3 : index
+// CHECK:           %[[CMP:.+]] = arith.cmpi ugt, %[[K2]], %[[M]] : index
+// CHECK:           %[[NEG_INF:.+]] = arith.constant 0xFF800000 : f32
+// CHECK:           %[[MASKED:.+]] = arith.select %[[CMP]], %[[NEG_INF]], %[[SCORE]] : f32
+// CHECK:           iree_linalg_ext.yield %[[MASKED]] : f32
+
+// -----
+
 func.func @custom_op_default(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
   %0 = iree_linalg_ext.custom_op {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],

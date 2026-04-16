@@ -2770,18 +2770,34 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
                                    getKeyMap(), getValueMap(), getOutputMap());
 }
 
+static void offsetAttentionIndices(OpBuilder &b, Region &body,
+                                   ArrayRef<OpFoldResult> offsets) {
+  IRRewriter rewriter(b);
+  for (auto indexOp : body.getOps<IREE::LinalgExt::IndexOp>()) {
+    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()]) {
+      continue;
+    }
+    OpBuilder::InsertionGuard guard(b);
+    rewriter.setInsertionPointAfter(indexOp);
+    AffineExpr index, offset;
+    bindDims(b.getContext(), index, offset);
+    OpFoldResult applied = affine::makeComposedFoldedAffineApply(
+        rewriter, indexOp.getLoc(), index + offset,
+        {getAsOpFoldResult(indexOp.getResult()), offsets[indexOp.getDim()]});
+    Value materialized =
+        getValueOrCreateConstantIndexOp(b, indexOp.getLoc(), applied);
+    rewriter.replaceUsesWithIf(indexOp, materialized, [&](OpOperand &use) {
+      return use.getOwner() != materialized.getDefiningOp();
+    });
+  }
+}
+
 FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
-
-  // TODO: Add support for linalg_ext.index operations in the region.
-  // Currently, tiling will break if index operations are present.
-  if (!getBody()->getOps<IREE::LinalgExt::IndexOp>().empty()) {
-    return failure();
-  }
 
   Location loc = getLoc();
 
@@ -2847,6 +2863,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  offsetAttentionIndices(builder, tiledOp->getRegion(0), offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
@@ -3006,6 +3023,7 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  offsetAttentionIndices(builder, tiledOp->getRegion(0), offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};

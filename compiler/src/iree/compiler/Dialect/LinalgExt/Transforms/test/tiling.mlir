@@ -2307,6 +2307,50 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @attention_causal(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32> {
+  %0 = tensor.empty() : tensor<192x1024x64xf32>
+  %scale = arith.constant 1.0 : f32
+  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        %m = iree_linalg_ext.index 1 : index
+                        %k2 = iree_linalg_ext.index 3 : index
+                        %cmp = arith.cmpi ugt, %k2, %m : index
+                        %neg_inf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %cmp, %neg_inf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     } -> tensor<192x1024x64xf32>
+  return %1 : tensor<192x1024x64xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// Verify that index ops are preserved in the tiled attention and offsets are applied.
+// The m dimension (dim 1) is tiled, so the index op for m gets an offset.
+// The k2 dimension (dim 3) is not tiled, so no offset is applied.
+// CHECK-LABEL: func.func @attention_causal
+// CHECK:        scf.for
+// CHECK:          scf.for
+// CHECK:            iree_linalg_ext.attention
+// CHECK:            ^bb0(%[[SCORE:.+]]: f32):
+// CHECK:              %[[M_RAW:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:              %[[M_OFF:.+]] = affine.apply
+// CHECK:              %[[K2:.+]] = iree_linalg_ext.index 3 : index
+// CHECK:              arith.cmpi ugt, %[[K2]], %[[M_OFF]] : index
+// CHECK:              arith.select
+// CHECK:              iree_linalg_ext.yield
+
+// -----
+
 func.func @attention_float_mask(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>, %mask: tensor<192x1024x1024xf32>) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
