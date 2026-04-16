@@ -7,6 +7,7 @@
 #include <benchmark/benchmark.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 #include "iree/async/frontier_tracker.h"
@@ -25,8 +26,20 @@
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/benchmark_flags.h"
+#include "iree/io/file_contents.h"
 #include "runtime/src/iree/hal/drivers/amdgpu/cts/testdata_amdgpu.h"
 #include "runtime/src/iree/hal/drivers/amdgpu/util/testdata_amdgpu_queue_benchmark.h"
+
+IREE_FLAG(
+    string, binding_count_executable_file, "",
+    "Optional raw HSACO or AMDGPU executable file used for binding-count "
+    "dispatch benchmark rows. When empty, the embedded benchmark executable "
+    "is used.");
+IREE_FLAG(
+    int32_t, binding_count_workgroup_size_x, 0,
+    "Optional 1D workgroup-size override for binding-count dispatch benchmark "
+    "rows. Use 64 to match common HIP launch benchmark shapes. The default 0 "
+    "uses the executable export's reflected workgroup size.");
 
 namespace {
 
@@ -118,6 +131,7 @@ class QueueBenchmark : public benchmark::Fixture {
     if (!initialized_) return;
     iree_hal_executable_release(binding_count_executable_);
     iree_hal_executable_cache_release(binding_count_executable_cache_);
+    iree_io_file_contents_free(binding_count_executable_file_contents_);
     iree_hal_executable_release(dispatch_executable_);
     iree_hal_executable_cache_release(dispatch_executable_cache_);
     iree_hal_device_release(device_);
@@ -125,6 +139,7 @@ class QueueBenchmark : public benchmark::Fixture {
     iree_hal_driver_release(driver_);
     binding_count_executable_ = nullptr;
     binding_count_executable_cache_ = nullptr;
+    binding_count_executable_file_contents_ = nullptr;
     dispatch_executable_ = nullptr;
     dispatch_executable_cache_ = nullptr;
     device_ = nullptr;
@@ -1093,18 +1108,35 @@ class QueueBenchmark : public benchmark::Fixture {
   bool EnsureBindingCountExecutable(benchmark::State& state) {
     if (binding_count_executable_) return true;
 
-    iree_const_byte_span_t executable_data = FindQueueBenchmarkExecutableData(
-        iree_make_cstring_view("queue_benchmark_testdata.bin"));
+    const iree_string_view_t executable_file =
+        iree_make_cstring_view(FLAG_binding_count_executable_file);
+    iree_io_file_contents_t* executable_file_contents = nullptr;
+    iree_const_byte_span_t executable_data = iree_const_byte_span_empty();
     iree_status_t status = iree_ok_status();
-    if (executable_data.data_length == 0) {
-      status = iree_make_status(
-          IREE_STATUS_NOT_FOUND,
-          "AMDGPU queue benchmark dispatch executable not found");
+    if (!iree_string_view_is_empty(executable_file)) {
+      status = iree_io_file_contents_read(executable_file, host_allocator_,
+                                          &executable_file_contents);
+      if (iree_status_is_ok(status)) {
+        executable_data = executable_file_contents->const_buffer;
+      }
+    } else {
+      executable_data = FindQueueBenchmarkExecutableData(
+          iree_make_cstring_view("queue_benchmark_testdata.bin"));
+      if (executable_data.data_length == 0) {
+        status = iree_make_status(
+            IREE_STATUS_NOT_FOUND,
+            "AMDGPU queue benchmark dispatch executable not found");
+      }
     }
     if (iree_status_is_ok(status)) {
       status = LoadExecutableFromData(executable_data,
                                       &binding_count_executable_cache_,
                                       &binding_count_executable_);
+    }
+    if (iree_status_is_ok(status)) {
+      binding_count_executable_file_contents_ = executable_file_contents;
+    } else {
+      iree_io_file_contents_free(executable_file_contents);
     }
     return HandleStatus(state, status,
                         "failed to load binding-count dispatch executable");
@@ -1299,44 +1331,59 @@ class QueueBenchmark : public benchmark::Fixture {
         IREE_HAL_DISPATCH_FLAG_NONE, out_operation_resource_count);
   }
 
-  static iree_status_t BindingCountExportOrdinal(
+  static iree_status_t BindingCountDispatchConfig(
+      iree_hal_dispatch_config_t* out_config) {
+    *out_config = iree_hal_make_static_dispatch_config(1, 1, 1);
+    if (FLAG_binding_count_workgroup_size_x == 0) {
+      return iree_ok_status();
+    }
+    if (FLAG_binding_count_workgroup_size_x < 0 ||
+        FLAG_binding_count_workgroup_size_x > UINT16_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "binding_count_workgroup_size_x must be in [0, %" PRIu16 "]",
+          UINT16_MAX);
+    }
+    out_config->workgroup_size[0] =
+        (uint32_t)FLAG_binding_count_workgroup_size_x;
+    out_config->workgroup_size[1] = 1;
+    out_config->workgroup_size[2] = 1;
+    return iree_ok_status();
+  }
+
+  static iree_status_t BindingCountExportName(int64_t binding_count,
+                                              char* buffer,
+                                              iree_host_size_t capacity,
+                                              iree_string_view_t* out_name) {
+    *out_name = iree_string_view_empty();
+    if (binding_count < 0 ||
+        binding_count > (int64_t)kDispatchBindingBenchmarkMaxCount) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "unsupported dispatch benchmark binding count "
+                              "%" PRId64,
+                              binding_count);
+    }
+    int result =
+        snprintf(buffer, capacity, "binding_count_%" PRId64, binding_count);
+    if (result < 0 || (iree_host_size_t)result >= capacity) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "binding-count export name is too long");
+    }
+    *out_name = iree_make_string_view(buffer, (iree_host_size_t)result);
+    return iree_ok_status();
+  }
+
+  iree_status_t BindingCountExportOrdinal(
       int64_t binding_count,
       iree_hal_executable_export_ordinal_t* out_export_ordinal) {
     *out_export_ordinal = 0;
-    switch (binding_count) {
-      case 0:
-        *out_export_ordinal = 0;
-        return iree_ok_status();
-      case 1:
-        *out_export_ordinal = 1;
-        return iree_ok_status();
-      case 8:
-        *out_export_ordinal = 2;
-        return iree_ok_status();
-      case 9:
-        *out_export_ordinal = 3;
-        return iree_ok_status();
-      case 16:
-        *out_export_ordinal = 4;
-        return iree_ok_status();
-      case 17:
-        *out_export_ordinal = 5;
-        return iree_ok_status();
-      case 24:
-        *out_export_ordinal = 6;
-        return iree_ok_status();
-      case 25:
-        *out_export_ordinal = 7;
-        return iree_ok_status();
-      case 256:
-        *out_export_ordinal = 8;
-        return iree_ok_status();
-      default:
-        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                                "unsupported dispatch benchmark binding count "
-                                "%" PRId64,
-                                binding_count);
-    }
+    char export_name_buffer[32] = {0};
+    iree_string_view_t export_name = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(BindingCountExportName(
+        binding_count, export_name_buffer, IREE_ARRAYSIZE(export_name_buffer),
+        &export_name));
+    return iree_hal_executable_lookup_export_by_name(
+        binding_count_executable_, export_name, out_export_ordinal);
   }
 
   iree_hal_buffer_ref_list_t BindingCountDispatchBindings(
@@ -1358,9 +1405,10 @@ class QueueBenchmark : public benchmark::Fixture {
     iree_hal_executable_export_ordinal_t export_ordinal = 0;
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
+    iree_hal_dispatch_config_t dispatch_config;
+    IREE_RETURN_IF_ERROR(BindingCountDispatchConfig(&dispatch_config));
     return iree_hal_amdgpu_host_queue_validate_dispatch(
-        host_queue, binding_count_executable_, export_ordinal,
-        iree_hal_make_static_dispatch_config(1, 1, 1),
+        host_queue, binding_count_executable_, export_ordinal, dispatch_config,
         iree_const_byte_span_empty(),
         BindingCountDispatchBindings(binding_count),
         IREE_HAL_DISPATCH_FLAG_NONE, out_operation_resource_count);
@@ -1373,10 +1421,11 @@ class QueueBenchmark : public benchmark::Fixture {
     iree_hal_executable_export_ordinal_t export_ordinal = 0;
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
+    iree_hal_dispatch_config_t dispatch_config;
+    IREE_RETURN_IF_ERROR(BindingCountDispatchConfig(&dispatch_config));
     return iree_hal_device_queue_dispatch(
         device_, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-        binding_count_executable_, export_ordinal,
-        iree_hal_make_static_dispatch_config(1, 1, 1),
+        binding_count_executable_, export_ordinal, dispatch_config,
         iree_const_byte_span_empty(),
         BindingCountDispatchBindings(binding_count),
         IREE_HAL_DISPATCH_FLAG_NONE);
@@ -1388,6 +1437,8 @@ class QueueBenchmark : public benchmark::Fixture {
     iree_hal_executable_export_ordinal_t export_ordinal = 0;
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
+    iree_hal_dispatch_config_t dispatch_config;
+    IREE_RETURN_IF_ERROR(BindingCountDispatchConfig(&dispatch_config));
 
     iree_hal_command_buffer_t* command_buffer = nullptr;
     iree_status_t status = iree_hal_command_buffer_create(
@@ -1400,8 +1451,7 @@ class QueueBenchmark : public benchmark::Fixture {
     if (iree_status_is_ok(status)) {
       status = iree_hal_command_buffer_dispatch(
           command_buffer, binding_count_executable_, export_ordinal,
-          iree_hal_make_static_dispatch_config(1, 1, 1),
-          iree_const_byte_span_empty(),
+          dispatch_config, iree_const_byte_span_empty(),
           BindingCountDispatchBindings(binding_count),
           IREE_HAL_DISPATCH_FLAG_NONE);
     }
@@ -1443,6 +1493,8 @@ class QueueBenchmark : public benchmark::Fixture {
     iree_hal_executable_export_ordinal_t export_ordinal = 0;
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
+    iree_hal_dispatch_config_t dispatch_config;
+    IREE_RETURN_IF_ERROR(BindingCountDispatchConfig(&dispatch_config));
 
     iree_hal_command_buffer_t* command_buffer = nullptr;
     iree_status_t status = iree_hal_command_buffer_create(
@@ -1455,8 +1507,7 @@ class QueueBenchmark : public benchmark::Fixture {
     for (int64_t i = 0; i < operation_count && iree_status_is_ok(status); ++i) {
       status = iree_hal_command_buffer_dispatch(
           command_buffer, binding_count_executable_, export_ordinal,
-          iree_hal_make_static_dispatch_config(1, 1, 1),
-          iree_const_byte_span_empty(),
+          dispatch_config, iree_const_byte_span_empty(),
           BindingCountDispatchBindings(binding_count),
           IREE_HAL_DISPATCH_FLAG_NONE);
     }
@@ -1469,6 +1520,17 @@ class QueueBenchmark : public benchmark::Fixture {
       iree_hal_command_buffer_release(command_buffer);
     }
     return status;
+  }
+
+  void SetBindingCountCounters(benchmark::State& state, int64_t binding_count) {
+    state.counters["binding_count"] = static_cast<double>(binding_count);
+    state.counters["binding_count_external_executable"] =
+        iree_string_view_is_empty(
+            iree_make_cstring_view(FLAG_binding_count_executable_file))
+            ? 0.0
+            : 1.0;
+    state.counters["binding_count_workgroup_size_x"] =
+        static_cast<double>(FLAG_binding_count_workgroup_size_x);
   }
 
   void SetCommandBufferProgramCounters(
@@ -1496,7 +1558,7 @@ class QueueBenchmark : public benchmark::Fixture {
     }
 
     state.counters["operation_count"] = static_cast<double>(operation_count);
-    state.counters["binding_count"] = static_cast<double>(binding_count);
+    SetBindingCountCounters(state, binding_count);
     state.counters["command_buffer_blocks"] =
         static_cast<double>(program->block_count);
     state.counters["command_buffer_payload_blocks"] =
@@ -1666,6 +1728,8 @@ class QueueBenchmark : public benchmark::Fixture {
   static iree_hal_executable_cache_t* binding_count_executable_cache_;
   // Empty-kernel executable with exports that vary only in ABI binding count.
   static iree_hal_executable_t* binding_count_executable_;
+  // Optional file contents backing an externally loaded binding-count HSACO.
+  static iree_io_file_contents_t* binding_count_executable_file_contents_;
 
   // Precomputed dispatch packet body used by direct-substrate attribution rows.
   iree_hsa_kernel_dispatch_packet_t pre_resolved_dispatch_packet_template_ = {};
@@ -1718,6 +1782,8 @@ iree_hal_executable_t* QueueBenchmark::dispatch_executable_ = nullptr;
 iree_hal_executable_cache_t* QueueBenchmark::binding_count_executable_cache_ =
     nullptr;
 iree_hal_executable_t* QueueBenchmark::binding_count_executable_ = nullptr;
+iree_io_file_contents_t*
+    QueueBenchmark::binding_count_executable_file_contents_ = nullptr;
 
 BENCHMARK_DEFINE_F(QueueBenchmark,
                    SameQueueBarrierWait)(benchmark::State& state) {
@@ -2645,7 +2711,7 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
     }
     benchmark::DoNotOptimize(operation_resource_count);
   }
-  state.counters["binding_count"] = static_cast<double>(binding_count);
+  SetBindingCountCounters(state, binding_count);
   state.SetItemsProcessed(state.iterations());
 }
 
@@ -2668,7 +2734,7 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
       break;
     }
   }
-  state.counters["binding_count"] = static_cast<double>(binding_count);
+  SetBindingCountCounters(state, binding_count);
   SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
 }
 
@@ -2691,7 +2757,7 @@ BENCHMARK_DEFINE_F(
       break;
     }
   }
-  state.counters["binding_count"] = static_cast<double>(binding_count);
+  SetBindingCountCounters(state, binding_count);
   SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/1);
 }
 
@@ -3104,6 +3170,7 @@ BENCHMARK_REGISTER_F(QueueBenchmark, DispatchValidateOnly)
 BENCHMARK_REGISTER_F(QueueBenchmark, DispatchBindingCountValidateOnly)
     ->Arg(0)
     ->Arg(1)
+    ->Arg(4)
     ->Arg(8)
     ->Arg(9)
     ->Arg(16)
@@ -3118,6 +3185,7 @@ BENCHMARK_REGISTER_F(QueueBenchmark,
                      SameQueueDispatchBindingCountPublicFinalInlineSubmitOnly)
     ->Arg(0)
     ->Arg(1)
+    ->Arg(4)
     ->Arg(8)
     ->Arg(9)
     ->Arg(16)
@@ -3133,6 +3201,7 @@ BENCHMARK_REGISTER_F(
     SameQueueCommandBufferBindingCountStaticPublicFinalInlineSubmitOnly)
     ->Arg(0)
     ->Arg(1)
+    ->Arg(4)
     ->Arg(8)
     ->Arg(9)
     ->Arg(16)
@@ -3145,22 +3214,14 @@ BENCHMARK_REGISTER_F(
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(QueueBenchmark,
                      SameQueueCommandBufferDispatchChainStaticPublicFinalInline)
-    ->Args({1, 8})
-    ->Args({10, 8})
-    ->Args({100, 8})
-    ->Args({1000, 8})
-    ->Args({5000, 8})
+    ->ArgsProduct({{1, 10, 100, 1000, 5000}, {0, 1, 4, 8, 16}})
     ->ArgNames({"operation_count", "binding_count"})
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(
     QueueBenchmark,
     SameQueueCommandBufferDispatchChainStaticPublicFinalInlineSubmitOnly)
-    ->Args({1, 8})
-    ->Args({10, 8})
-    ->Args({100, 8})
-    ->Args({1000, 8})
-    ->Args({5000, 8})
+    ->ArgsProduct({{1, 10, 100, 1000, 5000}, {0, 1, 4, 8, 16}})
     ->ArgNames({"operation_count", "binding_count"})
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
