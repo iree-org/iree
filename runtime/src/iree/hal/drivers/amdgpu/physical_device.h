@@ -218,6 +218,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   uint32_t host_queue_notification_capacity;
   // Per-host-queue kernarg ring capacity in 64-byte blocks.
   uint32_t host_queue_kernarg_capacity;
+  // AMD vendor-packet capabilities selected from this GPU agent's ISA.
+  iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities;
   // Hardware strategy selected for cross-queue epoch waits on this GPU agent.
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy;
 

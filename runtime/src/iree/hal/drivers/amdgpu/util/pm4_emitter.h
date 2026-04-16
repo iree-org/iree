@@ -37,11 +37,18 @@ enum {
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM = 0x49,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP = 9 << 0,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 = 2 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM = 5 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS = 1 << 16,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS = 40 << 0,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE = 5 << 8,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM = 3 << 24,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_DATA_SEL_TIMESTAMP = 3u << 29,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
@@ -125,6 +132,56 @@ static inline uint32_t iree_hal_amdgpu_pm4_addr_hi(uintptr_t address) {
 
 static inline uint32_t iree_hal_amdgpu_pm4_ib_addr_hi(uintptr_t address) {
   return (uint32_t)((address >> 32) & 0xFFFFu);
+}
+
+// Appends a COPY_DATA timestamp write to |target|. This is the RADV-style
+// top-of-pipe/immediate timestamp form and is intended for profiling records,
+// not memory copies. The packet form was probed on gfx1100 AQL compute queues;
+// callers must select it only for architectures where the physical-device
+// capability table says this form is valid.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target) {
+  if (!iree_host_ptr_has_alignment(target, 8)) return false;
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = 0;
+  dword[3] = 0;
+  dword[4] = (uint32_t)address;
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(address);
+  return true;
+}
+
+// Appends a RELEASE_MEM bottom-of-pipe timestamp write to |target|. This uses
+// only the common timestamp event/data fields and deliberately avoids cache or
+// PWS bits whose layout differs across gfx generations. The packet form was
+// probed on gfx1100 AQL compute queues; callers must select it only for
+// architectures where the physical-device capability table says this form is
+// valid.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target) {
+  if (!iree_host_ptr_has_alignment(target, 8)) return false;
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM, 8);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS |
+             IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE;
+  dword[2] =
+      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM |
+      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_DATA_SEL_TIMESTAMP;
+  dword[3] = (uint32_t)address;
+  dword[4] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[5] = 0;
+  dword[6] = 0;
+  dword[7] = 0;
+  return true;
 }
 
 static inline uint32_t iree_hal_amdgpu_pm4_wait_reg_mem_dw1(

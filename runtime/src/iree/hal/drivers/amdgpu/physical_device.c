@@ -155,18 +155,36 @@ static iree_status_t iree_hal_amdgpu_query_agent_gfxip_version(
       out_version);
 }
 
-static iree_hal_amdgpu_wait_barrier_strategy_t
-iree_hal_amdgpu_select_wait_barrier_strategy(
+static iree_hal_amdgpu_vendor_packet_capability_flags_t
+iree_hal_amdgpu_select_vendor_packet_capabilities(
     iree_hal_amdgpu_gfxip_version_t version) {
+  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities = 0;
   // Matches CLR's barrier_value_packet_ gate:
   //   gfx9.0.10 or gfx9.[minor >= 4].[stepping 0..2]
   if (version.major == 9 && ((version.minor == 0 && version.stepping == 10) ||
                              (version.minor >= 4 && version.stepping <= 2))) {
-    return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE;
+    capabilities |= IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+                    IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE;
   }
   // WAIT_REG_MEM64 is present in the gfx10+ PM4 packet tables. Gfx9 has only
   // the 32-bit WAIT_REG_MEM variant, and non-CDNA gfx9 therefore defers.
   if (version.major >= 10) {
+    capabilities |= IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+                    IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64;
+  }
+  return capabilities;
+}
+
+static iree_hal_amdgpu_wait_barrier_strategy_t
+iree_hal_amdgpu_select_wait_barrier_strategy(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t
+        vendor_packet_capabilities) {
+  if (vendor_packet_capabilities &
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE) {
+    return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE;
+  }
+  if (vendor_packet_capabilities &
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64) {
     return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64;
   }
   return IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
@@ -610,15 +628,22 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   }
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy =
       IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
+  iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities =
+      0;
   iree_hal_amdgpu_gfxip_version_t gfxip_version = {0};
-  if (iree_status_is_ok(status) && !options->force_wait_barrier_defer) {
+  if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_query_agent_gfxip_version(libhsa, device_agent,
                                                        &gfxip_version);
   }
-  if (iree_status_is_ok(status) && !options->force_wait_barrier_defer) {
-    wait_barrier_strategy =
-        iree_hal_amdgpu_select_wait_barrier_strategy(gfxip_version);
+  if (iree_status_is_ok(status)) {
+    vendor_packet_capabilities =
+        iree_hal_amdgpu_select_vendor_packet_capabilities(gfxip_version);
+    if (!options->force_wait_barrier_defer) {
+      wait_barrier_strategy = iree_hal_amdgpu_select_wait_barrier_strategy(
+          vendor_packet_capabilities);
+    }
   }
+  out_physical_device->vendor_packet_capabilities = vendor_packet_capabilities;
   out_physical_device->wait_barrier_strategy = wait_barrier_strategy;
 
   if (!iree_status_is_ok(status)) {
@@ -677,7 +702,8 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
         host_memory_pools->kernarg_pool, host_memory_pools->fine_pool,
         frontier_tracker, queue_axis, queue_affinity,
         completion_thread_affinity, physical_device->wait_barrier_strategy,
-        epoch_signal_table, &physical_device->fine_host_block_pool,
+        physical_device->vendor_packet_capabilities, epoch_signal_table,
+        &physical_device->fine_host_block_pool,
         &physical_device->buffer_transfer_context,
         physical_device->default_pool, &physical_device->transient_buffer_pool,
         &physical_device->file_staging_pool, physical_device->device_ordinal,
