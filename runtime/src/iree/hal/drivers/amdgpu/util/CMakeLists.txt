@@ -293,6 +293,22 @@ iree_cc_test(
   GROUP
     "iree-hal-drivers-amdgpu-tests"
 )
+
+iree_cc_test(
+  NAME
+    pm4_emitter_test
+  SRCS
+    "pm4_emitter_test.cc"
+  DEPS
+    ::util
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
 if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
 add_custom_command(OUTPUT queue_benchmark_testdata_srcs.stamp
     COMMAND ${CMAKE_COMMAND} -E touch queue_benchmark_testdata_srcs.stamp

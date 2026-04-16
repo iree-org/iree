@@ -33,6 +33,7 @@ IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
                           "PM4 IB slot must be exactly one cache line");
 
 enum {
+  IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY = 16,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
@@ -54,6 +55,60 @@ static const uint32_t
 static inline uint32_t iree_hal_amdgpu_pm4_make_header(uint32_t opcode,
                                                        uint32_t dword_count) {
   return (3u << 30) | (opcode << 8) | ((dword_count - 2u) << 16);
+}
+
+// Bounded builder for one queue-private PM4 IB slot.
+typedef struct iree_hal_amdgpu_pm4_ib_builder_t {
+  // Queue-owned PM4 IB slot being populated.
+  iree_hal_amdgpu_pm4_ib_slot_t* slot;
+  // Number of dwords already populated in |slot|.
+  uint32_t dword_count;
+} iree_hal_amdgpu_pm4_ib_builder_t;
+
+// Clears |slot| and initializes |out_builder| for bounded packet appends.
+static inline void iree_hal_amdgpu_pm4_ib_builder_initialize(
+    iree_hal_amdgpu_pm4_ib_slot_t* slot,
+    iree_hal_amdgpu_pm4_ib_builder_t* out_builder) {
+  memset(slot, 0, sizeof(*slot));
+  out_builder->slot = slot;
+  out_builder->dword_count = 0;
+}
+
+// Returns the number of dwords populated by |builder|.
+static inline uint32_t iree_hal_amdgpu_pm4_ib_builder_dword_count(
+    const iree_hal_amdgpu_pm4_ib_builder_t* builder) {
+  return builder->dword_count;
+}
+
+// Returns the remaining dword capacity in |builder|.
+static inline uint32_t iree_hal_amdgpu_pm4_ib_builder_remaining(
+    const iree_hal_amdgpu_pm4_ib_builder_t* builder) {
+  return IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY - builder->dword_count;
+}
+
+// Appends |dword_count| uninitialized dwords and returns their start, or NULL
+// if the requested span does not fit.
+static inline uint32_t* iree_hal_amdgpu_pm4_ib_builder_append_dwords(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, uint32_t dword_count) {
+  if (dword_count > iree_hal_amdgpu_pm4_ib_builder_remaining(builder)) {
+    return NULL;
+  }
+  uint32_t* dwords = &builder->slot->dwords[builder->dword_count];
+  builder->dword_count += dword_count;
+  return dwords;
+}
+
+// Appends one PM4 packet header and reserves |dword_count| packet dwords.
+// Returns the packet start, or NULL if the packet is malformed or does not fit.
+static inline uint32_t* iree_hal_amdgpu_pm4_ib_builder_append_packet(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, uint32_t opcode,
+    uint32_t dword_count) {
+  if (dword_count < 2) return NULL;
+  uint32_t* packet =
+      iree_hal_amdgpu_pm4_ib_builder_append_dwords(builder, dword_count);
+  if (!packet) return NULL;
+  packet[0] = iree_hal_amdgpu_pm4_make_header(opcode, dword_count);
+  return packet;
 }
 
 static inline uint32_t iree_hal_amdgpu_pm4_addr_lo(uintptr_t address) {
