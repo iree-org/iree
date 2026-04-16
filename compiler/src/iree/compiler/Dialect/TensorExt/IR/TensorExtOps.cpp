@@ -50,12 +50,11 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
-      requiredCount += shapedType.getNumDynamicDims();
-    } else if (auto tensorType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                   value.getType())) {
-      requiredCount += tensorType.getNumDynamicDims();
-    }
+    requiredCount +=
+        TypeSwitch<Type, int64_t>(value.getType())
+            .Case<ShapedType, IREE::TensorExt::DispatchTensorType>(
+                [&](auto type) { return type.getNumDynamicDims(); })
+            .Default([&](Type /*type*/) { return 0; });
   }
   if (dynamicDims.size() != requiredCount) {
     return op->emitOpError()
@@ -1001,13 +1000,12 @@ LogicalResult LinearizeRaggedDimsOp::reifyResultShapes(
 }
 
 LogicalResult LinearizeRaggedDimsOp::verify() {
-  ShapedType sourceType = cast<ShapedType>(getSource().getType());
-  ShapedType resultType = cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
 
   // 1. Verify source has ragged tensor encoding.
   auto raggedAttr =
       dyn_cast_if_present<RaggedShapeAttr>(getEncodingOrLayout(sourceType));
-
   if (!raggedAttr) {
     return emitOpError("expected source type to have a ragged tensor encoding");
   }
@@ -1020,12 +1018,11 @@ LogicalResult LinearizeRaggedDimsOp::verify() {
 
   // Get the sparse dimensions from the encoding.
   SmallVector<int64_t> sparseDims = raggedAttr.getSparseDimensions();
-
   if (sparseDims.empty()) {
     return emitOpError("ragged tensor encoding has no sparse dimensions");
   }
 
-  // Verify sparse dimensions are contiguous
+  // Verify sparse dimensions are contiguous.
   for (size_t i = 1; i < sparseDims.size(); ++i) {
     if (sparseDims[i] != sparseDims[i - 1] + 1) {
       return emitOpError("sparse dimensions must be contiguous, but got ")
@@ -1037,7 +1034,7 @@ LogicalResult LinearizeRaggedDimsOp::verify() {
   int64_t resultRank = resultType.getRank();
 
   // 2. Verify result rank: sparse dimensions are linearized into one dimension
-  // Result rank = source rank - number of sparse dimensions + 1
+  // Result rank = source rank - number of sparse dimensions + 1.
   int64_t expectedResultRank = sourceRank - sparseDims.size() + 1;
   if (resultRank != expectedResultRank) {
     return emitOpError("expected result rank to be ")
@@ -1047,11 +1044,11 @@ LogicalResult LinearizeRaggedDimsOp::verify() {
   }
 
   // 3. Build a set of sparse dimensions and a map from non-sparse source
-  // dimensions to result dimensions
+  // dimensions to result dimensions.
   llvm::SmallDenseSet<int64_t> sparseDimSet(sparseDims.begin(),
                                             sparseDims.end());
 
-  // Build mapping: non-sparse source dims -> result dims
+  // Build mapping: non-sparse source dims -> result dims.
   int64_t resultDimIndex = 0;
   for (int64_t sourceDim = 0; sourceDim < sourceRank; ++sourceDim) {
     if (sparseDimSet.contains(sourceDim)) {
@@ -1068,9 +1065,8 @@ LogicalResult LinearizeRaggedDimsOp::verify() {
 
     int64_t sourceSize = sourceType.getDimSize(sourceDim);
     int64_t resultSize = resultType.getDimSize(resultDimIndex);
-    bool sourceDynamic = ShapedType::isDynamic(sourceSize);
-    bool resultDynamic = ShapedType::isDynamic(resultSize);
-    if (!sourceDynamic && !resultDynamic && sourceSize != resultSize) {
+    if (ShapedType::isStatic(sourceSize) && ShapedType::isStatic(resultSize) &&
+        sourceSize != resultSize) {
       return emitOpError("expected source dimension ")
              << sourceDim << " with size " << sourceSize
              << " to be preserved in result dimension " << resultDimIndex
@@ -1081,18 +1077,9 @@ LogicalResult LinearizeRaggedDimsOp::verify() {
   }
 
   // 4. Verify the correct number of dynamic dimensions are provided
-  int64_t numResultDynamicDims = getResultDynamicDims().size();
-  int64_t numExpectedDynamicDims = 0;
-  for (int64_t i = 0; i < resultRank; ++i) {
-    if (resultType.isDynamicDim(i)) {
-      numExpectedDynamicDims++;
-    }
-  }
-
-  if (numResultDynamicDims != numExpectedDynamicDims) {
-    return emitOpError("expected ")
-           << numExpectedDynamicDims << " dynamic dimension values, but got "
-           << numResultDynamicDims;
+  if (failed(verifyOpDynamicDims(getOperation(), getResult(),
+                                 getResultDynamicDims()))) {
+    return failure();
   }
 
   return success();
