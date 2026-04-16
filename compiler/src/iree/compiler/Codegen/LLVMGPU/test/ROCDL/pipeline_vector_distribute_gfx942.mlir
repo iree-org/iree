@@ -1074,3 +1074,54 @@ func.func @matmul_map_store() attributes {hal.executable.target = #executable_ta
 //          CHECK:   %[[FLAT_OUTPUT_BUFFER:.+]] = memref.collapse_shape %[[OUTPUT_BUFFER]]
 //  CHECK-COUNT-4:   vector.scatter %[[FLAT_OUTPUT_BUFFER]]{{.*}} : memref<65536xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32>
 //          CHECK:   iree_codegen.dispatch_config @matmul_map_store workgroup_size = [256, 1, 1] subgroup_size = 64
+
+// -----
+
+#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#config = #iree_gpu.lowering_config<{workgroup = [64, 0, 0, 64], reduction = [0, 0, 16, 0], promote_operands = [0, 1, 2]}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @attention_f32_1x1024x128() attributes {hal.executable.target = #executable_target_rocm, translation_info = #translation} {
+  %cst = arith.constant 1.250000e-01 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x128xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>> -> tensor<1024x128xf32>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>> -> tensor<1024x128xf32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x128xf32>> -> tensor<1024x128xf32>
+  %7 = tensor.empty() : tensor<1024x128xf32>
+  %8 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+               affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+               affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+               affine_map<(d0, d1, d2, d3) -> ()>,
+               affine_map<(d0, d1, d2, d3) -> (d0, d3)>],
+               lowering_config = #config,
+               decomposition_config = {
+                qk_attrs = {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, subgroup_basis = [[4, 1, 1, 1], [0, 1, 2]], promote_operands = [0, 1]}>},
+                pv_attrs = {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, subgroup_basis = [[4, 1, 1, 1], [0, 2, 3]], promote_operands = [1]}>}
+               }}
+               ins(%4, %5, %6, %cst : tensor<1024x128xf32>, tensor<1024x128xf32>, tensor<1024x128xf32>, f32) outs(%7 : tensor<1024x128xf32>) {
+                ^bb0(%score: f32):
+                  iree_linalg_ext.yield %score : f32
+               } -> tensor<1024x128xf32>
+  iree_tensor_ext.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [1024, 128], strides = [1, 1] : tensor<1024x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x128xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @attention_f32_1x1024x128()
+
+// CHECK: scf.for %{{.*}} = %c0 to %c1024 step %c16
+// CHECK-SAME: -> (vector<{{.*}}xf32>, vector<{{.*}}xf32>, vector<{{.*}}xf32>)
+// Per subgroup per K2 iteration:
+// QK: 128/4 = 32 MFMAs, PV: (64/16)*(16/4) = 4*4 = 16 MFMAs = 48 total
+// CHECK-COUNT-48: amdgpu.mfma 16x16x4 {{.*}} blgp =  none : f32, f32, vector<4xf32>
+// CHECK: scf.yield
+// CHECK: iree_codegen.dispatch_config @attention_f32_1x1024x128 workgroup_size = [256, 1, 1] subgroup_size = 64
