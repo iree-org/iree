@@ -11,6 +11,13 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
+#layout_4 = #hal.pipeline.layout<constants = 0, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
 #layout_8 = #hal.pipeline.layout<constants = 0, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -396,31 +403,35 @@ hal.executable.source public @queue_benchmark {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_8 ordinal(2) layout(#layout_8) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_4 ordinal(2) layout(#layout_4) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_9 ordinal(3) layout(#layout_9) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_8 ordinal(3) layout(#layout_8) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_16 ordinal(4) layout(#layout_16) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_9 ordinal(4) layout(#layout_9) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_17 ordinal(5) layout(#layout_17) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_16 ordinal(5) layout(#layout_16) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_24 ordinal(6) layout(#layout_24) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_17 ordinal(6) layout(#layout_17) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_25 ordinal(7) layout(#layout_25) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_24 ordinal(7) layout(#layout_24) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-  hal.executable.export public @binding_count_256 ordinal(8) layout(#layout_256) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @binding_count_25 ordinal(8) layout(#layout_25) count(%arg0: !hal.device) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    hal.return %c1, %c1, %c1 : index, index, index
+  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  hal.executable.export public @binding_count_256 ordinal(9) layout(#layout_256) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
   } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
@@ -429,6 +440,9 @@ hal.executable.source public @queue_benchmark {
       return
     }
     func.func @binding_count_1() {
+      return
+    }
+    func.func @binding_count_4() {
       return
     }
     func.func @binding_count_8() {

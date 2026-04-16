@@ -342,6 +342,7 @@ iree_cc_binary_benchmark(
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::headers
     iree::hal::drivers::amdgpu::registration
+    iree::io::file_handle
   TESTONLY
   LABELS
     "benchmark"

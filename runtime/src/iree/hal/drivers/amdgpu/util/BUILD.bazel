@@ -350,6 +350,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/hal/drivers/amdgpu/device:dispatch",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/registration",
+        "//runtime/src/iree/io:file_handle",
         "@com_google_benchmark//:benchmark",
     ],
 )
