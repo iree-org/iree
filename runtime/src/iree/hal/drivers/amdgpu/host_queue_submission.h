@@ -94,8 +94,15 @@ typedef struct iree_hal_amdgpu_host_queue_barrier_submission_t {
 typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   // Generic kernel-shaped submission state.
   iree_hal_amdgpu_host_queue_kernel_submission_t kernel;
-  // Final uncommitted dispatch AQL slot.
+  // Packet id of |dispatch_slot|.
+  uint64_t dispatch_packet_id;
+  // Uncommitted dispatch payload AQL slot.
   iree_hal_amdgpu_aql_packet_t* dispatch_slot;
+  // Optional trailing queue-completion slot used when |dispatch_slot| completes
+  // with a profiling-owned signal instead of the queue epoch signal.
+  iree_hal_amdgpu_aql_packet_t* trailing_completion_slot;
+  // Completion signal to write into |dispatch_slot|.
+  iree_hsa_signal_t dispatch_completion_signal;
   // Setup bits published with |dispatch_slot|'s final header.
   uint16_t dispatch_setup;
   // Minimum acquire fence scope required by operation-local data visibility.

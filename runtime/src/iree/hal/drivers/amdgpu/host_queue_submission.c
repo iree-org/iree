@@ -189,6 +189,23 @@ iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
           minimum_release_scope));
 }
 
+// Returns the packet control for a dispatch packet followed by a trailing
+// queue-completion packet. The dispatch no longer signals the queue/user epoch,
+// so it keeps only operation-local visibility requirements; the trailing packet
+// owns signal-list release visibility.
+static iree_hal_amdgpu_aql_packet_control_t
+iree_hal_amdgpu_host_queue_payload_dispatch_packet_control(
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    iree_hsa_fence_scope_t minimum_acquire_scope,
+    iree_hsa_fence_scope_t minimum_release_scope) {
+  return iree_hal_amdgpu_aql_packet_control_barrier(
+      iree_hal_amdgpu_host_queue_max_fence_scope(
+          iree_hal_amdgpu_host_queue_max_fence_scope(
+              IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+          minimum_acquire_scope),
+      minimum_release_scope);
+}
+
 // Returns the packet control for a final no-op/barrier completion packet.
 static iree_hal_amdgpu_aql_packet_control_t
 iree_hal_amdgpu_host_queue_final_barrier_packet_control(
@@ -324,6 +341,13 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
   if (iree_status_is_ok(status)) {
     out_submission->packet_count = (uint32_t)packet_count;
     out_submission->first_packet_id = first_packet_id;
+    if (queue->profiling.hsa_queue_timestamps_enabled) {
+      out_submission->reclaim_entry->profile_packet_first_id = first_packet_id;
+      out_submission->reclaim_entry->profile_packet_count =
+          (uint32_t)packet_count;
+      iree_hal_amdgpu_host_queue_clear_profile_packet_events(
+          queue, first_packet_id, (uint32_t)packet_count);
+    }
     if (kernarg_block_count > 0) {
       out_submission->kernarg_blocks = iree_hal_amdgpu_kernarg_ring_allocate(
           &queue->kernarg_ring, kernarg_block_count,
@@ -461,16 +485,36 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission) {
   IREE_ASSERT_ARGUMENT(out_ready);
   IREE_ASSERT_ARGUMENT(out_submission);
+  *out_ready = false;
   memset(out_submission, 0, sizeof(*out_submission));
 
+  const bool use_profiling_completion_signal =
+      queue->profiling.hsa_queue_timestamps_enabled;
+  const uint32_t payload_packet_count =
+      use_profiling_completion_signal ? 2u : 1u;
   iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
-      /*payload_packet_count=*/1, kernarg_block_count, out_ready,
+      payload_packet_count, kernarg_block_count, out_ready,
       &out_submission->kernel);
   if (iree_status_is_ok(status) && *out_ready) {
-    out_submission->dispatch_slot = iree_hal_amdgpu_aql_ring_packet(
-        &queue->aql_ring, out_submission->kernel.first_packet_id +
-                              out_submission->kernel.packet_count - 1);
+    const uint64_t dispatch_packet_id = out_submission->kernel.first_packet_id +
+                                        out_submission->kernel.packet_count -
+                                        payload_packet_count;
+    out_submission->dispatch_packet_id = dispatch_packet_id;
+    out_submission->dispatch_slot =
+        iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, dispatch_packet_id);
+    out_submission->dispatch_completion_signal =
+        iree_hal_amdgpu_notification_ring_epoch_signal(
+            &queue->notification_ring);
+    if (use_profiling_completion_signal) {
+      out_submission->dispatch_completion_signal =
+          iree_hal_amdgpu_host_queue_profiling_completion_signal(
+              queue, dispatch_packet_id);
+      out_submission->trailing_completion_slot =
+          iree_hal_amdgpu_aql_ring_packet(
+              &queue->aql_ring, out_submission->kernel.first_packet_id +
+                                    out_submission->kernel.packet_count - 1);
+    }
   }
   return status;
 }
@@ -643,7 +687,6 @@ void iree_hal_amdgpu_host_queue_finish_kernel_submission(
       submission->kernarg_write_position;
   submission->reclaim_entry->count = submission->reclaim_resource_count;
   submission->reclaim_entry->pre_signal_action = submission->pre_signal_action;
-
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
   iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
 }
@@ -663,14 +706,31 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
       operation_resource_count, /*inout_resource_set=*/NULL, submission_flags,
       &submission->kernel);
 
-  uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
-      IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+  uint16_t queue_completion_header = 0;
+  iree_hal_amdgpu_aql_packet_control_t dispatch_packet_control =
       iree_hal_amdgpu_host_queue_final_dispatch_packet_control(
           queue, resolution, signal_semaphore_list,
-          submission->minimum_acquire_scope,
-          submission->minimum_release_scope));
+          submission->minimum_acquire_scope, submission->minimum_release_scope);
+  if (submission->trailing_completion_slot) {
+    dispatch_packet_control =
+        iree_hal_amdgpu_host_queue_payload_dispatch_packet_control(
+            resolution, submission->minimum_acquire_scope,
+            submission->minimum_release_scope);
+    queue_completion_header = iree_hal_amdgpu_aql_emit_nop(
+        &submission->trailing_completion_slot->barrier_and,
+        iree_hal_amdgpu_host_queue_final_barrier_packet_control(
+            queue, resolution, signal_semaphore_list),
+        iree_hal_amdgpu_notification_ring_epoch_signal(
+            &queue->notification_ring));
+  }
+  const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
+      IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH, dispatch_packet_control);
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
+  if (submission->trailing_completion_slot) {
+    iree_hal_amdgpu_aql_ring_commit(submission->trailing_completion_slot,
+                                    queue_completion_header, /*setup=*/0);
+  }
   iree_hal_amdgpu_aql_ring_doorbell(
       &queue->aql_ring,
       submission->kernel.first_packet_id + submission->kernel.packet_count - 1);
@@ -737,8 +797,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
       iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
           &submission.dispatch_slot->dispatch, dispatch_packet_template,
           submission.kernel.kernarg_blocks->data,
-          iree_hal_amdgpu_notification_ring_epoch_signal(
-              &queue->notification_ring));
+          submission.dispatch_completion_signal);
   iree_hal_amdgpu_host_queue_finish_dispatch_submission(
       queue, resolution, signal_semaphore_list, operation_resources,
       operation_resource_count, submission_flags, &submission);

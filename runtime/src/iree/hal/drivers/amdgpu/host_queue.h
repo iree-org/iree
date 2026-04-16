@@ -14,14 +14,17 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/device/blit.h"
 #include "iree/hal/drivers/amdgpu/util/aql_ring.h"
+#include "iree/hal/drivers/amdgpu/util/block_pool.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
 #include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/notification_ring.h"
 #include "iree/hal/drivers/amdgpu/virtual_queue.h"
 #include "iree/hal/pool.h"
+#include "iree/hal/profile_sink.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -287,6 +290,32 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   struct {
     // True when ROCR should populate dispatch completion signal timestamps.
     uint32_t hsa_queue_timestamps_enabled : 1;
+    // Serializes dispatch event batch mutation and flush.
+    iree_slim_mutex_t event_mutex;
+    // Borrowed fine-grained GPU-agent block pool backing raw signal storage.
+    iree_hal_amdgpu_block_pool_t* signal_block_pool;
+    // Host-side table of queue-owned GPU-agent raw signal blocks.
+    iree_hal_amdgpu_block_t** signal_blocks;
+    // Number of entries in |signal_blocks|.
+    uint32_t signal_block_count;
+    // Number of iree_amd_signal_t records in each signal block.
+    uint32_t signals_per_block;
+    // Allocation backing dispatch event batches and AQL-slot templates.
+    void* event_storage;
+    // Buffered dispatch event records waiting for a sink flush.
+    iree_hal_profile_dispatch_event_t* dispatch_events;
+    // Number of valid records in |dispatch_events|.
+    iree_host_size_t dispatch_event_count;
+    // Capacity of |dispatch_events| in records.
+    iree_host_size_t dispatch_event_capacity;
+    // Number of events dropped because |dispatch_events| was full.
+    uint64_t dropped_dispatch_event_count;
+    // Next queue-local dispatch event id assigned on completion drain.
+    uint64_t next_dispatch_event_id;
+    // AQL-slot-indexed dispatch event templates for in-flight profiled packets.
+    iree_hal_profile_dispatch_event_t* dispatch_event_templates;
+    // Number of entries in |dispatch_event_templates|.
+    uint32_t dispatch_event_template_capacity;
   } profiling;
 
   // False once this queue's accumulated frontier overflows while merging waited
@@ -431,6 +460,38 @@ iree_hal_amdgpu_host_queue_const_frontier(
   return (const iree_async_frontier_t*)&queue->frontier;
 }
 
+// Returns the raw profiling completion signal paired with |packet_id|'s AQL
+// slot. The returned pointer references queue-owned iree_amd_signal_t storage,
+// not a ROCR-created HSA signal, and must never be passed to host signal APIs
+// except as an AQL packet completion_signal handle. Valid only while HSA queue
+// timestamp profiling is enabled.
+static inline iree_amd_signal_t*
+iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id) {
+  const uint32_t signal_index = (uint32_t)(packet_id & queue->aql_ring.mask);
+  const uint32_t block_index =
+      signal_index / queue->profiling.signals_per_block;
+  const uint32_t block_signal_index =
+      signal_index - block_index * queue->profiling.signals_per_block;
+  uint8_t* block_ptr =
+      (uint8_t*)queue->profiling.signal_blocks[block_index]->ptr;
+  iree_amd_signal_t* signal =
+      (iree_amd_signal_t*)(block_ptr +
+                           block_signal_index * sizeof(iree_amd_signal_t));
+  return signal;
+}
+
+// Returns the raw profiling completion signal handle paired with |packet_id|'s
+// AQL slot.
+static inline iree_hsa_signal_t
+iree_hal_amdgpu_host_queue_profiling_completion_signal(
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id) {
+  iree_amd_signal_t* signal =
+      iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(queue,
+                                                                 packet_id);
+  return (iree_hsa_signal_t){.handle = (uint64_t)(uintptr_t)signal};
+}
+
 // Enqueues a driver-owned host action ordered after |wait_semaphore_list|.
 // |action| uses the reclaim-action status ownership contract: OK means the
 // ordering barrier completed, while non-OK is a borrowed queue/device failure
@@ -483,6 +544,11 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 // selected from the physical device ISA. Queues allocate dynamic PM4 IB slots
 // when AQL_PM4_IB is available so BARRIER_VALUE-based CDNA queues can still use
 // PM4 snippets for profiling or tiny operations.
+//
+// |profiling_signal_block_pool| provides fine-grained GPU-agent memory used for
+// raw iree_amd_signal_t records. The host initializes these records once during
+// queue creation; packets only use them for CP-written profiling timestamps and
+// never for host HSA waits or interrupts.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
@@ -494,6 +560,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
+    iree_hal_amdgpu_block_pool_t* profiling_signal_block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
     iree_hal_pool_t* default_pool,
     iree_hal_amdgpu_transient_buffer_pool_t* transient_buffer_pool,
@@ -517,6 +584,30 @@ void iree_hal_amdgpu_host_queue_deinitialize(
 // profiling API contract.
 iree_status_t iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
     iree_hal_amdgpu_host_queue_t* queue, bool enabled);
+
+// Clears queue-local profiling metadata for an AQL packet range.
+//
+// Caller must hold submission_mutex. Only used when HSA timestamp profiling is
+// enabled.
+void iree_hal_amdgpu_host_queue_clear_profile_packet_events(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t first_packet_id,
+    uint32_t packet_count);
+
+// Records a dispatch event template for |packet_id|'s AQL slot.
+//
+// Caller must hold submission_mutex. The matching raw completion signal must
+// be the packet's completion signal.
+void iree_hal_amdgpu_host_queue_record_profile_dispatch_packet(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id,
+    const iree_hal_profile_dispatch_event_t* event);
+
+// Writes and clears any buffered dispatch profile events for this queue.
+//
+// Sink writes are cold profiling API operations and may block. The submission
+// and completion paths only append to the queue-local batch.
+iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
+    iree_hal_amdgpu_host_queue_t* queue, iree_hal_profile_sink_t* sink,
+    uint64_t session_id);
 
 #ifdef __cplusplus
 }  // extern "C"

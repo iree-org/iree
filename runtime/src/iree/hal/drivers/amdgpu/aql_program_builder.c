@@ -321,13 +321,11 @@ static iree_status_t iree_hal_amdgpu_aql_program_builder_validate_command(
   }
 
   iree_host_size_t binding_source_length = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-          binding_source_count,
-          sizeof(iree_hal_amdgpu_command_buffer_binding_source_t),
-          &binding_source_length))) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "command binding source table size overflow");
-  }
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      0, &binding_source_length,
+      IREE_STRUCT_FIELD(binding_source_count,
+                        iree_hal_amdgpu_command_buffer_binding_source_t,
+                        NULL)));
 
   iree_host_size_t required_length = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_add(

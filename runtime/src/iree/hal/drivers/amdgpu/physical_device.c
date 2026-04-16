@@ -155,6 +155,57 @@ static iree_status_t iree_hal_amdgpu_query_agent_gfxip_version(
       out_version);
 }
 
+static iree_status_t iree_hal_amdgpu_query_agent_uuid(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    uint8_t out_uuid[16], bool* out_has_uuid) {
+  IREE_ASSERT_ARGUMENT(libhsa);
+  IREE_ASSERT_ARGUMENT(out_uuid);
+  IREE_ASSERT_ARGUMENT(out_has_uuid);
+
+  memset(out_uuid, 0, 16);
+  *out_has_uuid = false;
+
+  // HSA returns a prefixed ASCII string such as "GPU-4939e1d93d24ff77".
+  // Unsupported devices may return fallback strings such as "GPU-XX"; those
+  // are valid HSA responses but not stable identifiers for profile records.
+  char uuid_string[64] = {0};
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_UUID,
+      uuid_string));
+
+  iree_string_view_t uuid_hex = iree_make_cstring_view(uuid_string);
+  if (!iree_string_view_consume_prefix(&uuid_hex, IREE_SV("GPU-")) &&
+      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("CPU-")) &&
+      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("DSP-")) &&
+      !iree_string_view_consume_prefix(&uuid_hex, IREE_SV("AIE-"))) {
+    return iree_ok_status();
+  }
+
+  iree_host_size_t parsed_length = 0;
+  if (uuid_hex.size == 16) {
+    parsed_length = 8;
+  } else if (uuid_hex.size == 32) {
+    parsed_length = 16;
+  } else {
+    return iree_ok_status();
+  }
+  for (iree_host_size_t i = 0; i < uuid_hex.size; ++i) {
+    uint32_t value = 0;
+    if (!iree_hal_amdgpu_parse_hex_digit(uuid_hex.data[i], &value)) {
+      return iree_ok_status();
+    }
+  }
+
+  if (!iree_string_view_parse_hex_bytes(uuid_hex, parsed_length, out_uuid)) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "HSA device UUID was prevalidated but failed to parse: %.*s",
+        (int)uuid_hex.size, uuid_hex.data);
+  }
+  *out_has_uuid = true;
+  return iree_ok_status();
+}
+
 static iree_hal_amdgpu_vendor_packet_capability_flags_t
 iree_hal_amdgpu_select_vendor_packet_capabilities(
     iree_hal_amdgpu_gfxip_version_t version) {
@@ -396,6 +447,13 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
 
   out_physical_device->device_agent = device_agent;
   out_physical_device->device_ordinal = device_ordinal;
+  bool has_physical_device_uuid = false;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_query_agent_uuid(
+              libhsa, device_agent, out_physical_device->physical_device_uuid,
+              &has_physical_device_uuid));
+  out_physical_device->has_physical_device_uuid =
+      has_physical_device_uuid ? 1u : 0u;
   uint32_t host_numa_node = UINT32_MAX;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), host_agent,
@@ -704,6 +762,7 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
         completion_thread_affinity, physical_device->wait_barrier_strategy,
         physical_device->vendor_packet_capabilities, epoch_signal_table,
         &physical_device->fine_host_block_pool,
+        &physical_device->fine_block_pools.small,
         &physical_device->buffer_transfer_context,
         physical_device->default_pool, &physical_device->transient_buffer_pool,
         &physical_device->file_staging_pool, physical_device->device_ordinal,
