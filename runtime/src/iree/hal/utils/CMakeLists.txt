@@ -242,6 +242,35 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_file
+  HDRS
+    "profile_file.h"
+  SRCS
+    "profile_file.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::io::file_handle
+    iree::io::stream
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    profile_file_test
+  SRCS
+    "profile_file_test.cc"
+  DEPS
+    ::profile_file
+    iree::base
+    iree::hal
+    iree::io::file_handle
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     queue_emulation
   HDRS
     "queue_emulation.h"

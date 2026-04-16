@@ -1,0 +1,114 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#ifndef IREE_HAL_UTILS_PROFILE_FILE_H_
+#define IREE_HAL_UTILS_PROFILE_FILE_H_
+
+#include "iree/base/api.h"
+#include "iree/hal/profile_sink.h"
+#include "iree/io/file_handle.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+// Magic header bytes for IREE HAL profile bundle files: "IRPF".
+#define IREE_HAL_PROFILE_FILE_MAGIC 0x46505249u
+
+// Major version of the IREE HAL profile bundle file format.
+#define IREE_HAL_PROFILE_FILE_VERSION_MAJOR 1u
+
+// Minor version of the IREE HAL profile bundle file format.
+#define IREE_HAL_PROFILE_FILE_VERSION_MINOR 0u
+
+// File header stored at byte 0 of every IREE HAL profile bundle.
+typedef struct iree_hal_profile_file_header_t {
+  // Magic bytes equal to IREE_HAL_PROFILE_FILE_MAGIC.
+  uint32_t magic;
+  // Major version of the file format.
+  uint16_t version_major;
+  // Minor version of the file format.
+  uint16_t version_minor;
+  // Size of this header in bytes.
+  uint32_t header_length;
+  // Reserved for future file-level flags; must be zero.
+  uint32_t flags;
+} iree_hal_profile_file_header_t;
+
+// Type of one record in an IREE HAL profile bundle file.
+typedef uint16_t iree_hal_profile_file_record_type_t;
+enum iree_hal_profile_file_record_type_e {
+  IREE_HAL_PROFILE_FILE_RECORD_TYPE_NONE = 0u,
+  // Profiling session begin marker with session metadata.
+  IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_BEGIN = 1u,
+  // Profiling chunk emitted by iree_hal_profile_sink_write.
+  IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK = 2u,
+  // Profiling session end marker with terminal status code.
+  IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END = 3u,
+};
+
+// Record header followed by content type bytes, name bytes, and payload bytes.
+//
+// All multi-byte fields are serialized in little-endian order. The current
+// writer only supports little-endian hosts; a future big-endian implementation
+// must byte-swap instead of changing the file format.
+typedef struct iree_hal_profile_file_record_header_t {
+  // Total byte length of this record including header, strings, and payload.
+  uint64_t record_length;
+  // Total payload byte length after content type and name strings.
+  uint64_t payload_length;
+  // Profiling session identifier from iree_hal_profile_chunk_metadata_t.
+  uint64_t session_id;
+  // Stream identifier from iree_hal_profile_chunk_metadata_t.
+  uint64_t stream_id;
+  // Event identifier from iree_hal_profile_chunk_metadata_t.
+  uint64_t event_id;
+  // Executable identifier from iree_hal_profile_chunk_metadata_t.
+  uint64_t executable_id;
+  // Command-buffer identifier from iree_hal_profile_chunk_metadata_t.
+  uint64_t command_buffer_id;
+  // Size of this record header in bytes.
+  uint32_t header_length;
+  // Byte length of the content type string following this header.
+  uint32_t content_type_length;
+  // Byte length of the name string following the content type string.
+  uint32_t name_length;
+  // Physical device ordinal from iree_hal_profile_chunk_metadata_t.
+  uint32_t physical_device_ordinal;
+  // Queue ordinal from iree_hal_profile_chunk_metadata_t.
+  uint32_t queue_ordinal;
+  // Chunk flags from iree_hal_profile_chunk_metadata_t.
+  iree_hal_profile_chunk_flags_t chunk_flags;
+  // Session end status code for SESSION_END records, otherwise zero.
+  uint32_t session_status_code;
+  // Type of this file record.
+  iree_hal_profile_file_record_type_t record_type;
+  // Reserved for future record-level flags; must be zero.
+  uint16_t flags;
+  // Reserved for future record fields; must be zero.
+  uint32_t reserved0;
+  // Reserved for future record fields; must be zero.
+  uint32_t reserved1;
+} iree_hal_profile_file_record_header_t;
+
+// Creates a sink that writes raw HAL profile chunks to |file_handle|.
+//
+// The caller supplies the target file handle so embedders can choose normal
+// files, host allocations, temporary files, or platform-specific handles. The
+// sink opens a writable stream at offset zero, writes a file header during
+// creation, then appends session begin/chunk/end records as callbacks arrive.
+//
+// The returned sink is not internally synchronized. Callers must serialize
+// callbacks for a single sink instance, which matches the HAL profiling API.
+IREE_API_EXPORT iree_status_t iree_hal_profile_file_sink_create(
+    iree_io_file_handle_t* file_handle, iree_allocator_t host_allocator,
+    iree_hal_profile_sink_t** out_sink);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
+
+#endif  // IREE_HAL_UTILS_PROFILE_FILE_H_
