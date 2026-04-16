@@ -245,24 +245,25 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
                             "kernel submission requires at least one payload "
                             "packet and one kernarg block");
   }
-  if (IREE_UNLIKELY(kernarg_block_count < payload_packet_count)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "kernel submission requires at least as many "
-                            "kernarg blocks as payload packets");
-  }
 
   const uint64_t packet_count =
-      (uint64_t)resolution->barrier_count + kernarg_block_count;
+      (uint64_t)resolution->barrier_count + payload_packet_count;
   const uint64_t aql_queue_capacity = (uint64_t)queue->aql_ring.mask + 1;
   if (IREE_UNLIKELY(packet_count > aql_queue_capacity ||
                     packet_count > UINT32_MAX)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "kernel submission requires %" PRIu64
-        " AQL packets (%u barriers + %u kernarg blocks) but queue capacity is "
+        " AQL packets (%u barriers + %u payload packets) but queue capacity is "
         "%" PRIu64,
-        packet_count, resolution->barrier_count, kernarg_block_count,
+        packet_count, resolution->barrier_count, payload_packet_count,
         aql_queue_capacity);
+  }
+  if (IREE_UNLIKELY(kernarg_block_count > queue->kernarg_ring.capacity)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "kernel submission requires %u kernarg blocks but ring capacity is %u",
+        kernarg_block_count, queue->kernarg_ring.capacity);
   }
   if (IREE_UNLIKELY(signal_semaphore_list.count >
                     queue->notification_ring.capacity)) {
@@ -285,6 +286,10 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
           frontier_snapshot_count)) {
     return iree_ok_status();
   }
+  if (!iree_hal_amdgpu_kernarg_ring_can_allocate(&queue->kernarg_ring,
+                                                 kernarg_block_count)) {
+    return iree_ok_status();
+  }
 
   uint64_t first_packet_id = 0;
   if (!iree_hal_amdgpu_aql_ring_try_reserve(
@@ -301,7 +306,6 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       &out_submission->reclaim_resources);
   if (iree_status_is_ok(status)) {
     out_submission->packet_count = (uint32_t)packet_count;
-    out_submission->payload_packet_count = payload_packet_count;
     out_submission->first_packet_id = first_packet_id;
     out_submission->kernarg_blocks = iree_hal_amdgpu_kernarg_ring_allocate(
         &queue->kernarg_ring, kernarg_block_count,
@@ -423,15 +427,6 @@ void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
     const iree_hal_amdgpu_host_queue_kernel_submission_t* submission) {
   iree_hal_amdgpu_host_queue_emit_barriers(queue, resolution,
                                            submission->first_packet_id);
-  const uint32_t kernarg_packet_count =
-      submission->packet_count - resolution->barrier_count;
-  const uint32_t noop_packet_count =
-      kernarg_packet_count - submission->payload_packet_count;
-  if (noop_packet_count > 0) {
-    iree_hal_amdgpu_host_queue_fill_noop_packets(
-        queue, submission->first_packet_id + resolution->barrier_count,
-        noop_packet_count);
-  }
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(

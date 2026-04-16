@@ -1042,8 +1042,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_amdgpu_command_buffer_block_header_t* block,
     const uint64_t* binding_ptrs, uint64_t first_packet_id,
-    iree_hal_amdgpu_kernarg_block_t* kernarg_blocks,
-    uint32_t extra_noop_packet_count, uint16_t* packet_headers,
+    iree_hal_amdgpu_kernarg_block_t* kernarg_blocks, uint16_t* packet_headers,
     uint16_t* packet_setups) {
   const iree_hal_amdgpu_command_buffer_command_header_t* command =
       iree_hal_amdgpu_command_buffer_block_commands_const(block);
@@ -1068,14 +1067,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
               packet_index + 2 == block->aql_packet_count;
           iree_hal_amdgpu_aql_packet_t* patch_packet =
               iree_hal_amdgpu_aql_ring_packet(
-                  &queue->aql_ring, first_packet_id +
-                                        resolution->barrier_count +
-                                        extra_noop_packet_count + packet_index);
-          iree_hal_amdgpu_aql_packet_t* dispatch_packet =
-              iree_hal_amdgpu_aql_ring_packet(
                   &queue->aql_ring,
-                  first_packet_id + resolution->barrier_count +
-                      extra_noop_packet_count + packet_index + 1);
+                  first_packet_id + resolution->barrier_count + packet_index);
+          iree_hal_amdgpu_aql_packet_t* dispatch_packet =
+              iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring,
+                                              first_packet_id +
+                                                  resolution->barrier_count +
+                                                  packet_index + 1);
           const iree_hsa_signal_t completion_signal =
               is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                     &queue->notification_ring)
@@ -1109,9 +1107,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
               packet_index + 1 == block->aql_packet_count;
           iree_hal_amdgpu_aql_packet_t* packet =
               iree_hal_amdgpu_aql_ring_packet(
-                  &queue->aql_ring, first_packet_id +
-                                        resolution->barrier_count +
-                                        extra_noop_packet_count + packet_index);
+                  &queue->aql_ring,
+                  first_packet_id + resolution->barrier_count + packet_index);
           const iree_hsa_signal_t completion_signal =
               is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                     &queue->notification_ring)
@@ -1139,8 +1136,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
         const bool is_final_packet =
             packet_index + 1 == block->aql_packet_count;
         iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
-            &queue->aql_ring, first_packet_id + resolution->barrier_count +
-                                  extra_noop_packet_count + packet_index);
+            &queue->aql_ring,
+            first_packet_id + resolution->barrier_count + packet_index);
         const iree_hsa_signal_t completion_signal =
             is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                   &queue->notification_ring)
@@ -1175,8 +1172,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
         const bool is_final_packet =
             packet_index + 1 == block->aql_packet_count;
         iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
-            &queue->aql_ring, first_packet_id + resolution->barrier_count +
-                                  extra_noop_packet_count + packet_index);
+            &queue->aql_ring,
+            first_packet_id + resolution->barrier_count + packet_index);
         const iree_hsa_signal_t completion_signal =
             is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
                                   &queue->notification_ring)
@@ -1262,8 +1259,7 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_kernel_submission_t* submission,
-    const uint16_t* packet_headers, const uint16_t* packet_setups,
-    uint32_t extra_noop_packet_count) {
+    const uint16_t* packet_headers, const uint16_t* packet_setups) {
   submission->pre_signal_action = pre_signal_action;
   iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
                                                            submission);
@@ -1274,9 +1270,8 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
 
   for (uint32_t i = 0; i < block->aql_packet_count; ++i) {
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
-        &queue->aql_ring, submission->first_packet_id +
-                              resolution->barrier_count +
-                              extra_noop_packet_count + i);
+        &queue->aql_ring,
+        submission->first_packet_id + resolution->barrier_count + i);
     if (iree_hal_amdgpu_host_queue_aql_packet_header_type(packet_headers[i]) ==
         IREE_HSA_PACKET_TYPE_INVALID) {
       iree_hal_amdgpu_aql_ring_commit(packet, packet_headers[i],
@@ -1285,9 +1280,8 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
   }
   for (uint32_t i = 0; i < block->aql_packet_count; ++i) {
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
-        &queue->aql_ring, submission->first_packet_id +
-                              resolution->barrier_count +
-                              extra_noop_packet_count + i);
+        &queue->aql_ring,
+        submission->first_packet_id + resolution->barrier_count + i);
     if (iree_hal_amdgpu_host_queue_aql_packet_header_type(packet_headers[i]) !=
         IREE_HSA_PACKET_TYPE_INVALID) {
       iree_hal_amdgpu_aql_ring_commit(packet, packet_headers[i],
@@ -1316,14 +1310,6 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
   *out_ready = false;
   const uint32_t kernarg_block_count = (uint32_t)iree_host_size_ceil_div(
       block->kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
-  if (IREE_UNLIKELY(kernarg_block_count < block->aql_packet_count)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command-buffer block declares %" PRIu32
-                            " AQL packets but only %" PRIu32 " kernarg blocks",
-                            block->aql_packet_count, kernarg_block_count);
-  }
-  const uint32_t extra_noop_packet_count =
-      kernarg_block_count - block->aql_packet_count;
 
   iree_arena_allocator_t scratch_arena;
   iree_arena_initialize(queue->block_pool, &scratch_arena);
@@ -1358,15 +1344,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
       status = iree_hal_amdgpu_host_queue_write_command_buffer_block(
           queue, resolution, signal_semaphore_list, command_buffer,
           binding_table, block, binding_ptrs, submission.first_packet_id,
-          submission.kernarg_blocks, extra_noop_packet_count, packet_headers,
-          packet_setups);
+          submission.kernarg_blocks, packet_headers, packet_setups);
     }
     if (iree_status_is_ok(status)) {
       iree_hal_amdgpu_host_queue_finish_command_buffer_block(
           queue, resolution, signal_semaphore_list, block,
           inout_binding_resource_set, pre_signal_action, operation_resources,
           operation_resource_count, submission_flags, &submission,
-          packet_headers, packet_setups, extra_noop_packet_count);
+          packet_headers, packet_setups);
     } else {
       iree_hal_amdgpu_host_queue_fail_kernel_submission(queue, &submission);
     }

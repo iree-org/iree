@@ -477,15 +477,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
       &submission));
   if (!*out_ready) return iree_ok_status();
 
-  const uint32_t extra_noop_packet_count = target_kernarg_block_count - 1;
   iree_hal_amdgpu_aql_packet_t* patch_packet = iree_hal_amdgpu_aql_ring_packet(
-      &queue->aql_ring, submission.first_packet_id + resolution->barrier_count +
-                            extra_noop_packet_count);
+      &queue->aql_ring, submission.first_packet_id + resolution->barrier_count);
   iree_hal_amdgpu_aql_packet_t* dispatch_packet =
-      iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring,
-                                      submission.first_packet_id +
-                                          resolution->barrier_count +
-                                          extra_noop_packet_count + 1);
+      iree_hal_amdgpu_aql_ring_packet(
+          &queue->aql_ring,
+          submission.first_packet_id + resolution->barrier_count + 1);
   uint8_t* patch_kernarg_data = submission.kernarg_blocks[0].data;
   uint8_t* dispatch_kernarg_data = submission.kernarg_blocks[1].data;
   const uint32_t placeholder_workgroup_count[3] = {0, 0, 0};

@@ -49,20 +49,18 @@ static_assert(sizeof(iree_hal_amdgpu_kernarg_block_t) == 64,
 //   Multiple threads may call allocate() concurrently.
 //
 // Backpressure contract:
-//   The caller MUST reserve AQL ring slots BEFORE allocating kernarg blocks.
-//   The AQL ring spin-wait is the sole backpressure gate. The kernarg ring is
-//   sized so that:
+//   The caller must prove capacity for both the AQL ring and kernarg ring
+//   before publishing work. These resources are intentionally independent:
+//   crossing a 64-byte kernarg block boundary must not require extra AQL
+//   packets. Callers use can_allocate() as a non-mutating admission check
+//   before reserving AQL packets, then allocate() the same block count before
+//   committing packet headers.
 //
-//     kernarg_capacity >= 2 * aql_ring_capacity
-//
-//   and variable-size dispatches reserve one extra AQL slot for each extra
-//   staged kernarg block. A non-VMEM ring may need to skip one tail fragment at
-//   wrap to preserve contiguous multi-block allocations; that fragment is
-//   always smaller than the wrapped allocation and therefore smaller than
-//   aql_ring_capacity. The 2x sizing invariant covers at most one such gap plus
-//   all in-flight kernarg blocks accounted for by AQL reservations. Violating
-//   the AQL-first ordering breaks this invariant: N threads could allocate
-//   kernarg without AQL slots, and N is unbounded.
+//   A non-VMEM ring may need to skip one tail fragment at wrap to preserve
+//   contiguous multi-block allocations. The skipped fragment is counted as
+//   in-flight space until the allocation that caused the wrap retires. Both
+//   can_allocate() and allocate() model that skip identically so admission
+//   cannot succeed and then fail in normal execution.
 //
 // Memory ordering:
 //   write_position uses relaxed CAS. It only claims space; the actual
@@ -128,6 +126,31 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     iree_hal_amdgpu_kernarg_ring_t* ring);
 
+// Returns true if |block_count| contiguous blocks can currently be allocated
+// without exceeding the ring capacity. The check accounts for the same
+// tail-fragment skip used by allocate() and does not mutate the ring.
+//
+// This is a snapshot. It is a reservation proof only when the caller serializes
+// this check with a following allocate() call, such as under the host queue
+// submission mutex.
+static inline bool iree_hal_amdgpu_kernarg_ring_can_allocate(
+    iree_hal_amdgpu_kernarg_ring_t* ring, uint32_t block_count) {
+  if (IREE_UNLIKELY(block_count == 0 || block_count > ring->capacity)) {
+    return false;
+  }
+  uint64_t first_block = (uint64_t)iree_atomic_load(&ring->write_position,
+                                                    iree_memory_order_relaxed);
+  const uint64_t tail_block_count =
+      (uint64_t)ring->capacity - (first_block & ring->mask);
+  if (block_count > tail_block_count) {
+    first_block += tail_block_count;
+  }
+  const uint64_t next_write_position = first_block + block_count;
+  const uint64_t read_position = (uint64_t)iree_atomic_load(
+      &ring->read_position, iree_memory_order_acquire);
+  return next_write_position - read_position <= ring->capacity;
+}
+
 // Allocates |block_count| contiguous blocks from the ring.
 //
 // Returns a pointer to the first block, 64-byte aligned and suitable for use
@@ -141,16 +164,13 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
 // reclamation: when the GPU completes the associated submission, the drain
 // calls reclaim() with this position.
 //
-// REQUIRES: The caller must have already reserved AQL ring slots for this
-// submission. The AQL reservation is the backpressure gate; once it succeeds,
-// the sizing invariant guarantees kernarg space is available.
+// REQUIRES: The caller must have already proved capacity with can_allocate().
+// Under the host queue submission mutex, no other allocator can consume the
+// proved space before this call. A NULL return after a successful admission
+// check indicates an internal synchronization or sizing invariant failure.
 //
 // Returns NULL if block_count is 0 or exceeds ring capacity (checked before
-// touching any atomics), or if the ring is full after advancing
-// write_position. The latter indicates a violated sizing invariant (a
-// configuration error, not a recoverable runtime condition); the CAS has
-// already advanced write_position, which is acceptable because the system is
-// already in a bad state.
+// touching any atomics), or if the ring is full.
 static inline iree_hal_amdgpu_kernarg_block_t*
 iree_hal_amdgpu_kernarg_ring_allocate(iree_hal_amdgpu_kernarg_ring_t* ring,
                                       uint32_t block_count,
@@ -177,6 +197,12 @@ iree_hal_amdgpu_kernarg_ring_allocate(iree_hal_amdgpu_kernarg_ring_t* ring,
       first_block += tail_block_count;
     }
     next_write_position = first_block + block_count;
+    const uint64_t read_position = (uint64_t)iree_atomic_load(
+        &ring->read_position, iree_memory_order_acquire);
+    if (IREE_UNLIKELY(next_write_position - read_position > ring->capacity)) {
+      *out_end_position = 0;
+      return NULL;
+    }
     if (iree_atomic_compare_exchange_weak(
             &ring->write_position, &observed_write_position,
             (int64_t)next_write_position, iree_memory_order_relaxed,
@@ -187,17 +213,6 @@ iree_hal_amdgpu_kernarg_ring_allocate(iree_hal_amdgpu_kernarg_ring_t* ring,
 
   // Record the end position for the caller's reclamation tracking.
   *out_end_position = next_write_position;
-
-  // Defensive fullness check. Under the AQL-first backpressure invariant this
-  // should never fire: the AQL ring bounds in-flight packets, and the kernarg
-  // ring is sized to hold the worst-case kernarg consumption for the full AQL
-  // ring. Acquire pairs with the drain's release store on read_position.
-  const uint64_t read = (uint64_t)iree_atomic_load(&ring->read_position,
-                                                   iree_memory_order_acquire);
-  if (IREE_UNLIKELY(*out_end_position - read > ring->capacity)) {
-    return NULL;
-  }
-
   return &ring->base[first_block & ring->mask];
 }
 
