@@ -133,6 +133,15 @@ void iree_hal_amdgpu_transient_buffer_release_reservation(
 iree_hal_buffer_t* iree_hal_amdgpu_transient_buffer_backing_buffer(
     iree_hal_buffer_t* buffer);
 
+// Resolves the committed backing buffer.
+//
+// Command buffer recording uses this stricter query when capturing static
+// buffer identity: queued work may use staged backing through semaphore
+// dependencies, but reusable command buffers must not capture an alloca result
+// before its allocation has completed or after deallocation has been queued.
+iree_status_t iree_hal_amdgpu_transient_buffer_resolve_committed_backing(
+    iree_hal_buffer_t* buffer, iree_hal_buffer_t** out_backing_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

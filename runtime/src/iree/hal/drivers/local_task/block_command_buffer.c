@@ -58,9 +58,10 @@ static iree_hal_block_command_buffer_t* iree_hal_block_command_buffer_cast(
 //     for runtime resolution by the processor.
 //
 // Direct buffers use PERSISTENT mapping: the buffer is retained by the
-// resource_set for the CB's lifetime, so the pointer is stable. Buffers
-// that require SCOPED mapping must use the indirect path (binding table
-// provided at submit time, where the mapping lifecycle is bounded).
+// resource_set for the CB's lifetime, so the pointer is stable. Buffers that
+// are not available at record time, such as uncommitted queue_alloca
+// transients, must use the indirect path so queue_execute can resolve them
+// under semaphore ordering.
 //
 // The fixup data_index fields are pre-filled by the builder and preserved.
 static iree_status_t iree_hal_block_command_buffer_resolve_refs(
@@ -70,28 +71,17 @@ static iree_status_t iree_hal_block_command_buffer_resolve_refs(
     // data_index is pre-filled by the builder — write only the other fields.
     fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_NONE;
     if (buffer_refs[i].buffer) {
-      // Direct: try to map the buffer now. If the buffer can't be mapped
-      // yet (e.g. transient buffer from queue_alloca not yet committed),
-      // defer the mapping to drain time — the buffer will be committed by
-      // then (semaphore ordering guarantees this).
+      // Direct: map the buffer now. If the buffer can't be mapped yet, the
+      // caller must record an indirect binding table reference instead.
       iree_hal_buffer_mapping_t mapping = {{0}};
-      iree_status_t map_status = iree_hal_buffer_map_range(
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
           buffer_refs[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
           IREE_HAL_MEMORY_ACCESS_ANY, buffer_refs[i].offset,
-          buffer_refs[i].length, &mapping);
-      if (iree_status_is_ok(map_status)) {
-        fixups[i].host_ptr = mapping.contents.data;
-        fixups[i].offset = 0;  // map_range already applied the offset.
-        fixups[i].length = mapping.contents.data_length;
-        fixups[i].slot = 0;
-      } else {
-        iree_status_ignore(map_status);
-        fixups[i].buffer = buffer_refs[i].buffer;
-        fixups[i].offset = buffer_refs[i].offset;
-        fixups[i].length = buffer_refs[i].length;
-        fixups[i].slot = 0;
-        fixups[i].flags = IREE_HAL_CMD_FIXUP_FLAG_DEFERRED;
-      }
+          buffer_refs[i].length, &mapping));
+      fixups[i].host_ptr = mapping.contents.data;
+      fixups[i].offset = 0;  // map_range already applied the offset.
+      fixups[i].length = mapping.contents.data_length;
+      fixups[i].slot = 0;
     } else {
       // Indirect: record binding table slot for runtime resolution.
       fixups[i].host_ptr = NULL;
