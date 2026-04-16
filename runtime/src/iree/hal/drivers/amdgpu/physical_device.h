@@ -205,9 +205,9 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   // Fixed-size staging pool for non-mappable queue_read/queue_write transfers.
   iree_hal_amdgpu_staging_pool_t file_staging_pool;
 
-  // Builtin kernel table for this GPU agent and a host/device-neutral transfer
-  // context that points to it. Shared by all queues on the physical device.
+  // Builtin kernel table for this GPU agent.
   iree_hal_amdgpu_device_kernels_t device_kernels;
+  // Host/device-neutral transfer context that points into |device_kernels|.
   iree_hal_amdgpu_device_buffer_transfer_context_t buffer_transfer_context;
 
   // Total number of host queue slots allocated in |host_queues|.
@@ -262,6 +262,14 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
 // Deinitializes any host queues initialized by assign_frontier.
 void iree_hal_amdgpu_physical_device_deassign_frontier(
     iree_hal_amdgpu_physical_device_t* physical_device);
+
+// Enables or disables HSA dispatch timestamp population on all live queues.
+//
+// On enable failure, queues successfully enabled by this call are disabled
+// before the status is returned. On disable failure, the function attempts all
+// queues and joins failures.
+iree_status_t iree_hal_amdgpu_physical_device_set_hsa_profiling_enabled(
+    iree_hal_amdgpu_physical_device_t* physical_device, bool enabled);
 
 // Deinitializes a physical device and deallocates all device-specific
 // resources.

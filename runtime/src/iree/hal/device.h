@@ -21,6 +21,7 @@
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
 #include "iree/hal/pool.h"
+#include "iree/hal/profile_sink.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
@@ -150,6 +151,12 @@ typedef struct iree_hal_device_profiling_options_t {
   // path/prefix for a unique per capture name or a full path that will be
   // overwritten each capture.
   const char* file_path;
+
+  // Optional programmatic sink receiving HAL-native profiling chunks.
+  // The caller retains ownership of the sink for the duration of the
+  // profiling_begin call. Implementations that keep the sink beyond the call
+  // must retain it and release it during profiling_end or teardown.
+  iree_hal_profile_sink_t* sink;
 } iree_hal_device_profiling_options_t;
 
 // Bitfield specifying flags controlling an async allocation operation.

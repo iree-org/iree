@@ -60,6 +60,8 @@ iree_cc_library(
     "pool.h"
     "pool_set.c"
     "pool_set.h"
+    "profile_sink.c"
+    "profile_sink.h"
     "queue.h"
     "resource.h"
     "semaphore.c"

@@ -1756,6 +1756,22 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   IREE_TRACE_ZONE_END(z0);
 }
 
+iree_status_t iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
+    iree_hal_amdgpu_host_queue_t* queue, bool enabled) {
+  IREE_ASSERT_ARGUMENT(queue);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, enabled ? 1 : 0);
+
+  iree_status_t status = iree_hsa_amd_profiling_set_profiler_enabled(
+      IREE_LIBHSA(queue->libhsa), queue->hardware_queue, enabled ? 1 : 0);
+  if (iree_status_is_ok(status)) {
+    queue->profiling.hsa_queue_timestamps_enabled = enabled ? 1 : 0;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static void iree_hal_amdgpu_host_queue_trim(
     iree_hal_amdgpu_virtual_queue_t* base_queue) {}
 
