@@ -41,6 +41,7 @@ iree_lit_test_suite(
     "gpu_infer_memory_space.mlir"
     "gpu_lower_coalesced_dma_to_global_loads.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_argcompare.mlir"
     "gpu_nested_layout_vector_distribution_inner_tiled.mlir"
     "gpu_nested_layout_vector_distribution_mask.mlir"
     "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
