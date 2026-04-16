@@ -115,6 +115,11 @@ def MMA_X86_AVX512_1x16x2_I32_I8_CASTI16
 def MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16
     : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16", 0x13C1>;
 
+// AArch64 SVE `fmla` (f32, f32): 1×N×1 matmul tile; N is a scalable vector of
+// 4 f32 lanes per 128-bit chunk (see `ArmSveVLIn128bitUnits`).
+def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
+    : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32", 0x2210>;
+
 def IREECPU_MMAIntrinsic
     : IREECPU_I32EnumAttr<
           "MMAIntrinsic", "Descriptor for different MMA intrinsics",
@@ -127,7 +132,10 @@ def IREECPU_MMAIntrinsic
            MMA_X86_AVX512BF16_1x16x2_F32_BF16, MMA_X86_AVX512_1x16x2_I32_I16,
            MMA_X86_AVX512VNNI_1x16x2_I32_I16,
            MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
-           MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16]>;
+           MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
+
+           // Arm SVE
+           MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32]>;
 
 //===----------------------------------------------------------------------===//
 // CPU Lowering Pipelines
