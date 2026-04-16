@@ -2328,6 +2328,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extlinearize_ragged_dims-tensorextlinearizeraggeddimsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_tensor_ext.linearize_ragged_dims (TensorExt::LinearizeRaggedDimsOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6254,6 +6265,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extlinearize_ragged_dims-tensorextlinearizeraggeddimsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_tensor_ext.linearize_ragged_dims (TensorExt::LinearizeRaggedDimsOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -6353,6 +6375,7 @@ beyond what is currently available in the Tensor Dialect.</p>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop">iree_tensor_ext.dispatch.workgroup_count_from_slice (TensorExt::DispatchWorkgroupCountFromSliceOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop">iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkloadordinal-tensorextdispatchworkloadordinalop">iree_tensor_ext.dispatch.workload.ordinal (TensorExt::DispatchWorkloadOrdinalOp)</a></li>
+<li><a href="#iree_tensor_extlinearize_ragged_dims-tensorextlinearizeraggeddimsop">iree_tensor_ext.linearize_ragged_dims (TensorExt::LinearizeRaggedDimsOp)</a></li>
 </ul>
 </li>
 <li><a href="#type-constraints">Type constraints</a><ul>
@@ -6922,6 +6945,55 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
 <td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iree_tensor_extlinearize_ragged_dims-tensorextlinearizeraggeddimsop"><code>iree_tensor_ext.linearize_ragged_dims</code> (TensorExt::LinearizeRaggedDimsOp)<a class="headerlink" href="#iree_tensor_extlinearize_ragged_dims-tensorextlinearizeraggeddimsop" title="Permanent link">link</a></h3>
+<p><em>Linearizes the sparse dimensions of a ragged shaped value.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.linearize_ragged_dims` $source attr-dict `:` type($source) `-&gt;` type($result)(`{` $resultDynamicDims^ `}`)?
+</code></pre></div>
+<p>Linearizes the contiguous sparse dimensions of a tensor or memref with a
+<code>#iree_tensor_ext.ragged_shape</code> encoding/layout into a single dense
+dimension. The result has the same element type, preserves all non-sparse
+dimensions, removes the ragged encoding/layout, and has rank:</p>
+<div class="highlight"><pre><span></span><code>rank(source) - num_sparse_dimensions + 1
+</code></pre></div>
+<p>Dynamic result dimensions are provided by <code>resultDynamicDims</code>.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values or memref of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>resultDynamicDims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 </tbody>
 </table>
