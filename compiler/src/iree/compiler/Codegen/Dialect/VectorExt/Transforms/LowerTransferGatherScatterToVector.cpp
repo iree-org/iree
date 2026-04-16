@@ -27,6 +27,8 @@ namespace {
 static LogicalResult validateMaps(Operation *op, OperandRange indexVecs,
                                   AffineMap sourceMap,
                                   PatternRewriter &rewriter) {
+  // TODO: vector.gather/scatter requires a single index vector.
+  // We could flatten everything to 1-D to make it work.
   if (indexVecs.size() != 1) {
     return rewriter.notifyMatchFailure(op, "expected exactly one index vec");
   }
@@ -37,9 +39,9 @@ static LogicalResult validateMaps(Operation *op, OperandRange indexVecs,
 
   unsigned numResults = sourceMap.getNumResults();
   for (unsigned i = 0; i < numResults - 1; ++i) {
-    if (sourceMap.getResult(i).isFunctionOfSymbol(0)) {
+    if (!isa<AffineConstantExpr>(sourceMap.getResult(i))) {
       return rewriter.notifyMatchFailure(op,
-                                         "symbol must only appear in last dim");
+                                         "non-gathered dims must be constants");
     }
   }
 
@@ -47,14 +49,6 @@ static LogicalResult validateMaps(Operation *op, OperandRange indexVecs,
     return rewriter.notifyMatchFailure(op,
                                        "last dim must be a pure symbol expr");
   }
-
-  for (unsigned i = 0; i < numResults - 1; ++i) {
-    if (!isa<AffineConstantExpr>(sourceMap.getResult(i))) {
-      return rewriter.notifyMatchFailure(op,
-                                         "non-gathered dims must be constants");
-    }
-  }
-
   return success();
 }
 
