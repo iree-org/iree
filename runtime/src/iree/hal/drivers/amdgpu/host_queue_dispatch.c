@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
 typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
@@ -416,6 +417,22 @@ static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
   event->workgroup_size[2] = plan->kernel_args->workgroup_size[2];
 }
 
+static bool iree_hal_amdgpu_host_queue_should_profile_dispatch(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t executable_id,
+    iree_hal_executable_export_ordinal_t export_ordinal) {
+  if (!queue->profiling.hsa_queue_timestamps_enabled) return false;
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      (iree_hal_amdgpu_logical_device_t*)queue->logical_device;
+  const uint32_t physical_device_ordinal = queue->device_ordinal <= UINT32_MAX
+                                               ? (uint32_t)queue->device_ordinal
+                                               : UINT32_MAX;
+  const uint32_t queue_ordinal = iree_async_axis_queue_index(queue->axis);
+  return iree_hal_amdgpu_logical_device_should_profile_dispatch(
+      logical_device, executable_id, export_ordinal,
+      /*command_buffer_id=*/0, /*command_index=*/UINT32_MAX,
+      physical_device_ordinal, queue_ordinal);
+}
+
 iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
@@ -457,11 +474,15 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     bool uses_custom_direct_arguments,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready) {
+  const uint64_t executable_id =
+      iree_hal_amdgpu_executable_profile_id(executable);
+  const bool should_profile_dispatch =
+      iree_hal_amdgpu_host_queue_should_profile_dispatch(queue, executable_id,
+                                                         export_ordinal);
   iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events = {0};
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u,
-          &profile_events));
+          queue, should_profile_dispatch ? 1u : 0u, &profile_events));
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   iree_status_t status =
       iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
@@ -497,8 +518,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
         iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
             queue, profile_events.first_event_position);
     iree_hal_amdgpu_host_queue_initialize_dispatch_event(
-        event, plan, export_ordinal,
-        iree_hal_amdgpu_executable_profile_id(executable), config,
+        event, plan, export_ordinal, executable_id, config,
         IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_NONE);
     iree_hal_amdgpu_profile_dispatch_harvest_source_t* sources =
         iree_hal_amdgpu_device_profile_emplace_dispatch_harvest(
@@ -541,13 +561,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     bool uses_custom_direct_arguments,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready) {
+  const uint64_t executable_id =
+      iree_hal_amdgpu_executable_profile_id(executable);
+  const bool should_profile_dispatch =
+      iree_hal_amdgpu_host_queue_should_profile_dispatch(queue, executable_id,
+                                                         export_ordinal);
   const uint32_t target_kernarg_block_count = plan->kernarg_block_count;
   const uint32_t patch_kernarg_block_count = 1;
   iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events = {0};
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u,
-          &profile_events));
+          queue, should_profile_dispatch ? 1u : 0u, &profile_events));
   const bool profile_dispatch_packet = profile_events.event_count != 0;
   const uint32_t payload_packet_count = profile_dispatch_packet ? 3u : 2u;
   const uint32_t profile_harvest_kernarg_block_count =
@@ -648,8 +672,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
         iree_hal_amdgpu_host_queue_profile_dispatch_event_at(
             queue, profile_events.first_event_position);
     iree_hal_amdgpu_host_queue_initialize_dispatch_event(
-        event, plan, export_ordinal,
-        iree_hal_amdgpu_executable_profile_id(executable), config,
+        event, plan, export_ordinal, executable_id, config,
         IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS);
     iree_hal_amdgpu_profile_dispatch_harvest_source_t* sources =
         iree_hal_amdgpu_device_profile_emplace_dispatch_harvest(

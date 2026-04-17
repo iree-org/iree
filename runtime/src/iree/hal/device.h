@@ -161,6 +161,10 @@ typedef struct iree_hal_device_profiling_options_t {
   // must retain it and release it during profiling_end or teardown.
   iree_hal_profile_sink_t* sink;
 
+  // Optional filter selecting operations that should emit heavy profile
+  // artifacts. A zero-initialized filter matches all operations.
+  iree_hal_profile_capture_filter_t capture_filter;
+
   // Number of explicitly requested hardware counter sets.
   iree_host_size_t counter_set_count;
 

@@ -761,6 +761,105 @@ iree_hal_profile_memory_event_default(void) {
   return record;
 }
 
+// Bitfield specifying profile capture filter predicates.
+typedef uint32_t iree_hal_profile_capture_filter_flags_t;
+enum iree_hal_profile_capture_filter_flag_bits_t {
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_NONE = 0u,
+
+  // Match only executable exports whose names match
+  // |executable_export_pattern|.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN = 1u << 0,
+
+  // Match only operations associated with |command_buffer_id|.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID = 1u << 1,
+
+  // Match only command-buffer operations whose index is |command_index|. Direct
+  // queue operations have no command index and never match this predicate.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX = 1u << 2,
+
+  // Match only operations on |physical_device_ordinal|.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_PHYSICAL_DEVICE_ORDINAL = 1u << 3,
+
+  // Match only operations on |queue_ordinal|.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL = 1u << 4,
+};
+
+// Selects which operations should produce heavy profile artifacts.
+//
+// Profile producers should always preserve cheap session/metadata records
+// needed to interpret the capture, but may use this filter to decide whether to
+// emit expensive per-operation artifacts such as dispatch timestamp packets,
+// hardware counter ranges, or trace markers. Fields are active only when their
+// matching flag is set; a zero-initialized filter matches all operations.
+typedef struct iree_hal_profile_capture_filter_t {
+  // Flags selecting which fields below participate in matching.
+  iree_hal_profile_capture_filter_flags_t flags;
+
+  // Glob pattern matched with iree_string_view_match_pattern against an
+  // executable export name.
+  iree_string_view_t executable_export_pattern;
+
+  // Process-local command-buffer identifier to match.
+  uint64_t command_buffer_id;
+
+  // Zero-based command-buffer operation index to match.
+  uint32_t command_index;
+
+  // Session-local physical device ordinal to match.
+  uint32_t physical_device_ordinal;
+
+  // Session-local queue ordinal to match.
+  uint32_t queue_ordinal;
+
+  // Reserved for future filter fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_capture_filter_t;
+
+// Returns a capture filter matching all operations.
+static inline iree_hal_profile_capture_filter_t
+iree_hal_profile_capture_filter_default(void) {
+  iree_hal_profile_capture_filter_t filter;
+  memset(&filter, 0, sizeof(filter));
+  return filter;
+}
+
+// Returns true when |filter| has no active predicates.
+static inline bool iree_hal_profile_capture_filter_is_default(
+    const iree_hal_profile_capture_filter_t* filter) {
+  return filter->flags == IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_NONE;
+}
+
+// Returns true if |filter| matches the given profile location fields.
+static inline bool iree_hal_profile_capture_filter_matches_location(
+    const iree_hal_profile_capture_filter_t* filter, uint64_t command_buffer_id,
+    uint32_t command_index, uint32_t physical_device_ordinal,
+    uint32_t queue_ordinal) {
+  if (iree_any_bit_set(
+          filter->flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID) &&
+      filter->command_buffer_id != command_buffer_id) {
+    return false;
+  }
+  if (iree_any_bit_set(filter->flags,
+                       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX)) {
+    if (command_buffer_id == 0 || filter->command_index != command_index) {
+      return false;
+    }
+  }
+  if (iree_any_bit_set(
+          filter->flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_PHYSICAL_DEVICE_ORDINAL) &&
+      filter->physical_device_ordinal != physical_device_ordinal) {
+    return false;
+  }
+  if (iree_any_bit_set(filter->flags,
+                       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL) &&
+      filter->queue_ordinal != queue_ordinal) {
+    return false;
+  }
+  return true;
+}
+
 // Bitfield specifying properties of a requested hardware counter set.
 typedef uint32_t iree_hal_profile_counter_set_selection_flags_t;
 enum iree_hal_profile_counter_set_selection_flag_bits_t {

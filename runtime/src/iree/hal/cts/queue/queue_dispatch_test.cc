@@ -76,7 +76,11 @@ class DeviceProfilingScope {
     iree_hal_device_profiling_options_t options = {0};
     options.mode = mode;
     options.sink = sink;
-    iree_status_t status = iree_hal_device_profiling_begin(device_, &options);
+    return Begin(&options);
+  }
+
+  iree_status_t Begin(const iree_hal_device_profiling_options_t* options) {
+    iree_status_t status = iree_hal_device_profiling_begin(device_, options);
     if (iree_status_is_ok(status)) {
       is_active_ = true;
     }
@@ -529,6 +533,77 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
     EXPECT_TRUE(sink.saw_queue_metadata);
     EXPECT_FALSE(sink.write_after_end);
     ExpectDispatchEventsWithinClockCorrelationRange(sink);
+  }
+}
+
+// Capture filters must not perturb direct queue dispatch semantics or
+// completion when no dispatch event matches.
+TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.sink = TestProfileSinkAsBase(&sink);
+  profiling_options.capture_filter.flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
+  profiling_options.capture_filter.executable_export_pattern =
+      IREE_SV("iree-hal-cts-never-matches-*");
+  DeviceProfilingScope profiling(device_);
+  iree_status_t profiling_status = profiling.Begin(&profiling_options);
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling mode unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  {
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    CreateDeviceBufferWithData(input_data.data(),
+                               input_data.size() * sizeof(input_data[0]),
+                               input_buffer.out());
+  }
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  const uint32_t constant_data[] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_data, sizeof(constant_data));
+
+  SemaphoreList empty_wait;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+      executable_, /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+  EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+  if (sink.begin_count == 0) {
+    EXPECT_EQ(0, sink.end_count);
+    EXPECT_EQ(0, sink.dispatch_event_count);
+    EXPECT_FALSE(sink.write_after_end);
+  } else {
+    EXPECT_EQ(1, sink.begin_count);
+    EXPECT_EQ(1, sink.end_count);
+    EXPECT_EQ(0, sink.dispatch_event_count);
+    EXPECT_TRUE(sink.dispatch_events.empty());
+    EXPECT_FALSE(sink.write_after_end);
   }
 }
 

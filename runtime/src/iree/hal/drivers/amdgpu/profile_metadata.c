@@ -530,6 +530,41 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_command_operations(
   return status;
 }
 
+bool iree_hal_amdgpu_profile_metadata_export_matches(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    uint64_t executable_id, uint32_t export_ordinal,
+    iree_string_view_t pattern) {
+  if (iree_string_view_is_empty(pattern)) return true;
+
+  bool matches = false;
+  iree_slim_mutex_lock(&registry->mutex);
+  iree_host_size_t offset = 0;
+  while (offset + sizeof(iree_hal_profile_executable_export_record_t) <=
+         registry->executable_export_record_data_length) {
+    const uint8_t* record_data =
+        registry->executable_export_record_data + offset;
+    iree_hal_profile_executable_export_record_t record;
+    memcpy(&record, record_data, sizeof(record));
+    if (record.record_length < sizeof(record) ||
+        offset + record.record_length >
+            registry->executable_export_record_data_length ||
+        record.name_length != record.record_length - sizeof(record)) {
+      break;
+    }
+    if (record.executable_id == executable_id &&
+        record.export_ordinal == export_ordinal) {
+      matches = iree_string_view_match_pattern(
+          iree_make_string_view((const char*)record_data + sizeof(record),
+                                record.name_length),
+          pattern);
+      break;
+    }
+    offset += record.record_length;
+  }
+  iree_slim_mutex_unlock(&registry->mutex);
+  return matches;
+}
+
 static void iree_hal_amdgpu_profile_metadata_snapshot_deinitialize(
     iree_hal_amdgpu_profile_metadata_snapshot_t* snapshot) {
   iree_allocator_free(snapshot->host_allocator,

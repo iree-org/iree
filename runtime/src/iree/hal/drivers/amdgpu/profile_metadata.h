@@ -103,6 +103,12 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_command_operations(
     iree_host_size_t operation_count,
     const iree_hal_profile_command_operation_record_t* operations);
 
+// Returns true if the registered executable export name matches |pattern|.
+bool iree_hal_amdgpu_profile_metadata_export_matches(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    uint64_t executable_id, uint32_t export_ordinal,
+    iree_string_view_t pattern);
+
 // Writes metadata records newer than |cursor| and advances |cursor| on success.
 iree_status_t iree_hal_amdgpu_profile_metadata_write(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,

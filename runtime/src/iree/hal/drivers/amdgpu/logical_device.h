@@ -114,6 +114,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   struct {
     // Active profiling modes, or NONE when profiling is disabled.
     iree_hal_device_profiling_mode_t mode;
+    // Operation filter selecting heavy profiling artifacts for this session.
+    iree_hal_profile_capture_filter_t capture_filter;
     // Process-local profiling session identifier assigned at begin.
     uint64_t session_id;
     // Next process-local clock-correlation sample identifier.
@@ -197,6 +199,13 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
 // precondition is held by the caller.
 bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
     iree_hal_device_t* base_device);
+
+// Returns true when the active profile capture should emit heavy dispatch
+// artifacts for the given executable export and queue location.
+bool iree_hal_amdgpu_logical_device_should_profile_dispatch(
+    iree_hal_amdgpu_logical_device_t* logical_device, uint64_t executable_id,
+    uint32_t export_ordinal, uint64_t command_buffer_id, uint32_t command_index,
+    uint32_t physical_device_ordinal, uint32_t queue_ordinal);
 
 // Returns a session-local allocation id, or 0 when memory profiling is off.
 //

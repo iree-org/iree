@@ -453,6 +453,77 @@ IREE_FLAG(
     "Optional path for a raw IREE HAL profiling bundle. The output is written\n"
     "by tooling using a generic profile sink and does not change the\n"
     "implementation-specific meaning of --device_profiling_file.");
+IREE_FLAG(
+    string, device_profiling_filter_export, "",
+    "Optional glob pattern selecting executable export names that should emit\n"
+    "heavy profiling artifacts such as dispatch timings or hardware counter\n"
+    "samples. Cheap session metadata remains available so filtered captures\n"
+    "can still be decoded.");
+IREE_FLAG(
+    int64_t, device_profiling_filter_command_buffer, -1,
+    "Optional nonzero command buffer id selecting operations that should emit\n"
+    "heavy profiling artifacts. Use iree-profile command/queue output from an\n"
+    "earlier capture to find command buffer ids.");
+IREE_FLAG(
+    int64_t, device_profiling_filter_command_index, -1,
+    "Optional zero-based command-buffer operation index selecting operations\n"
+    "that should emit heavy profiling artifacts.");
+IREE_FLAG(
+    int64_t, device_profiling_filter_physical_device, -1,
+    "Optional physical device ordinal selecting operations that should emit\n"
+    "heavy profiling artifacts.");
+IREE_FLAG(int64_t, device_profiling_filter_queue, -1,
+          "Optional queue ordinal selecting operations that should emit heavy\n"
+          "profiling artifacts.");
+
+static iree_status_t iree_hal_profile_capture_filter_set_u32_from_flag(
+    int64_t flag_value, iree_hal_profile_capture_filter_flags_t flag,
+    const char* flag_name, uint32_t* out_value,
+    iree_hal_profile_capture_filter_t* inout_filter) {
+  if (flag_value < 0) return iree_ok_status();
+  if (flag_value > UINT32_MAX) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--%s value exceeds uint32_t", flag_name);
+  }
+  *out_value = (uint32_t)flag_value;
+  inout_filter->flags |= flag;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_profile_capture_filter_from_flags(
+    iree_hal_profile_capture_filter_t* out_filter) {
+  *out_filter = iree_hal_profile_capture_filter_default();
+  if (strlen(FLAG_device_profiling_filter_export) != 0) {
+    out_filter->flags |=
+        IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
+    out_filter->executable_export_pattern =
+        iree_make_cstring_view(FLAG_device_profiling_filter_export);
+  }
+  if (FLAG_device_profiling_filter_command_buffer == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--device_profiling_filter_command_buffer must be nonzero");
+  } else if (FLAG_device_profiling_filter_command_buffer > 0) {
+    out_filter->flags |= IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID;
+    out_filter->command_buffer_id =
+        (uint64_t)FLAG_device_profiling_filter_command_buffer;
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_profile_capture_filter_set_u32_from_flag(
+      FLAG_device_profiling_filter_command_index,
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX,
+      "device_profiling_filter_command_index", &out_filter->command_index,
+      out_filter));
+  IREE_RETURN_IF_ERROR(iree_hal_profile_capture_filter_set_u32_from_flag(
+      FLAG_device_profiling_filter_physical_device,
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_PHYSICAL_DEVICE_ORDINAL,
+      "device_profiling_filter_physical_device",
+      &out_filter->physical_device_ordinal, out_filter));
+  IREE_RETURN_IF_ERROR(iree_hal_profile_capture_filter_set_u32_from_flag(
+      FLAG_device_profiling_filter_queue,
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL,
+      "device_profiling_filter_queue", &out_filter->queue_ordinal, out_filter));
+  return iree_ok_status();
+}
 
 static iree_status_t iree_hal_profile_sink_create_from_flags(
     iree_allocator_t host_allocator, iree_hal_profile_sink_t** out_sink) {
@@ -497,6 +568,8 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
 
   // We don't validate the file path as each tool has their own style.
   options.file_path = FLAG_device_profiling_file;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_profile_capture_filter_from_flags(&options.capture_filter));
 
   iree_hal_profile_sink_t* sink = NULL;
   iree_status_t status =

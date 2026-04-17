@@ -471,6 +471,42 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(options);
 
+  const iree_hal_profile_capture_filter_flags_t supported_filter_flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_PHYSICAL_DEVICE_ORDINAL |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL;
+  if (iree_any_bit_set(options->capture_filter.flags,
+                       ~supported_filter_flags)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unsupported profile capture filter bits 0x%x",
+        options->capture_filter.flags & ~supported_filter_flags);
+  }
+  if (options->capture_filter.reserved0 != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture filter reserved fields must be zero");
+  }
+  if (iree_any_bit_set(
+          options->capture_filter.flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN) &&
+      iree_string_view_is_empty(
+          options->capture_filter.executable_export_pattern)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture executable export filter must not be empty");
+  }
+  if (iree_any_bit_set(
+          options->capture_filter.flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID) &&
+      options->capture_filter.command_buffer_id == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture command buffer filter must be nonzero");
+  }
+
   if (iree_hal_device_profiling_options_have_counter_sets(options)) {
     if (!options->counter_sets) {
       return iree_make_status(
