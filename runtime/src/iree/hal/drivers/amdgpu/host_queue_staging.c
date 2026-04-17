@@ -643,10 +643,17 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_submit_signal_barrier(
   iree_slim_mutex_lock(&transfer->queue->submission_mutex);
   bool ready = false;
   uint64_t submission_id = 0;
+  iree_hal_amdgpu_host_queue_profile_event_info_t profile_event_info = {
+      .type =
+          iree_hal_amdgpu_staging_transfer_profile_event_type(transfer->kind),
+      .payload_length = transfer->requested_length,
+      .operation_count = 1,
+  };
   iree_status_t status = iree_hal_amdgpu_host_queue_try_submit_barrier(
       transfer->queue, &resolution, transfer->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
+      &profile_event_info,
       iree_hal_amdgpu_host_queue_post_commit_callback_null(),
       /*resource_set=*/NULL,
       IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
@@ -654,15 +661,10 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_submit_signal_barrier(
   if (iree_status_is_ok(status) && ready) {
     iree_hal_amdgpu_wait_resolution_t profile_resolution = resolution;
     profile_resolution.wait_count = transfer->profile_wait_count;
+    profile_event_info.submission_id = submission_id;
     iree_hal_amdgpu_host_queue_record_profile_queue_event(
         transfer->queue, &profile_resolution, transfer->signal_semaphore_list,
-        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
-            .type = iree_hal_amdgpu_staging_transfer_profile_event_type(
-                transfer->kind),
-            .submission_id = submission_id,
-            .payload_length = transfer->requested_length,
-            .operation_count = 1,
-        });
+        &profile_event_info);
   }
   if (iree_status_is_ok(status) && !ready) {
     iree_hal_resource_retain(&transfer->resource);

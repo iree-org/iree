@@ -439,8 +439,8 @@ iree_status_t iree_hal_create_devices_from_flags(
 
 IREE_FLAG(
     string, device_profiling_mode, "",
-    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable', "
-    "'trace'])\n"
+    "HAL device profiling mode as a comma-separated list drawn from ['queue', "
+    "'dispatch', 'executable', 'trace']\n"
     "or empty to disable profiling. HAL implementations may require\n"
     "additional flags in order to configure profiling support on their\n"
     "devices.");
@@ -553,33 +553,51 @@ static iree_status_t iree_hal_profile_sink_create_from_flags(
   return status;
 }
 
+static iree_status_t iree_hal_device_profiling_mode_from_flags(
+    iree_hal_device_profiling_mode_t* out_mode) {
+  *out_mode = IREE_HAL_DEVICE_PROFILING_MODE_NONE;
+  iree_string_view_t remaining =
+      iree_string_view_trim(iree_make_cstring_view(FLAG_device_profiling_mode));
+  while (remaining.size != 0) {
+    iree_string_view_t mode_part = iree_string_view_empty();
+    iree_string_view_split(remaining, ',', &mode_part, &remaining);
+    mode_part = iree_string_view_trim(mode_part);
+    if (mode_part.size == 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "--device_profiling_mode contains an empty mode");
+    } else if (iree_string_view_equal(mode_part, IREE_SV("queue"))) {
+      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
+    } else if (iree_string_view_equal(mode_part, IREE_SV("dispatch"))) {
+      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+    } else if (iree_string_view_equal(mode_part, IREE_SV("executable"))) {
+      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
+    } else if (iree_string_view_equal(mode_part, IREE_SV("trace"))) {
+      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES;
+    } else {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported profiling mode '%.*s'",
+                              (int)mode_part.size, mode_part.data);
+    }
+    remaining = iree_string_view_trim(remaining);
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   if (!device) return iree_ok_status();
 
-  // Today we treat these as exclusive. When we have more implementations we
-  // can figure out how best to combine them.
   const iree_flag_string_list_t counter_names =
       FLAG_device_profiling_counter_list();
   iree_hal_device_profiling_options_t options = {0};
-  if (strlen(FLAG_device_profiling_mode) == 0) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_device_profiling_mode_from_flags(&options.mode));
+  if (options.mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
     if (counter_names.count != 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "--device_profiling_counter requires --device_profiling_mode");
     }
     return iree_ok_status();
-  } else if (strcmp(FLAG_device_profiling_mode, "queue") == 0) {
-    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
-  } else if (strcmp(FLAG_device_profiling_mode, "dispatch") == 0) {
-    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
-  } else if (strcmp(FLAG_device_profiling_mode, "executable") == 0) {
-    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
-  } else if (strcmp(FLAG_device_profiling_mode, "trace") == 0) {
-    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES;
-  } else {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported profiling mode '%s'",
-                            FLAG_device_profiling_mode);
   }
 
   // We don't validate the file path as each tool has their own style.

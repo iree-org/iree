@@ -2446,6 +2446,25 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_flush(
   return iree_ok_status();
 }
 
+static iree_status_t
+iree_hal_amdgpu_logical_device_verify_queue_device_profiling_supported(
+    iree_hal_amdgpu_logical_device_t* logical_device) {
+  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    if (iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
+            physical_device->vendor_packet_capabilities)) {
+      continue;
+    }
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "AMDGPU queue operation profiling requires PM4 timestamp range "
+        "support on physical device %" PRIhsz,
+        physical_device->device_ordinal);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
@@ -2473,6 +2492,12 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   if (logical_device->profiling.mode != IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "cannot nest AMDGPU profile captures");
+  }
+  if (iree_any_bit_set(options->mode,
+                       IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_logical_device_verify_queue_device_profiling_supported(
+            logical_device));
   }
 
   iree_hal_profile_sink_t* sink = options->sink;

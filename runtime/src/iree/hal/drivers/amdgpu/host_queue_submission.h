@@ -14,6 +14,9 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_amdgpu_host_queue_profile_event_info_t
+    iree_hal_amdgpu_host_queue_profile_event_info_t;
+
 typedef void(IREE_API_PTR* iree_hal_amdgpu_host_queue_post_commit_fn_t)(
     void* user_data, const iree_async_frontier_t* queue_frontier);
 
@@ -80,6 +83,9 @@ typedef struct iree_hal_amdgpu_host_queue_barrier_submission_t {
   iree_hal_amdgpu_reclaim_entry_t* reclaim_entry;
   // Reclaim resource slots owned by |reclaim_entry|.
   iree_hal_resource_t** reclaim_resources;
+  // Queue device profile event reservation for this submission.
+  iree_hal_amdgpu_profile_queue_device_event_reservation_t
+      profile_queue_device_events;
   // First AQL packet id reserved for this submission.
   uint64_t first_packet_id;
   // Number of AQL packets reserved starting at |first_packet_id|.
@@ -94,6 +100,9 @@ typedef struct iree_hal_amdgpu_host_queue_barrier_submission_t {
 typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   // Generic kernel-shaped submission state.
   iree_hal_amdgpu_host_queue_kernel_submission_t kernel;
+  // Queue device profile event reservation for this submission.
+  iree_hal_amdgpu_profile_queue_device_event_reservation_t
+      profile_queue_device_events;
   // Packet id of |dispatch_slot|.
   uint64_t dispatch_packet_id;
   // Uncommitted dispatch payload AQL slot.
@@ -127,7 +136,10 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
 typedef struct iree_hal_amdgpu_host_queue_pm4_ib_submission_t {
   // Generic payload-shaped submission state.
   iree_hal_amdgpu_host_queue_kernel_submission_t kernel;
-  // Final uncommitted PM4-IB AQL slot.
+  // Queue device profile event reservation for this submission.
+  iree_hal_amdgpu_profile_queue_device_event_reservation_t
+      profile_queue_device_events;
+  // Uncommitted PM4-IB payload AQL slot.
   iree_hal_amdgpu_aql_packet_t* pm4_ib_packet_slot;
   // Queue-owned PM4 IB storage referenced by |pm4_ib_packet_slot|.
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot;
@@ -167,7 +179,9 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t operation_resource_count, bool* out_ready,
+    iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t* profile_event_info,
+    bool* out_ready,
     iree_hal_amdgpu_host_queue_barrier_submission_t* out_submission);
 
 // Publishes a barrier-shaped packet submission and returns its queue submission
@@ -179,6 +193,7 @@ uint64_t iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t* profile_event_info,
     iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
     iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
@@ -229,6 +244,8 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count, uint32_t kernarg_block_count,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
     bool* out_ready,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission);
 
@@ -238,7 +255,10 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_host_size_t operation_resource_count, bool* out_ready,
+    iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
+    bool* out_ready,
     iree_hal_amdgpu_host_queue_pm4_ib_submission_t* out_submission);
 
 // Writes one final dispatch packet body into an AQL slot in forward field
@@ -259,6 +279,8 @@ uint64_t iree_hal_amdgpu_host_queue_finish_dispatch_submission(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_dispatch_submission_t* submission);
 
@@ -272,6 +294,8 @@ uint64_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission);
 
@@ -285,6 +309,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     const void* kernargs, iree_host_size_t kernarg_length,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready, uint64_t* out_submission_id);
 
@@ -298,6 +324,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_reclaim_action_t pre_signal_action,
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t* profile_event_info,
     iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
     iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,

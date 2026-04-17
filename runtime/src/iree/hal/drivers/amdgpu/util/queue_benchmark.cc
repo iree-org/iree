@@ -1281,8 +1281,8 @@ class QueueBenchmark : public benchmark::Fixture {
           host_queue, &resolution, signal_semaphore_list,
           IREE_ARRAYSIZE(operation_resources),
           pre_resolved_dispatch_kernarg_block_count_,
-          iree_hal_amdgpu_profile_dispatch_event_reservation_t{0}, &ready,
-          &submission);
+          iree_hal_amdgpu_profile_dispatch_event_reservation_t{0},
+          /*profile_queue_event_info=*/nullptr, &ready, &submission);
       if (iree_status_is_ok(status) && !ready) {
         status = iree_make_status(
             IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -1302,6 +1302,7 @@ class QueueBenchmark : public benchmark::Fixture {
         iree_hal_amdgpu_host_queue_finish_dispatch_submission(
             host_queue, &resolution, signal_semaphore_list, operation_resources,
             IREE_ARRAYSIZE(operation_resources),
+            /*profile_queue_event_info=*/nullptr,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
             &submission);
       }

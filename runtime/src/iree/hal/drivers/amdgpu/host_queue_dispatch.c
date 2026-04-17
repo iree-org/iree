@@ -504,7 +504,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   status = iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       queue, resolution, signal_semaphore_list, plan->operation_resource_count,
-      plan->kernarg_block_count, profile_events, out_ready, &submission);
+      plan->kernarg_block_count, profile_events,
+      /*profile_queue_event_info=*/NULL, out_ready, &submission);
   if (!iree_status_is_ok(status) || !*out_ready) {
     iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue,
                                                               profile_events);
@@ -553,7 +554,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
   const uint64_t submission_epoch =
       iree_hal_amdgpu_host_queue_finish_dispatch_submission(
           queue, resolution, signal_semaphore_list, operation_resources,
-          plan->operation_resource_count, submission_flags, &submission);
+          plan->operation_resource_count, /*profile_queue_event_info=*/NULL,
+          submission_flags, &submission);
   iree_hal_amdgpu_host_queue_record_profile_queue_event(
       queue, resolution, signal_semaphore_list,
       &(iree_hal_amdgpu_host_queue_profile_event_info_t){

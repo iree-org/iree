@@ -82,4 +82,51 @@ IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_profile_dispatch_harvest_args_t) == 16,
     "dispatch harvest args must match the kernel ABI");
 
+//===----------------------------------------------------------------------===//
+// Queue device event records
+//===----------------------------------------------------------------------===//
+
+// Device-written queue operation event.
+//
+// Host submission writes all static metadata before publishing the timestamp
+// packet. PM4 timestamp packets write only start_tick/end_tick while the
+// notification ring epoch continues to own readiness and reclaim.
+typedef struct iree_hal_amdgpu_profile_queue_device_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of queue operation represented by this device event.
+  uint32_t type;
+  // Flags describing queue operation properties.
+  uint32_t flags;
+  // Reserved for future queue device event fields; must be zero.
+  uint32_t reserved0;
+  // Producer-defined event identifier unique within the chunk stream.
+  uint64_t event_id;
+  // Queue submission epoch containing this device event.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 when not applicable.
+  uint64_t command_buffer_id;
+  // Producer-defined allocation identifier, or 0 when not applicable.
+  uint64_t allocation_id;
+  // Producer-defined stream identifier matching the queue metadata record.
+  uint64_t stream_id;
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+  // Session-local physical device ordinal associated with this operation.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this operation.
+  uint32_t queue_ordinal;
+  // Number of encoded payload operations represented by this queue operation.
+  uint32_t operation_count;
+  // Reserved for future queue device event fields; must be zero.
+  uint32_t reserved1;
+  // Device timestamp captured when queue-visible work started.
+  uint64_t start_tick;
+  // Device timestamp captured when queue-visible work completed.
+  uint64_t end_tick;
+} iree_hal_amdgpu_profile_queue_device_event_t;
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_profile_queue_device_event_t) == 96,
+    "queue device event record size is part of the profiling ABI");
+
 #endif  // IREE_HAL_DRIVERS_AMDGPU_ABI_PROFILE_H_

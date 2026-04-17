@@ -34,6 +34,28 @@ uint32_t iree_hal_amdgpu_host_queue_profile_semaphore_count(
                                            : (uint32_t)semaphore_list.count;
 }
 
+iree_hal_amdgpu_profile_queue_device_event_t*
+iree_hal_amdgpu_host_queue_initialize_profile_queue_device_event(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_queue_device_event_reservation_t reservation,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t* info) {
+  if (reservation.event_count == 0) return NULL;
+  IREE_ASSERT(info != NULL,
+              "queue device event reservation requires profile event info");
+  iree_hal_amdgpu_profile_queue_device_event_t* event =
+      iree_hal_amdgpu_host_queue_profile_queue_device_event_at(
+          queue, reservation.first_event_position);
+  event->type = info->type;
+  event->flags = info->flags;
+  event->command_buffer_id = info->command_buffer_id;
+  event->allocation_id = info->allocation_id;
+  event->payload_length = info->payload_length;
+  event->operation_count = info->operation_count;
+  event->start_tick = 0;
+  event->end_tick = 0;
+  return event;
+}
+
 static iree_hal_profile_queue_dependency_strategy_t
 iree_hal_amdgpu_host_queue_profile_dependency_strategy(
     const iree_hal_amdgpu_wait_resolution_t* resolution) {

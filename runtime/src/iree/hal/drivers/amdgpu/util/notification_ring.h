@@ -190,12 +190,17 @@ struct iree_hal_amdgpu_reclaim_entry_t {
   // First dispatch profiling event position reserved by this epoch.
   // Valid only when |profile_event_count| is non-zero.
   uint64_t profile_event_first_position;
+  // First queue device profiling event position reserved by this epoch.
+  // Valid only when |queue_device_event_count| is non-zero.
+  uint64_t queue_device_event_first_position;
   // Kernarg ring write position at the time of this submission. Drain/fail_all
   // report the highest position across retired epochs so the caller can reclaim
   // kernarg blocks. 0 means no kernarg was allocated.
   uint64_t kernarg_write_position;
   // Number of dispatch profiling events reserved by this epoch.
   uint32_t profile_event_count;
+  // Number of queue device profiling events reserved by this epoch.
+  uint32_t queue_device_event_count;
   // Number of retained resources stored in |resources|.
   uint16_t count;
   // Reserved padding for stable layout.

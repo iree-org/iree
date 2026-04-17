@@ -57,6 +57,16 @@ typedef struct iree_hal_amdgpu_profile_dispatch_event_reservation_t {
   uint32_t reserved0;
 } iree_hal_amdgpu_profile_dispatch_event_reservation_t;
 
+// Queue-local reservation of device-timestamped queue operation records.
+typedef struct iree_hal_amdgpu_profile_queue_device_event_reservation_t {
+  // Logical ring position of the first reserved queue device event.
+  uint64_t first_event_position;
+  // Number of reserved queue device events.
+  uint32_t event_count;
+  // Reserved padding.
+  uint32_t reserved0;
+} iree_hal_amdgpu_profile_queue_device_event_reservation_t;
+
 typedef struct iree_hal_amdgpu_host_queue_post_drain_action_t
     iree_hal_amdgpu_host_queue_post_drain_action_t;
 
@@ -318,6 +328,21 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     uint64_t dispatch_event_write_position;
     // Next queue-local dispatch event id assigned during submission.
     uint64_t next_dispatch_event_id;
+    // Device-visible queue operation records waiting for a sink flush.
+    iree_hal_amdgpu_profile_queue_device_event_t* queue_device_events;
+    // Power-of-two capacity of |queue_device_events| in records.
+    uint32_t queue_device_event_capacity;
+    // Capacity minus one, for mapping logical positions to physical slots.
+    uint32_t queue_device_event_mask;
+    // Logical ring position of the next queue device event to write to sink.
+    uint64_t queue_device_event_read_position;
+    // Logical ring position one past the last queue device event ready to
+    // write.
+    uint64_t queue_device_event_ready_position;
+    // Logical ring position one past the last reserved queue device event.
+    uint64_t queue_device_event_write_position;
+    // Next queue-local device event id assigned during submission.
+    uint64_t next_queue_device_event_id;
     // Borrowed hardware counter session active for this queue, or NULL.
     iree_hal_amdgpu_profile_counter_session_t* counter_session;
     // Host-side slot table pairing dispatch event ring slots with per-use
@@ -640,7 +665,38 @@ void iree_hal_amdgpu_host_queue_retire_profile_dispatch_events(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation);
 
-// Writes and clears any buffered dispatch profile events for this queue.
+// Returns true when queue device timestamp packets should be emitted.
+bool iree_hal_amdgpu_host_queue_should_profile_queue_device_events(
+    const iree_hal_amdgpu_host_queue_t* queue);
+
+// Reserves queue-local device-timestamped queue operation records.
+//
+// Caller must hold submission_mutex. If the ring cannot hold |event_count|
+// records the function fails with RESOURCE_EXHAUSTED. The returned records live
+// in device-visible memory so PM4 packets can write timestamp fields directly.
+iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
+    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count,
+    iree_hal_amdgpu_profile_queue_device_event_reservation_t* out_reservation);
+
+// Cancels a tail queue-device-event reservation before AQL publication.
+//
+// Caller must hold submission_mutex. Only valid for the most recent successful
+// reservation on a path that is failing before AQL publication.
+void iree_hal_amdgpu_host_queue_cancel_profile_queue_device_events(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_queue_device_event_reservation_t reservation);
+
+// Returns the queue device event record at |event_position|.
+iree_hal_amdgpu_profile_queue_device_event_t*
+iree_hal_amdgpu_host_queue_profile_queue_device_event_at(
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position);
+
+// Marks a completed queue-device-event reservation ready for sink flush.
+void iree_hal_amdgpu_host_queue_retire_profile_queue_device_events(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_queue_device_event_reservation_t reservation);
+
+// Writes and clears buffered device-side profile events for this queue.
 //
 // Sink writes are cold profiling API operations and may block. The submission
 // and completion paths only append to the queue-local batch.

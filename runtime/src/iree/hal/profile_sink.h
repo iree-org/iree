@@ -92,9 +92,17 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.queue-events")
 
+// Content type for an array of iree_hal_profile_queue_device_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.queue-device-events")
+
 // Content type for an array of iree_hal_profile_memory_event_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.memory-events")
+
+// Content type for an array of iree_hal_profile_event_relationship_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS \
+  IREE_SV("application/vnd.iree.hal.profile.event-relationships")
 
 // Content type for packed iree_hal_profile_counter_set_record_t records.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS \
@@ -112,6 +120,35 @@ enum iree_hal_profile_chunk_flag_bits_t {
 // raw trace bytes.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES \
   IREE_SV("application/vnd.iree.hal.profile.executable-traces")
+
+//===----------------------------------------------------------------------===//
+// Profile time domains
+//===----------------------------------------------------------------------===//
+
+// HAL profile records intentionally preserve raw timestamps in their native
+// clock domains. Consumers must not compare absolute timestamps from different
+// domains unless a clock-correlation record explicitly connects those domains.
+//
+// Canonical domain names used by JSONL tooling exports:
+//
+// - iree_host_time_ns:
+//   Nanoseconds returned by iree_time_now(). On POSIX this is IREE's
+//   monotonic host clock domain, not necessarily CLOCK_MONOTONIC_RAW.
+//
+// - device_tick:
+//   Raw physical-device timestamp ticks. The scale is producer/device-specific
+//   and must be fitted using clock-correlation records before conversion to
+//   nanoseconds or a host timeline.
+//
+// - driver_host_cpu_timestamp_ns:
+//   Driver-provided CPU timestamp sampled with a device tick. The unit is
+//   nanoseconds, but the clock domain is chosen by the driver. For AMDGPU KFD
+//   this is the kernel raw monotonic counter, which is not identical to
+//   iree_host_time_ns.
+//
+// - driver_host_system_timestamp:
+//   Driver-provided system timestamp sampled with a device tick. The unit is
+//   defined by the paired host_system_frequency_hz field.
 
 // Bitfield specifying which optional device record fields are populated.
 typedef uint32_t iree_hal_profile_device_flags_t;
@@ -733,6 +770,59 @@ iree_hal_profile_queue_event_default(void) {
   return record;
 }
 
+// Device-timestamped queue operation event.
+//
+// Queue device events describe when queue work became visible to the physical
+// device, in the device's raw timestamp domain. They complement, but do not
+// replace, host-timestamped queue events: consumers should join records by
+// explicit relationship records or by queue submission id when relationships
+// are absent.
+typedef struct iree_hal_profile_queue_device_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of queue operation represented by this device event.
+  iree_hal_profile_queue_event_type_t type;
+  // Flags describing queue operation properties.
+  iree_hal_profile_queue_event_flags_t flags;
+  // Reserved for future queue device event fields; must be zero.
+  uint32_t reserved0;
+  // Producer-defined event identifier unique within the chunk stream.
+  uint64_t event_id;
+  // Queue submission epoch containing this device event.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 when not applicable.
+  uint64_t command_buffer_id;
+  // Producer-defined allocation identifier, or 0 when not applicable.
+  uint64_t allocation_id;
+  // Producer-defined stream identifier matching the queue metadata record.
+  uint64_t stream_id;
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+  // Session-local physical device ordinal associated with this operation.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this operation.
+  uint32_t queue_ordinal;
+  // Number of encoded payload operations represented by this queue operation.
+  uint32_t operation_count;
+  // Reserved for future queue device event fields; must be zero.
+  uint32_t reserved1;
+  // Device timestamp captured when queue-visible work started.
+  uint64_t start_tick;
+  // Device timestamp captured when queue-visible work completed.
+  uint64_t end_tick;
+} iree_hal_profile_queue_device_event_t;
+
+// Returns a default device-timestamped queue operation event record.
+static inline iree_hal_profile_queue_device_event_t
+iree_hal_profile_queue_device_event_default(void) {
+  iree_hal_profile_queue_device_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
 // Type of memory lifecycle event recorded by a HAL producer.
 typedef uint32_t iree_hal_profile_memory_event_type_t;
 enum iree_hal_profile_memory_event_type_e {
@@ -841,6 +931,90 @@ iree_hal_profile_memory_event_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.result = UINT32_MAX;
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Type of relationship between two profile entities.
+typedef uint32_t iree_hal_profile_event_relationship_type_t;
+enum iree_hal_profile_event_relationship_type_e {
+  IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_NONE = 0u,
+
+  // A queue submission contains a device-side dispatch event.
+  IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_DISPATCH = 1u,
+
+  // A queue submission contains a device-side queue operation event.
+  IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_QUEUE_DEVICE_EVENT =
+      2u,
+};
+
+// Type of profile entity referenced by a relationship endpoint.
+typedef uint32_t iree_hal_profile_event_endpoint_type_t;
+enum iree_hal_profile_event_endpoint_type_e {
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_NONE = 0u,
+
+  // Queue submission identified by submission id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_SUBMISSION = 1u,
+
+  // Host queue event identified by event id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_EVENT = 2u,
+
+  // Device dispatch event identified by event id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_DISPATCH_EVENT = 3u,
+
+  // Recorded command-buffer operation identified by command-buffer id and
+  // command index.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_COMMAND_OPERATION = 4u,
+
+  // Memory lifecycle event identified by event id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_MEMORY_EVENT = 5u,
+
+  // External or embedded artifact identified by producer-defined artifact id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_ARTIFACT = 6u,
+
+  // Device queue event identified by event id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_DEVICE_EVENT = 7u,
+};
+
+// Relationship between two profile entities.
+//
+// Relationship records make cross-record joins explicit in the raw profile
+// bundle. Viewers should use these records for arrows, flows, and drilldown
+// links instead of reconstructing relationships from coincidental matching ids.
+typedef struct iree_hal_profile_event_relationship_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of relationship represented by this record.
+  iree_hal_profile_event_relationship_type_t type;
+  // Producer-defined relationship id unique within this endpoint scope.
+  uint64_t relationship_id;
+  // Source endpoint kind.
+  iree_hal_profile_event_endpoint_type_t source_type;
+  // Target endpoint kind.
+  iree_hal_profile_event_endpoint_type_t target_type;
+  // Session-local physical device ordinal shared by both endpoints.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal shared by both endpoints.
+  uint32_t queue_ordinal;
+  // Producer-defined stream identifier for this relationship.
+  uint64_t stream_id;
+  // Primary source endpoint id.
+  uint64_t source_id;
+  // Secondary source endpoint id, or 0 when absent.
+  uint64_t source_secondary_id;
+  // Primary target endpoint id.
+  uint64_t target_id;
+  // Secondary target endpoint id, or 0 when absent.
+  uint64_t target_secondary_id;
+} iree_hal_profile_event_relationship_record_t;
+
+// Returns a default event relationship record.
+static inline iree_hal_profile_event_relationship_record_t
+iree_hal_profile_event_relationship_record_default(void) {
+  iree_hal_profile_event_relationship_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
   return record;

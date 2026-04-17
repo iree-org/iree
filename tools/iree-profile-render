@@ -1,0 +1,1038 @@
+#!/usr/bin/env python3
+"""Renders IREE ireeperf-jsonl streams into external analysis formats.
+
+This script intentionally has no dependency on IREE Python bindings. It is a
+small adapter over the JSONL interchange stream emitted by:
+
+  iree-profile export --format=ireeperf-jsonl --output=run.ireeperf.jsonl \
+      run.ireeprof
+
+Format-specific imports are optional and delayed until render time so `--help`
+and dependency diagnostics work in a plain checkout.
+"""
+
+from __future__ import annotations
+
+import sys
+
+sys.dont_write_bytecode = True
+
+import argparse
+import collections
+import dataclasses
+import decimal
+import hashlib
+import json
+from pathlib import Path
+from typing import Any, Iterable
+
+
+SCHEMA_VERSION = 3
+TRUSTED_PACKET_SEQUENCE_ID = 1001
+UINT64_MASK = (1 << 64) - 1
+UINT32_MAX = (1 << 32) - 1
+INT64_MIN = -(1 << 63)
+INT64_MAX = (1 << 63) - 1
+
+
+DEPENDENCY_HINT = """\
+Missing optional Perfetto Python dependency.
+
+Run this script in a one-shot environment:
+
+  uvx --with perfetto --with protobuf python tools/iree-profile-render \\
+      --format=perfetto INPUT.ireeperf.jsonl -o OUTPUT.pftrace
+
+or install the optional packages into your active environment:
+
+  python -m pip install perfetto protobuf
+"""
+
+
+@dataclasses.dataclass
+class PerfettoImports:
+    trace_proto_builder: type
+    track_descriptor: type
+    track_event: type
+
+
+@dataclasses.dataclass
+class DeviceClockMapper:
+    """Maps raw device ticks to IREE host time nanoseconds."""
+
+    first_device_tick: int
+    first_host_time_ns: int
+    last_device_tick: int
+    last_host_time_ns: int
+
+    def host_time_from_device_tick(self, device_tick: int) -> int:
+        tick_delta = self.last_device_tick - self.first_device_tick
+        if tick_delta == 0:
+            return self.first_host_time_ns + (device_tick - self.first_device_tick)
+        host_delta = self.last_host_time_ns - self.first_host_time_ns
+        relative_tick_delta = device_tick - self.first_device_tick
+        return self.first_host_time_ns + round(
+            relative_tick_delta * host_delta / tick_delta
+        )
+
+
+@dataclasses.dataclass
+class TimelineEvent:
+    timestamp_ns: int
+    sort_key: tuple[Any, ...]
+    callback: Any
+
+
+@dataclasses.dataclass
+class ConversionStats:
+    records: int = 0
+    output_byte_count: int = 0
+    dispatch_slices: int = 0
+    queue_device_slices: int = 0
+    queue_instants: int = 0
+    memory_instants: int = 0
+    clock_instants: int = 0
+    diagnostic_instants: int = 0
+    counter_samples: int = 0
+    relationship_flows: int = 0
+    skipped_dispatches: int = 0
+    skipped_queue_device_events: int = 0
+
+
+class TrackRegistry:
+    """Creates deterministic Perfetto custom tracks."""
+
+    def __init__(self, builder: Any, track_descriptor: type):
+        self._builder = builder
+        self._track_descriptor = track_descriptor
+        self._defined: set[int] = set()
+
+    def uuid(self, *parts: Any) -> int:
+        digest = hashlib.blake2b(digest_size=8)
+        for part in parts:
+            digest.update(str(part).encode("utf-8"))
+            digest.update(b"\0")
+        value = int.from_bytes(digest.digest(), "little") & UINT64_MASK
+        return value or 1
+
+    def define(
+        self,
+        track_uuid: int,
+        name: str,
+        *,
+        parent_uuid: int | None = None,
+        sibling_order_rank: int | None = None,
+        is_counter: bool = False,
+        explicit_child_order: bool = False,
+    ) -> int:
+        if track_uuid in self._defined:
+            return track_uuid
+        packet = self._builder.add_packet()
+        descriptor = packet.track_descriptor
+        descriptor.uuid = track_uuid
+        descriptor.name = name
+        if parent_uuid is not None:
+            descriptor.parent_uuid = parent_uuid
+        if sibling_order_rank is not None:
+            descriptor.sibling_order_rank = sibling_order_rank
+        if is_counter:
+            descriptor.counter.SetInParent()
+        if explicit_child_order:
+            descriptor.child_ordering = self._track_descriptor.EXPLICIT
+        self._defined.add(track_uuid)
+        return track_uuid
+
+
+class LaneAllocator:
+    """Assigns overlapping slices to sibling tracks."""
+
+    def __init__(self):
+        self._lane_end_times: list[int] = []
+
+    def allocate(self, start_time_ns: int, end_time_ns: int) -> int:
+        for lane_index, lane_end_time_ns in enumerate(self._lane_end_times):
+            if start_time_ns >= lane_end_time_ns:
+                self._lane_end_times[lane_index] = end_time_ns
+                return lane_index
+        self._lane_end_times.append(end_time_ns)
+        return len(self._lane_end_times) - 1
+
+
+def import_perfetto() -> PerfettoImports:
+    try:
+        from perfetto.protos.perfetto.trace.perfetto_trace_pb2 import (
+            TrackDescriptor,
+            TrackEvent,
+        )
+        from perfetto.trace_builder.proto_builder import TraceProtoBuilder
+    except ImportError as error:
+        raise SystemExit(f"{DEPENDENCY_HINT}\nImport error: {error}") from error
+    return PerfettoImports(
+        trace_proto_builder=TraceProtoBuilder,
+        track_descriptor=TrackDescriptor,
+        track_event=TrackEvent,
+    )
+
+
+def parse_integer(value: Any, default: int = 0) -> int:
+    if value is None:
+        return default
+    if isinstance(value, decimal.Decimal):
+        return int(value.to_integral_value(rounding=decimal.ROUND_HALF_UP))
+    return int(value)
+
+
+def parse_ordinal(value: Any, default: int = -1) -> int:
+    ordinal = parse_integer(value, default)
+    return default if ordinal == UINT32_MAX else ordinal
+
+
+def timestamp_midpoint(record: dict[str, Any]) -> int | None:
+    begin_ns = record.get("host_time_begin_ns")
+    end_ns = record.get("host_time_end_ns")
+    if begin_ns is not None and end_ns is not None:
+        return (parse_integer(begin_ns) + parse_integer(end_ns)) // 2
+    host_time_ns = record.get("host_time_ns")
+    if host_time_ns is not None:
+        return parse_integer(host_time_ns)
+    return None
+
+
+def read_jsonl(path: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    if path == "-":
+        lines: Iterable[str] = sys.stdin
+        source_name = "<stdin>"
+    else:
+        lines = Path(path).open("r", encoding="utf-8")
+        source_name = path
+    try:
+        for line_number, line in enumerate(lines, start=1):
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+            try:
+                records.append(
+                    json.loads(
+                        stripped_line,
+                        parse_float=decimal.Decimal,
+                        parse_int=int,
+                    )
+                )
+            except json.JSONDecodeError as error:
+                raise SystemExit(
+                    f"{source_name}:{line_number}: invalid JSONL record: {error}"
+                ) from error
+    finally:
+        if path != "-":
+            lines.close()
+    return records
+
+
+def build_device_clock_mappers(
+    records: list[dict[str, Any]],
+) -> dict[int, DeviceClockMapper]:
+    samples_by_device: dict[int, list[dict[str, Any]]] = collections.defaultdict(list)
+    for record in records:
+        if record.get("record_type") != "clock_correlation":
+            continue
+        if "physical_device_ordinal" not in record or "device_tick" not in record:
+            continue
+        host_time_ns = timestamp_midpoint(record)
+        if host_time_ns is None:
+            continue
+        samples_by_device[parse_integer(record["physical_device_ordinal"])].append(
+            record
+        )
+
+    mappers: dict[int, DeviceClockMapper] = {}
+    for physical_device_ordinal, samples in samples_by_device.items():
+        samples.sort(key=lambda sample: parse_integer(sample["device_tick"]))
+        first = samples[0]
+        last = samples[-1]
+        first_host_time_ns = timestamp_midpoint(first)
+        last_host_time_ns = timestamp_midpoint(last)
+        if first_host_time_ns is None or last_host_time_ns is None:
+            continue
+        mappers[physical_device_ordinal] = DeviceClockMapper(
+            first_device_tick=parse_integer(first["device_tick"]),
+            first_host_time_ns=first_host_time_ns,
+            last_device_tick=parse_integer(last["device_tick"]),
+            last_host_time_ns=last_host_time_ns,
+        )
+    return mappers
+
+
+def device_event_host_time_range(
+    record: dict[str, Any], clock_mappers: dict[int, DeviceClockMapper]
+) -> tuple[int, int, str] | None:
+    if not record.get("valid", True):
+        return None
+    if "start_tick" not in record or "end_tick" not in record:
+        return None
+    physical_device_ordinal = parse_ordinal(record.get("physical_device_ordinal"), 0)
+    start_tick = parse_integer(record["start_tick"])
+    end_tick = parse_integer(record["end_tick"])
+    mapper = clock_mappers.get(physical_device_ordinal)
+    if mapper is not None:
+        return (
+            mapper.host_time_from_device_tick(start_tick),
+            mapper.host_time_from_device_tick(end_tick),
+            "iree_host_time_from_device_clock_fit",
+        )
+    if record.get("derived_time_available", False):
+        return (
+            parse_integer(record.get("start_driver_host_cpu_time_ns")),
+            parse_integer(record.get("end_driver_host_cpu_time_ns")),
+            str(record.get("derived_time_domain", "driver_host_cpu_timestamp_ns")),
+        )
+    return None
+
+
+def add_debug_annotations(track_event: Any, values: dict[str, Any]) -> None:
+    for name, value in values.items():
+        if value is None:
+            continue
+        annotation = track_event.debug_annotations.add()
+        annotation.name = name
+        if isinstance(value, bool):
+            annotation.bool_value = value
+        elif isinstance(value, decimal.Decimal):
+            annotation.double_value = float(value)
+        elif isinstance(value, int):
+            if 0 <= value <= UINT64_MASK:
+                annotation.uint_value = value
+            elif INT64_MIN <= value <= INT64_MAX:
+                annotation.int_value = value
+            else:
+                annotation.string_value = str(value)
+        elif isinstance(value, float):
+            annotation.double_value = value
+        elif isinstance(value, (list, tuple, dict)):
+            annotation.string_value = json.dumps(value, sort_keys=True)
+        else:
+            annotation.string_value = str(value)
+
+
+def add_slice_begin(
+    builder: Any,
+    track_event_type: type,
+    timestamp_ns: int,
+    track_uuid: int,
+    name: str,
+    annotations: dict[str, Any],
+    flow_ids: Iterable[int] = (),
+) -> None:
+    packet = builder.add_packet()
+    packet.timestamp = timestamp_ns
+    packet.trusted_packet_sequence_id = TRUSTED_PACKET_SEQUENCE_ID
+    event = packet.track_event
+    event.type = track_event_type.TYPE_SLICE_BEGIN
+    event.track_uuid = track_uuid
+    event.name = name
+    for flow_id in flow_ids:
+        event.flow_ids.append(flow_id)
+    add_debug_annotations(event, annotations)
+
+
+def add_slice_end(
+    builder: Any,
+    track_event_type: type,
+    timestamp_ns: int,
+    track_uuid: int,
+) -> None:
+    packet = builder.add_packet()
+    packet.timestamp = timestamp_ns
+    packet.trusted_packet_sequence_id = TRUSTED_PACKET_SEQUENCE_ID
+    event = packet.track_event
+    event.type = track_event_type.TYPE_SLICE_END
+    event.track_uuid = track_uuid
+
+
+def add_instant(
+    builder: Any,
+    track_event_type: type,
+    timestamp_ns: int,
+    track_uuid: int,
+    name: str,
+    annotations: dict[str, Any],
+    flow_ids: Iterable[int] = (),
+) -> None:
+    packet = builder.add_packet()
+    packet.timestamp = timestamp_ns
+    packet.trusted_packet_sequence_id = TRUSTED_PACKET_SEQUENCE_ID
+    event = packet.track_event
+    event.type = track_event_type.TYPE_INSTANT
+    event.track_uuid = track_uuid
+    event.name = name
+    for flow_id in flow_ids:
+        event.flow_ids.append(flow_id)
+    add_debug_annotations(event, annotations)
+
+
+def add_counter(
+    builder: Any,
+    track_event_type: type,
+    timestamp_ns: int,
+    track_uuid: int,
+    value: int,
+) -> None:
+    packet = builder.add_packet()
+    packet.timestamp = timestamp_ns
+    packet.trusted_packet_sequence_id = TRUSTED_PACKET_SEQUENCE_ID
+    event = packet.track_event
+    event.type = track_event_type.TYPE_COUNTER
+    event.track_uuid = track_uuid
+    event.counter_value = value
+
+
+def event_annotations(record: dict[str, Any]) -> dict[str, Any]:
+    skipped_keys = {"schema_version", "record_type", "key", "name"}
+    return {
+        key: value
+        for key, value in record.items()
+        if key not in skipped_keys
+        and isinstance(value, (bool, int, float, decimal.Decimal, str, list))
+    }
+
+
+def queue_key(record: dict[str, Any]) -> tuple[int, int]:
+    return (
+        parse_ordinal(record.get("physical_device_ordinal"), 0),
+        parse_ordinal(record.get("queue_ordinal"), -1),
+    )
+
+
+def submission_key(record: dict[str, Any]) -> tuple[int, int, int, int] | None:
+    submission_id = parse_integer(record.get("submission_id", 0))
+    if submission_id == 0:
+        return None
+    physical_device_ordinal, queue_ordinal = queue_key(record)
+    stream_id = parse_integer(record.get("stream_id", 0))
+    return (physical_device_ordinal, queue_ordinal, stream_id, submission_id)
+
+
+def event_endpoint_key(
+    record: dict[str, Any], endpoint_type: str
+) -> tuple[str, int, int, int, int] | None:
+    event_id = parse_integer(record.get("event_id", 0))
+    if event_id == 0:
+        return None
+    physical_device_ordinal, queue_ordinal = queue_key(record)
+    stream_id = parse_integer(record.get("stream_id", 0))
+    return (endpoint_type, physical_device_ordinal, queue_ordinal, stream_id, event_id)
+
+
+def build_trace(
+    records: list[dict[str, Any]], perfetto: PerfettoImports
+) -> tuple[bytes, ConversionStats]:
+    builder = perfetto.trace_proto_builder()
+    tracks = TrackRegistry(builder, perfetto.track_descriptor)
+    stats = ConversionStats(records=len(records))
+    clock_mappers = build_device_clock_mappers(records)
+
+    root_uuid = tracks.uuid("iree", "root")
+    diagnostics_uuid = tracks.uuid("iree", "diagnostics")
+    tracks.define(
+        root_uuid,
+        "IREE HAL profile",
+        sibling_order_rank=0,
+        explicit_child_order=True,
+    )
+    tracks.define(
+        diagnostics_uuid,
+        "diagnostics",
+        parent_uuid=root_uuid,
+        sibling_order_rank=100000,
+    )
+
+    def ensure_device_track(
+        physical_device_ordinal: int, record: dict[str, Any] | None = None
+    ) -> int:
+        device_uuid = tracks.uuid("iree", "device", physical_device_ordinal)
+        device_name = (
+            "device[unknown]"
+            if physical_device_ordinal < 0
+            else f"device[{physical_device_ordinal}]"
+        )
+        if record is not None and record.get("physical_device_uuid_present"):
+            device_name += f" {record.get('physical_device_uuid')}"
+        sibling_order_rank = (
+            999999 if physical_device_ordinal < 0 else physical_device_ordinal
+        )
+        tracks.define(
+            device_uuid,
+            device_name,
+            parent_uuid=root_uuid,
+            sibling_order_rank=sibling_order_rank,
+            explicit_child_order=True,
+        )
+        return device_uuid
+
+    def ensure_queue_tracks(
+        physical_device_ordinal: int,
+        queue_ordinal: int,
+        stream_id: Any | None = None,
+    ) -> int:
+        device_uuid = ensure_device_track(physical_device_ordinal)
+        queue_uuid = tracks.uuid(
+            "iree", "queue", physical_device_ordinal, queue_ordinal
+        )
+        queue_name = (
+            "device-scope events" if queue_ordinal < 0 else f"queue[{queue_ordinal}]"
+        )
+        if queue_ordinal >= 0 and stream_id is not None:
+            queue_name += f" stream={stream_id}"
+        sibling_order_rank = 999999 if queue_ordinal < 0 else queue_ordinal
+        tracks.define(
+            queue_uuid,
+            queue_name,
+            parent_uuid=device_uuid,
+            sibling_order_rank=sibling_order_rank,
+            explicit_child_order=True,
+        )
+        tracks.define(
+            tracks.uuid("iree", "queue-events", physical_device_ordinal, queue_ordinal),
+            "host queue events",
+            parent_uuid=queue_uuid,
+            sibling_order_rank=0,
+        )
+        tracks.define(
+            tracks.uuid("iree", "memory", physical_device_ordinal, queue_ordinal),
+            "host memory events",
+            parent_uuid=queue_uuid,
+            sibling_order_rank=20,
+        )
+        tracks.define(
+            tracks.uuid(
+                "iree", "queue-allocation-bytes", physical_device_ordinal, queue_ordinal
+            ),
+            "queue allocation bytes",
+            parent_uuid=queue_uuid,
+            sibling_order_rank=30,
+            is_counter=True,
+        )
+        return queue_uuid
+
+    device_records = [
+        record for record in records if record.get("record_type") == "device"
+    ]
+    for record in device_records:
+        ensure_device_track(parse_integer(record["physical_device_ordinal"]), record)
+
+    queue_records = [
+        record for record in records if record.get("record_type") == "queue"
+    ]
+    for record in queue_records:
+        physical_device_ordinal, queue_ordinal = queue_key(record)
+        ensure_queue_tracks(
+            physical_device_ordinal, queue_ordinal, record.get("stream_id")
+        )
+
+    dispatch_lane_allocators: dict[tuple[int, int], LaneAllocator] = (
+        collections.defaultdict(LaneAllocator)
+    )
+    queue_device_lane_allocators: dict[tuple[int, int], LaneAllocator] = (
+        collections.defaultdict(LaneAllocator)
+    )
+    timeline_events: list[TimelineEvent] = []
+    all_timestamp_ns: list[int] = []
+
+    flow_ids_by_endpoint: dict[tuple[str, int, int, int, int], list[int]] = (
+        collections.defaultdict(list)
+    )
+    flow_ids_by_submission: dict[tuple[int, int, int, int], list[int]] = (
+        collections.defaultdict(list)
+    )
+    for record in records:
+        if (
+            record.get("record_type") != "event_relationship"
+            or record.get("source_type") != "queue_submission"
+        ):
+            continue
+        target_type = str(record.get("target_type", ""))
+        if target_type not in ("dispatch_event", "queue_device_event"):
+            continue
+        physical_device_ordinal, queue_ordinal = queue_key(record)
+        stream_id = parse_integer(record.get("stream_id", 0))
+        source_id = parse_integer(record.get("source_id", 0))
+        target_id = parse_integer(record.get("target_id", 0))
+        if source_id == 0 or target_id == 0:
+            continue
+        submission_endpoint = (
+            physical_device_ordinal,
+            queue_ordinal,
+            stream_id,
+            source_id,
+        )
+        target_endpoint = (
+            target_type,
+            physical_device_ordinal,
+            queue_ordinal,
+            stream_id,
+            target_id,
+        )
+        flow_id = tracks.uuid(
+            "iree",
+            "relationship-flow",
+            parse_integer(record.get("relationship_id", 0)),
+            record.get("kind"),
+            submission_endpoint,
+            target_endpoint,
+        )
+        flow_ids_by_endpoint[target_endpoint].append(flow_id)
+        flow_ids_by_submission[submission_endpoint].append(flow_id)
+        stats.relationship_flows += 1
+
+    def define_dispatch_lane(
+        physical_device_ordinal: int, queue_ordinal: int, lane_index: int
+    ) -> int:
+        queue_uuid = ensure_queue_tracks(physical_device_ordinal, queue_ordinal)
+        track_uuid = tracks.uuid(
+            "iree", "dispatch", physical_device_ordinal, queue_ordinal, lane_index
+        )
+        tracks.define(
+            track_uuid,
+            "dispatch" if lane_index == 0 else f"dispatch lane {lane_index}",
+            parent_uuid=queue_uuid,
+            sibling_order_rank=10 + lane_index,
+        )
+        return track_uuid
+
+    def define_queue_device_lane(
+        physical_device_ordinal: int, queue_ordinal: int, lane_index: int
+    ) -> int:
+        queue_uuid = ensure_queue_tracks(physical_device_ordinal, queue_ordinal)
+        track_uuid = tracks.uuid(
+            "iree", "queue-device", physical_device_ordinal, queue_ordinal, lane_index
+        )
+        tracks.define(
+            track_uuid,
+            (
+                "device queue ops"
+                if lane_index == 0
+                else f"device queue ops lane {lane_index}"
+            ),
+            parent_uuid=queue_uuid,
+            sibling_order_rank=5 + lane_index,
+        )
+        return track_uuid
+
+    for record in records:
+        record_type = record.get("record_type")
+        if record_type == "dispatch_event":
+            host_range = device_event_host_time_range(record, clock_mappers)
+            if host_range is None:
+                stats.skipped_dispatches += 1
+                continue
+            start_time_ns, end_time_ns, time_domain = host_range
+            if end_time_ns < start_time_ns:
+                stats.skipped_dispatches += 1
+                continue
+            if end_time_ns == start_time_ns:
+                end_time_ns += 1
+            physical_device_ordinal, queue_ordinal = queue_key(record)
+            ensure_queue_tracks(
+                physical_device_ordinal, queue_ordinal, record.get("stream_id")
+            )
+            lane_index = dispatch_lane_allocators[
+                (physical_device_ordinal, queue_ordinal)
+            ].allocate(start_time_ns, end_time_ns)
+            track_uuid = define_dispatch_lane(
+                physical_device_ordinal, queue_ordinal, lane_index
+            )
+            name = str(record.get("key") or f"dispatch[{record.get('event_id', 0)}]")
+            annotations = event_annotations(record)
+            annotations["iree_perfetto_time_domain"] = time_domain
+            endpoint_key = event_endpoint_key(record, "dispatch_event")
+            flow_ids = tuple(flow_ids_by_endpoint.get(endpoint_key, ()))
+            timeline_events.append(
+                TimelineEvent(
+                    start_time_ns,
+                    (
+                        1,
+                        "dispatch_begin",
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        start_time_ns,
+                    ),
+                    lambda timestamp_ns=start_time_ns, track_uuid=track_uuid, name=name, annotations=annotations, flow_ids=flow_ids: add_slice_begin(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        name,
+                        annotations,
+                        flow_ids,
+                    ),
+                )
+            )
+            timeline_events.append(
+                TimelineEvent(
+                    end_time_ns,
+                    (
+                        0,
+                        "dispatch_end",
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        end_time_ns,
+                    ),
+                    lambda timestamp_ns=end_time_ns, track_uuid=track_uuid: add_slice_end(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                    ),
+                )
+            )
+            all_timestamp_ns.extend([start_time_ns, end_time_ns])
+            stats.dispatch_slices += 1
+        elif record_type == "queue_device_event":
+            host_range = device_event_host_time_range(record, clock_mappers)
+            if host_range is None:
+                stats.skipped_queue_device_events += 1
+                continue
+            start_time_ns, end_time_ns, time_domain = host_range
+            if end_time_ns < start_time_ns:
+                stats.skipped_queue_device_events += 1
+                continue
+            if end_time_ns == start_time_ns:
+                end_time_ns += 1
+            physical_device_ordinal, queue_ordinal = queue_key(record)
+            ensure_queue_tracks(
+                physical_device_ordinal, queue_ordinal, record.get("stream_id")
+            )
+            lane_index = queue_device_lane_allocators[
+                (physical_device_ordinal, queue_ordinal)
+            ].allocate(start_time_ns, end_time_ns)
+            track_uuid = define_queue_device_lane(
+                physical_device_ordinal, queue_ordinal, lane_index
+            )
+            name = f"queue-device:{record.get('op', 'event')}"
+            annotations = event_annotations(record)
+            annotations["iree_perfetto_time_domain"] = time_domain
+            endpoint_key = event_endpoint_key(record, "queue_device_event")
+            flow_ids = tuple(flow_ids_by_endpoint.get(endpoint_key, ()))
+            timeline_events.append(
+                TimelineEvent(
+                    start_time_ns,
+                    (
+                        1,
+                        "queue_device_begin",
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        start_time_ns,
+                    ),
+                    lambda timestamp_ns=start_time_ns, track_uuid=track_uuid, name=name, annotations=annotations, flow_ids=flow_ids: add_slice_begin(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        name,
+                        annotations,
+                        flow_ids,
+                    ),
+                )
+            )
+            timeline_events.append(
+                TimelineEvent(
+                    end_time_ns,
+                    (
+                        0,
+                        "queue_device_end",
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        end_time_ns,
+                    ),
+                    lambda timestamp_ns=end_time_ns, track_uuid=track_uuid: add_slice_end(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                    ),
+                )
+            )
+            all_timestamp_ns.extend([start_time_ns, end_time_ns])
+            stats.queue_device_slices += 1
+        elif record_type == "queue_event":
+            timestamp_ns = record.get("host_time_ns")
+            if timestamp_ns is None:
+                continue
+            physical_device_ordinal, queue_ordinal = queue_key(record)
+            ensure_queue_tracks(
+                physical_device_ordinal, queue_ordinal, record.get("stream_id")
+            )
+            track_uuid = tracks.uuid(
+                "iree", "queue-events", physical_device_ordinal, queue_ordinal
+            )
+            event_time_ns = parse_integer(timestamp_ns)
+            name = f"queue:{record.get('op', 'event')}"
+            annotations = event_annotations(record)
+            annotations["iree_perfetto_time_domain"] = record.get(
+                "host_time_domain", "iree_host_time_ns"
+            )
+            flow_ids = tuple(flow_ids_by_submission.get(submission_key(record), ()))
+            timeline_events.append(
+                TimelineEvent(
+                    event_time_ns,
+                    (2, "queue", physical_device_ordinal, queue_ordinal, event_time_ns),
+                    lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, name=name, annotations=annotations, flow_ids=flow_ids: add_instant(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        name,
+                        annotations,
+                        flow_ids,
+                    ),
+                )
+            )
+            all_timestamp_ns.append(event_time_ns)
+            stats.queue_instants += 1
+        elif record_type == "memory_event":
+            timestamp_ns = record.get("host_time_ns")
+            if timestamp_ns is None:
+                continue
+            physical_device_ordinal, queue_ordinal = queue_key(record)
+            ensure_queue_tracks(physical_device_ordinal, queue_ordinal)
+            track_uuid = tracks.uuid(
+                "iree", "memory", physical_device_ordinal, queue_ordinal
+            )
+            event_time_ns = parse_integer(timestamp_ns)
+            name = f"memory:{record.get('event_type', 'event')}"
+            annotations = event_annotations(record)
+            annotations["iree_perfetto_time_domain"] = record.get(
+                "host_time_domain", "iree_host_time_ns"
+            )
+            timeline_events.append(
+                TimelineEvent(
+                    event_time_ns,
+                    (
+                        2,
+                        "memory",
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        event_time_ns,
+                    ),
+                    lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, name=name, annotations=annotations: add_instant(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        name,
+                        annotations,
+                    ),
+                )
+            )
+            all_timestamp_ns.append(event_time_ns)
+            stats.memory_instants += 1
+        elif record_type == "clock_correlation":
+            event_time_ns = timestamp_midpoint(record)
+            if event_time_ns is None:
+                continue
+            physical_device_ordinal = parse_ordinal(
+                record.get("physical_device_ordinal"), 0
+            )
+            ensure_device_track(physical_device_ordinal)
+            track_uuid = tracks.uuid("iree", "device", physical_device_ordinal)
+            annotations = event_annotations(record)
+            timeline_events.append(
+                TimelineEvent(
+                    event_time_ns,
+                    (2, "clock", physical_device_ordinal, event_time_ns),
+                    lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, annotations=annotations: add_instant(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        "clock correlation",
+                        annotations,
+                    ),
+                )
+            )
+            all_timestamp_ns.append(event_time_ns)
+            stats.clock_instants += 1
+        elif record_type == "diagnostic":
+            annotations = event_annotations(record)
+            timeline_events.append(
+                TimelineEvent(
+                    0,
+                    (2, "diagnostic", record.get("source_record_index", 0)),
+                    lambda timestamp_ns=0, track_uuid=diagnostics_uuid, annotations=annotations: add_instant(
+                        builder,
+                        perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        str(record.get("code", "diagnostic")),
+                        annotations,
+                    ),
+                )
+            )
+            stats.diagnostic_instants += 1
+
+    queue_allocation_bytes: dict[tuple[int, int], int] = collections.defaultdict(int)
+    for record in sorted(
+        (record for record in records if record.get("record_type") == "memory_event"),
+        key=lambda item: parse_integer(item.get("host_time_ns", 0)),
+    ):
+        event_type = record.get("event_type")
+        if event_type not in ("queue_alloca", "queue_dealloca"):
+            continue
+        if "host_time_ns" not in record:
+            continue
+        physical_device_ordinal, queue_ordinal = queue_key(record)
+        ensure_queue_tracks(physical_device_ordinal, queue_ordinal)
+        key = (physical_device_ordinal, queue_ordinal)
+        length = parse_integer(record.get("length", 0))
+        if event_type == "queue_alloca":
+            queue_allocation_bytes[key] += length
+        else:
+            queue_allocation_bytes[key] = max(0, queue_allocation_bytes[key] - length)
+        event_time_ns = parse_integer(record["host_time_ns"])
+        track_uuid = tracks.uuid(
+            "iree", "queue-allocation-bytes", physical_device_ordinal, queue_ordinal
+        )
+        value = queue_allocation_bytes[key]
+        timeline_events.append(
+            TimelineEvent(
+                event_time_ns,
+                (
+                    2,
+                    "counter",
+                    physical_device_ordinal,
+                    queue_ordinal,
+                    event_time_ns,
+                ),
+                lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, value=value: add_counter(
+                    builder,
+                    perfetto.track_event,
+                    timestamp_ns,
+                    track_uuid,
+                    value,
+                ),
+            )
+        )
+        all_timestamp_ns.append(event_time_ns)
+        stats.counter_samples += 1
+
+    trace_epoch_ns = min(all_timestamp_ns) if all_timestamp_ns else 0
+
+    for event in sorted(
+        timeline_events, key=lambda item: (item.timestamp_ns, item.sort_key)
+    ):
+        event.callback(timestamp_ns=max(0, event.timestamp_ns - trace_epoch_ns))
+
+    return builder.serialize(), stats
+
+
+def render_perfetto(
+    records: list[dict[str, Any]], output_path: Path, perfetto: PerfettoImports
+) -> ConversionStats:
+    trace_bytes, stats = build_trace(records, perfetto)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(trace_bytes)
+    stats.output_byte_count = len(trace_bytes)
+    return stats
+
+
+def parse_arguments(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="iree-profile-render",
+        description=(
+            "Renders ireeperf-jsonl emitted by iree-profile into external "
+            "analysis formats."
+        ),
+        epilog=(
+            "Formats:\n"
+            "  perfetto   Native Perfetto TrackEvent .pftrace.\n\n"
+            "One-shot Perfetto dependency invocation:\n"
+            "  uvx --with perfetto --with protobuf python "
+            "tools/iree-profile-render --format=perfetto "
+            "INPUT.ireeperf.jsonl -o OUTPUT.pftrace\n\n"
+            "Pipeline:\n"
+            "  bazel-bin/tools/iree-profile export --format=ireeperf-jsonl "
+            "--output=- run.ireeprof | \\\n"
+            "    uvx --with perfetto --with protobuf python "
+            "tools/iree-profile-render --format=perfetto - -o run.pftrace"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        default="perfetto",
+        choices=("perfetto",),
+        help="Render format. Default: perfetto.",
+    )
+    parser.add_argument(
+        "input",
+        help="Input ireeperf-jsonl file, or '-' to read from stdin.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Output path for the selected render format.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print the conversion summary.",
+    )
+    return parser.parse_args(argv)
+
+
+def validate_schema(records: list[dict[str, Any]]) -> None:
+    schema_records = [
+        record for record in records if record.get("record_type") == "schema"
+    ]
+    if not schema_records:
+        raise SystemExit("input does not contain an ireeperf-jsonl schema record")
+    schema_record = schema_records[0]
+    if schema_record.get("format") != "ireeperf-jsonl":
+        raise SystemExit(f"unsupported input format: {schema_record.get('format')!r}")
+    schema_version = parse_integer(schema_record.get("schema_version", 0))
+    if schema_version != SCHEMA_VERSION:
+        raise SystemExit(
+            f"unsupported ireeperf-jsonl schema version {schema_version}; "
+            f"expected {SCHEMA_VERSION}"
+        )
+
+
+def main(argv: list[str]) -> int:
+    args = parse_arguments(argv)
+    if args.format == "perfetto":
+        renderer_state = import_perfetto()
+    else:
+        raise SystemExit(f"unsupported render format: {args.format}")
+
+    records = read_jsonl(args.input)
+    validate_schema(records)
+
+    output_path = Path(args.output)
+    if args.format == "perfetto":
+        stats = render_perfetto(records, output_path, renderer_state)
+    else:
+        raise SystemExit(f"unsupported render format: {args.format}")
+
+    if not args.quiet:
+        print(
+            "wrote "
+            f"{output_path} ({stats.output_byte_count} bytes, "
+            f"format={args.format}, records={stats.records}, "
+            f"dispatch_slices={stats.dispatch_slices}, "
+            f"queue_device_slices={stats.queue_device_slices}, "
+            f"queue_instants={stats.queue_instants}, "
+            f"memory_instants={stats.memory_instants}, "
+            f"clock_instants={stats.clock_instants}, "
+            f"counter_samples={stats.counter_samples}, "
+            f"relationship_flows={stats.relationship_flows}, "
+            f"skipped_dispatches={stats.skipped_dispatches}, "
+            f"skipped_queue_device_events={stats.skipped_queue_device_events})",
+            file=sys.stderr,
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

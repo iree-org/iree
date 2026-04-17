@@ -62,6 +62,8 @@ iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
   entry->pre_signal_action.user_data = NULL;
   entry->profile_event_first_position = 0;
   entry->profile_event_count = 0;
+  entry->queue_device_event_first_position = 0;
+  entry->queue_device_event_count = 0;
   entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;
@@ -111,6 +113,8 @@ void iree_hal_amdgpu_reclaim_entry_release(
   entry->pre_signal_action.user_data = NULL;
   entry->profile_event_first_position = 0;
   entry->profile_event_count = 0;
+  entry->queue_device_event_first_position = 0;
+  entry->queue_device_event_count = 0;
   entry->resource_set = NULL;
   entry->kernarg_write_position = 0;
   entry->count = 0;

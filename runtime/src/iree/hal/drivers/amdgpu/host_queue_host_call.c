@@ -217,11 +217,16 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
   iree_hal_resource_t* operation_resources[1] = {
       &state->resource,
   };
+  iree_hal_amdgpu_host_queue_profile_event_info_t profile_event_info = {
+      .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL,
+      .operation_count = 1,
+  };
   iree_hal_amdgpu_host_queue_barrier_submission_t submission;
   iree_status_t status =
       iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
           queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
-          IREE_ARRAYSIZE(operation_resources), out_ready, &submission);
+          IREE_ARRAYSIZE(operation_resources), &profile_event_info, out_ready,
+          &submission);
   if (iree_status_is_ok(status) && *out_ready) {
     const uint64_t submission_id =
         iree_hal_amdgpu_host_queue_finish_barrier_submission(
@@ -231,16 +236,14 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
                 .user_data = state,
             },
             operation_resources, IREE_ARRAYSIZE(operation_resources),
+            &profile_event_info,
             iree_hal_amdgpu_host_queue_post_commit_callback_null(),
             /*resource_set=*/NULL,
             IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &submission);
+    profile_event_info.submission_id = submission_id;
     iree_hal_amdgpu_host_queue_record_profile_queue_event(
         queue, &host_call_resolution, signal_semaphore_list,
-        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
-            .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL,
-            .submission_id = submission_id,
-            .operation_count = 1,
-        });
+        &profile_event_info);
   }
   if (!iree_status_is_ok(status) || !*out_ready) {
     iree_hal_resource_release(&state->resource);

@@ -47,6 +47,13 @@ uint64_t iree_hal_amdgpu_host_queue_profile_stream_id(
 uint32_t iree_hal_amdgpu_host_queue_profile_semaphore_count(
     const iree_hal_semaphore_list_t semaphore_list);
 
+// Initializes one reserved device-timestamped queue operation event.
+iree_hal_amdgpu_profile_queue_device_event_t*
+iree_hal_amdgpu_host_queue_initialize_profile_queue_device_event(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_profile_queue_device_event_reservation_t reservation,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t* info);
+
 // Records one queue operation event when queue profiling is enabled.
 //
 // This performs a cheap queue-local enabled check before preparing the full

@@ -23,7 +23,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["lit.cfg.py"])
+exports_files([
+    "iree-profile-render",
+    "lit.cfg.py",
+])
 
 iree_runtime_cc_binary(
     name = "iree-benchmark-executable",
