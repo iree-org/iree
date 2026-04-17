@@ -172,7 +172,8 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
 
 def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
     Pure, ReturnLike, Terminator,
-    HasParent<"::mlir::iree_compiler::IREE::GPU::BarrierRegionOp">]> {
+    ParentOneOf<["::mlir::iree_compiler::IREE::GPU::BarrierRegionOp",
+                 "::mlir::iree_compiler::IREE::GPU::SubgroupScanOp"]>]> {
   let summary = [{Yield values from a iree_gpu region.}];
   let description = [{
      This operation is used to yield values from a within a region.
@@ -183,6 +184,54 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
 
   let assemblyFormat =
       [{  attr-dict ($values^ `:` type($values))? }];
+}
+
+//===----------------------------------------------------------------------===//
+// SubgroupScanOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SubgroupScanOp : Op<IREEGPU_Dialect, "subgroup_scan", [
+    SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">,
+    AllTypesMatch<["value", "result"]>]> {
+  let summary = "Inclusive prefix scan across subgroup lanes.";
+  let description = [{
+    Performs an inclusive prefix scan of a scalar value across lanes within
+    a subgroup cluster. The combiner is specified by the region body, which
+    takes two arguments of the value type and yields one result.
+
+    The subgroup is divided into clusters of `size` lanes starting at lane 0
+    with inter-lane `stride`. Within each cluster, lane at logical position
+    `p` receives `val_0 op val_1 op ... op val_p`, where `op` is the combiner.
+
+    The combiner must be associative. It does not need to be commutative.
+
+    Example:
+    ```mlir
+    %scan = iree_gpu.subgroup_scan(%x) cluster(size = 4, stride = 2) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %add = arith.addf %lhs, %rhs : f32
+      iree_gpu.yield %add : f32
+    } : f32
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$value,
+    OptionalAttr<I32Attr>:$cluster_size,
+    DefaultValuedAttr<I32Attr, "1">:$cluster_stride
+  );
+  let results = (outs AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$result);
+  let regions = (region SizedRegion<1>:$combiner);
+
+  let assemblyFormat = [{
+    `(` $value `)`
+    (`cluster` `(` `size` `=` $cluster_size^
+      (`,` `stride` `=` $cluster_stride^)? `)`)?
+    $combiner attr-dict `:` type($value)
+  }];
+
+  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

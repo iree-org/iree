@@ -118,6 +118,41 @@ LogicalResult ValueBarrierOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// SubgroupScanOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SubgroupScanOp::verify() {
+  if (std::optional<uint32_t> size = getClusterSize()) {
+    if (!llvm::isPowerOf2_32(*size)) {
+      return emitOpError("cluster_size must be a power of 2");
+    }
+  }
+  uint32_t stride = getClusterStride();
+  if (!llvm::isPowerOf2_32(stride)) {
+    return emitOpError("cluster_stride must be a power of 2");
+  }
+  return success();
+}
+
+LogicalResult SubgroupScanOp::verifyRegions() {
+  Block &block = getCombiner().front();
+  if (block.getNumArguments() != 2) {
+    return emitOpError("combiner region must have exactly 2 arguments");
+  }
+  Type valTy = getValue().getType();
+  for (auto arg : block.getArguments()) {
+    if (arg.getType() != valTy) {
+      return emitOpError("combiner argument type must match value type");
+    }
+  }
+  auto yield = cast<IREE::GPU::YieldOp>(block.getTerminator());
+  if (yield.getNumOperands() != 1 || yield.getOperand(0).getType() != valTy) {
+    return emitOpError("combiner must yield one value of the value type");
+  }
+  return success();
+}
+
 // AMD Specific Operations
 
 //===----------------------------------------------------------------------===//
