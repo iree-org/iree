@@ -188,6 +188,36 @@ func.func @scatter_dim_mismatch(
 
 // -----
 
+func.func @scatter_mask_wrong_element_type(
+    %update : tensor<4xf32>, %indices : tensor<4x1xi32>,
+    %mask : tensor<4xi32>, %original : tensor<8xf32>) -> tensor<8xf32> {
+  // expected-error @below {{'iree_linalg_ext.scatter' op expected mask to have i1 or storage-legalized i8 element type}}
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices, %mask : tensor<4xf32>, tensor<4x1xi32>, tensor<4xi32>)
+    outs(%original : tensor<8xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      iree_linalg_ext.yield %arg1 : f32
+    } -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
+func.func @scatter_mask_wrong_shape(
+    %update : tensor<4xf32>, %indices : tensor<4x1xi32>,
+    %mask : tensor<5xi1>, %original : tensor<8xf32>) -> tensor<8xf32> {
+  // expected-error @below {{'iree_linalg_ext.scatter' op mask shape must match batch dimensions at dim#0}}
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%update, %indices, %mask : tensor<4xf32>, tensor<4x1xi32>, tensor<5xi1>)
+    outs(%original : tensor<8xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      iree_linalg_ext.yield %arg1 : f32
+    } -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
 func.func @scatter_dim_mismatch(
     %update : tensor<48x?x2x11xf32>, %indices : tensor<48x?x1xi32>,
     %original : tensor<2x?x10xf32>) -> tensor<2x?x10xf32> {
@@ -469,6 +499,19 @@ func.func @gather_dim_map_mismatch(
     ins(%source, %idx : tensor<2xf32>, tensor<1xi32>)
     outs(%output : tensor<1xf32>) -> tensor<1xf32>
   return %0 : tensor<1xf32>
+}
+
+// -----
+
+func.func @gather_mask_wrong_rank(
+    %source : tensor<10x10xf32>, %idx : tensor<3x1xi32>,
+    %mask : tensor<3x1xi1>, %output : tensor<3x10xf32>) -> tensor<3x10xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op expected mask rank to match batch rank}}
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx, %mask : tensor<10x10xf32>, tensor<3x1xi32>, tensor<3x1xi1>)
+    outs(%output : tensor<3x10xf32>) -> tensor<3x10xf32>
+  return %0 : tensor<3x10xf32>
 }
 
 // -----

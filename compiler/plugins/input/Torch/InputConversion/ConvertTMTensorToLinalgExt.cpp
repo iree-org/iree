@@ -92,7 +92,8 @@ struct ScatterOpConversion
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
         rewriter, op.getLoc(), op->getResultTypes(),
         /*updates=*/updateVal, /*indices=*/indicesVal,
-        /*original=*/op.getOutputs()[0], dimMap, op.getUniqueIndices());
+        /*mask=*/Value(), /*original=*/op.getOutputs()[0], dimMap,
+        op.getUniqueIndices());
     rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());
     rewriter.replaceOp(op, scatterOp->getResults());

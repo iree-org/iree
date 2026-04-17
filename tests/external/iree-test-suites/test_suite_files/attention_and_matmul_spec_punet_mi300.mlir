@@ -26,7 +26,7 @@ module attributes { transform.with_named_sequence } {
 transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
     transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
-    transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
+    transform.match.operation_name %attention ["iree_linalg_ext.online_attention"] : !transform.any_op
     %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
     transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf16> : !transform.any_value
 
@@ -52,7 +52,7 @@ transform.named_sequence @match_attention_f16(%attention: !transform.any_op {tra
 transform.named_sequence @match_attention_f8(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
     transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
-    transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
+    transform.match.operation_name %attention ["iree_linalg_ext.online_attention"] : !transform.any_op
     %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
     transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf8E4M3FNUZ> : !transform.any_value
 

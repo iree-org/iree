@@ -179,6 +179,54 @@ util.func public @staticAvgRaggedColumnLengths(%source : tensor<?x?x?xf32>,
 
 // -----
 
+// Check static iree_tensor_ext.linearize_ragged_dims
+
+util.func public @staticLinearizeRaggedDims(%source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>,
+    %d0 : index) -> tensor<10x?x30xf32> {
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<10x?x30xf32>{%d0}
+  util.return %0 : tensor<10x?x30xf32>
+}
+// CHECK-LABEL: @staticLinearizeRaggedDims
+// CHECK: iree_tensor_ext.linearize_ragged_dims %{{.*}} : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<10x?x30xf32>{%{{.*}}}
+
+// -----
+
+// Check dynamic iree_tensor_ext.linearize_ragged_dims
+
+util.func public @dynamicLinearizeRaggedDims(%source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>,
+    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x?x?xf32> {
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<?x?x?xf32>{%d0, %d1, %d2}
+  util.return %0 : tensor<?x?x?xf32>
+}
+// CHECK-LABEL: @dynamicLinearizeRaggedDims
+// CHECK: iree_tensor_ext.linearize_ragged_dims %{{.*}} : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<?x?x?xf32>{%{{.*}}, %{{.*}}, %{{.*}}}
+
+// -----
+
+// Check memref-type iree_tensor_ext.linearize_ragged_dims
+
+util.func public @memrefLinearizeRaggedDims(%source : memref<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>,
+    %d0 : index, %d1 : index, %d2 : index) -> memref<?x?x?xf32> {
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : memref<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> memref<?x?x?xf32>{%d0, %d1, %d2}
+  util.return %0 : memref<?x?x?xf32>
+}
+// CHECK-LABEL: @memrefLinearizeRaggedDims
+// CHECK: iree_tensor_ext.linearize_ragged_dims %{{.*}} : memref<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> memref<?x?x?xf32>{%{{.*}}, %{{.*}}, %{{.*}}}
+
+// -----
+
+// Check iree_tensor_ext.linearize_ragged_dims with ragged_shape<0>
+
+util.func public @linearizeRaggedDims0(%source : tensor<?x?xf32, #iree_tensor_ext.ragged_shape<0>>,
+    %linearized_size : index) -> tensor<?xf32> {
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<?x?xf32, #iree_tensor_ext.ragged_shape<0>> -> tensor<?xf32>{%linearized_size}
+  util.return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: @linearizeRaggedDims0
+// CHECK: iree_tensor_ext.linearize_ragged_dims %{{.*}} : tensor<?x?xf32, #iree_tensor_ext.ragged_shape<0>> -> tensor<?xf32>{%{{.*}}}
+
+// -----
+
 // Round trip test for SparseIterationDimsAttr
 func.func @sparseIterationDimsAttr() {
   scf.forall (%i, %j) = (0, 0) to (10, 20) step (1, 1) {

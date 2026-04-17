@@ -143,6 +143,21 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
                       });
 }
 
+static AffineMap getLeadingDimsProjectionMap(MLIRContext *ctx, int64_t dimCount,
+                                             int64_t projectedDimCount) {
+  SmallVector<AffineExpr> exprs;
+  exprs.reserve(projectedDimCount);
+  for (int64_t i = 0; i < projectedDimCount; ++i) {
+    exprs.push_back(getAffineDimExpr(i, ctx));
+  }
+  return AffineMap::get(dimCount, /*symbolCount=*/0, exprs, ctx);
+}
+
+static bool isSupportedMaskElementType(Type type) {
+  auto intType = dyn_cast<IntegerType>(type);
+  return intType && (intType.getWidth() == 1 || intType.getWidth() == 8);
+}
+
 /// Helper function to verify both `scatter` and `gather`. Since both ops share
 /// the same semantics, we can use the same function to verify them. Note: this
 /// is written from the perspective of `scatter` op. For gather, `updateType`
@@ -217,6 +232,26 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
       dimMap.size() != indicesType.getShape().back()) {
     return op->emitOpError(
         "size of dimension map must match the last dimension of indices");
+  }
+
+  if (std::optional<ShapedType> maybeMaskType = op.getMaskType()) {
+    auto maskType = *maybeMaskType;
+    if (!isSupportedMaskElementType(maskType.getElementType())) {
+      return op->emitOpError(
+          "expected mask to have i1 or storage-legalized i8 element type");
+    }
+    if (maskType.getRank() != static_cast<int64_t>(batchRank)) {
+      return op->emitOpError("expected mask rank to match batch rank");
+    }
+    for (auto dim : llvm::seq<int64_t>(0, static_cast<int64_t>(batchRank))) {
+      if (maskType.isDynamicDim(dim) || updateType.isDynamicDim(dim)) {
+        continue;
+      }
+      if (maskType.getDimSize(dim) != updateType.getDimSize(dim)) {
+        return op->emitOpError("mask shape must match batch dimensions at dim#")
+               << dim;
+      }
+    }
   }
 
   {
@@ -453,9 +488,15 @@ SmallVector<int64_t> ScatterOp::getStaticLoopRanges() {
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
-          builder.getMultiDimIdentityMap(getIndicesType().getRank()),
-          /*output=*/AffineMap(nullptr)};
+  SmallVector<AffineMap> maps = {
+      builder.getMultiDimIdentityMap(getUpdateType().getRank()),
+      builder.getMultiDimIdentityMap(getIndicesType().getRank())};
+  if (getMask()) {
+    maps.push_back(getLeadingDimsProjectionMap(
+        getContext(), getUpdateType().getRank(), getBatchRank()));
+  }
+  maps.push_back(/*output=*/AffineMap(nullptr));
+  return maps;
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
@@ -484,10 +525,15 @@ SmallVector<int64_t> GatherOp::getStaticLoopRanges() {
 
 SmallVector<AffineMap> GatherOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return SmallVector<AffineMap>{
+  SmallVector<AffineMap> maps = {
       AffineMap(nullptr),
-      builder.getMultiDimIdentityMap(getIndicesType().getRank()),
-      builder.getMultiDimIdentityMap(getOutputType().getRank())};
+      builder.getMultiDimIdentityMap(getIndicesType().getRank())};
+  if (getMask()) {
+    maps.push_back(getLeadingDimsProjectionMap(
+        getContext(), getOutputType().getRank(), getBatchRank()));
+  }
+  maps.push_back(builder.getMultiDimIdentityMap(getOutputType().getRank()));
+  return maps;
 }
 
 SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
@@ -502,7 +548,7 @@ struct ConvertGatherToExtract : OpRewritePattern<IREE::LinalgExt::GatherOp> {
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
     // TODO: support memref case.
-    if (!gatherOp.hasPureTensorSemantics()) {
+    if (!gatherOp.hasPureTensorSemantics() || gatherOp.getMask()) {
       return failure();
     }
 
@@ -2183,6 +2229,41 @@ LogicalResult OnlineAttentionOp::reifyResultShapes(
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+SmallVector<int64_t> OnlineAttentionOp::getStaticLoopRanges() {
+  SmallVector<int64_t> bounds(getIterationDomainRank());
+  SmallVector<bool> dimsFound(getIterationDomainRank(), false);
+
+  ArrayRef<int64_t> queryShape = getQuery().getType().getShape();
+  ArrayRef<AffineExpr> queryDims = getQueryMap().getResults();
+  ArrayRef<int64_t> valueShape = getValue().getType().getShape();
+  ArrayRef<AffineExpr> valueDims = getValueMap().getResults();
+
+  auto fillSizes = [&](ArrayRef<int64_t> sizes, ArrayRef<AffineExpr> dims) {
+    for (auto [size, dim] : llvm::zip_equal(sizes, dims)) {
+      int pos = cast<AffineDimExpr>(dim).getPosition();
+      if (dimsFound[pos]) {
+        continue;
+      }
+      bounds[pos] = size;
+      dimsFound[pos] = true;
+    }
+  };
+  fillSizes(queryShape, queryDims);
+  fillSizes(valueShape, valueDims);
+  return bounds;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForOperands() {
+  auto maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs());
+  return maps;
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsForResults() {
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
 }
 
 void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,

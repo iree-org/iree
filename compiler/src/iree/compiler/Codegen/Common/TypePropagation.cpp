@@ -372,18 +372,21 @@ struct IREELinalgExtScatterTypePropagation
   LogicalResult
   matchAndRewrite(IREE::LinalgExt::ScatterOp scatterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    auto opOperands = scatterOp->getOpOperands();
-    Type inputType = opOperands[0].get().getType();
+    Type inputType = scatterOp.getUpdates().getType();
     Type legalizedInputType = this->getTypeConverter()->convertType(inputType);
+    Type maskType =
+        scatterOp.getMask() ? scatterOp.getMask().getType() : Type();
+    Type legalizedMaskType =
+        maskType ? this->getTypeConverter()->convertType(maskType) : Type();
+    Type resultType = scatterOp.getOriginal().getType();
+    Type legalizedResultType =
+        this->getTypeConverter()->convertType(resultType);
 
-    if (inputType == legalizedInputType) {
+    if (inputType == legalizedInputType && maskType == legalizedMaskType &&
+        resultType == legalizedResultType) {
       return scatterOp.emitOpError(
           "unexpected all types legal within conversion pattern");
     }
-
-    Type resultType = opOperands[2].get().getType();
-    Type legalizedResultType =
-        this->getTypeConverter()->convertType(resultType);
 
     // Create a clone of the operation without cloning its regions.
     auto modifiedOp =

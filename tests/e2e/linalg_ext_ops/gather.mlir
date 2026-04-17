@@ -71,3 +71,17 @@ func.func @gather_fuse_elementwise() {
   check.expect_eq_const(%generic, dense<[4, 6]> : tensor<2xi32>) : tensor<2xi32>
   return
 }
+
+func.func @gather_operand_mask_preserves_output() {
+  %source = util.unfoldable_constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
+  %output = util.unfoldable_constant dense<[[99, 98], [97, 96]]> : tensor<2x2xi32>
+  %indices = util.unfoldable_constant dense<[1, 0]> : tensor<2xi32>
+  %mask = util.unfoldable_constant dense<[true, false]> : tensor<2xi1>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+                          ins(%source, %indices, %mask : tensor<2x2xi32>, tensor<2xi32>, tensor<2xi1>)
+                          outs(%output: tensor<2x2xi32>) -> tensor<2x2xi32>
+
+  check.expect_eq_const(%result, dense<[[2, 3], [97, 96]]> : tensor<2x2xi32>)
+            : tensor<2x2xi32>
+  return
+}
