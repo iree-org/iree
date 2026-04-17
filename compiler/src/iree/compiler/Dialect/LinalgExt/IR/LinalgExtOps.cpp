@@ -1366,6 +1366,12 @@ LogicalResult TopkV2Op::verify() {
     if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
       return emitOpError("input values/indices shape must match");
     }
+    auto outputIndicesType = cast<ShapedType>(getOutputIndices().getType());
+    if (inputIndicesType.getElementType() !=
+        outputIndicesType.getElementType()) {
+      return emitOpError(
+          "expected input/output indices element types to be identical");
+    }
   }
 
   if (Value outputIndices = getOutputIndices()) {
