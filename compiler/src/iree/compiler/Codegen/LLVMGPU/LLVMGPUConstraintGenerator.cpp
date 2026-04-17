@@ -108,8 +108,9 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
     if (failed(contractionDims)) {
       return failure();
     }
-    return ContractionLikeDims{contractionDims->m, contractionDims->n,
-                               contractionDims->k};
+    return ContractionLikeDims{llvm::to_vector(contractionDims->m),
+                               llvm::to_vector(contractionDims->n),
+                               llvm::to_vector(contractionDims->k)};
   }
   if (linalg::isaConvolutionOpInterface(linalgOp)) {
     FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
@@ -120,9 +121,9 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
       return failure();
     }
     // Maps outputImage→M, outputChannel→N, inputChannel→K.
-    return ContractionLikeDims{convolutionDims->outputImage,
-                               convolutionDims->outputChannel,
-                               convolutionDims->inputChannel};
+    return ContractionLikeDims{llvm::to_vector(convolutionDims->outputImage),
+                               llvm::to_vector(convolutionDims->outputChannel),
+                               llvm::to_vector(convolutionDims->inputChannel)};
   }
   return failure();
 }
