@@ -44,7 +44,7 @@ static Attribute makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
   return IntegerAttr::get(IntegerType::get(ctx, 64), value);
 }
 
-/// Helper to create a IntKnobAttr.
+/// Helper to create an IntKnobAttr.
 static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
   return IREE::Codegen::IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
 }

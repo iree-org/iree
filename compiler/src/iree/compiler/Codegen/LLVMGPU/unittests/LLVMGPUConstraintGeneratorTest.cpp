@@ -357,6 +357,7 @@ protected:
 
   // conv_2d_nhwc_hwcf with input=1x18x18x4, filter=3x3x4x8, output=1x16x16x8.
   // 7 loops: (n, oh, ow, oc, kh, kw, ic).
+
   RootOpLoopInfo loopInfoForConv() {
 
     AffineExpr d0 = getAffineDimExpr(0, &ctx);
