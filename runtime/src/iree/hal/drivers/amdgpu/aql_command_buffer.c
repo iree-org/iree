@@ -21,6 +21,10 @@
 //===----------------------------------------------------------------------===//
 
 enum {
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY_LOG2 = 9,
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY = 512,
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_MASK =
+      IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY - 1,
   IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_PAGE_CAPACITY_LOG2 = 9,
   IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_PAGE_CAPACITY = 512,
   IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_PAGE_MASK =
@@ -32,6 +36,25 @@ typedef enum iree_hal_amdgpu_aql_command_buffer_rodata_segment_flag_bits_e {
   IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_FLAG_PREPUBLISHED_KERNARGS =
       1u << 0,
 } iree_hal_amdgpu_aql_command_buffer_rodata_segment_flag_bits_t;
+
+typedef struct iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t {
+  // Next page in ordinal order.
+  struct iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* next;
+  // Number of valid entries in |buffers|.
+  uint32_t count;
+  // Reserved bits for future page metadata.
+  uint32_t reserved0;
+  // Fixed-capacity direct buffer table.
+  iree_hal_buffer_t*
+      buffers[IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY];
+} iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t;
+static_assert((IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY &
+               IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_MASK) == 0,
+              "static buffer page capacity must be a power-of-two");
+static_assert(
+    sizeof(iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t) <=
+        IREE_HAL_AMDGPU_AQL_PROGRAM_DEFAULT_BLOCK_SIZE,
+    "static buffer page should fit in a default command-buffer block");
 
 typedef struct iree_hal_amdgpu_aql_command_buffer_rodata_segment_t {
   // Command-buffer-owned immutable payload bytes.
@@ -86,20 +109,26 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   uint32_t device_ordinal;
   // Reserved bytes for stable layout.
   uint32_t reserved0;
+  // Arena owning recording-lifetime static buffer pages, rodata pages, and
+  // rodata payload bytes referenced by finalized program command records.
+  iree_arena_allocator_t recording_arena;
   // Resource set retaining direct buffers and executables when not unretained.
   iree_hal_resource_set_t* resource_set;
-  // Direct buffers referenced by static command records.
-  iree_hal_buffer_t** static_buffers;
-  // Allocated entries in |static_buffers|.
-  uint32_t static_buffer_capacity;
-  // Valid entries in |static_buffers|.
-  uint32_t static_buffer_count;
+  // Direct buffer ordinal table captured while recording.
+  struct {
+    // First static buffer page in ordinal order.
+    iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* first_page;
+    // Last static buffer page in ordinal order.
+    iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* current_page;
+    // Total direct buffer ordinals assigned.
+    uint32_t count;
+    // Reserved bytes for stable layout.
+    uint32_t reserved0;
+  } static_buffers;
   // Device-visible storage containing prepublished static dispatch kernargs.
   iree_hal_buffer_t* prepublished_kernarg_buffer;
-  // Immutable payload storage captured while recording.
+  // Immutable payload ordinal table captured while recording.
   struct {
-    // Arena that owns segment pages and payload bytes.
-    iree_arena_allocator_t arena;
     // First segment page in ordinal order.
     iree_hal_amdgpu_aql_command_buffer_rodata_segment_page_t* first_page;
     // Last segment page in ordinal order.
@@ -143,14 +172,12 @@ static void iree_hal_amdgpu_aql_command_buffer_reset_resources(
     iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
   iree_hal_resource_set_free(command_buffer->resource_set);
   command_buffer->resource_set = NULL;
-  iree_allocator_free(command_buffer->host_allocator,
-                      command_buffer->static_buffers);
-  command_buffer->static_buffers = NULL;
-  command_buffer->static_buffer_capacity = 0;
-  command_buffer->static_buffer_count = 0;
+  command_buffer->static_buffers.first_page = NULL;
+  command_buffer->static_buffers.current_page = NULL;
+  command_buffer->static_buffers.count = 0;
   iree_hal_buffer_release(command_buffer->prepublished_kernarg_buffer);
   command_buffer->prepublished_kernarg_buffer = NULL;
-  iree_arena_reset(&command_buffer->rodata.arena);
+  iree_arena_reset(&command_buffer->recording_arena);
   command_buffer->rodata.first_page = NULL;
   command_buffer->rodata.current_page = NULL;
   command_buffer->rodata.segment_count = 0;
@@ -169,44 +196,80 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(
   return status;
 }
 
-static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_static_buffers(
-    iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
-  if (command_buffer->static_buffer_count <
-      command_buffer->static_buffer_capacity) {
-    return iree_ok_status();
+static iree_hal_buffer_t*
+iree_hal_amdgpu_aql_command_buffer_static_buffer_for_ordinal(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer, uint32_t ordinal) {
+  if (IREE_UNLIKELY(ordinal >= command_buffer->static_buffers.count)) {
+    return NULL;
   }
-  if (IREE_UNLIKELY(command_buffer->static_buffer_capacity > UINT32_MAX / 2)) {
+
+  uint32_t page_ordinal =
+      ordinal >>
+      IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY_LOG2;
+  const uint32_t buffer_ordinal =
+      ordinal & IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_MASK;
+  iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* page =
+      command_buffer->static_buffers.first_page;
+  while (page_ordinal > 0 && page) {
+    page = page->next;
+    --page_ordinal;
+  }
+  if (IREE_UNLIKELY(!page || buffer_ordinal >= page->count)) return NULL;
+  return page->buffers[buffer_ordinal];
+}
+
+static iree_status_t
+iree_hal_amdgpu_aql_command_buffer_ensure_static_buffer_page(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
+    iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t** out_page) {
+  *out_page = NULL;
+  if (IREE_UNLIKELY(command_buffer->static_buffers.count == UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "command-buffer static buffer table overflow");
   }
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->static_buffer_capacity);
-  iree_host_size_t capacity = command_buffer->static_buffer_capacity;
-  iree_status_t status = iree_allocator_grow_array(
-      command_buffer->host_allocator, /*minimum_capacity=*/16,
-      sizeof(*command_buffer->static_buffers), &capacity,
-      (void**)&command_buffer->static_buffers);
-  if (iree_status_is_ok(status)) {
-    command_buffer->static_buffer_capacity = (uint32_t)capacity;
+  iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* page =
+      command_buffer->static_buffers.current_page;
+  if (page &&
+      page->count <
+          IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_STATIC_BUFFER_PAGE_CAPACITY) {
+    *out_page = page;
+    return iree_ok_status();
   }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->static_buffers.count);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(&command_buffer->recording_arena, sizeof(*page),
+                              (void**)&page));
+  memset(page, 0, sizeof(*page));
+  if (command_buffer->static_buffers.current_page) {
+    command_buffer->static_buffers.current_page->next = page;
+  } else {
+    command_buffer->static_buffers.first_page = page;
+  }
+  command_buffer->static_buffers.current_page = page;
+  *out_page = page;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_static_buffer(
     iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
     iree_hal_buffer_t* buffer, uint32_t* out_ordinal) {
+  *out_ordinal = 0;
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(command_buffer));
+  iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* page = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_aql_command_buffer_ensure_static_buffers(command_buffer));
+      iree_hal_amdgpu_aql_command_buffer_ensure_static_buffer_page(
+          command_buffer, &page));
   if (command_buffer->resource_set) {
     IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
         command_buffer->resource_set, /*count=*/1, &buffer));
   }
-  *out_ordinal = command_buffer->static_buffer_count;
-  command_buffer->static_buffers[command_buffer->static_buffer_count++] =
-      buffer;
+  *out_ordinal = command_buffer->static_buffers.count;
+  ++command_buffer->static_buffers.count;
+  page->buffers[page->count++] = buffer;
   return iree_ok_status();
 }
 
@@ -260,7 +323,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
           IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RODATA_SEGMENT_PAGE_CAPACITY) {
     IREE_TRACE_ZONE_BEGIN(z0);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_arena_allocate(&command_buffer->rodata.arena, sizeof(*page),
+        z0, iree_arena_allocate(&command_buffer->recording_arena, sizeof(*page),
                                 (void**)&page));
     memset(page, 0, sizeof(*page));
     if (command_buffer->rodata.current_page) {
@@ -296,7 +359,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_allocate_rodata_segment(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, byte_length);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_arena_allocate_aligned(&command_buffer->rodata.arena,
+      iree_arena_allocate_aligned(&command_buffer->recording_arena,
                                   iree_max((iree_host_size_t)1, byte_length),
                                   alignment, (void**)&rodata));
   iree_status_t status =
@@ -579,7 +642,7 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
   command_buffer->profile_metadata = profile_metadata;
   command_buffer->block_pool = block_pool;
   command_buffer->device_ordinal = (uint32_t)device_ordinal;
-  iree_arena_initialize(block_pool, &command_buffer->rodata.arena);
+  iree_arena_initialize(block_pool, &command_buffer->recording_arena);
   iree_hal_amdgpu_aql_program_builder_initialize(block_pool,
                                                  &command_buffer->builder);
 
@@ -606,7 +669,7 @@ static void iree_hal_amdgpu_aql_command_buffer_destroy(
   iree_hal_amdgpu_aql_program_release(&command_buffer->program);
   iree_hal_amdgpu_aql_program_builder_deinitialize(&command_buffer->builder);
   iree_hal_amdgpu_aql_command_buffer_reset_resources(command_buffer);
-  iree_arena_deinitialize(&command_buffer->rodata.arena);
+  iree_arena_deinitialize(&command_buffer->recording_arena);
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -643,9 +706,8 @@ iree_hal_buffer_t* iree_hal_amdgpu_aql_command_buffer_static_buffer(
     iree_hal_command_buffer_t* base_command_buffer, uint32_t ordinal) {
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
-  return ordinal < command_buffer->static_buffer_count
-             ? command_buffer->static_buffers[ordinal]
-             : NULL;
+  return iree_hal_amdgpu_aql_command_buffer_static_buffer_for_ordinal(
+      command_buffer, ordinal);
 }
 
 const uint8_t* iree_hal_amdgpu_aql_command_buffer_rodata(
