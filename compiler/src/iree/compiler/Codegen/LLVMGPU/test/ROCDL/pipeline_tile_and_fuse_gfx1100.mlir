@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm}, builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target, iree-codegen-gpu-check-resource-usage)))))" \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline, iree-codegen-llvmgpu-rocdl-lowering-pipeline{include-llvm-lowering=false}, func.func(iree-codegen-gpu-check-resource-usage)))))" \
 // RUN:   %s | FileCheck %s
 
 // Regression test for dynamic batch_matmul with WMMAR3 on gfx1100.
