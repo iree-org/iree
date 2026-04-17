@@ -220,8 +220,11 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
   // WAIT_REG_MEM64 is present in the gfx10+ PM4 packet tables. Gfx9 has only
   // the 32-bit WAIT_REG_MEM variant, and non-CDNA gfx9 therefore defers.
   if (version.major >= 10) {
-    capabilities |= IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
-                    IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64;
+    capabilities |=
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP;
   }
   return capabilities;
 }

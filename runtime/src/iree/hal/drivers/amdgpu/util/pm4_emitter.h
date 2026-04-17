@@ -36,6 +36,11 @@ enum {
   IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY = 16,
   // PM4-IB AQL envelopes encode the indirect-buffer dword count in 20 bits.
   IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT = 0xFFFFF,
+  IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT = 6,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT = 8,
+  IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT =
+      IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT +
+      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
@@ -146,7 +151,8 @@ static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
   if (!iree_host_ptr_has_alignment(target, 8)) return false;
   const uintptr_t address = (uintptr_t)target;
   uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
-      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
+      IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT);
   if (!dword) return false;
   dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP |
              IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM |
@@ -171,7 +177,8 @@ iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
   if (!iree_host_ptr_has_alignment(target, 8)) return false;
   const uintptr_t address = (uintptr_t)target;
   uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
-      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM, 8);
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM,
+      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT);
   if (!dword) return false;
   dword[1] = IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS |
              IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE;
@@ -183,6 +190,29 @@ iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
   dword[5] = 0;
   dword[6] = 0;
   dword[7] = 0;
+  return true;
+}
+
+// Appends a timestamp range around subsequent queue work. The start timestamp
+// is an immediate COPY_DATA timestamp and the end timestamp is a bottom-of-pipe
+// RELEASE_MEM timestamp. The helper preflights all space and alignment so it
+// either appends the complete range marker or leaves |builder| unchanged.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_range_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* start_target,
+    void* end_target) {
+  if (!iree_host_ptr_has_alignment(start_target, 8) ||
+      !iree_host_ptr_has_alignment(end_target, 8)) {
+    return false;
+  }
+  if (iree_hal_amdgpu_pm4_ib_builder_remaining(builder) <
+      IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT) {
+    return false;
+  }
+  iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(builder,
+                                                               start_target);
+  iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
+      builder, end_target);
   return true;
 }
 
@@ -297,8 +327,7 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib_dwords(
       IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER, 4);
   packet->ib_jump_cmd[1] = iree_hal_amdgpu_pm4_addr_lo(ib_address);
   packet->ib_jump_cmd[2] = iree_hal_amdgpu_pm4_ib_addr_hi(ib_address);
-  packet->ib_jump_cmd[3] =
-      (ib_dword_count & IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT) | (1u << 23);
+  packet->ib_jump_cmd[3] = ib_dword_count | (1u << 23);
   packet->dw_cnt_remain = 0xA;
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(packet->reserved); ++i) {
     packet->reserved[i] = 0;

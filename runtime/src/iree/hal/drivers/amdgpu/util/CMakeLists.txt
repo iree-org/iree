@@ -131,6 +131,7 @@ iree_cc_library(
     "kernarg_ring.h"
     "kfd.h"
     "notification_ring.h"
+    "pm4_capabilities.h"
     "pm4_emitter.h"
     "pm4_program.h"
     "signal_pool.h"

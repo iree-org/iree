@@ -23,6 +23,7 @@
 #include "iree/hal/drivers/amdgpu/util/kernarg_ring.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/notification_ring.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_capabilities.h"
 #include "iree/hal/drivers/amdgpu/virtual_queue.h"
 #include "iree/hal/pool.h"
 #include "iree/hal/profile_sink.h"
@@ -47,29 +48,6 @@ typedef struct iree_hal_amdgpu_profile_dispatch_event_reservation_t {
   // Reserved padding.
   uint32_t reserved0;
 } iree_hal_amdgpu_profile_dispatch_event_reservation_t;
-
-// Hardware mechanism used for cross-queue epoch waits after wait resolution
-// proves that a dependency has already been submitted by a local peer queue.
-typedef enum iree_hal_amdgpu_wait_barrier_strategy_e {
-  // No device-side 64-bit epoch wait is known for this agent; unresolved
-  // cross-queue waits must use software deferral.
-  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER = 0,
-  // AMD vendor AQL BARRIER_VALUE packet.
-  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_AQL_BARRIER_VALUE = 1,
-  // AMD vendor AQL PM4-IB packet executing a WAIT_REG_MEM64 PM4 packet.
-  IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_PM4_WAIT_REG_MEM64 = 2,
-} iree_hal_amdgpu_wait_barrier_strategy_t;
-
-// AMD vendor-packet capabilities available on a physical device.
-enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
-  // AMD vendor AQL PM4-IB packets can jump to device-visible PM4 programs.
-  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB = 1u << 0,
-  // AMD vendor AQL BARRIER_VALUE packets can wait on arbitrary signal values.
-  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE = 1u << 1,
-  // PM4 WAIT_REG_MEM64 packets can perform 64-bit memory comparisons.
-  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 = 1u << 2,
-};
-typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
 
 typedef struct iree_hal_amdgpu_host_queue_post_drain_action_t
     iree_hal_amdgpu_host_queue_post_drain_action_t;
