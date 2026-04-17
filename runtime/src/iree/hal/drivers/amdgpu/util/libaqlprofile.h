@@ -82,6 +82,45 @@ typedef hsa_status_t(
     IREE_API_PTR* iree_hal_amdgpu_aqlprofile_memory_copy_callback_t)(
     void* target, const void* source, size_t size, void* user_data);
 
+typedef enum iree_hal_amdgpu_aqlprofile_att_parameter_rt_timestamp_e {
+  IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_RT_TIMESTAMP_DEFAULT = 0,
+  IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_RT_TIMESTAMP_ENABLE = 1,
+  IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_RT_TIMESTAMP_DISABLE = 2,
+} iree_hal_amdgpu_aqlprofile_att_parameter_rt_timestamp_t;
+
+typedef enum iree_hal_amdgpu_aqlprofile_att_parameter_name_ext_e {
+  IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_NAME_BUFFER_SIZE_HIGH = 11,
+  IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_NAME_RT_TIMESTAMP = 12,
+} iree_hal_amdgpu_aqlprofile_att_parameter_name_ext_t;
+
+typedef struct iree_hal_amdgpu_aqlprofile_att_parameter_t {
+  // aqlprofile ATT parameter name or extended ATT parameter name.
+  uint32_t parameter_name;
+  union {
+    // Scalar parameter value.
+    uint32_t value;
+    struct {
+      // Performance counter event id packed into ATT perf-counter parameters.
+      uint32_t counter_id : 28;
+      // SIMD mask packed into ATT perf-counter parameters.
+      uint32_t simd_mask : 4;
+    };
+  };
+} iree_hal_amdgpu_aqlprofile_att_parameter_t;
+
+typedef struct iree_hal_amdgpu_aqlprofile_att_profile_t {
+  // HSA GPU agent being traced.
+  hsa_agent_t agent;
+  // Borrowed array of ATT trace parameters.
+  const iree_hal_amdgpu_aqlprofile_att_parameter_t* parameters;
+  // Number of entries in |parameters|.
+  uint32_t parameter_count;
+} iree_hal_amdgpu_aqlprofile_att_profile_t;
+
+typedef hsa_status_t(
+    IREE_API_PTR* iree_hal_amdgpu_aqlprofile_att_data_callback_t)(
+    uint32_t shader_engine, void* buffer, uint64_t size, void* user_data);
+
 typedef union iree_hal_amdgpu_aqlprofile_pmc_event_flags_t {
   // Raw aqlprofile PMC event flags.
   uint32_t raw;
@@ -159,6 +198,28 @@ typedef struct iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t {
   iree_hsa_amd_aql_pm4_ib_packet_t read_packet;
 } iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t;
 
+typedef struct iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t {
+  // AQL PM4-IB packet that starts thread trace.
+  iree_hsa_amd_aql_pm4_ib_packet_t start_packet;
+  // AQL PM4-IB packet that stops thread trace and flushes trace metadata.
+  iree_hsa_amd_aql_pm4_ib_packet_t stop_packet;
+} iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t;
+
+typedef struct iree_hal_amdgpu_aqlprofile_att_code_object_data_t {
+  // Stable code-object marker id.
+  uint64_t id;
+  // Device load address of the code object.
+  uint64_t address;
+  // Loaded code-object byte length.
+  uint64_t length;
+  // HSA GPU agent owning the code object.
+  hsa_agent_t agent;
+  // True when this marker records an unload instead of a load.
+  uint32_t is_unload : 1;
+  // True when the code object was loaded before thread trace started.
+  uint32_t from_start : 1;
+} iree_hal_amdgpu_aqlprofile_att_code_object_data_t;
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_libaqlprofile_t
 //===----------------------------------------------------------------------===//
@@ -205,6 +266,36 @@ typedef struct iree_hal_amdgpu_libaqlprofile_t {
       iree_hal_amdgpu_aqlprofile_handle_t handle,
       iree_hal_amdgpu_aqlprofile_pmc_data_callback_t callback, void* user_data);
 
+  // Creates persistent PM4 programs and AQL PM4-IB packet templates for one
+  // ATT/SQTT trace control profile handle. Optional; use
+  // iree_hal_amdgpu_libaqlprofile_has_att_support before calling.
+  hsa_status_t(HSA_API* aqlprofile_att_create_packets)(
+      iree_hal_amdgpu_aqlprofile_handle_t* handle,
+      iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t* packets,
+      iree_hal_amdgpu_aqlprofile_att_profile_t profile,
+      iree_hal_amdgpu_aqlprofile_memory_alloc_callback_t alloc_cb,
+      iree_hal_amdgpu_aqlprofile_memory_dealloc_callback_t dealloc_cb,
+      iree_hal_amdgpu_aqlprofile_memory_copy_callback_t memcpy_cb,
+      void* user_data);
+
+  // Deletes PM4 programs and buffers associated with an ATT/SQTT handle.
+  void(HSA_API* aqlprofile_att_delete_packets)(
+      iree_hal_amdgpu_aqlprofile_handle_t handle);
+
+  // Iterates decoded ATT/SQTT trace data by shader engine.
+  hsa_status_t(HSA_API* aqlprofile_att_iterate_data)(
+      iree_hal_amdgpu_aqlprofile_handle_t handle,
+      iree_hal_amdgpu_aqlprofile_att_data_callback_t callback, void* user_data);
+
+  // Creates a persistent AQL PM4-IB packet for a code-object marker.
+  hsa_status_t(HSA_API* aqlprofile_att_codeobj_marker)(
+      iree_hsa_amd_aql_pm4_ib_packet_t* packet,
+      iree_hal_amdgpu_aqlprofile_handle_t* handle,
+      iree_hal_amdgpu_aqlprofile_att_code_object_data_t data,
+      iree_hal_amdgpu_aqlprofile_memory_alloc_callback_t alloc_cb,
+      iree_hal_amdgpu_aqlprofile_memory_dealloc_callback_t dealloc_cb,
+      void* user_data);
+
   // Optionally returns a textual error for the most recent aqlprofile error.
   hsa_status_t(HSA_API* hsa_ven_amd_aqlprofile_error_string)(const char** str);
 } iree_hal_amdgpu_libaqlprofile_t;
@@ -222,6 +313,11 @@ iree_status_t iree_hal_amdgpu_libaqlprofile_initialize(
 // Deinitializes |libaqlprofile| by unloading the backing library.
 void iree_hal_amdgpu_libaqlprofile_deinitialize(
     iree_hal_amdgpu_libaqlprofile_t* libaqlprofile);
+
+// Returns true when the loaded aqlprofile library exports the full ATT/SQTT
+// packet generation and data iteration ABI.
+bool iree_hal_amdgpu_libaqlprofile_has_att_support(
+    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile);
 
 // Returns an IREE status with the aqlprofile error string when available.
 iree_status_t iree_status_from_aqlprofile_status(

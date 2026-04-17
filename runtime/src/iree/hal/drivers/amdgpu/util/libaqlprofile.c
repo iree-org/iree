@@ -24,6 +24,14 @@ IREE_AMDGPU_STATIC_ASSERT(
         sizeof(aqlprofile_buffer_desc_flags_t),
     "aqlprofile buffer flags layout must match the v2 SDK");
 IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_aqlprofile_att_parameter_t) ==
+        sizeof(aqlprofile_att_parameter_t),
+    "aqlprofile ATT parameter layout must match the v2 SDK");
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_aqlprofile_att_profile_t) ==
+        sizeof(aqlprofile_att_profile_t),
+    "aqlprofile ATT profile layout must match the v2 SDK");
+IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_aqlprofile_pmc_event_flags_t) ==
         sizeof(aqlprofile_pmc_event_flags_t),
     "aqlprofile PMC event flags layout must match the v2 SDK");
@@ -46,12 +54,28 @@ IREE_AMDGPU_STATIC_ASSERT(
         sizeof(aqlprofile_pmc_aql_packets_t),
     "aqlprofile PMC AQL packet bundle layout must match the v2 SDK");
 IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t) ==
+        sizeof(aqlprofile_att_control_aql_packets_t),
+    "aqlprofile ATT AQL packet bundle layout must match the v2 SDK");
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_aqlprofile_att_code_object_data_t) ==
+        sizeof(aqlprofile_att_codeobj_data_t),
+    "aqlprofile ATT code object marker layout must match the v2 SDK");
+IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hsa_amd_aql_pm4_ib_packet_t) ==
         sizeof(hsa_ext_amd_aql_pm4_packet_t),
     "PM4-IB AQL packet layout must match the HSA vendor SDK");
 IREE_AMDGPU_STATIC_ASSERT((uint32_t)IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ ==
                               (uint32_t)HSA_VEN_AMD_AQLPROFILE_BLOCK_NAME_SQ,
                           "SQ block id must match the HSA vendor SDK");
+IREE_AMDGPU_STATIC_ASSERT(
+    (uint32_t)IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_NAME_BUFFER_SIZE_HIGH ==
+        (uint32_t)AQLPROFILE_ATT_PARAMETER_NAME_BUFFER_SIZE_HIGH,
+    "ATT buffer-size-high parameter id must match the v2 SDK");
+IREE_AMDGPU_STATIC_ASSERT(
+    (uint32_t)IREE_HAL_AMDGPU_AQLPROFILE_ATT_PARAMETER_NAME_RT_TIMESTAMP ==
+        (uint32_t)AQLPROFILE_ATT_PARAMETER_NAME_RT_TIMESTAMP,
+    "ATT runtime-timestamp parameter id must match the v2 SDK");
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -81,6 +105,32 @@ static iree_status_t iree_hal_amdgpu_libaqlprofile_load_symbols(
   IREE_HAL_AMDGPU_LIBAQLPROFILE_LOOKUP(aqlprofile_pmc_create_packets);
   IREE_HAL_AMDGPU_LIBAQLPROFILE_LOOKUP(aqlprofile_pmc_delete_packets);
   IREE_HAL_AMDGPU_LIBAQLPROFILE_LOOKUP(aqlprofile_pmc_iterate_data);
+
+  out_libaqlprofile->aqlprofile_att_create_packets = (hsa_status_t(HSA_API*)(
+      iree_hal_amdgpu_aqlprofile_handle_t*,
+      iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t*,
+      iree_hal_amdgpu_aqlprofile_att_profile_t,
+      iree_hal_amdgpu_aqlprofile_memory_alloc_callback_t,
+      iree_hal_amdgpu_aqlprofile_memory_dealloc_callback_t,
+      iree_hal_amdgpu_aqlprofile_memory_copy_callback_t, void*))
+      iree_dynamic_library_try_lookup_symbol(library,
+                                             "aqlprofile_att_create_packets");
+  out_libaqlprofile->aqlprofile_att_delete_packets =
+      (void(HSA_API*)(iree_hal_amdgpu_aqlprofile_handle_t))
+          iree_dynamic_library_try_lookup_symbol(
+              library, "aqlprofile_att_delete_packets");
+  out_libaqlprofile->aqlprofile_att_iterate_data = (hsa_status_t(HSA_API*)(
+      iree_hal_amdgpu_aqlprofile_handle_t,
+      iree_hal_amdgpu_aqlprofile_att_data_callback_t, void*))
+      iree_dynamic_library_try_lookup_symbol(library,
+                                             "aqlprofile_att_iterate_data");
+  out_libaqlprofile->aqlprofile_att_codeobj_marker = (hsa_status_t(HSA_API*)(
+      iree_hsa_amd_aql_pm4_ib_packet_t*, iree_hal_amdgpu_aqlprofile_handle_t*,
+      iree_hal_amdgpu_aqlprofile_att_code_object_data_t,
+      iree_hal_amdgpu_aqlprofile_memory_alloc_callback_t,
+      iree_hal_amdgpu_aqlprofile_memory_dealloc_callback_t, void*))
+      iree_dynamic_library_try_lookup_symbol(library,
+                                             "aqlprofile_att_codeobj_marker");
 
   out_libaqlprofile->hsa_ven_amd_aqlprofile_error_string =
       (hsa_status_t(HSA_API*)(const char**))
@@ -252,6 +302,14 @@ void iree_hal_amdgpu_libaqlprofile_deinitialize(
   IREE_ASSERT_ARGUMENT(libaqlprofile);
   iree_dynamic_library_release(libaqlprofile->library);
   memset(libaqlprofile, 0, sizeof(*libaqlprofile));
+}
+
+bool iree_hal_amdgpu_libaqlprofile_has_att_support(
+    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile) {
+  return libaqlprofile && libaqlprofile->aqlprofile_att_create_packets &&
+         libaqlprofile->aqlprofile_att_delete_packets &&
+         libaqlprofile->aqlprofile_att_iterate_data &&
+         libaqlprofile->aqlprofile_att_codeobj_marker;
 }
 
 iree_status_t iree_status_from_aqlprofile_status(
