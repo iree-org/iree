@@ -2427,7 +2427,7 @@ iree_hal_amdgpu_host_queue_defer_alloca_pool_notification_wait(
   iree_hal_amdgpu_alloca_reservation_t alloca_reservation;
   iree_status_t status = iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
       queue, resolution, allocation_pool, params, allocation_size, flags,
-      reserve_flags, &alloca_reservation);
+      reserve_flags, buffer, &alloca_reservation);
 
   bool observation_transferred = false;
   if (iree_status_is_ok(status)) {
@@ -2508,7 +2508,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_alloca(
   iree_hal_amdgpu_alloca_reservation_t alloca_reservation;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
       queue, resolution, allocation_pool, params, allocation_size, flags,
-      reserve_flags, &alloca_reservation));
+      reserve_flags, buffer, &alloca_reservation));
   switch (alloca_reservation.readiness) {
     case IREE_HAL_AMDGPU_ALLOCA_RESERVATION_READY:
       return iree_hal_amdgpu_host_queue_submit_alloca_reservation(

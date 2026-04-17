@@ -166,9 +166,9 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
     iree_host_size_t operation_resource_count, bool* out_ready,
     iree_hal_amdgpu_host_queue_barrier_submission_t* out_submission);
 
-// Publishes a barrier-shaped packet submission. Caller must hold
-// submission_mutex.
-void iree_hal_amdgpu_host_queue_finish_barrier_submission(
+// Publishes a barrier-shaped packet submission and returns its queue submission
+// epoch. Caller must hold submission_mutex.
+uint64_t iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,

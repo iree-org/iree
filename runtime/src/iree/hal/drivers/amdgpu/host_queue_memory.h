@@ -51,7 +51,7 @@ iree_status_t iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     iree_hal_pool_t* allocation_pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
-    iree_hal_pool_reserve_flags_t reserve_flags,
+    iree_hal_pool_reserve_flags_t reserve_flags, iree_hal_buffer_t* buffer,
     iree_hal_amdgpu_alloca_reservation_t* out_reservation);
 
 // Materializes a ready reservation, stages it on |buffer|, and submits the

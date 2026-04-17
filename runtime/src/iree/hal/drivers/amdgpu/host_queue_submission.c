@@ -830,7 +830,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
   return iree_ok_status();
 }
 
-void iree_hal_amdgpu_host_queue_finish_barrier_submission(
+uint64_t iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -897,7 +897,8 @@ void iree_hal_amdgpu_host_queue_finish_barrier_submission(
   reclaim_entry->count = submission->reclaim_resource_count;
 
   iree_hal_amdgpu_host_queue_merge_barrier_axes(queue, resolution);
-  iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_commit_signals(queue, signal_semaphore_list);
   if (post_commit_callback.fn) {
     post_commit_callback.fn(post_commit_callback.user_data,
                             iree_hal_amdgpu_host_queue_const_frontier(queue));
@@ -927,6 +928,7 @@ void iree_hal_amdgpu_host_queue_finish_barrier_submission(
   iree_hal_amdgpu_aql_ring_doorbell(&queue->aql_ring,
                                     first_packet_id + aql_packet_count - 1);
   memset(submission, 0, sizeof(*submission));
+  return submission_epoch;
 }
 
 void iree_hal_amdgpu_host_queue_fail_barrier_submission(
@@ -959,7 +961,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
       out_ready, &submission));
   if (!*out_ready) return iree_ok_status();
 
-  iree_hal_amdgpu_host_queue_finish_barrier_submission(
+  (void)iree_hal_amdgpu_host_queue_finish_barrier_submission(
       queue, resolution, signal_semaphore_list, pre_signal_action,
       operation_resources, operation_resource_count, post_commit_callback,
       resource_set, submission_flags, &submission);

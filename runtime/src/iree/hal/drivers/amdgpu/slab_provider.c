@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/memory/tracing.h"
 
@@ -30,6 +31,9 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
 
   // HSA pool this provider acquires slabs from.
   hsa_amd_memory_pool_t memory_pool;
+
+  // Session-local physical device ordinal owning this provider.
+  uint32_t physical_device_ordinal;
 
   // Borrowed wrapper pool used for materialized HAL buffer views.
   iree_hal_amdgpu_buffer_pool_t* buffer_pool;
@@ -74,6 +78,30 @@ static const iree_hal_amdgpu_slab_provider_t*
 iree_hal_amdgpu_slab_provider_const_cast(
     const iree_hal_slab_provider_t* base_provider) {
   return (const iree_hal_amdgpu_slab_provider_t*)base_provider;
+}
+
+static void iree_hal_amdgpu_slab_provider_record_memory_event(
+    iree_hal_amdgpu_slab_provider_t* provider,
+    iree_hal_profile_memory_event_type_t type, const void* backing_ptr,
+    iree_device_size_t length) {
+  if (!iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
+          provider->device)) {
+    return;
+  }
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = type;
+  event.allocation_id = (uint64_t)(uintptr_t)backing_ptr;
+  event.pool_id = (uint64_t)(uintptr_t)provider;
+  event.backing_id = (uint64_t)(uintptr_t)backing_ptr;
+  event.physical_device_ordinal = provider->physical_device_ordinal;
+  event.memory_type = provider->memory_type;
+  event.buffer_usage = provider->supported_usage;
+  event.length = length;
+  event.alignment = provider->allocation_alignment;
+  iree_hal_amdgpu_logical_device_record_profile_memory_event(provider->device,
+                                                             &event);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -165,7 +193,7 @@ iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
 iree_status_t iree_hal_amdgpu_slab_provider_create(
     iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
-    hsa_amd_memory_pool_t memory_pool,
+    hsa_amd_memory_pool_t memory_pool, iree_host_size_t physical_device_ordinal,
     iree_hal_queue_affinity_t queue_affinity_mask,
     iree_hal_amdgpu_buffer_pool_t* buffer_pool, iree_string_view_t trace_name,
     iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider) {
@@ -183,6 +211,13 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
                             "AMDGPU slab provider queue affinity mask must "
                             "not be empty");
   }
+  if (IREE_UNLIKELY(physical_device_ordinal > UINT32_MAX)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "AMDGPU slab provider physical device ordinal out of range: %" PRIhsz,
+        physical_device_ordinal);
+  }
 
   iree_hal_amdgpu_slab_provider_t* provider = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -196,6 +231,7 @@ iree_status_t iree_hal_amdgpu_slab_provider_create(
   provider->libhsa = libhsa;
   provider->topology = topology;
   provider->memory_pool = memory_pool;
+  provider->physical_device_ordinal = (uint32_t)physical_device_ordinal;
   provider->buffer_pool = buffer_pool;
   provider->queue_affinity_mask = queue_affinity_mask;
   provider->total_acquired = IREE_ATOMIC_VAR_INIT(0);
@@ -281,6 +317,9 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
     iree_hal_memory_trace_alloc(&provider->trace, base_ptr, allocation_size);
     iree_atomic_fetch_add(&provider->total_acquired, 1,
                           iree_memory_order_relaxed);
+    iree_hal_amdgpu_slab_provider_record_memory_event(
+        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE, base_ptr,
+        allocation_size);
   } else if (base_ptr) {
     IREE_IGNORE_ERROR(
         iree_hsa_amd_memory_pool_free(IREE_LIBHSA(provider->libhsa), base_ptr));
@@ -297,6 +336,9 @@ static void iree_hal_amdgpu_slab_provider_release_slab(
       iree_hal_amdgpu_slab_provider_cast(base_provider);
   IREE_TRACE_ZONE_BEGIN(z0);
   if (slab->base_ptr) {
+    iree_hal_amdgpu_slab_provider_record_memory_event(
+        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE,
+        slab->base_ptr, (iree_device_size_t)slab->provider_handle);
     iree_hal_memory_trace_free(&provider->trace, slab->base_ptr);
     IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
         IREE_LIBHSA(provider->libhsa), slab->base_ptr));

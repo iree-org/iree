@@ -337,6 +337,27 @@ void iree_hal_amdgpu_transient_buffer_abort_dealloca(
   iree_atomic_store(&buffer->dealloca_queued, 0, iree_memory_order_release);
 }
 
+bool iree_hal_amdgpu_transient_buffer_query_reservation(
+    iree_hal_buffer_t* base_buffer, iree_hal_pool_t** out_pool,
+    iree_hal_pool_reservation_t* out_reservation) {
+  IREE_ASSERT_ARGUMENT(base_buffer);
+  IREE_ASSERT_ARGUMENT(out_pool);
+  IREE_ASSERT_ARGUMENT(out_reservation);
+  *out_pool = NULL;
+  memset(out_reservation, 0, sizeof(*out_reservation));
+
+  iree_hal_amdgpu_transient_buffer_t* buffer =
+      iree_hal_amdgpu_transient_buffer_cast(base_buffer);
+  if (!buffer->reservation_pool) return false;
+  if (iree_atomic_load(&buffer->reservation_armed, iree_memory_order_acquire) ==
+      0) {
+    return false;
+  }
+  *out_pool = buffer->reservation_pool;
+  *out_reservation = buffer->reservation;
+  return true;
+}
+
 void iree_hal_amdgpu_transient_buffer_release_reservation(
     iree_hal_buffer_t* base_buffer,
     const iree_async_frontier_t* death_frontier) {

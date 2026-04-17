@@ -116,6 +116,15 @@ bool iree_hal_amdgpu_transient_buffer_begin_dealloca(iree_hal_buffer_t* buffer);
 // be used when no dealloca completion action was published.
 void iree_hal_amdgpu_transient_buffer_abort_dealloca(iree_hal_buffer_t* buffer);
 
+// Returns the attached pool reservation without transferring ownership.
+//
+// Used by cold diagnostic/profiling paths that need to describe the reservation
+// before queue_dealloca releases it. Returns false if |buffer| has no armed
+// reservation.
+bool iree_hal_amdgpu_transient_buffer_query_reservation(
+    iree_hal_buffer_t* buffer, iree_hal_pool_t** out_pool,
+    iree_hal_pool_reservation_t* out_reservation);
+
 // Releases the attached reservation exactly once. No-op if none is attached or
 // if the reservation has already been released.
 void iree_hal_amdgpu_transient_buffer_release_reservation(

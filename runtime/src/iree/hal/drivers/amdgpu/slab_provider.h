@@ -59,7 +59,7 @@ iree_status_t iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
 iree_status_t iree_hal_amdgpu_slab_provider_create(
     iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
-    hsa_amd_memory_pool_t memory_pool,
+    hsa_amd_memory_pool_t memory_pool, iree_host_size_t physical_device_ordinal,
     iree_hal_queue_affinity_t queue_affinity_mask,
     iree_hal_amdgpu_buffer_pool_t* buffer_pool, iree_string_view_t trace_name,
     iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider);

@@ -10,6 +10,7 @@
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 #include "iree/hal/drivers/amdgpu/profile_metadata.h"
@@ -121,6 +122,23 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     iree_hal_amdgpu_profile_metadata_cursor_t metadata_cursor;
     // Retained programmatic sink receiving HAL-native profiling chunks.
     iree_hal_profile_sink_t* sink;
+    // Host-side memory lifecycle event stream protected by
+    // |memory_event_mutex|.
+    iree_hal_profile_memory_event_t* memory_events;
+    // Mutex protecting memory event stream positions and dropped counts.
+    iree_slim_mutex_t memory_event_mutex;
+    // Allocated memory event ring capacity, always a power of two when nonzero.
+    iree_host_size_t memory_event_capacity;
+    // Mask used to wrap memory event stream positions.
+    iree_host_size_t memory_event_mask;
+    // Absolute memory event stream read position.
+    uint64_t memory_event_read_position;
+    // Absolute memory event stream write position.
+    uint64_t memory_event_write_position;
+    // Memory events dropped because the stream was full.
+    uint64_t memory_event_dropped_count;
+    // Next nonzero memory event id assigned by this stream.
+    uint64_t next_memory_event_id;
   } profiling;
 
   // Topology metadata assigned by the device group after construction.
@@ -153,5 +171,22 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+// Returns true when memory lifecycle profiling records would be retained.
+//
+// Producers may use this to avoid preparing profiling payloads on hot paths.
+// The answer is only meaningful while the device profiling begin/end idle
+// precondition is held by the caller.
+bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
+    iree_hal_device_t* base_device);
+
+// Records one memory lifecycle event into the active profiling stream.
+//
+// This never calls the sink directly. Events are buffered in host memory and
+// emitted by profiling_flush/end, making this safe for submission and pool
+// paths that must not block on file or tool I/O.
+void iree_hal_amdgpu_logical_device_record_profile_memory_event(
+    iree_hal_device_t* base_device,
+    const iree_hal_profile_memory_event_t* event);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_

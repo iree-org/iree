@@ -590,9 +590,9 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
         trace_name, IREE_ARRAYSIZE(trace_name), "default-slab", device_ordinal);
     status = iree_hal_amdgpu_slab_provider_create(
         logical_device, libhsa, &system->topology, coarse_block_memory_pool,
-        queue_affinity_mask, &out_physical_device->materialized_buffer_pool,
-        slab_trace_name, host_allocator,
-        &out_physical_device->default_slab_provider);
+        device_ordinal, queue_affinity_mask,
+        &out_physical_device->materialized_buffer_pool, slab_trace_name,
+        host_allocator, &out_physical_device->default_slab_provider);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_amdgpu_slab_provider_memory_pool_properties_t properties;

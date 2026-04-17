@@ -74,6 +74,10 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.dispatch-events")
 
+// Content type for an array of iree_hal_profile_memory_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.memory-events")
+
 // Bitfield specifying which optional device record fields are populated.
 typedef uint32_t iree_hal_profile_device_flags_t;
 enum iree_hal_profile_device_flag_bits_t {
@@ -370,6 +374,113 @@ iree_hal_profile_dispatch_event_default(void) {
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
   record.export_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Type of memory lifecycle event recorded by a HAL producer.
+typedef uint32_t iree_hal_profile_memory_event_type_t;
+enum iree_hal_profile_memory_event_type_e {
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_NONE = 0u,
+
+  // Slab-provider backing allocation acquired from the platform allocator.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE = 1u,
+
+  // Slab-provider backing allocation released to the platform allocator.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE = 2u,
+
+  // Pool reservation attempt for a logical allocation.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE = 3u,
+
+  // Pool reservation materialized into a HAL buffer.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE = 4u,
+
+  // Pool reservation released for reuse after its death frontier.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE = 5u,
+
+  // Pool reservation could not proceed until a memory-readiness condition.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT = 6u,
+
+  // Queue alloca operation published to a HAL queue.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA = 7u,
+
+  // Queue dealloca operation published to a HAL queue.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA = 8u,
+};
+
+// Bitfield specifying properties of one memory lifecycle event.
+typedef uint32_t iree_hal_profile_memory_event_flags_t;
+enum iree_hal_profile_memory_event_flag_bits_t {
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_NONE = 0u,
+
+  // Event is associated with a HAL queue operation.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION = 1u << 0,
+
+  // Event waited on a frontier supplied by the allocation pool.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_FRONTIER = 1u << 1,
+
+  // Event waited on a pool notification instead of a device frontier.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_NOTIFICATION = 1u << 2,
+
+  // Event references an actual pool reservation.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION = 1u << 3,
+};
+
+// Host-timestamped memory lifecycle event.
+//
+// Memory events describe allocations, reservations, and queue-visible
+// allocation operations. The timestamp is in IREE host monotonic time, not a
+// device clock domain. Producer-defined ids are stable only within one profile
+// session and are intended for joining records in the same bundle.
+typedef struct iree_hal_profile_memory_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of memory lifecycle transition represented by this record.
+  iree_hal_profile_memory_event_type_t type;
+  // Flags describing queue/wait properties of this memory event.
+  iree_hal_profile_memory_event_flags_t flags;
+  // Type-specific result code, or UINT32_MAX when not applicable.
+  uint32_t result;
+  // Producer-defined event identifier unique within the memory event stream.
+  uint64_t event_id;
+  // IREE monotonic host timestamp in nanoseconds.
+  int64_t host_time_ns;
+  // Producer-defined allocation identifier for related memory events.
+  uint64_t allocation_id;
+  // Producer-defined pool or provider identifier for related memory events.
+  uint64_t pool_id;
+  // Producer-defined backing allocation or slab identifier.
+  uint64_t backing_id;
+  // Queue submission epoch associated with this event, or 0 when not queued.
+  uint64_t submission_id;
+  // Session-local physical device ordinal associated with this event.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this event, or UINT32_MAX.
+  uint32_t queue_ordinal;
+  // Number of frontier entries associated with a wait event.
+  uint32_t frontier_entry_count;
+  // Reserved for future memory event fields; must be zero.
+  uint32_t reserved0;
+  // HAL memory type bits associated with the allocation.
+  uint64_t memory_type;
+  // HAL buffer usage bits associated with the allocation.
+  uint64_t buffer_usage;
+  // Byte offset within |backing_id|, when known.
+  uint64_t offset;
+  // Byte length of the allocation, reservation, or slab.
+  uint64_t length;
+  // Requested or guaranteed byte alignment for the allocation.
+  uint64_t alignment;
+} iree_hal_profile_memory_event_t;
+
+// Returns a default memory lifecycle event record.
+static inline iree_hal_profile_memory_event_t
+iree_hal_profile_memory_event_default(void) {
+  iree_hal_profile_memory_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.result = UINT32_MAX;
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
   return record;
 }
 
