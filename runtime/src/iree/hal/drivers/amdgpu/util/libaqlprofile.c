@@ -6,9 +6,9 @@
 
 #include "iree/hal/drivers/amdgpu/util/libaqlprofile.h"
 
-#include "aqlprofile-sdk/aql_profile_v2.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
+#include "third_party/hsa-runtime-headers/include/aqlprofile-sdk/aql_profile_v2.h"
 
 // Keep vendor aqlprofile headers private to this translation unit. The public
 // wrapper mirrors only the narrow ABI surface used by the HAL so callers do not
