@@ -591,7 +591,17 @@ struct ConvertToCoalescedDMABase : OpRewritePattern<OpTy> {
       return failure();
     }
 
-    return createDMAInForall<OpTy>(threadForallOp, rewriter);
+    // createDMAInForall must not fail after tileToThreadLevel, because
+    // tileToThreadLevel already erased the original op via replaceOp.
+    // Failing here would leave a dangling reference (use-after-free).
+    // All eligibility checks must happen before this point (e.g., in
+    // isCopyDMAConvertible / computeThreadNumThreads).
+    [[maybe_unused]] LogicalResult result =
+        createDMAInForall<OpTy>(threadForallOp, rewriter);
+    assert(succeeded(result) &&
+           "createDMAInForall must not fail after tileToThreadLevel erased "
+           "the original op");
+    return success();
   }
 
 protected:
@@ -667,7 +677,12 @@ struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
       return failure();
     }
 
-    return createDMAInForall<linalg::CopyOp>(threadForallOp, rewriter);
+    [[maybe_unused]] LogicalResult result =
+        createDMAInForall<linalg::CopyOp>(threadForallOp, rewriter);
+    assert(succeeded(result) &&
+           "createDMAInForall must not fail after tileToThreadLevel erased "
+           "the original op");
+    return success();
   }
 };
 
@@ -756,9 +771,8 @@ struct ConvertGatherToCoalescedDMA
       return WalkResult::interrupt();
     });
 
-    if (!tiledGatherOp) {
-      return failure();
-    }
+    assert(tiledGatherOp &&
+           "tiled gather op must exist after tileToThreadLevel");
 
     Block *forallBody = threadForallOp.getBody();
     Value sharedOut = forallBody->getArguments().back();
