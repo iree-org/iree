@@ -439,7 +439,8 @@ iree_status_t iree_hal_create_devices_from_flags(
 
 IREE_FLAG(
     string, device_profiling_mode, "",
-    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable'])\n"
+    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable', "
+    "'trace'])\n"
     "or empty to disable profiling. HAL implementations may require\n"
     "additional flags in order to configure profiling support on their\n"
     "devices.");
@@ -573,6 +574,8 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
     options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
   } else if (strcmp(FLAG_device_profiling_mode, "executable") == 0) {
     options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
+  } else if (strcmp(FLAG_device_profiling_mode, "trace") == 0) {
+    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES;
   } else {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported profiling mode '%s'",

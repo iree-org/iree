@@ -264,7 +264,8 @@ static bool iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
   return iree_any_bit_set(
       mode, IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS |
                 IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS |
-                IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS);
+                IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS |
+                IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES);
 }
 
 // Power-of-two capacity for logical-device memory lifecycle event buffering.
@@ -309,10 +310,10 @@ bool iree_hal_amdgpu_logical_device_should_profile_dispatch(
     iree_hal_amdgpu_logical_device_t* logical_device, uint64_t executable_id,
     uint32_t export_ordinal, uint64_t command_buffer_id, uint32_t command_index,
     uint32_t physical_device_ordinal, uint32_t queue_ordinal) {
-  if (!iree_any_bit_set(
-          logical_device->profiling.mode,
-          IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS |
-              IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS)) {
+  if (!iree_any_bit_set(logical_device->profiling.mode,
+                        IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS |
+                            IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS |
+                            IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES)) {
     return false;
   }
 
@@ -2386,7 +2387,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   const iree_hal_device_profiling_mode_t supported_modes =
       IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS |
       IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS |
-      IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
+      IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS |
+      IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES;
   if (iree_any_bit_set(options->mode, ~supported_modes)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported AMDGPU profiling mode bits 0x%" PRIx64,

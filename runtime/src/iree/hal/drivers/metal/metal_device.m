@@ -673,6 +673,11 @@ static iree_status_t iree_hal_metal_device_profiling_begin(
     iree_hal_device_t* base_device, const iree_hal_device_profiling_options_t* options) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
 
+  if (iree_hal_device_profiling_options_have_executable_traces(options)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Metal executable trace profiling is not implemented");
+  }
+
   if (iree_hal_device_profiling_options_have_counter_sets(options)) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "Metal hardware counter profiling is not implemented");

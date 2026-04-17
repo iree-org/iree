@@ -142,6 +142,12 @@ enum iree_hal_device_profiling_mode_bits_t {
   // significant performance impact and should only be used when investigating
   // individual dispatches.
   IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS = 1u << 2,
+
+  // Capture heavyweight executable trace artifacts such as instruction/thread
+  // traces for selected dispatches or command-buffer ranges. This can allocate
+  // large device buffers and inject additional queue packets and should only be
+  // enabled with a narrow capture filter.
+  IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES = 1u << 3,
 };
 
 // Controls profiling options.
@@ -179,6 +185,13 @@ typedef struct iree_hal_device_profiling_options_t {
 static inline bool iree_hal_device_profiling_options_have_counter_sets(
     const iree_hal_device_profiling_options_t* options) {
   return options->counter_set_count != 0;
+}
+
+// Returns true when |options| requests executable trace artifacts.
+static inline bool iree_hal_device_profiling_options_have_executable_traces(
+    const iree_hal_device_profiling_options_t* options) {
+  return iree_any_bit_set(options->mode,
+                          IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES);
 }
 
 // Bitfield specifying flags controlling an async allocation operation.

@@ -1205,6 +1205,11 @@ static iree_status_t iree_hal_cuda_device_queue_flush(
 static iree_status_t iree_hal_cuda_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
+  if (iree_hal_device_profiling_options_have_executable_traces(options)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "CUDA executable trace profiling is not implemented");
+  }
   if (iree_hal_device_profiling_options_have_counter_sets(options)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
