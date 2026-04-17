@@ -712,6 +712,7 @@ static iree_status_t BeginSqWaveWidthProfiling(DeviceProfilingScope* profiling,
       IREE_SV("SQ_WAVES"),
       IREE_SV("SQ_WAVES_32"),
       IREE_SV("SQ_WAVES_64"),
+      IREE_SV("SQ_BUSY_CYCLES"),
   };
   return BeginHardwareCounterProfiling(
       profiling, sink, IREE_ARRAYSIZE(counter_names), counter_names);
@@ -766,10 +767,16 @@ TEST_F(HostQueueCommandBufferTest,
   EXPECT_EQ(1, sink.counter_set_metadata_count);
   EXPECT_EQ(1, sink.counter_metadata_count);
   ASSERT_FALSE(sink.counter_set_records.empty());
-  ASSERT_EQ(sink.counter_set_records.size() * 3u, sink.counter_records.size());
+  ASSERT_EQ(sink.counter_set_records.size() * 4u, sink.counter_records.size());
+  const iree_hal_profile_counter_unit_t expected_units[] = {
+      IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+      IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+      IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+      IREE_HAL_PROFILE_COUNTER_UNIT_CYCLES,
+  };
   iree_host_size_t counter_record_index = 0;
   for (const auto& counter_set_record : sink.counter_set_records) {
-    ASSERT_EQ(3u, counter_set_record.counter_count);
+    ASSERT_EQ(4u, counter_set_record.counter_count);
     uint32_t sample_value_count = 0;
     for (uint32_t i = 0; i < counter_set_record.counter_count; ++i) {
       const auto& counter_record = sink.counter_records[counter_record_index++];
@@ -777,6 +784,7 @@ TEST_F(HostQueueCommandBufferTest,
                 counter_record.counter_set_id);
       EXPECT_EQ(sample_value_count, counter_record.sample_value_offset);
       EXPECT_GT(counter_record.sample_value_count, 0u);
+      EXPECT_EQ(expected_units[i], counter_record.unit);
       sample_value_count += counter_record.sample_value_count;
     }
     EXPECT_EQ(sample_value_count, counter_set_record.sample_value_count);

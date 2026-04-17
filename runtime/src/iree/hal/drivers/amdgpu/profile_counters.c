@@ -89,6 +89,18 @@ static const iree_hal_amdgpu_profile_counter_descriptor_t
             .gfx11_event_id = 6,
             .gfx12_event_id = 6,
         },
+        {
+            .name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ_BUSY_CYCLES"),
+            .block_name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ"),
+            .description = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV(
+                "Clock cycles with active waves in a shader engine."),
+            .unit = IREE_HAL_PROFILE_COUNTER_UNIT_CYCLES,
+            .block_name_id = IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ,
+            .gfx9_event_id = 3,
+            .gfx10_event_id = 3,
+            .gfx11_event_id = 3,
+            .gfx12_event_id = 3,
+        },
 };
 
 #undef IREE_HAL_AMDGPU_PROFILE_COUNTER_SV
@@ -427,7 +439,7 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_selection(
       return iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
           "unsupported AMDGPU counter '%.*s'; supported counters: "
-          "SQ_WAVES, SQ_WAVES_32, SQ_WAVES_64",
+          "SQ_WAVES, SQ_WAVES_32, SQ_WAVES_64, SQ_BUSY_CYCLES",
           (int)selection->counter_names[i].size,
           selection->counter_names[i].data);
     }
