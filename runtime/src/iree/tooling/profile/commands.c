@@ -6,7 +6,13 @@
 
 #include "iree/tooling/profile/commands.h"
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/cat.h"
+#include "iree/tooling/profile/counter.h"
+#include "iree/tooling/profile/explain.h"
+#include "iree/tooling/profile/export.h"
+#include "iree/tooling/profile/memory.h"
+#include "iree/tooling/profile/projection.h"
+#include "iree/tooling/profile/summary.h"
 
 static iree_status_t iree_profile_run_cat(
     const iree_profile_command_invocation_t* invocation) {
@@ -75,7 +81,7 @@ static iree_status_t iree_profile_run_executable(
 
 static iree_status_t iree_profile_run_memory(
     const iree_profile_command_invocation_t* invocation) {
-  return iree_profile_memory_file(
+  return iree_profile_memory_report_file(
       invocation->input_path, invocation->options->format,
       invocation->options->filter, invocation->options->id,
       invocation->output_file, invocation->options->host_allocator);

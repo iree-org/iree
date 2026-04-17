@@ -17,7 +17,8 @@
 #include "iree/base/internal/path.h"
 #include "iree/hal/utils/profile_file.h"
 #include "iree/io/file_contents.h"
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/common.h"
+#include "iree/tooling/profile/reader.h"
 
 //===----------------------------------------------------------------------===//
 // ROCm trace-decoder ABI mirrors
@@ -963,8 +964,11 @@ static iree_status_t iree_profile_att_parse_file(
   // Trace payloads borrow from the mapped bundle, so the ATT profile retains
   // the mapping instead of closing the generic reader at the end of parsing.
   profile->file_contents = profile_file.contents;
-  return iree_profile_file_for_each_record(
-      &profile_file, iree_profile_att_parse_record, profile);
+  iree_profile_file_record_callback_t record_callback = {
+      .fn = iree_profile_att_parse_record,
+      .user_data = profile,
+  };
+  return iree_profile_file_for_each_record(&profile_file, record_callback);
 }
 
 static const iree_profile_att_code_object_t* iree_profile_att_find_code_object(

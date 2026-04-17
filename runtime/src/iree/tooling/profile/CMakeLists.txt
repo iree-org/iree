@@ -14,9 +14,19 @@ iree_cc_library(
   NAME
     profile
   HDRS
+    "cat.h"
     "commands.h"
+    "common.h"
+    "counter.h"
+    "dispatch.h"
+    "explain.h"
+    "export.h"
     "help.h"
     "internal.h"
+    "memory.h"
+    "projection.h"
+    "reader.h"
+    "summary.h"
   SRCS
     "cat.c"
     "commands.c"

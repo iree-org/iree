@@ -4,7 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/dispatch.h"
+
+#include <string.h>
+
+#include "iree/tooling/profile/reader.h"
 
 void iree_profile_dispatch_context_initialize(
     iree_allocator_t host_allocator,
@@ -590,7 +594,7 @@ static void iree_profile_dispatch_record_top_event(
 
   const uint64_t duration_ticks = event->end_tick - event->start_tick;
   iree_host_size_t target_index = context->top_dispatch_count;
-  if (context->top_dispatch_count < IREE_PROFILE_EXPLAIN_TOP_DISPATCH_COUNT) {
+  if (context->top_dispatch_count < IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT) {
     ++context->top_dispatch_count;
   } else {
     target_index = 0;

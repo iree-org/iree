@@ -4,7 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/explain.h"
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "iree/tooling/profile/dispatch.h"
+#include "iree/tooling/profile/memory.h"
+#include "iree/tooling/profile/reader.h"
+#include "iree/tooling/profile/summary.h"
+
+#define IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT 10
 
 typedef struct iree_profile_explain_export_rank_t {
   // Session-local physical device ordinal for this export aggregate.
@@ -432,7 +442,7 @@ static iree_status_t iree_profile_explain_print_text(
     }
 
     iree_profile_dispatch_top_event_t
-        top_dispatches[IREE_PROFILE_EXPLAIN_TOP_DISPATCH_COUNT];
+        top_dispatches[IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT];
     memcpy(top_dispatches, dispatch_context->top_dispatches,
            dispatch_context->top_dispatch_count * sizeof(top_dispatches[0]));
     qsort(top_dispatches, dispatch_context->top_dispatch_count,
@@ -730,7 +740,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
     }
 
     iree_profile_dispatch_top_event_t
-        top_dispatches[IREE_PROFILE_EXPLAIN_TOP_DISPATCH_COUNT];
+        top_dispatches[IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT];
     memcpy(top_dispatches, dispatch_context->top_dispatches,
            dispatch_context->top_dispatch_count * sizeof(top_dispatches[0]));
     qsort(top_dispatches, dispatch_context->top_dispatch_count,
@@ -957,11 +967,15 @@ iree_status_t iree_profile_explain_file(iree_string_view_t path,
       .id_filter = id_filter,
       .file = file,
   };
-  iree_status_t status = iree_profile_file_for_each_record(
-      &profile_file, iree_profile_explain_metadata_record, &parse_context);
+  iree_profile_file_record_callback_t record_callback = {
+      .fn = iree_profile_explain_metadata_record,
+      .user_data = &parse_context,
+  };
+  iree_status_t status =
+      iree_profile_file_for_each_record(&profile_file, record_callback);
   if (iree_status_is_ok(status)) {
-    status = iree_profile_file_for_each_record(
-        &profile_file, iree_profile_explain_event_record, &parse_context);
+    record_callback.fn = iree_profile_explain_event_record;
+    status = iree_profile_file_for_each_record(&profile_file, record_callback);
   }
 
   if (iree_status_is_ok(status)) {

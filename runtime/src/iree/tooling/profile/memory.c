@@ -4,7 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/memory.h"
+
+#include <string.h>
+
+#include "iree/tooling/profile/dispatch.h"
+#include "iree/tooling/profile/reader.h"
 
 const char* iree_profile_memory_event_type_name(
     iree_hal_profile_memory_event_type_t type) {
@@ -866,11 +871,11 @@ static iree_status_t iree_profile_memory_record(
       context->emit_events, context->file);
 }
 
-iree_status_t iree_profile_memory_file(iree_string_view_t path,
-                                       iree_string_view_t format,
-                                       iree_string_view_t filter,
-                                       int64_t id_filter, FILE* file,
-                                       iree_allocator_t host_allocator) {
+iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
+                                              iree_string_view_t format,
+                                              iree_string_view_t filter,
+                                              int64_t id_filter, FILE* file,
+                                              iree_allocator_t host_allocator) {
   bool is_text = iree_string_view_equal(format, IREE_SV("text"));
   bool is_jsonl = iree_string_view_equal(format, IREE_SV("jsonl"));
   if (!is_text && !is_jsonl) {
@@ -892,8 +897,12 @@ iree_status_t iree_profile_memory_file(iree_string_view_t path,
       .emit_events = is_jsonl,
       .file = file,
   };
-  iree_status_t status = iree_profile_file_for_each_record(
-      &profile_file, iree_profile_memory_record, &parse_context);
+  iree_profile_file_record_callback_t record_callback = {
+      .fn = iree_profile_memory_record,
+      .user_data = &parse_context,
+  };
+  iree_status_t status =
+      iree_profile_file_for_each_record(&profile_file, record_callback);
 
   if (iree_status_is_ok(status)) {
     if (is_text) {

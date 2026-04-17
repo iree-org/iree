@@ -11,7 +11,7 @@
 
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/reader.h"
 
 namespace {
 

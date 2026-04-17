@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/projection.h"
+
+#include "iree/tooling/profile/reader.h"
 
 static bool iree_profile_command_operation_filter_matches(
     iree_string_view_t operation_name, iree_string_view_t key,
@@ -1016,11 +1018,15 @@ iree_status_t iree_profile_projection_file(
       .emit_events = emit_events,
       .file = file,
   };
-  iree_status_t status = iree_profile_file_for_each_record(
-      &profile_file, iree_profile_projection_metadata_record, &parse_context);
+  iree_profile_file_record_callback_t record_callback = {
+      .fn = iree_profile_projection_metadata_record,
+      .user_data = &parse_context,
+  };
+  iree_status_t status =
+      iree_profile_file_for_each_record(&profile_file, record_callback);
   if (iree_status_is_ok(status)) {
-    status = iree_profile_file_for_each_record(
-        &profile_file, iree_profile_projection_event_record, &parse_context);
+    record_callback.fn = iree_profile_projection_event_record;
+    status = iree_profile_file_for_each_record(&profile_file, record_callback);
   }
 
   if (iree_status_is_ok(status)) {

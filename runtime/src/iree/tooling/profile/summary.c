@@ -4,7 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/internal.h"
+#include "iree/tooling/profile/summary.h"
+
+#include <string.h>
+
+#include "iree/tooling/profile/reader.h"
 
 void iree_profile_summary_initialize(iree_allocator_t host_allocator,
                                      iree_profile_summary_t* out_summary) {
@@ -925,8 +929,12 @@ iree_status_t iree_profile_summary_file(iree_string_view_t path,
 
   iree_profile_summary_t summary;
   iree_profile_summary_initialize(host_allocator, &summary);
-  iree_status_t status = iree_profile_file_for_each_record(
-      &profile_file, iree_profile_summary_record, &summary);
+  iree_profile_file_record_callback_t record_callback = {
+      .fn = iree_profile_summary_record,
+      .user_data = &summary,
+  };
+  iree_status_t status =
+      iree_profile_file_for_each_record(&profile_file, record_callback);
 
   if (iree_status_is_ok(status)) {
     if (is_text) {
