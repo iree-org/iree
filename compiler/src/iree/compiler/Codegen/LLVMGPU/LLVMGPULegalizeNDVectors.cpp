@@ -833,9 +833,7 @@ struct ConvertTransferRead final
     auto vec1DType = VectorType::get({shape.back()}, resultTy.getElementType());
 
     AffineMap permMap = op.getPermutationMap();
-    AffineMap newPermMap =
-        AffineMap::get(permMap.getNumDims(), permMap.getNumSymbols(),
-                       {permMap.getResults().back()}, rewriter.getContext());
+    AffineMap newPermMap = permMap.getMinorSubMap(1);
 
     ArrayAttr newInBoundsAttr;
     if (ArrayAttr inBounds = op.getInBoundsAttr()) {
@@ -935,9 +933,7 @@ struct ConvertTransferWrite final
     int64_t numOuterDims = outerShape.size();
 
     AffineMap permMap = op.getPermutationMap();
-    AffineMap newPermMap =
-        AffineMap::get(permMap.getNumDims(), permMap.getNumSymbols(),
-                       {permMap.getResults().back()}, rewriter.getContext());
+    AffineMap newPermMap = permMap.getMinorSubMap(1);
 
     ArrayAttr newInBoundsAttr;
     if (ArrayAttr inBounds = op.getInBoundsAttr()) {
