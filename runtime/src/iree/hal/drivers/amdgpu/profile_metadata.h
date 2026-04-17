@@ -24,6 +24,8 @@ typedef struct iree_hal_amdgpu_profile_metadata_cursor_t {
   iree_host_size_t executable_export_record_data_length;
   // Number of command-buffer records already emitted.
   iree_host_size_t command_buffer_record_count;
+  // Number of command-operation records already emitted.
+  iree_host_size_t command_operation_record_count;
 } iree_hal_amdgpu_profile_metadata_cursor_t;
 
 // Logical-device-owned registry of durable profiling metadata side tables.
@@ -54,6 +56,12 @@ typedef struct iree_hal_amdgpu_profile_metadata_registry_t {
   iree_host_size_t command_buffer_record_count;
   // Allocated command-buffer record capacity.
   iree_host_size_t command_buffer_record_capacity;
+  // Command-operation records in command-buffer recording order.
+  iree_hal_profile_command_operation_record_t* command_operation_records;
+  // Number of valid command-operation records.
+  iree_host_size_t command_operation_record_count;
+  // Allocated command-operation record capacity.
+  iree_host_size_t command_operation_record_capacity;
 } iree_hal_amdgpu_profile_metadata_registry_t;
 
 // Initializes |out_registry| for logical-device-lifetime metadata.
@@ -82,6 +90,12 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     iree_host_size_t physical_device_ordinal, uint64_t* out_command_buffer_id);
+
+// Registers immutable command-buffer operation records.
+iree_status_t iree_hal_amdgpu_profile_metadata_register_command_operations(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    iree_host_size_t operation_count,
+    const iree_hal_profile_command_operation_record_t* operations);
 
 // Writes metadata records newer than |cursor| and advances |cursor| on success.
 iree_status_t iree_hal_amdgpu_profile_metadata_write(

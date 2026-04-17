@@ -76,6 +76,8 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   iree_allocator_t host_allocator;
   // Borrowed device allocator used during recording finalization.
   iree_hal_allocator_t* device_allocator;
+  // Borrowed logical-device profiling metadata registry.
+  iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata;
   // Block pool used for durable command-buffer program blocks.
   iree_arena_block_pool_t* block_pool;
   // Producer-local profile command-buffer id assigned at creation.
@@ -541,6 +543,10 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "command-buffer block pool is required");
   }
+  if (IREE_UNLIKELY(!profile_metadata)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "command-buffer profile metadata is required");
+  }
   if (IREE_UNLIKELY(device_ordinal > UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "command-buffer device ordinal %" PRIhsz
@@ -570,6 +576,7 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
       &iree_hal_amdgpu_aql_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->device_allocator = device_allocator;
+  command_buffer->profile_metadata = profile_metadata;
   command_buffer->block_pool = block_pool;
   command_buffer->device_ordinal = (uint32_t)device_ordinal;
   iree_arena_initialize(block_pool, &command_buffer->rodata.arena);
@@ -674,6 +681,256 @@ void* iree_hal_amdgpu_aql_command_buffer_prepublished_kernarg(
   return (void*)(uintptr_t)segment->device_pointer;
 }
 
+static iree_hal_profile_command_operation_flags_t
+iree_hal_amdgpu_aql_command_buffer_binding_kind_profile_flags(
+    iree_hal_amdgpu_command_buffer_binding_kind_t kind) {
+  switch (kind) {
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_STATIC:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_KIND_DYNAMIC:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_DYNAMIC_BINDINGS;
+    default:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_NONE;
+  }
+}
+
+static iree_hal_profile_command_operation_type_t
+iree_hal_amdgpu_aql_command_buffer_profile_operation_type(uint8_t opcode) {
+  switch (opcode) {
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BARRIER:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_BARRIER;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_FILL:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_FILL;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COPY:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_COPY;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_UPDATE:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_UPDATE;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_PROFILE_MARKER:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_PROFILE_MARKER;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BRANCH:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_BRANCH;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COND_BRANCH:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_COND_BRANCH;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_RETURN:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_RETURN;
+    default:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE;
+  }
+}
+
+static iree_hal_profile_command_operation_flags_t
+iree_hal_amdgpu_aql_command_buffer_profile_dispatch_binding_flags(
+    const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    const iree_hal_amdgpu_command_buffer_dispatch_command_t* dispatch_command) {
+  if (dispatch_command->binding_count == 0) {
+    return IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_NONE;
+  }
+  if (dispatch_command->binding_source_offset == 0) {
+    return IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS;
+  }
+
+  iree_hal_profile_command_operation_flags_t flags =
+      IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_NONE;
+  const uint8_t* block_base = (const uint8_t*)block;
+  const uint32_t binding_source_offset =
+      dispatch_command->binding_source_offset;
+  const iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources =
+      (const iree_hal_amdgpu_command_buffer_binding_source_t*)(block_base +
+                                                               binding_source_offset);
+  for (uint16_t i = 0; i < dispatch_command->binding_count; ++i) {
+    flags |= iree_any_bit_set(
+                 binding_sources[i].flags,
+                 IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_DYNAMIC)
+                 ? IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_DYNAMIC_BINDINGS
+                 : IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS;
+  }
+  return flags;
+}
+
+static void iree_hal_amdgpu_aql_command_buffer_initialize_profile_operation(
+    uint64_t command_buffer_id,
+    const iree_hal_amdgpu_command_buffer_block_header_t* block,
+    uint32_t block_command_ordinal,
+    const iree_hal_amdgpu_command_buffer_command_header_t* command,
+    iree_hal_profile_command_operation_record_t* out_record) {
+  iree_hal_profile_command_operation_record_t record =
+      iree_hal_profile_command_operation_record_default();
+  record.type = iree_hal_amdgpu_aql_command_buffer_profile_operation_type(
+      command->opcode);
+  record.command_buffer_id = command_buffer_id;
+  record.command_index = command->command_index;
+  record.block_ordinal = block->block_ordinal;
+  record.block_command_ordinal = block_command_ordinal;
+  if (iree_any_bit_set(
+          command->flags,
+          IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_HAS_BARRIER)) {
+    record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_EXECUTION_BARRIER;
+  }
+
+  switch (command->opcode) {
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BARRIER:
+      record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_EXECUTION_BARRIER;
+      break;
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH: {
+      const iree_hal_amdgpu_command_buffer_dispatch_command_t*
+          dispatch_command =
+              (const iree_hal_amdgpu_command_buffer_dispatch_command_t*)command;
+      record.flags |=
+          iree_hal_amdgpu_aql_command_buffer_profile_dispatch_binding_flags(
+              block, dispatch_command);
+      if (iree_any_bit_set(
+              dispatch_command->dispatch_flags,
+              IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS)) {
+        record.flags |=
+            IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_INDIRECT_PARAMETERS;
+      }
+      if (dispatch_command->kernarg_strategy ==
+          IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_PREPUBLISHED) {
+        record.flags |=
+            IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_PREPUBLISHED_ARGUMENTS;
+      }
+      record.executable_id = dispatch_command->executable_id;
+      record.export_ordinal = dispatch_command->export_ordinal;
+      record.binding_count = dispatch_command->binding_count;
+      record.workgroup_size[0] = dispatch_command->workgroup_size[0];
+      record.workgroup_size[1] = dispatch_command->workgroup_size[1];
+      record.workgroup_size[2] = dispatch_command->workgroup_size[2];
+      if (!iree_any_bit_set(
+              dispatch_command->dispatch_flags,
+              IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS)) {
+        for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(record.workgroup_count);
+             ++i) {
+          record.workgroup_count[i] =
+              dispatch_command->workgroup_size[i] == 0
+                  ? 0
+                  : dispatch_command->grid_size[i] /
+                        dispatch_command->workgroup_size[i];
+        }
+      }
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_FILL: {
+      const iree_hal_amdgpu_command_buffer_fill_command_t* fill_command =
+          (const iree_hal_amdgpu_command_buffer_fill_command_t*)command;
+      record.flags |=
+          iree_hal_amdgpu_aql_command_buffer_binding_kind_profile_flags(
+              fill_command->target_kind);
+      record.target_offset = fill_command->target_offset;
+      record.length = fill_command->length;
+      record.target_ordinal = fill_command->target_ordinal;
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COPY: {
+      const iree_hal_amdgpu_command_buffer_copy_command_t* copy_command =
+          (const iree_hal_amdgpu_command_buffer_copy_command_t*)command;
+      record.flags |=
+          iree_hal_amdgpu_aql_command_buffer_binding_kind_profile_flags(
+              copy_command->source_kind);
+      record.flags |=
+          iree_hal_amdgpu_aql_command_buffer_binding_kind_profile_flags(
+              copy_command->target_kind);
+      record.source_offset = copy_command->source_offset;
+      record.target_offset = copy_command->target_offset;
+      record.length = copy_command->length;
+      record.source_ordinal = copy_command->source_ordinal;
+      record.target_ordinal = copy_command->target_ordinal;
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_UPDATE: {
+      const iree_hal_amdgpu_command_buffer_update_command_t* update_command =
+          (const iree_hal_amdgpu_command_buffer_update_command_t*)command;
+      record.flags |=
+          iree_hal_amdgpu_aql_command_buffer_binding_kind_profile_flags(
+              update_command->target_kind);
+      record.target_offset = update_command->target_offset;
+      record.length = update_command->length;
+      record.target_ordinal = update_command->target_ordinal;
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_BRANCH: {
+      const iree_hal_amdgpu_command_buffer_branch_command_t* branch_command =
+          (const iree_hal_amdgpu_command_buffer_branch_command_t*)command;
+      record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW;
+      record.target_block_ordinal = branch_command->target_block_ordinal;
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_COND_BRANCH: {
+      const iree_hal_amdgpu_command_buffer_cond_branch_command_t*
+          branch_command =
+              (const iree_hal_amdgpu_command_buffer_cond_branch_command_t*)
+                  command;
+      record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW;
+      record.target_block_ordinal = branch_command->true_block_ordinal;
+      record.alternate_block_ordinal = branch_command->false_block_ordinal;
+      break;
+    }
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_RETURN:
+      record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW;
+      break;
+    default:
+      break;
+  }
+  *out_record = record;
+}
+
+static iree_status_t
+iree_hal_amdgpu_aql_command_buffer_register_profile_operations(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
+  if (command_buffer->program.command_count == 0) {
+    return iree_ok_status();
+  }
+
+  iree_host_size_t byte_length = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      0, &byte_length,
+      IREE_STRUCT_FIELD(command_buffer->program.command_count,
+                        iree_hal_profile_command_operation_record_t, NULL)));
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, command_buffer->program.command_count);
+
+  iree_hal_profile_command_operation_record_t* records = NULL;
+  iree_status_t status = iree_allocator_malloc(command_buffer->host_allocator,
+                                               byte_length, (void**)&records);
+
+  iree_host_size_t record_count = 0;
+  if (iree_status_is_ok(status)) {
+    for (iree_hal_amdgpu_command_buffer_block_header_t* block =
+             command_buffer->program.first_block;
+         block; block = iree_hal_amdgpu_aql_program_block_next(
+                    command_buffer->program.block_pool, block)) {
+      const iree_hal_amdgpu_command_buffer_command_header_t* command =
+          iree_hal_amdgpu_command_buffer_block_commands_const(block);
+      for (uint16_t i = 0; i < block->command_count &&
+                           record_count < command_buffer->program.command_count;
+           ++i) {
+        iree_hal_amdgpu_aql_command_buffer_initialize_profile_operation(
+            command_buffer->profile_id, block, i, command,
+            &records[record_count++]);
+        command = iree_hal_amdgpu_command_buffer_command_next_const(command);
+      }
+    }
+  }
+  if (iree_status_is_ok(status) &&
+      record_count != command_buffer->program.command_count) {
+    status =
+        iree_make_status(IREE_STATUS_INTERNAL,
+                         "profile command-operation count mismatch: expected "
+                         "%u but got %" PRIhsz,
+                         command_buffer->program.command_count, record_count);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_profile_metadata_register_command_operations(
+        command_buffer->profile_metadata, record_count, records);
+  }
+
+  iree_allocator_free(command_buffer->host_allocator, records);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 //===----------------------------------------------------------------------===//
 // Recording Session
 //===----------------------------------------------------------------------===//
@@ -697,6 +954,10 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_end(
     status =
         iree_hal_amdgpu_aql_command_buffer_materialize_prepublished_kernargs(
             command_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_aql_command_buffer_register_profile_operations(
+        command_buffer);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_resource_set_freeze(command_buffer->resource_set);

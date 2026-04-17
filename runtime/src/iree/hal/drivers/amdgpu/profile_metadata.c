@@ -23,6 +23,10 @@ typedef struct iree_hal_amdgpu_profile_metadata_snapshot_t {
   iree_hal_profile_command_buffer_record_t* command_buffer_records;
   // Number of command-buffer records in |command_buffer_records|.
   iree_host_size_t command_buffer_record_count;
+  // Command-operation records copied from the registry.
+  iree_hal_profile_command_operation_record_t* command_operation_records;
+  // Number of command-operation records in |command_operation_records|.
+  iree_host_size_t command_operation_record_count;
   // Cursor position after this snapshot's copied records.
   iree_hal_amdgpu_profile_metadata_cursor_t end_cursor;
 } iree_hal_amdgpu_profile_metadata_snapshot_t;
@@ -40,6 +44,7 @@ void iree_hal_amdgpu_profile_metadata_initialize(
 void iree_hal_amdgpu_profile_metadata_deinitialize(
     iree_hal_amdgpu_profile_metadata_registry_t* registry) {
   iree_allocator_t host_allocator = registry->host_allocator;
+  iree_allocator_free(host_allocator, registry->command_operation_records);
   iree_allocator_free(host_allocator, registry->command_buffer_records);
   iree_allocator_free(host_allocator, registry->executable_export_record_data);
   iree_allocator_free(host_allocator, registry->executable_records);
@@ -286,8 +291,64 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_command_buffer(
   return status;
 }
 
+iree_status_t iree_hal_amdgpu_profile_metadata_register_command_operations(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    iree_host_size_t operation_count,
+    const iree_hal_profile_command_operation_record_t* operations) {
+  if (operation_count == 0) {
+    return iree_ok_status();
+  }
+  if (IREE_UNLIKELY(!operations)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "profile command-operation records are required");
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, operation_count);
+
+  iree_slim_mutex_lock(&registry->mutex);
+
+  iree_host_size_t new_record_count = 0;
+  iree_host_size_t byte_length = 0;
+  iree_status_t status = iree_ok_status();
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_add(registry->command_operation_record_count,
+                                      operation_count, &new_record_count))) {
+    status =
+        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                         "profile command-operation metadata count overflow");
+  }
+  if (iree_status_is_ok(status)) {
+    status = IREE_STRUCT_LAYOUT(
+        0, &byte_length,
+        IREE_STRUCT_FIELD(operation_count,
+                          iree_hal_profile_command_operation_record_t, NULL));
+  }
+  if (iree_status_is_ok(status) &&
+      new_record_count > registry->command_operation_record_capacity) {
+    status = iree_allocator_grow_array(
+        registry->host_allocator,
+        iree_max((iree_host_size_t)64, new_record_count),
+        sizeof(registry->command_operation_records[0]),
+        &registry->command_operation_record_capacity,
+        (void**)&registry->command_operation_records);
+  }
+  if (iree_status_is_ok(status)) {
+    memcpy(registry->command_operation_records +
+               registry->command_operation_record_count,
+           operations, byte_length);
+    registry->command_operation_record_count = new_record_count;
+  }
+
+  iree_slim_mutex_unlock(&registry->mutex);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static void iree_hal_amdgpu_profile_metadata_snapshot_deinitialize(
     iree_hal_amdgpu_profile_metadata_snapshot_t* snapshot) {
+  iree_allocator_free(snapshot->host_allocator,
+                      snapshot->command_operation_records);
   iree_allocator_free(snapshot->host_allocator,
                       snapshot->command_buffer_records);
   iree_allocator_free(snapshot->host_allocator,
@@ -311,7 +372,9 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
                     cursor->executable_export_record_data_length >
                         registry->executable_export_record_data_length ||
                     cursor->command_buffer_record_count >
-                        registry->command_buffer_record_count)) {
+                        registry->command_buffer_record_count ||
+                    cursor->command_operation_record_count >
+                        registry->command_operation_record_count)) {
     status =
         iree_make_status(IREE_STATUS_INTERNAL,
                          "profile metadata cursor is outside registry bounds");
@@ -320,6 +383,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
   iree_host_size_t executable_record_count = 0;
   iree_host_size_t executable_export_record_data_length = 0;
   iree_host_size_t command_buffer_record_count = 0;
+  iree_host_size_t command_operation_record_count = 0;
   if (iree_status_is_ok(status)) {
     executable_record_count =
         registry->executable_record_count - cursor->executable_record_count;
@@ -328,6 +392,8 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
         cursor->executable_export_record_data_length;
     command_buffer_record_count = registry->command_buffer_record_count -
                                   cursor->command_buffer_record_count;
+    command_operation_record_count = registry->command_operation_record_count -
+                                     cursor->command_operation_record_count;
   }
 
   if (iree_status_is_ok(status) && executable_record_count > 0) {
@@ -382,6 +448,27 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
     }
   }
 
+  if (iree_status_is_ok(status) && command_operation_record_count > 0) {
+    iree_host_size_t byte_length = 0;
+    status = IREE_STRUCT_LAYOUT(
+        0, &byte_length,
+        IREE_STRUCT_FIELD(command_operation_record_count,
+                          iree_hal_profile_command_operation_record_t, NULL));
+    if (iree_status_is_ok(status)) {
+      status = iree_allocator_malloc(
+          registry->host_allocator, byte_length,
+          (void**)&out_snapshot->command_operation_records);
+    }
+    if (iree_status_is_ok(status)) {
+      memcpy(out_snapshot->command_operation_records,
+             registry->command_operation_records +
+                 cursor->command_operation_record_count,
+             byte_length);
+      out_snapshot->command_operation_record_count =
+          command_operation_record_count;
+    }
+  }
+
   if (iree_status_is_ok(status)) {
     out_snapshot->end_cursor.executable_record_count =
         registry->executable_record_count;
@@ -389,6 +476,8 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
         registry->executable_export_record_data_length;
     out_snapshot->end_cursor.command_buffer_record_count =
         registry->command_buffer_record_count;
+    out_snapshot->end_cursor.command_operation_record_count =
+        registry->command_operation_record_count;
   }
 
   iree_slim_mutex_unlock(&registry->mutex);
@@ -402,7 +491,9 @@ iree_status_t iree_hal_amdgpu_profile_metadata_write(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_hal_profile_sink_t* sink, uint64_t session_id, iree_string_view_t name,
     iree_hal_amdgpu_profile_metadata_cursor_t* cursor) {
-  if (!sink) return iree_ok_status();
+  if (!sink) {
+    return iree_ok_status();
+  }
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -446,6 +537,20 @@ iree_status_t iree_hal_amdgpu_profile_metadata_write(
         snapshot.command_buffer_records,
         snapshot.command_buffer_record_count *
             sizeof(snapshot.command_buffer_records[0]));
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  if (iree_status_is_ok(status) &&
+      snapshot.command_operation_record_count > 0) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS;
+    metadata.name = name;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec = iree_make_const_byte_span(
+        snapshot.command_operation_records,
+        snapshot.command_operation_record_count *
+            sizeof(snapshot.command_operation_records[0]));
     status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
   }
 

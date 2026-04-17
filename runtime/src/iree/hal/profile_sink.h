@@ -66,6 +66,10 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS \
   IREE_SV("application/vnd.iree.hal.profile.command-buffers")
 
+// Content type for an array of iree_hal_profile_command_operation_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS \
+  IREE_SV("application/vnd.iree.hal.profile.command-operations")
+
 // Content type for an array of iree_hal_profile_clock_correlation_record_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS \
   IREE_SV("application/vnd.iree.hal.profile.clock-correlations")
@@ -263,6 +267,130 @@ iree_hal_profile_command_buffer_record_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Type of command-buffer operation recorded by a HAL producer.
+typedef uint32_t iree_hal_profile_command_operation_type_t;
+enum iree_hal_profile_command_operation_type_e {
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE = 0u,
+
+  // Execution or memory visibility barrier.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_BARRIER = 1u,
+
+  // Kernel dispatch operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH = 2u,
+
+  // Device buffer fill operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_FILL = 3u,
+
+  // Device buffer copy operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_COPY = 4u,
+
+  // Host-to-device buffer update operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_UPDATE = 5u,
+
+  // Profiling or debug marker operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_PROFILE_MARKER = 6u,
+
+  // Unconditional command-buffer branch operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_BRANCH = 7u,
+
+  // Conditional command-buffer branch operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_COND_BRANCH = 8u,
+
+  // Command-buffer return operation.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_RETURN = 9u,
+};
+
+// Bitfield specifying properties of one command-buffer operation record.
+typedef uint32_t iree_hal_profile_command_operation_flags_t;
+enum iree_hal_profile_command_operation_flag_bits_t {
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_NONE = 0u,
+
+  // Operation represents an execution or memory visibility barrier.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_EXECUTION_BARRIER = 1u << 0,
+
+  // Operation reads dynamic dispatch parameters from device memory.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_INDIRECT_PARAMETERS = 1u << 1,
+
+  // Operation uses at least one dynamic binding-table slot.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_DYNAMIC_BINDINGS = 1u << 2,
+
+  // Operation uses at least one statically recorded buffer reference.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS = 1u << 3,
+
+  // Operation has immutable prepublished dispatch arguments.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_PREPUBLISHED_ARGUMENTS = 1u << 4,
+
+  // Operation changes command-buffer control flow.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW = 1u << 5,
+};
+
+// Session-level reusable command-buffer operation description.
+//
+// Producers should emit command-operation records after the command-buffer
+// record defining |command_buffer_id| and before dispatch event records that
+// reference |command_buffer_id| and |command_index|. The fields are intended to
+// be compact enough for one record per recorded command and generic enough for
+// non-AMDGPU producers to populate from their own command encodings.
+typedef struct iree_hal_profile_command_operation_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of command-buffer operation represented by this record.
+  iree_hal_profile_command_operation_type_t type;
+  // Flags describing operation properties.
+  iree_hal_profile_command_operation_flags_t flags;
+  // Command ordinal within |command_buffer_id|.
+  uint32_t command_index;
+  // Process-local command-buffer identifier.
+  uint64_t command_buffer_id;
+  // Producer-local command block ordinal containing this operation.
+  uint32_t block_ordinal;
+  // Command ordinal within |block_ordinal|.
+  uint32_t block_command_ordinal;
+  // Process-local executable identifier, or 0 when not applicable.
+  uint64_t executable_id;
+  // Executable export ordinal, or UINT32_MAX when not applicable.
+  uint32_t export_ordinal;
+  // Number of binding slots used by the operation, or 0 when not applicable.
+  uint32_t binding_count;
+  // Static workgroup counts for dispatch operations, or zero when dynamic.
+  uint32_t workgroup_count[3];
+  // Workgroup sizes for dispatch operations, or zero when not applicable.
+  uint32_t workgroup_size[3];
+  // Source byte offset for transfer operations, or 0 when not applicable.
+  uint64_t source_offset;
+  // Target byte offset for transfer operations, or 0 when not applicable.
+  uint64_t target_offset;
+  // Byte length for transfer operations, or 0 when not applicable.
+  uint64_t length;
+  // Producer-defined source binding ordinal, or UINT32_MAX when absent.
+  uint32_t source_ordinal;
+  // Producer-defined target binding ordinal, or UINT32_MAX when absent.
+  uint32_t target_ordinal;
+  // Primary branch target block ordinal, or UINT32_MAX when not applicable.
+  uint32_t target_block_ordinal;
+  // Alternate branch target block ordinal, or UINT32_MAX when absent.
+  uint32_t alternate_block_ordinal;
+  // Reserved for future command-operation record fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_command_operation_record_t;
+
+// Returns a default command-buffer operation record.
+static inline iree_hal_profile_command_operation_record_t
+iree_hal_profile_command_operation_record_default(void) {
+  iree_hal_profile_command_operation_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.command_index = UINT32_MAX;
+  record.block_ordinal = UINT32_MAX;
+  record.block_command_ordinal = UINT32_MAX;
+  record.export_ordinal = UINT32_MAX;
+  record.source_ordinal = UINT32_MAX;
+  record.target_ordinal = UINT32_MAX;
+  record.target_block_ordinal = UINT32_MAX;
+  record.alternate_block_ordinal = UINT32_MAX;
   return record;
 }
 
