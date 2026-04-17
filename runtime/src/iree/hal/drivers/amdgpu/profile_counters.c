@@ -1075,13 +1075,9 @@ static void iree_hal_amdgpu_host_queue_emplace_profile_counter_packet(
     iree_hal_amdgpu_aql_packet_control_t packet_control,
     iree_hsa_signal_t completion_signal, uint16_t* out_header,
     uint16_t* out_setup) {
-  memcpy((uint8_t*)&packet->pm4_ib + sizeof(uint32_t),
-         (const uint8_t*)source_packet + sizeof(uint32_t),
-         sizeof(*source_packet) - sizeof(uint32_t));
-  packet->pm4_ib.completion_signal = completion_signal;
-  *out_setup = IREE_HSA_AMD_AQL_FORMAT_PM4_IB;
-  *out_header = iree_hal_amdgpu_aql_make_header(
-      IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC, packet_control);
+  iree_hal_amdgpu_profile_aqlprofile_emplace_pm4_ib_packet(
+      source_packet, packet, packet_control, completion_signal, out_header,
+      out_setup);
 }
 
 static void iree_hal_amdgpu_host_queue_emplace_profile_counter_packet_at(

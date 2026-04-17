@@ -38,6 +38,10 @@ typedef struct iree_hal_amdgpu_profile_counter_sample_slot_t
     iree_hal_amdgpu_profile_counter_sample_slot_t;
 typedef struct iree_hal_amdgpu_profile_counter_session_t
     iree_hal_amdgpu_profile_counter_session_t;
+typedef struct iree_hal_amdgpu_profile_trace_session_t
+    iree_hal_amdgpu_profile_trace_session_t;
+typedef struct iree_hal_amdgpu_profile_trace_slot_t
+    iree_hal_amdgpu_profile_trace_slot_t;
 typedef struct iree_hal_amdgpu_staging_pool_t iree_hal_amdgpu_staging_pool_t;
 typedef struct iree_hal_amdgpu_transient_buffer_pool_t
     iree_hal_amdgpu_transient_buffer_pool_t;
@@ -322,8 +326,11 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     iree_hal_amdgpu_profile_counter_sample_slot_t* counter_sample_slots;
     // Number of counter sample slots associated with each dispatch event slot.
     uint32_t counter_set_count;
-    // Reserved padding.
-    uint32_t reserved0;
+    // Borrowed executable trace session active for this queue, or NULL.
+    iree_hal_amdgpu_profile_trace_session_t* trace_session;
+    // Host-side slot table pairing dispatch event ring slots with per-use
+    // aqlprofile ATT handles.
+    iree_hal_amdgpu_profile_trace_slot_t* trace_slots;
   } profiling;
 
   // False once this queue's accumulated frontier overflows while merging waited

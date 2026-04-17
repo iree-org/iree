@@ -139,6 +139,12 @@ typedef struct iree_profile_summary_t {
   uint64_t counter_sample_chunk_count;
   // Hardware counter sample records parsed.
   uint64_t counter_sample_record_count;
+  // Executable trace chunks parsed.
+  uint64_t executable_trace_chunk_count;
+  // Executable trace records parsed.
+  uint64_t executable_trace_record_count;
+  // Raw executable trace bytes referenced by trace records.
+  uint64_t executable_trace_data_bytes;
   // Chunk records with unknown content types.
   uint64_t unknown_chunk_count;
 } iree_profile_summary_t;
@@ -1925,6 +1931,44 @@ static iree_status_t iree_profile_summary_process_counter_sample_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_executable_trace_record(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  if (record->payload.data_length <
+      sizeof(iree_hal_profile_executable_trace_record_t)) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk has a truncated trace record");
+  }
+
+  iree_hal_profile_executable_trace_record_t trace_record;
+  memcpy(&trace_record, record->payload.data, sizeof(trace_record));
+  if (trace_record.record_length < sizeof(trace_record) ||
+      trace_record.record_length > record->payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk has invalid typed record length %u",
+        trace_record.record_length);
+  }
+  if (trace_record.data_length !=
+      record->payload.data_length - trace_record.record_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk data length is inconsistent with "
+        "payload length");
+  }
+
+  if (trace_record.data_length >
+      UINT64_MAX - summary->executable_trace_data_bytes) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profile executable trace byte counter overflowed");
+  }
+
+  ++summary->executable_trace_record_count;
+  summary->executable_trace_data_bytes += trace_record.data_length;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_summary_process_queue_event_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -2034,6 +2078,12 @@ static iree_status_t iree_profile_summary_process_record(
                  IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
     ++summary->counter_sample_chunk_count;
     return iree_profile_summary_process_counter_sample_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
+    ++summary->executable_trace_chunk_count;
+    return iree_profile_summary_process_executable_trace_record(summary,
+                                                                record);
   }
 
   ++summary->unknown_chunk_count;
@@ -2103,24 +2153,25 @@ static void iree_profile_print_summary_text(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
-  fprintf(file,
-          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
-          " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
-          " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
-          " memory_events=%" PRIu64 " counter_sets=%" PRIu64
-          " counters=%" PRIu64 " counter_samples=%" PRIu64 " unknown=%" PRIu64
-          " truncated=%" PRIu64 "\n",
-          summary->device_chunk_count, summary->queue_chunk_count,
-          summary->executable_chunk_count,
-          summary->executable_export_chunk_count,
-          summary->command_buffer_chunk_count,
-          summary->command_operation_chunk_count,
-          summary->clock_correlation_chunk_count,
-          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
-          summary->memory_event_chunk_count, summary->counter_set_chunk_count,
-          summary->counter_chunk_count, summary->counter_sample_chunk_count,
-          summary->unknown_chunk_count, summary->truncated_chunk_count);
+  fprintf(
+      file,
+      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+      " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+      " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
+      " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
+      " memory_events=%" PRIu64 " counter_sets=%" PRIu64 " counters=%" PRIu64
+      " counter_samples=%" PRIu64 " executable_traces=%" PRIu64
+      " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
+      summary->device_chunk_count, summary->queue_chunk_count,
+      summary->executable_chunk_count, summary->executable_export_chunk_count,
+      summary->command_buffer_chunk_count,
+      summary->command_operation_chunk_count,
+      summary->clock_correlation_chunk_count,
+      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+      summary->memory_event_chunk_count, summary->counter_set_chunk_count,
+      summary->counter_chunk_count, summary->counter_sample_chunk_count,
+      summary->executable_trace_chunk_count, summary->unknown_chunk_count,
+      summary->truncated_chunk_count);
   fprintf(
       file,
       "metadata_records: executables=%" PRIu64 " executable_exports=%" PRIu64
@@ -2130,9 +2181,12 @@ static void iree_profile_print_summary_text(
       summary->command_operation_record_count);
   fprintf(file,
           "event_records: queue_events=%" PRIu64 " memory_events=%" PRIu64
-          " counter_samples=%" PRIu64 "\n",
+          " counter_samples=%" PRIu64 " executable_traces=%" PRIu64 "\n",
           summary->queue_event_record_count, summary->memory_event_record_count,
-          summary->counter_sample_record_count);
+          summary->counter_sample_record_count,
+          summary->executable_trace_record_count);
+  fprintf(file, "trace_data_bytes: executable_traces=%" PRIu64 "\n",
+          summary->executable_trace_data_bytes);
   fprintf(file,
           "counter_records: counter_sets=%" PRIu64 " counters=%" PRIu64 "\n",
           summary->counter_set_record_count, summary->counter_record_count);
@@ -2226,7 +2280,10 @@ static void iree_profile_print_summary_jsonl(
       ",\"memory_event_records\":%" PRIu64 ",\"counter_set_chunks\":%" PRIu64
       ",\"counter_set_records\":%" PRIu64 ",\"counter_chunks\":%" PRIu64
       ",\"counter_records\":%" PRIu64 ",\"counter_sample_chunks\":%" PRIu64
-      ",\"counter_sample_records\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
+      ",\"counter_sample_records\":%" PRIu64
+      ",\"executable_trace_chunks\":%" PRIu64
+      ",\"executable_trace_records\":%" PRIu64
+      ",\"executable_trace_data_bytes\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
       ",\"truncated_chunks\":%" PRIu64 "}\n",
       summary->file_record_count, summary->session_begin_count,
       summary->chunk_count, summary->session_end_count,
@@ -2243,7 +2300,10 @@ static void iree_profile_print_summary_jsonl(
       summary->memory_event_record_count, summary->counter_set_chunk_count,
       summary->counter_set_record_count, summary->counter_chunk_count,
       summary->counter_record_count, summary->counter_sample_chunk_count,
-      summary->counter_sample_record_count, summary->unknown_chunk_count,
+      summary->counter_sample_record_count,
+      summary->executable_trace_chunk_count,
+      summary->executable_trace_record_count,
+      summary->executable_trace_data_bytes, summary->unknown_chunk_count,
       summary->truncated_chunk_count);
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
@@ -7087,6 +7147,71 @@ static iree_status_t iree_profile_export_process_counter_sample_records(
   return status;
 }
 
+static const char* iree_profile_executable_trace_format_name(
+    iree_hal_profile_executable_trace_format_t format) {
+  switch (format) {
+    case IREE_HAL_PROFILE_EXECUTABLE_TRACE_FORMAT_NONE:
+      return "none";
+    case IREE_HAL_PROFILE_EXECUTABLE_TRACE_FORMAT_AMDGPU_ATT:
+      return "amdgpu_att";
+    default:
+      return "unknown";
+  }
+}
+
+static iree_status_t iree_profile_export_process_executable_trace_record(
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  if (record->payload.data_length <
+      sizeof(iree_hal_profile_executable_trace_record_t)) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk has a truncated trace record");
+  }
+
+  iree_hal_profile_executable_trace_record_t trace_record;
+  memcpy(&trace_record, record->payload.data, sizeof(trace_record));
+  if (trace_record.record_length < sizeof(trace_record) ||
+      trace_record.record_length > record->payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk has invalid typed record length %u",
+        trace_record.record_length);
+  }
+  if (trace_record.data_length !=
+      record->payload.data_length - trace_record.record_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk data length is inconsistent with "
+        "payload length");
+  }
+
+  iree_profile_export_print_prefix(file, "executable_trace", record_index);
+  fprintf(file, ",\"trace_id\":%" PRIu64 ",\"format\":", trace_record.trace_id);
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(iree_profile_executable_trace_format_name(
+                trace_record.format)));
+  fprintf(file,
+          ",\"format_value\":%u,\"flags\":%u,\"shader_engine\":%u"
+          ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
+          ",\"command_buffer_id\":%" PRIu64
+          ",\"command_index\":%u"
+          ",\"executable_id\":%" PRIu64
+          ",\"export_ordinal\":%u"
+          ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+          ",\"stream_id\":%" PRIu64
+          ",\"record_length\":%u"
+          ",\"data_length\":%" PRIu64 "}\n",
+          trace_record.format, trace_record.flags, trace_record.shader_engine,
+          trace_record.dispatch_event_id, trace_record.submission_id,
+          trace_record.command_buffer_id, trace_record.command_index,
+          trace_record.executable_id, trace_record.export_ordinal,
+          trace_record.physical_device_ordinal, trace_record.queue_ordinal,
+          trace_record.stream_id, trace_record.record_length,
+          trace_record.data_length);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_export_process_decoded_record(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
@@ -7173,6 +7298,11 @@ static iree_status_t iree_profile_export_process_decoded_record(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
     return iree_profile_export_process_counter_sample_records(
+        record, record_index, file);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
+    return iree_profile_export_process_executable_trace_record(
         record, record_index, file);
   }
 

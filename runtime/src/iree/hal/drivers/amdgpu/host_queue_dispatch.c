@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_counters.h"
+#include "iree/hal/drivers/amdgpu/profile_traces.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
 typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
@@ -487,6 +488,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
   iree_status_t status =
       iree_hal_amdgpu_host_queue_prepare_profile_counter_samples(
           queue, profile_events);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_prepare_profile_traces(queue,
+                                                               profile_events);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue,
                                                               profile_events);
@@ -582,6 +587,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
   iree_status_t status =
       iree_hal_amdgpu_host_queue_prepare_profile_counter_samples(
           queue, profile_events);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_prepare_profile_traces(queue,
+                                                               profile_events);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue,
                                                               profile_events);
@@ -594,8 +603,15 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
   const uint32_t profile_counter_packet_count =
       iree_hal_amdgpu_host_queue_profile_counter_packet_count(queue,
                                                               profile_events);
-  const uint32_t payload_packet_count =
-      2u + profile_counter_packet_count + (profile_dispatch_packet ? 1u : 0u);
+  const uint32_t profile_trace_packet_count =
+      iree_hal_amdgpu_host_queue_profile_trace_packet_count(queue,
+                                                            profile_events);
+  const uint32_t profile_trace_start_packet_count =
+      iree_hal_amdgpu_host_queue_profile_trace_start_packet_count(
+          queue, profile_events);
+  const uint32_t payload_packet_count = 2u + profile_counter_packet_count +
+                                        profile_trace_packet_count +
+                                        (profile_dispatch_packet ? 1u : 0u);
   const uint32_t profile_harvest_kernarg_block_count =
       profile_dispatch_packet
           ? (uint32_t)iree_host_size_ceil_div(
@@ -618,8 +634,9 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
 
   const uint64_t patch_packet_id =
       submission.first_packet_id + resolution->barrier_count;
-  const uint64_t dispatch_packet_id =
-      patch_packet_id + 1u + profile_counter_set_count;
+  const uint64_t dispatch_packet_id = patch_packet_id + 1u +
+                                      profile_counter_set_count +
+                                      profile_trace_start_packet_count;
   const uint64_t profile_harvest_packet_id =
       patch_packet_id + payload_packet_count - 1u;
   iree_hal_amdgpu_aql_packet_t* patch_packet =
@@ -717,6 +734,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
           queue, resolution, signal_semaphore_list, operation_resources,
           plan->operation_resource_count, /*inout_resource_set=*/NULL,
           submission_flags, &submission);
+  uint16_t profile_harvest_header = 0;
   if (profile_dispatch_packet) {
     submission.reclaim_entry->profile_event_first_position =
         profile_events.first_event_position;
@@ -728,15 +746,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     profile_harvest_packet->dispatch.completion_signal =
         iree_hal_amdgpu_notification_ring_epoch_signal(
             &queue->notification_ring);
-    const uint16_t profile_harvest_header = iree_hal_amdgpu_aql_make_header(
+    profile_harvest_header = iree_hal_amdgpu_aql_make_header(
         IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
         iree_hal_amdgpu_aql_packet_control_barrier(
             iree_hal_amdgpu_host_queue_max_fence_scope(
                 IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
             IREE_HSA_FENCE_SCOPE_SYSTEM));
-    iree_hal_amdgpu_aql_ring_commit(profile_harvest_packet,
-                                    profile_harvest_header,
-                                    profile_harvest_packet->dispatch.setup);
   }
   if (profile_counter_set_count != 0) {
     iree_hal_amdgpu_host_queue_commit_profile_counter_start_packets(
@@ -746,11 +761,31 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
             iree_hal_amdgpu_host_queue_max_fence_scope(
                 IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
             IREE_HSA_FENCE_SCOPE_AGENT));
-    iree_hal_amdgpu_host_queue_commit_profile_counter_read_stop_packets(
-        queue, profile_events.first_event_position, profile_counter_set_count,
-        dispatch_packet_id + 1u,
+  }
+  if (profile_trace_packet_count != 0) {
+    iree_hal_amdgpu_host_queue_commit_profile_trace_start_packet(
+        queue, profile_events.first_event_position,
+        patch_packet_id + 1u + profile_counter_set_count,
+        iree_hal_amdgpu_aql_packet_control_barrier(
+            iree_hal_amdgpu_host_queue_max_fence_scope(
+                IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+            IREE_HSA_FENCE_SCOPE_AGENT));
+    iree_hal_amdgpu_host_queue_commit_profile_trace_stop_packet(
+        queue, profile_events.first_event_position, dispatch_packet_id + 1u,
         iree_hal_amdgpu_aql_packet_control_barrier(IREE_HSA_FENCE_SCOPE_AGENT,
                                                    IREE_HSA_FENCE_SCOPE_AGENT));
+  }
+  if (profile_counter_set_count != 0) {
+    iree_hal_amdgpu_host_queue_commit_profile_counter_read_stop_packets(
+        queue, profile_events.first_event_position, profile_counter_set_count,
+        dispatch_packet_id + 1u + profile_trace_start_packet_count,
+        iree_hal_amdgpu_aql_packet_control_barrier(IREE_HSA_FENCE_SCOPE_AGENT,
+                                                   IREE_HSA_FENCE_SCOPE_AGENT));
+  }
+  if (profile_dispatch_packet) {
+    iree_hal_amdgpu_aql_ring_commit(profile_harvest_packet,
+                                    profile_harvest_header,
+                                    profile_harvest_packet->dispatch.setup);
   }
   const uint16_t patch_setup = patch_packet->dispatch.setup;
   const uint16_t patch_header = iree_hal_amdgpu_aql_make_header(

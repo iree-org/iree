@@ -48,6 +48,14 @@ typedef enum iree_hal_amdgpu_aqlprofile_agent_version_e {
   IREE_HAL_AMDGPU_AQLPROFILE_AGENT_VERSION_V1 = 2,
 } iree_hal_amdgpu_aqlprofile_agent_version_t;
 
+typedef uint32_t iree_hal_amdgpu_aqlprofile_parameter_name_t;
+enum iree_hal_amdgpu_aqlprofile_parameter_name_e {
+  IREE_HAL_AMDGPU_AQLPROFILE_PARAMETER_NAME_COMPUTE_UNIT_TARGET = 0,
+  IREE_HAL_AMDGPU_AQLPROFILE_PARAMETER_NAME_SE_MASK = 5,
+  IREE_HAL_AMDGPU_AQLPROFILE_PARAMETER_NAME_SIMD_SELECTION = 8,
+  IREE_HAL_AMDGPU_AQLPROFILE_PARAMETER_NAME_ATT_BUFFER_SIZE = 10,
+};
+
 typedef uint32_t iree_hal_amdgpu_aqlprofile_block_name_t;
 enum iree_hal_amdgpu_aqlprofile_block_name_e {
   IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ = 6,

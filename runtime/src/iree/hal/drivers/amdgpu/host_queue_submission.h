@@ -107,6 +107,8 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events;
   // Number of counter sets captured around |dispatch_slot|.
   uint32_t profile_counter_set_count;
+  // Number of executable trace start packets before |dispatch_slot|.
+  uint32_t profile_trace_start_packet_count;
   // Completion signal to write into |dispatch_slot|.
   iree_hsa_signal_t dispatch_completion_signal;
   // Setup bits published with |dispatch_slot|'s final header.

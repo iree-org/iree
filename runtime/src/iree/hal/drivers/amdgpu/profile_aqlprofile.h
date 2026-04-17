@@ -8,6 +8,8 @@
 #define IREE_HAL_DRIVERS_AMDGPU_PROFILE_AQLPROFILE_H_
 
 #include "iree/hal/drivers/amdgpu/system.h"
+#include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
+#include "iree/hal/drivers/amdgpu/util/aql_ring.h"
 #include "iree/hal/drivers/amdgpu/util/libaqlprofile.h"
 
 #ifdef __cplusplus
@@ -49,6 +51,16 @@ hsa_status_t iree_hal_amdgpu_profile_aqlprofile_memory_copy(void* target,
                                                             const void* source,
                                                             size_t size,
                                                             void* user_data);
+
+// Copies aqlprofile's PM4-IB AQL packet template into |packet| and returns the
+// header/setup dwords the caller must publish after all packet bodies are
+// populated.
+void iree_hal_amdgpu_profile_aqlprofile_emplace_pm4_ib_packet(
+    const iree_hsa_amd_aql_pm4_ib_packet_t* source_packet,
+    iree_hal_amdgpu_aql_packet_t* packet,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal, uint16_t* out_header,
+    uint16_t* out_setup);
 
 #ifdef __cplusplus
 }  // extern "C"

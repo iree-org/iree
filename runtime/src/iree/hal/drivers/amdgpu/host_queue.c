@@ -25,6 +25,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
 #include "iree/hal/drivers/amdgpu/profile_counters.h"
+#include "iree/hal/drivers/amdgpu/profile_traces.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
@@ -475,6 +476,10 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
                                        event_count ? &iovec : NULL);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_host_queue_write_profile_counter_samples(
+        queue, sink, session_id, read_position, event_count, events);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_write_profile_traces(
         queue, sink, session_id, read_position, event_count, events);
   }
 

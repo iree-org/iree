@@ -110,8 +110,11 @@ hsa_status_t iree_hal_amdgpu_profile_aqlprofile_memory_alloc(
 
   hsa_amd_memory_pool_t memory_pool = {0};
   const bool should_clear = flags.host_access;
-  const bool should_allow_device_access =
-      flags.host_access && flags.device_access;
+  const bool should_allow_device_access = flags.device_access;
+  const bool should_allocate_executable =
+      flags.host_access && flags.device_access &&
+      flags.memory_hint ==
+          IREE_HAL_AMDGPU_AQLPROFILE_MEMORY_HINT_DEVICE_NONCOHERENT;
   if (flags.host_access) {
     memory_pool = context->host_memory_pools->coarse_pool;
     if (flags.memory_hint ==
@@ -127,7 +130,8 @@ hsa_status_t iree_hal_amdgpu_profile_aqlprofile_memory_alloc(
 
   hsa_status_t status = iree_hal_amdgpu_profile_hsa_memory_pool_allocate(
       context->libhsa, memory_pool, (size_t)size,
-      HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, ptr);
+      should_allocate_executable ? HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG : 0,
+      ptr);
   if (status != HSA_STATUS_SUCCESS) return status;
   if (should_clear) memset(*ptr, 0, (size_t)size);
 
@@ -160,4 +164,19 @@ hsa_status_t iree_hal_amdgpu_profile_aqlprofile_memory_copy(void* target,
       (iree_hal_amdgpu_profile_aqlprofile_memory_context_t*)user_data;
   return iree_hal_amdgpu_profile_hsa_memory_copy(context->libhsa, target,
                                                  source, size);
+}
+
+void iree_hal_amdgpu_profile_aqlprofile_emplace_pm4_ib_packet(
+    const iree_hsa_amd_aql_pm4_ib_packet_t* source_packet,
+    iree_hal_amdgpu_aql_packet_t* packet,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal, uint16_t* out_header,
+    uint16_t* out_setup) {
+  memcpy((uint8_t*)&packet->pm4_ib + sizeof(uint32_t),
+         (const uint8_t*)source_packet + sizeof(uint32_t),
+         sizeof(*source_packet) - sizeof(uint32_t));
+  packet->pm4_ib.completion_signal = completion_signal;
+  *out_setup = IREE_HSA_AMD_AQL_FORMAT_PM4_IB;
+  *out_header = iree_hal_amdgpu_aql_make_header(
+      IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC, packet_control);
 }

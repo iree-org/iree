@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/amdgpu/executable_cache.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_counters.h"
+#include "iree/hal/drivers/amdgpu/profile_traces.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
@@ -1090,6 +1091,58 @@ iree_hal_amdgpu_logical_device_set_counter_profiling_enabled(
   return status;
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_set_trace_profiling_enabled(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_amdgpu_profile_trace_session_t* trace_session, bool enabled) {
+  if (!iree_hal_amdgpu_profile_trace_session_is_active(trace_session)) {
+    return iree_ok_status();
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, enabled ? 1 : 0);
+
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t changed_queue_count = 0;
+  for (iree_host_size_t i = 0;
+       i < logical_device->physical_device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    for (iree_host_size_t j = 0;
+         j < physical_device->host_queue_count && iree_status_is_ok(status);
+         ++j) {
+      iree_hal_amdgpu_host_queue_t* queue = &physical_device->host_queues[j];
+      if (enabled) {
+        status = iree_hal_amdgpu_host_queue_enable_profile_traces(
+            queue, trace_session);
+        if (iree_status_is_ok(status)) {
+          ++changed_queue_count;
+        }
+      } else {
+        iree_hal_amdgpu_host_queue_disable_profile_traces(queue);
+      }
+    }
+  }
+
+  if (!iree_status_is_ok(status) && enabled) {
+    for (iree_host_size_t i = 0, seen_queue_count = 0;
+         i < logical_device->physical_device_count &&
+         seen_queue_count < changed_queue_count;
+         ++i) {
+      iree_hal_amdgpu_physical_device_t* physical_device =
+          logical_device->physical_devices[i];
+      for (iree_host_size_t j = 0; j < physical_device->host_queue_count &&
+                                   seen_queue_count < changed_queue_count;
+           ++j, ++seen_queue_count) {
+        iree_hal_amdgpu_host_queue_disable_profile_traces(
+            &physical_device->host_queues[j]);
+      }
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 // Selects one host queue from |queue_affinity| after intersecting with this
 // logical device's supported queues. The current policy is deterministic
 // first-set-bit selection, which is enough to honor explicit HIP stream
@@ -1497,6 +1550,21 @@ static void iree_hal_amdgpu_logical_device_destroy(
 
   iree_hal_amdgpu_profile_counter_session_t* counter_session =
       logical_device->profiling.counter_session;
+  iree_hal_amdgpu_profile_trace_session_t* trace_session =
+      logical_device->profiling.trace_session;
+  if (trace_session) {
+    for (iree_host_size_t i = 0; i < logical_device->physical_device_count;
+         ++i) {
+      iree_hal_amdgpu_physical_device_t* physical_device =
+          logical_device->physical_devices[i];
+      for (iree_host_size_t j = 0; j < physical_device->host_queue_count; ++j) {
+        iree_hal_amdgpu_host_queue_disable_profile_traces(
+            &physical_device->host_queues[j]);
+      }
+    }
+    logical_device->profiling.trace_session = NULL;
+    iree_hal_amdgpu_profile_trace_session_destroy(trace_session);
+  }
   if (counter_session) {
     for (iree_host_size_t i = 0; i < logical_device->physical_device_count;
          ++i) {
@@ -2420,10 +2488,18 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
 
   bool sink_session_begun = false;
   bool hsa_profiling_enabled = false;
+  bool counter_profiling_enabled = false;
+  bool trace_profiling_enabled = false;
   iree_hal_amdgpu_profile_counter_session_t* counter_session = NULL;
+  iree_hal_amdgpu_profile_trace_session_t* trace_session = NULL;
   iree_status_t status = iree_hal_amdgpu_profile_counter_session_create(
       logical_device, options, logical_device->host_allocator,
       &counter_session);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_profile_trace_session_create(
+        logical_device, options, logical_device->host_allocator,
+        &trace_session);
+  }
   if (sink) {
     if (iree_status_is_ok(status)) {
       status = iree_hal_profile_sink_begin_session(sink, &metadata);
@@ -2466,6 +2542,12 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_logical_device_set_counter_profiling_enabled(
         logical_device, counter_session, true);
+    counter_profiling_enabled = iree_status_is_ok(status);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_logical_device_set_trace_profiling_enabled(
+        logical_device, trace_session, true);
+    trace_profiling_enabled = iree_status_is_ok(status);
   }
 
   if (iree_status_is_ok(status)) {
@@ -2474,11 +2556,22 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     logical_device->profiling.session_id = session_id;
     logical_device->profiling.sink = sink;
     logical_device->profiling.counter_session = counter_session;
+    logical_device->profiling.trace_session = trace_session;
     iree_hal_amdgpu_logical_device_set_queue_profiling_enabled(
         logical_device,
         iree_any_bit_set(options->mode,
                          IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS));
   } else {
+    if (trace_profiling_enabled) {
+      status = iree_status_join(
+          status, iree_hal_amdgpu_logical_device_set_trace_profiling_enabled(
+                      logical_device, trace_session, false));
+    }
+    if (counter_profiling_enabled) {
+      status = iree_status_join(
+          status, iree_hal_amdgpu_logical_device_set_counter_profiling_enabled(
+                      logical_device, counter_session, false));
+    }
     if (hsa_profiling_enabled) {
       status = iree_status_join(
           status, iree_hal_amdgpu_logical_device_set_hsa_profiling_enabled(
@@ -2495,6 +2588,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     logical_device->profiling.capture_filter =
         iree_hal_profile_capture_filter_default();
     iree_hal_amdgpu_profile_counter_session_destroy(counter_session);
+    iree_hal_amdgpu_profile_trace_session_destroy(trace_session);
     iree_hal_profile_sink_release(sink);
   }
   return status;
@@ -2534,6 +2628,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   iree_hal_profile_sink_t* sink = logical_device->profiling.sink;
   iree_hal_amdgpu_profile_counter_session_t* counter_session =
       logical_device->profiling.counter_session;
+  iree_hal_amdgpu_profile_trace_session_t* trace_session =
+      logical_device->profiling.trace_session;
   const uint64_t session_id = logical_device->profiling.session_id;
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_amdgpu_logical_device_profile_session_metadata(logical_device,
@@ -2552,6 +2648,9 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
     status = iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
         logical_device, sink, session_id);
   }
+  status = iree_status_join(
+      status, iree_hal_amdgpu_logical_device_set_trace_profiling_enabled(
+                  logical_device, trace_session, false));
   status = iree_status_join(
       status, iree_hal_amdgpu_logical_device_set_counter_profiling_enabled(
                   logical_device, counter_session, false));
@@ -2574,10 +2673,12 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   memset(&logical_device->profiling.metadata_cursor, 0,
          sizeof(logical_device->profiling.metadata_cursor));
   logical_device->profiling.counter_session = NULL;
+  logical_device->profiling.trace_session = NULL;
   iree_hal_amdgpu_logical_device_set_queue_profiling_enabled(logical_device,
                                                              false);
   logical_device->profiling.sink = NULL;
   iree_hal_amdgpu_profile_counter_session_destroy(counter_session);
+  iree_hal_amdgpu_profile_trace_session_destroy(trace_session);
   iree_hal_profile_sink_release(sink);
   return status;
 }

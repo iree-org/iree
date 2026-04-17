@@ -98,6 +98,11 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES \
   IREE_SV("application/vnd.iree.hal.profile.counter-samples")
 
+// Content type for one iree_hal_profile_executable_trace_record_t followed by
+// raw trace bytes.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES \
+  IREE_SV("application/vnd.iree.hal.profile.executable-traces")
+
 // Bitfield specifying which optional device record fields are populated.
 typedef uint32_t iree_hal_profile_device_flags_t;
 enum iree_hal_profile_device_flag_bits_t {
@@ -1051,6 +1056,81 @@ typedef struct iree_hal_profile_counter_sample_record_t {
 static inline iree_hal_profile_counter_sample_record_t
 iree_hal_profile_counter_sample_record_default(void) {
   iree_hal_profile_counter_sample_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.command_index = UINT32_MAX;
+  record.export_ordinal = UINT32_MAX;
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one executable trace record.
+typedef uint32_t iree_hal_profile_executable_trace_flags_t;
+enum iree_hal_profile_executable_trace_flag_bits_t {
+  IREE_HAL_PROFILE_EXECUTABLE_TRACE_FLAG_NONE = 0u,
+
+  // |dispatch_event_id| references a dispatch event in the same profile
+  // session.
+  IREE_HAL_PROFILE_EXECUTABLE_TRACE_FLAG_DISPATCH_EVENT = 1u << 0,
+
+  // |command_buffer_id| and |command_index| reference a command-buffer
+  // operation in the same profile session.
+  IREE_HAL_PROFILE_EXECUTABLE_TRACE_FLAG_COMMAND_OPERATION = 1u << 1,
+};
+
+// Raw executable trace format.
+typedef uint32_t iree_hal_profile_executable_trace_format_t;
+enum iree_hal_profile_executable_trace_format_e {
+  IREE_HAL_PROFILE_EXECUTABLE_TRACE_FORMAT_NONE = 0u,
+
+  // AMD ATT/SQTT bytes as returned by aqlprofile_att_iterate_data.
+  IREE_HAL_PROFILE_EXECUTABLE_TRACE_FORMAT_AMDGPU_ATT = 1u,
+};
+
+// Executable trace artifact followed by |data_length| raw bytes.
+//
+// Trace chunks are intentionally one artifact per chunk because instruction
+// traces may be large. Consumers join the artifact back to dispatch events,
+// command-buffer operations, executable metadata, and queue metadata using the
+// ids embedded here and in the chunk metadata.
+typedef struct iree_hal_profile_executable_trace_record_t {
+  // Size of this record in bytes, excluding trailing trace bytes.
+  uint32_t record_length;
+  // Raw trace byte format.
+  iree_hal_profile_executable_trace_format_t format;
+  // Flags describing which correlation fields are valid.
+  iree_hal_profile_executable_trace_flags_t flags;
+  // Shader engine or producer-defined trace partition ordinal.
+  uint32_t shader_engine;
+  // Producer-defined trace identifier unique within the trace stream.
+  uint64_t trace_id;
+  // Dispatch event identifier associated with this trace, or 0 when absent.
+  uint64_t dispatch_event_id;
+  // Queue submission epoch associated with this trace, or 0 when absent.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 when absent.
+  uint64_t command_buffer_id;
+  // Process-local executable identifier, or 0 when absent.
+  uint64_t executable_id;
+  // Producer-defined stream identifier matching queue metadata, or 0.
+  uint64_t stream_id;
+  // Command ordinal within a command buffer, or UINT32_MAX when absent.
+  uint32_t command_index;
+  // Executable export ordinal, or UINT32_MAX when absent.
+  uint32_t export_ordinal;
+  // Session-local physical device ordinal associated with this trace.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this trace, or UINT32_MAX.
+  uint32_t queue_ordinal;
+  // Byte length of the trailing raw trace data.
+  uint64_t data_length;
+} iree_hal_profile_executable_trace_record_t;
+
+// Returns a default executable trace record.
+static inline iree_hal_profile_executable_trace_record_t
+iree_hal_profile_executable_trace_record_default(void) {
+  iree_hal_profile_executable_trace_record_t record;
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
