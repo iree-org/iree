@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/base/alignment.h"
+
 typedef struct iree_hal_amdgpu_profile_metadata_snapshot_t {
   // Host allocator used for snapshot copies.
   iree_allocator_t host_allocator;
@@ -31,6 +33,140 @@ typedef struct iree_hal_amdgpu_profile_metadata_snapshot_t {
   iree_hal_amdgpu_profile_metadata_cursor_t end_cursor;
 } iree_hal_amdgpu_profile_metadata_snapshot_t;
 
+typedef struct iree_hal_amdgpu_profile_hash64_state_t {
+  // First SipHash state word.
+  uint64_t v0;
+  // Second SipHash state word.
+  uint64_t v1;
+  // Third SipHash state word.
+  uint64_t v2;
+  // Fourth SipHash state word.
+  uint64_t v3;
+  // Total number of bytes absorbed by the hash.
+  uint64_t total_length;
+  // Partial input bytes waiting to form the next 64-bit word.
+  uint8_t tail[8];
+  // Number of valid bytes in |tail|.
+  uint8_t tail_length;
+} iree_hal_amdgpu_profile_hash64_state_t;
+
+static uint64_t iree_hal_amdgpu_profile_hash64_rotate_left(uint64_t value,
+                                                           int bit_count) {
+  return (value << bit_count) | (value >> (64 - bit_count));
+}
+
+static void iree_hal_amdgpu_profile_hash64_round(
+    iree_hal_amdgpu_profile_hash64_state_t* state) {
+  state->v0 += state->v1;
+  state->v1 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v1, 13);
+  state->v1 ^= state->v0;
+  state->v0 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v0, 32);
+  state->v2 += state->v3;
+  state->v3 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v3, 16);
+  state->v3 ^= state->v2;
+  state->v0 += state->v3;
+  state->v3 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v3, 21);
+  state->v3 ^= state->v0;
+  state->v2 += state->v1;
+  state->v1 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v1, 17);
+  state->v1 ^= state->v2;
+  state->v2 = iree_hal_amdgpu_profile_hash64_rotate_left(state->v2, 32);
+}
+
+static void iree_hal_amdgpu_profile_hash64_initialize(
+    uint64_t key0, uint64_t key1,
+    iree_hal_amdgpu_profile_hash64_state_t* out_state) {
+  memset(out_state, 0, sizeof(*out_state));
+  out_state->v0 = UINT64_C(0x736f6d6570736575) ^ key0;
+  out_state->v1 = UINT64_C(0x646f72616e646f6d) ^ key1;
+  out_state->v2 = UINT64_C(0x6c7967656e657261) ^ key0;
+  out_state->v3 = UINT64_C(0x7465646279746573) ^ key1;
+}
+
+static void iree_hal_amdgpu_profile_hash64_compress(
+    iree_hal_amdgpu_profile_hash64_state_t* state, uint64_t word) {
+  state->v3 ^= word;
+  for (int i = 0; i < 2; ++i) {
+    iree_hal_amdgpu_profile_hash64_round(state);
+  }
+  state->v0 ^= word;
+}
+
+static void iree_hal_amdgpu_profile_hash64_append(
+    iree_hal_amdgpu_profile_hash64_state_t* state, const void* data,
+    iree_host_size_t data_length) {
+  if (data_length == 0) return;
+
+  const uint8_t* cursor = (const uint8_t*)data;
+  const uint8_t* const end = cursor + data_length;
+  state->total_length += data_length;
+
+  if (state->tail_length != 0) {
+    while (cursor < end && state->tail_length < sizeof(state->tail)) {
+      state->tail[state->tail_length++] = *cursor++;
+    }
+    if (state->tail_length == sizeof(state->tail)) {
+      iree_hal_amdgpu_profile_hash64_compress(
+          state, iree_unaligned_load_le_u64((const uint64_t*)state->tail));
+      state->tail_length = 0;
+    }
+  }
+
+  const iree_host_size_t remaining_length = (iree_host_size_t)(end - cursor);
+  const uint8_t* const word_end =
+      cursor + remaining_length - (remaining_length % sizeof(uint64_t));
+  for (; cursor < word_end; cursor += sizeof(uint64_t)) {
+    iree_hal_amdgpu_profile_hash64_compress(
+        state, iree_unaligned_load_le_u64((const uint64_t*)cursor));
+  }
+
+  while (cursor < end) {
+    state->tail[state->tail_length++] = *cursor++;
+  }
+}
+
+static uint64_t iree_hal_amdgpu_profile_hash64_finalize(
+    iree_hal_amdgpu_profile_hash64_state_t* state) {
+  uint64_t final_word = (state->total_length & 0xFFu) << 56;
+  for (uint8_t i = 0; i < state->tail_length; ++i) {
+    final_word |= ((uint64_t)state->tail[i]) << (i * 8);
+  }
+
+  state->v3 ^= final_word;
+  for (int i = 0; i < 2; ++i) {
+    iree_hal_amdgpu_profile_hash64_round(state);
+  }
+  state->v0 ^= final_word;
+  state->v2 ^= 0xFFu;
+  for (int i = 0; i < 4; ++i) {
+    iree_hal_amdgpu_profile_hash64_round(state);
+  }
+  return state->v0 ^ state->v1 ^ state->v2 ^ state->v3;
+}
+
+static void iree_hal_amdgpu_profile_hash128_initialize(
+    iree_hal_amdgpu_profile_hash64_state_t out_states[2]) {
+  iree_hal_amdgpu_profile_hash64_initialize(UINT64_C(0x0706050403020100),
+                                            UINT64_C(0x0f0e0d0c0b0a0908),
+                                            &out_states[0]);
+  iree_hal_amdgpu_profile_hash64_initialize(UINT64_C(0x1716151413121110),
+                                            UINT64_C(0x1f1e1d1c1b1a1918),
+                                            &out_states[1]);
+}
+
+static void iree_hal_amdgpu_profile_hash128_append(
+    iree_hal_amdgpu_profile_hash64_state_t states[2], const void* data,
+    iree_host_size_t data_length) {
+  iree_hal_amdgpu_profile_hash64_append(&states[0], data, data_length);
+  iree_hal_amdgpu_profile_hash64_append(&states[1], data, data_length);
+}
+
+static void iree_hal_amdgpu_profile_hash128_finalize(
+    iree_hal_amdgpu_profile_hash64_state_t states[2], uint64_t out_hash[2]) {
+  out_hash[0] = iree_hal_amdgpu_profile_hash64_finalize(&states[0]);
+  out_hash[1] = iree_hal_amdgpu_profile_hash64_finalize(&states[1]);
+}
+
 void iree_hal_amdgpu_profile_metadata_initialize(
     iree_allocator_t host_allocator,
     iree_hal_amdgpu_profile_metadata_registry_t* out_registry) {
@@ -50,6 +186,42 @@ void iree_hal_amdgpu_profile_metadata_deinitialize(
   iree_allocator_free(host_allocator, registry->executable_records);
   iree_slim_mutex_deinitialize(&registry->mutex);
   memset(registry, 0, sizeof(*registry));
+}
+
+void iree_hal_amdgpu_profile_metadata_hash_code_object(
+    iree_const_byte_span_t code_object_data, uint64_t out_hash[2]) {
+  iree_hal_amdgpu_profile_hash64_state_t states[2];
+  iree_hal_amdgpu_profile_hash128_initialize(states);
+  iree_hal_amdgpu_profile_hash128_append(states, code_object_data.data,
+                                         code_object_data.data_length);
+  iree_hal_amdgpu_profile_hash128_finalize(states, out_hash);
+}
+
+static void iree_hal_amdgpu_profile_metadata_hash_pipeline(
+    const uint64_t code_object_hash[2], uint32_t export_ordinal,
+    const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
+    iree_string_view_t export_name, uint64_t out_hash[2]) {
+  iree_hal_amdgpu_profile_hash64_state_t states[2];
+  iree_hal_amdgpu_profile_hash128_initialize(states);
+  iree_hal_amdgpu_profile_hash128_append(states, code_object_hash,
+                                         2 * sizeof(code_object_hash[0]));
+  iree_hal_amdgpu_profile_hash128_append(states, &export_ordinal,
+                                         sizeof(export_ordinal));
+  iree_hal_amdgpu_profile_hash128_append(
+      states, &host_kernel_args->constant_count,
+      sizeof(host_kernel_args->constant_count));
+  iree_hal_amdgpu_profile_hash128_append(
+      states, &host_kernel_args->binding_count,
+      sizeof(host_kernel_args->binding_count));
+  iree_hal_amdgpu_profile_hash128_append(
+      states, host_kernel_args->workgroup_size,
+      sizeof(host_kernel_args->workgroup_size));
+  const uint64_t export_name_length = export_name.size;
+  iree_hal_amdgpu_profile_hash128_append(states, &export_name_length,
+                                         sizeof(export_name_length));
+  iree_hal_amdgpu_profile_hash128_append(states, export_name.data,
+                                         export_name.size);
+  iree_hal_amdgpu_profile_hash128_finalize(states, out_hash);
 }
 
 static iree_status_t iree_hal_amdgpu_profile_metadata_export_record_length(
@@ -111,6 +283,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_append_export_records(
     uint64_t executable_id, iree_host_size_t export_count,
     const iree_hal_executable_export_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
+    const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint8_t* target_data) {
   uint8_t* cursor = target_data;
@@ -132,6 +305,12 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_append_export_records(
     record.workgroup_size[0] = host_kernel_args[i].workgroup_size[0];
     record.workgroup_size[1] = host_kernel_args[i].workgroup_size[1];
     record.workgroup_size[2] = host_kernel_args[i].workgroup_size[2];
+    if (code_object_hash) {
+      record.flags |= IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH;
+      iree_hal_amdgpu_profile_metadata_hash_pipeline(
+          code_object_hash, record.export_ordinal, &host_kernel_args[i], name,
+          record.pipeline_hash);
+    }
     record.name_length = (uint32_t)name.size;
 
     memcpy(cursor, &record, sizeof(record));
@@ -148,6 +327,7 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_host_size_t export_count,
     const iree_hal_executable_export_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
+    const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id) {
   IREE_ASSERT_ARGUMENT(out_executable_id);
@@ -217,12 +397,17 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
         iree_hal_profile_executable_record_default();
     record.executable_id = executable_id;
     record.export_count = (uint32_t)export_count;
+    if (code_object_hash) {
+      record.flags |= IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH;
+      record.code_object_hash[0] = code_object_hash[0];
+      record.code_object_hash[1] = code_object_hash[1];
+    }
 
     uint8_t* export_data = registry->executable_export_record_data +
                            registry->executable_export_record_data_length;
     status = iree_hal_amdgpu_profile_metadata_append_export_records(
         executable_id, export_count, export_infos, export_parameter_offsets,
-        host_kernel_args, export_data);
+        code_object_hash, host_kernel_args, export_data);
     if (iree_status_is_ok(status)) {
       registry->executable_records[registry->executable_record_count++] =
           record;

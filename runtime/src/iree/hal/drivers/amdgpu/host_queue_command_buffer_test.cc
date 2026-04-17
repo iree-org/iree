@@ -388,6 +388,10 @@ static iree_status_t CommandBufferProfileSinkWrite(
                 records[i].record_length);
       EXPECT_NE(0u, records[i].executable_id);
       EXPECT_GT(records[i].export_count, 0u);
+      EXPECT_NE(0u, records[i].flags &
+                        IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
+      EXPECT_NE(
+          0u, records[i].code_object_hash[0] | records[i].code_object_hash[1]);
       test_sink->executable_ids.push_back(records[i].executable_id);
     }
     ++test_sink->executable_metadata_count;
@@ -410,6 +414,9 @@ static iree_status_t CommandBufferProfileSinkWrite(
       }
       EXPECT_NE(0u, record.executable_id);
       EXPECT_NE(UINT32_MAX, record.export_ordinal);
+      EXPECT_NE(0u, record.flags &
+                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+      EXPECT_NE(0u, record.pipeline_hash[0] | record.pipeline_hash[1]);
       EXPECT_EQ(record.name_length,
                 record.record_length - (uint32_t)sizeof(record));
       test_sink->executable_export_ids.push_back(record.executable_id);

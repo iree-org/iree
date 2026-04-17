@@ -946,6 +946,8 @@ typedef struct iree_hal_amdgpu_executable_t {
 
   // Producer-local profile executable id assigned at creation.
   uint64_t profile_id;
+  // Stable content hash for the exact loaded HSACO/code-object bytes.
+  uint64_t profile_code_object_hash[2];
 
   // Total number of exports in the executable.
   iree_host_size_t kernel_count;
@@ -1619,6 +1621,10 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
         executable->export_parameter_offsets, executable->export_parameters,
         export_name_storage, export_parameter_name_storage);
   }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_profile_metadata_hash_code_object(
+        code_object_data, executable->profile_code_object_hash);
+  }
 
   // Publish any embedded source files to the tracing infrastructure.
   if (iree_status_is_ok(status)) {
@@ -1722,6 +1728,10 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_raw_hsaco(
         &hsaco_metadata, executable->export_infos,
         executable->export_parameter_offsets, executable->export_parameters,
         export_name_storage, export_parameter_name_storage);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_profile_metadata_hash_code_object(
+        code_object_data, executable->profile_code_object_hash);
   }
 
   // Load executable and register it with all GPU agents.
@@ -1837,7 +1847,8 @@ iree_status_t iree_hal_amdgpu_executable_create(
         iree_hal_amdgpu_executable_cast(*out_executable);
     status = iree_hal_amdgpu_profile_metadata_register_executable(
         profile_metadata, executable->kernel_count, executable->export_infos,
-        executable->export_parameter_offsets, executable->host_kernel_args,
+        executable->export_parameter_offsets,
+        executable->profile_code_object_hash, executable->host_kernel_args,
         &executable->profile_id);
   }
   if (!iree_status_is_ok(status)) {

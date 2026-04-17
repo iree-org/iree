@@ -324,6 +324,8 @@ typedef struct iree_profile_memory_context_t {
 typedef struct iree_profile_dispatch_export_t {
   // Producer-local executable identifier owning this export.
   uint64_t executable_id;
+  // Flags specifying which optional export fields are populated.
+  iree_hal_profile_executable_export_flags_t flags;
   // Export ordinal used by dispatch event records.
   uint32_t export_ordinal;
   // Number of HAL ABI constant words expected by this export.
@@ -334,6 +336,9 @@ typedef struct iree_profile_dispatch_export_t {
   uint32_t parameter_count;
   // Static workgroup size for each dispatch dimension.
   uint32_t workgroup_size[3];
+  // Deterministic executable-export identity hash words when present in
+  // |flags|.
+  uint64_t pipeline_hash[2];
   // Borrowed export name from the mapped profile bundle.
   iree_string_view_t name;
 } iree_profile_dispatch_export_t;
@@ -583,6 +588,10 @@ static void iree_profile_fprint_json_string(FILE* file,
     }
   }
   fputc('"', file);
+}
+
+static void iree_profile_fprint_hash_hex(FILE* file, const uint64_t hash[2]) {
+  fprintf(file, "%016" PRIx64 "%016" PRIx64, hash[0], hash[1]);
 }
 
 static void iree_profile_dump_header_text(
@@ -1964,6 +1973,7 @@ static iree_status_t iree_profile_dispatch_process_export_records(
       if (iree_status_is_ok(status)) {
         iree_profile_dispatch_export_t export_info = {
             .executable_id = record_value.executable_id,
+            .flags = record_value.flags,
             .export_ordinal = record_value.export_ordinal,
             .constant_count = record_value.constant_count,
             .binding_count = record_value.binding_count,
@@ -1971,6 +1981,8 @@ static iree_status_t iree_profile_dispatch_process_export_records(
             .workgroup_size = {record_value.workgroup_size[0],
                                record_value.workgroup_size[1],
                                record_value.workgroup_size[2]},
+            .pipeline_hash = {record_value.pipeline_hash[0],
+                              record_value.pipeline_hash[1]},
             .name =
                 iree_make_string_view((const char*)record->payload.data +
                                           payload_offset + sizeof(record_value),
@@ -2765,13 +2777,18 @@ static iree_status_t iree_profile_executable_print_text(
     if (id_filter >= 0 && executable->executable_id != (uint64_t)id_filter) {
       continue;
     }
-    fprintf(file,
-            "executable %" PRIu64
-            ": exports=%u flags=%u "
-            "code_object_hash=%016" PRIx64 "%016" PRIx64 "\n",
+    const bool has_code_object_hash = iree_all_bits_set(
+        executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
+    fprintf(file, "executable %" PRIu64 ": exports=%u flags=%u ",
             executable->executable_id, executable->export_count,
-            executable->flags, executable->code_object_hash[0],
-            executable->code_object_hash[1]);
+            executable->flags);
+    fprintf(file, "code_object_hash=");
+    if (has_code_object_hash) {
+      iree_profile_fprint_hash_hex(file, executable->code_object_hash);
+    } else {
+      fprintf(file, "unavailable");
+    }
+    fputc('\n', file);
     for (iree_host_size_t j = 0; j < context->export_count; ++j) {
       const iree_profile_dispatch_export_t* export_info = &context->exports[j];
       if (export_info->executable_id != executable->executable_id) continue;
@@ -2781,13 +2798,23 @@ static iree_status_t iree_profile_executable_print_text(
           export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
       if (!iree_profile_dispatch_key_matches(key, filter)) continue;
 
+      const bool has_pipeline_hash = iree_all_bits_set(
+          export_info->flags,
+          IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
       fprintf(file,
-              "  export %u: %.*s constants=%u bindings=%u parameters=%u "
-              "workgroup_size=%ux%ux%u\n",
+              "  export %u: %.*s flags=%u constants=%u bindings=%u "
+              "parameters=%u workgroup_size=%ux%ux%u pipeline_hash=",
               export_info->export_ordinal, (int)key.size, key.data,
-              export_info->constant_count, export_info->binding_count,
-              export_info->parameter_count, export_info->workgroup_size[0],
-              export_info->workgroup_size[1], export_info->workgroup_size[2]);
+              export_info->flags, export_info->constant_count,
+              export_info->binding_count, export_info->parameter_count,
+              export_info->workgroup_size[0], export_info->workgroup_size[1],
+              export_info->workgroup_size[2]);
+      if (has_pipeline_hash) {
+        iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
+      } else {
+        fprintf(file, "unavailable");
+      }
+      fputc('\n', file);
       bool has_aggregate = false;
       for (iree_host_size_t k = 0; k < context->aggregate_count; ++k) {
         const iree_profile_dispatch_aggregate_t* aggregate =
@@ -2858,13 +2885,22 @@ static iree_status_t iree_profile_executable_print_jsonl(
     if (id_filter >= 0 && executable->executable_id != (uint64_t)id_filter) {
       continue;
     }
+    const bool has_code_object_hash = iree_all_bits_set(
+        executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
     fprintf(file,
             "{\"type\":\"executable\",\"executable_id\":%" PRIu64
-            ",\"flags\":%u,\"export_count\":%u,\"code_object_hash\":[%" PRIu64
-            ",%" PRIu64 "]}\n",
+            ",\"flags\":%u,\"export_count\":%u"
+            ",\"code_object_hash_present\":%s,\"code_object_hash\":",
             executable->executable_id, executable->flags,
-            executable->export_count, executable->code_object_hash[0],
-            executable->code_object_hash[1]);
+            executable->export_count, has_code_object_hash ? "true" : "false");
+    if (has_code_object_hash) {
+      fputc('"', file);
+      iree_profile_fprint_hash_hex(file, executable->code_object_hash);
+      fputc('"', file);
+    } else {
+      fprintf(file, "null");
+    }
+    fputs("}\n", file);
     for (iree_host_size_t j = 0; j < context->export_count; ++j) {
       const iree_profile_dispatch_export_t* export_info = &context->exports[j];
       if (export_info->executable_id != executable->executable_id) continue;
@@ -2874,17 +2910,31 @@ static iree_status_t iree_profile_executable_print_jsonl(
           export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
       if (!iree_profile_dispatch_key_matches(key, filter)) continue;
 
+      const bool has_pipeline_hash = iree_all_bits_set(
+          export_info->flags,
+          IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
       fprintf(file,
               "{\"type\":\"executable_export\",\"executable_id\":%" PRIu64
-              ",\"export_ordinal\":%u,\"key\":",
-              export_info->executable_id, export_info->export_ordinal);
+              ",\"export_ordinal\":%u,\"flags\":%u,\"key\":",
+              export_info->executable_id, export_info->export_ordinal,
+              export_info->flags);
       iree_profile_fprint_json_string(file, key);
       fprintf(file,
               ",\"constant_count\":%u,\"binding_count\":%u"
-              ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]}\n",
+              ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
+              ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
               export_info->constant_count, export_info->binding_count,
               export_info->parameter_count, export_info->workgroup_size[0],
-              export_info->workgroup_size[1], export_info->workgroup_size[2]);
+              export_info->workgroup_size[1], export_info->workgroup_size[2],
+              has_pipeline_hash ? "true" : "false");
+      if (has_pipeline_hash) {
+        fputc('"', file);
+        iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
+        fputc('"', file);
+      } else {
+        fprintf(file, "null");
+      }
+      fputs("}\n", file);
       for (iree_host_size_t k = 0; k < context->aggregate_count; ++k) {
         const iree_profile_dispatch_aggregate_t* aggregate =
             &context->aggregates[k];
@@ -4410,7 +4460,10 @@ static const char kIreeProfileUsage[] =
     "               dispatch timing totals.\n"
     "  executable   Executable/export catalog joined with dispatch timing. "
     "Use\n"
-    "               this when optimizing a specific kernel name or export.\n"
+    "               this when optimizing a specific kernel name or export. "
+    "Includes\n"
+    "               code_object_hash and pipeline_hash when producers provide "
+    "them.\n"
     "  dispatch     Per-export dispatch timing aggregates, or individual "
     "events\n"
     "               with --dispatch_events --format=jsonl.\n"
@@ -4528,7 +4581,11 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "  correlation, and per-device timing totals.\n"
       "- `executable` lists executable/export metadata and joins export ids "
       "to\n"
-      "  dispatch timing aggregates.\n"
+      "  dispatch timing aggregates. Hash-capable producers include "
+      "`code_object_hash`\n"
+      "  on `executable` rows and `pipeline_hash` on `executable_export` "
+      "rows for\n"
+      "  cross-run and external-tool correlation.\n"
       "- `dispatch` groups timings by executable export, or emits every "
       "dispatch\n"
       "  event with `--dispatch_events`.\n"
