@@ -777,6 +777,25 @@ static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
   return cond;
 }
 
+/// Conditionally execute `thenFn` when `cond` is true, otherwise yield
+/// `fallback`. Returns the scf.if result.
+static Value buildCondOp(OpBuilder &builder, Location loc, Value cond,
+                         Value fallback,
+                         function_ref<Value(OpBuilder &)> thenFn) {
+  auto ifOp =
+      scf::IfOp::create(builder, loc, TypeRange{fallback.getType()}, cond,
+                        /*addThenBlock=*/true, /*addElseBlock=*/true);
+  {
+    auto thenBuilder = ifOp.getThenBodyBuilder();
+    scf::YieldOp::create(thenBuilder, loc, thenFn(thenBuilder));
+  }
+  {
+    auto elseBuilder = ifOp.getElseBodyBuilder();
+    scf::YieldOp::create(elseBuilder, loc, fallback);
+  }
+  return ifOp.getResult(0);
+}
+
 /// Given a transfer op's in_bounds attribute, return the attribute reduced to
 /// only the innermost entry (the last vector dimension). Returns null if the
 /// input attribute is null (i.e. the op uses the default).
@@ -849,29 +868,19 @@ struct ConvertTransferRead final
                                      outerInBounds, newIndices)
               : Value{};
 
-      Value result;
-      if (inBoundsCond) {
-        auto ifOp = scf::IfOp::create(rewriter, loc, TypeRange{vec1DType},
-                                      inBoundsCond, /*addThenBlock=*/true,
-                                      /*addElseBlock=*/true);
-        {
-          auto thenBuilder = ifOp.getThenBodyBuilder();
-          auto readOp = vector::TransferReadOp::create(
-              thenBuilder, loc, vec1DType, op.getBase(), newIndices,
-              AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
-              newInBoundsAttr);
-          scf::YieldOp::create(thenBuilder, loc, readOp.getResult());
-        }
-        {
-          auto elseBuilder = ifOp.getElseBodyBuilder();
-          scf::YieldOp::create(elseBuilder, loc, paddingVec);
-        }
-        result = ifOp.getResult(0);
-      } else {
-        result = vector::TransferReadOp::create(
-            rewriter, loc, vec1DType, op.getBase(), newIndices,
+      auto buildRead = [&](OpBuilder &b) -> Value {
+        return vector::TransferReadOp::create(
+            b, loc, vec1DType, op.getBase(), newIndices,
             AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
             newInBoundsAttr);
+      };
+
+      Value result;
+      if (inBoundsCond) {
+        result =
+            buildCondOp(rewriter, loc, inBoundsCond, paddingVec, buildRead);
+      } else {
+        result = buildRead(rewriter);
       }
       results.push_back(result);
     }
@@ -939,38 +948,26 @@ struct ConvertTransferWrite final
                                      outerInBounds, newIndices)
               : Value{};
 
+      auto buildWrite = [&](OpBuilder &b) {
+        return vector::TransferWriteOp::create(
+            b, loc, vecSlice, dest, newIndices, AffineMapAttr::get(newPermMap),
+            newMask, newInBoundsAttr);
+      };
+
       if (inBoundsCond) {
         if (isTensor) {
-          auto ifOp =
-              scf::IfOp::create(rewriter, loc, TypeRange{dest.getType()},
-                                inBoundsCond, /*addThenBlock=*/true,
-                                /*addElseBlock=*/true);
-          {
-            auto thenBuilder = ifOp.getThenBodyBuilder();
-            auto writeOp = vector::TransferWriteOp::create(
-                thenBuilder, loc, vecSlice, dest, newIndices,
-                AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
-            scf::YieldOp::create(thenBuilder, loc, writeOp.getResult());
-          }
-          {
-            auto elseBuilder = ifOp.getElseBodyBuilder();
-            scf::YieldOp::create(elseBuilder, loc, dest);
-          }
-          dest = ifOp.getResult(0);
+          dest = buildCondOp(
+              rewriter, loc, inBoundsCond, dest,
+              [&](OpBuilder &b) -> Value { return buildWrite(b).getResult(); });
         } else {
           scf::IfOp::create(rewriter, loc, inBoundsCond,
                             [&](OpBuilder &thenBuilder, Location thenLoc) {
-                              vector::TransferWriteOp::create(
-                                  thenBuilder, thenLoc, vecSlice, dest,
-                                  newIndices, AffineMapAttr::get(newPermMap),
-                                  newMask, newInBoundsAttr);
+                              buildWrite(thenBuilder);
                               scf::YieldOp::create(thenBuilder, thenLoc);
                             });
         }
       } else {
-        auto writeOp = vector::TransferWriteOp::create(
-            rewriter, loc, vecSlice, dest, newIndices,
-            AffineMapAttr::get(newPermMap), newMask, newInBoundsAttr);
+        auto writeOp = buildWrite(rewriter);
         if (isTensor) {
           dest = writeOp.getResult();
         }
