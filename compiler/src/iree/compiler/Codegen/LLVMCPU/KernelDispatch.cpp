@@ -2982,15 +2982,19 @@ getBatchless2DConvKind(linalg::LinalgOp op) {
     return std::nullopt;
   }
 
-  if (maybeConvDims->outputImage.size() != 2) {
+  if (maybeConvDims->outputImage.size() != 2 ||
+      maybeConvDims->filterLoop.size() != 2) {
     return std::nullopt;
   }
 
+  // Each kind requires an exact dimension structure so that our hardcoded tile
+  // size vectors cover every loop dimension without gaps.
   if (!maybeConvDims->inputChannel.empty() &&
-      !maybeConvDims->outputChannel.empty()) {
+      !maybeConvDims->outputChannel.empty() && maybeConvDims->depth.empty()) {
     return BatchlessConvKind::Regular;
   }
-  if (!maybeConvDims->depth.empty()) {
+  if (!maybeConvDims->depth.empty() && maybeConvDims->inputChannel.empty() &&
+      maybeConvDims->outputChannel.empty()) {
     return BatchlessConvKind::Depthwise;
   }
   if (maybeConvDims->inputChannel.empty() &&
