@@ -753,7 +753,7 @@ getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                    int operandIndex) {
   SmallVector<Type> elementTypes;
   intrinsic.getElementTypes(elementTypes);
-  assert(operandIndex > 0 && "operand index must be positive");
+  assert(operandIndex >= 0 && "operand index must be non-negative");
   return elementTypes[operandIndex].getIntOrFloatBitWidth();
 }
 
