@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_H_
 #define IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_COMMAND_BUFFER_H_
 
+#include "iree/hal/drivers/amdgpu/abi/command_buffer.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 
 #ifdef __cplusplus

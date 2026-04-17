@@ -1198,12 +1198,18 @@ static iree_status_t iree_hal_amdgpu_host_queue_check_packet_commands(
                   scratch_arena, dispatch_command, &kernarg_block,
                   &dispatch_kernarg_data);
           if (iree_status_is_ok(status)) {
+            const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
+                IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+                iree_hal_amdgpu_aql_packet_control(
+                    /*has_barrier=*/false, IREE_HSA_FENCE_SCOPE_AGENT,
+                    IREE_HSA_FENCE_SCOPE_AGENT));
             status =
                 iree_hal_amdgpu_host_queue_replay_indirect_dispatch_packet_bodies(
                     queue, block, command_buffer, binding_table, binding_ptrs,
                     dispatch_command, &packet, &dispatch_packet,
                     patch_kernarg_block.data, dispatch_kernarg_data,
-                    iree_hsa_signal_null(), &patch_setup, &dispatch_setup);
+                    iree_hsa_signal_null(), dispatch_header, &patch_setup,
+                    &dispatch_setup);
           }
           if (iree_status_is_ok(status)) packet_count += 2;
         } else {
