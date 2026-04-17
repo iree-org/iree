@@ -535,7 +535,7 @@ static void iree_profile_memory_print_event_jsonl(
           event->buffer_usage, event->offset, event->length, event->alignment);
 }
 
-iree_status_t iree_profile_memory_process_event_records(
+iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     int64_t id_filter, bool emit_events, FILE* file) {
@@ -865,7 +865,7 @@ static iree_status_t iree_profile_memory_record(
   (void)record_index;
   iree_profile_memory_parse_context_t* context =
       (iree_profile_memory_parse_context_t*)user_data;
-  return iree_profile_memory_process_event_records(
+  return iree_profile_memory_context_accumulate_record(
       context->memory_context, record, context->filter, context->id_filter,
       context->emit_events, context->file);
 }

@@ -940,7 +940,7 @@ static iree_status_t iree_profile_explain_event_record(
         &context->dispatch_context->model, record, IREE_SV("*"),
         /*id_filter=*/-1));
   }
-  return iree_profile_memory_process_event_records(
+  return iree_profile_memory_context_accumulate_record(
       context->memory_context, record, IREE_SV("*"), /*id_filter=*/-1,
       /*emit_events=*/false, context->file);
 }

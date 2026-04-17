@@ -202,8 +202,13 @@ typedef struct iree_profile_memory_context_t {
   uint64_t truncated_event_count;
 } iree_profile_memory_context_t;
 
+// Returns the stable text spelling used for memory event JSON/text output.
 const char* iree_profile_memory_event_type_name(
     iree_hal_profile_memory_event_type_t type);
+
+//===----------------------------------------------------------------------===//
+// Memory event aggregation
+//===----------------------------------------------------------------------===//
 
 // Initializes |out_context| for memory event aggregation.
 void iree_profile_memory_context_initialize(
@@ -214,16 +219,25 @@ void iree_profile_memory_context_initialize(
 void iree_profile_memory_context_deinitialize(
     iree_profile_memory_context_t* context);
 
-// Processes one profile file record and accumulates matching memory events.
+// Accumulates memory events from one profile file record into |context|.
 //
-// If |emit_events| is true, each matched memory event is written as JSONL to
-// |file| in addition to updating aggregate state.
-iree_status_t iree_profile_memory_process_event_records(
+// Non-memory records are ignored. |filter| matches the memory event key fields,
+// and |id_filter| restricts the matched allocation/event id when non-negative.
+// If |emit_events| is true then each matched memory event is also written as a
+// JSONL row to |file| before the aggregate report is generated.
+iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     int64_t id_filter, bool emit_events, FILE* file);
 
-// Reads a profile bundle from |path| and writes a memory report to |file|.
+//===----------------------------------------------------------------------===//
+// File-level reporting
+//===----------------------------------------------------------------------===//
+
+// Opens |path|, aggregates memory events, and writes a memory report to |file|.
+//
+// Text output emits summary tables. JSONL output emits matched raw memory event
+// rows followed by aggregate summary rows for devices, pools, and allocations.
 iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
                                               iree_string_view_t format,
                                               iree_string_view_t filter,

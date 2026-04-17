@@ -127,7 +127,7 @@ typedef struct iree_profile_att_rocprofiler_wave_t {
   iree_profile_att_rocprofiler_instruction_t* instructions_array;
 } iree_profile_att_rocprofiler_wave_t;
 
-typedef void (*iree_profile_att_rocprofiler_callback_t)(
+typedef void (*iree_profile_att_rocprofiler_callback_fn_t)(
     iree_profile_att_rocprofiler_record_type_t record_type, void* trace_events,
     uint64_t trace_event_count, void* user_data);
 
@@ -148,9 +148,13 @@ typedef struct iree_profile_att_rocprofiler_library_t {
       uint64_t load_address, uint64_t load_size, const void* data,
       uint64_t data_length);
   // Decodes one ATT/SQTT trace blob.
+  //
+  // ROCprofiler's ABI passes the callback function and user data separately, so
+  // this imported function pointer intentionally uses a *_fn_t callback type
+  // instead of IREE's usual callback_t struct convention.
   iree_profile_att_rocprofiler_status_t (*trace_decode)(
       iree_profile_att_rocprofiler_decoder_id_t decoder,
-      iree_profile_att_rocprofiler_callback_t callback, void* data,
+      iree_profile_att_rocprofiler_callback_fn_t callback_fn, void* data,
       uint64_t data_length, void* user_data);
   // Returns a diagnostic string for decoder info records.
   const char* (*info_string)(iree_profile_att_rocprofiler_decoder_id_t decoder,
