@@ -28,6 +28,24 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    libaqlprofile
+  HDRS
+    "libaqlprofile.h"
+  SRCS
+    "libaqlprofile.c"
+  DEPS
+    ::libhsa
+    hsa_runtime::headers
+    iree::base
+    iree::base::internal
+    iree::base::internal::dynamic_library
+    iree::base::internal::path
+    iree::hal::drivers::amdgpu::abi
+  PUBLIC
+)
+
 iree_cc_test(
   NAME
     libhsa_test

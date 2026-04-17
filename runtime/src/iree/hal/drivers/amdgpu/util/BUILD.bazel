@@ -41,6 +41,25 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "libaqlprofile",
+    srcs = [
+        "libaqlprofile.c",
+    ],
+    hdrs = [
+        "libaqlprofile.h",
+    ],
+    deps = [
+        ":libhsa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
+        "@hsa_runtime_headers",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "libhsa_test",
     srcs = ["libhsa_test.cc"],
