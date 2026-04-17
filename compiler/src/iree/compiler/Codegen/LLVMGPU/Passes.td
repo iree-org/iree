@@ -57,6 +57,7 @@ def LLVMGPULegalizeNDVectorsPass :
     InterfacePass<"iree-llvmgpu-legalize-nd-vectors", "mlir::FunctionOpInterface"> {
   let summary = "Legalize n-D vectors to 1-D vectors using type conversion.";
   let dependentDialects = [
+    "affine::AffineDialect",
     "memref::MemRefDialect",
     "nvgpu::NVGPUDialect",
     "scf::SCFDialect",

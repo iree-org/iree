@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -732,6 +733,35 @@ struct ConvertReturnLike final
   }
 };
 
+// TODO: Upstream into mlir/Dialect/Vector/Utils/VectorUtils.h. This is a copy
+// of the file-local `sliceTransferIndices` from VectorUnroll.cpp.
+static SmallVector<Value> sliceTransferIndices(ArrayRef<int64_t> elementOffsets,
+                                               ArrayRef<Value> indices,
+                                               AffineMap permutationMap,
+                                               Location loc,
+                                               OpBuilder &builder) {
+  MLIRContext *ctx = builder.getContext();
+  auto isBroadcast = [](AffineExpr expr) {
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
+      return constExpr.getValue() == 0;
+    }
+    return false;
+  };
+  SmallVector<Value> slicedIndices(indices);
+  for (const auto &dim : llvm::enumerate(permutationMap.getResults())) {
+    if (isBroadcast(dim.value())) {
+      continue;
+    }
+    unsigned pos = cast<AffineDimExpr>(dim.value()).getPosition();
+    auto expr = getAffineDimExpr(0, ctx) +
+                getAffineConstantExpr(elementOffsets[dim.index()], ctx);
+    auto map = AffineMap::get(/*dimCount=*/1, /*symbolCount=*/0, expr);
+    slicedIndices[pos] =
+        affine::AffineApplyOp::create(builder, loc, map, indices[pos]);
+  }
+  return slicedIndices;
+}
+
 /// Determine which outer dims of a transfer op's permutation map have
 /// in_bounds = false and map to a real source dimension (not a broadcast).
 /// Returns true if any outer dim needs a bounds check.
@@ -847,18 +877,10 @@ struct ConvertTransferRead final
     SmallVector<int64_t> tileShape(numOuterDims, 1);
     for (SmallVector<int64_t> outerIdx :
          StaticTileOffsetRange(outerShape, tileShape)) {
-      SmallVector<Value> newIndices(op.getIndices());
-      for (int64_t d = 0; d < numOuterDims; ++d) {
-        auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
-        if (!dimExpr || outerIdx[d] == 0) {
-          continue;
-        }
-        int64_t memrefDim = dimExpr.getPosition();
-        Value offset =
-            arith::ConstantIndexOp::create(rewriter, loc, outerIdx[d]);
-        newIndices[memrefDim] =
-            arith::AddIOp::create(rewriter, loc, newIndices[memrefDim], offset);
-      }
+      outerIdx.push_back(0);
+      SmallVector<Value> originalIndices(op.getIndices());
+      SmallVector<Value> newIndices = sliceTransferIndices(
+          outerIdx, originalIndices, permMap, loc, rewriter);
 
       Value newMask = convertedMask.empty() ? Value{} : convertedMask[idx++];
 
@@ -926,18 +948,10 @@ struct ConvertTransferWrite final
     SmallVector<int64_t> tileShape(numOuterDims, 1);
     for (SmallVector<int64_t> outerIdx :
          StaticTileOffsetRange(outerShape, tileShape)) {
-      SmallVector<Value> newIndices(op.getIndices());
-      for (int64_t d = 0; d < numOuterDims; ++d) {
-        auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
-        if (!dimExpr || outerIdx[d] == 0) {
-          continue;
-        }
-        int64_t memrefDim = dimExpr.getPosition();
-        Value offset =
-            arith::ConstantIndexOp::create(rewriter, loc, outerIdx[d]);
-        newIndices[memrefDim] =
-            arith::AddIOp::create(rewriter, loc, newIndices[memrefDim], offset);
-      }
+      outerIdx.push_back(0);
+      SmallVector<Value> originalIndices(op.getIndices());
+      SmallVector<Value> newIndices = sliceTransferIndices(
+          outerIdx, originalIndices, permMap, loc, rewriter);
 
       Value newMask = convertedMask.empty() ? Value{} : convertedMask[flatIdx];
       Value vecSlice = vectorSlices[flatIdx++];
@@ -954,23 +968,21 @@ struct ConvertTransferWrite final
             newMask, newInBoundsAttr);
       };
 
-      if (inBoundsCond) {
-        if (isTensor) {
-          dest = buildCondOp(
-              rewriter, loc, inBoundsCond, dest,
-              [&](OpBuilder &b) -> Value { return buildWrite(b).getResult(); });
-        } else {
-          scf::IfOp::create(rewriter, loc, inBoundsCond,
-                            [&](OpBuilder &thenBuilder, Location thenLoc) {
-                              buildWrite(thenBuilder);
-                              scf::YieldOp::create(thenBuilder, thenLoc);
-                            });
-        }
-      } else {
+      if (inBoundsCond && isTensor) {
+        dest = buildCondOp(
+            rewriter, loc, inBoundsCond, dest,
+            [&](OpBuilder &b) -> Value { return buildWrite(b).getResult(); });
+      } else if (inBoundsCond && !isTensor) {
+        scf::IfOp::create(rewriter, loc, inBoundsCond,
+                          [&](OpBuilder &thenBuilder, Location thenLoc) {
+                            buildWrite(thenBuilder);
+                            scf::YieldOp::create(thenBuilder, thenLoc);
+                          });
+      } else if (!inBoundsCond && isTensor) {
         auto writeOp = buildWrite(rewriter);
-        if (isTensor) {
-          dest = writeOp.getResult();
-        }
+        dest = writeOp.getResult();
+      } else /* (!inBoundsCond && !isTensor) */ {
+        buildWrite(rewriter);
       }
     }
 
@@ -1004,7 +1016,7 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast,
-	ConvertTransferRead, ConvertTransferWrite>(typeConverter, ctx);
+        ConvertTransferRead, ConvertTransferWrite>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the

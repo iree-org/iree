@@ -319,22 +319,29 @@ func.func @transfer_read_2d(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: ind
   %vec = vector.transfer_read %A[%a, %b, %c], %padding {in_bounds = [true, false]} : memref<?x?x?xf32>, vector<5x4xf32>
   return %vec : vector<5x4xf32>
 }
+// CHECK-DAG:   #[[$ID:.*]] = affine_map<(d0) -> (d0)>
+// CHECK-DAG:   #[[$P1:.*]] = affine_map<(d0) -> (d0 + 1)>
+// CHECK-DAG:   #[[$P2:.*]] = affine_map<(d0) -> (d0 + 2)>
+// CHECK-DAG:   #[[$P3:.*]] = affine_map<(d0) -> (d0 + 3)>
+// CHECK-DAG:   #[[$P4:.*]] = affine_map<(d0) -> (d0 + 4)>
 // CHECK-LABEL: func.func @transfer_read_2d
 //  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32)
 //  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
-//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
-//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
-//       CHECK:   %[[OFF2:.+]] = arith.addi %[[IDX1]], %[[C2]] : index
-//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF2]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
-//       CHECK:   %[[C3:.+]] = arith.constant 3 : index
-//       CHECK:   %[[OFF3:.+]] = arith.addi %[[IDX1]], %[[C3]] : index
-//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF3]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
-//       CHECK:   %[[C4:.+]] = arith.constant 4 : index
-//       CHECK:   %[[OFF4:.+]] = arith.addi %[[IDX1]], %[[C4]] : index
-//       CHECK:   %[[V4:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF4]], %[[IDX2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_2:.+]] = affine.apply #[[$P2]](%[[IDX1]])
+//       CHECK:   %[[OFF2_2:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_2]], %[[OFF2_2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_3:.+]] = affine.apply #[[$P3]](%[[IDX1]])
+//       CHECK:   %[[OFF2_3:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_3]], %[[OFF2_3]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_4:.+]] = affine.apply #[[$P4]](%[[IDX1]])
+//       CHECK:   %[[OFF2_4:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V4:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_4]], %[[OFF2_4]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
 //       CHECK:   return %[[V0]], %[[V1]], %[[V2]], %[[V3]], %[[V4]] : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
 
 // -----
@@ -347,11 +354,13 @@ func.func @transfer_read_2d_masked(%A: memref<?x?x?xf32>, %a: index, %b: index, 
 // CHECK-LABEL: func.func @transfer_read_2d_masked
 //  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
 //  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
-//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[PAD]], %[[M0]]
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[PAD]], %[[M0]]
 //  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
-//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[PAD]], %[[M1]]
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[PAD]], %[[M1]]
 //  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
 //       CHECK:   return %[[V0]], %[[V1]] : vector<4xf32>, vector<4xf32>
 
@@ -364,13 +373,15 @@ func.func @transfer_write_2d(%vec: vector<3x4xf32>, %A: memref<?x?x?xf32>, %a: i
 }
 // CHECK-LABEL: func.func @transfer_write_2d
 //  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index)
-//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
-//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
-//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
-//       CHECK:   %[[OFF2:.+]] = arith.addi %[[IDX1]], %[[C2]] : index
-//       CHECK:   vector.transfer_write %[[V2]], %[[A]][%[[IDX0]], %[[OFF2]], %[[IDX2]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_2:.+]] = affine.apply #[[$P2]](%[[IDX1]])
+//       CHECK:   %[[OFF2_2:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V2]], %[[A]][%[[IDX0]], %[[OFF1_2]], %[[OFF2_2]]] : vector<4xf32>, memref<?x?x?xf32>
 //       CHECK:   return
 
 // -----
@@ -382,11 +393,13 @@ func.func @transfer_write_2d_masked(%vec: vector<2x4xf32>, %A: memref<?x?x?xf32>
 }
 // CHECK-LABEL: func.func @transfer_write_2d_masked
 //  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
-//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[IDX1]], %[[IDX2]]], %[[M0]]
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[M0]]
 //  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[OFF1:.+]] = arith.addi %[[IDX1]], %[[C1]] : index
-//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1]], %[[IDX2]]], %[[M1]]
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[M1]]
 //  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
 //       CHECK:   return
 
@@ -403,20 +416,22 @@ func.func @transfer_read_2d_oob(%A: memref<?x?xf32>, %i: index, %j: index, %pad:
 //  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32)
 //  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
 //       CHECK:   %[[PADVEC:.+]] = vector.broadcast %[[PAD]] : f32 to vector<4xf32>
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[J0:.+]] = affine.apply #[[$ID]](%[[J]])
 //       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
-//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM0]] : index
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
 //       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (vector<4xf32>) {
-//       CHECK:     vector.transfer_read %[[A]][%[[I]], %[[J]]], %[[PAD]] {in_bounds = [true]}
+//       CHECK:     vector.transfer_read %[[A]][%[[I0]], %[[J0]]], %[[PAD]] {in_bounds = [true]}
 //       CHECK:     scf.yield
 //       CHECK:   } else {
 //       CHECK:     scf.yield %[[PADVEC]]
 //       CHECK:   }
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[I1:.+]] = arith.addi %[[I]], %[[C1]] : index
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[J1:.+]] = affine.apply #[[$ID]](%[[J]])
 //       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
 //       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
 //       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (vector<4xf32>) {
-//       CHECK:     vector.transfer_read %[[A]][%[[I1]], %[[J]]], %[[PAD]] {in_bounds = [true]}
+//       CHECK:     vector.transfer_read %[[A]][%[[I1]], %[[J1]]], %[[PAD]] {in_bounds = [true]}
 //       CHECK:     scf.yield
 //       CHECK:   } else {
 //       CHECK:     scf.yield %[[PADVEC]]
@@ -433,16 +448,18 @@ func.func @transfer_write_2d_oob(%vec: vector<2x4xf32>, %A: memref<?x?xf32>, %i:
 }
 // CHECK-LABEL: func.func @transfer_write_2d_oob
 //  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[J0:.+]] = affine.apply #[[$ID]](%[[J]])
 //       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
-//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM0]] : index
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
 //       CHECK:   scf.if %[[CMP0]] {
-//       CHECK:     vector.transfer_write %[[V0]], %[[A]][%[[I]], %[[J]]] {in_bounds = [true]}
+//       CHECK:     vector.transfer_write %[[V0]], %[[A]][%[[I0]], %[[J0]]] {in_bounds = [true]}
 //       CHECK:   }
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[I1:.+]] = arith.addi %[[I]], %[[C1]] : index
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[J1:.+]] = affine.apply #[[$ID]](%[[J]])
 //       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
 //       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
 //       CHECK:   scf.if %[[CMP1]] {
-//       CHECK:     vector.transfer_write %[[V1]], %[[A]][%[[I1]], %[[J]]] {in_bounds = [true]}
+//       CHECK:     vector.transfer_write %[[V1]], %[[A]][%[[I1]], %[[J1]]] {in_bounds = [true]}
 //       CHECK:   }
 //       CHECK:   return
