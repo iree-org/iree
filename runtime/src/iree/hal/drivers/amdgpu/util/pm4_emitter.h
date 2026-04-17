@@ -41,17 +41,35 @@ enum {
   IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT =
       IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT +
       IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT,
+  IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT = 2,
+  IREE_HAL_AMDGPU_PM4_SET_REGISTER_DWORD_COUNT = 3,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DWORD_COUNT = 6,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_EVENT_WRITE = 0x46,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM = 0x49,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_SH_REG = 0x76,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_UCONFIG_REG = 0x79,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
+  IREE_HAL_AMDGPU_PM4_REGISTER_OFFSET_MASK = 0x3FFFF,
+  IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_START = 0x00002C00,
+  IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_END = 0x00002FFF,
+  IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_START = 0x0000C000,
+  IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_END = 0x0000FFFF,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP = 9 << 0,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 = 2 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_MEM_MAPPED_REGISTER = 0 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_PERFCOUNTER = 4 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_IMMEDIATE_DATA = 5 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM_MAPPED_REGISTER = 0 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM = 5 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 = 2 << 8,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_PERFCOUNTER = 4 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS = 1 << 16,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
+  IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH = 7 << 0,
+  IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH = 4 << 8,
   IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS = 40 << 0,
   IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE = 5 << 8,
   IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM = 3 << 24,
@@ -65,6 +83,16 @@ enum {
 
 static const uint32_t
     IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE = 0x80000000u;
+
+typedef enum iree_hal_amdgpu_pm4_register_space_e {
+  IREE_HAL_AMDGPU_PM4_REGISTER_SPACE_MEM_MAPPED_REGISTER = 0,
+  IREE_HAL_AMDGPU_PM4_REGISTER_SPACE_PERFCOUNTER = 4,
+} iree_hal_amdgpu_pm4_register_space_t;
+
+typedef enum iree_hal_amdgpu_pm4_write_confirmation_e {
+  IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_NONE = 0,
+  IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_WAIT = 1,
+} iree_hal_amdgpu_pm4_write_confirmation_t;
 
 static inline uint32_t iree_hal_amdgpu_pm4_make_header(uint32_t opcode,
                                                        uint32_t dword_count) {
@@ -139,6 +167,143 @@ static inline uint32_t iree_hal_amdgpu_pm4_addr_hi(uintptr_t address) {
 
 static inline uint32_t iree_hal_amdgpu_pm4_ib_addr_hi(uintptr_t address) {
   return (uint32_t)((address >> 32) & 0xFFFFu);
+}
+
+static inline bool iree_hal_amdgpu_pm4_register_space_is_valid(
+    iree_hal_amdgpu_pm4_register_space_t register_space) {
+  return register_space ==
+             IREE_HAL_AMDGPU_PM4_REGISTER_SPACE_MEM_MAPPED_REGISTER ||
+         register_space == IREE_HAL_AMDGPU_PM4_REGISTER_SPACE_PERFCOUNTER;
+}
+
+static inline bool iree_hal_amdgpu_pm4_write_confirmation_is_valid(
+    iree_hal_amdgpu_pm4_write_confirmation_t write_confirmation) {
+  return write_confirmation == IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_NONE ||
+         write_confirmation == IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_WAIT;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_copy_data_source_register_space(
+    iree_hal_amdgpu_pm4_register_space_t register_space) {
+  return (uint32_t)register_space << 0;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_copy_data_target_register_space(
+    iree_hal_amdgpu_pm4_register_space_t register_space) {
+  return (uint32_t)register_space << 8;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_copy_data_write_confirmation(
+    iree_hal_amdgpu_pm4_write_confirmation_t write_confirmation) {
+  return write_confirmation == IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_WAIT
+             ? IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION
+             : 0;
+}
+
+// Appends an EVENT_WRITE CS_PARTIAL_FLUSH packet. This is the queue-local
+// wait-idle building block around counter programming; stronger
+// cache-management packets should remain separate helpers.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_event_write_cs_partial_flush(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder) {
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_EVENT_WRITE,
+      IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH |
+             IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH;
+  return true;
+}
+
+// Appends a SET_SH_REG packet for persistent shader registers.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_set_sh_reg(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, uint32_t register_address,
+    uint32_t value) {
+  if (register_address < IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_START ||
+      register_address > IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_END) {
+    return false;
+  }
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_SH_REG,
+      IREE_HAL_AMDGPU_PM4_SET_REGISTER_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] = register_address - IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_START;
+  dword[2] = value;
+  return true;
+}
+
+// Appends a SET_UCONFIG_REG packet for user configuration registers.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_set_uconfig_reg(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, uint32_t register_address,
+    uint32_t value) {
+  if (register_address < IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_START ||
+      register_address > IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_END) {
+    return false;
+  }
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_UCONFIG_REG,
+      IREE_HAL_AMDGPU_PM4_SET_REGISTER_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] = register_address - IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_START;
+  dword[2] = value;
+  return true;
+}
+
+// Appends a COPY_DATA packet that writes an immediate 32-bit value into a
+// memory-mapped register or perfcounter register address.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_copy_immediate32_to_register(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_register_space_t register_space,
+    uint32_t register_address, uint32_t value,
+    iree_hal_amdgpu_pm4_write_confirmation_t write_confirmation) {
+  if (!iree_hal_amdgpu_pm4_register_space_is_valid(register_space) ||
+      !iree_hal_amdgpu_pm4_write_confirmation_is_valid(write_confirmation) ||
+      register_address > IREE_HAL_AMDGPU_PM4_REGISTER_OFFSET_MASK) {
+    return false;
+  }
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] =
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_IMMEDIATE_DATA |
+      iree_hal_amdgpu_pm4_copy_data_target_register_space(register_space) |
+      iree_hal_amdgpu_pm4_copy_data_write_confirmation(write_confirmation);
+  dword[2] = value;
+  dword[3] = 0;
+  dword[4] = register_address;
+  dword[5] = 0;
+  return true;
+}
+
+// Appends a COPY_DATA packet that copies a 32-bit register or perfcounter value
+// into memory.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_copy_register32_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_register_space_t register_space,
+    uint32_t register_address, void* target,
+    iree_hal_amdgpu_pm4_write_confirmation_t write_confirmation) {
+  if (!iree_hal_amdgpu_pm4_register_space_is_valid(register_space) ||
+      !iree_hal_amdgpu_pm4_write_confirmation_is_valid(write_confirmation) ||
+      register_address > IREE_HAL_AMDGPU_PM4_REGISTER_OFFSET_MASK ||
+      !iree_host_ptr_has_alignment(target, 4)) {
+    return false;
+  }
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] =
+      iree_hal_amdgpu_pm4_copy_data_source_register_space(register_space) |
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+      iree_hal_amdgpu_pm4_copy_data_write_confirmation(write_confirmation);
+  dword[2] = register_address;
+  dword[3] = 0;
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(address);
+  return true;
 }
 
 // Appends a COPY_DATA timestamp write to |target|. This is the RADV-style

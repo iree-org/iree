@@ -38,6 +38,18 @@ enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP = 1u << 3,
   // PM4 RELEASE_MEM can write a bottom-of-pipe timestamp to memory.
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP = 1u << 4,
+  // PM4 EVENT_WRITE can emit compute-pipeline events.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE = 1u << 5,
+  // PM4 SET_SH_REG can program persistent shader registers.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG = 1u << 6,
+  // PM4 SET_UCONFIG_REG can program user configuration registers.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG = 1u << 7,
+  // PM4 COPY_DATA can read register values into memory.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_REGISTER_READBACK = 1u << 8,
+  // PM4 COPY_DATA can read performance-counter values into memory.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK = 1u << 9,
+  // PM4 COPY_DATA can write immediate values into registers/perfcounters.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE = 1u << 10,
 };
 typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
 
@@ -51,6 +63,22 @@ iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP);
+}
+
+// Returns true if the device can emit the gfx10+ packet families needed for
+// queue-local PMC start/read/stop programs.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_gfx10_pmc_programs(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_REGISTER_READBACK |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE);
 }
 
 #ifdef __cplusplus
