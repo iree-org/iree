@@ -207,6 +207,91 @@ typedef struct iree_profile_memory_device_t {
   uint64_t total_buffer_free_bytes;
 } iree_profile_memory_device_t;
 
+typedef enum iree_profile_memory_lifecycle_kind_e {
+  // Slab-provider backing allocation lifecycle.
+  IREE_PROFILE_MEMORY_LIFECYCLE_KIND_SLAB = 0,
+  // Pool reservation lifecycle.
+  IREE_PROFILE_MEMORY_LIFECYCLE_KIND_POOL_RESERVATION = 1,
+  // Queue-visible transient allocation lifecycle.
+  IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION = 2,
+  // Direct synchronous HAL buffer lifecycle.
+  IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION = 3,
+} iree_profile_memory_lifecycle_kind_t;
+
+typedef struct iree_profile_memory_pool_t {
+  // Lifecycle kind responsible for this aggregate.
+  iree_profile_memory_lifecycle_kind_t kind;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Producer-defined pool/provider identifier.
+  uint64_t pool_id;
+  // HAL memory type bits observed for this pool/provider.
+  uint64_t memory_type;
+  // HAL buffer usage bits observed for this pool/provider.
+  uint64_t buffer_usage;
+  // Matched events attributed to this pool/provider.
+  uint64_t event_count;
+  // Wait events attributed to this pool/provider.
+  uint64_t wait_count;
+  // Materialize events attributed to this pool/provider.
+  uint64_t materialize_count;
+  // Current live allocation/reservation/slab count.
+  uint64_t current_allocation_count;
+  // Maximum live allocation/reservation/slab count.
+  uint64_t high_water_allocation_count;
+  // Current live bytes in this pool/provider aggregate.
+  uint64_t current_bytes;
+  // Maximum live bytes in this pool/provider aggregate.
+  uint64_t high_water_bytes;
+  // Cumulative bytes acquired/allocated/reserved.
+  uint64_t total_allocate_bytes;
+  // Cumulative bytes released/freed/deallocated.
+  uint64_t total_free_bytes;
+} iree_profile_memory_pool_t;
+
+typedef struct iree_profile_memory_allocation_t {
+  // Lifecycle kind represented by this allocation row.
+  iree_profile_memory_lifecycle_kind_t kind;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Producer-defined allocation identifier.
+  uint64_t allocation_id;
+  // Producer-defined pool/provider identifier.
+  uint64_t pool_id;
+  // Producer-defined backing allocation or slab identifier.
+  uint64_t backing_id;
+  // HAL memory type bits observed for this allocation.
+  uint64_t memory_type;
+  // HAL buffer usage bits observed for this allocation.
+  uint64_t buffer_usage;
+  // First matched event id in this lifecycle.
+  uint64_t first_event_id;
+  // Last matched event id in this lifecycle.
+  uint64_t last_event_id;
+  // First matched event host timestamp.
+  int64_t first_host_time_ns;
+  // Last matched event host timestamp.
+  int64_t last_host_time_ns;
+  // First nonzero queue submission id associated with this allocation.
+  uint64_t first_submission_id;
+  // Last nonzero queue submission id associated with this allocation.
+  uint64_t last_submission_id;
+  // Number of matched events in this lifecycle.
+  uint64_t event_count;
+  // Wait events in this lifecycle.
+  uint64_t wait_count;
+  // Materialize events in this lifecycle.
+  uint64_t materialize_count;
+  // Current live bytes after matched events.
+  uint64_t current_bytes;
+  // Maximum live bytes observed after matched events.
+  uint64_t high_water_bytes;
+  // Cumulative bytes acquired/allocated/reserved.
+  uint64_t total_allocate_bytes;
+  // Cumulative bytes released/freed/deallocated.
+  uint64_t total_free_bytes;
+} iree_profile_memory_allocation_t;
+
 typedef struct iree_profile_memory_context_t {
   // Host allocator used for dynamic memory summary arrays.
   iree_allocator_t host_allocator;
@@ -216,6 +301,18 @@ typedef struct iree_profile_memory_context_t {
   iree_host_size_t device_count;
   // Capacity of |devices| in entries.
   iree_host_size_t device_capacity;
+  // Dynamic array of per-pool/provider memory summaries.
+  iree_profile_memory_pool_t* pools;
+  // Number of valid entries in |pools|.
+  iree_host_size_t pool_count;
+  // Capacity of |pools| in entries.
+  iree_host_size_t pool_capacity;
+  // Dynamic array of per-allocation memory lifecycles.
+  iree_profile_memory_allocation_t* allocations;
+  // Number of valid entries in |allocations|.
+  iree_host_size_t allocation_count;
+  // Capacity of |allocations| in entries.
+  iree_host_size_t allocation_capacity;
   // Total memory events parsed before filtering.
   uint64_t total_event_count;
   // Memory events matched by --id and --filter.
@@ -3191,6 +3288,109 @@ static const char* iree_profile_memory_event_type_name(
   }
 }
 
+static const char* iree_profile_memory_lifecycle_kind_name(
+    iree_profile_memory_lifecycle_kind_t kind) {
+  switch (kind) {
+    case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_SLAB:
+      return "slab";
+    case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_POOL_RESERVATION:
+      return "pool_reservation";
+    case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION:
+      return "queue_allocation";
+    case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION:
+      return "buffer_allocation";
+    default:
+      return "unknown";
+  }
+}
+
+static bool iree_profile_memory_event_allocation_kind(
+    const iree_hal_profile_memory_event_t* event,
+    iree_profile_memory_lifecycle_kind_t* out_kind) {
+  switch (event->type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_SLAB;
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT:
+      if (iree_all_bits_set(
+              event->flags,
+              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION)) {
+        *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_POOL_RESERVATION;
+        return true;
+      }
+      return false;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION;
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION;
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool iree_profile_memory_event_pool_kind(
+    const iree_hal_profile_memory_event_t* event,
+    iree_profile_memory_lifecycle_kind_t* out_kind) {
+  switch (event->type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_SLAB;
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_POOL_RESERVATION;
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION;
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION;
+      return true;
+    default:
+      return false;
+  }
+}
+
+static bool iree_profile_memory_event_increases_live_bytes(
+    const iree_hal_profile_memory_event_t* event) {
+  switch (event->type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
+      return iree_all_bits_set(
+          event->flags, IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION);
+    default:
+      return false;
+  }
+}
+
+static bool iree_profile_memory_event_decreases_live_bytes(
+    const iree_hal_profile_memory_event_t* event) {
+  switch (event->type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static void iree_profile_memory_context_initialize(
     iree_allocator_t host_allocator,
     iree_profile_memory_context_t* out_context) {
@@ -3201,6 +3401,8 @@ static void iree_profile_memory_context_initialize(
 static void iree_profile_memory_context_deinitialize(
     iree_profile_memory_context_t* context) {
   iree_allocator_free(context->host_allocator, context->devices);
+  iree_allocator_free(context->host_allocator, context->pools);
+  iree_allocator_free(context->host_allocator, context->allocations);
   memset(context, 0, sizeof(*context));
 }
 
@@ -3231,6 +3433,99 @@ static iree_status_t iree_profile_memory_get_device(
   device->physical_device_ordinal = physical_device_ordinal;
   *out_device = device;
   return iree_ok_status();
+}
+
+static iree_status_t iree_profile_memory_get_pool(
+    iree_profile_memory_context_t* context,
+    iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
+    uint64_t pool_id, uint64_t memory_type,
+    iree_profile_memory_pool_t** out_pool) {
+  *out_pool = NULL;
+
+  for (iree_host_size_t i = context->pool_count; i > 0; --i) {
+    iree_profile_memory_pool_t* pool = &context->pools[i - 1];
+    if (pool->kind == kind &&
+        pool->physical_device_ordinal == physical_device_ordinal &&
+        pool->pool_id == pool_id && pool->memory_type == memory_type) {
+      *out_pool = pool;
+      return iree_ok_status();
+    }
+  }
+
+  if (context->pool_count + 1 > context->pool_capacity) {
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        context->host_allocator,
+        iree_max((iree_host_size_t)8, context->pool_count + 1),
+        sizeof(context->pools[0]), &context->pool_capacity,
+        (void**)&context->pools));
+  }
+
+  iree_profile_memory_pool_t* pool = &context->pools[context->pool_count++];
+  memset(pool, 0, sizeof(*pool));
+  pool->kind = kind;
+  pool->physical_device_ordinal = physical_device_ordinal;
+  pool->pool_id = pool_id;
+  pool->memory_type = memory_type;
+  *out_pool = pool;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_memory_get_allocation(
+    iree_profile_memory_context_t* context,
+    iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
+    uint64_t allocation_id, uint64_t pool_id,
+    iree_profile_memory_allocation_t** out_allocation) {
+  *out_allocation = NULL;
+
+  for (iree_host_size_t i = context->allocation_count; i > 0; --i) {
+    iree_profile_memory_allocation_t* allocation = &context->allocations[i - 1];
+    if (allocation->kind == kind &&
+        allocation->physical_device_ordinal == physical_device_ordinal &&
+        allocation->allocation_id == allocation_id &&
+        allocation->pool_id == pool_id) {
+      *out_allocation = allocation;
+      return iree_ok_status();
+    }
+  }
+
+  if (context->allocation_count + 1 > context->allocation_capacity) {
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        context->host_allocator,
+        iree_max((iree_host_size_t)16, context->allocation_count + 1),
+        sizeof(context->allocations[0]), &context->allocation_capacity,
+        (void**)&context->allocations));
+  }
+
+  iree_profile_memory_allocation_t* allocation =
+      &context->allocations[context->allocation_count++];
+  memset(allocation, 0, sizeof(*allocation));
+  allocation->kind = kind;
+  allocation->physical_device_ordinal = physical_device_ordinal;
+  allocation->allocation_id = allocation_id;
+  allocation->pool_id = pool_id;
+  *out_allocation = allocation;
+  return iree_ok_status();
+}
+
+static uint64_t iree_profile_memory_resolve_pool_id(
+    const iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event,
+    iree_profile_memory_lifecycle_kind_t kind) {
+  if (event->pool_id != 0) return event->pool_id;
+  if (kind != IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
+    return event->pool_id;
+  }
+
+  for (iree_host_size_t i = context->allocation_count; i > 0; --i) {
+    const iree_profile_memory_allocation_t* allocation =
+        &context->allocations[i - 1];
+    if (allocation->kind == kind &&
+        allocation->physical_device_ordinal == event->physical_device_ordinal &&
+        allocation->allocation_id == event->allocation_id) {
+      return allocation->pool_id;
+    }
+  }
+  return event->pool_id;
 }
 
 static bool iree_profile_memory_event_matches(
@@ -3358,6 +3653,113 @@ static void iree_profile_memory_record_event(
   }
 }
 
+static void iree_profile_memory_apply_live_increase(
+    uint64_t length, uint64_t* current_count, uint64_t* high_water_count,
+    uint64_t* current_bytes, uint64_t* high_water_bytes,
+    uint64_t* total_allocate_bytes) {
+  *current_count += 1;
+  *high_water_count = iree_max(*high_water_count, *current_count);
+  *current_bytes += length;
+  *high_water_bytes = iree_max(*high_water_bytes, *current_bytes);
+  *total_allocate_bytes += length;
+}
+
+static void iree_profile_memory_apply_live_decrease(
+    uint64_t length, uint64_t* current_count, uint64_t* current_bytes,
+    uint64_t* total_free_bytes) {
+  *current_count = *current_count == 0 ? 0 : *current_count - 1;
+  *current_bytes = length > *current_bytes ? 0 : *current_bytes - length;
+  *total_free_bytes += length;
+}
+
+static iree_status_t iree_profile_memory_record_pool_event(
+    iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event) {
+  iree_profile_memory_lifecycle_kind_t kind = 0;
+  if (!iree_profile_memory_event_pool_kind(event, &kind)) {
+    return iree_ok_status();
+  }
+
+  const uint64_t pool_id =
+      iree_profile_memory_resolve_pool_id(context, event, kind);
+  iree_profile_memory_pool_t* pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_memory_get_pool(
+      context, kind, event->physical_device_ordinal, pool_id,
+      event->memory_type, &pool));
+  ++pool->event_count;
+  pool->buffer_usage |= event->buffer_usage;
+  if (event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT) {
+    ++pool->wait_count;
+  } else if (event->type ==
+             IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
+    ++pool->materialize_count;
+  }
+
+  if (iree_profile_memory_event_increases_live_bytes(event)) {
+    iree_profile_memory_apply_live_increase(
+        event->length, &pool->current_allocation_count,
+        &pool->high_water_allocation_count, &pool->current_bytes,
+        &pool->high_water_bytes, &pool->total_allocate_bytes);
+  } else if (iree_profile_memory_event_decreases_live_bytes(event)) {
+    iree_profile_memory_apply_live_decrease(
+        event->length, &pool->current_allocation_count, &pool->current_bytes,
+        &pool->total_free_bytes);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_memory_record_allocation_event(
+    iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event) {
+  iree_profile_memory_lifecycle_kind_t kind = 0;
+  if (!iree_profile_memory_event_allocation_kind(event, &kind)) {
+    return iree_ok_status();
+  }
+
+  const uint64_t pool_id =
+      iree_profile_memory_resolve_pool_id(context, event, kind);
+  iree_profile_memory_allocation_t* allocation = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_memory_get_allocation(
+      context, kind, event->physical_device_ordinal, event->allocation_id,
+      pool_id, &allocation));
+  if (allocation->first_event_id == 0) {
+    allocation->first_event_id = event->event_id;
+    allocation->first_host_time_ns = event->host_time_ns;
+  }
+  allocation->last_event_id = event->event_id;
+  allocation->last_host_time_ns = event->host_time_ns;
+  if (allocation->first_submission_id == 0 && event->submission_id != 0) {
+    allocation->first_submission_id = event->submission_id;
+  }
+  if (event->submission_id != 0) {
+    allocation->last_submission_id = event->submission_id;
+  }
+  allocation->backing_id =
+      allocation->backing_id ? allocation->backing_id : event->backing_id;
+  allocation->memory_type |= event->memory_type;
+  allocation->buffer_usage |= event->buffer_usage;
+  ++allocation->event_count;
+  if (event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT) {
+    ++allocation->wait_count;
+  } else if (event->type ==
+             IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
+    ++allocation->materialize_count;
+  }
+
+  if (iree_profile_memory_event_increases_live_bytes(event)) {
+    allocation->total_allocate_bytes += event->length;
+    allocation->current_bytes += event->length;
+    allocation->high_water_bytes =
+        iree_max(allocation->high_water_bytes, allocation->current_bytes);
+  } else if (iree_profile_memory_event_decreases_live_bytes(event)) {
+    allocation->total_free_bytes += event->length;
+    allocation->current_bytes = event->length > allocation->current_bytes
+                                    ? 0
+                                    : allocation->current_bytes - event->length;
+  }
+  return iree_ok_status();
+}
+
 static void iree_profile_memory_print_event_jsonl(
     const iree_hal_profile_memory_event_t* event, FILE* file) {
   fprintf(file,
@@ -3416,6 +3818,12 @@ static iree_status_t iree_profile_memory_process_event_records(
             context, event.physical_device_ordinal, &device);
         if (iree_status_is_ok(status)) {
           iree_profile_memory_record_event(device, &event);
+          status = iree_profile_memory_record_pool_event(context, &event);
+        }
+        if (iree_status_is_ok(status)) {
+          status = iree_profile_memory_record_allocation_event(context, &event);
+        }
+        if (iree_status_is_ok(status)) {
           if (emit_events) {
             iree_profile_memory_print_event_jsonl(&event, file);
           }
@@ -3430,6 +3838,13 @@ static iree_status_t iree_profile_memory_process_event_records(
 static iree_status_t iree_profile_memory_print_text(
     const iree_profile_memory_context_t* context, iree_string_view_t filter,
     int64_t id_filter, FILE* file) {
+  uint64_t live_allocation_count = 0;
+  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+    if (context->allocations[i].current_bytes != 0) {
+      ++live_allocation_count;
+    }
+  }
+
   fprintf(file, "IREE HAL profile memory summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   if (id_filter >= 0) {
@@ -3437,9 +3852,12 @@ static iree_status_t iree_profile_memory_print_text(
   }
   fprintf(file,
           "events: total=%" PRIu64 " matched=%" PRIu64
-          " truncated_matched=%" PRIu64 " devices=%" PRIhsz "\n",
+          " truncated_matched=%" PRIu64 " devices=%" PRIhsz " pools=%" PRIhsz
+          " allocation_lifecycles=%" PRIhsz " live_lifecycles=%" PRIu64 "\n",
           context->total_event_count, context->matched_event_count,
-          context->truncated_event_count, context->device_count);
+          context->truncated_event_count, context->device_count,
+          context->pool_count, context->allocation_count,
+          live_allocation_count);
   for (iree_host_size_t i = 0; i < context->device_count; ++i) {
     const iree_profile_memory_device_t* device = &context->devices[i];
     fprintf(file,
@@ -3492,21 +3910,72 @@ static iree_status_t iree_profile_memory_print_text(
             device->total_buffer_allocate_bytes,
             device->total_buffer_free_bytes);
   }
+  for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
+    const iree_profile_memory_pool_t* pool = &context->pools[i];
+    fprintf(file,
+            "pool[%s device=%u id=%" PRIu64 " memory_type=%" PRIu64
+            "]: events=%" PRIu64 " waits=%" PRIu64 " materializes=%" PRIu64
+            " live_at_end=%" PRIu64 " peak_live=%" PRIu64
+            " current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
+            " allocate_bytes=%" PRIu64 " free_bytes=%" PRIu64 "\n",
+            iree_profile_memory_lifecycle_kind_name(pool->kind),
+            pool->physical_device_ordinal, pool->pool_id, pool->memory_type,
+            pool->event_count, pool->wait_count, pool->materialize_count,
+            pool->current_allocation_count, pool->high_water_allocation_count,
+            pool->current_bytes, pool->high_water_bytes,
+            pool->total_allocate_bytes, pool->total_free_bytes);
+  }
+  if (id_filter >= 0) {
+    for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+      const iree_profile_memory_allocation_t* allocation =
+          &context->allocations[i];
+      const int64_t duration_ns =
+          allocation->last_host_time_ns >= allocation->first_host_time_ns
+              ? allocation->last_host_time_ns - allocation->first_host_time_ns
+              : 0;
+      fprintf(
+          file,
+          "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
+          " backing=%" PRIu64 "]: events=%" PRIu64 " waits=%" PRIu64
+          " materializes=%" PRIu64 " live_at_end=%s current_bytes=%" PRIu64
+          " high_water_bytes=%" PRIu64 " allocate_bytes=%" PRIu64
+          " free_bytes=%" PRIu64 " first_event=%" PRIu64 " last_event=%" PRIu64
+          " duration_ns=%" PRId64 "\n",
+          iree_profile_memory_lifecycle_kind_name(allocation->kind),
+          allocation->physical_device_ordinal, allocation->allocation_id,
+          allocation->pool_id, allocation->backing_id, allocation->event_count,
+          allocation->wait_count, allocation->materialize_count,
+          allocation->current_bytes != 0 ? "true" : "false",
+          allocation->current_bytes, allocation->high_water_bytes,
+          allocation->total_allocate_bytes, allocation->total_free_bytes,
+          allocation->first_event_id, allocation->last_event_id, duration_ns);
+    }
+  }
   return iree_ok_status();
 }
 
 static void iree_profile_memory_print_jsonl_summary(
     const iree_profile_memory_context_t* context, iree_string_view_t filter,
     int64_t id_filter, FILE* file) {
+  uint64_t live_allocation_count = 0;
+  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+    if (context->allocations[i].current_bytes != 0) {
+      ++live_allocation_count;
+    }
+  }
+
   fprintf(file, "{\"type\":\"memory_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
           ",\"id_filter\":%" PRId64 ",\"total_events\":%" PRIu64
           ",\"matched_events\":%" PRIu64
           ",\"truncated_matched_events\":%" PRIu64 ",\"devices\":%" PRIhsz
-          "}\n",
+          ",\"pools\":%" PRIhsz ",\"allocation_lifecycles\":%" PRIhsz
+          ",\"live_allocation_lifecycles\":%" PRIu64 "}\n",
           id_filter, context->total_event_count, context->matched_event_count,
-          context->truncated_event_count, context->device_count);
+          context->truncated_event_count, context->device_count,
+          context->pool_count, context->allocation_count,
+          live_allocation_count);
   for (iree_host_size_t i = 0; i < context->device_count; ++i) {
     const iree_profile_memory_device_t* device = &context->devices[i];
     fprintf(
@@ -3563,6 +4032,65 @@ static void iree_profile_memory_print_jsonl_summary(
         device->high_water_buffer_allocation_count,
         device->current_buffer_bytes, device->high_water_buffer_bytes,
         device->total_buffer_allocate_bytes, device->total_buffer_free_bytes);
+  }
+  for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
+    const iree_profile_memory_pool_t* pool = &context->pools[i];
+    fprintf(file, "{\"type\":\"memory_pool\",\"kind\":");
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(
+                  iree_profile_memory_lifecycle_kind_name(pool->kind)));
+    fprintf(file,
+            ",\"physical_device_ordinal\":%u,\"pool_id\":%" PRIu64
+            ",\"memory_type\":%" PRIu64 ",\"buffer_usage\":%" PRIu64
+            ",\"events\":%" PRIu64 ",\"waits\":%" PRIu64
+            ",\"materializes\":%" PRIu64 ",\"current_allocations\":%" PRIu64
+            ",\"high_water_allocations\":%" PRIu64 ",\"current_bytes\":%" PRIu64
+            ",\"high_water_bytes\":%" PRIu64
+            ",\"total_allocate_bytes\":%" PRIu64
+            ",\"total_free_bytes\":%" PRIu64 "}\n",
+            pool->physical_device_ordinal, pool->pool_id, pool->memory_type,
+            pool->buffer_usage, pool->event_count, pool->wait_count,
+            pool->materialize_count, pool->current_allocation_count,
+            pool->high_water_allocation_count, pool->current_bytes,
+            pool->high_water_bytes, pool->total_allocate_bytes,
+            pool->total_free_bytes);
+  }
+  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+    const iree_profile_memory_allocation_t* allocation =
+        &context->allocations[i];
+    const int64_t duration_ns =
+        allocation->last_host_time_ns >= allocation->first_host_time_ns
+            ? allocation->last_host_time_ns - allocation->first_host_time_ns
+            : 0;
+    fprintf(file, "{\"type\":\"memory_allocation\",\"kind\":");
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(
+                  iree_profile_memory_lifecycle_kind_name(allocation->kind)));
+    fprintf(
+        file,
+        ",\"physical_device_ordinal\":%u,\"allocation_id\":%" PRIu64
+        ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
+        ",\"memory_type\":%" PRIu64 ",\"buffer_usage\":%" PRIu64
+        ",\"events\":%" PRIu64 ",\"waits\":%" PRIu64
+        ",\"materializes\":%" PRIu64
+        ",\"live_at_end\":%s"
+        ",\"current_bytes\":%" PRIu64 ",\"high_water_bytes\":%" PRIu64
+        ",\"total_allocate_bytes\":%" PRIu64 ",\"total_free_bytes\":%" PRIu64
+        ",\"first_event_id\":%" PRIu64 ",\"last_event_id\":%" PRIu64
+        ",\"first_host_time_ns\":%" PRId64 ",\"last_host_time_ns\":%" PRId64
+        ",\"duration_ns\":%" PRId64 ",\"first_submission_id\":%" PRIu64
+        ",\"last_submission_id\":%" PRIu64 "}\n",
+        allocation->physical_device_ordinal, allocation->allocation_id,
+        allocation->pool_id, allocation->backing_id, allocation->memory_type,
+        allocation->buffer_usage, allocation->event_count,
+        allocation->wait_count, allocation->materialize_count,
+        allocation->current_bytes != 0 ? "true" : "false",
+        allocation->current_bytes, allocation->high_water_bytes,
+        allocation->total_allocate_bytes, allocation->total_free_bytes,
+        allocation->first_event_id, allocation->last_event_id,
+        allocation->first_host_time_ns, allocation->last_host_time_ns,
+        duration_ns, allocation->first_submission_id,
+        allocation->last_submission_id);
   }
 }
 
@@ -3936,9 +4464,9 @@ static const char kIreeProfileUsage[] =
     "      jq 'select(.type==\"queue_event\" or "
     ".type==\"queue_submission\")'\n"
     "  iree-profile memory --format=jsonl /tmp/model.ireeprof | \\\n"
-    "      jq 'select(.type==\"memory_device\") | \\\n"
-    "          {physical_device_ordinal,current_queue_allocations,"
-    "high_water_queue_bytes}'\n"
+    "      jq 'select(.type==\"memory_pool\") | \\\n"
+    "          {kind,physical_device_ordinal,pool_id,"
+    "high_water_bytes,waits}'\n"
     "  iree-profile command --id=1 --format=jsonl --dispatch_events \\\n"
     "      /tmp/model.ireeprof | jq 'select(.type==\"dispatch_event\")'\n"
     "\n"
@@ -4017,8 +4545,10 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "- `memory` summarizes slab/provider events, pool reservation events, "
       "async\n"
       "  queue alloca/dealloca, and synchronous HAL buffer allocation/free "
-      "high-water behavior. With `--format=jsonl`\n"
-      "  it also emits individual `memory_event` rows before the summary. "
+      "high-water behavior. With `--format=jsonl` it emits individual\n"
+      "  `memory_event` rows before the summary and then emits `memory_pool` "
+      "and\n"
+      "  `memory_allocation` rows for pool/provider and lifecycle drilldown. "
       "Live\n"
       "  allocations at profile end are capture-window state and may be "
       "normal\n"
@@ -4040,9 +4570,8 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "  `command_operation`, and `command_execution`.\n"
       "- `queue --format=jsonl` emits `queue_summary`, `queue`,\n"
       "  `queue_submission`, and `queue_event`.\n"
-      "- `memory --format=jsonl` emits `memory_event`, `memory_summary`, "
-      "and\n"
-      "  `memory_device`.\n"
+      "- `memory --format=jsonl` emits `memory_event`, `memory_summary`,\n"
+      "  `memory_device`, `memory_pool`, and `memory_allocation`.\n"
       "\n"
       "## Cross-Reference Keys\n"
       "\n"
@@ -4086,7 +4615,12 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "  submissions when nonzero. `memory_event.allocation_id` joins all "
       "events\n"
       "  associated with one producer-defined allocation handle. "
-      "`memory_device`\n"
+      "`memory_pool`\n"
+      "  groups by producer pool/provider id and memory type. "
+      "`memory_allocation`\n"
+      "  groups capture-window lifecycle rows by kind, allocation id, and "
+      "pool id.\n"
+      "  `memory_device`\n"
       "  live/high-water fields are computed over the capture window, so "
       "they\n"
       "  need not balance to zero if buffers outlive profiling.\n"
@@ -4163,11 +4697,23 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "high_water_buffer_bytes}'\n"
       "```\n"
       "\n"
+      "Find pools/providers with the largest memory high-water:\n"
+      "\n"
+      "```bash\n"
+      "iree-profile memory --format=jsonl /tmp/model.ireeprof | \\\n"
+      "  jq -s 'map(select(.type==\"memory_pool\")) | \\\n"
+      "         sort_by(.high_water_bytes) | reverse[:20] | \\\n"
+      "         map({kind,physical_device_ordinal,pool_id,memory_type,"
+      "high_water_bytes,waits})'\n"
+      "```\n"
+      "\n"
       "Trace one allocation lifecycle:\n"
       "\n"
       "```bash\n"
       "iree-profile memory --format=jsonl --id=<allocation_id> \\\n"
-      "  /tmp/model.ireeprof | jq 'select(.type==\"memory_event\")'\n"
+      "  /tmp/model.ireeprof | \\\n"
+      "  jq 'select(.type==\"memory_event\" or "
+      ".type==\"memory_allocation\")'\n"
       "```\n"
       "\n"
       "Map executable ids and export ordinals to names:\n"
