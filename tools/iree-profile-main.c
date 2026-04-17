@@ -38,7 +38,8 @@ IREE_FLAG(bool, agent_md, false,
           "workflows and exits.");
 IREE_FLAG(string, rocm_library_path, "",
           "ROCm library directory or exact dynamic library path used by ATT "
-          "decode. Leave empty to use the system dynamic library search path.");
+          "decode. Overrides IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH and "
+          "IREE_HAL_AMDGPU_LIBHSA_PATH.");
 
 #define IREE_PROFILE_EXPLAIN_TOP_DISPATCH_COUNT 8
 #define IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT 10
@@ -7805,10 +7806,13 @@ static const char kIreeProfileUsage[] =
     "of\n"
     "                          only aggregate counter rows. Requires JSONL.\n"
     "  --output=path|-         Export destination path, or `-` for stdout.\n"
-    "  --rocm_library_path=dir  ROCm library directory used by `att` to load\n"
-    "                          librocprofiler-sdk, librocprof-trace-decoder,\n"
-    "                          and libamd_comgr when they are not on the\n"
-    "                          system library path.\n"
+    "  --rocm_library_path=path ROCm library directory or exact dynamic "
+    "library\n"
+    "                          path used by `att`. Overrides\n"
+    "                          IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH and\n"
+    "                          IREE_HAL_AMDGPU_LIBHSA_PATH; if all are "
+    "unset,\n"
+    "                          uses the system dynamic library search path.\n"
     "  --agent_md              Print a Markdown guide optimized for "
     "AGENTS.md.\n"
     "\n"
@@ -7909,10 +7913,11 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "- `att` decodes AMDGPU ATT/SQTT executable trace blobs with ROCm's\n"
       "  trace decoder and annotates decoded PCs using code objects embedded "
       "in\n"
-      "  the `.ireeprof` bundle. Use `--rocm_library_path=/opt/rocm/lib` when\n"
-      "  ROCm profiler libraries are not discoverable through the normal "
-      "system\n"
-      "  dynamic library search path.\n"
+      "  the `.ireeprof` bundle. Library lookup uses `--rocm_library_path` "
+      "first,\n"
+      "  then `IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH`, then "
+      "`IREE_HAL_AMDGPU_LIBHSA_PATH`,\n"
+      "  then the normal system dynamic library search path.\n"
       "- `explain` gives an opinionated first-pass bottleneck view: visible "
       "device\n"
       "  spans, summed active dispatch time, merged per-queue busy intervals, "
@@ -8116,7 +8121,7 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "\n"
       "```bash\n"
       "iree-profile att --format=jsonl --filter='*matmul*' \\\n"
-      "  --rocm_library_path=/opt/rocm/lib /tmp/model.ireeprof | \\\n"
+      "  /tmp/model.ireeprof | \\\n"
       "  jq 'select(.type==\"att_instruction\") | \\\n"
       "      {trace_id,pc,category,hits,stall,instruction}'\n"
       "```\n"

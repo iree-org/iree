@@ -497,6 +497,28 @@ static uint32_t iree_profile_att_instruction_dominant_category(
 // Dynamic ROCm library loading
 //===----------------------------------------------------------------------===//
 
+static iree_string_view_t iree_profile_att_rocm_library_path_or_env(
+    iree_string_view_t rocm_library_path) {
+  if (!iree_string_view_is_empty(rocm_library_path)) {
+    return rocm_library_path;
+  }
+
+  // Match the AMDGPU runtime capture path knobs so users can configure ROCm
+  // discovery once and use the same environment for capture and decode.
+  static const char* const env_names[] = {
+      "IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH",
+      "IREE_HAL_AMDGPU_LIBHSA_PATH",
+  };
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(env_names); ++i) {
+    iree_string_view_t env_path = iree_make_cstring_view(getenv(env_names[i]));
+    if (!iree_string_view_is_empty(env_path)) {
+      return env_path;
+    }
+  }
+
+  return iree_string_view_empty();
+}
+
 static iree_status_t iree_profile_att_load_dynamic_library(
     iree_string_view_t rocm_library_path, const char* library_name,
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
@@ -1768,6 +1790,9 @@ static iree_status_t iree_profile_att_report_file(
                             "unsupported att format '%.*s'", (int)format.size,
                             format.data);
   }
+
+  rocm_library_path =
+      iree_profile_att_rocm_library_path_or_env(rocm_library_path);
 
   iree_profile_att_rocprofiler_library_t rocprofiler;
   IREE_RETURN_IF_ERROR(iree_profile_att_rocprofiler_load(
