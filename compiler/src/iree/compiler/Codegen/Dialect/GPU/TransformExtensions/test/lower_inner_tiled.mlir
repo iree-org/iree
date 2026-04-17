@@ -622,7 +622,8 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   vector.broadcast %[[MMA]] : f64 to vector<1xf64>
 
 // -----
-// 16-bit VDMFMA variants (F16, BF16).
+
+// CDNA3/gfx942 16-bit VDMFMA variants (unroll=2).
 
 #contraction_accesses = [
  affine_map<() -> ()>,
