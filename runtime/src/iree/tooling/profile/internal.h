@@ -14,6 +14,7 @@
 #include "iree/tooling/profile/explain.h"
 #include "iree/tooling/profile/export.h"
 #include "iree/tooling/profile/memory.h"
+#include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/projection.h"
 #include "iree/tooling/profile/reader.h"
 #include "iree/tooling/profile/summary.h"

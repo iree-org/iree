@@ -8,7 +8,6 @@
 
 #include <string.h>
 
-#include "iree/tooling/profile/dispatch.h"
 #include "iree/tooling/profile/reader.h"
 
 const char* iree_profile_memory_event_type_name(
@@ -288,7 +287,7 @@ static bool iree_profile_memory_event_matches(
   }
   iree_string_view_t type_name =
       iree_make_cstring_view(iree_profile_memory_event_type_name(event->type));
-  return iree_profile_dispatch_key_matches(type_name, filter);
+  return iree_profile_key_matches(type_name, filter);
 }
 
 static void iree_profile_memory_record_event(

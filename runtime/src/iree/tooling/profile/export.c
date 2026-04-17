@@ -9,8 +9,8 @@
 #include <errno.h>
 #include <string.h>
 
-#include "iree/tooling/profile/dispatch.h"
 #include "iree/tooling/profile/memory.h"
+#include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
 #define IREE_PROFILE_EXPORT_SCHEMA_VERSION 3
@@ -46,17 +46,17 @@ static void iree_profile_export_fprint_nullable_hash(FILE* file, bool has_hash,
 }
 
 static bool iree_profile_export_try_derive_driver_host_cpu_time_ns(
-    const iree_profile_dispatch_context_t* context,
-    uint32_t physical_device_ordinal, uint64_t tick, double* out_time_ns) {
+    const iree_profile_model_t* model, uint32_t physical_device_ordinal,
+    uint64_t tick, double* out_time_ns) {
   *out_time_ns = 0.0;
   if (tick == 0) return false;
 
-  const iree_profile_dispatch_device_t* device =
-      iree_profile_dispatch_find_device(context, physical_device_ordinal);
+  const iree_profile_model_device_t* device =
+      iree_profile_model_find_device(model, physical_device_ordinal);
   double ns_per_tick = 0.0;
   double tick_frequency_hz = 0.0;
-  if (!iree_profile_dispatch_device_try_fit_clock(device, &ns_per_tick,
-                                                  &tick_frequency_hz)) {
+  if (!iree_profile_model_device_try_fit_clock(device, &ns_per_tick,
+                                               &tick_frequency_hz)) {
     return false;
   }
   (void)tick_frequency_hz;
@@ -286,7 +286,7 @@ static iree_status_t iree_profile_export_process_command_buffer_records(
 }
 
 static iree_status_t iree_profile_export_process_command_operation_records(
-    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
   iree_profile_typed_record_iterator_t iterator;
@@ -307,9 +307,8 @@ static iree_status_t iree_profile_export_process_command_operation_records(
         iree_profile_command_operation_type_name(operation_record.type);
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
-    status = iree_profile_command_operation_resolve_key(
-        context, &operation_record, numeric_buffer, sizeof(numeric_buffer),
-        &key);
+    status = iree_profile_model_resolve_command_operation_key(
+        model, &operation_record, numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       iree_profile_export_print_prefix(file, "command_operation", record_index);
       fprintf(file,
@@ -398,7 +397,7 @@ static iree_status_t iree_profile_export_process_clock_records(
 }
 
 static iree_status_t iree_profile_export_process_dispatch_records(
-    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
   iree_profile_typed_record_iterator_t iterator;
@@ -424,18 +423,18 @@ static iree_status_t iree_profile_export_process_dispatch_records(
     double end_driver_host_cpu_time_ns = 0.0;
     const bool has_derived_start =
         iree_profile_export_try_derive_driver_host_cpu_time_ns(
-            context, record->header.physical_device_ordinal,
+            model, record->header.physical_device_ordinal,
             dispatch_record.start_tick, &start_driver_host_cpu_time_ns);
     const bool has_derived_end =
         iree_profile_export_try_derive_driver_host_cpu_time_ns(
-            context, record->header.physical_device_ordinal,
+            model, record->header.physical_device_ordinal,
             dispatch_record.end_tick, &end_driver_host_cpu_time_ns);
     const bool has_derived_time =
         is_valid && has_derived_start && has_derived_end;
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
-    status = iree_profile_dispatch_resolve_key(
-        context, record->header.physical_device_ordinal,
+    status = iree_profile_model_resolve_dispatch_key(
+        model, record->header.physical_device_ordinal,
         dispatch_record.executable_id, dispatch_record.export_ordinal,
         numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
@@ -483,7 +482,7 @@ static iree_status_t iree_profile_export_process_dispatch_records(
 }
 
 static iree_status_t iree_profile_export_process_queue_device_event_records(
-    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
   iree_profile_typed_record_iterator_t iterator;
@@ -511,11 +510,11 @@ static iree_status_t iree_profile_export_process_queue_device_event_records(
     double end_driver_host_cpu_time_ns = 0.0;
     const bool has_derived_start =
         iree_profile_export_try_derive_driver_host_cpu_time_ns(
-            context, queue_device_event.physical_device_ordinal,
+            model, queue_device_event.physical_device_ordinal,
             queue_device_event.start_tick, &start_driver_host_cpu_time_ns);
     const bool has_derived_end =
         iree_profile_export_try_derive_driver_host_cpu_time_ns(
-            context, queue_device_event.physical_device_ordinal,
+            model, queue_device_event.physical_device_ordinal,
             queue_device_event.end_tick, &end_driver_host_cpu_time_ns);
     const bool has_derived_time =
         is_valid && has_derived_start && has_derived_end;
@@ -913,7 +912,7 @@ static iree_status_t iree_profile_export_process_executable_trace_record(
 }
 
 static iree_status_t iree_profile_export_process_decoded_record(
-    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
   if (record->header.record_type ==
@@ -964,7 +963,7 @@ static iree_status_t iree_profile_export_process_decoded_record(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
     return iree_profile_export_process_command_operation_records(
-        context, record, record_index, file);
+        model, record, record_index, file);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
@@ -973,7 +972,7 @@ static iree_status_t iree_profile_export_process_decoded_record(
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-    return iree_profile_export_process_dispatch_records(context, record,
+    return iree_profile_export_process_dispatch_records(model, record,
                                                         record_index, file);
   } else if (iree_string_view_equal(
                  record->content_type,
@@ -984,7 +983,7 @@ static iree_status_t iree_profile_export_process_decoded_record(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
     return iree_profile_export_process_queue_device_event_records(
-        context, record, record_index, file);
+        model, record, record_index, file);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
@@ -1023,8 +1022,8 @@ static iree_status_t iree_profile_export_process_decoded_record(
 }
 
 typedef struct iree_profile_export_parse_context_t {
-  // Dispatch metadata used to resolve executable export keys.
-  iree_profile_dispatch_context_t* dispatch_context;
+  // Shared profile metadata used to resolve executable export keys.
+  iree_profile_model_t* model;
   // Output stream receiving decoded JSONL records.
   FILE* file;
 } iree_profile_export_parse_context_t;
@@ -1035,8 +1034,7 @@ static iree_status_t iree_profile_export_metadata_record(
   (void)record_index;
   iree_profile_export_parse_context_t* context =
       (iree_profile_export_parse_context_t*)user_data;
-  return iree_profile_dispatch_process_metadata_record(
-      context->dispatch_context, record);
+  return iree_profile_model_process_metadata_record(context->model, record);
 }
 
 static iree_status_t iree_profile_export_decoded_record(
@@ -1045,7 +1043,7 @@ static iree_status_t iree_profile_export_decoded_record(
   iree_profile_export_parse_context_t* context =
       (iree_profile_export_parse_context_t*)user_data;
   return iree_profile_export_process_decoded_record(
-      context->dispatch_context, record, record_index, context->file);
+      context->model, record, record_index, context->file);
 }
 
 static iree_status_t iree_profile_export_ireeperf_jsonl_file(
@@ -1054,10 +1052,10 @@ static iree_status_t iree_profile_export_ireeperf_jsonl_file(
   IREE_RETURN_IF_ERROR(
       iree_profile_file_open(path, host_allocator, &profile_file));
 
-  iree_profile_dispatch_context_t context;
-  iree_profile_dispatch_context_initialize(host_allocator, &context);
+  iree_profile_model_t model;
+  iree_profile_model_initialize(host_allocator, &model);
   iree_profile_export_parse_context_t parse_context = {
-      .dispatch_context = &context,
+      .model = &model,
       .file = file,
   };
   iree_profile_file_record_callback_t record_callback = {
@@ -1093,7 +1091,7 @@ static iree_status_t iree_profile_export_ireeperf_jsonl_file(
     status = iree_profile_file_for_each_record(&profile_file, record_callback);
   }
 
-  iree_profile_dispatch_context_deinitialize(&context);
+  iree_profile_model_deinitialize(&model);
   iree_profile_file_close(&profile_file);
   return status;
 }

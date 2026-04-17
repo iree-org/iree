@@ -9,7 +9,7 @@
 #include <float.h>
 #include <string.h>
 
-#include "iree/tooling/profile/dispatch.h"
+#include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
 static void iree_profile_counter_context_initialize(
@@ -261,14 +261,14 @@ static bool iree_profile_counter_filter_matches(
     const iree_profile_counter_set_t* counter_set,
     const iree_profile_counter_t* counter, iree_string_view_t key,
     iree_string_view_t filter) {
-  return iree_profile_dispatch_key_matches(key, filter) ||
-         iree_profile_dispatch_key_matches(counter_set->name, filter) ||
-         iree_profile_dispatch_key_matches(counter->block_name, filter) ||
-         iree_profile_dispatch_key_matches(counter->name, filter);
+  return iree_profile_key_matches(key, filter) ||
+         iree_profile_key_matches(counter_set->name, filter) ||
+         iree_profile_key_matches(counter->block_name, filter) ||
+         iree_profile_key_matches(counter->name, filter);
 }
 
 static iree_status_t iree_profile_counter_resolve_sample_key(
-    const iree_profile_dispatch_context_t* dispatch_context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_counter_sample_record_t* sample,
     char* numeric_buffer, iree_host_size_t numeric_buffer_capacity,
     iree_string_view_t* out_key) {
@@ -276,8 +276,8 @@ static iree_status_t iree_profile_counter_resolve_sample_key(
   if (sample->executable_id == 0 || sample->export_ordinal == UINT32_MAX) {
     return iree_ok_status();
   }
-  return iree_profile_dispatch_resolve_key(
-      dispatch_context, sample->physical_device_ordinal, sample->executable_id,
+  return iree_profile_model_resolve_dispatch_key(
+      model, sample->physical_device_ordinal, sample->executable_id,
       sample->export_ordinal, numeric_buffer, numeric_buffer_capacity, out_key);
 }
 
@@ -386,7 +386,7 @@ static void iree_profile_counter_print_sample_jsonl(
 
 static iree_status_t iree_profile_counter_process_sample_records(
     iree_profile_counter_context_t* counter_context,
-    const iree_profile_dispatch_context_t* dispatch_context,
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     int64_t id_filter, bool emit_samples, FILE* file) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
@@ -448,8 +448,7 @@ static iree_status_t iree_profile_counter_process_sample_records(
     iree_string_view_t key = iree_string_view_empty();
     if (iree_status_is_ok(status)) {
       status = iree_profile_counter_resolve_sample_key(
-          dispatch_context, &sample, numeric_buffer, sizeof(numeric_buffer),
-          &key);
+          model, &sample, numeric_buffer, sizeof(numeric_buffer), &key);
     }
 
     bool matched_sample = false;
@@ -509,7 +508,7 @@ static iree_status_t iree_profile_counter_process_sample_records(
 }
 
 static iree_status_t iree_profile_counter_resolve_aggregate_key(
-    const iree_profile_dispatch_context_t* dispatch_context,
+    const iree_profile_model_t* model,
     const iree_profile_counter_aggregate_t* aggregate, char* numeric_buffer,
     iree_host_size_t numeric_buffer_capacity, iree_string_view_t* out_key) {
   *out_key = IREE_SV("unattributed");
@@ -517,10 +516,10 @@ static iree_status_t iree_profile_counter_resolve_aggregate_key(
       aggregate->export_ordinal == UINT32_MAX) {
     return iree_ok_status();
   }
-  return iree_profile_dispatch_resolve_key(
-      dispatch_context, aggregate->physical_device_ordinal,
-      aggregate->executable_id, aggregate->export_ordinal, numeric_buffer,
-      numeric_buffer_capacity, out_key);
+  return iree_profile_model_resolve_dispatch_key(
+      model, aggregate->physical_device_ordinal, aggregate->executable_id,
+      aggregate->export_ordinal, numeric_buffer, numeric_buffer_capacity,
+      out_key);
 }
 
 static iree_status_t iree_profile_counter_print_metadata_text(
@@ -611,8 +610,8 @@ static void iree_profile_counter_print_metadata_jsonl(
 
 static iree_status_t iree_profile_counter_print_text(
     const iree_profile_counter_context_t* counter_context,
-    const iree_profile_dispatch_context_t* dispatch_context,
-    iree_string_view_t filter, int64_t id_filter, FILE* file) {
+    const iree_profile_model_t* model, iree_string_view_t filter,
+    int64_t id_filter, FILE* file) {
   fprintf(file, "IREE HAL profile counter summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   if (id_filter >= 0) {
@@ -654,8 +653,7 @@ static iree_status_t iree_profile_counter_print_text(
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_counter_resolve_aggregate_key(
-        dispatch_context, aggregate, numeric_buffer, sizeof(numeric_buffer),
-        &key);
+        model, aggregate, numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       const double variance =
           aggregate->sample_count > 1
@@ -691,9 +689,8 @@ static iree_status_t iree_profile_counter_print_text(
 
 static iree_status_t iree_profile_counter_print_jsonl(
     const iree_profile_counter_context_t* counter_context,
-    const iree_profile_dispatch_context_t* dispatch_context,
-    iree_string_view_t filter, int64_t id_filter, bool emit_samples,
-    FILE* file) {
+    const iree_profile_model_t* model, iree_string_view_t filter,
+    int64_t id_filter, bool emit_samples, FILE* file) {
   fprintf(file, "{\"type\":\"counter_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
@@ -733,8 +730,7 @@ static iree_status_t iree_profile_counter_print_jsonl(
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_counter_resolve_aggregate_key(
-        dispatch_context, aggregate, numeric_buffer, sizeof(numeric_buffer),
-        &key);
+        model, aggregate, numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       const double variance =
           aggregate->sample_count > 1
@@ -782,8 +778,8 @@ static iree_status_t iree_profile_counter_print_jsonl(
 }
 
 typedef struct iree_profile_counter_parse_context_t {
-  // Dispatch metadata used to resolve executable export keys.
-  iree_profile_dispatch_context_t* dispatch_context;
+  // Shared profile metadata used to resolve executable export keys.
+  iree_profile_model_t* model;
   // Counter metadata and aggregate state.
   iree_profile_counter_context_t* counter_context;
   // Optional glob filter applied to projected keys.
@@ -802,8 +798,8 @@ static iree_status_t iree_profile_counter_metadata_record(
   (void)record_index;
   iree_profile_counter_parse_context_t* context =
       (iree_profile_counter_parse_context_t*)user_data;
-  IREE_RETURN_IF_ERROR(iree_profile_dispatch_process_metadata_record(
-      context->dispatch_context, record));
+  IREE_RETURN_IF_ERROR(
+      iree_profile_model_process_metadata_record(context->model, record));
   return iree_profile_counter_process_metadata_record(context->counter_context,
                                                       record);
 }
@@ -815,9 +811,8 @@ static iree_status_t iree_profile_counter_sample_record(
   iree_profile_counter_parse_context_t* context =
       (iree_profile_counter_parse_context_t*)user_data;
   return iree_profile_counter_process_sample_records(
-      context->counter_context, context->dispatch_context, record,
-      context->filter, context->id_filter, context->emit_samples,
-      context->file);
+      context->counter_context, context->model, record, context->filter,
+      context->id_filter, context->emit_samples, context->file);
 }
 
 iree_status_t iree_profile_counter_file(iree_string_view_t path,
@@ -842,12 +837,12 @@ iree_status_t iree_profile_counter_file(iree_string_view_t path,
   IREE_RETURN_IF_ERROR(
       iree_profile_file_open(path, host_allocator, &profile_file));
 
-  iree_profile_dispatch_context_t dispatch_context;
-  iree_profile_dispatch_context_initialize(host_allocator, &dispatch_context);
+  iree_profile_model_t model;
+  iree_profile_model_initialize(host_allocator, &model);
   iree_profile_counter_context_t counter_context;
   iree_profile_counter_context_initialize(host_allocator, &counter_context);
   iree_profile_counter_parse_context_t parse_context = {
-      .dispatch_context = &dispatch_context,
+      .model = &model,
       .counter_context = &counter_context,
       .filter = filter,
       .id_filter = id_filter,
@@ -867,17 +862,16 @@ iree_status_t iree_profile_counter_file(iree_string_view_t path,
 
   if (iree_status_is_ok(status)) {
     if (is_text) {
-      status = iree_profile_counter_print_text(
-          &counter_context, &dispatch_context, filter, id_filter, file);
+      status = iree_profile_counter_print_text(&counter_context, &model, filter,
+                                               id_filter, file);
     } else {
-      status = iree_profile_counter_print_jsonl(&counter_context,
-                                                &dispatch_context, filter,
-                                                id_filter, emit_samples, file);
+      status = iree_profile_counter_print_jsonl(
+          &counter_context, &model, filter, id_filter, emit_samples, file);
     }
   }
 
   iree_profile_counter_context_deinitialize(&counter_context);
-  iree_profile_dispatch_context_deinitialize(&dispatch_context);
+  iree_profile_model_deinitialize(&model);
   iree_profile_file_close(&profile_file);
   return status;
 }

@@ -29,6 +29,11 @@ void iree_profile_fprint_json_string(FILE* file, iree_string_view_t value);
 // Prints a two-word 128-bit hash as lower-case hexadecimal.
 void iree_profile_fprint_hash_hex(FILE* file, const uint64_t hash[2]);
 
+// Returns true when |filter| matches |key|, treating an empty filter as
+// match-all.
+bool iree_profile_key_matches(iree_string_view_t key,
+                              iree_string_view_t filter);
+
 // Returns sqrt(value) without requiring this standalone tool to link libm.
 double iree_profile_sqrt_f64(double value);
 

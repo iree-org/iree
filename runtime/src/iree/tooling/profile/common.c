@@ -62,6 +62,15 @@ void iree_profile_fprint_hash_hex(FILE* file, const uint64_t hash[2]) {
   fprintf(file, "%016" PRIx64 "%016" PRIx64, hash[0], hash[1]);
 }
 
+bool iree_profile_key_matches(iree_string_view_t key,
+                              iree_string_view_t filter) {
+  if (iree_string_view_is_empty(filter) ||
+      iree_string_view_equal(filter, IREE_SV("*"))) {
+    return true;
+  }
+  return iree_string_view_match_pattern(key, filter);
+}
+
 double iree_profile_sqrt_f64(double value) {
   if (value <= 0.0) return 0.0;
   // Keep this standalone C tool free of libm linkage.
