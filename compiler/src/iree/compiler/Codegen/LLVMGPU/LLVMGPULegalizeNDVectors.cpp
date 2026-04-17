@@ -814,6 +814,18 @@ static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
   return cond;
 }
 
+/// Given a transfer op's in_bounds attribute, return the attribute reduced to
+/// only the innermost entry (the last vector dimension). Returns null if the
+/// input attribute is null (i.e. the op uses the default).
+template <typename TransferOp>
+static ArrayAttr getInnerInBoundsAttr(OpBuilder &builder, TransferOp op) {
+  ArrayAttr inBounds = op.getInBoundsAttr();
+  if (!inBounds) {
+    return {};
+  }
+  return builder.getArrayAttr({inBounds.getValue().back()});
+}
+
 struct ConvertTransferRead final
     : public OpConversionPattern<vector::TransferReadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -834,11 +846,7 @@ struct ConvertTransferRead final
 
     AffineMap permMap = op.getPermutationMap();
     AffineMap newPermMap = permMap.getMinorSubMap(1);
-
-    ArrayAttr newInBoundsAttr;
-    if (ArrayAttr inBounds = op.getInBoundsAttr()) {
-      newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
-    }
+    ArrayAttr newInBoundsAttr = getInnerInBoundsAttr(rewriter, op);
 
     SmallVector<bool> outerInBounds;
     bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
@@ -934,11 +942,7 @@ struct ConvertTransferWrite final
 
     AffineMap permMap = op.getPermutationMap();
     AffineMap newPermMap = permMap.getMinorSubMap(1);
-
-    ArrayAttr newInBoundsAttr;
-    if (ArrayAttr inBounds = op.getInBoundsAttr()) {
-      newInBoundsAttr = rewriter.getArrayAttr({inBounds.getValue().back()});
-    }
+    ArrayAttr newInBoundsAttr = getInnerInBoundsAttr(rewriter, op);
 
     SmallVector<bool> outerInBounds;
     bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
