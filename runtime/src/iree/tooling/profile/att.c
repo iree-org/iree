@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "tools/iree-profile-att.h"
+#include "iree/tooling/profile/att.h"
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -17,6 +17,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/hal/utils/profile_file.h"
 #include "iree/io/file_contents.h"
+#include "iree/tooling/profile/internal.h"
 
 //===----------------------------------------------------------------------===//
 // ROCm trace-decoder ABI mirrors
@@ -407,45 +408,6 @@ static iree_status_t iree_profile_att_copy_cstring(
 static iree_string_view_t iree_profile_att_cstring_view_or_empty(
     const char* string) {
   return string ? iree_make_cstring_view(string) : iree_string_view_empty();
-}
-
-static void iree_profile_att_fprint_json_string(FILE* file,
-                                                iree_string_view_t value) {
-  fputc('"', file);
-  for (iree_host_size_t i = 0; i < value.size; ++i) {
-    const unsigned char c = (unsigned char)value.data[i];
-    switch (c) {
-      case '"':
-        fputs("\\\"", file);
-        break;
-      case '\\':
-        fputs("\\\\", file);
-        break;
-      case '\b':
-        fputs("\\b", file);
-        break;
-      case '\f':
-        fputs("\\f", file);
-        break;
-      case '\n':
-        fputs("\\n", file);
-        break;
-      case '\r':
-        fputs("\\r", file);
-        break;
-      case '\t':
-        fputs("\\t", file);
-        break;
-      default:
-        if (c < 0x20) {
-          fprintf(file, "\\u%04x", c);
-        } else {
-          fputc(c, file);
-        }
-        break;
-    }
-  }
-  fputc('"', file);
 }
 
 static const char* iree_profile_att_instruction_category_name(
@@ -986,56 +948,48 @@ static iree_status_t iree_profile_att_parse_trace(
   return iree_profile_att_append_trace(profile, trace);
 }
 
+static iree_status_t iree_profile_att_parse_record(
+    void* user_data, const iree_hal_profile_file_record_t* record,
+    iree_host_size_t record_index) {
+  (void)record_index;
+  iree_profile_att_profile_t* profile = (iree_profile_att_profile_t*)user_data;
+  if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(
+          record->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS)) {
+    return iree_profile_att_parse_code_objects(profile, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS)) {
+    return iree_profile_att_parse_code_object_loads(profile, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+    return iree_profile_att_parse_exports(profile, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
+    return iree_profile_att_parse_dispatches(profile, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
+    return iree_profile_att_parse_trace(profile, record);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_att_parse_file(
     iree_string_view_t path, iree_profile_att_profile_t* profile) {
-  IREE_RETURN_IF_ERROR(iree_io_file_contents_map(path, IREE_IO_FILE_ACCESS_READ,
-                                                 profile->host_allocator,
-                                                 &profile->file_contents));
-
-  iree_hal_profile_file_header_t header;
-  iree_host_size_t record_offset = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_profile_file_parse_header(
-      profile->file_contents->const_buffer, &header, &record_offset));
-
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         record_offset < profile->file_contents->const_buffer.data_length) {
-    iree_hal_profile_file_record_t record;
-    iree_host_size_t next_record_offset = 0;
-    status = iree_hal_profile_file_parse_record(
-        profile->file_contents->const_buffer, record_offset, &record,
-        &next_record_offset);
-    if (iree_status_is_ok(status) &&
-        record.header.record_type == IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
-      if (iree_string_view_equal(
-              record.content_type,
-              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS)) {
-        status = iree_profile_att_parse_code_objects(profile, &record);
-      } else if (
-          iree_string_view_equal(
-              record.content_type,
-              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS)) {
-        status = iree_profile_att_parse_code_object_loads(profile, &record);
-      } else if (iree_string_view_equal(
-                     record.content_type,
-                     IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-        status = iree_profile_att_parse_exports(profile, &record);
-      } else if (iree_string_view_equal(
-                     record.content_type,
-                     IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-        status = iree_profile_att_parse_dispatches(profile, &record);
-      } else if (iree_string_view_equal(
-                     record.content_type,
-                     IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
-        status = iree_profile_att_parse_trace(profile, &record);
-      }
-    }
-    if (iree_status_is_ok(status)) {
-      record_offset = next_record_offset;
-    }
-  }
-  (void)header;
-  return status;
+  iree_profile_file_t profile_file;
+  IREE_RETURN_IF_ERROR(
+      iree_profile_file_open(path, profile->host_allocator, &profile_file));
+  // Trace payloads borrow from the mapped bundle, so the ATT profile retains
+  // the mapping instead of closing the generic reader at the end of parsing.
+  profile->file_contents = profile_file.contents;
+  return iree_profile_file_for_each_record(
+      &profile_file, iree_profile_att_parse_record, profile);
 }
 
 static const iree_profile_att_code_object_t* iree_profile_att_find_code_object(
@@ -1721,7 +1675,7 @@ static iree_status_t iree_profile_att_print_trace_jsonl(
           trace->record.command_index, trace->record.executable_id,
           trace->record.export_ordinal, trace->record.physical_device_ordinal,
           trace->record.queue_ordinal, trace->record.stream_id);
-  iree_profile_att_fprint_json_string(
+  iree_profile_fprint_json_string(
       file, export_info ? export_info->name : IREE_SV("<unknown>"));
   fprintf(file,
           ",\"raw_bytes\":%" PRIhsz ",\"gfxip\":%" PRIu64 ",\"waves\":%" PRIu64
@@ -1764,7 +1718,7 @@ static iree_status_t iree_profile_att_print_trace_jsonl(
           "{\"type\":\"att_instruction\",\"trace_id\":%" PRIu64
           ",\"code_object_id\":%" PRIu64 ",\"pc\":%" PRIu64 ",\"category\":",
           trace->record.trace_id, stats->pc.code_object_id, stats->pc.address);
-      iree_profile_att_fprint_json_string(
+      iree_profile_fprint_json_string(
           file, iree_make_cstring_view(
                     iree_profile_att_instruction_category_name(category)));
       fprintf(file,
@@ -1773,7 +1727,7 @@ static iree_status_t iree_profile_att_print_trace_jsonl(
               ",\"last_time\":%" PRId64 ",\"instruction\":",
               stats->hit_count, stats->duration, stats->stall,
               stats->first_time, stats->last_time);
-      iree_profile_att_fprint_json_string(file, instruction);
+      iree_profile_fprint_json_string(file, instruction);
       fputs("}\n", file);
     }
   }
@@ -1858,4 +1812,23 @@ IREE_API_EXPORT iree_status_t iree_profile_att_file(
   iree_profile_att_deinitialize(&profile);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static iree_status_t iree_profile_att_run(
+    const iree_profile_command_invocation_t* invocation) {
+  return iree_profile_att_file(
+      invocation->input_path, invocation->options->format,
+      invocation->options->filter, invocation->options->id,
+      invocation->options->rocm_library_path, invocation->output_file,
+      invocation->options->host_allocator);
+}
+
+static const iree_profile_command_t kIreeProfileAttCommand = {
+    "att",
+    "Decode AMDGPU ATT/SQTT traces and annotate decoded instructions.",
+    iree_profile_att_run,
+};
+
+const iree_profile_command_t* iree_profile_att_command(void) {
+  return &kIreeProfileAttCommand;
 }

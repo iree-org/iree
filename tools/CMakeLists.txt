@@ -275,11 +275,17 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::tooling::flags
-    iree::hal::utils::profile_file
-    iree::io::file_handle
+    iree::tooling::profile
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
+
+if(IREE_HAL_DRIVER_AMDGPU)
+  target_compile_definitions(iree-profile PRIVATE IREE_PROFILE_HAVE_AMDGPU_ATT=1)
+  target_link_libraries(iree-profile PRIVATE iree::tooling::profile::att)
+else()
+  target_compile_definitions(iree-profile PRIVATE IREE_PROFILE_HAVE_AMDGPU_ATT=0)
+endif()
 
 iree_cc_binary(
   NAME

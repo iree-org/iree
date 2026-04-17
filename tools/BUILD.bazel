@@ -193,20 +193,19 @@ iree_runtime_cc_binary(
 
 iree_runtime_cc_binary(
     name = "iree-profile",
-    srcs = [
-        "iree-profile-att.c",
-        "iree-profile-att.h",
-        "iree-profile-main.c",
-    ],
+    srcs = ["iree-profile-main.c"],
+    defines = select({
+        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["IREE_PROFILE_HAVE_AMDGPU_ATT=1"],
+        "//conditions:default": ["IREE_PROFILE_HAVE_AMDGPU_ATT=0"],
+    }),
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:dynamic_library",
-        "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/base/tooling:flags",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/utils:profile_file",
-        "//runtime/src/iree/io:file_handle",
-    ],
+        "//runtime/src/iree/tooling/profile",
+    ] + select({
+        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["//runtime/src/iree/tooling/profile:att"],
+        "//conditions:default": [],
+    }),
 )
 
 iree_compiler_cc_binary(

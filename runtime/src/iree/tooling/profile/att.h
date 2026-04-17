@@ -4,16 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLS_IREE_PROFILE_ATT_H_
-#define IREE_TOOLS_IREE_PROFILE_ATT_H_
+#ifndef IREE_TOOLING_PROFILE_ATT_H_
+#define IREE_TOOLING_PROFILE_ATT_H_
 
 #include <stdio.h>
 
 #include "iree/base/api.h"
+#include "iree/tooling/profile/commands.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+const iree_profile_command_t* iree_profile_att_command(void);
 
 // Decodes AMDGPU ATT/SQTT records in |path| and prints an annotated report.
 iree_status_t iree_profile_att_file(iree_string_view_t path,
@@ -27,4 +30,4 @@ iree_status_t iree_profile_att_file(iree_string_view_t path,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_TOOLS_IREE_PROFILE_ATT_H_
+#endif  // IREE_TOOLING_PROFILE_ATT_H_
