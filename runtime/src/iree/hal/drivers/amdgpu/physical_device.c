@@ -31,12 +31,6 @@
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_FINE_BLOCK_POOL_SMALL_PAGE_SIZE 128
 #define IREE_HAL_AMDGPU_PHYSICAL_DEVICE_FINE_BLOCK_POOL_LARGE_PAGE_SIZE 4096
 
-typedef struct iree_hal_amdgpu_gfxip_version_t {
-  uint32_t major;
-  uint32_t minor;
-  uint32_t stepping;
-} iree_hal_amdgpu_gfxip_version_t;
-
 typedef struct iree_hal_amdgpu_agent_first_isa_t {
   uint32_t count;
   hsa_isa_t value;
@@ -709,6 +703,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
                                                        &gfxip_version);
   }
   if (iree_status_is_ok(status)) {
+    out_physical_device->gfxip_version = gfxip_version;
     vendor_packet_capabilities =
         iree_hal_amdgpu_select_vendor_packet_capabilities(gfxip_version);
     if (!options->force_wait_barrier_defer) {

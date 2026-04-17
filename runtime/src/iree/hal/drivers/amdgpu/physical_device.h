@@ -24,6 +24,15 @@
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
 
+typedef struct iree_hal_amdgpu_gfxip_version_t {
+  // Major gfx ISA version, such as 9, 10, 11, or 12.
+  uint32_t major;
+  // Minor gfx ISA version within |major|.
+  uint32_t minor;
+  // Stepping digit within |major|.|minor|.
+  uint32_t stepping;
+} iree_hal_amdgpu_gfxip_version_t;
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
 //===----------------------------------------------------------------------===//
@@ -167,6 +176,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_host_size_t device_ordinal;
   // KFD GPU identifier used when querying per-device clock counters.
   uint32_t kfd_gpu_uid;
+  // Parsed gfx ISA version reported by the HSA agent.
+  iree_hal_amdgpu_gfxip_version_t gfxip_version;
   // Stable physical device UUID bytes reported by HSA when available.
   uint8_t physical_device_uuid[16];
   // True when |physical_device_uuid| contains a stable HSA device identifier.

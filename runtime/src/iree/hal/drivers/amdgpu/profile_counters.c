@@ -23,21 +23,89 @@ static const iree_string_view_t iree_hal_amdgpu_profile_counter_set_name(void) {
   return IREE_SV("amdgpu.pmc");
 }
 
-static const iree_string_view_t iree_hal_amdgpu_profile_counter_block_name(
-    void) {
-  return IREE_SV("SQ");
-}
-
-static const iree_string_view_t iree_hal_amdgpu_profile_counter_name(void) {
-  return IREE_SV("SQ_WAVES");
-}
-
-static const iree_string_view_t iree_hal_amdgpu_profile_counter_description(
-    void) {
-  return IREE_SV("Raw SQ_WAVES values returned by aqlprofile.");
-}
-
 enum { iree_hal_amdgpu_profile_counter_packets_per_set = 3u };
+enum { iree_hal_amdgpu_profile_counter_event_unsupported = UINT32_MAX };
+
+// Static description of one raw hardware counter we can request from
+// aqlprofile by name.
+typedef struct iree_hal_amdgpu_profile_counter_descriptor_t {
+  // User-visible counter name accepted in profiling options and metadata.
+  iree_string_view_t name;
+  // User-visible hardware block name emitted in metadata.
+  iree_string_view_t block_name;
+  // User-visible description emitted in metadata.
+  iree_string_view_t description;
+  // Display unit for values returned by this counter.
+  iree_hal_profile_counter_unit_t unit;
+  // aqlprofile hardware block identifier for this counter.
+  iree_hal_amdgpu_aqlprofile_block_name_t block_name_id;
+  // aqlprofile event id for gfx9 devices, or unsupported.
+  uint32_t gfx9_event_id;
+  // aqlprofile event id for gfx10 devices, or unsupported.
+  uint32_t gfx10_event_id;
+  // aqlprofile event id for gfx11 devices, or unsupported.
+  uint32_t gfx11_event_id;
+  // aqlprofile event id for gfx12 devices, or unsupported.
+  uint32_t gfx12_event_id;
+} iree_hal_amdgpu_profile_counter_descriptor_t;
+
+#define IREE_HAL_AMDGPU_PROFILE_COUNTER_SV(value) {(value), sizeof(value) - 1}
+
+static const iree_hal_amdgpu_profile_counter_descriptor_t
+    iree_hal_amdgpu_profile_counter_descriptors[] = {
+        {
+            .name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ_WAVES"),
+            .block_name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ"),
+            .description = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV(
+                "Raw SQ_WAVES values returned by aqlprofile."),
+            .unit = IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+            .block_name_id = IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ,
+            .gfx9_event_id = 4,
+            .gfx10_event_id = 4,
+            .gfx11_event_id = 4,
+            .gfx12_event_id = 4,
+        },
+        {
+            .name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ_WAVES_32"),
+            .block_name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ"),
+            .description = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV(
+                "Raw SQ_WAVES_32 values returned by aqlprofile."),
+            .unit = IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+            .block_name_id = IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ,
+            .gfx9_event_id = iree_hal_amdgpu_profile_counter_event_unsupported,
+            .gfx10_event_id = 5,
+            .gfx11_event_id = 5,
+            .gfx12_event_id = 5,
+        },
+        {
+            .name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ_WAVES_64"),
+            .block_name = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV("SQ"),
+            .description = IREE_HAL_AMDGPU_PROFILE_COUNTER_SV(
+                "Raw SQ_WAVES_64 values returned by aqlprofile."),
+            .unit = IREE_HAL_PROFILE_COUNTER_UNIT_COUNT,
+            .block_name_id = IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ,
+            .gfx9_event_id = iree_hal_amdgpu_profile_counter_event_unsupported,
+            .gfx10_event_id = 6,
+            .gfx11_event_id = 6,
+            .gfx12_event_id = 6,
+        },
+};
+
+#undef IREE_HAL_AMDGPU_PROFILE_COUNTER_SV
+
+// One resolved raw counter within a selected counter set.
+typedef struct iree_hal_amdgpu_profile_counter_t {
+  // Static counter descriptor used for metadata and event matching.
+  const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor;
+  // Resolved aqlprofile hardware event request for the physical device.
+  iree_hal_amdgpu_aqlprofile_pmc_event_t event;
+  // Counter ordinal within its owning counter set.
+  uint32_t counter_ordinal;
+  // First uint64_t slot occupied by this counter in emitted sample records.
+  uint32_t sample_value_offset;
+  // Number of uint64_t slots occupied by this counter in emitted samples.
+  uint32_t sample_value_count;
+} iree_hal_amdgpu_profile_counter_t;
 
 // One resolved counter set for one physical device.
 typedef struct iree_hal_amdgpu_profile_counter_set_t {
@@ -45,12 +113,16 @@ typedef struct iree_hal_amdgpu_profile_counter_set_t {
   uint64_t counter_set_id;
   // Session-local physical device ordinal owning this counter set.
   uint32_t physical_device_ordinal;
+  // Number of counters in |counters|.
+  uint32_t counter_count;
   // Number of uint64_t values in each sample for this counter set.
   uint32_t sample_value_count;
   // Registered aqlprofile agent used when creating per-use sample handles.
   iree_hal_amdgpu_aqlprofile_agent_handle_t agent;
-  // Single hardware event captured by this first counter implementation.
-  iree_hal_amdgpu_aqlprofile_pmc_event_t event;
+  // Contiguous aqlprofile event requests for all counters in this set.
+  iree_hal_amdgpu_aqlprofile_pmc_event_t* events;
+  // Resolved counters with emitted sample-value slices.
+  iree_hal_amdgpu_profile_counter_t* counters;
   // Session-owned human-readable counter set name.
   iree_string_view_t name;
 } iree_hal_amdgpu_profile_counter_set_t;
@@ -100,18 +172,18 @@ struct iree_hal_amdgpu_profile_counter_session_t {
 
 // Callback context used to count decoded aqlprofile values.
 typedef struct iree_hal_amdgpu_profile_counter_count_context_t {
-  // Number of callback values observed.
-  uint32_t value_count;
+  // Counter set whose per-counter sample widths are being discovered.
+  iree_hal_amdgpu_profile_counter_set_t* counter_set;
 } iree_hal_amdgpu_profile_counter_count_context_t;
 
 // Callback context used to copy decoded aqlprofile values.
 typedef struct iree_hal_amdgpu_profile_counter_collect_context_t {
+  // Counter set describing the emitted sample-value layout.
+  const iree_hal_amdgpu_profile_counter_set_t* counter_set;
   // Destination value vector.
   uint64_t* values;
-  // Capacity of |values| in uint64_t elements.
-  uint32_t value_capacity;
-  // Number of values written so far.
-  uint32_t value_count;
+  // Per-counter value counts already written for the current sample.
+  uint32_t* counter_value_counts;
 } iree_hal_amdgpu_profile_counter_collect_context_t;
 
 //===----------------------------------------------------------------------===//
@@ -212,29 +284,114 @@ static hsa_status_t iree_hal_amdgpu_profile_counter_memory_copy(
                                                  source, size);
 }
 
+static const iree_hal_amdgpu_profile_counter_descriptor_t*
+iree_hal_amdgpu_profile_counter_find_descriptor(iree_string_view_t name) {
+  for (iree_host_size_t i = 0;
+       i < IREE_ARRAYSIZE(iree_hal_amdgpu_profile_counter_descriptors); ++i) {
+    const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor =
+        &iree_hal_amdgpu_profile_counter_descriptors[i];
+    if (iree_string_view_equal(name, descriptor->name)) return descriptor;
+  }
+  return NULL;
+}
+
+static iree_status_t iree_hal_amdgpu_profile_counter_resolve_event(
+    const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor,
+    iree_hal_amdgpu_gfxip_version_t gfxip_version,
+    iree_hal_amdgpu_aqlprofile_pmc_event_t* out_event) {
+  uint32_t event_id = iree_hal_amdgpu_profile_counter_event_unsupported;
+  switch (gfxip_version.major) {
+    case 9:
+      event_id = descriptor->gfx9_event_id;
+      break;
+    case 10:
+      event_id = descriptor->gfx10_event_id;
+      break;
+    case 11:
+      event_id = descriptor->gfx11_event_id;
+      break;
+    case 12:
+      event_id = descriptor->gfx12_event_id;
+      break;
+    default:
+      break;
+  }
+  if (IREE_UNLIKELY(event_id ==
+                    iree_hal_amdgpu_profile_counter_event_unsupported)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "AMDGPU counter '%.*s' is not mapped for gfx%u.%u.%u",
+        (int)descriptor->name.size, descriptor->name.data, gfxip_version.major,
+        gfxip_version.minor, gfxip_version.stepping);
+  }
+
+  *out_event = (iree_hal_amdgpu_aqlprofile_pmc_event_t){
+      .block_index = 0,
+      .event_id = event_id,
+      .block_name = descriptor->block_name_id,
+  };
+  return iree_ok_status();
+}
+
+static bool iree_hal_amdgpu_profile_counter_events_equal(
+    iree_hal_amdgpu_aqlprofile_pmc_event_t lhs,
+    iree_hal_amdgpu_aqlprofile_pmc_event_t rhs) {
+  return lhs.block_index == rhs.block_index && lhs.event_id == rhs.event_id &&
+         lhs.flags.raw == rhs.flags.raw && lhs.block_name == rhs.block_name;
+}
+
+static bool iree_hal_amdgpu_profile_counter_find_index_by_event(
+    const iree_hal_amdgpu_profile_counter_set_t* counter_set,
+    iree_hal_amdgpu_aqlprofile_pmc_event_t event,
+    uint32_t* out_counter_ordinal) {
+  for (uint32_t i = 0; i < counter_set->counter_count; ++i) {
+    const iree_hal_amdgpu_profile_counter_t* counter =
+        &counter_set->counters[i];
+    if (iree_hal_amdgpu_profile_counter_events_equal(counter->event, event)) {
+      *out_counter_ordinal = i;
+      return true;
+    }
+  }
+  return false;
+}
+
 static hsa_status_t iree_hal_amdgpu_profile_counter_count_callback(
     iree_hal_amdgpu_aqlprofile_pmc_event_t event, uint64_t counter_id,
     uint64_t counter_value, void* user_data) {
-  (void)event;
   (void)counter_id;
   (void)counter_value;
   iree_hal_amdgpu_profile_counter_count_context_t* context =
       (iree_hal_amdgpu_profile_counter_count_context_t*)user_data;
-  ++context->value_count;
+  uint32_t counter_ordinal = 0;
+  if (!iree_hal_amdgpu_profile_counter_find_index_by_event(
+          context->counter_set, event, &counter_ordinal)) {
+    return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+  }
+  ++context->counter_set->counters[counter_ordinal].sample_value_count;
   return HSA_STATUS_SUCCESS;
 }
 
 static hsa_status_t iree_hal_amdgpu_profile_counter_collect_callback(
     iree_hal_amdgpu_aqlprofile_pmc_event_t event, uint64_t counter_id,
     uint64_t counter_value, void* user_data) {
-  (void)event;
   (void)counter_id;
   iree_hal_amdgpu_profile_counter_collect_context_t* context =
       (iree_hal_amdgpu_profile_counter_collect_context_t*)user_data;
-  if (context->value_count >= context->value_capacity) {
+  uint32_t counter_ordinal = 0;
+  if (!iree_hal_amdgpu_profile_counter_find_index_by_event(
+          context->counter_set, event, &counter_ordinal)) {
+    return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+  }
+  const iree_hal_amdgpu_profile_counter_t* counter =
+      &context->counter_set->counters[counter_ordinal];
+  uint32_t* counter_value_count =
+      &context->counter_value_counts[counter_ordinal];
+  if (*counter_value_count >= counter->sample_value_count) {
     return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
   }
-  context->values[context->value_count++] = counter_value;
+  context->values[counter->sample_value_offset + *counter_value_count] =
+      counter_value;
+  ++*counter_value_count;
   return HSA_STATUS_SUCCESS;
 }
 
@@ -242,35 +399,61 @@ static hsa_status_t iree_hal_amdgpu_profile_counter_collect_callback(
 // iree_hal_amdgpu_profile_counter_session_t
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_amdgpu_profile_counter_set_from_selection(
+static iree_status_t iree_hal_amdgpu_profile_counter_initialize_selection(
     const iree_hal_profile_counter_set_selection_t* selection,
-    iree_hal_amdgpu_aqlprofile_pmc_event_t* out_event) {
+    iree_hal_amdgpu_gfxip_version_t gfxip_version,
+    iree_hal_amdgpu_profile_counter_set_t* counter_set) {
   if (IREE_UNLIKELY(selection->flags !=
                     IREE_HAL_PROFILE_COUNTER_SET_SELECTION_FLAG_NONE)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported AMDGPU counter set flags 0x%x",
                             selection->flags);
   }
-  if (IREE_UNLIKELY(selection->counter_name_count != 1)) {
+  if (IREE_UNLIKELY(selection->counter_name_count == 0)) {
     return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "AMDGPU counter profiling currently requires exactly one counter per "
-        "set");
+        IREE_STATUS_INVALID_ARGUMENT,
+        "AMDGPU counter profiling requires at least one counter per set");
   }
-  if (IREE_UNLIKELY(
-          !iree_string_view_equal(selection->counter_names[0],
-                                  iree_hal_amdgpu_profile_counter_name()))) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "unsupported AMDGPU counter '%.*s'; supported counters: SQ_WAVES",
-        (int)selection->counter_names[0].size,
-        selection->counter_names[0].data);
+  if (IREE_UNLIKELY(selection->counter_name_count > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "AMDGPU counter count exceeds uint32_t");
   }
 
-  memset(out_event, 0, sizeof(*out_event));
-  out_event->block_name = IREE_HAL_AMDGPU_AQLPROFILE_BLOCK_NAME_SQ;
-  out_event->block_index = 0;
-  out_event->event_id = 4;
+  for (iree_host_size_t i = 0; i < selection->counter_name_count; ++i) {
+    const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor =
+        iree_hal_amdgpu_profile_counter_find_descriptor(
+            selection->counter_names[i]);
+    if (IREE_UNLIKELY(!descriptor)) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "unsupported AMDGPU counter '%.*s'; supported counters: "
+          "SQ_WAVES, SQ_WAVES_32, SQ_WAVES_64",
+          (int)selection->counter_names[i].size,
+          selection->counter_names[i].data);
+    }
+    for (iree_host_size_t j = 0; j < i; ++j) {
+      if (iree_string_view_equal(selection->counter_names[i],
+                                 selection->counter_names[j])) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "duplicate AMDGPU counter '%.*s' in one counter set",
+            (int)selection->counter_names[i].size,
+            selection->counter_names[i].data);
+      }
+    }
+
+    const uint32_t counter_ordinal = (uint32_t)i;
+    iree_hal_amdgpu_aqlprofile_pmc_event_t event = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_counter_resolve_event(
+        descriptor, gfxip_version, &event));
+    counter_set->events[i] = event;
+    counter_set->counters[i] = (iree_hal_amdgpu_profile_counter_t){
+        .descriptor = descriptor,
+        .event = event,
+        .counter_ordinal = counter_ordinal,
+    };
+  }
+  counter_set->counter_count = (uint32_t)selection->counter_name_count;
   return iree_ok_status();
 }
 
@@ -318,19 +501,47 @@ static iree_status_t iree_hal_amdgpu_profile_counter_register_agent(
 static iree_status_t iree_hal_amdgpu_profile_counter_count_values(
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
     iree_hal_amdgpu_aqlprofile_handle_t handle,
-    uint32_t* out_sample_value_count) {
-  iree_hal_amdgpu_profile_counter_count_context_t context = {0};
+    iree_hal_amdgpu_profile_counter_set_t* counter_set) {
+  for (uint32_t i = 0; i < counter_set->counter_count; ++i) {
+    counter_set->counters[i].sample_value_count = 0;
+    counter_set->counters[i].sample_value_offset = 0;
+  }
+
+  iree_hal_amdgpu_profile_counter_count_context_t context = {
+      .counter_set = counter_set,
+  };
   IREE_RETURN_IF_AQLPROFILE_ERROR(
       libaqlprofile,
       libaqlprofile->aqlprofile_pmc_iterate_data(
           handle, iree_hal_amdgpu_profile_counter_count_callback, &context),
       "iterating AMDGPU counter metadata");
-  if (IREE_UNLIKELY(context.value_count == 0)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "aqlprofile reported zero values for selected AMDGPU counter");
+
+  iree_host_size_t sample_value_count = 0;
+  for (uint32_t i = 0; i < counter_set->counter_count; ++i) {
+    iree_hal_amdgpu_profile_counter_t* counter = &counter_set->counters[i];
+    if (IREE_UNLIKELY(counter->sample_value_count == 0)) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "aqlprofile reported zero values for selected AMDGPU counter '%.*s'",
+          (int)counter->descriptor->name.size, counter->descriptor->name.data);
+    }
+    if (IREE_UNLIKELY(sample_value_count > UINT32_MAX)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "AMDGPU counter sample value count overflow");
+    }
+    counter->sample_value_offset = (uint32_t)sample_value_count;
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(sample_value_count,
+                                                  counter->sample_value_count,
+                                                  &sample_value_count))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "AMDGPU counter sample value count overflow");
+    }
   }
-  *out_sample_value_count = context.value_count;
+  if (IREE_UNLIKELY(sample_value_count > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "AMDGPU counter sample value count overflow");
+  }
+  counter_set->sample_value_count = (uint32_t)sample_value_count;
   return iree_ok_status();
 }
 
@@ -342,8 +553,8 @@ static iree_status_t iree_hal_amdgpu_profile_counter_create_packets(
     iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t* out_packets) {
   iree_hal_amdgpu_aqlprofile_pmc_profile_t profile = {
       .agent = counter_set->agent,
-      .events = &counter_set->event,
-      .event_count = 1,
+      .events = counter_set->events,
+      .event_count = counter_set->counter_count,
   };
   IREE_RETURN_IF_AQLPROFILE_ERROR(
       libaqlprofile,
@@ -370,28 +581,12 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_set(
     iree_host_size_t selection_ordinal,
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
     iree_hal_amdgpu_profile_counter_session_t* session,
+    iree_hal_amdgpu_profile_counter_t** inout_counter_storage,
+    iree_hal_amdgpu_aqlprofile_pmc_event_t** inout_event_storage,
     char** inout_string_storage,
     iree_hal_amdgpu_profile_counter_set_t* out_counter_set) {
   const iree_hal_profile_counter_set_selection_t* selection =
       &options->counter_sets[selection_ordinal];
-  iree_hal_amdgpu_aqlprofile_pmc_event_t event;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_profile_counter_set_from_selection(selection, &event));
-
-  bool valid = false;
-  IREE_RETURN_IF_AQLPROFILE_ERROR(
-      libaqlprofile,
-      libaqlprofile->aqlprofile_validate_pmc_event(
-          session->agent_handles[physical_device->device_ordinal], &event,
-          &valid),
-      "validating AMDGPU counter event");
-  if (IREE_UNLIKELY(!valid)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "AMDGPU counter SQ_WAVES is not valid on physical device %" PRIhsz,
-        physical_device->device_ordinal);
-  }
-
   iree_string_view_t set_name = selection->name;
   if (iree_string_view_is_empty(set_name)) {
     set_name = iree_hal_amdgpu_profile_counter_set_name();
@@ -405,11 +600,36 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_set(
           ((uint64_t)(uint32_t)physical_device->device_ordinal << 32) |
           (uint64_t)(selection_ordinal + 1),
       .physical_device_ordinal = (uint32_t)physical_device->device_ordinal,
+      .counter_count = 0,
       .sample_value_count = 0,
       .agent = session->agent_handles[physical_device->device_ordinal],
-      .event = event,
+      .events = *inout_event_storage,
+      .counters = *inout_counter_storage,
       .name = iree_make_string_view(string_storage, set_name.size),
   };
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_counter_initialize_selection(
+      selection, physical_device->gfxip_version, out_counter_set));
+  *inout_counter_storage += out_counter_set->counter_count;
+  *inout_event_storage += out_counter_set->counter_count;
+
+  for (uint32_t i = 0; i < out_counter_set->counter_count; ++i) {
+    const iree_hal_amdgpu_profile_counter_t* counter =
+        &out_counter_set->counters[i];
+    bool valid = false;
+    IREE_RETURN_IF_AQLPROFILE_ERROR(
+        libaqlprofile,
+        libaqlprofile->aqlprofile_validate_pmc_event(
+            session->agent_handles[physical_device->device_ordinal],
+            &counter->event, &valid),
+        "validating AMDGPU counter event");
+    if (IREE_UNLIKELY(!valid)) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "AMDGPU counter '%.*s' is not valid on physical device %" PRIhsz,
+          (int)counter->descriptor->name.size, counter->descriptor->name.data,
+          physical_device->device_ordinal);
+    }
+  }
 
   iree_hal_amdgpu_profile_counter_memory_context_t memory_context = {
       .libhsa = session->libhsa,
@@ -424,7 +644,7 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_set(
       &metadata_packets);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_profile_counter_count_values(
-        libaqlprofile, metadata_handle, &out_counter_set->sample_value_count);
+        libaqlprofile, metadata_handle, out_counter_set);
   }
   iree_hal_amdgpu_profile_counter_destroy_packets(libaqlprofile,
                                                   &metadata_handle);
@@ -454,13 +674,6 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "AMDGPU counter set count exceeds uint32_t");
   }
-  if (IREE_UNLIKELY(options->counter_set_count != 1)) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "AMDGPU counter profiling currently supports one counter set per "
-        "session");
-  }
   if (IREE_UNLIKELY(logical_device->physical_device_count > UINT32_MAX)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
@@ -475,8 +688,28 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "AMDGPU counter set count overflow");
   }
+  iree_host_size_t counter_total_count = 0;
   iree_host_size_t string_storage_length = 0;
   for (iree_host_size_t i = 0; i < options->counter_set_count; ++i) {
+    if (IREE_UNLIKELY(options->counter_sets[i].counter_name_count == 0)) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "AMDGPU counter profiling requires at least one counter per set");
+    }
+    iree_host_size_t replicated_counter_count = 0;
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+                          logical_device->physical_device_count,
+                          options->counter_sets[i].counter_name_count,
+                          &replicated_counter_count) ||
+                      !iree_host_size_checked_add(counter_total_count,
+                                                  replicated_counter_count,
+                                                  &counter_total_count))) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "AMDGPU counter count overflow");
+    }
+
     iree_string_view_t set_name = options->counter_sets[i].name;
     if (iree_string_view_is_empty(set_name)) {
       set_name = iree_hal_amdgpu_profile_counter_set_name();
@@ -496,6 +729,8 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
 
   iree_host_size_t agent_handles_offset = 0;
   iree_host_size_t counter_sets_offset = 0;
+  iree_host_size_t counters_offset = 0;
+  iree_host_size_t events_offset = 0;
   iree_host_size_t string_storage_offset = 0;
   iree_host_size_t session_size = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -507,6 +742,12 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
               IREE_STRUCT_FIELD(counter_set_total_count,
                                 iree_hal_amdgpu_profile_counter_set_t,
                                 &counter_sets_offset),
+              IREE_STRUCT_FIELD(counter_total_count,
+                                iree_hal_amdgpu_profile_counter_t,
+                                &counters_offset),
+              IREE_STRUCT_FIELD(counter_total_count,
+                                iree_hal_amdgpu_aqlprofile_pmc_event_t,
+                                &events_offset),
               IREE_STRUCT_FIELD(string_storage_length, char,
                                 &string_storage_offset)));
 
@@ -525,6 +766,11 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
   session->counter_sets =
       (iree_hal_amdgpu_profile_counter_set_t*)((uint8_t*)session +
                                                counter_sets_offset);
+  iree_hal_amdgpu_profile_counter_t* counter_storage =
+      (iree_hal_amdgpu_profile_counter_t*)((uint8_t*)session + counters_offset);
+  iree_hal_amdgpu_aqlprofile_pmc_event_t* event_storage =
+      (iree_hal_amdgpu_aqlprofile_pmc_event_t*)((uint8_t*)session +
+                                                events_offset);
   iree_atomic_store(&session->next_sample_id, 1, iree_memory_order_relaxed);
 
   iree_status_t status = iree_hal_amdgpu_libaqlprofile_initialize(
@@ -551,7 +797,8 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
           physical_device->device_ordinal * options->counter_set_count + j;
       status = iree_hal_amdgpu_profile_counter_initialize_set(
           options, physical_device, j, &session->libaqlprofile, session,
-          &string_storage, &session->counter_sets[counter_set_index]);
+          &counter_storage, &event_storage, &string_storage,
+          &session->counter_sets[counter_set_index]);
     }
   }
 
@@ -591,17 +838,15 @@ static iree_status_t iree_hal_amdgpu_profile_counter_set_record_size(
 }
 
 static iree_status_t iree_hal_amdgpu_profile_counter_record_size(
+    const iree_hal_amdgpu_profile_counter_t* counter,
     iree_host_size_t* out_record_size) {
-  const iree_string_view_t block_name =
-      iree_hal_amdgpu_profile_counter_block_name();
-  const iree_string_view_t counter_name =
-      iree_hal_amdgpu_profile_counter_name();
-  const iree_string_view_t description =
-      iree_hal_amdgpu_profile_counter_description();
+  const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor =
+      counter->descriptor;
   return IREE_STRUCT_LAYOUT(
       0, out_record_size,
       IREE_STRUCT_FIELD(1, iree_hal_profile_counter_record_t, NULL),
-      IREE_STRUCT_FIELD(block_name.size + counter_name.size + description.size,
+      IREE_STRUCT_FIELD(descriptor->block_name.size + descriptor->name.size +
+                            descriptor->description.size,
                         char, NULL));
 }
 
@@ -625,12 +870,14 @@ static iree_status_t iree_hal_amdgpu_profile_counter_metadata_size(
                               "AMDGPU counter set metadata overflow");
     }
 
-    IREE_RETURN_IF_ERROR(
-        iree_hal_amdgpu_profile_counter_record_size(&record_size));
-    if (IREE_UNLIKELY(!iree_host_size_checked_add(counter_size, record_size,
-                                                  &counter_size))) {
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "AMDGPU counter metadata overflow");
+    for (uint32_t j = 0; j < counter_set->counter_count; ++j) {
+      IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_counter_record_size(
+          &counter_set->counters[j], &record_size));
+      if (IREE_UNLIKELY(!iree_host_size_checked_add(counter_size, record_size,
+                                                    &counter_size))) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "AMDGPU counter metadata overflow");
+      }
     }
   }
   *out_counter_set_size = counter_set_size;
@@ -655,7 +902,7 @@ static iree_status_t iree_hal_amdgpu_profile_counter_pack_counter_set_record(
   record.record_length = (uint32_t)record_size;
   record.counter_set_id = counter_set->counter_set_id;
   record.physical_device_ordinal = counter_set->physical_device_ordinal;
-  record.counter_count = 1;
+  record.counter_count = counter_set->counter_count;
   record.sample_value_count = counter_set->sample_value_count;
   record.name_length = (uint32_t)counter_set->name.size;
 
@@ -669,43 +916,41 @@ static iree_status_t iree_hal_amdgpu_profile_counter_pack_counter_set_record(
 
 static iree_status_t iree_hal_amdgpu_profile_counter_pack_counter_record(
     const iree_hal_amdgpu_profile_counter_set_t* counter_set,
+    const iree_hal_amdgpu_profile_counter_t* counter,
     uint8_t** inout_storage_ptr) {
   iree_host_size_t record_size = 0;
   IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_profile_counter_record_size(&record_size));
+      iree_hal_amdgpu_profile_counter_record_size(counter, &record_size));
   if (IREE_UNLIKELY(record_size > UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "AMDGPU counter metadata record exceeds uint32_t");
   }
 
-  const iree_string_view_t block_name =
-      iree_hal_amdgpu_profile_counter_block_name();
-  const iree_string_view_t counter_name =
-      iree_hal_amdgpu_profile_counter_name();
-  const iree_string_view_t description =
-      iree_hal_amdgpu_profile_counter_description();
+  const iree_hal_amdgpu_profile_counter_descriptor_t* descriptor =
+      counter->descriptor;
   iree_hal_profile_counter_record_t record =
       iree_hal_profile_counter_record_default();
   record.record_length = (uint32_t)record_size;
   record.flags = IREE_HAL_PROFILE_COUNTER_FLAG_RAW;
-  record.unit = IREE_HAL_PROFILE_COUNTER_UNIT_COUNT;
+  record.unit = descriptor->unit;
   record.physical_device_ordinal = counter_set->physical_device_ordinal;
   record.counter_set_id = counter_set->counter_set_id;
-  record.counter_ordinal = 0;
-  record.sample_value_offset = 0;
-  record.sample_value_count = counter_set->sample_value_count;
-  record.block_name_length = (uint32_t)block_name.size;
-  record.name_length = (uint32_t)counter_name.size;
-  record.description_length = (uint32_t)description.size;
+  record.counter_ordinal = counter->counter_ordinal;
+  record.sample_value_offset = counter->sample_value_offset;
+  record.sample_value_count = counter->sample_value_count;
+  record.block_name_length = (uint32_t)descriptor->block_name.size;
+  record.name_length = (uint32_t)descriptor->name.size;
+  record.description_length = (uint32_t)descriptor->description.size;
 
   uint8_t* storage_ptr = *inout_storage_ptr;
   memcpy(storage_ptr, &record, sizeof(record));
   uint8_t* string_ptr = storage_ptr + sizeof(record);
-  memcpy(string_ptr, block_name.data, block_name.size);
-  string_ptr += block_name.size;
-  memcpy(string_ptr, counter_name.data, counter_name.size);
-  string_ptr += counter_name.size;
-  memcpy(string_ptr, description.data, description.size);
+  memcpy(string_ptr, descriptor->block_name.data, descriptor->block_name.size);
+  string_ptr += descriptor->block_name.size;
+  memcpy(string_ptr, descriptor->name.data, descriptor->name.size);
+  string_ptr += descriptor->name.size;
+  memcpy(string_ptr, descriptor->description.data,
+         descriptor->description.size);
   *inout_storage_ptr = storage_ptr + record_size;
   return iree_ok_status();
 }
@@ -758,9 +1003,10 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_write_metadata(
         &session->counter_sets[i];
     status = iree_hal_amdgpu_profile_counter_pack_counter_set_record(
         counter_set, &counter_set_ptr);
-    if (iree_status_is_ok(status)) {
+    for (uint32_t j = 0;
+         j < counter_set->counter_count && iree_status_is_ok(status); ++j) {
       status = iree_hal_amdgpu_profile_counter_pack_counter_record(
-          counter_set, &counter_ptr);
+          counter_set, &counter_set->counters[j], &counter_ptr);
     }
   }
 
@@ -1104,6 +1350,26 @@ iree_hal_amdgpu_host_queue_profile_counter_sample_storage_size(
   return iree_ok_status();
 }
 
+static iree_status_t
+iree_hal_amdgpu_host_queue_profile_counter_max_counter_count(
+    iree_hal_amdgpu_host_queue_t* queue, uint32_t* out_counter_count) {
+  uint32_t max_counter_count = 0;
+  for (uint32_t counter_set_ordinal = 0;
+       counter_set_ordinal < queue->profiling.counter_set_count;
+       ++counter_set_ordinal) {
+    const iree_hal_amdgpu_profile_counter_set_t* counter_set =
+        iree_hal_amdgpu_host_queue_profile_counter_set(queue,
+                                                       counter_set_ordinal);
+    if (IREE_UNLIKELY(!counter_set)) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "AMDGPU counter set is not available");
+    }
+    max_counter_count = iree_max(max_counter_count, counter_set->counter_count);
+  }
+  *out_counter_count = max_counter_count;
+  return iree_ok_status();
+}
+
 static void iree_hal_amdgpu_profile_counter_initialize_sample_record(
     const iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_profile_dispatch_event_t* event,
@@ -1135,11 +1401,14 @@ static void iree_hal_amdgpu_profile_counter_initialize_sample_record(
 static iree_status_t iree_hal_amdgpu_profile_counter_collect_sample_values(
     iree_hal_amdgpu_profile_counter_session_t* session,
     const iree_hal_amdgpu_profile_counter_set_t* counter_set,
-    iree_hal_amdgpu_profile_counter_sample_slot_t* slot, uint64_t* values) {
+    iree_hal_amdgpu_profile_counter_sample_slot_t* slot,
+    uint32_t* counter_value_counts, uint64_t* values) {
+  memset(counter_value_counts, 0,
+         counter_set->counter_count * sizeof(counter_value_counts[0]));
   iree_hal_amdgpu_profile_counter_collect_context_t collect_context = {
+      .counter_set = counter_set,
       .values = values,
-      .value_capacity = counter_set->sample_value_count,
-      .value_count = 0,
+      .counter_value_counts = counter_value_counts,
   };
   iree_status_t status = iree_status_from_aqlprofile_status(
       &session->libaqlprofile, __FILE__, __LINE__,
@@ -1147,13 +1416,18 @@ static iree_status_t iree_hal_amdgpu_profile_counter_collect_sample_values(
           slot->handle, iree_hal_amdgpu_profile_counter_collect_callback,
           &collect_context),
       "aqlprofile_pmc_iterate_data", "iterating AMDGPU counter sample values");
-  if (iree_status_is_ok(status) &&
-      collect_context.value_count != counter_set->sample_value_count) {
-    status = iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "aqlprofile returned %u values for AMDGPU counter sample but metadata "
-        "declared %u",
-        collect_context.value_count, counter_set->sample_value_count);
+  for (uint32_t i = 0;
+       i < counter_set->counter_count && iree_status_is_ok(status); ++i) {
+    const iree_hal_amdgpu_profile_counter_t* counter =
+        &counter_set->counters[i];
+    if (counter_value_counts[i] != counter->sample_value_count) {
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "aqlprofile returned %u values for AMDGPU counter '%.*s' but "
+          "metadata declared %u",
+          counter_value_counts[i], (int)counter->descriptor->name.size,
+          counter->descriptor->name.data, counter->sample_value_count);
+    }
   }
   return status;
 }
@@ -1162,8 +1436,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_pack_profile_counter_sample(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_counter_session_t* session, uint64_t event_position,
     const iree_hal_profile_dispatch_event_t* event,
-    uint32_t counter_set_ordinal, uint8_t* storage,
-    iree_host_size_t* out_record_size) {
+    uint32_t counter_set_ordinal, uint32_t* counter_value_counts,
+    uint8_t* storage, iree_host_size_t* out_record_size) {
   *out_record_size = 0;
   const iree_hal_amdgpu_profile_counter_set_t* counter_set =
       iree_hal_amdgpu_host_queue_profile_counter_set(queue,
@@ -1196,7 +1470,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_pack_profile_counter_sample(
   memcpy(storage, &sample_record, sizeof(sample_record));
   uint64_t* values = (uint64_t*)(void*)(storage + sizeof(sample_record));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_counter_collect_sample_values(
-      session, counter_set, slot, values));
+      session, counter_set, slot, counter_value_counts, values));
   *out_record_size = record_size;
   return iree_ok_status();
 }
@@ -1205,7 +1479,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_pack_profile_counter_samples(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_counter_session_t* session,
     uint64_t event_read_position, iree_host_size_t event_count,
-    const iree_hal_profile_dispatch_event_t* events, uint8_t* storage) {
+    const iree_hal_profile_dispatch_event_t* events,
+    uint32_t* counter_value_counts, uint8_t* storage) {
   uint8_t* sample_ptr = storage;
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t event_ordinal = 0;
@@ -1220,7 +1495,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_pack_profile_counter_samples(
       iree_host_size_t record_size = 0;
       status = iree_hal_amdgpu_host_queue_pack_profile_counter_sample(
           queue, session, event_position, event, counter_set_ordinal,
-          sample_ptr, &record_size);
+          counter_value_counts, sample_ptr, &record_size);
       if (iree_status_is_ok(status)) {
         sample_ptr += record_size;
       }
@@ -1265,20 +1540,36 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_counter_samples(
       z0, iree_hal_amdgpu_host_queue_profile_counter_sample_storage_size(
               queue, event_count, &sample_storage_size));
 
-  uint8_t* sample_storage = NULL;
+  uint32_t max_counter_count = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(queue->host_allocator, sample_storage_size,
-                                (void**)&sample_storage));
-  iree_status_t status =
-      iree_hal_amdgpu_host_queue_pack_profile_counter_samples(
-          queue, session, event_read_position, event_count, events,
-          sample_storage);
+      z0, iree_hal_amdgpu_host_queue_profile_counter_max_counter_count(
+              queue, &max_counter_count));
+  iree_host_size_t counter_value_counts_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(0, &counter_value_counts_size,
+                         IREE_STRUCT_FIELD(max_counter_count, uint32_t, NULL)));
+  uint32_t* counter_value_counts = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(queue->host_allocator, counter_value_counts_size,
+                            (void**)&counter_value_counts));
+
+  uint8_t* sample_storage = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      queue->host_allocator, sample_storage_size, (void**)&sample_storage);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_pack_profile_counter_samples(
+        queue, session, event_read_position, event_count, events,
+        counter_value_counts, sample_storage);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_host_queue_write_profile_counter_chunk(
         queue, sink, session_id, sample_storage, sample_storage_size);
   }
 
   iree_allocator_free(queue->host_allocator, sample_storage);
+  iree_allocator_free(queue->host_allocator, counter_value_counts);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
