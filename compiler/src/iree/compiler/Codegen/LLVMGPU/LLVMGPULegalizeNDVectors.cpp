@@ -6,15 +6,14 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -753,49 +752,13 @@ static bool getOuterBoundsInfo(ArrayAttr inBoundsAttr, AffineMap permMap,
   return false;
 }
 
-/// Pre-compute source dimension sizes for dims that need bounds checking.
-/// Only computes sizes for memref/tensor dims referenced by OOB outer dims.
-static void precomputeSourceDimSizes(OpBuilder &builder, Location loc,
-                                     Value source, AffineMap permMap,
-                                     ArrayRef<bool> outerInBounds,
-                                     SmallVectorImpl<Value> &sourceDimSizes) {
-  auto sourceType = cast<ShapedType>(source.getType());
-  int64_t numOuterDims = outerInBounds.size();
-  sourceDimSizes.assign(sourceType.getRank(), Value{});
-  for (int64_t d = 0; d < numOuterDims; ++d) {
-    if (outerInBounds[d]) {
-      continue;
-    }
-    auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
-    if (!dimExpr) {
-      continue;
-    }
-    int64_t memrefDim = dimExpr.getPosition();
-    if (sourceDimSizes[memrefDim]) {
-      continue;
-    }
-    int64_t staticSize = sourceType.getDimSize(memrefDim);
-    if (staticSize != ShapedType::kDynamic) {
-      sourceDimSizes[memrefDim] =
-          arith::ConstantIndexOp::create(builder, loc, staticSize);
-    } else if (isa<MemRefType>(sourceType)) {
-      sourceDimSizes[memrefDim] =
-          memref::DimOp::create(builder, loc, source, memrefDim);
-    } else {
-      sourceDimSizes[memrefDim] =
-          tensor::DimOp::create(builder, loc, source, memrefDim);
-    }
-  }
-}
-
 /// Build an i1 condition that is true iff all OOB outer dims are within the
 /// source bounds for the given `newIndices`. Returns nullptr if no check is
 /// needed (all outer dims are in-bounds or are broadcasts).
 static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
-                                  AffineMap permMap,
+                                  Value source, AffineMap permMap,
                                   ArrayRef<bool> outerInBounds,
-                                  ValueRange newIndices,
-                                  ArrayRef<Value> sourceDimSizes) {
+                                  ValueRange newIndices) {
   Value cond;
   for (int64_t d = 0, e = outerInBounds.size(); d < e; ++d) {
     if (outerInBounds[d]) {
@@ -806,9 +769,9 @@ static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
       continue;
     }
     int64_t memrefDim = dimExpr.getPosition();
-    Value cmp =
-        arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::slt,
-                              newIndices[memrefDim], sourceDimSizes[memrefDim]);
+    Value dimSize = vector::createOrFoldDimOp(builder, loc, source, memrefDim);
+    Value cmp = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::slt,
+                                      newIndices[memrefDim], dimSize);
     cond = cond ? Value(arith::AndIOp::create(builder, loc, cond, cmp)) : cmp;
   }
   return cond;
@@ -852,11 +815,8 @@ struct ConvertTransferRead final
     bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
                                                numOuterDims, outerInBounds);
 
-    SmallVector<Value> sourceDimSizes;
     Value paddingVec;
     if (needsBoundsCheck) {
-      precomputeSourceDimSizes(rewriter, loc, op.getBase(), permMap,
-                               outerInBounds, sourceDimSizes);
       paddingVec = vector::BroadcastOp::create(rewriter, loc, vec1DType,
                                                op.getPadding());
     }
@@ -885,8 +845,8 @@ struct ConvertTransferRead final
 
       Value inBoundsCond =
           needsBoundsCheck
-              ? buildOuterBoundsCond(rewriter, loc, permMap, outerInBounds,
-                                     newIndices, sourceDimSizes)
+              ? buildOuterBoundsCond(rewriter, loc, op.getBase(), permMap,
+                                     outerInBounds, newIndices)
               : Value{};
 
       Value result;
@@ -948,12 +908,6 @@ struct ConvertTransferWrite final
     bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
                                                numOuterDims, outerInBounds);
 
-    SmallVector<Value> sourceDimSizes;
-    if (needsBoundsCheck) {
-      precomputeSourceDimSizes(rewriter, loc, op.getBase(), permMap,
-                               outerInBounds, sourceDimSizes);
-    }
-
     SmallVector<Value> vectorSlices(adaptor.getValueToStore());
     ValueRange convertedMask = adaptor.getMask();
     Value dest = op.getBase();
@@ -981,8 +935,8 @@ struct ConvertTransferWrite final
 
       Value inBoundsCond =
           needsBoundsCheck
-              ? buildOuterBoundsCond(rewriter, loc, permMap, outerInBounds,
-                                     newIndices, sourceDimSizes)
+              ? buildOuterBoundsCond(rewriter, loc, op.getBase(), permMap,
+                                     outerInBounds, newIndices)
               : Value{};
 
       if (inBoundsCond) {

@@ -402,10 +402,9 @@ func.func @transfer_read_2d_oob(%A: memref<?x?xf32>, %i: index, %j: index, %pad:
 // CHECK-LABEL: func.func @transfer_read_2d_oob
 //  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32)
 //  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[A]], %[[C0]] : memref<?x?xf32>
 //       CHECK:   %[[PADVEC:.+]] = vector.broadcast %[[PAD]] : f32 to vector<4xf32>
-//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM]] : index
+//       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM0]] : index
 //       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (vector<4xf32>) {
 //       CHECK:     vector.transfer_read %[[A]][%[[I]], %[[J]]], %[[PAD]] {in_bounds = [true]}
 //       CHECK:     scf.yield
@@ -414,7 +413,8 @@ func.func @transfer_read_2d_oob(%A: memref<?x?xf32>, %i: index, %j: index, %pad:
 //       CHECK:   }
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[I1:.+]] = arith.addi %[[I]], %[[C1]] : index
-//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM]] : index
+//       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
 //       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (vector<4xf32>) {
 //       CHECK:     vector.transfer_read %[[A]][%[[I1]], %[[J]]], %[[PAD]] {in_bounds = [true]}
 //       CHECK:     scf.yield
@@ -433,15 +433,15 @@ func.func @transfer_write_2d_oob(%vec: vector<2x4xf32>, %A: memref<?x?xf32>, %i:
 }
 // CHECK-LABEL: func.func @transfer_write_2d_oob
 //  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[A]], %[[C0]] : memref<?x?xf32>
-//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM]] : index
+//       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I]], %[[DIM0]] : index
 //       CHECK:   scf.if %[[CMP0]] {
 //       CHECK:     vector.transfer_write %[[V0]], %[[A]][%[[I]], %[[J]]] {in_bounds = [true]}
 //       CHECK:   }
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[I1:.+]] = arith.addi %[[I]], %[[C1]] : index
-//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM]] : index
+//       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
 //       CHECK:   scf.if %[[CMP1]] {
 //       CHECK:     vector.transfer_write %[[V1]], %[[A]][%[[I1]], %[[J]]] {in_bounds = [true]}
 //       CHECK:   }
