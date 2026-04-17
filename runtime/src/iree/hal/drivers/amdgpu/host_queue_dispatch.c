@@ -457,9 +457,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     bool uses_custom_direct_arguments,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready) {
-  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events =
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events = {0};
+  IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u);
+          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u,
+          &profile_events));
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   iree_status_t status =
       iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
@@ -541,9 +543,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     bool* out_ready) {
   const uint32_t target_kernarg_block_count = plan->kernarg_block_count;
   const uint32_t patch_kernarg_block_count = 1;
-  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events =
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events = {0};
+  IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u);
+          queue, queue->profiling.hsa_queue_timestamps_enabled ? 1u : 0u,
+          &profile_events));
   const bool profile_dispatch_packet = profile_events.event_count != 0;
   const uint32_t payload_packet_count = profile_dispatch_packet ? 3u : 2u;
   const uint32_t profile_harvest_kernarg_block_count =

@@ -330,8 +330,6 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     uint64_t dispatch_event_ready_position;
     // Logical ring position one past the last reserved event.
     uint64_t dispatch_event_write_position;
-    // Number of events dropped because |dispatch_events| was full.
-    uint64_t dropped_dispatch_event_count;
     // Next queue-local dispatch event id assigned during submission.
     uint64_t next_dispatch_event_id;
   } profiling;
@@ -576,9 +574,9 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 // PM4 snippets for profiling or tiny operations.
 //
 // |profiling_signal_block_pool| provides fine-grained GPU-agent memory used for
-// raw iree_amd_signal_t records. The host initializes these records once during
-// queue creation; packets only use them for CP-written profiling timestamps and
-// never for host HSA waits or interrupts.
+// raw iree_amd_signal_t records. The host initializes these records once when
+// timestamp profiling begins; packets only use them for CP-written profiling
+// timestamps and never for host HSA waits or interrupts.
 iree_status_t iree_hal_amdgpu_host_queue_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, iree_hal_device_t* logical_device,
     iree_async_proactor_t* proactor, hsa_agent_t gpu_agent,
@@ -617,11 +615,13 @@ iree_status_t iree_hal_amdgpu_host_queue_set_hsa_profiling_enabled(
 
 // Reserves queue-local dispatch profile event records.
 //
-// Caller must hold submission_mutex. If the ring is full the returned
-// reservation has event_count 0 and the dropped-event counter is incremented.
-iree_hal_amdgpu_profile_dispatch_event_reservation_t
-iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count);
+// Caller must hold submission_mutex. If the ring cannot hold |event_count|
+// records the function fails with RESOURCE_EXHAUSTED. Callers that want to keep
+// long captures exact must drain with iree_hal_device_profiling_flush before
+// the ring fills.
+iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
+    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t* out_reservation);
 
 // Cancels a tail reservation before its packets have been published.
 //

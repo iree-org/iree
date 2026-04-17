@@ -1678,9 +1678,10 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
   const uint32_t profile_dispatch_event_count =
       iree_hal_amdgpu_host_queue_command_buffer_profile_dispatch_event_count(
           queue, block);
-  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events =
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events = {0};
+  IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, profile_dispatch_event_count);
+          queue, profile_dispatch_event_count, &profile_events));
   const bool profile_dispatch_packets = profile_events.event_count != 0;
   if (IREE_UNLIKELY(profile_dispatch_packets &&
                     block->aql_packet_count == UINT32_MAX)) {

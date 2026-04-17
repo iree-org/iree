@@ -1201,6 +1201,42 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
 }
 
 TEST_F(HostQueueCommandBufferTest,
+       ProfiledDispatchReservationFailsWhenCapacityExceeded) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(nullptr, queue);
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling mode unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation = {0};
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_status_t status =
+      iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
+          queue, queue->profiling.dispatch_event_capacity + 1, &reservation);
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+  IREE_ASSERT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+  EXPECT_EQ(0u, reservation.event_count);
+
+  IREE_ASSERT_OK(profiling.End());
+}
+
+TEST_F(HostQueueCommandBufferTest,
        ProfiledCommandBufferDispatchSignalsSurviveAqlSlotReuse) {
   static constexpr uint32_t kAqlCapacity = 64;
   static constexpr uint32_t kDispatchCount = kAqlCapacity + 32;

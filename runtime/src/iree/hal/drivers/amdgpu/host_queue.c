@@ -251,7 +251,6 @@ static iree_status_t iree_hal_amdgpu_host_queue_ensure_profile_event_storage(
   queue->profiling.dispatch_event_read_position = 0;
   queue->profiling.dispatch_event_ready_position = 0;
   queue->profiling.dispatch_event_write_position = 0;
-  queue->profiling.dropped_dispatch_event_count = 0;
   queue->profiling.next_dispatch_event_id = 1;
   iree_slim_mutex_unlock(&queue->profiling.event_mutex);
 
@@ -265,7 +264,6 @@ static void iree_hal_amdgpu_host_queue_clear_profile_events(
   queue->profiling.dispatch_event_read_position = 0;
   queue->profiling.dispatch_event_ready_position = 0;
   queue->profiling.dispatch_event_write_position = 0;
-  queue->profiling.dropped_dispatch_event_count = 0;
   queue->profiling.next_dispatch_event_id = 1;
   if (queue->profiling.event_storage) {
     memset(queue->profiling.event_storage, 0,
@@ -288,7 +286,6 @@ static void iree_hal_amdgpu_host_queue_deallocate_profile_events(
   queue->profiling.dispatch_event_read_position = 0;
   queue->profiling.dispatch_event_ready_position = 0;
   queue->profiling.dispatch_event_write_position = 0;
-  queue->profiling.dropped_dispatch_event_count = 0;
   queue->profiling.next_dispatch_event_id = 0;
   IREE_TRACE_ZONE_END(z0);
 }
@@ -305,25 +302,37 @@ static void iree_hal_amdgpu_host_queue_reclaim_retired(
   iree_hal_amdgpu_host_queue_retire_profile_dispatch_events(queue, reservation);
 }
 
-iree_hal_amdgpu_profile_dispatch_event_reservation_t
-iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count) {
-  iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation = {0};
+iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
+    iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count,
+    iree_hal_amdgpu_profile_dispatch_event_reservation_t* out_reservation) {
+  *out_reservation = (iree_hal_amdgpu_profile_dispatch_event_reservation_t){0};
   if (event_count == 0 || !queue->profiling.hsa_queue_timestamps_enabled ||
       !queue->profiling.dispatch_events) {
-    return reservation;
+    return iree_ok_status();
+  }
+  if (IREE_UNLIKELY(event_count > queue->profiling.dispatch_event_capacity)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "dispatch profiling reservation of %" PRIu32
+                            " events exceeds queue capacity %" PRIu32,
+                            event_count,
+                            queue->profiling.dispatch_event_capacity);
   }
 
+  bool is_exhausted = false;
+  uint64_t exhausted_available_count = 0;
+  uint64_t exhausted_ready_count = 0;
   iree_slim_mutex_lock(&queue->profiling.event_mutex);
   const uint64_t read_position = queue->profiling.dispatch_event_read_position;
+  const uint64_t ready_position =
+      queue->profiling.dispatch_event_ready_position;
   const uint64_t write_position =
       queue->profiling.dispatch_event_write_position;
   const uint64_t occupied_count = write_position - read_position;
   const uint64_t available_count =
       queue->profiling.dispatch_event_capacity - occupied_count;
   if (event_count <= available_count) {
-    reservation.first_event_position = write_position;
-    reservation.event_count = event_count;
+    out_reservation->first_event_position = write_position;
+    out_reservation->event_count = event_count;
     queue->profiling.dispatch_event_write_position =
         write_position + event_count;
     for (uint32_t i = 0; i < event_count; ++i) {
@@ -337,10 +346,20 @@ iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
       event->export_ordinal = UINT32_MAX;
     }
   } else {
-    queue->profiling.dropped_dispatch_event_count += event_count;
+    is_exhausted = true;
+    exhausted_available_count = available_count;
+    exhausted_ready_count = ready_position - read_position;
   }
   iree_slim_mutex_unlock(&queue->profiling.event_mutex);
-  return reservation;
+  if (IREE_UNLIKELY(is_exhausted)) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "dispatch profiling event ring exhausted: requested %" PRIu32
+        " events, available %" PRIu64 ", ready %" PRIu64 ", capacity %" PRIu32,
+        event_count, exhausted_available_count, exhausted_ready_count,
+        queue->profiling.dispatch_event_capacity);
+  }
+  return iree_ok_status();
 }
 
 void iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(
@@ -387,14 +406,12 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
 
   iree_hal_profile_dispatch_event_t* events = NULL;
   iree_host_size_t event_count = 0;
-  uint64_t dropped_event_count = 0;
   iree_host_size_t event_storage_size = 0;
   iree_slim_mutex_lock(&queue->profiling.event_mutex);
   const uint64_t read_position = queue->profiling.dispatch_event_read_position;
   const uint64_t ready_position =
       queue->profiling.dispatch_event_ready_position;
   event_count = (iree_host_size_t)(ready_position - read_position);
-  dropped_event_count = queue->profiling.dropped_dispatch_event_count;
   iree_status_t status = iree_ok_status();
   if (event_count > 0) {
     status = IREE_STRUCT_LAYOUT(
@@ -434,7 +451,7 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
-  if (event_count == 0 && dropped_event_count == 0) {
+  if (event_count == 0) {
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
@@ -450,9 +467,6 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
       ((uint64_t)physical_device_ordinal << 32) | (uint64_t)queue_ordinal;
   metadata.physical_device_ordinal = physical_device_ordinal;
   metadata.queue_ordinal = queue_ordinal;
-  if (dropped_event_count != 0) {
-    metadata.flags |= IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
-  }
 
   iree_const_byte_span_t iovec =
       iree_make_const_byte_span(events, event_storage_size);
@@ -462,11 +476,6 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
   if (iree_status_is_ok(status)) {
     iree_slim_mutex_lock(&queue->profiling.event_mutex);
     queue->profiling.dispatch_event_read_position = read_position + event_count;
-    if (queue->profiling.dropped_dispatch_event_count >= dropped_event_count) {
-      queue->profiling.dropped_dispatch_event_count -= dropped_event_count;
-    } else {
-      queue->profiling.dropped_dispatch_event_count = 0;
-    }
     iree_slim_mutex_unlock(&queue->profiling.event_mutex);
   }
 
