@@ -17,7 +17,7 @@
 #endif  // IREE_PROFILE_HAVE_AMDGPU_ATT
 
 #if IREE_PROFILE_HAVE_AMDGPU_ATT
-#include "iree/tooling/profile/att.h"
+#include "iree/tooling/profile/att/att.h"
 #endif  // IREE_PROFILE_HAVE_AMDGPU_ATT
 
 IREE_FLAG(string, format, "text",

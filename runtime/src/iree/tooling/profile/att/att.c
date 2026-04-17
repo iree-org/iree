@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/profile/att.h"
+#include "iree/tooling/profile/att/att.h"
 
 #include <inttypes.h>
 #include <stdbool.h>

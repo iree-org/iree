@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOOLING_PROFILE_ATT_H_
-#define IREE_TOOLING_PROFILE_ATT_H_
+#ifndef IREE_TOOLING_PROFILE_ATT_ATT_H_
+#define IREE_TOOLING_PROFILE_ATT_ATT_H_
 
 #include <stdio.h>
 
@@ -30,4 +30,4 @@ iree_status_t iree_profile_att_file(iree_string_view_t path,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_TOOLING_PROFILE_ATT_H_
+#endif  // IREE_TOOLING_PROFILE_ATT_ATT_H_

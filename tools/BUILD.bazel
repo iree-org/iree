@@ -203,7 +203,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/tooling/profile",
     ] + select({
-        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["//runtime/src/iree/tooling/profile:att"],
+        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["//runtime/src/iree/tooling/profile/att"],
         "//conditions:default": [],
     }),
 )
