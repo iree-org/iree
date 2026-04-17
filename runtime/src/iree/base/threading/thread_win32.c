@@ -290,24 +290,28 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   group_affinity.Group = affinity.group;
   if (affinity.group_any) {
     group_affinity.Mask = (KAFFINITY)UINTPTR_MAX;
-  } else {
+  } else if (affinity.id_assigned) {
     KAFFINITY affinity_mask = 1ull << affinity.id;
     if (affinity.smt) {
       affinity_mask |= 1ull << (affinity.id + 1);
     }
     group_affinity.Mask = affinity_mask;
+  } else {
+    // No specific processor requested; allow the platform to place the thread
+    // on any processor.
+    group_affinity.Mask = (KAFFINITY)UINTPTR_MAX;
   }
   SetThreadGroupAffinity(thread->handle, &group_affinity, NULL);
 
-  // TODO(benvanik): figure out of this is a bad thing; sometimes it can result
-  // in the scheduler alternating cores within the affinity mask; in theory it's
-  // just an SMT ID change and doesn't have any impact on caches but it'd be
-  // good to check.
-  PROCESSOR_NUMBER ideal_processor;
-  memset(&ideal_processor, 0, sizeof(ideal_processor));
-  ideal_processor.Group = affinity.group;
-  ideal_processor.Number = affinity.id;
-  SetThreadIdealProcessorEx(thread->handle, &ideal_processor, NULL);
+  // Only set an ideal processor when a specific processor id was assigned.
+  // If no id was assigned we must not bias the scheduler toward CPU 0.
+  if (affinity.id_assigned) {
+    PROCESSOR_NUMBER ideal_processor;
+    memset(&ideal_processor, 0, sizeof(ideal_processor));
+    ideal_processor.Group = affinity.group;
+    ideal_processor.Number = affinity.id;
+    SetThreadIdealProcessorEx(thread->handle, &ideal_processor, NULL);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
