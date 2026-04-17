@@ -14,7 +14,7 @@
 
 #include <string.h>
 
-#include "iree/base/alignment.h"
+#include "iree/base/api.h"
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
@@ -34,6 +34,8 @@ IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
 
 enum {
   IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY = 16,
+  // PM4-IB AQL envelopes encode the indirect-buffer dword count in 20 bits.
+  IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT = 0xFFFFF,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
@@ -282,17 +284,21 @@ static inline uint32_t iree_hal_amdgpu_pm4_emit_copy_data64(
   return 6;
 }
 
-static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib(
-    iree_hsa_amd_aql_pm4_ib_packet_t* packet,
-    const iree_hal_amdgpu_pm4_ib_slot_t* ib_slot, uint32_t ib_dword_count,
+// Emits an AQL PM4-IB envelope referencing |ib_dwords|. The referenced dword
+// storage must remain immutable and live until the AQL packet retires.
+static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib_dwords(
+    iree_hsa_amd_aql_pm4_ib_packet_t* packet, const uint32_t* ib_dwords,
+    uint32_t ib_dword_count,
     iree_hal_amdgpu_aql_packet_control_t packet_control,
     iree_hsa_signal_t completion_signal, uint16_t* out_setup) {
-  const uintptr_t ib_address = (uintptr_t)ib_slot->dwords;
+  IREE_ASSERT(ib_dword_count <= IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT);
+  const uintptr_t ib_address = (uintptr_t)ib_dwords;
   packet->ib_jump_cmd[0] = iree_hal_amdgpu_pm4_make_header(
       IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER, 4);
   packet->ib_jump_cmd[1] = iree_hal_amdgpu_pm4_addr_lo(ib_address);
   packet->ib_jump_cmd[2] = iree_hal_amdgpu_pm4_ib_addr_hi(ib_address);
-  packet->ib_jump_cmd[3] = (ib_dword_count & 0xFFFFFu) | (1u << 23);
+  packet->ib_jump_cmd[3] =
+      (ib_dword_count & IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT) | (1u << 23);
   packet->dw_cnt_remain = 0xA;
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(packet->reserved); ++i) {
     packet->reserved[i] = 0;
@@ -301,6 +307,16 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib(
   *out_setup = IREE_HSA_AMD_AQL_FORMAT_PM4_IB;
   return iree_hal_amdgpu_aql_make_header(IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC,
                                          packet_control);
+}
+
+static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib(
+    iree_hsa_amd_aql_pm4_ib_packet_t* packet,
+    const iree_hal_amdgpu_pm4_ib_slot_t* ib_slot, uint32_t ib_dword_count,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal, uint16_t* out_setup) {
+  return iree_hal_amdgpu_aql_emit_pm4_ib_dwords(packet, ib_slot->dwords,
+                                                ib_dword_count, packet_control,
+                                                completion_signal, out_setup);
 }
 
 #ifdef __cplusplus

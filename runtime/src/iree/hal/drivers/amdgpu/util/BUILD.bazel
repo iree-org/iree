@@ -136,6 +136,7 @@ iree_runtime_cc_library(
         "kernarg_ring.c",
         "kfd.c",
         "notification_ring.c",
+        "pm4_program.c",
         "signal_pool.c",
         "vmem.c",
     ],
@@ -152,6 +153,7 @@ iree_runtime_cc_library(
         "kfd.h",
         "notification_ring.h",
         "pm4_emitter.h",
+        "pm4_program.h",
         "signal_pool.h",
         "vmem.h",
     ],
@@ -165,6 +167,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:target_map",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:toc",
@@ -308,6 +311,23 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":util",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "pm4_program_test",
+    srcs = ["pm4_program_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":topology",
+        ":util",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

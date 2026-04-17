@@ -132,6 +132,7 @@ iree_cc_library(
     "kfd.h"
     "notification_ring.h"
     "pm4_emitter.h"
+    "pm4_program.h"
     "signal_pool.h"
     "vmem.h"
   SRCS
@@ -141,6 +142,7 @@ iree_cc_library(
     "kernarg_ring.c"
     "kfd.c"
     "notification_ring.c"
+    "pm4_program.c"
     "signal_pool.c"
     "vmem.c"
   DEPS
@@ -153,6 +155,7 @@ iree_cc_library(
     iree::base::threading
     iree::base::threading::thread
     iree::hal
+    iree::hal::drivers::amdgpu::abi
     iree::hal::drivers::amdgpu::device::binaries::target_map
     iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::headers
@@ -301,6 +304,24 @@ iree_cc_test(
     "pm4_emitter_test.cc"
   DEPS
     ::util
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    pm4_program_test
+  SRCS
+    "pm4_program_test.cc"
+  DEPS
+    ::topology
+    ::util
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
