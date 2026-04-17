@@ -103,29 +103,26 @@ SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
 FailureOr<ContractionLikeDims>
 inferContractionLikeDims(linalg::LinalgOp linalgOp) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
-    auto contractionDims = linalg::inferContractionDims(linalgOp);
+    FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+        mlir::linalg::inferContractionDims(linalgOp);
     if (failed(contractionDims)) {
       return failure();
     }
-    return ContractionLikeDims{
-        {contractionDims->m.begin(), contractionDims->m.end()},
-        {contractionDims->n.begin(), contractionDims->n.end()},
-        {contractionDims->k.begin(), contractionDims->k.end()}};
+    return ContractionLikeDims{contractionDims->m, contractionDims->n,
+                               contractionDims->k};
   }
   if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    auto convolutionDims = linalg::inferConvolutionDims(linalgOp);
+    FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
+        mlir::linalg::inferConvolutionDims(linalgOp);
     if (failed(convolutionDims) || convolutionDims->outputImage.empty() ||
         convolutionDims->outputChannel.empty() ||
         convolutionDims->inputChannel.empty()) {
       return failure();
     }
     // Maps outputImage→M, outputChannel→N, inputChannel→K.
-    return ContractionLikeDims{{convolutionDims->outputImage.begin(),
-                                convolutionDims->outputImage.end()},
-                               {convolutionDims->outputChannel.begin(),
-                                convolutionDims->outputChannel.end()},
-                               {convolutionDims->inputChannel.begin(),
-                                convolutionDims->inputChannel.end()}};
+    return ContractionLikeDims{convolutionDims->outputImage,
+                               convolutionDims->outputChannel,
+                               convolutionDims->inputChannel};
   }
   return failure();
 }
@@ -250,21 +247,21 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp,
     return success();
   }
 
-  auto dims = inferContractionLikeDims(linalgOp);
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(linalgOp);
   if (failed(dims)) {
     return success();
   }
 
   MLIRContext *ctx = rootOp->getContext();
   OpBuilder builder(ctx);
-  auto compatibleMMAs =
+  SmallVector<Attribute> compatibleMMAs =
       getCompatibleMMAAttrs(linalgOp, gpuTarget, *loopInfo, *dims);
   DictionaryAttr knobs =
       buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
   Attribute pipelineAttr = IREE::GPU::PipelineAttr::get(
       ctx, IREE::GPU::LoweringPipeline::VectorDistribute);
 
-  auto shell =
+  ConstraintsOpShell shell =
       createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
                                loopInfo->numLoops, loopInfo->indexingMaps);
 
@@ -282,7 +279,7 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
     return success();
   }
 
-  // KernelConfig.cpp currently only labels one root op per set.
+  // Currently only labels one root op per set.
   Operation *tunableOp = rootOps.front();
   if (!tunableOp) {
     return success();
