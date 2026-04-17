@@ -12,6 +12,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
+#include "iree/hal/drivers/amdgpu/profile_aqlprofile.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/libaqlprofile.h"
 
@@ -139,20 +140,10 @@ typedef struct iree_hal_amdgpu_profile_counter_set_t {
   iree_string_view_t name;
 } iree_hal_amdgpu_profile_counter_set_t;
 
-// Callback context used by aqlprofile memory allocation and copy hooks.
-typedef struct iree_hal_amdgpu_profile_counter_memory_context_t {
-  // HSA API table used by raw callback-status functions.
-  const iree_hal_amdgpu_libhsa_t* libhsa;
-  // GPU agent that must be able to access allocated aqlprofile memory.
-  hsa_agent_t device_agent;
-  // Host memory pools nearest to |device_agent|.
-  const iree_hal_amdgpu_host_memory_pools_t* host_memory_pools;
-} iree_hal_amdgpu_profile_counter_memory_context_t;
-
 // Per-queue/per-event-ring-slot mutable aqlprofile capture state.
 struct iree_hal_amdgpu_profile_counter_sample_slot_t {
   // Callback context retained for the lifetime of |handle|.
-  iree_hal_amdgpu_profile_counter_memory_context_t memory_context;
+  iree_hal_amdgpu_profile_aqlprofile_memory_context_t memory_context;
   // aqlprofile handle owning PM4 programs and output storage for this slot.
   iree_hal_amdgpu_aqlprofile_handle_t handle;
   // AQL PM4-IB packet templates referencing |handle|'s immutable PM4 programs.
@@ -197,104 +188,6 @@ typedef struct iree_hal_amdgpu_profile_counter_collect_context_t {
   // Per-counter value counts already written for the current sample.
   uint32_t* counter_value_counts;
 } iree_hal_amdgpu_profile_counter_collect_context_t;
-
-//===----------------------------------------------------------------------===//
-// Raw HSA callbacks used by aqlprofile
-//===----------------------------------------------------------------------===//
-
-static hsa_status_t iree_hal_amdgpu_profile_hsa_memory_pool_allocate(
-    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_amd_memory_pool_t memory_pool,
-    size_t size, uint32_t flags, void** ptr) {
-#if IREE_HAL_AMDGPU_LIBHSA_STATIC
-  (void)libhsa;
-  return hsa_amd_memory_pool_allocate(memory_pool, size, flags, ptr);
-#else
-  return libhsa->hsa_amd_memory_pool_allocate(memory_pool, size, flags, ptr);
-#endif  // IREE_HAL_AMDGPU_LIBHSA_STATIC
-}
-
-static hsa_status_t iree_hal_amdgpu_profile_hsa_memory_pool_free(
-    const iree_hal_amdgpu_libhsa_t* libhsa, void* ptr) {
-#if IREE_HAL_AMDGPU_LIBHSA_STATIC
-  (void)libhsa;
-  return hsa_amd_memory_pool_free(ptr);
-#else
-  return libhsa->hsa_amd_memory_pool_free(ptr);
-#endif  // IREE_HAL_AMDGPU_LIBHSA_STATIC
-}
-
-static hsa_status_t iree_hal_amdgpu_profile_hsa_agents_allow_access(
-    const iree_hal_amdgpu_libhsa_t* libhsa, uint32_t num_agents,
-    const hsa_agent_t* agents, const uint32_t* flags, const void* ptr) {
-#if IREE_HAL_AMDGPU_LIBHSA_STATIC
-  (void)libhsa;
-  return hsa_amd_agents_allow_access(num_agents, agents, flags, ptr);
-#else
-  return libhsa->hsa_amd_agents_allow_access(num_agents, agents, flags, ptr);
-#endif  // IREE_HAL_AMDGPU_LIBHSA_STATIC
-}
-
-static hsa_status_t iree_hal_amdgpu_profile_hsa_memory_copy(
-    const iree_hal_amdgpu_libhsa_t* libhsa, void* target, const void* source,
-    size_t size) {
-#if IREE_HAL_AMDGPU_LIBHSA_STATIC
-  (void)libhsa;
-  return hsa_memory_copy(target, source, size);
-#else
-  return libhsa->hsa_memory_copy(target, source, size);
-#endif  // IREE_HAL_AMDGPU_LIBHSA_STATIC
-}
-
-static hsa_status_t iree_hal_amdgpu_profile_counter_memory_alloc(
-    void** ptr, uint64_t size,
-    iree_hal_amdgpu_aqlprofile_buffer_desc_flags_t flags, void* user_data) {
-  iree_hal_amdgpu_profile_counter_memory_context_t* context =
-      (iree_hal_amdgpu_profile_counter_memory_context_t*)user_data;
-  *ptr = NULL;
-  if (size == 0) return HSA_STATUS_SUCCESS;
-  if (!flags.host_access) return HSA_STATUS_ERROR_INVALID_ARGUMENT;
-
-  hsa_amd_memory_pool_t memory_pool = context->host_memory_pools->coarse_pool;
-  if (flags.memory_hint ==
-      IREE_HAL_AMDGPU_AQLPROFILE_MEMORY_HINT_DEVICE_UNCACHED) {
-    memory_pool = context->host_memory_pools->kernarg_pool;
-  }
-  if (!memory_pool.handle) return HSA_STATUS_ERROR_INVALID_ALLOCATION;
-
-  hsa_status_t status = iree_hal_amdgpu_profile_hsa_memory_pool_allocate(
-      context->libhsa, memory_pool, (size_t)size,
-      HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, ptr);
-  if (status != HSA_STATUS_SUCCESS) return status;
-  memset(*ptr, 0, (size_t)size);
-
-  if (flags.device_access) {
-    status = iree_hal_amdgpu_profile_hsa_agents_allow_access(
-        context->libhsa, /*num_agents=*/1, &context->device_agent,
-        /*flags=*/NULL, *ptr);
-    if (status != HSA_STATUS_SUCCESS) {
-      iree_hal_amdgpu_profile_hsa_memory_pool_free(context->libhsa, *ptr);
-      *ptr = NULL;
-    }
-  }
-  return status;
-}
-
-static void iree_hal_amdgpu_profile_counter_memory_dealloc(void* ptr,
-                                                           void* user_data) {
-  if (!ptr) return;
-  iree_hal_amdgpu_profile_counter_memory_context_t* context =
-      (iree_hal_amdgpu_profile_counter_memory_context_t*)user_data;
-  iree_hal_amdgpu_profile_hsa_memory_pool_free(context->libhsa, ptr);
-}
-
-static hsa_status_t iree_hal_amdgpu_profile_counter_memory_copy(
-    void* target, const void* source, size_t size, void* user_data) {
-  if (size == 0) return HSA_STATUS_SUCCESS;
-  iree_hal_amdgpu_profile_counter_memory_context_t* context =
-      (iree_hal_amdgpu_profile_counter_memory_context_t*)user_data;
-  return iree_hal_amdgpu_profile_hsa_memory_copy(context->libhsa, target,
-                                                 source, size);
-}
 
 static const iree_hal_amdgpu_profile_counter_descriptor_t*
 iree_hal_amdgpu_profile_counter_find_descriptor(iree_string_view_t name) {
@@ -469,47 +362,6 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_selection(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_amdgpu_profile_counter_register_agent(
-    const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
-    hsa_agent_t device_agent,
-    iree_hal_amdgpu_aqlprofile_agent_handle_t* out_agent_handle) {
-  char agent_name[64] = {0};
-  iree_hal_amdgpu_aqlprofile_agent_info_v1_t agent_info;
-  memset(&agent_info, 0, sizeof(agent_info));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent, HSA_AGENT_INFO_NAME, agent_name));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_NUM_XCC, &agent_info.xcc_num));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_NUM_SHADER_ENGINES,
-      &agent_info.se_num));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_COMPUTE_UNIT_COUNT,
-      &agent_info.cu_num));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_NUM_SHADER_ARRAYS_PER_SE,
-      &agent_info.shader_arrays_per_se));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_DOMAIN, &agent_info.domain));
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), device_agent,
-      (hsa_agent_info_t)HSA_AMD_AGENT_INFO_BDFID, &agent_info.location_id));
-  agent_info.agent_gfxip = agent_name;
-  IREE_RETURN_IF_AQLPROFILE_ERROR(
-      libaqlprofile,
-      libaqlprofile->aqlprofile_register_agent_info(
-          out_agent_handle, &agent_info,
-          IREE_HAL_AMDGPU_AQLPROFILE_AGENT_VERSION_V1),
-      "registering AMDGPU profiling agent");
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_amdgpu_profile_counter_count_values(
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
     iree_hal_amdgpu_aqlprofile_handle_t handle,
@@ -560,7 +412,7 @@ static iree_status_t iree_hal_amdgpu_profile_counter_count_values(
 static iree_status_t iree_hal_amdgpu_profile_counter_create_packets(
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
     const iree_hal_amdgpu_profile_counter_set_t* counter_set,
-    const iree_hal_amdgpu_profile_counter_memory_context_t* memory_context,
+    const iree_hal_amdgpu_profile_aqlprofile_memory_context_t* memory_context,
     iree_hal_amdgpu_aqlprofile_handle_t* out_handle,
     iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t* out_packets) {
   iree_hal_amdgpu_aqlprofile_pmc_profile_t profile = {
@@ -572,9 +424,10 @@ static iree_status_t iree_hal_amdgpu_profile_counter_create_packets(
       libaqlprofile,
       libaqlprofile->aqlprofile_pmc_create_packets(
           out_handle, out_packets, profile,
-          iree_hal_amdgpu_profile_counter_memory_alloc,
-          iree_hal_amdgpu_profile_counter_memory_dealloc,
-          iree_hal_amdgpu_profile_counter_memory_copy, (void*)memory_context),
+          iree_hal_amdgpu_profile_aqlprofile_memory_alloc,
+          iree_hal_amdgpu_profile_aqlprofile_memory_dealloc,
+          iree_hal_amdgpu_profile_aqlprofile_memory_copy,
+          (void*)memory_context),
       "creating AMDGPU counter PM4 packets");
   return iree_ok_status();
 }
@@ -643,10 +496,12 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_set(
     }
   }
 
-  iree_hal_amdgpu_profile_counter_memory_context_t memory_context = {
+  iree_hal_amdgpu_profile_aqlprofile_memory_context_t memory_context = {
       .libhsa = session->libhsa,
       .device_agent = physical_device->device_agent,
       .host_memory_pools = &physical_device->host_memory_pools,
+      .device_coarse_pool =
+          physical_device->coarse_block_pools.large.memory_pool,
   };
   iree_hal_amdgpu_aqlprofile_handle_t metadata_handle = {0};
   iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t metadata_packets;
@@ -793,7 +648,7 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
        ++i) {
     iree_hal_amdgpu_physical_device_t* physical_device =
         logical_device->physical_devices[i];
-    status = iree_hal_amdgpu_profile_counter_register_agent(
+    status = iree_hal_amdgpu_profile_aqlprofile_register_agent(
         session->libhsa, &session->libaqlprofile, physical_device->device_agent,
         &session->agent_handles[physical_device->device_ordinal]);
   }
@@ -1196,10 +1051,12 @@ iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_counter_samples(
         iree_hal_amdgpu_physical_device_t* physical_device =
             logical_device->physical_devices[queue->device_ordinal];
         slot->memory_context =
-            (iree_hal_amdgpu_profile_counter_memory_context_t){
+            (iree_hal_amdgpu_profile_aqlprofile_memory_context_t){
                 .libhsa = session->libhsa,
                 .device_agent = physical_device->device_agent,
                 .host_memory_pools = &physical_device->host_memory_pools,
+                .device_coarse_pool =
+                    physical_device->coarse_block_pools.large.memory_pool,
             };
         IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_counter_create_packets(
             &session->libaqlprofile, counter_set, &slot->memory_context,
