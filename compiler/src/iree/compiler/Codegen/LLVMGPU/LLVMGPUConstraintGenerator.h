@@ -30,11 +30,11 @@ struct RootOpLoopInfo {
   SmallVector<AffineMap> indexingMaps;
 };
 
-/// Get compatible MMA attrs for the given target and element types.
-SmallVector<Attribute> getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget,
-                                             Type lhsElemType, Type rhsElemType,
-                                             Type accElemType, MLIRContext *ctx,
-                                             bool includeVirtual = false);
+/// Get unique compatible MMA attrs for matmul and conv ops.
+SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
+                                             IREE::GPU::TargetAttr gpuTarget,
+                                             const RootOpLoopInfo &loopInfo,
+                                             const ContractionLikeDims &dims);
 
 /// Get contraction-like (m,n,k) dims for a linalg op.
 FailureOr<ContractionLikeDims>

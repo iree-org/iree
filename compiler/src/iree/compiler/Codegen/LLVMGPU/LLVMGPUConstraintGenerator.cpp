@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUConstraintGenerator.h"
 
+#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -48,67 +49,53 @@ static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
   return IREE::Codegen::IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
 }
 
-/// Get compatible MMA attrs for the given target and element types.
-/// Uses the same filtering as KernelConfig.cpp: subgroup size and
-/// distribution mapping kind, plus element type compatibility.
-/// Returns unique Attribute objects (MMAAttr and VirtualMMAAttr).
-SmallVector<Attribute> getCompatibleMMAAttrs(IREE::GPU::TargetAttr gpuTarget,
-                                             Type lhsElemType, Type rhsElemType,
-                                             Type accElemType, MLIRContext *ctx,
-                                             bool includeVirtual) {
-  const int64_t targetSubgroupSize = gpuTarget.getPreferredSubgroupSize();
+/// Get unique compatible MMA attrs for matmul and conv ops.
+SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
+                                             IREE::GPU::TargetAttr gpuTarget,
+                                             const RootOpLoopInfo &loopInfo,
+                                             const ContractionLikeDims &dims) {
+  if (gpuTarget.getWgp().getMma().empty()) {
+    return {};
+  }
 
-  SmallVector<Attribute> attrs;
+  SmallVector<Attribute> mmaAttrs;
+  const int64_t targetSubgroupSize = gpuTarget.getPreferredSubgroupSize();
+  SmallVector<int64_t> bounds = loopInfo.staticLoopRanges;
+  Type lhsElemType = getElementTypeOrSelf(op.getDpsInputOperand(0)->get());
+  Type rhsElemType = getElementTypeOrSelf(op.getDpsInputOperand(1)->get());
+  Type initElemType = getElementTypeOrSelf(op.getDpsInitOperand(0)->get());
+
+  GPUMatmulShapeType problem{bounds[dims.m.back()], bounds[dims.n.back()],
+                             bounds[dims.k.back()], lhsElemType,
+                             rhsElemType,           initElemType};
+
+  auto getIntrinsic = [](IREE::GPU::MMAAttr mma) -> GPUIntrinsicType {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
+  };
+
   for (IREE::GPU::MMAAttr mma : gpuTarget.getWgp().getMma()) {
-    // Filter 1: Subgroup size.
     if (mma.getSubgroupSize() != targetSubgroupSize) {
       continue;
     }
-    // Filter 2: Distribution mapping.
     if (!mma.getDistributionMappingKind()) {
       continue;
     }
-    // Filter 3: Element type compatibility.
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    if (aType != lhsElemType || bType != rhsElemType) {
-      continue;
-    }
-    // Allow accumulator upcasting: MMA acc type can be narrower.
-    if (cType != accElemType &&
-        cType.getIntOrFloatBitWidth() > accElemType.getIntOrFloatBitWidth()) {
+    // Check if the mma intrinsic supports the problem.
+
+    if (failed(canTargetIntrinsic(problem, getIntrinsic(mma),
+                                  targetSubgroupSize, /*canUpcastAcc*/ true,
+                                  /*mustBeAligned*/ false))) {
       continue;
     }
 
     Attribute mmaAttr = Attribute(mma);
-    if (!llvm::is_contained(attrs, mmaAttr)) {
-      attrs.push_back(mmaAttr);
-    }
-
-    if (!includeVirtual) {
-      continue;
-    }
-    for (IREE::GPU::VirtualMMAIntrinsic vmma : mma.getVirtualIntrinsics()) {
-      auto vmmaAttr = Attribute(IREE::GPU::VirtualMMAAttr::get(ctx, vmma));
-      if (!llvm::is_contained(attrs, vmmaAttr)) {
-        attrs.push_back(vmmaAttr);
-      }
+    if (!llvm::is_contained(mmaAttrs, mmaAttr)) {
+      mmaAttrs.push_back(mmaAttr);
     }
   }
-  return attrs;
-}
-
-/// Get compatible MMA attrs for a linalg op.
-static SmallVector<Attribute>
-getCompatibleMMAAttrsForLinalgOp(IREE::GPU::TargetAttr gpuTarget,
-                                 linalg::LinalgOp linalgOp) {
-  Type lhsElemType =
-      getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
-  Type rhsElemType =
-      getElementTypeOrSelf(linalgOp.getDpsInputOperand(1)->get().getType());
-  Type accElemType =
-      getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
-  return getCompatibleMMAAttrs(gpuTarget, lhsElemType, rhsElemType, accElemType,
-                               linalgOp.getContext());
+  return mmaAttrs;
 }
 
 /// Get contraction-like (m,n,k) dims for a linalg op.
@@ -270,7 +257,8 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp,
 
   MLIRContext *ctx = rootOp->getContext();
   OpBuilder builder(ctx);
-  auto compatibleMMAs = getCompatibleMMAAttrsForLinalgOp(gpuTarget, linalgOp);
+  auto compatibleMMAs =
+      getCompatibleMMAAttrs(linalgOp, gpuTarget, *loopInfo, *dims);
   DictionaryAttr knobs =
       buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
   Attribute pipelineAttr = IREE::GPU::PipelineAttr::get(

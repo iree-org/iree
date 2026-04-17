@@ -24,7 +24,9 @@ class GetCompatibleMMAAttrsTest : public ::testing::Test {
 protected:
   GetCompatibleMMAAttrsTest() {
     DialectRegistry reg;
-    reg.insert<IREE::GPU::IREEGPUDialect>();
+    reg.insert<IREE::GPU::IREEGPUDialect, arith::ArithDialect,
+               func::FuncDialect, linalg::LinalgDialect,
+               tensor::TensorDialect>();
     ctx.appendDialectRegistry(reg);
     ctx.loadAllAvailableDialects();
   }
@@ -39,20 +41,43 @@ protected:
     return IREE::GPU::getHIPTargetDetails("gfx1201", "", &ctx);
   }
 
+  linalg::LinalgOp parseLinalgOp(StringRef mlirText) {
+    module = parseSourceString<ModuleOp>(mlirText, &ctx);
+    linalg::LinalgOp result;
+    module->walk([&](linalg::LinalgOp op) { result = op; });
+    return result;
+  }
+
 private:
   MLIRContext ctx;
+  OwningOpRef<ModuleOp> module;
 };
 
 TEST_F(GetCompatibleMMAAttrsTest, F16InputF32AccOnGfx942) {
-  MLIRContext *ctx = getContext();
   auto target = getGfx942Target();
   ASSERT_TRUE(target);
 
-  Type f16 = Float16Type::get(ctx);
-  Type f32 = Float32Type::get(ctx);
-  auto result = getCompatibleMMAAttrs(target, f16, f16, f32, ctx);
+  auto op = parseLinalgOp(R"(
+    func.func @test(%lhs: tensor<16x32xf16>, %rhs: tensor<32x16xf16>,
+                    %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+      %0 = linalg.matmul
+          ins(%lhs, %rhs : tensor<16x32xf16>, tensor<32x16xf16>)
+          outs(%acc : tensor<16x16xf32>) -> tensor<16x16xf32>
+      return %0 : tensor<16x16xf32>
+    }
+  )");
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_FALSE(result.empty());
 
+  Type f16 = Float16Type::get(getContext());
+  Type f32 = Float32Type::get(getContext());
   for (Attribute attr : result) {
     auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
     ASSERT_TRUE(!!mma);
@@ -63,27 +88,28 @@ TEST_F(GetCompatibleMMAAttrsTest, F16InputF32AccOnGfx942) {
   }
 }
 
-TEST_F(GetCompatibleMMAAttrsTest, IncludesVirtualMMA) {
-  MLIRContext *ctx = getContext();
-  auto target = getGfx942Target();
-  ASSERT_TRUE(target);
-
-  Type f16 = Float16Type::get(ctx);
-  Type f32 = Float32Type::get(ctx);
-  auto withoutVirtual = getCompatibleMMAAttrs(target, f16, f16, f32, ctx);
-  auto withVirtual = getCompatibleMMAAttrs(target, f16, f16, f32, ctx,
-                                           /*includeVirtual=*/true);
-  EXPECT_GE(withVirtual.size(), withoutVirtual.size());
-}
-
 TEST_F(GetCompatibleMMAAttrsTest, I8InputI32AccOnRDNA4) {
-  MLIRContext *ctx = getContext();
   auto target = getGfx1201Target();
   ASSERT_TRUE(target);
 
-  Type i8 = IntegerType::get(ctx, 8);
-  Type i32 = IntegerType::get(ctx, 32);
-  auto result = getCompatibleMMAAttrs(target, i8, i8, i32, ctx);
+  auto op = parseLinalgOp(R"(
+    func.func @test(%lhs: tensor<16x32xi8>, %rhs: tensor<32x16xi8>,
+                    %acc: tensor<16x16xi32>) -> tensor<16x16xi32> {
+      %0 = linalg.matmul
+          ins(%lhs, %rhs : tensor<16x32xi8>, tensor<32x16xi8>)
+          outs(%acc : tensor<16x16xi32>) -> tensor<16x16xi32>
+      return %0 : tensor<16x16xi32>
+    }
+  )");
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+
+  Type i8 = IntegerType::get(getContext(), 8);
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_FALSE(result.empty());
 
   for (Attribute attr : result) {
@@ -96,24 +122,50 @@ TEST_F(GetCompatibleMMAAttrsTest, I8InputI32AccOnRDNA4) {
 }
 
 TEST_F(GetCompatibleMMAAttrsTest, IncompatibleTypesReturnEmpty) {
-  MLIRContext *ctx = getContext();
   auto target = getGfx942Target();
   ASSERT_TRUE(target);
 
-  Type i1 = IntegerType::get(ctx, 1);
-  auto result = getCompatibleMMAAttrs(target, i1, i1, i1, ctx);
+  auto op = parseLinalgOp(R"(
+    func.func @test(%lhs: tensor<16x32xi1>, %rhs: tensor<32x16xi1>,
+                    %acc: tensor<16x16xi1>) -> tensor<16x16xi1> {
+      %0 = linalg.matmul
+          ins(%lhs, %rhs : tensor<16x32xi1>, tensor<32x16xi1>)
+          outs(%acc : tensor<16x16xi1>) -> tensor<16x16xi1>
+      return %0 : tensor<16x16xi1>
+    }
+  )");
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_TRUE(result.empty());
 }
 
 TEST_F(GetCompatibleMMAAttrsTest, NoDuplicates) {
-  MLIRContext *ctx = getContext();
   auto target = getGfx942Target();
   ASSERT_TRUE(target);
 
-  Type f16 = Float16Type::get(ctx);
-  Type f32 = Float32Type::get(ctx);
-  auto result = getCompatibleMMAAttrs(target, f16, f16, f32, ctx,
-                                      /*includeVirtual=*/true);
+  auto op = parseLinalgOp(R"(
+    func.func @test(%lhs: tensor<16x32xf16>, %rhs: tensor<32x16xf16>,
+                    %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+      %0 = linalg.matmul
+          ins(%lhs, %rhs : tensor<16x32xf16>, tensor<32x16xf16>)
+          outs(%acc : tensor<16x16xf32>) -> tensor<16x16xf32>
+      return %0 : tensor<16x16xf32>
+    }
+  )");
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   for (size_t i = 0; i < result.size(); ++i) {
     for (size_t j = i + 1; j < result.size(); ++j) {
       EXPECT_NE(result[i], result[j]);
