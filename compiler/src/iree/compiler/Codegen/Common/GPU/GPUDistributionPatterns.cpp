@@ -323,7 +323,8 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
         gatherOp.getOffsets(),
         getDistributed(rewriter, indexVec, indicesLayout),
         getDistributed(rewriter, mask, maskLayout),
-        getDistributed(rewriter, passThru, passThruLayout));
+        getDistributed(rewriter, passThru, passThruLayout),
+        gatherOp.getAlignmentAttr());
 
     replaceOpWithDistributedValues(rewriter, gatherOp, distributed);
     return success();
