@@ -3618,6 +3618,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-test-fold-forall-into-pcf-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-pcf-test-fold-forall-into-pcf-loop
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6181,6 +6192,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-test-fold-forall-into-pcf-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-pcf-test-fold-forall-into-pcf-loop
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6325,6 +6347,23 @@ mapping attributes or with local_mapping attributes are converted.</p>
 <p>The underlying conversion pattern is exposed separately via
 <code>convertForallToPCFLoop()</code> with callbacks for mapping processor IDs to custom
 execution scopes.</p>
+<h3 id="-iree-pcf-test-fold-forall-into-pcf-loop"><code>-iree-pcf-test-fold-forall-into-pcf-loop</code><a class="headerlink" href="#-iree-pcf-test-fold-forall-into-pcf-loop" title="Permanent link">link</a></h3>
+<p><em>Test pass for foldForallIntoPCFLoop transform</em></p>
+<p>Test pass for folding <code>scf.forall</code> ops containing <code>pcf.loop</code> ops into a
+single <code>pcf.generic</code> operation.</p>
+<p>The input is IR containing <code>scf.forall</code> ops with <code>iree_codegen.local_mapping</code>
+attributes that contain a <code>pcf.loop</code> with <code>#pcf.sequential</code> scope as the
+last operation before the terminator.</p>
+<p>Structural requirements validated:
+- All ops in <code>scf.forall.in_parallel</code> are <code>tensor.parallel_insert_slice</code>.
+- All insert sources come from the same <code>pcf.loop</code> result.
+- All insert destinations are <code>scf.forall</code> shared_outs.
+- The <code>pcf.loop</code> is the last op before terminator in forall body.
+- The <code>pcf.loop</code> has a single count argument (linearized).
+- All <code>pcf.loop</code> region ref arg users are <code>pcf.write_slice</code> ops.
+- Ref args have <code>SyncOnReturnAttr</code> sync scope.</p>
+<p>The underlying transform is exposed via <code>foldForallIntoPCFLoop()</code> for use
+in custom pipelines with different matching criteria.</p>
 
 
 
