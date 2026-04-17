@@ -6,6 +6,8 @@
 
 #include "iree/hal/device.h"
 
+#include <inttypes.h>
+
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
@@ -468,6 +470,44 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(options);
+
+  if (iree_hal_device_profiling_options_have_counter_sets(options)) {
+    if (!options->counter_sets) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "hardware counter set selections require a counter_sets array");
+    }
+    if (!iree_any_bit_set(
+            options->mode,
+            IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS |
+                IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "hardware counter set selections require dispatch or executable "
+          "profiling mode");
+    }
+    for (iree_host_size_t i = 0; i < options->counter_set_count; ++i) {
+      const iree_hal_profile_counter_set_selection_t* counter_set =
+          &options->counter_sets[i];
+      if (counter_set->counter_name_count == 0 || !counter_set->counter_names) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "hardware counter set %" PRIhsz
+                                " must request at least one counter name",
+                                i);
+      }
+      for (iree_host_size_t j = 0; j < counter_set->counter_name_count; ++j) {
+        iree_string_view_t counter_name = counter_set->counter_names[j];
+        if (iree_string_view_is_empty(counter_name) || !counter_name.data) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "hardware counter set %" PRIhsz
+              " has an empty counter name at index %" PRIhsz,
+              i, j);
+        }
+      }
+    }
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       _VTABLE_DISPATCH(device, profiling_begin)(device, options);

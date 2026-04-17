@@ -2295,6 +2295,11 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
                             "unsupported AMDGPU profiling mode bits 0x%" PRIx64,
                             options->mode & ~supported_modes);
   }
+  if (iree_hal_device_profiling_options_have_counter_sets(options)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "AMDGPU hardware counter profiling is not implemented yet");
+  }
   if (options->mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
     return iree_ok_status();
   }

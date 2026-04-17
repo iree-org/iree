@@ -1938,6 +1938,12 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   (void)device;
 
+  if (iree_hal_device_profiling_options_have_counter_sets(options)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan hardware counter profiling is not implemented");
+  }
+
   if (iree_all_bits_set(options->mode,
                         IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
     // AMD-specific - we could snoop the device to only do this for the vendor

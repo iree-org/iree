@@ -856,6 +856,11 @@ static iree_status_t iree_hal_sync_device_queue_flush(
 static iree_status_t iree_hal_sync_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
+  if (iree_hal_device_profiling_options_have_counter_sets(options)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "local-sync hardware counter profiling is not implemented");
+  }
   // Unimplemented (and that's ok).
   // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
   // https://man7.org/linux/man-pages/man2/perf_event_open.2.html

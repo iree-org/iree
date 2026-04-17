@@ -123,6 +123,18 @@ typedef struct iree_profile_summary_t {
   uint64_t memory_event_chunk_count;
   // Memory event records parsed.
   uint64_t memory_event_record_count;
+  // Hardware counter set metadata chunks parsed.
+  uint64_t counter_set_chunk_count;
+  // Hardware counter set metadata records parsed.
+  uint64_t counter_set_record_count;
+  // Hardware counter metadata chunks parsed.
+  uint64_t counter_chunk_count;
+  // Hardware counter metadata records parsed.
+  uint64_t counter_record_count;
+  // Hardware counter sample chunks parsed.
+  uint64_t counter_sample_chunk_count;
+  // Hardware counter sample records parsed.
+  uint64_t counter_sample_record_count;
   // Chunk records with unknown content types.
   uint64_t unknown_chunk_count;
 } iree_profile_summary_t;
@@ -1613,6 +1625,104 @@ static iree_status_t iree_profile_summary_process_memory_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_counter_set_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_set_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_set_record_t counter_set_record;
+      memcpy(&counter_set_record, record->payload.data + payload_offset,
+             sizeof(counter_set_record));
+      if (counter_set_record.name_length !=
+          record_length - sizeof(counter_set_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter set name length is inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        ++summary->counter_set_record_count;
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_summary_process_counter_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_record_t counter_record;
+      memcpy(&counter_record, record->payload.data + payload_offset,
+             sizeof(counter_record));
+      iree_host_size_t trailing_length = 0;
+      if (!iree_host_size_checked_add(counter_record.block_name_length,
+                                      counter_record.name_length,
+                                      &trailing_length) ||
+          !iree_host_size_checked_add(trailing_length,
+                                      counter_record.description_length,
+                                      &trailing_length) ||
+          trailing_length != record_length - sizeof(counter_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter string lengths are inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        ++summary->counter_record_count;
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_summary_process_counter_sample_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_sample_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_sample_record_t sample_record;
+      memcpy(&sample_record, record->payload.data + payload_offset,
+             sizeof(sample_record));
+      iree_host_size_t values_length = 0;
+      if (!iree_host_size_checked_mul(sample_record.sample_value_count,
+                                      sizeof(uint64_t), &values_length) ||
+          values_length != record_length - sizeof(sample_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter sample value count is inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        ++summary->counter_sample_record_count;
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_queue_event_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -1708,6 +1818,20 @@ static iree_status_t iree_profile_summary_process_record(
                  IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
     ++summary->memory_event_chunk_count;
     return iree_profile_summary_process_memory_event_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS)) {
+    ++summary->counter_set_chunk_count;
+    return iree_profile_summary_process_counter_set_records(summary, record);
+  } else if (iree_string_view_equal(record->content_type,
+                                    IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS)) {
+    ++summary->counter_chunk_count;
+    return iree_profile_summary_process_counter_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
+    ++summary->counter_sample_chunk_count;
+    return iree_profile_summary_process_counter_sample_records(summary, record);
   }
 
   ++summary->unknown_chunk_count;
@@ -1777,21 +1901,24 @@ static void iree_profile_print_summary_text(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
-  fprintf(
-      file,
-      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-      " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
-      " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
-      " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
-      " memory_events=%" PRIu64 " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
-      summary->device_chunk_count, summary->queue_chunk_count,
-      summary->executable_chunk_count, summary->executable_export_chunk_count,
-      summary->command_buffer_chunk_count,
-      summary->command_operation_chunk_count,
-      summary->clock_correlation_chunk_count,
-      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
-      summary->memory_event_chunk_count, summary->unknown_chunk_count,
-      summary->truncated_chunk_count);
+  fprintf(file,
+          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
+          " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
+          " memory_events=%" PRIu64 " counter_sets=%" PRIu64
+          " counters=%" PRIu64 " counter_samples=%" PRIu64 " unknown=%" PRIu64
+          " truncated=%" PRIu64 "\n",
+          summary->device_chunk_count, summary->queue_chunk_count,
+          summary->executable_chunk_count,
+          summary->executable_export_chunk_count,
+          summary->command_buffer_chunk_count,
+          summary->command_operation_chunk_count,
+          summary->clock_correlation_chunk_count,
+          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+          summary->memory_event_chunk_count, summary->counter_set_chunk_count,
+          summary->counter_chunk_count, summary->counter_sample_chunk_count,
+          summary->unknown_chunk_count, summary->truncated_chunk_count);
   fprintf(
       file,
       "metadata_records: executables=%" PRIu64 " executable_exports=%" PRIu64
@@ -1800,9 +1927,13 @@ static void iree_profile_print_summary_text(
       summary->command_buffer_record_count,
       summary->command_operation_record_count);
   fprintf(file,
-          "event_records: queue_events=%" PRIu64 " memory_events=%" PRIu64 "\n",
-          summary->queue_event_record_count,
-          summary->memory_event_record_count);
+          "event_records: queue_events=%" PRIu64 " memory_events=%" PRIu64
+          " counter_samples=%" PRIu64 "\n",
+          summary->queue_event_record_count, summary->memory_event_record_count,
+          summary->counter_sample_record_count);
+  fprintf(file,
+          "counter_records: counter_sets=%" PRIu64 " counters=%" PRIu64 "\n",
+          summary->counter_set_record_count, summary->counter_record_count);
   fprintf(file, "devices:\n");
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
@@ -1890,7 +2021,10 @@ static void iree_profile_print_summary_jsonl(
       ",\"clock_correlation_chunks\":%" PRIu64
       ",\"dispatch_event_chunks\":%" PRIu64 ",\"queue_event_chunks\":%" PRIu64
       ",\"queue_event_records\":%" PRIu64 ",\"memory_event_chunks\":%" PRIu64
-      ",\"memory_event_records\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
+      ",\"memory_event_records\":%" PRIu64 ",\"counter_set_chunks\":%" PRIu64
+      ",\"counter_set_records\":%" PRIu64 ",\"counter_chunks\":%" PRIu64
+      ",\"counter_records\":%" PRIu64 ",\"counter_sample_chunks\":%" PRIu64
+      ",\"counter_sample_records\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
       ",\"truncated_chunks\":%" PRIu64 "}\n",
       summary->file_record_count, summary->session_begin_count,
       summary->chunk_count, summary->session_end_count,
@@ -1904,7 +2038,10 @@ static void iree_profile_print_summary_jsonl(
       summary->clock_correlation_chunk_count,
       summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
       summary->queue_event_record_count, summary->memory_event_chunk_count,
-      summary->memory_event_record_count, summary->unknown_chunk_count,
+      summary->memory_event_record_count, summary->counter_set_chunk_count,
+      summary->counter_set_record_count, summary->counter_chunk_count,
+      summary->counter_record_count, summary->counter_sample_chunk_count,
+      summary->counter_sample_record_count, summary->unknown_chunk_count,
       summary->truncated_chunk_count);
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
@@ -5839,6 +5976,169 @@ static iree_status_t iree_profile_export_process_memory_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_export_process_counter_set_records(
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_set_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_set_record_t counter_set_record;
+      memcpy(&counter_set_record, record->payload.data + payload_offset,
+             sizeof(counter_set_record));
+      if (counter_set_record.name_length !=
+          record_length - sizeof(counter_set_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter set name length is inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        iree_string_view_t name = iree_make_string_view(
+            (const char*)record->payload.data + payload_offset +
+                sizeof(counter_set_record),
+            counter_set_record.name_length);
+        iree_profile_export_print_prefix(file, "counter_set", record_index);
+        fprintf(file,
+                ",\"counter_set_id\":%" PRIu64
+                ",\"physical_device_ordinal\":%u"
+                ",\"flags\":%u,\"counter_count\":%u"
+                ",\"sample_value_count\":%u,\"name\":",
+                counter_set_record.counter_set_id,
+                counter_set_record.physical_device_ordinal,
+                counter_set_record.flags, counter_set_record.counter_count,
+                counter_set_record.sample_value_count);
+        iree_profile_fprint_json_string(file, name);
+        fputs("}\n", file);
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_export_process_counter_records(
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_record_t counter_record;
+      memcpy(&counter_record, record->payload.data + payload_offset,
+             sizeof(counter_record));
+      iree_host_size_t trailing_length = 0;
+      if (!iree_host_size_checked_add(counter_record.block_name_length,
+                                      counter_record.name_length,
+                                      &trailing_length) ||
+          !iree_host_size_checked_add(trailing_length,
+                                      counter_record.description_length,
+                                      &trailing_length) ||
+          trailing_length != record_length - sizeof(counter_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter string lengths are inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        const char* string_base = (const char*)record->payload.data +
+                                  payload_offset + sizeof(counter_record);
+        iree_string_view_t block_name = iree_make_string_view(
+            string_base, counter_record.block_name_length);
+        iree_string_view_t name = iree_make_string_view(
+            string_base + counter_record.block_name_length,
+            counter_record.name_length);
+        iree_string_view_t description = iree_make_string_view(
+            string_base + counter_record.block_name_length +
+                counter_record.name_length,
+            counter_record.description_length);
+        iree_profile_export_print_prefix(file, "counter", record_index);
+        fprintf(file,
+                ",\"counter_set_id\":%" PRIu64
+                ",\"counter_ordinal\":%u"
+                ",\"physical_device_ordinal\":%u,\"flags\":%u"
+                ",\"unit\":%u,\"sample_value_offset\":%u"
+                ",\"sample_value_count\":%u,\"block\":",
+                counter_record.counter_set_id, counter_record.counter_ordinal,
+                counter_record.physical_device_ordinal, counter_record.flags,
+                counter_record.unit, counter_record.sample_value_offset,
+                counter_record.sample_value_count);
+        iree_profile_fprint_json_string(file, block_name);
+        fprintf(file, ",\"name\":");
+        iree_profile_fprint_json_string(file, name);
+        fprintf(file, ",\"description\":");
+        iree_profile_fprint_json_string(file, description);
+        fputs("}\n", file);
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_export_process_counter_sample_records(
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_counter_sample_record_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_counter_sample_record_t sample_record;
+      memcpy(&sample_record, record->payload.data + payload_offset,
+             sizeof(sample_record));
+      iree_host_size_t values_length = 0;
+      if (!iree_host_size_checked_mul(sample_record.sample_value_count,
+                                      sizeof(uint64_t), &values_length) ||
+          values_length != record_length - sizeof(sample_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "counter sample value count is inconsistent with record length");
+      }
+      if (iree_status_is_ok(status)) {
+        const uint64_t* values =
+            (const uint64_t*)(record->payload.data + payload_offset +
+                              sizeof(sample_record));
+        iree_profile_export_print_prefix(file, "counter_sample", record_index);
+        fprintf(file,
+                ",\"sample_id\":%" PRIu64 ",\"counter_set_id\":%" PRIu64
+                ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
+                ",\"command_buffer_id\":%" PRIu64
+                ",\"command_index\":%u,\"executable_id\":%" PRIu64
+                ",\"export_ordinal\":%u"
+                ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+                ",\"stream_id\":%" PRIu64 ",\"flags\":%u,\"values\":[",
+                sample_record.sample_id, sample_record.counter_set_id,
+                sample_record.dispatch_event_id, sample_record.submission_id,
+                sample_record.command_buffer_id, sample_record.command_index,
+                sample_record.executable_id, sample_record.export_ordinal,
+                sample_record.physical_device_ordinal,
+                sample_record.queue_ordinal, sample_record.stream_id,
+                sample_record.flags);
+        for (uint32_t i = 0; i < sample_record.sample_value_count; ++i) {
+          if (i != 0) fputc(',', file);
+          fprintf(file, "%" PRIu64, values[i]);
+        }
+        fputs("]}\n", file);
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_export_process_decoded_record(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
@@ -5912,6 +6212,20 @@ static iree_status_t iree_profile_export_process_decoded_record(
                  IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
     return iree_profile_export_process_memory_event_records(record,
                                                             record_index, file);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS)) {
+    return iree_profile_export_process_counter_set_records(record, record_index,
+                                                           file);
+  } else if (iree_string_view_equal(record->content_type,
+                                    IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS)) {
+    return iree_profile_export_process_counter_records(record, record_index,
+                                                       file);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
+    return iree_profile_export_process_counter_sample_records(
+        record, record_index, file);
   }
 
   iree_profile_export_print_diagnostic(

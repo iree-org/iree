@@ -277,6 +277,32 @@ class DeviceProfilingScope {
   bool is_active_ = false;
 };
 
+TEST_F(HostQueueCommandBufferTest,
+       ExplicitHardwareCounterSelectionFailsLoudUntilImplemented) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_string_view_t counter_names[] = {
+      IREE_SV("SQ_WAVES"),
+  };
+  iree_hal_profile_counter_set_selection_t counter_set = {
+      /*.flags=*/IREE_HAL_PROFILE_COUNTER_SET_SELECTION_FLAG_NONE,
+      /*.name=*/IREE_SV("smoke"),
+      /*.counter_name_count=*/IREE_ARRAYSIZE(counter_names),
+      /*.counter_names=*/counter_names,
+  };
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.counter_set_count = 1;
+  profiling_options.counter_sets = &counter_set;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
+                        iree_hal_device_profiling_begin(
+                            test_device.base_device(), &profiling_options));
+}
+
 struct CommandBufferProfileSink {
   // HAL resource header for the profile sink.
   iree_hal_resource_t resource;

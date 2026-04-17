@@ -86,6 +86,18 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.memory-events")
 
+// Content type for packed iree_hal_profile_counter_set_record_t records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS \
+  IREE_SV("application/vnd.iree.hal.profile.counter-sets")
+
+// Content type for packed iree_hal_profile_counter_record_t records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS \
+  IREE_SV("application/vnd.iree.hal.profile.counters")
+
+// Content type for packed iree_hal_profile_counter_sample_record_t records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES \
+  IREE_SV("application/vnd.iree.hal.profile.counter-samples")
+
 // Bitfield specifying which optional device record fields are populated.
 typedef uint32_t iree_hal_profile_device_flags_t;
 enum iree_hal_profile_device_flag_bits_t {
@@ -744,6 +756,206 @@ iree_hal_profile_memory_event_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.result = UINT32_MAX;
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of a requested hardware counter set.
+typedef uint32_t iree_hal_profile_counter_set_selection_flags_t;
+enum iree_hal_profile_counter_set_selection_flag_bits_t {
+  IREE_HAL_PROFILE_COUNTER_SET_SELECTION_FLAG_NONE = 0u,
+};
+
+// Caller-provided hardware counter set selection.
+//
+// The selection describes one named group of hardware counters requested for a
+// profiling session. All pointers are borrowed and must remain valid for the
+// duration of iree_hal_device_profiling_begin. A producer that supports the
+// selected counters emits one counter-set metadata record, one counter metadata
+// record per resolved counter, and counter-sample records using the same
+// |counter_set_id|.
+typedef struct iree_hal_profile_counter_set_selection_t {
+  // Flags controlling counter set selection behavior.
+  iree_hal_profile_counter_set_selection_flags_t flags;
+  // Human-readable counter set name used in emitted metadata.
+  iree_string_view_t name;
+  // Number of requested counter names in |counter_names|.
+  iree_host_size_t counter_name_count;
+  // Borrowed array of requested implementation-specific counter names.
+  const iree_string_view_t* counter_names;
+} iree_hal_profile_counter_set_selection_t;
+
+// Bitfield specifying properties of one emitted hardware counter set.
+typedef uint32_t iree_hal_profile_counter_set_flags_t;
+enum iree_hal_profile_counter_set_flag_bits_t {
+  IREE_HAL_PROFILE_COUNTER_SET_FLAG_NONE = 0u,
+};
+
+// Session-level hardware counter set description followed by |name_length|
+// bytes. The trailing name is not NUL-terminated.
+//
+// A counter set defines the value-vector layout used by all sample records that
+// reference |counter_set_id|. Consumers join sample values to counter metadata
+// by applying each counter record's |sample_value_offset| and
+// |sample_value_count| within the sample record's trailing uint64_t value
+// vector.
+typedef struct iree_hal_profile_counter_set_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing counter set properties.
+  iree_hal_profile_counter_set_flags_t flags;
+  // Producer-local counter set identifier referenced by counters and samples.
+  uint64_t counter_set_id;
+  // Session-local physical device ordinal associated with this counter set.
+  uint32_t physical_device_ordinal;
+  // Number of counter records associated with this counter set.
+  uint32_t counter_count;
+  // Number of uint64_t values in each sample record for this counter set.
+  uint32_t sample_value_count;
+  // Byte length of the trailing counter set name.
+  uint32_t name_length;
+} iree_hal_profile_counter_set_record_t;
+
+// Returns a default hardware counter set record.
+static inline iree_hal_profile_counter_set_record_t
+iree_hal_profile_counter_set_record_default(void) {
+  iree_hal_profile_counter_set_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one emitted hardware counter.
+typedef uint32_t iree_hal_profile_counter_flags_t;
+enum iree_hal_profile_counter_flag_bits_t {
+  IREE_HAL_PROFILE_COUNTER_FLAG_NONE = 0u,
+
+  // Counter is a raw hardware value without producer-side derivation.
+  IREE_HAL_PROFILE_COUNTER_FLAG_RAW = 1u << 0,
+};
+
+// Unit describing how a counter value should be displayed.
+typedef uint32_t iree_hal_profile_counter_unit_t;
+enum iree_hal_profile_counter_unit_e {
+  IREE_HAL_PROFILE_COUNTER_UNIT_NONE = 0u,
+
+  // Counter values represent an unscaled event count.
+  IREE_HAL_PROFILE_COUNTER_UNIT_COUNT = 1u,
+
+  // Counter values represent clock cycles.
+  IREE_HAL_PROFILE_COUNTER_UNIT_CYCLES = 2u,
+
+  // Counter values represent bytes.
+  IREE_HAL_PROFILE_COUNTER_UNIT_BYTES = 3u,
+};
+
+// Session-level hardware counter description followed by |block_name_length|,
+// |name_length|, and |description_length| bytes. Trailing strings are stored in
+// that order and are not NUL-terminated.
+//
+// Some hardware counter requests expand into multiple raw values due to device
+// topology dimensions such as XCC/SE/block instances. The
+// |sample_value_offset| and |sample_value_count| fields describe where those
+// raw values are stored in each sample record for the owning counter set.
+typedef struct iree_hal_profile_counter_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing counter properties.
+  iree_hal_profile_counter_flags_t flags;
+  // Display unit for raw sample values.
+  iree_hal_profile_counter_unit_t unit;
+  // Session-local physical device ordinal associated with this counter.
+  uint32_t physical_device_ordinal;
+  // Producer-local counter set identifier owning this counter.
+  uint64_t counter_set_id;
+  // Counter ordinal within |counter_set_id|.
+  uint32_t counter_ordinal;
+  // First uint64_t value slot occupied by this counter in each sample record.
+  uint32_t sample_value_offset;
+  // Number of uint64_t value slots occupied by this counter in each sample.
+  uint32_t sample_value_count;
+  // Byte length of the trailing hardware block name.
+  uint32_t block_name_length;
+  // Byte length of the trailing counter name.
+  uint32_t name_length;
+  // Byte length of the trailing counter description.
+  uint32_t description_length;
+} iree_hal_profile_counter_record_t;
+
+// Returns a default hardware counter record.
+static inline iree_hal_profile_counter_record_t
+iree_hal_profile_counter_record_default(void) {
+  iree_hal_profile_counter_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one emitted hardware counter sample.
+typedef uint32_t iree_hal_profile_counter_sample_flags_t;
+enum iree_hal_profile_counter_sample_flag_bits_t {
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_NONE = 0u,
+
+  // |dispatch_event_id| references a dispatch event in the same profile
+  // session.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DISPATCH_EVENT = 1u << 0,
+
+  // |command_buffer_id| and |command_index| reference a command-buffer
+  // operation in the same profile session.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION = 1u << 1,
+};
+
+// Hardware counter sample followed by |sample_value_count| uint64_t values.
+//
+// Samples are intentionally vector-shaped: one sample record represents one
+// measured dispatch/range for one counter set, and counter metadata defines how
+// to split the trailing value vector into named counters. This keeps dense
+// dispatch-counter streams compact while preserving raw per-instance hardware
+// values for later tooling-side aggregation.
+typedef struct iree_hal_profile_counter_sample_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing which correlation fields are valid.
+  iree_hal_profile_counter_sample_flags_t flags;
+  // Producer-local sample identifier unique within the counter sample stream.
+  uint64_t sample_id;
+  // Producer-local counter set identifier defining the trailing value layout.
+  uint64_t counter_set_id;
+  // Dispatch event identifier associated with this sample, or 0 when absent.
+  uint64_t dispatch_event_id;
+  // Queue submission epoch associated with this sample, or 0 when absent.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 when absent.
+  uint64_t command_buffer_id;
+  // Process-local executable identifier, or 0 when absent.
+  uint64_t executable_id;
+  // Producer-defined stream identifier matching queue metadata, or 0.
+  uint64_t stream_id;
+  // Command ordinal within a command buffer, or UINT32_MAX when absent.
+  uint32_t command_index;
+  // Executable export ordinal, or UINT32_MAX when absent.
+  uint32_t export_ordinal;
+  // Session-local physical device ordinal associated with this sample.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this sample, or UINT32_MAX.
+  uint32_t queue_ordinal;
+  // Number of trailing uint64_t sample values.
+  uint32_t sample_value_count;
+  // Reserved for future counter sample fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_counter_sample_record_t;
+
+// Returns a default hardware counter sample record.
+static inline iree_hal_profile_counter_sample_record_t
+iree_hal_profile_counter_sample_record_default(void) {
+  iree_hal_profile_counter_sample_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.command_index = UINT32_MAX;
+  record.export_ordinal = UINT32_MAX;
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
   return record;

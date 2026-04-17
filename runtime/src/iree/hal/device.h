@@ -131,13 +131,16 @@ enum iree_hal_device_profiling_mode_bits_t {
   // of HAL API usage with minimal overhead.
   IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS = 1u << 0,
 
-  // Capture aggregated dispatch performance counters across all commands within
-  // the profiled range.
+  // Capture dispatch-level profiling records. Implementations may emit
+  // timestamps, software-visible queue metadata, and any explicitly selected
+  // hardware counters that can be attributed to dispatches.
   IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS = 1u << 1,
 
-  // Capture detailed executable performance counters correlated to source
-  // locations. This can have a significant performance impact and should only
-  // be used when investigating the performance of an individual dispatch.
+  // Capture detailed executable-level profiling records. Implementations may
+  // emit source-correlated executable data and any explicitly selected hardware
+  // counters that can be attributed below the dispatch level. This can have a
+  // significant performance impact and should only be used when investigating
+  // individual dispatches.
   IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS = 1u << 2,
 };
 
@@ -157,7 +160,22 @@ typedef struct iree_hal_device_profiling_options_t {
   // profiling_begin call. Implementations that keep the sink beyond the call
   // must retain it and release it during profiling_end or teardown.
   iree_hal_profile_sink_t* sink;
+
+  // Number of explicitly requested hardware counter sets.
+  iree_host_size_t counter_set_count;
+
+  // Borrowed array of explicitly requested hardware counter sets.
+  // Implementations must either capture every requested counter set exactly or
+  // fail profiling_begin; silently dropping counters would make the profile
+  // bundle misleading.
+  const iree_hal_profile_counter_set_selection_t* counter_sets;
 } iree_hal_device_profiling_options_t;
+
+// Returns true when |options| requests explicit hardware counter capture.
+static inline bool iree_hal_device_profiling_options_have_counter_sets(
+    const iree_hal_device_profiling_options_t* options) {
+  return options->counter_set_count != 0;
+}
 
 // Bitfield specifying flags controlling an async allocation operation.
 typedef uint64_t iree_hal_alloca_flags_t;
