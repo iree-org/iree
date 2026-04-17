@@ -190,10 +190,17 @@ iree_runtime_cc_binary(
 
 iree_runtime_cc_binary(
     name = "iree-profile",
-    srcs = ["iree-profile-main.c"],
+    srcs = [
+        "iree-profile-att.c",
+        "iree-profile-att.h",
+        "iree-profile-main.c",
+    ],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/utils:profile_file",
         "//runtime/src/iree/io:file_handle",
     ],

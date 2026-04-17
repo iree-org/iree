@@ -58,6 +58,16 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES \
   IREE_SV("application/vnd.iree.hal.profile.executables")
 
+// Content type for packed iree_hal_profile_executable_code_object_record_t
+// records followed by exact code-object bytes.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS \
+  IREE_SV("application/vnd.iree.hal.profile.executable-code-objects")
+
+// Content type for an array of
+// iree_hal_profile_executable_code_object_load_record_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS \
+  IREE_SV("application/vnd.iree.hal.profile.executable-code-object-loads")
+
 // Content type for packed iree_hal_profile_executable_export_record_t records.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS \
   IREE_SV("application/vnd.iree.hal.profile.executable-exports")
@@ -205,6 +215,76 @@ iree_hal_profile_executable_record_default(void) {
   iree_hal_profile_executable_record_t record;
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
+  return record;
+}
+
+// Bitfield specifying which code-object record fields are populated.
+typedef uint32_t iree_hal_profile_executable_code_object_flags_t;
+enum iree_hal_profile_executable_code_object_flag_bits_t {
+  IREE_HAL_PROFILE_EXECUTABLE_CODE_OBJECT_FLAG_NONE = 0u,
+  // The |code_object_hash| field contains a deterministic content hash.
+  IREE_HAL_PROFILE_EXECUTABLE_CODE_OBJECT_FLAG_CODE_OBJECT_HASH = 1u << 0,
+};
+
+// Session-level executable code-object image followed by |data_length| bytes.
+//
+// Producers should emit code-object records before executable trace records
+// that reference the corresponding |executable_id| and |code_object_id|. The
+// trailing bytes are the exact code-object image loaded by the runtime so
+// offline consumers can disassemble and decode hardware trace PCs without
+// consulting process-local executable state.
+typedef struct iree_hal_profile_executable_code_object_record_t {
+  // Size of this record in bytes including trailing code-object image bytes.
+  uint32_t record_length;
+  // Flags specifying which optional code-object fields are populated.
+  iree_hal_profile_executable_code_object_flags_t flags;
+  // Producer-local executable identifier owning this code object.
+  uint64_t executable_id;
+  // Producer-local code-object marker identifier used by hardware traces.
+  uint64_t code_object_id;
+  // Byte length of the trailing code-object image.
+  uint64_t data_length;
+  // Deterministic code-object content hash words when present in |flags|.
+  uint64_t code_object_hash[2];
+} iree_hal_profile_executable_code_object_record_t;
+
+// Returns a default executable code-object record.
+static inline iree_hal_profile_executable_code_object_record_t
+iree_hal_profile_executable_code_object_record_default(void) {
+  iree_hal_profile_executable_code_object_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  return record;
+}
+
+// Session-level executable code-object load range for one physical device.
+//
+// Hardware trace decoders use |load_delta|, not the process virtual load base,
+// to translate runtime PCs into code-object virtual addresses. Producers should
+// emit one load record for each physical device where |code_object_id| was
+// loaded.
+typedef struct iree_hal_profile_executable_code_object_load_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Session-local physical device ordinal owning this loaded code object.
+  uint32_t physical_device_ordinal;
+  // Producer-local executable identifier owning this code object.
+  uint64_t executable_id;
+  // Producer-local code-object marker identifier used by hardware traces.
+  uint64_t code_object_id;
+  // Loader-provided code-object load delta used for PC translation.
+  int64_t load_delta;
+  // Byte length of the loaded code-object range on the device.
+  uint64_t load_size;
+} iree_hal_profile_executable_code_object_load_record_t;
+
+// Returns a default executable code-object load record.
+static inline iree_hal_profile_executable_code_object_load_record_t
+iree_hal_profile_executable_code_object_load_record_default(void) {
+  iree_hal_profile_executable_code_object_load_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
   return record;
 }
 

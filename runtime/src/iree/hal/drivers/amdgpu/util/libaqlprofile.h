@@ -216,9 +216,9 @@ typedef struct iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t {
 typedef struct iree_hal_amdgpu_aqlprofile_att_code_object_data_t {
   // Stable code-object marker id.
   uint64_t id;
-  // Device load address of the code object.
+  // Loader-provided code-object load delta used by the ATT decoder.
   uint64_t address;
-  // Loaded code-object byte length.
+  // Loaded code-object range byte length.
   uint64_t length;
   // HSA GPU agent owning the code object.
   hsa_agent_t agent;

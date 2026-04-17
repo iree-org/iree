@@ -17,6 +17,16 @@ typedef struct iree_hal_amdgpu_profile_metadata_snapshot_t {
   iree_hal_profile_executable_record_t* executable_records;
   // Number of executable records in |executable_records|.
   iree_host_size_t executable_record_count;
+  // Packed executable code-object records copied from the registry.
+  uint8_t* executable_code_object_record_data;
+  // Byte length of |executable_code_object_record_data|.
+  iree_host_size_t executable_code_object_record_data_length;
+  // Executable code-object load records copied from the registry.
+  iree_hal_profile_executable_code_object_load_record_t*
+      executable_code_object_load_records;
+  // Number of executable code-object load records in
+  // |executable_code_object_load_records|.
+  iree_host_size_t executable_code_object_load_record_count;
   // Packed executable export records copied from the registry.
   uint8_t* executable_export_record_data;
   // Byte length of |executable_export_record_data|.
@@ -183,6 +193,10 @@ void iree_hal_amdgpu_profile_metadata_deinitialize(
   iree_allocator_free(host_allocator, registry->command_operation_records);
   iree_allocator_free(host_allocator, registry->command_buffer_records);
   iree_allocator_free(host_allocator, registry->executable_export_record_data);
+  iree_allocator_free(host_allocator,
+                      registry->executable_code_object_load_records);
+  iree_allocator_free(host_allocator,
+                      registry->executable_code_object_record_data);
   iree_allocator_free(host_allocator, registry->executable_records);
   iree_slim_mutex_deinitialize(&registry->mutex);
   memset(registry, 0, sizeof(*registry));
@@ -322,12 +336,77 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_append_export_records(
   return iree_ok_status();
 }
 
+static iree_status_t
+iree_hal_amdgpu_profile_metadata_code_object_record_data_length(
+    iree_const_byte_span_t code_object_data,
+    iree_host_size_t* out_data_length) {
+  *out_data_length = 0;
+  if (IREE_UNLIKELY(!code_object_data.data ||
+                    code_object_data.data_length == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "profile executable code-object data is required");
+  }
+  iree_host_size_t data_length = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_profile_executable_code_object_record_t), &data_length,
+      IREE_STRUCT_FIELD(code_object_data.data_length, uint8_t, NULL)));
+  if (IREE_UNLIKELY(data_length > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable code-object record length exceeds uint32_t");
+  }
+  *out_data_length = data_length;
+  return iree_ok_status();
+}
+
+static void iree_hal_amdgpu_profile_metadata_append_code_object_record(
+    uint64_t executable_id, iree_const_byte_span_t code_object_data,
+    const uint64_t code_object_hash[2], uint8_t* target_data) {
+  iree_hal_profile_executable_code_object_record_t record =
+      iree_hal_profile_executable_code_object_record_default();
+  record.record_length =
+      (uint32_t)(sizeof(record) + code_object_data.data_length);
+  record.executable_id = executable_id;
+  record.code_object_id = executable_id;
+  record.data_length = code_object_data.data_length;
+  if (code_object_hash) {
+    record.flags |=
+        IREE_HAL_PROFILE_EXECUTABLE_CODE_OBJECT_FLAG_CODE_OBJECT_HASH;
+    record.code_object_hash[0] = code_object_hash[0];
+    record.code_object_hash[1] = code_object_hash[1];
+  }
+  memcpy(target_data, &record, sizeof(record));
+  memcpy(target_data + sizeof(record), code_object_data.data,
+         code_object_data.data_length);
+}
+
+static void iree_hal_amdgpu_profile_metadata_append_code_object_load_records(
+    uint64_t executable_id, iree_host_size_t code_object_load_info_count,
+    const iree_hal_amdgpu_profile_code_object_load_info_t*
+        code_object_load_infos,
+    iree_hal_profile_executable_code_object_load_record_t* target_records) {
+  for (iree_host_size_t i = 0; i < code_object_load_info_count; ++i) {
+    iree_hal_profile_executable_code_object_load_record_t record =
+        iree_hal_profile_executable_code_object_load_record_default();
+    record.physical_device_ordinal =
+        code_object_load_infos[i].physical_device_ordinal;
+    record.executable_id = executable_id;
+    record.code_object_id = executable_id;
+    record.load_delta = code_object_load_infos[i].load_delta;
+    record.load_size = code_object_load_infos[i].load_size;
+    target_records[i] = record;
+  }
+}
+
 iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_host_size_t export_count,
     const iree_hal_executable_export_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
-    const uint64_t code_object_hash[2],
+    iree_const_byte_span_t code_object_data, const uint64_t code_object_hash[2],
+    iree_host_size_t code_object_load_info_count,
+    const iree_hal_amdgpu_profile_code_object_load_info_t*
+        code_object_load_infos,
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id) {
   IREE_ASSERT_ARGUMENT(out_executable_id);
@@ -342,11 +421,26 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "profile executable export count exceeds uint32_t");
   }
+  if (IREE_UNLIKELY(code_object_load_info_count > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable code-object load count exceeds uint32_t");
+  }
+  if (IREE_UNLIKELY(code_object_load_info_count > 0 &&
+                    !code_object_load_infos)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile executable code-object load records are required");
+  }
 
   iree_host_size_t export_data_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_export_data_length(
       export_count, export_infos, export_parameter_offsets,
       &export_data_length));
+  iree_host_size_t code_object_record_data_length = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_profile_metadata_code_object_record_data_length(
+          code_object_data, &code_object_record_data_length));
 
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, export_count);
@@ -369,6 +463,48 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
         sizeof(registry->executable_records[0]),
         &registry->executable_record_capacity,
         (void**)&registry->executable_records);
+  }
+
+  iree_host_size_t new_code_object_record_data_length =
+      registry->executable_code_object_record_data_length;
+  if (iree_status_is_ok(status) &&
+      IREE_UNLIKELY(!iree_host_size_checked_add(
+          new_code_object_record_data_length, code_object_record_data_length,
+          &new_code_object_record_data_length))) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable code-object metadata length overflow");
+  }
+  if (iree_status_is_ok(status) &&
+      new_code_object_record_data_length >
+          registry->executable_code_object_record_data_capacity) {
+    status = iree_allocator_grow_array(
+        registry->host_allocator,
+        iree_max((iree_host_size_t)1024, new_code_object_record_data_length),
+        sizeof(registry->executable_code_object_record_data[0]),
+        &registry->executable_code_object_record_data_capacity,
+        (void**)&registry->executable_code_object_record_data);
+  }
+
+  iree_host_size_t new_code_object_load_record_count =
+      registry->executable_code_object_load_record_count;
+  if (iree_status_is_ok(status) &&
+      IREE_UNLIKELY(!iree_host_size_checked_add(
+          new_code_object_load_record_count, code_object_load_info_count,
+          &new_code_object_load_record_count))) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable code-object load metadata count overflow");
+  }
+  if (iree_status_is_ok(status) &&
+      new_code_object_load_record_count >
+          registry->executable_code_object_load_record_capacity) {
+    status = iree_allocator_grow_array(
+        registry->host_allocator,
+        iree_max((iree_host_size_t)16, new_code_object_load_record_count),
+        sizeof(registry->executable_code_object_load_records[0]),
+        &registry->executable_code_object_load_record_capacity,
+        (void**)&registry->executable_code_object_load_records);
   }
 
   iree_host_size_t new_export_data_length =
@@ -409,8 +545,27 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
         executable_id, export_count, export_infos, export_parameter_offsets,
         code_object_hash, host_kernel_args, export_data);
     if (iree_status_is_ok(status)) {
+      uint8_t* code_object_data_target =
+          registry->executable_code_object_record_data +
+          registry->executable_code_object_record_data_length;
+      iree_hal_amdgpu_profile_metadata_append_code_object_record(
+          executable_id, code_object_data, code_object_hash,
+          code_object_data_target);
+
+      iree_hal_profile_executable_code_object_load_record_t*
+          code_object_load_records =
+              registry->executable_code_object_load_records +
+              registry->executable_code_object_load_record_count;
+      iree_hal_amdgpu_profile_metadata_append_code_object_load_records(
+          executable_id, code_object_load_info_count, code_object_load_infos,
+          code_object_load_records);
+
       registry->executable_records[registry->executable_record_count++] =
           record;
+      registry->executable_code_object_record_data_length =
+          new_code_object_record_data_length;
+      registry->executable_code_object_load_record_count =
+          new_code_object_load_record_count;
       registry->executable_export_record_data_length = new_export_data_length;
       ++registry->next_executable_id;
       *out_executable_id = executable_id;
@@ -420,6 +575,37 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
   iree_slim_mutex_unlock(&registry->mutex);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_status_t iree_hal_amdgpu_profile_metadata_lookup_code_object_load(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    uint64_t executable_id, uint32_t physical_device_ordinal,
+    iree_hal_profile_executable_code_object_load_record_t* out_record) {
+  *out_record = iree_hal_profile_executable_code_object_load_record_default();
+
+  iree_slim_mutex_lock(&registry->mutex);
+  bool found = false;
+  for (iree_host_size_t i = 0;
+       i < registry->executable_code_object_load_record_count; ++i) {
+    const iree_hal_profile_executable_code_object_load_record_t* record =
+        &registry->executable_code_object_load_records[i];
+    if (record->executable_id == executable_id &&
+        record->physical_device_ordinal == physical_device_ordinal) {
+      *out_record = *record;
+      found = true;
+      break;
+    }
+  }
+  iree_slim_mutex_unlock(&registry->mutex);
+
+  if (IREE_UNLIKELY(!found)) {
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "profile code-object load metadata not found for executable %" PRIu64
+        " on physical device %" PRIu32,
+        executable_id, physical_device_ordinal);
+  }
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_amdgpu_profile_metadata_register_command_buffer(
@@ -573,6 +759,10 @@ static void iree_hal_amdgpu_profile_metadata_snapshot_deinitialize(
                       snapshot->command_buffer_records);
   iree_allocator_free(snapshot->host_allocator,
                       snapshot->executable_export_record_data);
+  iree_allocator_free(snapshot->host_allocator,
+                      snapshot->executable_code_object_load_records);
+  iree_allocator_free(snapshot->host_allocator,
+                      snapshot->executable_code_object_record_data);
   iree_allocator_free(snapshot->host_allocator, snapshot->executable_records);
   memset(snapshot, 0, sizeof(*snapshot));
 }
@@ -589,6 +779,10 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
   iree_status_t status = iree_ok_status();
   if (IREE_UNLIKELY(cursor->executable_record_count >
                         registry->executable_record_count ||
+                    cursor->executable_code_object_record_data_length >
+                        registry->executable_code_object_record_data_length ||
+                    cursor->executable_code_object_load_record_count >
+                        registry->executable_code_object_load_record_count ||
                     cursor->executable_export_record_data_length >
                         registry->executable_export_record_data_length ||
                     cursor->command_buffer_record_count >
@@ -601,12 +795,20 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
   }
 
   iree_host_size_t executable_record_count = 0;
+  iree_host_size_t executable_code_object_record_data_length = 0;
+  iree_host_size_t executable_code_object_load_record_count = 0;
   iree_host_size_t executable_export_record_data_length = 0;
   iree_host_size_t command_buffer_record_count = 0;
   iree_host_size_t command_operation_record_count = 0;
   if (iree_status_is_ok(status)) {
     executable_record_count =
         registry->executable_record_count - cursor->executable_record_count;
+    executable_code_object_record_data_length =
+        registry->executable_code_object_record_data_length -
+        cursor->executable_code_object_record_data_length;
+    executable_code_object_load_record_count =
+        registry->executable_code_object_load_record_count -
+        cursor->executable_code_object_load_record_count;
     executable_export_record_data_length =
         registry->executable_export_record_data_length -
         cursor->executable_export_record_data_length;
@@ -631,6 +833,44 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
              registry->executable_records + cursor->executable_record_count,
              byte_length);
       out_snapshot->executable_record_count = executable_record_count;
+    }
+  }
+
+  if (iree_status_is_ok(status) &&
+      executable_code_object_record_data_length > 0) {
+    status = iree_allocator_malloc(
+        registry->host_allocator, executable_code_object_record_data_length,
+        (void**)&out_snapshot->executable_code_object_record_data);
+    if (iree_status_is_ok(status)) {
+      memcpy(out_snapshot->executable_code_object_record_data,
+             registry->executable_code_object_record_data +
+                 cursor->executable_code_object_record_data_length,
+             executable_code_object_record_data_length);
+      out_snapshot->executable_code_object_record_data_length =
+          executable_code_object_record_data_length;
+    }
+  }
+
+  if (iree_status_is_ok(status) &&
+      executable_code_object_load_record_count > 0) {
+    iree_host_size_t byte_length = 0;
+    status = IREE_STRUCT_LAYOUT(
+        0, &byte_length,
+        IREE_STRUCT_FIELD(executable_code_object_load_record_count,
+                          iree_hal_profile_executable_code_object_load_record_t,
+                          NULL));
+    if (iree_status_is_ok(status)) {
+      status = iree_allocator_malloc(
+          registry->host_allocator, byte_length,
+          (void**)&out_snapshot->executable_code_object_load_records);
+    }
+    if (iree_status_is_ok(status)) {
+      memcpy(out_snapshot->executable_code_object_load_records,
+             registry->executable_code_object_load_records +
+                 cursor->executable_code_object_load_record_count,
+             byte_length);
+      out_snapshot->executable_code_object_load_record_count =
+          executable_code_object_load_record_count;
     }
   }
 
@@ -692,6 +932,10 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
   if (iree_status_is_ok(status)) {
     out_snapshot->end_cursor.executable_record_count =
         registry->executable_record_count;
+    out_snapshot->end_cursor.executable_code_object_record_data_length =
+        registry->executable_code_object_record_data_length;
+    out_snapshot->end_cursor.executable_code_object_load_record_count =
+        registry->executable_code_object_load_record_count;
     out_snapshot->end_cursor.executable_export_record_data_length =
         registry->executable_export_record_data_length;
     out_snapshot->end_cursor.command_buffer_record_count =
@@ -731,6 +975,35 @@ iree_status_t iree_hal_amdgpu_profile_metadata_write(
         iree_make_const_byte_span(snapshot.executable_records,
                                   snapshot.executable_record_count *
                                       sizeof(snapshot.executable_records[0]));
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  if (iree_status_is_ok(status) &&
+      snapshot.executable_code_object_record_data_length > 0) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type =
+        IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS;
+    metadata.name = name;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec = iree_make_const_byte_span(
+        snapshot.executable_code_object_record_data,
+        snapshot.executable_code_object_record_data_length);
+    status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
+  }
+
+  if (iree_status_is_ok(status) &&
+      snapshot.executable_code_object_load_record_count > 0) {
+    iree_hal_profile_chunk_metadata_t metadata =
+        iree_hal_profile_chunk_metadata_default();
+    metadata.content_type =
+        IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS;
+    metadata.name = name;
+    metadata.session_id = session_id;
+    iree_const_byte_span_t iovec = iree_make_const_byte_span(
+        snapshot.executable_code_object_load_records,
+        snapshot.executable_code_object_load_record_count *
+            sizeof(snapshot.executable_code_object_load_records[0]));
     status = iree_hal_profile_sink_write(sink, &metadata, 1, &iovec);
   }
 

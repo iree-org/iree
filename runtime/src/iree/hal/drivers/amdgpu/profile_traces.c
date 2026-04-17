@@ -20,10 +20,11 @@
 // Executable trace support tables
 //===----------------------------------------------------------------------===//
 
-enum { iree_hal_amdgpu_profile_trace_packets_per_event = 2u };
+enum { iree_hal_amdgpu_profile_trace_packets_per_event = 3u };
+enum { iree_hal_amdgpu_profile_trace_start_packets_per_event = 2u };
 enum { iree_hal_amdgpu_profile_trace_default_buffer_size = 16 * 1024 * 1024 };
 enum { iree_hal_amdgpu_profile_trace_default_se_mask = 1u };
-enum { iree_hal_amdgpu_profile_trace_default_target_cu = 0u };
+enum { iree_hal_amdgpu_profile_trace_default_target_cu = 1u };
 enum { iree_hal_amdgpu_profile_trace_default_simd_select = 0xFu };
 
 // Per-queue/per-event-ring-slot mutable aqlprofile ATT capture state.
@@ -34,6 +35,12 @@ struct iree_hal_amdgpu_profile_trace_slot_t {
   iree_hal_amdgpu_aqlprofile_handle_t handle;
   // AQL PM4-IB packet templates referencing |handle|'s immutable PM4 programs.
   iree_hal_amdgpu_aqlprofile_att_control_aql_packets_t packets;
+  // aqlprofile handle owning the PM4 program for |code_object_marker_packet|.
+  iree_hal_amdgpu_aqlprofile_handle_t code_object_marker_handle;
+  // AQL PM4-IB packet template that publishes the loaded code-object marker.
+  iree_hsa_amd_aql_pm4_ib_packet_t code_object_marker_packet;
+  // Code-object id currently represented by |code_object_marker_packet|.
+  uint64_t code_object_marker_id;
   // Producer-local trace id assigned when this slot is reserved for a dispatch.
   uint64_t trace_id;
 };
@@ -136,6 +143,32 @@ static iree_status_t iree_hal_amdgpu_profile_trace_create_packets(
           iree_hal_amdgpu_profile_aqlprofile_memory_copy,
           (void*)memory_context),
       "creating AMDGPU ATT PM4 packets");
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_profile_trace_create_code_object_marker(
+    const iree_hal_amdgpu_profile_trace_session_t* session,
+    iree_hal_amdgpu_physical_device_t* physical_device,
+    const iree_hal_amdgpu_profile_aqlprofile_memory_context_t* memory_context,
+    const iree_hal_profile_executable_code_object_load_record_t* load_record,
+    iree_hal_amdgpu_aqlprofile_handle_t* out_handle,
+    iree_hsa_amd_aql_pm4_ib_packet_t* out_packet) {
+  iree_hal_amdgpu_aqlprofile_att_code_object_data_t code_object_data = {
+      .id = load_record->code_object_id,
+      .address = (uint64_t)load_record->load_delta,
+      .length = load_record->load_size,
+      .agent = physical_device->device_agent,
+      .is_unload = 0,
+      .from_start = 1,
+  };
+  IREE_RETURN_IF_AQLPROFILE_ERROR(
+      &session->libaqlprofile,
+      session->libaqlprofile.aqlprofile_att_codeobj_marker(
+          out_packet, out_handle, code_object_data,
+          iree_hal_amdgpu_profile_aqlprofile_memory_alloc,
+          iree_hal_amdgpu_profile_aqlprofile_memory_dealloc,
+          (void*)memory_context),
+      "creating AMDGPU ATT code-object marker packet");
   return iree_ok_status();
 }
 
@@ -293,6 +326,9 @@ void iree_hal_amdgpu_host_queue_disable_profile_traces(
   for (uint32_t i = 0; i < queue->profiling.dispatch_event_capacity; ++i) {
     iree_hal_amdgpu_profile_trace_destroy_packets(
         &session->libaqlprofile, &queue->profiling.trace_slots[i].handle);
+    iree_hal_amdgpu_profile_trace_destroy_packets(
+        &session->libaqlprofile,
+        &queue->profiling.trace_slots[i].code_object_marker_handle);
   }
   iree_allocator_free(queue->host_allocator, queue->profiling.trace_slots);
   queue->profiling.trace_session = NULL;
@@ -313,7 +349,8 @@ uint32_t iree_hal_amdgpu_host_queue_profile_trace_start_packet_count(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation) {
   if (!reservation.event_count || !queue->profiling.trace_session) return 0;
-  return reservation.event_count;
+  return reservation.event_count *
+         iree_hal_amdgpu_profile_trace_start_packets_per_event;
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_traces(
@@ -352,6 +389,51 @@ iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_traces(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_trace_code_object(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t executable_id) {
+  iree_hal_amdgpu_profile_trace_session_t* session =
+      queue->profiling.trace_session;
+  if (!session) return iree_ok_status();
+
+  iree_hal_amdgpu_profile_trace_slot_t* slot =
+      iree_hal_amdgpu_host_queue_profile_trace_slot(queue, event_position);
+  if (IREE_UNLIKELY(!slot->handle.handle)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "AMDGPU executable trace slot must be prepared before its code-object "
+        "marker");
+  }
+
+  const uint32_t physical_device_ordinal =
+      iree_hal_amdgpu_host_queue_profile_device_ordinal(queue);
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      (iree_hal_amdgpu_logical_device_t*)queue->logical_device;
+  iree_hal_profile_executable_code_object_load_record_t load_record;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_lookup_code_object_load(
+      &logical_device->profile_metadata, executable_id, physical_device_ordinal,
+      &load_record));
+
+  if (slot->code_object_marker_handle.handle &&
+      slot->code_object_marker_id == load_record.code_object_id) {
+    return iree_ok_status();
+  }
+
+  iree_hal_amdgpu_profile_trace_destroy_packets(
+      &session->libaqlprofile, &slot->code_object_marker_handle);
+  memset(&slot->code_object_marker_packet, 0,
+         sizeof(slot->code_object_marker_packet));
+  slot->code_object_marker_id = 0;
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      logical_device->physical_devices[queue->device_ordinal];
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_trace_create_code_object_marker(
+      session, physical_device, &slot->memory_context, &load_record,
+      &slot->code_object_marker_handle, &slot->code_object_marker_packet));
+  slot->code_object_marker_id = load_record.code_object_id;
+  return iree_ok_status();
+}
+
 static void iree_hal_amdgpu_host_queue_emplace_profile_trace_packet_at(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hsa_amd_aql_pm4_ib_packet_t* source_packet,
@@ -375,6 +457,18 @@ void iree_hal_amdgpu_host_queue_emplace_profile_trace_start_packet(
   iree_hal_amdgpu_host_queue_emplace_profile_trace_packet_at(
       queue, &slot->packets.start_packet, first_packet_id, first_packet_index,
       packet_control, packet_headers, packet_setups);
+}
+
+void iree_hal_amdgpu_host_queue_emplace_profile_trace_code_object_packet(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t first_packet_id, uint32_t first_packet_index,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    uint16_t* packet_headers, uint16_t* packet_setups) {
+  iree_hal_amdgpu_profile_trace_slot_t* slot =
+      iree_hal_amdgpu_host_queue_profile_trace_slot(queue, event_position);
+  iree_hal_amdgpu_host_queue_emplace_profile_trace_packet_at(
+      queue, &slot->code_object_marker_packet, first_packet_id,
+      first_packet_index, packet_control, packet_headers, packet_setups);
 }
 
 void iree_hal_amdgpu_host_queue_emplace_profile_trace_stop_packet(
@@ -410,6 +504,15 @@ void iree_hal_amdgpu_host_queue_commit_profile_trace_start_packet(
       iree_hal_amdgpu_host_queue_profile_trace_slot(queue, event_position);
   iree_hal_amdgpu_host_queue_commit_profile_trace_packet(
       queue, &slot->packets.start_packet, packet_id, packet_control);
+}
+
+void iree_hal_amdgpu_host_queue_commit_profile_trace_code_object_packet(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t packet_id, iree_hal_amdgpu_aql_packet_control_t packet_control) {
+  iree_hal_amdgpu_profile_trace_slot_t* slot =
+      iree_hal_amdgpu_host_queue_profile_trace_slot(queue, event_position);
+  iree_hal_amdgpu_host_queue_commit_profile_trace_packet(
+      queue, &slot->code_object_marker_packet, packet_id, packet_control);
 }
 
 void iree_hal_amdgpu_host_queue_commit_profile_trace_stop_packet(

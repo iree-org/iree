@@ -113,8 +113,9 @@ hsa_status_t iree_hal_amdgpu_profile_aqlprofile_memory_alloc(
   const bool should_allow_device_access = flags.device_access;
   const bool should_allocate_executable =
       flags.host_access && flags.device_access &&
-      flags.memory_hint ==
-          IREE_HAL_AMDGPU_AQLPROFILE_MEMORY_HINT_DEVICE_NONCOHERENT;
+      (flags.memory_hint ==
+           IREE_HAL_AMDGPU_AQLPROFILE_MEMORY_HINT_DEVICE_NONCOHERENT ||
+       flags.memory_hint == IREE_HAL_AMDGPU_AQLPROFILE_MEMORY_HINT_NONE);
   if (flags.host_access) {
     memory_pool = context->host_memory_pools->coarse_pool;
     if (flags.memory_hint ==

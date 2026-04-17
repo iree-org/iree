@@ -17,6 +17,8 @@ extend-exclude = [
 hsa = "hsa"
 # ARM Scalable Matrix Extension.
 sme = "sme"
+# AMDGPU vector ALU instruction category.
+valu = "valu"
 # MLIR OpFoldResult abbreviation.
 ofr = "ofr"
 # GPU instruction conversion suffix (dp4xi8toi32).

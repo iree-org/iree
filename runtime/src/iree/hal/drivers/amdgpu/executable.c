@@ -566,6 +566,92 @@ static iree_status_t iree_hal_amdgpu_executable_load_module(
   return status;
 }
 
+typedef struct iree_hal_amdgpu_executable_find_loaded_code_object_state_t {
+  // Borrowed HSA API table used for loader extension queries.
+  const iree_hal_amdgpu_libhsa_t* libhsa;
+  // HSA agent whose loaded code object is being searched.
+  hsa_agent_t agent;
+  // Loaded code object matching |agent| when found.
+  hsa_loaded_code_object_t loaded_code_object;
+} iree_hal_amdgpu_executable_find_loaded_code_object_state_t;
+
+static hsa_status_t iree_hal_amdgpu_executable_iterate_loaded_code_object(
+    hsa_executable_t executable, hsa_loaded_code_object_t loaded_code_object,
+    void* user_data) {
+  iree_hal_amdgpu_executable_find_loaded_code_object_state_t* find_state =
+      (iree_hal_amdgpu_executable_find_loaded_code_object_state_t*)user_data;
+  hsa_agent_t agent = {0};
+  hsa_status_t hsa_status =
+      find_state->libhsa->amd_loader
+          .hsa_ven_amd_loader_loaded_code_object_get_info(
+              loaded_code_object,
+              HSA_VEN_AMD_LOADER_LOADED_CODE_OBJECT_INFO_AGENT, &agent);
+  if (hsa_status != HSA_STATUS_SUCCESS) return hsa_status;
+  if (agent.handle == find_state->agent.handle) {
+    find_state->loaded_code_object = loaded_code_object;
+    return HSA_STATUS_INFO_BREAK;
+  }
+  return HSA_STATUS_SUCCESS;
+}
+
+static iree_status_t iree_hal_amdgpu_executable_find_loaded_code_object(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_executable_t executable,
+    hsa_agent_t agent, hsa_loaded_code_object_t* out_loaded_code_object) {
+  *out_loaded_code_object = (hsa_loaded_code_object_t){0};
+  iree_hal_amdgpu_executable_find_loaded_code_object_state_t find_state = {
+      .libhsa = libhsa,
+      .agent = agent,
+      .loaded_code_object = {0},
+  };
+  hsa_status_t hsa_status =
+      libhsa->amd_loader
+          .hsa_ven_amd_loader_executable_iterate_loaded_code_objects(
+              executable, iree_hal_amdgpu_executable_iterate_loaded_code_object,
+              &find_state);
+  if (hsa_status == HSA_STATUS_SUCCESS) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "no loaded code object found for agent");
+  }
+  if (hsa_status != HSA_STATUS_INFO_BREAK) {
+    return iree_status_from_hsa_status(
+        __FILE__, __LINE__, hsa_status,
+        "hsa_ven_amd_loader_executable_iterate_loaded_code_objects",
+        "iterating loaded executable code objects");
+  }
+  *out_loaded_code_object = find_state.loaded_code_object;
+  return iree_ok_status();
+}
+
+static iree_status_t
+iree_hal_amdgpu_executable_populate_profile_code_object_load_info(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_executable_t executable,
+    uint32_t physical_device_ordinal, hsa_agent_t device_agent,
+    iree_hal_amdgpu_profile_code_object_load_info_t* out_load_info) {
+  memset(out_load_info, 0, sizeof(*out_load_info));
+  out_load_info->physical_device_ordinal = physical_device_ordinal;
+
+  hsa_loaded_code_object_t loaded_code_object = {0};
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_executable_find_loaded_code_object(
+      libhsa, executable, device_agent, &loaded_code_object));
+
+  hsa_status_t hsa_status =
+      libhsa->amd_loader.hsa_ven_amd_loader_loaded_code_object_get_info(
+          loaded_code_object,
+          HSA_VEN_AMD_LOADER_LOADED_CODE_OBJECT_INFO_LOAD_DELTA,
+          &out_load_info->load_delta);
+  if (hsa_status == HSA_STATUS_SUCCESS) {
+    hsa_status =
+        libhsa->amd_loader.hsa_ven_amd_loader_loaded_code_object_get_info(
+            loaded_code_object,
+            HSA_VEN_AMD_LOADER_LOADED_CODE_OBJECT_INFO_LOAD_SIZE,
+            &out_load_info->load_size);
+  }
+  return iree_status_from_hsa_status(
+      __FILE__, __LINE__, hsa_status,
+      "hsa_ven_amd_loader_loaded_code_object_get_info",
+      "querying loaded executable code-object profile metadata");
+}
+
 #define IREE_HAL_AMDGPU_MAX_STACK_SYMBOL_NAME_LENGTH \
   ((iree_host_size_t)(4 * 1024))
 
@@ -1132,6 +1218,56 @@ iree_hal_amdgpu_executable_initialize_dispatch_descriptors_for_device(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_amdgpu_executable_register_profile_metadata(
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
+    iree_const_byte_span_t code_object_data,
+    iree_hal_amdgpu_executable_t* executable) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_host_size_t load_info_storage_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &load_info_storage_size,
+              IREE_STRUCT_FIELD(topology->gpu_agent_count,
+                                iree_hal_amdgpu_profile_code_object_load_info_t,
+                                NULL)));
+
+  iree_hal_amdgpu_profile_code_object_load_info_t* load_infos = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(executable->host_allocator,
+                                load_info_storage_size, (void**)&load_infos));
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t device_ordinal = 0;
+       device_ordinal < topology->gpu_agent_count && iree_status_is_ok(status);
+       ++device_ordinal) {
+    if (IREE_UNLIKELY(device_ordinal > UINT32_MAX)) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "profile executable physical device ordinal exceeds uint32_t");
+    } else {
+      status =
+          iree_hal_amdgpu_executable_populate_profile_code_object_load_info(
+              libhsa, executable->handle, (uint32_t)device_ordinal,
+              topology->gpu_agents[device_ordinal],
+              &load_infos[device_ordinal]);
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_profile_metadata_register_executable(
+        profile_metadata, executable->kernel_count, executable->export_infos,
+        executable->export_parameter_offsets, code_object_data,
+        executable->profile_code_object_hash, topology->gpu_agent_count,
+        load_infos, executable->host_kernel_args, &executable->profile_id);
+  }
+
+  iree_allocator_free(executable->host_allocator, load_infos);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t
 iree_hal_amdgpu_executable_validate_export_parameter_requirements(
     iree_hal_amdgpu_ExportDef_table_t export_def,
@@ -1564,6 +1700,7 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_amdgpu_device_limits_t* limits, hsa_agent_t any_device_agent,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   *out_executable = NULL;
 
@@ -1679,7 +1816,13 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
 
   // Invalidate the kernel object pointer in all host args so that we don't
   // accidentally use it instead of the device-specific one.
-  iree_hal_amdgpu_executable_invalidate_host_kernel_objects(executable);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_executable_register_profile_metadata(
+        libhsa, topology, profile_metadata, code_object_data, executable);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_executable_invalidate_host_kernel_objects(executable);
+  }
 
   iree_hal_amdgpu_hsaco_metadata_deinitialize(&hsaco_metadata);
 
@@ -1696,6 +1839,7 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_raw_hsaco(
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_amdgpu_device_limits_t* limits, hsa_agent_t any_device_agent,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   *out_executable = NULL;
 
@@ -1770,7 +1914,13 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_raw_hsaco(
 
   // Invalidate the kernel object pointer in all host args so that we don't
   // accidentally use it instead of the device-specific one.
-  iree_hal_amdgpu_executable_invalidate_host_kernel_objects(executable);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_executable_register_profile_metadata(
+        libhsa, topology, profile_metadata, code_object_data, executable);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_executable_invalidate_host_kernel_objects(executable);
+  }
 
   iree_hal_amdgpu_hsaco_metadata_deinitialize(&hsaco_metadata);
 
@@ -1836,20 +1986,11 @@ iree_status_t iree_hal_amdgpu_executable_create(
           executable_params->executable_data)) {
     status = iree_hal_amdgpu_executable_create_from_flatbuffer(
         libhsa, topology, executable_params, &limits, any_device_agent,
-        host_allocator, out_executable);
+        profile_metadata, host_allocator, out_executable);
   } else {
     status = iree_hal_amdgpu_executable_create_from_raw_hsaco(
         libhsa, topology, executable_params, &limits, any_device_agent,
-        host_allocator, out_executable);
-  }
-  if (iree_status_is_ok(status)) {
-    iree_hal_amdgpu_executable_t* executable =
-        iree_hal_amdgpu_executable_cast(*out_executable);
-    status = iree_hal_amdgpu_profile_metadata_register_executable(
-        profile_metadata, executable->kernel_count, executable->export_infos,
-        executable->export_parameter_offsets,
-        executable->profile_code_object_hash, executable->host_kernel_args,
-        &executable->profile_id);
+        profile_metadata, host_allocator, out_executable);
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_executable_release(*out_executable);

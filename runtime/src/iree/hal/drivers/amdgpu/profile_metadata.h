@@ -20,6 +20,10 @@ extern "C" {
 typedef struct iree_hal_amdgpu_profile_metadata_cursor_t {
   // Number of executable records already emitted.
   iree_host_size_t executable_record_count;
+  // Byte length of packed executable code-object records already emitted.
+  iree_host_size_t executable_code_object_record_data_length;
+  // Number of executable code-object load records already emitted.
+  iree_host_size_t executable_code_object_load_record_count;
   // Byte length of packed executable export records already emitted.
   iree_host_size_t executable_export_record_data_length;
   // Number of command-buffer records already emitted.
@@ -44,6 +48,19 @@ typedef struct iree_hal_amdgpu_profile_metadata_registry_t {
   iree_host_size_t executable_record_count;
   // Allocated executable record capacity.
   iree_host_size_t executable_record_capacity;
+  // Packed executable code-object records in executable id assignment order.
+  uint8_t* executable_code_object_record_data;
+  // Byte length of valid packed executable code-object records.
+  iree_host_size_t executable_code_object_record_data_length;
+  // Allocated byte capacity for packed executable code-object records.
+  iree_host_size_t executable_code_object_record_data_capacity;
+  // Executable code-object load records in executable id assignment order.
+  iree_hal_profile_executable_code_object_load_record_t*
+      executable_code_object_load_records;
+  // Number of valid executable code-object load records.
+  iree_host_size_t executable_code_object_load_record_count;
+  // Allocated executable code-object load record capacity.
+  iree_host_size_t executable_code_object_load_record_capacity;
   // Packed executable export records in executable id assignment order.
   uint8_t* executable_export_record_data;
   // Byte length of valid packed executable export records.
@@ -63,6 +80,16 @@ typedef struct iree_hal_amdgpu_profile_metadata_registry_t {
   // Allocated command-operation record capacity.
   iree_host_size_t command_operation_record_capacity;
 } iree_hal_amdgpu_profile_metadata_registry_t;
+
+// Loader-reported code-object range for one physical device.
+typedef struct iree_hal_amdgpu_profile_code_object_load_info_t {
+  // Session-local physical device ordinal owning this loaded code object.
+  uint32_t physical_device_ordinal;
+  // Loader-provided code-object load delta used for PC translation.
+  int64_t load_delta;
+  // Byte length of the loaded code-object range on the device.
+  uint64_t load_size;
+} iree_hal_amdgpu_profile_code_object_load_info_t;
 
 // Initializes |out_registry| for logical-device-lifetime metadata.
 void iree_hal_amdgpu_profile_metadata_initialize(
@@ -84,9 +111,19 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_host_size_t export_count,
     const iree_hal_executable_export_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
-    const uint64_t code_object_hash[2],
+    iree_const_byte_span_t code_object_data, const uint64_t code_object_hash[2],
+    iree_host_size_t code_object_load_info_count,
+    const iree_hal_amdgpu_profile_code_object_load_info_t*
+        code_object_load_infos,
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id);
+
+// Looks up the code-object load record for |executable_id| on a physical
+// device.
+iree_status_t iree_hal_amdgpu_profile_metadata_lookup_code_object_load(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    uint64_t executable_id, uint32_t physical_device_ordinal,
+    iree_hal_profile_executable_code_object_load_record_t* out_record);
 
 // Registers immutable command-buffer creation metadata and assigns
 // |out_command_buffer_id|.

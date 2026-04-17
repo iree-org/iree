@@ -67,15 +67,32 @@ uint32_t iree_hal_amdgpu_host_queue_profile_trace_start_packet_count(
 // Prepares executable trace slots for |reservation|.
 //
 // Caller must hold queue->submission_mutex and must call this only after the
-// dispatch profile events have been reserved. Handles are created lazily per
-// event-ring slot and then reused only after the dispatch event cursor has
-// advanced past the slot.
+// dispatch profile events have been reserved. Start/stop handles are created
+// lazily per event-ring slot and then reused only after the dispatch event
+// cursor has advanced past the slot.
 iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_traces(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation);
 
+// Prepares the ATT code-object marker packet for |event_position|.
+//
+// Caller must hold queue->submission_mutex and call
+// iree_hal_amdgpu_host_queue_prepare_profile_traces first for the same event
+// slot so the aqlprofile allocation context has been initialized.
+iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_trace_code_object(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t executable_id);
+
 // Emplaces one ATT start packet for |event_position| at |first_packet_index|.
 void iree_hal_amdgpu_host_queue_emplace_profile_trace_start_packet(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t first_packet_id, uint32_t first_packet_index,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    uint16_t* packet_headers, uint16_t* packet_setups);
+
+// Emplaces one ATT code-object marker packet for |event_position| at
+// |first_packet_index|.
+void iree_hal_amdgpu_host_queue_emplace_profile_trace_code_object_packet(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
     uint64_t first_packet_id, uint32_t first_packet_index,
     iree_hal_amdgpu_aql_packet_control_t packet_control,
@@ -90,6 +107,12 @@ void iree_hal_amdgpu_host_queue_emplace_profile_trace_stop_packet(
 
 // Commits one ATT start packet for |event_position| at |packet_id|.
 void iree_hal_amdgpu_host_queue_commit_profile_trace_start_packet(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
+    uint64_t packet_id, iree_hal_amdgpu_aql_packet_control_t packet_control);
+
+// Commits one ATT code-object marker packet for |event_position| at
+// |packet_id|.
+void iree_hal_amdgpu_host_queue_commit_profile_trace_code_object_packet(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
     uint64_t packet_id, iree_hal_amdgpu_aql_packet_control_t packet_control);
 

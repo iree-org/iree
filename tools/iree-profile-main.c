@@ -15,6 +15,7 @@
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/utils/profile_file.h"
 #include "iree/io/file_contents.h"
+#include "tools/iree-profile-att.h"
 
 IREE_FLAG(string, format, "text",
           "Output format for profile commands: one of `text` or `jsonl`.");
@@ -35,6 +36,9 @@ IREE_FLAG(bool, counter_samples, false,
 IREE_FLAG(bool, agent_md, false,
           "Prints an agent-oriented Markdown guide for iree-profile JSONL "
           "workflows and exits.");
+IREE_FLAG(string, rocm_library_path, "",
+          "ROCm library directory or exact dynamic library path used by ATT "
+          "decode. Leave empty to use the system dynamic library search path.");
 
 #define IREE_PROFILE_EXPLAIN_TOP_DISPATCH_COUNT 8
 #define IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT 10
@@ -103,6 +107,16 @@ typedef struct iree_profile_summary_t {
   uint64_t executable_chunk_count;
   // Executable records parsed.
   uint64_t executable_record_count;
+  // Executable code-object metadata chunks parsed.
+  uint64_t executable_code_object_chunk_count;
+  // Executable code-object image records parsed.
+  uint64_t executable_code_object_record_count;
+  // Executable code-object image bytes referenced by metadata records.
+  uint64_t executable_code_object_data_bytes;
+  // Executable code-object load metadata chunks parsed.
+  uint64_t executable_code_object_load_chunk_count;
+  // Executable code-object load records parsed.
+  uint64_t executable_code_object_load_record_count;
   // Executable export metadata chunks parsed.
   uint64_t executable_export_chunk_count;
   // Executable export records parsed.
@@ -1703,6 +1717,69 @@ static iree_status_t iree_profile_summary_process_executable_records(
   return status;
 }
 
+static iree_status_t
+iree_profile_summary_process_executable_code_object_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_executable_code_object_record_t),
+        &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_executable_code_object_record_t code_object_record;
+      memcpy(&code_object_record, record->payload.data + payload_offset,
+             sizeof(code_object_record));
+      if (code_object_record.data_length !=
+          record_length - sizeof(code_object_record)) {
+        status = iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "profile executable code-object data length is inconsistent with "
+            "record length");
+      }
+      if (iree_status_is_ok(status) &&
+          code_object_record.data_length >
+              UINT64_MAX - summary->executable_code_object_data_bytes) {
+        status = iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "profile executable code-object byte counter overflowed");
+      }
+      if (iree_status_is_ok(status)) {
+        ++summary->executable_code_object_record_count;
+        summary->executable_code_object_data_bytes +=
+            code_object_record.data_length;
+        payload_offset += record_length;
+      }
+    }
+  }
+  return status;
+}
+
+static iree_status_t
+iree_profile_summary_process_executable_code_object_load_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_executable_code_object_load_record_t),
+        &record_length);
+    if (iree_status_is_ok(status)) {
+      ++summary->executable_code_object_load_record_count;
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_executable_export_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -2028,6 +2105,18 @@ static iree_status_t iree_profile_summary_process_record(
     return iree_profile_summary_process_executable_records(summary, record);
   } else if (iree_string_view_equal(
                  record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS)) {
+    ++summary->executable_code_object_chunk_count;
+    return iree_profile_summary_process_executable_code_object_records(summary,
+                                                                       record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS)) {
+    ++summary->executable_code_object_load_chunk_count;
+    return iree_profile_summary_process_executable_code_object_load_records(
+        summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
     ++summary->executable_export_chunk_count;
     return iree_profile_summary_process_executable_export_records(summary,
@@ -2153,39 +2242,52 @@ static void iree_profile_print_summary_text(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
-  fprintf(
-      file,
-      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-      " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
-      " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
-      " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
-      " memory_events=%" PRIu64 " counter_sets=%" PRIu64 " counters=%" PRIu64
-      " counter_samples=%" PRIu64 " executable_traces=%" PRIu64
-      " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
-      summary->device_chunk_count, summary->queue_chunk_count,
-      summary->executable_chunk_count, summary->executable_export_chunk_count,
-      summary->command_buffer_chunk_count,
-      summary->command_operation_chunk_count,
-      summary->clock_correlation_chunk_count,
-      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
-      summary->memory_event_chunk_count, summary->counter_set_chunk_count,
-      summary->counter_chunk_count, summary->counter_sample_chunk_count,
-      summary->executable_trace_chunk_count, summary->unknown_chunk_count,
-      summary->truncated_chunk_count);
-  fprintf(
-      file,
-      "metadata_records: executables=%" PRIu64 " executable_exports=%" PRIu64
-      " command_buffers=%" PRIu64 " command_operations=%" PRIu64 "\n",
-      summary->executable_record_count, summary->executable_export_record_count,
-      summary->command_buffer_record_count,
-      summary->command_operation_record_count);
+  fprintf(file,
+          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+          " executable_code_objects=%" PRIu64
+          " executable_code_object_loads=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
+          " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
+          " memory_events=%" PRIu64 " counter_sets=%" PRIu64
+          " counters=%" PRIu64 " counter_samples=%" PRIu64
+          " executable_traces=%" PRIu64 " unknown=%" PRIu64
+          " truncated=%" PRIu64 "\n",
+          summary->device_chunk_count, summary->queue_chunk_count,
+          summary->executable_chunk_count,
+          summary->executable_code_object_chunk_count,
+          summary->executable_code_object_load_chunk_count,
+          summary->executable_export_chunk_count,
+          summary->command_buffer_chunk_count,
+          summary->command_operation_chunk_count,
+          summary->clock_correlation_chunk_count,
+          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+          summary->memory_event_chunk_count, summary->counter_set_chunk_count,
+          summary->counter_chunk_count, summary->counter_sample_chunk_count,
+          summary->executable_trace_chunk_count, summary->unknown_chunk_count,
+          summary->truncated_chunk_count);
+  fprintf(file,
+          "metadata_records: executables=%" PRIu64
+          " executable_code_objects=%" PRIu64
+          " executable_code_object_loads=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " command_operations=%" PRIu64 "\n",
+          summary->executable_record_count,
+          summary->executable_code_object_record_count,
+          summary->executable_code_object_load_record_count,
+          summary->executable_export_record_count,
+          summary->command_buffer_record_count,
+          summary->command_operation_record_count);
   fprintf(file,
           "event_records: queue_events=%" PRIu64 " memory_events=%" PRIu64
           " counter_samples=%" PRIu64 " executable_traces=%" PRIu64 "\n",
           summary->queue_event_record_count, summary->memory_event_record_count,
           summary->counter_sample_record_count,
           summary->executable_trace_record_count);
-  fprintf(file, "trace_data_bytes: executable_traces=%" PRIu64 "\n",
+  fprintf(file,
+          "trace_data_bytes: code_objects=%" PRIu64
+          " executable_traces=%" PRIu64 "\n",
+          summary->executable_code_object_data_bytes,
           summary->executable_trace_data_bytes);
   fprintf(file,
           "counter_records: counter_sets=%" PRIu64 " counters=%" PRIu64 "\n",
@@ -2268,6 +2370,11 @@ static void iree_profile_print_summary_jsonl(
       ",\"session_end_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
       ",\"device_chunks\":%" PRIu64 ",\"queue_chunks\":%" PRIu64
       ",\"executable_chunks\":%" PRIu64 ",\"executable_records\":%" PRIu64
+      ",\"executable_code_object_chunks\":%" PRIu64
+      ",\"executable_code_object_records\":%" PRIu64
+      ",\"executable_code_object_data_bytes\":%" PRIu64
+      ",\"executable_code_object_load_chunks\":%" PRIu64
+      ",\"executable_code_object_load_records\":%" PRIu64
       ",\"executable_export_chunks\":%" PRIu64
       ",\"executable_export_records\":%" PRIu64
       ",\"command_buffer_chunks\":%" PRIu64
@@ -2289,7 +2396,13 @@ static void iree_profile_print_summary_jsonl(
       summary->chunk_count, summary->session_end_count,
       summary->unknown_record_count, summary->device_chunk_count,
       summary->queue_chunk_count, summary->executable_chunk_count,
-      summary->executable_record_count, summary->executable_export_chunk_count,
+      summary->executable_record_count,
+      summary->executable_code_object_chunk_count,
+      summary->executable_code_object_record_count,
+      summary->executable_code_object_data_bytes,
+      summary->executable_code_object_load_chunk_count,
+      summary->executable_code_object_load_record_count,
+      summary->executable_export_chunk_count,
       summary->executable_export_record_count,
       summary->command_buffer_chunk_count, summary->command_buffer_record_count,
       summary->command_operation_chunk_count,
@@ -7605,6 +7718,9 @@ static const char kIreeProfileUsage[] =
     "\n"
     "Usage:\n"
     "  iree-profile summary [--format=text|jsonl] <file.ireeprof>\n"
+    "  iree-profile att [--format=text|jsonl] [--filter=pattern]\n"
+    "      [--id=trace_or_dispatch_event_id]\n"
+    "      [--rocm_library_path=/opt/rocm/lib] <file.ireeprof>\n"
     "  iree-profile explain [--format=text|jsonl] [--filter=pattern]\n"
     "      [--id=dispatch_event_id] <file.ireeprof>\n"
     "  iree-profile executable [--format=text|jsonl] [--id=executable_id]\n"
@@ -7629,6 +7745,9 @@ static const char kIreeProfileUsage[] =
     "Commands:\n"
     "  summary      Bundle health, metadata counts, clock fit, and per-device\n"
     "               dispatch timing totals.\n"
+    "  att          Decodes AMDGPU ATT/SQTT executable traces using ROCm's\n"
+    "               trace decoder and annotates decoded PCs with embedded\n"
+    "               code-object disassembly.\n"
     "  explain      Opinionated bottleneck summary: device spans, queue busy\n"
     "               intervals, top exports/dispatches, transfer/memory totals,"
     "\n"
@@ -7668,7 +7787,8 @@ static const char kIreeProfileUsage[] =
     "  --filter=pattern        Wildcard over dispatch/export keys, command op\n"
     "                          names/keys, or queue/memory event type names,\n"
     "                          such as '*softmax*' or 'copy'.\n"
-    "  --id=N                  dispatch: event_id; executable: executable_id;\n"
+    "  --id=N                  att: trace_id or dispatch event_id;\n"
+    "                          dispatch: event_id; executable: executable_id;\n"
     "                          command: command_buffer_id; memory: "
     "event_id or\n"
     "                          allocation_id; queue: submission_id; "
@@ -7685,6 +7805,10 @@ static const char kIreeProfileUsage[] =
     "of\n"
     "                          only aggregate counter rows. Requires JSONL.\n"
     "  --output=path|-         Export destination path, or `-` for stdout.\n"
+    "  --rocm_library_path=dir  ROCm library directory used by `att` to load\n"
+    "                          librocprofiler-sdk, librocprof-trace-decoder,\n"
+    "                          and libamd_comgr when they are not on the\n"
+    "                          system library path.\n"
     "  --agent_md              Print a Markdown guide optimized for "
     "AGENTS.md.\n"
     "\n"
@@ -7701,6 +7825,8 @@ static const char kIreeProfileUsage[] =
     "\n"
     "Analysis examples:\n"
     "  iree-profile summary /tmp/model.ireeprof\n"
+    "  iree-profile att --rocm_library_path=/opt/rocm/lib \\\n"
+    "      --filter='*matmul*' /tmp/model.ireeprof\n"
     "  iree-profile explain /tmp/model.ireeprof\n"
     "  iree-profile explain --format=jsonl /tmp/model.ireeprof | \\\n"
     "      jq 'select(.type | startswith(\"explain_top_\"))'\n"
@@ -7780,6 +7906,13 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "- `summary` checks bundle health, metadata counts, dispatch counts, "
       "clock\n"
       "  correlation, and per-device timing totals.\n"
+      "- `att` decodes AMDGPU ATT/SQTT executable trace blobs with ROCm's\n"
+      "  trace decoder and annotates decoded PCs using code objects embedded "
+      "in\n"
+      "  the `.ireeprof` bundle. Use `--rocm_library_path=/opt/rocm/lib` when\n"
+      "  ROCm profiler libraries are not discoverable through the normal "
+      "system\n"
+      "  dynamic library search path.\n"
       "- `explain` gives an opinionated first-pass bottleneck view: visible "
       "device\n"
       "  spans, summed active dispatch time, merged per-queue busy intervals, "
@@ -7838,6 +7971,7 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "## JSONL Record Types\n"
       "\n"
       "- `summary` emits `summary` and `device_summary`.\n"
+      "- `att --format=jsonl` emits `att_trace` and `att_instruction`.\n"
       "- `explain --format=jsonl` emits `explain_summary`, "
       "`explain_device`,\n"
       "  `explain_queue`, `explain_top_export`, "
@@ -7976,6 +8110,15 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "  jq 'select(.type==\"dispatch_event\") | \\\n"
       "      {event_id,submission_id,command_buffer_id,command_index,key,"
       "duration_ns}'\n"
+      "```\n"
+      "\n"
+      "Decode ATT traces for one kernel name pattern:\n"
+      "\n"
+      "```bash\n"
+      "iree-profile att --format=jsonl --filter='*matmul*' \\\n"
+      "  --rocm_library_path=/opt/rocm/lib /tmp/model.ireeprof | \\\n"
+      "  jq 'select(.type==\"att_instruction\") | \\\n"
+      "      {trace_id,pc,category,hits,stall,instruction}'\n"
       "```\n"
       "\n"
       "Find expensive command-buffer executions:\n"
@@ -8130,6 +8273,7 @@ int main(int argc, char** argv) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "missing profile bundle path");
   } else if (!iree_string_view_equal(command, IREE_SV("cat")) &&
+             !iree_string_view_equal(command, IREE_SV("att")) &&
              !iree_string_view_equal(command, IREE_SV("command")) &&
              !iree_string_view_equal(command, IREE_SV("counter")) &&
              !iree_string_view_equal(command, IREE_SV("dispatch")) &&
@@ -8148,6 +8292,12 @@ int main(int argc, char** argv) {
     if (iree_string_view_equal(command, IREE_SV("summary"))) {
       status = iree_profile_summary_file(
           path, iree_make_cstring_view(FLAG_format), stdout, host_allocator);
+    } else if (iree_string_view_equal(command, IREE_SV("att"))) {
+      status =
+          iree_profile_att_file(path, iree_make_cstring_view(FLAG_format),
+                                iree_make_cstring_view(FLAG_filter), FLAG_id,
+                                iree_make_cstring_view(FLAG_rocm_library_path),
+                                stdout, host_allocator);
     } else if (iree_string_view_equal(command, IREE_SV("explain"))) {
       status = iree_profile_explain_file(
           path, iree_make_cstring_view(FLAG_format),
