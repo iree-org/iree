@@ -392,6 +392,30 @@ func.func @complex_chain_reshape_and_transpose(%buffer : memref<4x8xf32>) -> ten
 
 // -----
 
+// Chain with a complex relayout op chain where an op has a lowering_config.
+// Ops with lowering_config are roots for downstream transformations and should
+// not be folded into a MapLoad.
+func.func @complex_chain_with_lowering_config(%buffer : memref<4x8xf32>) -> tensor<2x2x8xf32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<4x8xf32> -> tensor<4x8xf32>
+  %expanded = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 2, 8] : tensor<4x8xf32> into tensor<2x2x8xf32>
+  %init = tensor.empty() : tensor<2x2x8xf32>
+  %copy = linalg.copy {lowering_config = #iree_gpu.derived_thread_config} ins(%expanded : tensor<2x2x8xf32>) outs(%init : tensor<2x2x8xf32>) -> tensor<2x2x8xf32>
+  return %copy : tensor<2x2x8xf32>
+}
+// CHECK-LABEL: @complex_chain_with_lowering_config
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       CHECK:   tensor.expand_shape
+//       CHECK:   linalg.copy
+//   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @complex_chain_with_lowering_config
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   iree_codegen.load_from_buffer
+//       FOLD:   iree_linalg_ext.map_load
+//       FOLD:   } : tensor<4x8xf32> into tensor<2x2x8xf32> -> tensor<2x2x8xf32>
+
+// -----
+
 // Chain broadcast -> pad -> expand_shape folds into map_load, but copy doesn't
 // because it uses expand_shape's result (later map_load) as outs (operand 1).
 func.func @fold_broadcast_pad_expand_shape(%buffer : memref<2x64xf32>, %batch : index) -> tensor<1x4x16x4x2x16xf32> {
