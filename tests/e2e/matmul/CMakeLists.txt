@@ -2615,6 +2615,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
     "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA3"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2644,6 +2645,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
     "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA3"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2677,6 +2679,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
     "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA4"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2706,6 +2709,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
     "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA4"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
