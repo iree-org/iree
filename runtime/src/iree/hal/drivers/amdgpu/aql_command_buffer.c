@@ -1919,6 +1919,8 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
   const uint32_t kernarg_block_length =
       patch_kernarg_block_length + dispatch_kernarg_block_length;
   const bool prepublish_kernargs =
+      !iree_all_bits_set(command_buffer->base.mode,
+                         IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) &&
       !uses_indirect_parameters && !has_dynamic_bindings;
   const uint32_t queue_kernarg_block_length =
       prepublish_kernargs ? 0 : kernarg_block_length;
