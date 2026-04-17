@@ -657,6 +657,12 @@ enum iree_hal_profile_memory_event_type_e {
 
   // Queue dealloca operation published to a HAL queue.
   IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA = 8u,
+
+  // Synchronous HAL buffer allocation.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE = 9u,
+
+  // Synchronous HAL buffer free.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE = 10u,
 };
 
 // Bitfield specifying properties of one memory lifecycle event.

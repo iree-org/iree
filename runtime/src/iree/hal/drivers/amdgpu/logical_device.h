@@ -139,6 +139,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     uint64_t memory_event_dropped_count;
     // Next nonzero memory event id assigned by this stream.
     uint64_t next_memory_event_id;
+    // Next nonzero memory allocation id assigned to profiled buffers.
+    uint64_t next_memory_allocation_id;
     // Host-side queue operation event stream protected by |queue_event_mutex|.
     iree_hal_profile_queue_event_t* queue_events;
     // Mutex protecting queue event stream positions and dropped counts.
@@ -196,13 +198,26 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
 bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
     iree_hal_device_t* base_device);
 
+// Returns a session-local allocation id, or 0 when memory profiling is off.
+//
+// |out_session_id| receives the active profiling session id owning the returned
+// allocation id. Callers that may release after a later profiling session
+// begins must pass the id back to the session-filtered record helper.
+uint64_t iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+    iree_hal_device_t* base_device, uint64_t* out_session_id);
+
 // Records one memory lifecycle event into the active profiling stream.
 //
 // This never calls the sink directly. Events are buffered in host memory and
 // emitted by profiling_flush/end, making this safe for submission and pool
 // paths that must not block on file or tool I/O.
-void iree_hal_amdgpu_logical_device_record_profile_memory_event(
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event(
     iree_hal_device_t* base_device,
+    const iree_hal_profile_memory_event_t* event);
+
+// Records one memory lifecycle event only if |session_id| is still active.
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+    iree_hal_device_t* base_device, uint64_t session_id,
     const iree_hal_profile_memory_event_t* event);
 
 // Records one queue operation event into the active profiling stream.

@@ -153,6 +153,14 @@ typedef struct iree_profile_memory_device_t {
   uint64_t pool_release_count;
   // Pool wait events matched for this device.
   uint64_t pool_wait_count;
+  // Synchronous HAL buffer allocation events matched for this device.
+  uint64_t buffer_allocate_count;
+  // Synchronous HAL buffer free events matched for this device.
+  uint64_t buffer_free_count;
+  // Current live synchronous buffer allocations after matched events.
+  uint64_t current_buffer_allocation_count;
+  // Maximum live synchronous buffer allocations observed.
+  uint64_t high_water_buffer_allocation_count;
   // Current live pool reservations after applying matched pool events.
   uint64_t current_pool_reservation_count;
   // Maximum live pool reservations observed while applying matched events.
@@ -189,6 +197,14 @@ typedef struct iree_profile_memory_device_t {
   uint64_t total_queue_alloca_bytes;
   // Total bytes deallocated by matched queue dealloca events.
   uint64_t total_queue_dealloca_bytes;
+  // Current synchronous buffer bytes after matched allocate/free events.
+  uint64_t current_buffer_bytes;
+  // Maximum synchronous buffer bytes observed while applying matched events.
+  uint64_t high_water_buffer_bytes;
+  // Total synchronous buffer bytes allocated by matched events.
+  uint64_t total_buffer_allocate_bytes;
+  // Total synchronous buffer bytes freed by matched events.
+  uint64_t total_buffer_free_bytes;
 } iree_profile_memory_device_t;
 
 typedef struct iree_profile_memory_context_t {
@@ -3166,6 +3182,10 @@ static const char* iree_profile_memory_event_type_name(
       return "queue_alloca";
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
       return "queue_dealloca";
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+      return "buffer_allocate";
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      return "buffer_free";
     default:
       return "unknown";
   }
@@ -3287,6 +3307,29 @@ static void iree_profile_memory_record_event(
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT:
       ++device->pool_wait_count;
       break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+      ++device->buffer_allocate_count;
+      ++device->current_buffer_allocation_count;
+      device->high_water_buffer_allocation_count =
+          iree_max(device->high_water_buffer_allocation_count,
+                   device->current_buffer_allocation_count);
+      device->total_buffer_allocate_bytes += event->length;
+      device->current_buffer_bytes += event->length;
+      device->high_water_buffer_bytes = iree_max(
+          device->high_water_buffer_bytes, device->current_buffer_bytes);
+      break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      ++device->buffer_free_count;
+      device->current_buffer_allocation_count =
+          device->current_buffer_allocation_count == 0
+              ? 0
+              : device->current_buffer_allocation_count - 1;
+      device->total_buffer_free_bytes += event->length;
+      device->current_buffer_bytes =
+          event->length > device->current_buffer_bytes
+              ? 0
+              : device->current_buffer_bytes - event->length;
+      break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
       ++device->queue_alloca_count;
       ++device->current_queue_allocation_count;
@@ -3403,12 +3446,14 @@ static iree_status_t iree_profile_memory_print_text(
             "device[%u]: events=%" PRIu64 " slab_acquire/release=%" PRIu64
             "/%" PRIu64 " pool_reserve/materialize/release/wait=%" PRIu64
             "/%" PRIu64 "/%" PRIu64 "/%" PRIu64
-            " queue_alloca/dealloca=%" PRIu64 "/%" PRIu64 "\n",
+            " queue_alloca/dealloca=%" PRIu64 "/%" PRIu64
+            " buffer_allocate/free=%" PRIu64 "/%" PRIu64 "\n",
             device->physical_device_ordinal, device->event_count,
             device->slab_acquire_count, device->slab_release_count,
             device->pool_reserve_count, device->pool_materialize_count,
             device->pool_release_count, device->pool_wait_count,
-            device->queue_alloca_count, device->queue_dealloca_count);
+            device->queue_alloca_count, device->queue_dealloca_count,
+            device->buffer_allocate_count, device->buffer_free_count);
     fprintf(file,
             "  slab_provider_events: live_at_end=%" PRIu64 " peak_live=%" PRIu64
             " current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
@@ -3437,6 +3482,15 @@ static iree_status_t iree_profile_memory_print_text(
             device->current_queue_bytes, device->high_water_queue_bytes,
             device->total_queue_alloca_bytes,
             device->total_queue_dealloca_bytes);
+    fprintf(file,
+            "  buffer_allocations: live_at_end=%" PRIu64 " peak_live=%" PRIu64
+            " current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
+            " allocate_bytes=%" PRIu64 " free_bytes=%" PRIu64 "\n",
+            device->current_buffer_allocation_count,
+            device->high_water_buffer_allocation_count,
+            device->current_buffer_bytes, device->high_water_buffer_bytes,
+            device->total_buffer_allocate_bytes,
+            device->total_buffer_free_bytes);
   }
   return iree_ok_status();
 }
@@ -3462,7 +3516,8 @@ static void iree_profile_memory_print_jsonl_summary(
         ",\"slab_releases\":%" PRIu64 ",\"pool_reserves\":%" PRIu64
         ",\"pool_materializes\":%" PRIu64 ",\"pool_releases\":%" PRIu64
         ",\"pool_waits\":%" PRIu64 ",\"queue_allocas\":%" PRIu64
-        ",\"queue_deallocas\":%" PRIu64 ",\"current_slab_allocations\":%" PRIu64
+        ",\"queue_deallocas\":%" PRIu64 ",\"buffer_allocates\":%" PRIu64
+        ",\"buffer_frees\":%" PRIu64 ",\"current_slab_allocations\":%" PRIu64
         ",\"high_water_slab_allocations\":%" PRIu64
         ",\"current_slab_bytes\":%" PRIu64 ",\"high_water_slab_bytes\":%" PRIu64
         ",\"total_slab_acquired_bytes\":%" PRIu64
@@ -3478,12 +3533,19 @@ static void iree_profile_memory_print_jsonl_summary(
         ",\"current_queue_bytes\":%" PRIu64
         ",\"high_water_queue_bytes\":%" PRIu64
         ",\"total_queue_alloca_bytes\":%" PRIu64
-        ",\"total_queue_dealloca_bytes\":%" PRIu64 "}\n",
+        ",\"total_queue_dealloca_bytes\":%" PRIu64
+        ",\"current_buffer_allocations\":%" PRIu64
+        ",\"high_water_buffer_allocations\":%" PRIu64
+        ",\"current_buffer_bytes\":%" PRIu64
+        ",\"high_water_buffer_bytes\":%" PRIu64
+        ",\"total_buffer_allocate_bytes\":%" PRIu64
+        ",\"total_buffer_free_bytes\":%" PRIu64 "}\n",
         device->physical_device_ordinal, device->event_count,
         device->slab_acquire_count, device->slab_release_count,
         device->pool_reserve_count, device->pool_materialize_count,
         device->pool_release_count, device->pool_wait_count,
         device->queue_alloca_count, device->queue_dealloca_count,
+        device->buffer_allocate_count, device->buffer_free_count,
         device->current_slab_allocation_count,
         device->high_water_slab_allocation_count, device->current_slab_bytes,
         device->high_water_slab_bytes, device->total_slab_acquired_bytes,
@@ -3496,7 +3558,11 @@ static void iree_profile_memory_print_jsonl_summary(
         device->current_queue_allocation_count,
         device->high_water_queue_allocation_count, device->current_queue_bytes,
         device->high_water_queue_bytes, device->total_queue_alloca_bytes,
-        device->total_queue_dealloca_bytes);
+        device->total_queue_dealloca_bytes,
+        device->current_buffer_allocation_count,
+        device->high_water_buffer_allocation_count,
+        device->current_buffer_bytes, device->high_water_buffer_bytes,
+        device->total_buffer_allocate_bytes, device->total_buffer_free_bytes);
   }
 }
 
@@ -3829,7 +3895,8 @@ static const char kIreeProfileUsage[] =
     "spans.\n"
     "  memory       Memory lifecycle events and high-water summaries for "
     "slabs,\n"
-    "               pools, and async queue allocations. Live-at-end counts\n"
+    "               pools, async queue allocations, and HAL buffers. "
+    "Live-at-end counts\n"
     "               are capture-window state, not required leaks.\n"
     "  cat          Raw bundle record dump for format archaeology/debugging.\n"
     "\n"
@@ -3948,9 +4015,9 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "counts,\n"
       "  dependency strategy, payload bytes, and related object ids.\n"
       "- `memory` summarizes slab/provider events, pool reservation events, "
-      "and\n"
-      "  async queue alloca/dealloca high-water behavior. With "
-      "`--format=jsonl`\n"
+      "async\n"
+      "  queue alloca/dealloca, and synchronous HAL buffer allocation/free "
+      "high-water behavior. With `--format=jsonl`\n"
       "  it also emits individual `memory_event` rows before the summary. "
       "Live\n"
       "  allocations at profile end are capture-window state and may be "
@@ -4092,7 +4159,8 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "iree-profile memory --format=jsonl /tmp/model.ireeprof | \\\n"
       "  jq 'select(.type==\"memory_device\") | \\\n"
       "      {physical_device_ordinal,current_queue_allocations,"
-      "high_water_queue_bytes}'\n"
+      "high_water_queue_bytes,current_buffer_allocations,"
+      "high_water_buffer_bytes}'\n"
       "```\n"
       "\n"
       "Trace one allocation lifecycle:\n"

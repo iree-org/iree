@@ -304,37 +304,70 @@ bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
       logical_device);
 }
 
-void iree_hal_amdgpu_logical_device_record_profile_memory_event(
-    iree_hal_device_t* base_device,
+uint64_t iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+    iree_hal_device_t* base_device, uint64_t* out_session_id) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  *out_session_id = 0;
+  if (!iree_hal_amdgpu_logical_device_profile_memory_events_requested(
+          logical_device)) {
+    return 0;
+  }
+
+  iree_slim_mutex_lock(&logical_device->profiling.memory_event_mutex);
+  *out_session_id = logical_device->profiling.session_id;
+  const uint64_t allocation_id =
+      logical_device->profiling.next_memory_allocation_id++;
+  iree_slim_mutex_unlock(&logical_device->profiling.memory_event_mutex);
+  return allocation_id;
+}
+
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+    iree_hal_device_t* base_device, uint64_t session_id,
     const iree_hal_profile_memory_event_t* event) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
   if (!iree_hal_amdgpu_logical_device_profile_memory_events_requested(
           logical_device)) {
-    return;
+    return false;
   }
 
+  bool recorded = false;
   iree_slim_mutex_lock(&logical_device->profiling.memory_event_mutex);
-  const uint64_t read_position =
-      logical_device->profiling.memory_event_read_position;
-  const uint64_t write_position =
-      logical_device->profiling.memory_event_write_position;
-  const uint64_t occupied_count = write_position - read_position;
-  if (occupied_count < logical_device->profiling.memory_event_capacity) {
-    iree_hal_profile_memory_event_t record = *event;
-    record.record_length = sizeof(record);
-    record.event_id = logical_device->profiling.next_memory_event_id++;
-    if (record.host_time_ns == 0) {
-      record.host_time_ns = iree_time_now();
+  const bool session_matches =
+      session_id == 0 || logical_device->profiling.session_id == session_id;
+  if (session_matches) {
+    const uint64_t read_position =
+        logical_device->profiling.memory_event_read_position;
+    const uint64_t write_position =
+        logical_device->profiling.memory_event_write_position;
+    const uint64_t occupied_count = write_position - read_position;
+    if (occupied_count < logical_device->profiling.memory_event_capacity) {
+      iree_hal_profile_memory_event_t record = *event;
+      record.record_length = sizeof(record);
+      record.event_id = logical_device->profiling.next_memory_event_id++;
+      if (record.host_time_ns == 0) {
+        record.host_time_ns = iree_time_now();
+      }
+      logical_device->profiling
+          .memory_events[write_position &
+                         logical_device->profiling.memory_event_mask] = record;
+      logical_device->profiling.memory_event_write_position =
+          write_position + 1;
+      recorded = true;
+    } else {
+      ++logical_device->profiling.memory_event_dropped_count;
     }
-    logical_device->profiling
-        .memory_events[write_position &
-                       logical_device->profiling.memory_event_mask] = record;
-    logical_device->profiling.memory_event_write_position = write_position + 1;
-  } else {
-    ++logical_device->profiling.memory_event_dropped_count;
   }
   iree_slim_mutex_unlock(&logical_device->profiling.memory_event_mutex);
+  return recorded;
+}
+
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event(
+    iree_hal_device_t* base_device,
+    const iree_hal_profile_memory_event_t* event) {
+  return iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+      base_device, /*session_id=*/0, event);
 }
 
 static bool iree_hal_amdgpu_logical_device_profile_queue_events_requested(
@@ -413,6 +446,7 @@ static void iree_hal_amdgpu_logical_device_clear_profile_memory_events(
   logical_device->profiling.memory_event_write_position = 0;
   logical_device->profiling.memory_event_dropped_count = 0;
   logical_device->profiling.next_memory_event_id = 1;
+  logical_device->profiling.next_memory_allocation_id = 1;
   if (logical_device->profiling.memory_events) {
     memset(logical_device->profiling.memory_events, 0,
            logical_device->profiling.memory_event_capacity *
@@ -432,6 +466,7 @@ static void iree_hal_amdgpu_logical_device_deallocate_profile_memory_events(
   logical_device->profiling.memory_event_write_position = 0;
   logical_device->profiling.memory_event_dropped_count = 0;
   logical_device->profiling.next_memory_event_id = 0;
+  logical_device->profiling.next_memory_allocation_id = 0;
 }
 
 static iree_status_t

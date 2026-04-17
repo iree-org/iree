@@ -20,6 +20,9 @@
 static const char* IREE_HAL_AMDGPU_ALLOCATOR_ID = "iree-hal-amdgpu-unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
+// HSA memory-pool allocations are reported and rounded to this alignment.
+#define IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT 256
+
 typedef struct iree_hal_amdgpu_allocator_t {
   // HAL resource header for allocator lifetime management.
   iree_hal_resource_t resource;
@@ -53,6 +56,9 @@ typedef struct iree_hal_amdgpu_allocator_t {
 typedef struct iree_hal_amdgpu_allocator_placement_t {
   // HSA memory pool selected for the allocation.
   hsa_amd_memory_pool_t memory_pool;
+
+  // Physical device ordinal owning |memory_pool|.
+  uint32_t physical_device_ordinal;
 
   // Resolved HAL memory type exposed by the created buffer.
   iree_hal_memory_type_t memory_type;
@@ -179,6 +185,7 @@ static bool iree_hal_amdgpu_allocator_resolve_placement(
   params->type = memory_type;
   params->usage &= supported_usage;
   out_placement->memory_pool = memory_pool;
+  out_placement->physical_device_ordinal = (uint32_t)device_ordinal;
   out_placement->memory_type = memory_type;
   return true;
 }
@@ -295,7 +302,7 @@ static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
   heaps[0].allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
                            IREE_HAL_BUFFER_USAGE_DISPATCH | sharing_usage;
   heaps[0].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[0].min_alignment = 256;
+  heaps[0].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
 
   // Heap 1: fine-grained device-local memory for explicit host visibility.
   heaps[1].type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
@@ -303,14 +310,14 @@ static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
                   IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
   heaps[1].allowed_usage = mappable_usage;
   heaps[1].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[1].min_alignment = 256;
+  heaps[1].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
 
   // Heap 2: fine-grained host-local memory visible to the device.
   heaps[2].type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   heaps[2].allowed_usage = mappable_usage;
   heaps[2].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[2].min_alignment = 256;
+  heaps[2].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
 
   return iree_ok_status();
 }
@@ -348,10 +355,45 @@ iree_hal_amdgpu_allocator_query_buffer_compatibility(
   // Guard against 0-byte allocations.
   if (*allocation_size == 0) *allocation_size = 4;
 
-  // Align to 256 bytes (HSA memory pool minimum alignment).
-  *allocation_size = iree_device_size_ceil_div(*allocation_size, 256) * 256;
+  // Align to the HSA memory pool minimum.
+  *allocation_size =
+      iree_device_size_ceil_div(*allocation_size,
+                                IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT) *
+      IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
 
   return compatibility;
+}
+
+static void iree_hal_amdgpu_allocator_record_buffer_allocate(
+    iree_hal_amdgpu_allocator_t* allocator,
+    const iree_hal_amdgpu_allocator_placement_t* memory_placement,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    void* host_ptr, iree_hal_buffer_t* buffer) {
+  uint64_t session_id = 0;
+  const uint64_t allocation_id =
+      iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+          (iree_hal_device_t*)allocator->logical_device, &session_id);
+  if (allocation_id == 0) {
+    return;
+  }
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE;
+  event.allocation_id = allocation_id;
+  event.pool_id = memory_placement->memory_pool.handle;
+  event.backing_id = (uint64_t)(uintptr_t)host_ptr;
+  event.physical_device_ordinal = memory_placement->physical_device_ordinal;
+  event.memory_type = memory_placement->memory_type;
+  event.buffer_usage = params.usage;
+  event.length = allocation_size;
+  event.alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
+  if (iree_hal_amdgpu_logical_device_record_profile_memory_event(
+          (iree_hal_device_t*)allocator->logical_device, &event)) {
+    iree_hal_amdgpu_buffer_set_profile_allocation(
+        buffer, session_id, allocation_id, event.pool_id,
+        event.physical_device_ordinal, event.alignment);
+  }
 }
 
 static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
@@ -393,7 +435,9 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
 
   // Guard against 0-byte allocations and align to the HSA memory pool minimum.
   if (allocation_size == 0) allocation_size = 4;
-  if (!iree_device_size_checked_align(allocation_size, 256, &allocation_size)) {
+  if (!iree_device_size_checked_align(allocation_size,
+                                      IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT,
+                                      &allocation_size)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "allocation size %" PRIdsz
@@ -440,6 +484,9 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
                            (iree_host_size_t)allocation_size);
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, compat_params.type, allocation_size));
+    iree_hal_amdgpu_allocator_record_buffer_allocate(
+        allocator, &memory_placement, compat_params, allocation_size, host_ptr,
+        buffer);
     *out_buffer = buffer;
   } else {
     if (host_ptr) {

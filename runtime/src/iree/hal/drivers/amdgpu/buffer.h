@@ -102,6 +102,16 @@ iree_status_t iree_hal_amdgpu_buffer_create_pooled(
     iree_hal_amdgpu_buffer_pool_t* pool, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer);
 
+// Tags |buffer| with a profiling allocation id.
+//
+// Only direct synchronous allocator buffers should be tagged. Pool/materialized
+// and queue_alloca transient buffers have their own pool/reservation event
+// streams and must not be double-counted as standalone buffer allocations.
+void iree_hal_amdgpu_buffer_set_profile_allocation(
+    iree_hal_buffer_t* buffer, uint64_t session_id, uint64_t allocation_id,
+    uint64_t pool_id, uint32_t physical_device_ordinal,
+    iree_device_size_t alignment);
+
 // Returns the HSA-allocated base pointer for the given |buffer|, or NULL if
 // |buffer| is not an AMDGPU buffer. HSA uses unified virtual addressing so
 // the returned pointer is valid for both host and GPU access.

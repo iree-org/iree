@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
 
 //===----------------------------------------------------------------------===//
@@ -39,6 +40,21 @@ struct iree_hal_amdgpu_buffer_t {
   // When present the callback owns release of |host_ptr| and any backing pool
   // bookkeeping. When null this buffer frees |host_ptr| directly with HSA.
   iree_hal_buffer_release_callback_t release_callback;
+
+  // Session-local profiling allocation id for direct allocator buffers.
+  uint64_t profile_allocation_id;
+
+  // Profiling session id owning |profile_allocation_id|.
+  uint64_t profile_session_id;
+
+  // Producer-defined memory pool id used for profiling events.
+  uint64_t profile_pool_id;
+
+  // Physical device ordinal used for profiling allocation/free events.
+  uint32_t profile_physical_device_ordinal;
+
+  // Byte alignment used for profiling allocation/free events.
+  iree_device_size_t profile_alignment;
 };
 
 static const iree_hal_buffer_vtable_t iree_hal_amdgpu_buffer_vtable;
@@ -239,6 +255,11 @@ static void iree_hal_amdgpu_buffer_initialize(
   out_buffer->libhsa = libhsa;
   out_buffer->host_ptr = host_ptr;
   out_buffer->release_callback = release_callback;
+  out_buffer->profile_allocation_id = 0;
+  out_buffer->profile_session_id = 0;
+  out_buffer->profile_pool_id = 0;
+  out_buffer->profile_physical_device_ordinal = UINT32_MAX;
+  out_buffer->profile_alignment = 0;
 }
 
 iree_status_t iree_hal_amdgpu_buffer_create(
@@ -294,11 +315,39 @@ iree_status_t iree_hal_amdgpu_buffer_create_pooled(
   return iree_ok_status();
 }
 
+void iree_hal_amdgpu_buffer_set_profile_allocation(
+    iree_hal_buffer_t* base_buffer, uint64_t session_id, uint64_t allocation_id,
+    uint64_t pool_id, uint32_t physical_device_ordinal,
+    iree_device_size_t alignment) {
+  iree_hal_amdgpu_buffer_t* buffer = iree_hal_amdgpu_buffer_cast(base_buffer);
+  buffer->profile_allocation_id = allocation_id;
+  buffer->profile_session_id = session_id;
+  buffer->profile_pool_id = pool_id;
+  buffer->profile_physical_device_ordinal = physical_device_ordinal;
+  buffer->profile_alignment = alignment;
+}
+
 static void iree_hal_amdgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_amdgpu_buffer_t* buffer = iree_hal_amdgpu_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = buffer->host_allocator;
   iree_hal_amdgpu_buffer_pool_t* pool = buffer->pool;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (buffer->profile_allocation_id != 0 && base_buffer->placement.device) {
+    iree_hal_profile_memory_event_t event =
+        iree_hal_profile_memory_event_default();
+    event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE;
+    event.allocation_id = buffer->profile_allocation_id;
+    event.pool_id = buffer->profile_pool_id;
+    event.backing_id = (uint64_t)(uintptr_t)buffer->host_ptr;
+    event.physical_device_ordinal = buffer->profile_physical_device_ordinal;
+    event.memory_type = base_buffer->memory_type;
+    event.buffer_usage = base_buffer->allowed_usage;
+    event.length = base_buffer->allocation_size;
+    event.alignment = buffer->profile_alignment;
+    iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+        base_buffer->placement.device, buffer->profile_session_id, &event);
+  }
 
   if (buffer->release_callback.fn) {
     buffer->release_callback.fn(buffer->release_callback.user_data,
@@ -311,6 +360,11 @@ static void iree_hal_amdgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   buffer->libhsa = NULL;
   buffer->host_ptr = NULL;
   buffer->release_callback = iree_hal_buffer_release_callback_null();
+  buffer->profile_allocation_id = 0;
+  buffer->profile_session_id = 0;
+  buffer->profile_pool_id = 0;
+  buffer->profile_physical_device_ordinal = UINT32_MAX;
+  buffer->profile_alignment = 0;
   if (pool) {
     iree_hal_amdgpu_buffer_pool_release(pool, buffer);
   } else {
