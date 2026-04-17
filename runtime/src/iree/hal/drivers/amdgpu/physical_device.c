@@ -456,6 +456,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
 
   out_physical_device->device_agent = device_agent;
   out_physical_device->device_ordinal = device_ordinal;
+  out_physical_device->host_memory_pools = *host_memory_pools;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,

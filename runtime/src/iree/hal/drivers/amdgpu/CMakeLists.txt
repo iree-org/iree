@@ -58,6 +58,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "profile_counters.c"
+    "profile_counters.h"
     "profile_metadata.c"
     "profile_metadata.h"
     "semaphore.c"
@@ -88,6 +90,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::device::profiling
     iree::hal::drivers::amdgpu::util
     iree::hal::drivers::amdgpu::util::hsaco_metadata
+    iree::hal::drivers::amdgpu::util::libaqlprofile
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::memory::slab_provider
@@ -127,6 +130,7 @@ iree_cc_library(
     "host_queue_waits.h"
     "logical_device.h"
     "physical_device.h"
+    "profile_counters.h"
     "profile_metadata.h"
     "semaphore.h"
     "slab_provider.h"

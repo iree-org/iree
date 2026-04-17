@@ -10,6 +10,7 @@
 
 #include "iree/hal/drivers/amdgpu/device/profiling.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/profile_counters.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
@@ -484,8 +485,15 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
   memset(out_submission, 0, sizeof(*out_submission));
 
   const bool use_profiling_completion_signal = profile_events.event_count != 0;
+  const uint32_t profile_counter_set_count =
+      iree_hal_amdgpu_host_queue_profile_counter_set_count(queue,
+                                                           profile_events);
+  const uint32_t profile_counter_packet_count =
+      iree_hal_amdgpu_host_queue_profile_counter_packet_count(queue,
+                                                              profile_events);
   const uint32_t payload_packet_count =
-      use_profiling_completion_signal ? 2u : 1u;
+      1u + profile_counter_packet_count +
+      (use_profiling_completion_signal ? 1u : 0u);
   const uint32_t profile_harvest_kernarg_block_count =
       use_profiling_completion_signal
           ? (uint32_t)iree_host_size_ceil_div(
@@ -500,8 +508,8 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       &out_submission->kernel);
   if (iree_status_is_ok(status) && *out_ready) {
     const uint64_t dispatch_packet_id = out_submission->kernel.first_packet_id +
-                                        out_submission->kernel.packet_count -
-                                        payload_packet_count;
+                                        resolution->barrier_count +
+                                        profile_counter_set_count;
     out_submission->dispatch_packet_id = dispatch_packet_id;
     out_submission->dispatch_slot =
         iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, dispatch_packet_id);
@@ -510,6 +518,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
             &queue->notification_ring);
     if (use_profiling_completion_signal) {
       out_submission->profile_events = profile_events;
+      out_submission->profile_counter_set_count = profile_counter_set_count;
       out_submission->dispatch_completion_signal =
           iree_hal_amdgpu_host_queue_profiling_completion_signal(
               queue, profile_events.first_event_position);
@@ -748,8 +757,26 @@ uint64_t iree_hal_amdgpu_host_queue_finish_dispatch_submission(
   }
   const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH, dispatch_packet_control);
+  if (submission->profile_counter_set_count != 0) {
+    iree_hal_amdgpu_host_queue_commit_profile_counter_start_packets(
+        queue, submission->profile_events.first_event_position,
+        submission->profile_counter_set_count,
+        submission->kernel.first_packet_id + resolution->barrier_count,
+        iree_hal_amdgpu_aql_packet_control_barrier(
+            iree_hal_amdgpu_host_queue_max_fence_scope(
+                IREE_HSA_FENCE_SCOPE_AGENT, resolution->inline_acquire_scope),
+            IREE_HSA_FENCE_SCOPE_AGENT));
+  }
   iree_hal_amdgpu_aql_ring_commit(submission->dispatch_slot, dispatch_header,
                                   submission->dispatch_setup);
+  if (submission->profile_counter_set_count != 0) {
+    iree_hal_amdgpu_host_queue_commit_profile_counter_read_stop_packets(
+        queue, submission->profile_events.first_event_position,
+        submission->profile_counter_set_count,
+        submission->dispatch_packet_id + 1,
+        iree_hal_amdgpu_aql_packet_control_barrier(IREE_HSA_FENCE_SCOPE_AGENT,
+                                                   IREE_HSA_FENCE_SCOPE_AGENT));
+  }
   if (submission->profile_harvest_slot) {
     iree_hal_amdgpu_aql_ring_commit(submission->profile_harvest_slot,
                                     profile_harvest_header,

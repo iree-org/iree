@@ -475,6 +475,12 @@ IREE_FLAG(
 IREE_FLAG(int64_t, device_profiling_filter_queue, -1,
           "Optional queue ordinal selecting operations that should emit heavy\n"
           "profiling artifacts.");
+IREE_FLAG_LIST(
+    string, device_profiling_counter,
+    "Optional implementation-specific hardware counter name to capture. May "
+    "be\n"
+    "specified multiple times; the selected HAL driver decides which counter\n"
+    "names and combinations are supported.");
 
 static iree_status_t iree_hal_profile_capture_filter_set_u32_from_flag(
     int64_t flag_value, iree_hal_profile_capture_filter_flags_t flag,
@@ -551,8 +557,15 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
 
   // Today we treat these as exclusive. When we have more implementations we
   // can figure out how best to combine them.
+  const iree_flag_string_list_t counter_names =
+      FLAG_device_profiling_counter_list();
   iree_hal_device_profiling_options_t options = {0};
   if (strlen(FLAG_device_profiling_mode) == 0) {
+    if (counter_names.count != 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "--device_profiling_counter requires --device_profiling_mode");
+    }
     return iree_ok_status();
   } else if (strcmp(FLAG_device_profiling_mode, "queue") == 0) {
     options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
@@ -570,6 +583,13 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   options.file_path = FLAG_device_profiling_file;
   IREE_RETURN_IF_ERROR(
       iree_hal_profile_capture_filter_from_flags(&options.capture_filter));
+  iree_hal_profile_counter_set_selection_t counter_set = {0};
+  if (counter_names.count != 0) {
+    counter_set.counter_name_count = counter_names.count;
+    counter_set.counter_names = counter_names.values;
+    options.counter_set_count = 1;
+    options.counter_sets = &counter_set;
+  }
 
   iree_hal_profile_sink_t* sink = NULL;
   iree_status_t status =

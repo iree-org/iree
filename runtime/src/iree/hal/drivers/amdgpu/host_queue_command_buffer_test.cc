@@ -281,32 +281,6 @@ class DeviceProfilingScope {
   bool is_active_ = false;
 };
 
-TEST_F(HostQueueCommandBufferTest,
-       ExplicitHardwareCounterSelectionFailsLoudUntilImplemented) {
-  iree_hal_amdgpu_logical_device_options_t options;
-  iree_hal_amdgpu_logical_device_options_initialize(&options);
-  TestLogicalDevice test_device;
-  IREE_ASSERT_OK(
-      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
-
-  iree_string_view_t counter_names[] = {
-      IREE_SV("SQ_WAVES"),
-  };
-  iree_hal_profile_counter_set_selection_t counter_set = {
-      /*.flags=*/IREE_HAL_PROFILE_COUNTER_SET_SELECTION_FLAG_NONE,
-      /*.name=*/IREE_SV("smoke"),
-      /*.counter_name_count=*/IREE_ARRAYSIZE(counter_names),
-      /*.counter_names=*/counter_names,
-  };
-  iree_hal_device_profiling_options_t profiling_options = {0};
-  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
-  profiling_options.counter_set_count = 1;
-  profiling_options.counter_sets = &counter_set;
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
-                        iree_hal_device_profiling_begin(
-                            test_device.base_device(), &profiling_options));
-}
-
 struct CommandBufferProfileSink {
   // HAL resource header for the profile sink.
   iree_hal_resource_t resource;
@@ -335,6 +309,15 @@ struct CommandBufferProfileSink {
   // Number of clock correlation chunks observed.
   int clock_correlation_count = 0;
 
+  // Number of counter set metadata chunks observed.
+  int counter_set_metadata_count = 0;
+
+  // Number of counter metadata chunks observed.
+  int counter_metadata_count = 0;
+
+  // Number of counter sample chunks observed.
+  int counter_sample_count = 0;
+
   // Executable identifiers copied from EXECUTABLES chunks.
   std::vector<uint64_t> executable_ids;
 
@@ -349,6 +332,12 @@ struct CommandBufferProfileSink {
 
   // Dispatch events copied from DISPATCH_EVENTS chunks.
   std::vector<iree_hal_profile_dispatch_event_t> dispatch_events;
+
+  // Counter sample records copied from COUNTER_SAMPLES chunks.
+  std::vector<iree_hal_profile_counter_sample_record_t> counter_samples;
+
+  // Counter sample values copied from COUNTER_SAMPLES chunks.
+  std::vector<uint64_t> counter_sample_values;
 
   // Physical device ordinals for entries in |dispatch_events|.
   std::vector<uint32_t> dispatch_event_physical_device_ordinals;
@@ -507,6 +496,56 @@ static iree_status_t CommandBufferProfileSinkWrite(
     ++test_sink->clock_correlation_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS)) {
+    iree_host_size_t payload_offset = 0;
+    while (payload_offset < iovecs[0].data_length) {
+      if (iovecs[0].data_length - payload_offset <
+          sizeof(iree_hal_profile_counter_set_record_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "truncated counter set profile record");
+      }
+      iree_hal_profile_counter_set_record_t record;
+      memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
+      if (record.record_length < sizeof(record) ||
+          record.record_length > iovecs[0].data_length - payload_offset) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "invalid counter set profile record");
+      }
+      EXPECT_NE(0u, record.counter_set_id);
+      EXPECT_GT(record.counter_count, 0u);
+      EXPECT_GT(record.sample_value_count, 0u);
+      EXPECT_EQ(record.name_length,
+                record.record_length - (uint32_t)sizeof(record));
+      payload_offset += record.record_length;
+    }
+    ++test_sink->counter_set_metadata_count;
+  } else if (iree_string_view_equal(metadata->content_type,
+                                    IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS)) {
+    iree_host_size_t payload_offset = 0;
+    while (payload_offset < iovecs[0].data_length) {
+      if (iovecs[0].data_length - payload_offset <
+          sizeof(iree_hal_profile_counter_record_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "truncated counter profile record");
+      }
+      iree_hal_profile_counter_record_t record;
+      memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
+      if (record.record_length < sizeof(record) ||
+          record.record_length > iovecs[0].data_length - payload_offset) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "invalid counter profile record");
+      }
+      EXPECT_NE(0u, record.counter_set_id);
+      EXPECT_GT(record.sample_value_count, 0u);
+      const uint32_t string_length = record.block_name_length +
+                                     record.name_length +
+                                     record.description_length;
+      EXPECT_EQ(string_length, record.record_length - (uint32_t)sizeof(record));
+      payload_offset += record.record_length;
+    }
+    ++test_sink->counter_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
     EXPECT_NE(UINT32_MAX, metadata->physical_device_ordinal);
     EXPECT_NE(UINT32_MAX, metadata->queue_ordinal);
@@ -523,6 +562,39 @@ static iree_status_t CommandBufferProfileSinkWrite(
     test_sink->dispatch_event_physical_device_ordinals.insert(
         test_sink->dispatch_event_physical_device_ordinals.end(), record_count,
         metadata->physical_device_ordinal);
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
+    iree_host_size_t payload_offset = 0;
+    while (payload_offset < iovecs[0].data_length) {
+      if (iovecs[0].data_length - payload_offset <
+          sizeof(iree_hal_profile_counter_sample_record_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "truncated counter sample profile record");
+      }
+      iree_hal_profile_counter_sample_record_t record;
+      memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
+      if (record.record_length < sizeof(record) ||
+          record.record_length > iovecs[0].data_length - payload_offset) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "invalid counter sample profile record");
+      }
+      EXPECT_NE(0u, record.sample_id);
+      EXPECT_NE(0u, record.counter_set_id);
+      EXPECT_NE(0u, record.dispatch_event_id);
+      EXPECT_GT(record.sample_value_count, 0u);
+      EXPECT_EQ(record.record_length,
+                sizeof(record) +
+                    record.sample_value_count * (uint32_t)sizeof(uint64_t));
+      const auto* values = reinterpret_cast<const uint64_t*>(
+          iovecs[0].data + payload_offset + sizeof(record));
+      test_sink->counter_sample_values.insert(
+          test_sink->counter_sample_values.end(), values,
+          values + record.sample_value_count);
+      test_sink->counter_samples.push_back(record);
+      payload_offset += record.record_length;
+    }
+    ++test_sink->counter_sample_count;
   }
 
   return iree_ok_status();
@@ -593,6 +665,55 @@ static void ExpectDispatchEventsWithinClockCorrelationRange(
 static bool IsProfilingUnsupported(iree_status_t status) {
   return iree_status_is_unimplemented(status) ||
          iree_status_is_invalid_argument(status);
+}
+
+static bool IsHardwareCounterProfilingUnavailable(iree_status_t status) {
+  return IsProfilingUnsupported(status) || iree_status_is_not_found(status) ||
+         iree_status_is_failed_precondition(status);
+}
+
+static iree_status_t BeginSqWavesProfiling(DeviceProfilingScope* profiling,
+                                           CommandBufferProfileSink* sink) {
+  iree_string_view_t counter_names[] = {
+      IREE_SV("SQ_WAVES"),
+  };
+  iree_hal_profile_counter_set_selection_t counter_set = {
+      /*.flags=*/IREE_HAL_PROFILE_COUNTER_SET_SELECTION_FLAG_NONE,
+      /*.name=*/IREE_SV("smoke"),
+      /*.counter_name_count=*/IREE_ARRAYSIZE(counter_names),
+      /*.counter_names=*/counter_names,
+  };
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.sink = CommandBufferProfileSinkAsBase(sink);
+  profiling_options.counter_set_count = 1;
+  profiling_options.counter_sets = &counter_set;
+  return profiling->Begin(&profiling_options);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ExplicitHardwareCounterSelectionEmitsMetadataWhenAvailable) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status = BeginSqWavesProfiling(&profiling, &sink);
+  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "AMDGPU hardware counter profiling unavailable";
+  }
+  IREE_ASSERT_OK(profiling_status);
+  IREE_ASSERT_OK(profiling.End());
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.counter_set_metadata_count);
+  EXPECT_EQ(1, sink.counter_metadata_count);
 }
 
 static iree_status_t AppendConstantsBindingsDispatch(
@@ -1225,6 +1346,157 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_GE(event.end_tick, event.start_tick);
   }
   ExpectDispatchEventsWithinClockCorrelationRange(sink);
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       CommandBufferDispatchesEmitHardwareCounterSamples) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status = BeginSqWavesProfiling(&profiling, &sink);
+  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "AMDGPU hardware counter profiling unavailable";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      input_buffer.out()));
+  const uint32_t input_values[4] = {1, 2, 3, 4};
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
+                                           input_values, sizeof(input_values)));
+
+  Ref<iree_hal_buffer_t> output_buffer0;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer0.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer0, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  Ref<iree_hal_buffer_t> output_buffer1;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer1.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer1, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  iree_hal_buffer_ref_t binding_refs0[2] = {
+      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer)),
+      iree_hal_make_buffer_ref(output_buffer0, /*offset=*/0,
+                               iree_hal_buffer_byte_length(output_buffer0)),
+  };
+  const iree_hal_buffer_ref_list_t bindings0 = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs0),
+      /*values=*/binding_refs0,
+  };
+  IREE_ASSERT_OK(
+      AppendConstantsBindingsDispatch(command_buffer, executable, bindings0));
+  iree_hal_buffer_ref_t binding_refs1[2] = {
+      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer)),
+      iree_hal_make_buffer_ref(output_buffer1, /*offset=*/0,
+                               iree_hal_buffer_byte_length(output_buffer1)),
+  };
+  const iree_hal_buffer_ref_list_t bindings1 = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs1),
+      /*values=*/binding_refs1,
+  };
+  IREE_ASSERT_OK(
+      AppendConstantsBindingsDispatch(command_buffer, executable, bindings1));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  const uint32_t expected_values[4] = {13, 16, 19, 22};
+  uint32_t output_values0[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
+      output_buffer0, /*offset=*/0, output_values0, sizeof(output_values0)));
+  EXPECT_EQ(0,
+            memcmp(output_values0, expected_values, sizeof(expected_values)));
+  uint32_t output_values1[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
+      output_buffer1, /*offset=*/0, output_values1, sizeof(output_values1)));
+  EXPECT_EQ(0,
+            memcmp(output_values1, expected_values, sizeof(expected_values)));
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.counter_set_metadata_count);
+  EXPECT_EQ(1, sink.counter_metadata_count);
+  EXPECT_GE(sink.counter_sample_count, 1);
+  ASSERT_EQ(2u, sink.dispatch_events.size());
+  ASSERT_EQ(sink.dispatch_events.size(), sink.counter_samples.size());
+  iree_host_size_t sample_value_count = 0;
+  for (iree_host_size_t i = 0; i < sink.counter_samples.size(); ++i) {
+    const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[i];
+    const iree_hal_profile_counter_sample_record_t& sample =
+        sink.counter_samples[i];
+    EXPECT_TRUE(iree_all_bits_set(
+        sample.flags,
+        IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DISPATCH_EVENT |
+            IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION));
+    EXPECT_EQ(sample.dispatch_event_id, event.event_id);
+    EXPECT_EQ(sample.submission_id, event.submission_id);
+    EXPECT_EQ(sample.command_buffer_id, event.command_buffer_id);
+    EXPECT_EQ(sample.executable_id, event.executable_id);
+    EXPECT_EQ(sample.command_index, event.command_index);
+    EXPECT_EQ(sample.export_ordinal, event.export_ordinal);
+    sample_value_count += sample.sample_value_count;
+  }
+  ASSERT_EQ(sample_value_count, sink.counter_sample_values.size());
+  EXPECT_NE(sink.counter_sample_values.end(),
+            std::find_if(sink.counter_sample_values.begin(),
+                         sink.counter_sample_values.end(),
+                         [](uint64_t value) { return value != 0; }));
 
   iree_hal_executable_release(executable);
   iree_hal_executable_cache_release(executable_cache);

@@ -34,6 +34,10 @@ extern "C" {
 
 typedef struct iree_hal_amdgpu_pending_op_t iree_hal_amdgpu_pending_op_t;
 typedef struct iree_hal_amdgpu_pm4_ib_slot_t iree_hal_amdgpu_pm4_ib_slot_t;
+typedef struct iree_hal_amdgpu_profile_counter_sample_slot_t
+    iree_hal_amdgpu_profile_counter_sample_slot_t;
+typedef struct iree_hal_amdgpu_profile_counter_session_t
+    iree_hal_amdgpu_profile_counter_session_t;
 typedef struct iree_hal_amdgpu_staging_pool_t iree_hal_amdgpu_staging_pool_t;
 typedef struct iree_hal_amdgpu_transient_buffer_pool_t
     iree_hal_amdgpu_transient_buffer_pool_t;
@@ -310,6 +314,16 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     uint64_t dispatch_event_write_position;
     // Next queue-local dispatch event id assigned during submission.
     uint64_t next_dispatch_event_id;
+    // Borrowed hardware counter session active for this queue, or NULL.
+    iree_hal_amdgpu_profile_counter_session_t* counter_session;
+    // Host-side slot table pairing dispatch event ring slots with per-use
+    // aqlprofile handles. One logical dispatch event owns |counter_set_count|
+    // contiguous slots until its event ring position is flushed.
+    iree_hal_amdgpu_profile_counter_sample_slot_t* counter_sample_slots;
+    // Number of counter sample slots associated with each dispatch event slot.
+    uint32_t counter_set_count;
+    // Reserved padding.
+    uint32_t reserved0;
   } profiling;
 
   // False once this queue's accumulated frontier overflows while merging waited

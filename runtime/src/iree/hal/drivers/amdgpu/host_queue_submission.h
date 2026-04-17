@@ -105,6 +105,8 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
   iree_hal_amdgpu_kernarg_block_t* profile_harvest_kernarg_blocks;
   // Dispatch profile event reservation harvested by |profile_harvest_slot|.
   iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events;
+  // Number of counter sets captured around |dispatch_slot|.
+  uint32_t profile_counter_set_count;
   // Completion signal to write into |dispatch_slot|.
   iree_hsa_signal_t dispatch_completion_signal;
   // Setup bits published with |dispatch_slot|'s final header.

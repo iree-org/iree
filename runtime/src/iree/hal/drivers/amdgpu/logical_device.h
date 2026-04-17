@@ -22,6 +22,8 @@ typedef struct iree_hal_amdgpu_physical_device_t
     iree_hal_amdgpu_physical_device_t;
 typedef struct iree_hal_amdgpu_epoch_signal_table_t
     iree_hal_amdgpu_epoch_signal_table_t;
+typedef struct iree_hal_amdgpu_profile_counter_session_t
+    iree_hal_amdgpu_profile_counter_session_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
@@ -124,6 +126,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     iree_hal_amdgpu_profile_metadata_cursor_t metadata_cursor;
     // Retained programmatic sink receiving HAL-native profiling chunks.
     iree_hal_profile_sink_t* sink;
+    // Hardware counter session active for selected dispatches, or NULL.
+    iree_hal_amdgpu_profile_counter_session_t* counter_session;
     // Host-side memory lifecycle event stream protected by
     // |memory_event_mutex|.
     iree_hal_profile_memory_event_t* memory_events;

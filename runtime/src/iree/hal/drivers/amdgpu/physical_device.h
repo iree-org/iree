@@ -173,6 +173,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   uint32_t has_physical_device_uuid : 1;
   // NUMA node of the CPU agent nearest to |device_agent|.
   uint32_t host_numa_node;
+  // Host memory pools for the CPU agent nearest to |device_agent|.
+  iree_hal_amdgpu_host_memory_pools_t host_memory_pools;
 
   // Fine-grained block pools for device memory blocks of various sizes.
   iree_hal_amdgpu_block_pools_t fine_block_pools;
