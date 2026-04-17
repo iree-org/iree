@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan --pass-pipeline='builtin.module(iree-codegen-spirv-configuration-pipeline, func.func(iree-spirv-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan \
+// RUN:   --iree-codegen-spirv-configuration-pipeline \
+// RUN:   --iree-codegen-linalg-to-spirv-pipeline='include-spirv-lowering=false' \
+// RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
