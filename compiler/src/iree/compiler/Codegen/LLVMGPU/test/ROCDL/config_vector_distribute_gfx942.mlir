@@ -338,8 +338,8 @@ func.func @attention_20x4096x64x4096x64_f8() {
 // CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:            MFMA_F32_16x16x32_F8E4M3FNUZ
 // CHECK-SAME{LITERAL}:   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]
-// CHECK-SAME: reduction =  [0, 0, 0, 128, 0]
-// CHECK-SAME: workgroup =  [1, 64, 0, 0, 64]
+// CHECK-SAME: reduction =  [0, 0, 0, 64, 0]
+// CHECK-SAME: workgroup =  [1, 64, 0, 0, 16]
 
 // -----
 
@@ -524,3 +524,55 @@ func.func @attention_multi_m_dynamic(%arg0 : tensor<20x8x?x16x64xf16>, %arg1 : t
 // CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 64, 0]
 // CHECK-SAME:                           workgroup =  [1, 4, 1, 16, 0, 0, 64]
+
+// -----
+
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+
+// CHECK-LABEL: func.func @attention_f32_20x4096x128x4096x128()
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @attention_f32_20x4096x128x4096x128() {
+  %cst = arith.constant 1.250000e-01 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x4096x128xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [20, 4096, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>> -> tensor<20x4096x128xf32>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>> -> tensor<20x4096x128xf32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x128xf32>> -> tensor<20x4096x128xf32>
+  %7 = tensor.empty() : tensor<20x4096x128xf32>
+  %8 = tensor.empty() : tensor<20x4096xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %9 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<20x4096x128xf32>) -> tensor<20x4096x128xf32>
+  %10 = linalg.fill ins(%cst_1 : f32) outs(%8 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %11 = linalg.fill ins(%cst_2 : f32) outs(%8 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %12:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, f32) outs(%9, %10, %11 : tensor<20x4096x128xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  ^bb0(%arg0: f32):
+    iree_linalg_ext.yield %arg0 : f32
+  } -> tensor<20x4096x128xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+  iree_tensor_ext.dispatch.tensor.store %12#0, %3, offsets = [0, 0, 0], sizes = [20, 4096, 128], strides = [1, 1, 1] : tensor<20x4096x128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x4096x128xf32>>
+  return
+}
+
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:            mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:            mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:            reduction =  [0, 0, 0, 16, 0]
+// CHECK-SAME:            workgroup =  [1, 64, 0, 0, 64]
