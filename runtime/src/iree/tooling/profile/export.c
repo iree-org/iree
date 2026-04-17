@@ -95,40 +95,38 @@ static void iree_profile_export_print_diagnostic(
 static iree_status_t iree_profile_export_process_device_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_device_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_device_record_t device_record;
-      memcpy(&device_record, record->payload.data + payload_offset,
-             sizeof(device_record));
-      const bool has_uuid =
-          iree_all_bits_set(device_record.flags,
-                            IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID);
-      iree_profile_export_print_prefix(file, "device", record_index);
-      fprintf(file,
-              ",\"physical_device_ordinal\":%u,\"flags\":%u"
-              ",\"queue_count\":%u,\"physical_device_uuid_present\":%s"
-              ",\"physical_device_uuid\":",
-              device_record.physical_device_ordinal, device_record.flags,
-              device_record.queue_count, has_uuid ? "true" : "false");
-      if (has_uuid) {
-        fputc('"', file);
-        iree_profile_export_fprint_hex_bytes(
-            file, device_record.physical_device_uuid,
-            sizeof(device_record.physical_device_uuid));
-        fputc('"', file);
-      } else {
-        fprintf(file, "null");
-      }
-      fputs("}\n", file);
-      payload_offset += record_length;
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_record_t device_record;
+    memcpy(&device_record, typed_record.contents.data, sizeof(device_record));
+    const bool has_uuid = iree_all_bits_set(
+        device_record.flags, IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID);
+    iree_profile_export_print_prefix(file, "device", record_index);
+    fprintf(file,
+            ",\"physical_device_ordinal\":%u,\"flags\":%u"
+            ",\"queue_count\":%u,\"physical_device_uuid_present\":%s"
+            ",\"physical_device_uuid\":",
+            device_record.physical_device_ordinal, device_record.flags,
+            device_record.queue_count, has_uuid ? "true" : "false");
+    if (has_uuid) {
+      fputc('"', file);
+      iree_profile_export_fprint_hex_bytes(
+          file, device_record.physical_device_uuid,
+          sizeof(device_record.physical_device_uuid));
+      fputc('"', file);
+    } else {
+      fprintf(file, "null");
     }
+    fputs("}\n", file);
   }
   return status;
 }
@@ -136,26 +134,25 @@ static iree_status_t iree_profile_export_process_device_records(
 static iree_status_t iree_profile_export_process_queue_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_queue_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_queue_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_queue_record_t queue_record;
-      memcpy(&queue_record, record->payload.data + payload_offset,
-             sizeof(queue_record));
-      iree_profile_export_print_prefix(file, "queue", record_index);
-      fprintf(file,
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"stream_id\":%" PRIu64 "}\n",
-              queue_record.physical_device_ordinal, queue_record.queue_ordinal,
-              queue_record.stream_id);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_queue_record_t queue_record;
+    memcpy(&queue_record, typed_record.contents.data, sizeof(queue_record));
+    iree_profile_export_print_prefix(file, "queue", record_index);
+    fprintf(file,
+            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+            ",\"stream_id\":%" PRIu64 "}\n",
+            queue_record.physical_device_ordinal, queue_record.queue_ordinal,
+            queue_record.stream_id);
   }
   return status;
 }
@@ -163,35 +160,35 @@ static iree_status_t iree_profile_export_process_queue_records(
 static iree_status_t iree_profile_export_process_executable_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_executable_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_executable_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_executable_record_t executable_record;
-      memcpy(&executable_record, record->payload.data + payload_offset,
-             sizeof(executable_record));
-      const bool has_code_object_hash =
-          iree_all_bits_set(executable_record.flags,
-                            IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
-      iree_profile_export_print_prefix(file, "executable", record_index);
-      fprintf(file,
-              ",\"executable_id\":%" PRIu64
-              ",\"flags\":%u"
-              ",\"export_count\":%u,\"code_object_hash_present\":%s"
-              ",\"code_object_hash\":",
-              executable_record.executable_id, executable_record.flags,
-              executable_record.export_count,
-              has_code_object_hash ? "true" : "false");
-      iree_profile_export_fprint_nullable_hash(
-          file, has_code_object_hash, executable_record.code_object_hash);
-      fputs("}\n", file);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_executable_record_t executable_record;
+    memcpy(&executable_record, typed_record.contents.data,
+           sizeof(executable_record));
+    const bool has_code_object_hash =
+        iree_all_bits_set(executable_record.flags,
+                          IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
+    iree_profile_export_print_prefix(file, "executable", record_index);
+    fprintf(file,
+            ",\"executable_id\":%" PRIu64
+            ",\"flags\":%u"
+            ",\"export_count\":%u,\"code_object_hash_present\":%s"
+            ",\"code_object_hash\":",
+            executable_record.executable_id, executable_record.flags,
+            executable_record.export_count,
+            has_code_object_hash ? "true" : "false");
+    iree_profile_export_fprint_nullable_hash(
+        file, has_code_object_hash, executable_record.code_object_hash);
+    fputs("}\n", file);
   }
   return status;
 }
@@ -199,54 +196,51 @@ static iree_status_t iree_profile_export_process_executable_records(
 static iree_status_t iree_profile_export_process_executable_export_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_executable_export_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_executable_export_record_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_executable_export_record_t export_record;
+    memcpy(&export_record, typed_record.contents.data, sizeof(export_record));
+    if ((iree_host_size_t)export_record.name_length !=
+        typed_record.inline_payload.data_length) {
+      status =
+          iree_make_status(IREE_STATUS_DATA_LOSS,
+                           "executable export name length is inconsistent");
+    }
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_executable_export_record_t export_record;
-      memcpy(&export_record, record->payload.data + payload_offset,
-             sizeof(export_record));
-      if (export_record.name_length != record_length - sizeof(export_record)) {
-        status =
-            iree_make_status(IREE_STATUS_DATA_LOSS,
-                             "executable export name length is inconsistent");
-      }
-      if (iree_status_is_ok(status)) {
-        const bool has_pipeline_hash = iree_all_bits_set(
-            export_record.flags,
-            IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
-        iree_string_view_t name =
-            iree_make_string_view((const char*)record->payload.data +
-                                      payload_offset + sizeof(export_record),
-                                  export_record.name_length);
-        iree_profile_export_print_prefix(file, "executable_export",
-                                         record_index);
-        fprintf(file,
-                ",\"executable_id\":%" PRIu64
-                ",\"export_ordinal\":%u"
-                ",\"flags\":%u,\"name\":",
-                export_record.executable_id, export_record.export_ordinal,
-                export_record.flags);
-        iree_profile_fprint_json_string(file, name);
-        fprintf(file,
-                ",\"constant_count\":%u,\"binding_count\":%u"
-                ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
-                ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
-                export_record.constant_count, export_record.binding_count,
-                export_record.parameter_count, export_record.workgroup_size[0],
-                export_record.workgroup_size[1],
-                export_record.workgroup_size[2],
-                has_pipeline_hash ? "true" : "false");
-        iree_profile_export_fprint_nullable_hash(file, has_pipeline_hash,
-                                                 export_record.pipeline_hash);
-        fputs("}\n", file);
-      }
-      payload_offset += record_length;
+      const bool has_pipeline_hash = iree_all_bits_set(
+          export_record.flags,
+          IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+      iree_string_view_t name =
+          iree_make_string_view((const char*)typed_record.inline_payload.data,
+                                typed_record.inline_payload.data_length);
+      iree_profile_export_print_prefix(file, "executable_export", record_index);
+      fprintf(file,
+              ",\"executable_id\":%" PRIu64
+              ",\"export_ordinal\":%u"
+              ",\"flags\":%u,\"name\":",
+              export_record.executable_id, export_record.export_ordinal,
+              export_record.flags);
+      iree_profile_fprint_json_string(file, name);
+      fprintf(file,
+              ",\"constant_count\":%u,\"binding_count\":%u"
+              ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
+              ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
+              export_record.constant_count, export_record.binding_count,
+              export_record.parameter_count, export_record.workgroup_size[0],
+              export_record.workgroup_size[1], export_record.workgroup_size[2],
+              has_pipeline_hash ? "true" : "false");
+      iree_profile_export_fprint_nullable_hash(file, has_pipeline_hash,
+                                               export_record.pipeline_hash);
+      fputs("}\n", file);
     }
   }
   return status;
@@ -255,32 +249,31 @@ static iree_status_t iree_profile_export_process_executable_export_records(
 static iree_status_t iree_profile_export_process_command_buffer_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_command_buffer_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_command_buffer_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_command_buffer_record_t command_buffer_record;
-      memcpy(&command_buffer_record, record->payload.data + payload_offset,
-             sizeof(command_buffer_record));
-      iree_profile_export_print_prefix(file, "command_buffer", record_index);
-      fprintf(
-          file,
-          ",\"command_buffer_id\":%" PRIu64
-          ",\"flags\":%u"
-          ",\"physical_device_ordinal\":%u,\"mode\":%" PRIu64
-          ",\"command_categories\":%" PRIu64 ",\"queue_affinity\":%" PRIu64
-          "}\n",
-          command_buffer_record.command_buffer_id, command_buffer_record.flags,
-          command_buffer_record.physical_device_ordinal,
-          command_buffer_record.mode, command_buffer_record.command_categories,
-          command_buffer_record.queue_affinity);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_command_buffer_record_t command_buffer_record;
+    memcpy(&command_buffer_record, typed_record.contents.data,
+           sizeof(command_buffer_record));
+    iree_profile_export_print_prefix(file, "command_buffer", record_index);
+    fprintf(
+        file,
+        ",\"command_buffer_id\":%" PRIu64
+        ",\"flags\":%u"
+        ",\"physical_device_ordinal\":%u,\"mode\":%" PRIu64
+        ",\"command_categories\":%" PRIu64 ",\"queue_affinity\":%" PRIu64 "}\n",
+        command_buffer_record.command_buffer_id, command_buffer_record.flags,
+        command_buffer_record.physical_device_ordinal,
+        command_buffer_record.mode, command_buffer_record.command_categories,
+        command_buffer_record.queue_affinity);
   }
   return status;
 }
@@ -289,66 +282,65 @@ static iree_status_t iree_profile_export_process_command_operation_records(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_command_operation_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_command_operation_record_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_command_operation_record_t operation_record;
+    memcpy(&operation_record, typed_record.contents.data,
+           sizeof(operation_record));
+    const char* operation_name =
+        iree_profile_command_operation_type_name(operation_record.type);
+    char numeric_buffer[128];
+    iree_string_view_t key = iree_string_view_empty();
+    status = iree_profile_command_operation_resolve_key(
+        context, &operation_record, numeric_buffer, sizeof(numeric_buffer),
+        &key);
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_command_operation_record_t operation_record;
-      memcpy(&operation_record, record->payload.data + payload_offset,
-             sizeof(operation_record));
-      const char* operation_name =
-          iree_profile_command_operation_type_name(operation_record.type);
-      char numeric_buffer[128];
-      iree_string_view_t key = iree_string_view_empty();
-      status = iree_profile_command_operation_resolve_key(
-          context, &operation_record, numeric_buffer, sizeof(numeric_buffer),
-          &key);
-      if (iree_status_is_ok(status)) {
-        iree_profile_export_print_prefix(file, "command_operation",
-                                         record_index);
-        fprintf(file,
-                ",\"command_buffer_id\":%" PRIu64
-                ",\"command_index\":%u"
-                ",\"op\":",
-                operation_record.command_buffer_id,
-                operation_record.command_index);
-        iree_profile_fprint_json_string(file,
-                                        iree_make_cstring_view(operation_name));
-        fprintf(file, ",\"key\":");
-        iree_profile_fprint_json_string(file, key);
-        fprintf(
-            file,
-            ",\"flags\":%u,\"block_ordinal\":%u"
-            ",\"block_command_ordinal\":%u"
-            ",\"executable_id\":%" PRIu64
-            ",\"export_ordinal\":%u"
-            ",\"binding_count\":%u,\"workgroup_count\":[%u,%u,%u]"
-            ",\"workgroup_size\":[%u,%u,%u]"
-            ",\"source_ordinal\":%u,\"target_ordinal\":%u"
-            ",\"source_offset\":%" PRIu64 ",\"target_offset\":%" PRIu64
-            ",\"length\":%" PRIu64
-            ",\"target_block_ordinal\":%u"
-            ",\"alternate_block_ordinal\":%u}\n",
-            operation_record.flags, operation_record.block_ordinal,
-            operation_record.block_command_ordinal,
-            operation_record.executable_id, operation_record.export_ordinal,
-            operation_record.binding_count, operation_record.workgroup_count[0],
-            operation_record.workgroup_count[1],
-            operation_record.workgroup_count[2],
-            operation_record.workgroup_size[0],
-            operation_record.workgroup_size[1],
-            operation_record.workgroup_size[2], operation_record.source_ordinal,
-            operation_record.target_ordinal, operation_record.source_offset,
-            operation_record.target_offset, operation_record.length,
-            operation_record.target_block_ordinal,
-            operation_record.alternate_block_ordinal);
-        payload_offset += record_length;
-      }
+      iree_profile_export_print_prefix(file, "command_operation", record_index);
+      fprintf(file,
+              ",\"command_buffer_id\":%" PRIu64
+              ",\"command_index\":%u"
+              ",\"op\":",
+              operation_record.command_buffer_id,
+              operation_record.command_index);
+      iree_profile_fprint_json_string(file,
+                                      iree_make_cstring_view(operation_name));
+      fprintf(file, ",\"key\":");
+      iree_profile_fprint_json_string(file, key);
+      fprintf(file,
+              ",\"flags\":%u,\"block_ordinal\":%u"
+              ",\"block_command_ordinal\":%u"
+              ",\"executable_id\":%" PRIu64
+              ",\"export_ordinal\":%u"
+              ",\"binding_count\":%u,\"workgroup_count\":[%u,%u,%u]"
+              ",\"workgroup_size\":[%u,%u,%u]"
+              ",\"source_ordinal\":%u,\"target_ordinal\":%u"
+              ",\"source_offset\":%" PRIu64 ",\"target_offset\":%" PRIu64
+              ",\"length\":%" PRIu64
+              ",\"target_block_ordinal\":%u"
+              ",\"alternate_block_ordinal\":%u}\n",
+              operation_record.flags, operation_record.block_ordinal,
+              operation_record.block_command_ordinal,
+              operation_record.executable_id, operation_record.export_ordinal,
+              operation_record.binding_count,
+              operation_record.workgroup_count[0],
+              operation_record.workgroup_count[1],
+              operation_record.workgroup_count[2],
+              operation_record.workgroup_size[0],
+              operation_record.workgroup_size[1],
+              operation_record.workgroup_size[2],
+              operation_record.source_ordinal, operation_record.target_ordinal,
+              operation_record.source_offset, operation_record.target_offset,
+              operation_record.length, operation_record.target_block_ordinal,
+              operation_record.alternate_block_ordinal);
     }
   }
   return status;
@@ -357,45 +349,43 @@ static iree_status_t iree_profile_export_process_command_operation_records(
 static iree_status_t iree_profile_export_process_clock_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_clock_correlation_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_clock_correlation_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_clock_correlation_record_t clock_record;
-      memcpy(&clock_record, record->payload.data + payload_offset,
-             sizeof(clock_record));
-      iree_profile_export_print_prefix(file, "clock_correlation", record_index);
-      fprintf(
-          file,
-          ",\"sample_id\":%" PRIu64
-          ",\"flags\":%u"
-          ",\"physical_device_ordinal\":%u"
-          ",\"device_tick_domain\":\"device_tick\""
-          ",\"device_tick\":%" PRIu64
-          ",\"host_cpu_timestamp_domain\":\"driver_host_cpu_timestamp_ns\""
-          ",\"host_cpu_timestamp_ns\":%" PRIu64
-          ",\"host_system_timestamp_domain\":\"driver_host_system_timestamp\""
-          ",\"host_system_timestamp\":%" PRIu64
-          ",\"host_system_frequency_hz\":%" PRIu64
-          ",\"host_time_domain\":\"iree_host_time_ns\""
-          ",\"host_time_begin_ns\":%" PRId64 ",\"host_time_end_ns\":%" PRId64
-          ",\"host_time_uncertainty_ns\":%" PRId64 "}\n",
-          clock_record.sample_id, clock_record.flags,
-          clock_record.physical_device_ordinal, clock_record.device_tick,
-          clock_record.host_cpu_timestamp_ns,
-          clock_record.host_system_timestamp,
-          clock_record.host_system_frequency_hz,
-          clock_record.host_time_begin_ns, clock_record.host_time_end_ns,
-          clock_record.host_time_end_ns >= clock_record.host_time_begin_ns
-              ? clock_record.host_time_end_ns - clock_record.host_time_begin_ns
-              : 0);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_clock_correlation_record_t clock_record;
+    memcpy(&clock_record, typed_record.contents.data, sizeof(clock_record));
+    iree_profile_export_print_prefix(file, "clock_correlation", record_index);
+    fprintf(
+        file,
+        ",\"sample_id\":%" PRIu64
+        ",\"flags\":%u"
+        ",\"physical_device_ordinal\":%u"
+        ",\"device_tick_domain\":\"device_tick\""
+        ",\"device_tick\":%" PRIu64
+        ",\"host_cpu_timestamp_domain\":\"driver_host_cpu_timestamp_ns\""
+        ",\"host_cpu_timestamp_ns\":%" PRIu64
+        ",\"host_system_timestamp_domain\":\"driver_host_system_timestamp\""
+        ",\"host_system_timestamp\":%" PRIu64
+        ",\"host_system_frequency_hz\":%" PRIu64
+        ",\"host_time_domain\":\"iree_host_time_ns\""
+        ",\"host_time_begin_ns\":%" PRId64 ",\"host_time_end_ns\":%" PRId64
+        ",\"host_time_uncertainty_ns\":%" PRId64 "}\n",
+        clock_record.sample_id, clock_record.flags,
+        clock_record.physical_device_ordinal, clock_record.device_tick,
+        clock_record.host_cpu_timestamp_ns, clock_record.host_system_timestamp,
+        clock_record.host_system_frequency_hz, clock_record.host_time_begin_ns,
+        clock_record.host_time_end_ns,
+        clock_record.host_time_end_ns >= clock_record.host_time_begin_ns
+            ? clock_record.host_time_end_ns - clock_record.host_time_begin_ns
+            : 0);
   }
   return status;
 }
@@ -404,60 +394,142 @@ static iree_status_t iree_profile_export_process_dispatch_records(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_dispatch_event_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_dispatch_event_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_dispatch_event_t dispatch_record;
+    memcpy(&dispatch_record, typed_record.contents.data,
+           sizeof(dispatch_record));
+    const bool is_valid =
+        dispatch_record.start_tick != 0 && dispatch_record.end_tick != 0 &&
+        dispatch_record.end_tick >= dispatch_record.start_tick;
+    const uint64_t duration_ticks =
+        is_valid ? dispatch_record.end_tick - dispatch_record.start_tick : 0;
+    double start_driver_host_cpu_time_ns = 0.0;
+    double end_driver_host_cpu_time_ns = 0.0;
+    const bool has_derived_start =
+        iree_profile_export_try_derive_driver_host_cpu_time_ns(
+            context, record->header.physical_device_ordinal,
+            dispatch_record.start_tick, &start_driver_host_cpu_time_ns);
+    const bool has_derived_end =
+        iree_profile_export_try_derive_driver_host_cpu_time_ns(
+            context, record->header.physical_device_ordinal,
+            dispatch_record.end_tick, &end_driver_host_cpu_time_ns);
+    const bool has_derived_time =
+        is_valid && has_derived_start && has_derived_end;
+    char numeric_buffer[128];
+    iree_string_view_t key = iree_string_view_empty();
+    status = iree_profile_dispatch_resolve_key(
+        context, record->header.physical_device_ordinal,
+        dispatch_record.executable_id, dispatch_record.export_ordinal,
+        numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_dispatch_event_t dispatch_record;
-      memcpy(&dispatch_record, record->payload.data + payload_offset,
-             sizeof(dispatch_record));
-      const bool is_valid =
-          dispatch_record.start_tick != 0 && dispatch_record.end_tick != 0 &&
-          dispatch_record.end_tick >= dispatch_record.start_tick;
-      const uint64_t duration_ticks =
-          is_valid ? dispatch_record.end_tick - dispatch_record.start_tick : 0;
-      double start_driver_host_cpu_time_ns = 0.0;
-      double end_driver_host_cpu_time_ns = 0.0;
-      const bool has_derived_start =
-          iree_profile_export_try_derive_driver_host_cpu_time_ns(
-              context, record->header.physical_device_ordinal,
-              dispatch_record.start_tick, &start_driver_host_cpu_time_ns);
-      const bool has_derived_end =
-          iree_profile_export_try_derive_driver_host_cpu_time_ns(
-              context, record->header.physical_device_ordinal,
-              dispatch_record.end_tick, &end_driver_host_cpu_time_ns);
-      const bool has_derived_time =
-          is_valid && has_derived_start && has_derived_end;
-      char numeric_buffer[128];
-      iree_string_view_t key = iree_string_view_empty();
-      status = iree_profile_dispatch_resolve_key(
-          context, record->header.physical_device_ordinal,
-          dispatch_record.executable_id, dispatch_record.export_ordinal,
-          numeric_buffer, sizeof(numeric_buffer), &key);
-      if (iree_status_is_ok(status)) {
-        iree_profile_export_print_prefix(file, "dispatch_event", record_index);
-        fprintf(file,
-                ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-                ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
-                ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
-                ",\"command_index\":%u,\"executable_id\":%" PRIu64
-                ",\"export_ordinal\":%u,\"key\":",
-                record->header.physical_device_ordinal,
-                record->header.queue_ordinal, record->header.stream_id,
-                dispatch_record.event_id, dispatch_record.submission_id,
-                dispatch_record.command_buffer_id,
-                dispatch_record.command_index, dispatch_record.executable_id,
-                dispatch_record.export_ordinal);
-        iree_profile_fprint_json_string(file, key);
-        fprintf(
-            file,
-            ",\"flags\":%u,\"workgroup_count\":[%u,%u,%u]"
-            ",\"workgroup_size\":[%u,%u,%u]"
+      iree_profile_export_print_prefix(file, "dispatch_event", record_index);
+      fprintf(file,
+              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+              ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
+              ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+              ",\"command_index\":%u,\"executable_id\":%" PRIu64
+              ",\"export_ordinal\":%u,\"key\":",
+              record->header.physical_device_ordinal,
+              record->header.queue_ordinal, record->header.stream_id,
+              dispatch_record.event_id, dispatch_record.submission_id,
+              dispatch_record.command_buffer_id, dispatch_record.command_index,
+              dispatch_record.executable_id, dispatch_record.export_ordinal);
+      iree_profile_fprint_json_string(file, key);
+      fprintf(
+          file,
+          ",\"flags\":%u,\"workgroup_count\":[%u,%u,%u]"
+          ",\"workgroup_size\":[%u,%u,%u]"
+          ",\"device_tick_domain\":\"device_tick\""
+          ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
+          ",\"duration_ticks\":%" PRIu64
+          ",\"valid\":%s"
+          ",\"derived_time_available\":%s"
+          ",\"derived_time_domain\":\"driver_host_cpu_timestamp_ns\""
+          ",\"start_driver_host_cpu_time_ns\":%.3f"
+          ",\"end_driver_host_cpu_time_ns\":%.3f"
+          ",\"duration_time_domain\":\"device_tick_duration_ns\""
+          ",\"duration_ns\":%.3f}\n",
+          dispatch_record.flags, dispatch_record.workgroup_count[0],
+          dispatch_record.workgroup_count[1],
+          dispatch_record.workgroup_count[2], dispatch_record.workgroup_size[0],
+          dispatch_record.workgroup_size[1], dispatch_record.workgroup_size[2],
+          dispatch_record.start_tick, dispatch_record.end_tick, duration_ticks,
+          is_valid ? "true" : "false", has_derived_time ? "true" : "false",
+          has_derived_time ? start_driver_host_cpu_time_ns : 0.0,
+          has_derived_time ? end_driver_host_cpu_time_ns : 0.0,
+          has_derived_time
+              ? end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns
+              : 0.0);
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_export_process_queue_device_event_records(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_queue_device_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_queue_device_event_t queue_device_event;
+    memcpy(&queue_device_event, typed_record.contents.data,
+           sizeof(queue_device_event));
+    const bool is_valid =
+        queue_device_event.start_tick != 0 &&
+        queue_device_event.end_tick != 0 &&
+        queue_device_event.end_tick >= queue_device_event.start_tick;
+    const uint64_t duration_ticks =
+        is_valid ? queue_device_event.end_tick - queue_device_event.start_tick
+                 : 0;
+    double start_driver_host_cpu_time_ns = 0.0;
+    double end_driver_host_cpu_time_ns = 0.0;
+    const bool has_derived_start =
+        iree_profile_export_try_derive_driver_host_cpu_time_ns(
+            context, queue_device_event.physical_device_ordinal,
+            queue_device_event.start_tick, &start_driver_host_cpu_time_ns);
+    const bool has_derived_end =
+        iree_profile_export_try_derive_driver_host_cpu_time_ns(
+            context, queue_device_event.physical_device_ordinal,
+            queue_device_event.end_tick, &end_driver_host_cpu_time_ns);
+    const bool has_derived_time =
+        is_valid && has_derived_start && has_derived_end;
+    iree_profile_export_print_prefix(file, "queue_device_event", record_index);
+    fprintf(file,
+            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+            ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
+            ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+            ",\"allocation_id\":%" PRIu64 ",\"op\":",
+            queue_device_event.physical_device_ordinal,
+            queue_device_event.queue_ordinal, queue_device_event.stream_id,
+            queue_device_event.event_id, queue_device_event.submission_id,
+            queue_device_event.command_buffer_id,
+            queue_device_event.allocation_id);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(
+                  iree_profile_queue_event_type_name(queue_device_event.type)));
+    fprintf(file,
+            ",\"type_value\":%u,\"flags\":%u"
+            ",\"payload_length\":%" PRIu64
+            ",\"operation_count\":%u"
             ",\"device_tick_domain\":\"device_tick\""
             ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
             ",\"duration_ticks\":%" PRIu64
@@ -468,102 +540,16 @@ static iree_status_t iree_profile_export_process_dispatch_records(
             ",\"end_driver_host_cpu_time_ns\":%.3f"
             ",\"duration_time_domain\":\"device_tick_duration_ns\""
             ",\"duration_ns\":%.3f}\n",
-            dispatch_record.flags, dispatch_record.workgroup_count[0],
-            dispatch_record.workgroup_count[1],
-            dispatch_record.workgroup_count[2],
-            dispatch_record.workgroup_size[0],
-            dispatch_record.workgroup_size[1],
-            dispatch_record.workgroup_size[2], dispatch_record.start_tick,
-            dispatch_record.end_tick, duration_ticks,
+            queue_device_event.type, queue_device_event.flags,
+            queue_device_event.payload_length,
+            queue_device_event.operation_count, queue_device_event.start_tick,
+            queue_device_event.end_tick, duration_ticks,
             is_valid ? "true" : "false", has_derived_time ? "true" : "false",
             has_derived_time ? start_driver_host_cpu_time_ns : 0.0,
             has_derived_time ? end_driver_host_cpu_time_ns : 0.0,
             has_derived_time
                 ? end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns
                 : 0.0);
-        payload_offset += record_length;
-      }
-    }
-  }
-  return status;
-}
-
-static iree_status_t iree_profile_export_process_queue_device_event_records(
-    const iree_profile_dispatch_context_t* context,
-    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
-    FILE* file) {
-  iree_host_size_t payload_offset = 0;
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_queue_device_event_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_queue_device_event_t queue_device_event;
-      memcpy(&queue_device_event, record->payload.data + payload_offset,
-             sizeof(queue_device_event));
-      const bool is_valid =
-          queue_device_event.start_tick != 0 &&
-          queue_device_event.end_tick != 0 &&
-          queue_device_event.end_tick >= queue_device_event.start_tick;
-      const uint64_t duration_ticks =
-          is_valid ? queue_device_event.end_tick - queue_device_event.start_tick
-                   : 0;
-      double start_driver_host_cpu_time_ns = 0.0;
-      double end_driver_host_cpu_time_ns = 0.0;
-      const bool has_derived_start =
-          iree_profile_export_try_derive_driver_host_cpu_time_ns(
-              context, queue_device_event.physical_device_ordinal,
-              queue_device_event.start_tick, &start_driver_host_cpu_time_ns);
-      const bool has_derived_end =
-          iree_profile_export_try_derive_driver_host_cpu_time_ns(
-              context, queue_device_event.physical_device_ordinal,
-              queue_device_event.end_tick, &end_driver_host_cpu_time_ns);
-      const bool has_derived_time =
-          is_valid && has_derived_start && has_derived_end;
-      iree_profile_export_print_prefix(file, "queue_device_event",
-                                       record_index);
-      fprintf(file,
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
-              ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
-              ",\"allocation_id\":%" PRIu64 ",\"op\":",
-              queue_device_event.physical_device_ordinal,
-              queue_device_event.queue_ordinal, queue_device_event.stream_id,
-              queue_device_event.event_id, queue_device_event.submission_id,
-              queue_device_event.command_buffer_id,
-              queue_device_event.allocation_id);
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(iree_profile_queue_event_type_name(
-                    queue_device_event.type)));
-      fprintf(file,
-              ",\"type_value\":%u,\"flags\":%u"
-              ",\"payload_length\":%" PRIu64
-              ",\"operation_count\":%u"
-              ",\"device_tick_domain\":\"device_tick\""
-              ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
-              ",\"duration_ticks\":%" PRIu64
-              ",\"valid\":%s"
-              ",\"derived_time_available\":%s"
-              ",\"derived_time_domain\":\"driver_host_cpu_timestamp_ns\""
-              ",\"start_driver_host_cpu_time_ns\":%.3f"
-              ",\"end_driver_host_cpu_time_ns\":%.3f"
-              ",\"duration_time_domain\":\"device_tick_duration_ns\""
-              ",\"duration_ns\":%.3f}\n",
-              queue_device_event.type, queue_device_event.flags,
-              queue_device_event.payload_length,
-              queue_device_event.operation_count, queue_device_event.start_tick,
-              queue_device_event.end_tick, duration_ticks,
-              is_valid ? "true" : "false", has_derived_time ? "true" : "false",
-              has_derived_time ? start_driver_host_cpu_time_ns : 0.0,
-              has_derived_time ? end_driver_host_cpu_time_ns : 0.0,
-              has_derived_time
-                  ? end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns
-                  : 0.0);
-      payload_offset += record_length;
-    }
   }
   return status;
 }
@@ -571,46 +557,45 @@ static iree_status_t iree_profile_export_process_queue_device_event_records(
 static iree_status_t iree_profile_export_process_queue_event_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_queue_event_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_queue_event_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_queue_event_t queue_event;
-      memcpy(&queue_event, record->payload.data + payload_offset,
-             sizeof(queue_event));
-      iree_profile_export_print_prefix(file, "queue_event", record_index);
-      fprintf(file, ",\"event_id\":%" PRIu64 ",\"op\":", queue_event.event_id);
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(
-                    iree_profile_queue_event_type_name(queue_event.type)));
-      fprintf(file, ",\"type_value\":%u,\"flags\":%u,\"dependency_strategy\":",
-              queue_event.type, queue_event.flags);
-      iree_profile_fprint_json_string(
-          file,
-          iree_make_cstring_view(iree_profile_queue_dependency_strategy_name(
-              queue_event.dependency_strategy)));
-      fprintf(file,
-              ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
-              ",\"allocation_id\":%" PRIu64
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"stream_id\":%" PRIu64 ",\"host_time_ns\":%" PRId64
-              ",\"host_time_domain\":\"iree_host_time_ns\""
-              ",\"wait_count\":%u,\"signal_count\":%u"
-              ",\"barrier_count\":%u,\"operation_count\":%u"
-              ",\"payload_length\":%" PRIu64 "}\n",
-              queue_event.submission_id, queue_event.command_buffer_id,
-              queue_event.allocation_id, queue_event.physical_device_ordinal,
-              queue_event.queue_ordinal, queue_event.stream_id,
-              queue_event.host_time_ns, queue_event.wait_count,
-              queue_event.signal_count, queue_event.barrier_count,
-              queue_event.operation_count, queue_event.payload_length);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_queue_event_t queue_event;
+    memcpy(&queue_event, typed_record.contents.data, sizeof(queue_event));
+    iree_profile_export_print_prefix(file, "queue_event", record_index);
+    fprintf(file, ",\"event_id\":%" PRIu64 ",\"op\":", queue_event.event_id);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(
+                  iree_profile_queue_event_type_name(queue_event.type)));
+    fprintf(file, ",\"type_value\":%u,\"flags\":%u,\"dependency_strategy\":",
+            queue_event.type, queue_event.flags);
+    iree_profile_fprint_json_string(
+        file,
+        iree_make_cstring_view(iree_profile_queue_dependency_strategy_name(
+            queue_event.dependency_strategy)));
+    fprintf(file,
+            ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+            ",\"allocation_id\":%" PRIu64
+            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+            ",\"stream_id\":%" PRIu64 ",\"host_time_ns\":%" PRId64
+            ",\"host_time_domain\":\"iree_host_time_ns\""
+            ",\"wait_count\":%u,\"signal_count\":%u"
+            ",\"barrier_count\":%u,\"operation_count\":%u"
+            ",\"payload_length\":%" PRIu64 "}\n",
+            queue_event.submission_id, queue_event.command_buffer_id,
+            queue_event.allocation_id, queue_event.physical_device_ordinal,
+            queue_event.queue_ordinal, queue_event.stream_id,
+            queue_event.host_time_ns, queue_event.wait_count,
+            queue_event.signal_count, queue_event.barrier_count,
+            queue_event.operation_count, queue_event.payload_length);
   }
   return status;
 }
@@ -618,43 +603,42 @@ static iree_status_t iree_profile_export_process_queue_event_records(
 static iree_status_t iree_profile_export_process_memory_event_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_memory_event_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_memory_event_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_memory_event_t memory_event;
-      memcpy(&memory_event, record->payload.data + payload_offset,
-             sizeof(memory_event));
-      iree_profile_export_print_prefix(file, "memory_event", record_index);
-      fprintf(file, ",\"event_id\":%" PRIu64 ",\"event_type\":",
-              memory_event.event_id);
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(
-                    iree_profile_memory_event_type_name(memory_event.type)));
-      fprintf(file,
-              ",\"event_type_value\":%u,\"flags\":%u,\"result\":%u"
-              ",\"host_time_ns\":%" PRId64 ",\"allocation_id\":%" PRIu64
-              ",\"host_time_domain\":\"iree_host_time_ns\""
-              ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
-              ",\"submission_id\":%" PRIu64
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
-              ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
-              ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64 "}\n",
-              memory_event.type, memory_event.flags, memory_event.result,
-              memory_event.host_time_ns, memory_event.allocation_id,
-              memory_event.pool_id, memory_event.backing_id,
-              memory_event.submission_id, memory_event.physical_device_ordinal,
-              memory_event.queue_ordinal, memory_event.frontier_entry_count,
-              memory_event.memory_type, memory_event.buffer_usage,
-              memory_event.offset, memory_event.length, memory_event.alignment);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_memory_event_t memory_event;
+    memcpy(&memory_event, typed_record.contents.data, sizeof(memory_event));
+    iree_profile_export_print_prefix(file, "memory_event", record_index);
+    fprintf(file,
+            ",\"event_id\":%" PRIu64 ",\"event_type\":", memory_event.event_id);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(
+                  iree_profile_memory_event_type_name(memory_event.type)));
+    fprintf(file,
+            ",\"event_type_value\":%u,\"flags\":%u,\"result\":%u"
+            ",\"host_time_ns\":%" PRId64 ",\"allocation_id\":%" PRIu64
+            ",\"host_time_domain\":\"iree_host_time_ns\""
+            ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
+            ",\"submission_id\":%" PRIu64
+            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+            ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
+            ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
+            ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64 "}\n",
+            memory_event.type, memory_event.flags, memory_event.result,
+            memory_event.host_time_ns, memory_event.allocation_id,
+            memory_event.pool_id, memory_event.backing_id,
+            memory_event.submission_id, memory_event.physical_device_ordinal,
+            memory_event.queue_ordinal, memory_event.frontier_entry_count,
+            memory_event.memory_type, memory_event.buffer_usage,
+            memory_event.offset, memory_event.length, memory_event.alignment);
   }
   return status;
 }
@@ -662,51 +646,48 @@ static iree_status_t iree_profile_export_process_memory_event_records(
 static iree_status_t iree_profile_export_process_event_relationship_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_event_relationship_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_event_relationship_record_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_event_relationship_record_t relationship_record;
-      memcpy(&relationship_record, record->payload.data + payload_offset,
-             sizeof(relationship_record));
-      iree_profile_export_print_prefix(file, "event_relationship",
-                                       record_index);
-      fprintf(file, ",\"relationship_id\":%" PRIu64 ",\"kind\":",
-              relationship_record.relationship_id);
-      iree_profile_fprint_json_string(
-          file,
-          iree_make_cstring_view(iree_profile_event_relationship_type_name(
-              relationship_record.type)));
-      fprintf(file,
-              ",\"kind_value\":%u,\"source_type\":", relationship_record.type);
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(iree_profile_event_endpoint_type_name(
-                    relationship_record.source_type)));
-      fprintf(file, ",\"source_type_value\":%u,\"target_type\":",
-              relationship_record.source_type);
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(iree_profile_event_endpoint_type_name(
-                    relationship_record.target_type)));
-      fprintf(file,
-              ",\"target_type_value\":%u"
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"stream_id\":%" PRIu64 ",\"source_id\":%" PRIu64
-              ",\"source_secondary_id\":%" PRIu64 ",\"target_id\":%" PRIu64
-              ",\"target_secondary_id\":%" PRIu64 "}\n",
-              relationship_record.target_type,
-              relationship_record.physical_device_ordinal,
-              relationship_record.queue_ordinal, relationship_record.stream_id,
-              relationship_record.source_id,
-              relationship_record.source_secondary_id,
-              relationship_record.target_id,
-              relationship_record.target_secondary_id);
-      payload_offset += record_length;
-    }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_event_relationship_record_t relationship_record;
+    memcpy(&relationship_record, typed_record.contents.data,
+           sizeof(relationship_record));
+    iree_profile_export_print_prefix(file, "event_relationship", record_index);
+    fprintf(file, ",\"relationship_id\":%" PRIu64 ",\"kind\":",
+            relationship_record.relationship_id);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(iree_profile_event_relationship_type_name(
+                  relationship_record.type)));
+    fprintf(file,
+            ",\"kind_value\":%u,\"source_type\":", relationship_record.type);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(iree_profile_event_endpoint_type_name(
+                  relationship_record.source_type)));
+    fprintf(file, ",\"source_type_value\":%u,\"target_type\":",
+            relationship_record.source_type);
+    iree_profile_fprint_json_string(
+        file, iree_make_cstring_view(iree_profile_event_endpoint_type_name(
+                  relationship_record.target_type)));
+    fprintf(
+        file,
+        ",\"target_type_value\":%u"
+        ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+        ",\"stream_id\":%" PRIu64 ",\"source_id\":%" PRIu64
+        ",\"source_secondary_id\":%" PRIu64 ",\"target_id\":%" PRIu64
+        ",\"target_secondary_id\":%" PRIu64 "}\n",
+        relationship_record.target_type,
+        relationship_record.physical_device_ordinal,
+        relationship_record.queue_ordinal, relationship_record.stream_id,
+        relationship_record.source_id, relationship_record.source_secondary_id,
+        relationship_record.target_id, relationship_record.target_secondary_id);
   }
   return status;
 }
@@ -714,43 +695,42 @@ static iree_status_t iree_profile_export_process_event_relationship_records(
 static iree_status_t iree_profile_export_process_counter_set_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_counter_set_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_counter_set_record_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_counter_set_record_t counter_set_record;
+    memcpy(&counter_set_record, typed_record.contents.data,
+           sizeof(counter_set_record));
+    if ((iree_host_size_t)counter_set_record.name_length !=
+        typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "counter set name length is inconsistent with record length");
+    }
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_counter_set_record_t counter_set_record;
-      memcpy(&counter_set_record, record->payload.data + payload_offset,
-             sizeof(counter_set_record));
-      if (counter_set_record.name_length !=
-          record_length - sizeof(counter_set_record)) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "counter set name length is inconsistent with record length");
-      }
-      if (iree_status_is_ok(status)) {
-        iree_string_view_t name = iree_make_string_view(
-            (const char*)record->payload.data + payload_offset +
-                sizeof(counter_set_record),
-            counter_set_record.name_length);
-        iree_profile_export_print_prefix(file, "counter_set", record_index);
-        fprintf(file,
-                ",\"counter_set_id\":%" PRIu64
-                ",\"physical_device_ordinal\":%u"
-                ",\"flags\":%u,\"counter_count\":%u"
-                ",\"sample_value_count\":%u,\"name\":",
-                counter_set_record.counter_set_id,
-                counter_set_record.physical_device_ordinal,
-                counter_set_record.flags, counter_set_record.counter_count,
-                counter_set_record.sample_value_count);
-        iree_profile_fprint_json_string(file, name);
-        fputs("}\n", file);
-        payload_offset += record_length;
-      }
+      iree_string_view_t name =
+          iree_make_string_view((const char*)typed_record.inline_payload.data,
+                                typed_record.inline_payload.data_length);
+      iree_profile_export_print_prefix(file, "counter_set", record_index);
+      fprintf(file,
+              ",\"counter_set_id\":%" PRIu64
+              ",\"physical_device_ordinal\":%u"
+              ",\"flags\":%u,\"counter_count\":%u"
+              ",\"sample_value_count\":%u,\"name\":",
+              counter_set_record.counter_set_id,
+              counter_set_record.physical_device_ordinal,
+              counter_set_record.flags, counter_set_record.counter_count,
+              counter_set_record.sample_value_count);
+      iree_profile_fprint_json_string(file, name);
+      fputs("}\n", file);
     }
   }
   return status;
@@ -759,61 +739,59 @@ static iree_status_t iree_profile_export_process_counter_set_records(
 static iree_status_t iree_profile_export_process_counter_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_counter_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_counter_record_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_counter_record_t counter_record;
+    memcpy(&counter_record, typed_record.contents.data, sizeof(counter_record));
+    iree_host_size_t trailing_length = 0;
+    if (!iree_host_size_checked_add(counter_record.block_name_length,
+                                    counter_record.name_length,
+                                    &trailing_length) ||
+        !iree_host_size_checked_add(trailing_length,
+                                    counter_record.description_length,
+                                    &trailing_length) ||
+        trailing_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "counter string lengths are inconsistent with record length");
+    }
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_counter_record_t counter_record;
-      memcpy(&counter_record, record->payload.data + payload_offset,
-             sizeof(counter_record));
-      iree_host_size_t trailing_length = 0;
-      if (!iree_host_size_checked_add(counter_record.block_name_length,
-                                      counter_record.name_length,
-                                      &trailing_length) ||
-          !iree_host_size_checked_add(trailing_length,
-                                      counter_record.description_length,
-                                      &trailing_length) ||
-          trailing_length != record_length - sizeof(counter_record)) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "counter string lengths are inconsistent with record length");
-      }
-      if (iree_status_is_ok(status)) {
-        const char* string_base = (const char*)record->payload.data +
-                                  payload_offset + sizeof(counter_record);
-        iree_string_view_t block_name = iree_make_string_view(
-            string_base, counter_record.block_name_length);
-        iree_string_view_t name = iree_make_string_view(
-            string_base + counter_record.block_name_length,
-            counter_record.name_length);
-        iree_string_view_t description = iree_make_string_view(
-            string_base + counter_record.block_name_length +
-                counter_record.name_length,
-            counter_record.description_length);
-        iree_profile_export_print_prefix(file, "counter", record_index);
-        fprintf(file,
-                ",\"counter_set_id\":%" PRIu64
-                ",\"counter_ordinal\":%u"
-                ",\"physical_device_ordinal\":%u,\"flags\":%u"
-                ",\"unit\":%u,\"sample_value_offset\":%u"
-                ",\"sample_value_count\":%u,\"block\":",
-                counter_record.counter_set_id, counter_record.counter_ordinal,
-                counter_record.physical_device_ordinal, counter_record.flags,
-                counter_record.unit, counter_record.sample_value_offset,
-                counter_record.sample_value_count);
-        iree_profile_fprint_json_string(file, block_name);
-        fprintf(file, ",\"name\":");
-        iree_profile_fprint_json_string(file, name);
-        fprintf(file, ",\"description\":");
-        iree_profile_fprint_json_string(file, description);
-        fputs("}\n", file);
-        payload_offset += record_length;
-      }
+      const char* string_base = (const char*)typed_record.inline_payload.data;
+      iree_string_view_t block_name =
+          iree_make_string_view(string_base, counter_record.block_name_length);
+      iree_string_view_t name =
+          iree_make_string_view(string_base + counter_record.block_name_length,
+                                counter_record.name_length);
+      iree_string_view_t description =
+          iree_make_string_view(string_base + counter_record.block_name_length +
+                                    counter_record.name_length,
+                                counter_record.description_length);
+      iree_profile_export_print_prefix(file, "counter", record_index);
+      fprintf(file,
+              ",\"counter_set_id\":%" PRIu64
+              ",\"counter_ordinal\":%u"
+              ",\"physical_device_ordinal\":%u,\"flags\":%u"
+              ",\"unit\":%u,\"sample_value_offset\":%u"
+              ",\"sample_value_count\":%u,\"block\":",
+              counter_record.counter_set_id, counter_record.counter_ordinal,
+              counter_record.physical_device_ordinal, counter_record.flags,
+              counter_record.unit, counter_record.sample_value_offset,
+              counter_record.sample_value_count);
+      iree_profile_fprint_json_string(file, block_name);
+      fprintf(file, ",\"name\":");
+      iree_profile_fprint_json_string(file, name);
+      fprintf(file, ",\"description\":");
+      iree_profile_fprint_json_string(file, description);
+      fputs("}\n", file);
     }
   }
   return status;
@@ -822,53 +800,51 @@ static iree_status_t iree_profile_export_process_counter_records(
 static iree_status_t iree_profile_export_process_counter_sample_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_counter_sample_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_counter_sample_record_t), &record_length);
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_counter_sample_record_t sample_record;
+    memcpy(&sample_record, typed_record.contents.data, sizeof(sample_record));
+    iree_host_size_t values_length = 0;
+    if (!iree_host_size_checked_mul(sample_record.sample_value_count,
+                                    sizeof(uint64_t), &values_length) ||
+        values_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "counter sample value count is inconsistent with record length");
+    }
     if (iree_status_is_ok(status)) {
-      iree_hal_profile_counter_sample_record_t sample_record;
-      memcpy(&sample_record, record->payload.data + payload_offset,
-             sizeof(sample_record));
-      iree_host_size_t values_length = 0;
-      if (!iree_host_size_checked_mul(sample_record.sample_value_count,
-                                      sizeof(uint64_t), &values_length) ||
-          values_length != record_length - sizeof(sample_record)) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "counter sample value count is inconsistent with record length");
+      const uint64_t* values =
+          (const uint64_t*)typed_record.inline_payload.data;
+      iree_profile_export_print_prefix(file, "counter_sample", record_index);
+      fprintf(file,
+              ",\"sample_id\":%" PRIu64 ",\"counter_set_id\":%" PRIu64
+              ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
+              ",\"command_buffer_id\":%" PRIu64
+              ",\"command_index\":%u,\"executable_id\":%" PRIu64
+              ",\"export_ordinal\":%u"
+              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+              ",\"stream_id\":%" PRIu64 ",\"flags\":%u,\"values\":[",
+              sample_record.sample_id, sample_record.counter_set_id,
+              sample_record.dispatch_event_id, sample_record.submission_id,
+              sample_record.command_buffer_id, sample_record.command_index,
+              sample_record.executable_id, sample_record.export_ordinal,
+              sample_record.physical_device_ordinal,
+              sample_record.queue_ordinal, sample_record.stream_id,
+              sample_record.flags);
+      for (uint32_t i = 0; i < sample_record.sample_value_count; ++i) {
+        if (i != 0) fputc(',', file);
+        fprintf(file, "%" PRIu64, values[i]);
       }
-      if (iree_status_is_ok(status)) {
-        const uint64_t* values =
-            (const uint64_t*)(record->payload.data + payload_offset +
-                              sizeof(sample_record));
-        iree_profile_export_print_prefix(file, "counter_sample", record_index);
-        fprintf(file,
-                ",\"sample_id\":%" PRIu64 ",\"counter_set_id\":%" PRIu64
-                ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
-                ",\"command_buffer_id\":%" PRIu64
-                ",\"command_index\":%u,\"executable_id\":%" PRIu64
-                ",\"export_ordinal\":%u"
-                ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-                ",\"stream_id\":%" PRIu64 ",\"flags\":%u,\"values\":[",
-                sample_record.sample_id, sample_record.counter_set_id,
-                sample_record.dispatch_event_id, sample_record.submission_id,
-                sample_record.command_buffer_id, sample_record.command_index,
-                sample_record.executable_id, sample_record.export_ordinal,
-                sample_record.physical_device_ordinal,
-                sample_record.queue_ordinal, sample_record.stream_id,
-                sample_record.flags);
-        for (uint32_t i = 0; i < sample_record.sample_value_count; ++i) {
-          if (i != 0) fputc(',', file);
-          fprintf(file, "%" PRIu64, values[i]);
-        }
-        fputs("]}\n", file);
-        payload_offset += record_length;
-      }
+      fputs("]}\n", file);
     }
   }
   return status;
@@ -889,24 +865,14 @@ static const char* iree_profile_executable_trace_format_name(
 static iree_status_t iree_profile_export_process_executable_trace_record(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  if (record->payload.data_length <
-      sizeof(iree_hal_profile_executable_trace_record_t)) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk has a truncated trace record");
-  }
-
+  iree_profile_typed_record_t typed_record;
+  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
+      record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
+      &typed_record));
   iree_hal_profile_executable_trace_record_t trace_record;
-  memcpy(&trace_record, record->payload.data, sizeof(trace_record));
-  if (trace_record.record_length < sizeof(trace_record) ||
-      trace_record.record_length > record->payload.data_length) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk has invalid typed record length %u",
-        trace_record.record_length);
-  }
-  if (trace_record.data_length !=
-      record->payload.data_length - trace_record.record_length) {
+  memcpy(&trace_record, typed_record.contents.data, sizeof(trace_record));
+  if ((iree_host_size_t)trace_record.data_length !=
+      typed_record.following_payload.data_length) {
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
         "profile executable trace chunk data length is inconsistent with "

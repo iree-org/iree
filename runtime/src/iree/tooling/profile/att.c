@@ -763,43 +763,34 @@ static iree_status_t iree_profile_att_append_trace(
 static iree_status_t iree_profile_att_parse_code_objects(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_executable_code_object_record_t),
+      &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    if (record->payload.data_length - payload_offset <
-        sizeof(iree_hal_profile_executable_code_object_record_t)) {
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_executable_code_object_record_t code_object_record;
+    memcpy(&code_object_record, typed_record.contents.data,
+           sizeof(code_object_record));
+    if ((iree_host_size_t)code_object_record.data_length !=
+        typed_record.inline_payload.data_length) {
       status = iree_make_status(
           IREE_STATUS_DATA_LOSS,
-          "profile executable code-object chunk has a truncated record");
-    }
-    iree_hal_profile_executable_code_object_record_t code_object_record;
-    if (iree_status_is_ok(status)) {
-      memcpy(&code_object_record, record->payload.data + payload_offset,
-             sizeof(code_object_record));
-      if (code_object_record.record_length < sizeof(code_object_record) ||
-          code_object_record.record_length >
-              record->payload.data_length - payload_offset ||
-          code_object_record.data_length !=
-              code_object_record.record_length - sizeof(code_object_record)) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "profile executable code-object chunk has an invalid record");
-      }
+          "profile executable code-object chunk has an invalid record");
     }
     if (iree_status_is_ok(status)) {
       iree_profile_att_code_object_t code_object = {
           .executable_id = code_object_record.executable_id,
           .code_object_id = code_object_record.code_object_id,
-          .data = iree_make_const_byte_span(
-              record->payload.data + payload_offset +
-                  sizeof(code_object_record),
-              (iree_host_size_t)code_object_record.data_length),
+          .data = typed_record.inline_payload,
       };
       status = iree_profile_att_append_code_object(profile, code_object);
-    }
-    if (iree_status_is_ok(status)) {
-      payload_offset += (iree_host_size_t)code_object_record.record_length;
     }
   }
   return status;
@@ -808,23 +799,21 @@ static iree_status_t iree_profile_att_parse_code_objects(
 static iree_status_t iree_profile_att_parse_code_object_loads(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  if (record->payload.data_length %
-          sizeof(iree_hal_profile_executable_code_object_load_record_t) !=
-      0) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable code-object load chunk has truncated records");
-  }
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_executable_code_object_load_record_t),
+      &iterator);
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t payload_offset = 0;
-       iree_status_is_ok(status) &&
-       payload_offset < record->payload.data_length;
-       payload_offset +=
-       sizeof(iree_hal_profile_executable_code_object_load_record_t)) {
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
     iree_hal_profile_executable_code_object_load_record_t load_record;
-    memcpy(&load_record, record->payload.data + payload_offset,
-           sizeof(load_record));
-    if (load_record.record_length != sizeof(load_record)) {
+    memcpy(&load_record, typed_record.contents.data, sizeof(load_record));
+    if (typed_record.record_length != sizeof(load_record)) {
       status = iree_make_status(
           IREE_STATUS_DATA_LOSS,
           "profile executable code-object load record has invalid length");
@@ -847,43 +836,34 @@ static iree_status_t iree_profile_att_parse_code_object_loads(
 static iree_status_t iree_profile_att_parse_exports(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_executable_export_record_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    if (record->payload.data_length - payload_offset <
-        sizeof(iree_hal_profile_executable_export_record_t)) {
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_executable_export_record_t export_record;
+    memcpy(&export_record, typed_record.contents.data, sizeof(export_record));
+    if ((iree_host_size_t)export_record.name_length !=
+        typed_record.inline_payload.data_length) {
       status = iree_make_status(
           IREE_STATUS_DATA_LOSS,
-          "profile executable export chunk has a truncated record");
-    }
-    iree_hal_profile_executable_export_record_t export_record;
-    if (iree_status_is_ok(status)) {
-      memcpy(&export_record, record->payload.data + payload_offset,
-             sizeof(export_record));
-      if (export_record.record_length < sizeof(export_record) ||
-          export_record.record_length >
-              record->payload.data_length - payload_offset ||
-          export_record.name_length !=
-              export_record.record_length - sizeof(export_record)) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "profile executable export chunk has an invalid record");
-      }
+          "profile executable export chunk has an invalid record");
     }
     if (iree_status_is_ok(status)) {
       iree_profile_att_export_t export_info = {
           .executable_id = export_record.executable_id,
           .export_ordinal = export_record.export_ordinal,
           .name = iree_make_string_view(
-              (const char*)record->payload.data + payload_offset +
-                  sizeof(export_record),
-              (iree_host_size_t)export_record.name_length),
+              (const char*)typed_record.inline_payload.data,
+              typed_record.inline_payload.data_length),
       };
       status = iree_profile_att_append_export(profile, export_info);
-    }
-    if (iree_status_is_ok(status)) {
-      payload_offset += (iree_host_size_t)export_record.record_length;
     }
   }
   return status;
@@ -892,23 +872,24 @@ static iree_status_t iree_profile_att_parse_exports(
 static iree_status_t iree_profile_att_parse_dispatches(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  if (record->payload.data_length % sizeof(iree_hal_profile_dispatch_event_t) !=
-      0) {
-    return iree_make_status(IREE_STATUS_DATA_LOSS,
-                            "profile dispatch chunk has truncated records");
-  }
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_dispatch_event_t), &iterator);
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t payload_offset = 0;
-       iree_status_is_ok(status) &&
-       payload_offset < record->payload.data_length;
-       payload_offset += sizeof(iree_hal_profile_dispatch_event_t)) {
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
     iree_profile_att_dispatch_t dispatch = {
         .physical_device_ordinal = record->header.physical_device_ordinal,
         .queue_ordinal = record->header.queue_ordinal,
     };
-    memcpy(&dispatch.record, record->payload.data + payload_offset,
+    memcpy(&dispatch.record, typed_record.contents.data,
            sizeof(dispatch.record));
-    if (dispatch.record.record_length != sizeof(dispatch.record)) {
+    if (typed_record.record_length != sizeof(dispatch.record)) {
       status =
           iree_make_status(IREE_STATUS_DATA_LOSS,
                            "profile dispatch event record has invalid length");
@@ -923,27 +904,21 @@ static iree_status_t iree_profile_att_parse_dispatches(
 static iree_status_t iree_profile_att_parse_trace(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  if (record->payload.data_length <
-      sizeof(iree_hal_profile_executable_trace_record_t)) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk has a truncated trace record");
-  }
+  iree_profile_typed_record_t typed_record;
+  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
+      record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
+      &typed_record));
   iree_hal_profile_executable_trace_record_t trace_record;
-  memcpy(&trace_record, record->payload.data, sizeof(trace_record));
-  if (trace_record.record_length < sizeof(trace_record) ||
-      trace_record.record_length > record->payload.data_length ||
-      trace_record.data_length !=
-          record->payload.data_length - trace_record.record_length) {
+  memcpy(&trace_record, typed_record.contents.data, sizeof(trace_record));
+  if ((iree_host_size_t)trace_record.data_length !=
+      typed_record.following_payload.data_length) {
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
         "profile executable trace chunk has invalid trace record length");
   }
   iree_profile_att_trace_t trace = {
       .record = trace_record,
-      .data = iree_make_const_byte_span(
-          record->payload.data + trace_record.record_length,
-          (iree_host_size_t)trace_record.data_length),
+      .data = typed_record.following_payload,
   };
   return iree_profile_att_append_trace(profile, trace);
 }

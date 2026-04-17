@@ -37,6 +37,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    common_test
+  SRCS
+    "common_test.cc"
+  DEPS
+    ::profile
+    iree::base
+    iree::hal::utils::profile_file
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 if(IREE_HAL_DRIVER_AMDGPU)
 
 iree_cc_library(

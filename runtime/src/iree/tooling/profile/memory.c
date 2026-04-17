@@ -545,38 +545,38 @@ iree_status_t iree_profile_memory_process_event_records(
 
   const bool is_truncated = iree_any_bit_set(
       record->header.chunk_flags, IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED);
-  iree_host_size_t payload_offset = 0;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_memory_event_t), &iterator);
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) &&
-         payload_offset < record->payload.data_length) {
-    iree_host_size_t record_length = 0;
-    status = iree_profile_payload_record_length(
-        record->content_type, record->payload, payload_offset,
-        sizeof(iree_hal_profile_memory_event_t), &record_length);
-    if (iree_status_is_ok(status)) {
-      iree_hal_profile_memory_event_t event;
-      memcpy(&event, record->payload.data + payload_offset, sizeof(event));
-      ++context->total_event_count;
-      if (iree_profile_memory_event_matches(&event, id_filter, filter)) {
-        ++context->matched_event_count;
-        if (is_truncated) ++context->truncated_event_count;
-        iree_profile_memory_device_t* device = NULL;
-        status = iree_profile_memory_get_device(
-            context, event.physical_device_ordinal, &device);
-        if (iree_status_is_ok(status)) {
-          iree_profile_memory_record_event(device, &event);
-          status = iree_profile_memory_record_pool_event(context, &event);
-        }
-        if (iree_status_is_ok(status)) {
-          status = iree_profile_memory_record_allocation_event(context, &event);
-        }
-        if (iree_status_is_ok(status)) {
-          if (emit_events) {
-            iree_profile_memory_print_event_jsonl(&event, file);
-          }
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_memory_event_t event;
+    memcpy(&event, typed_record.contents.data, sizeof(event));
+    ++context->total_event_count;
+    if (iree_profile_memory_event_matches(&event, id_filter, filter)) {
+      ++context->matched_event_count;
+      if (is_truncated) ++context->truncated_event_count;
+      iree_profile_memory_device_t* device = NULL;
+      status = iree_profile_memory_get_device(
+          context, event.physical_device_ordinal, &device);
+      if (iree_status_is_ok(status)) {
+        iree_profile_memory_record_event(device, &event);
+        status = iree_profile_memory_record_pool_event(context, &event);
+      }
+      if (iree_status_is_ok(status)) {
+        status = iree_profile_memory_record_allocation_event(context, &event);
+      }
+      if (iree_status_is_ok(status)) {
+        if (emit_events) {
+          iree_profile_memory_print_event_jsonl(&event, file);
         }
       }
-      payload_offset += record_length;
     }
   }
   return status;

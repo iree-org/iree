@@ -40,6 +40,36 @@ typedef iree_status_t (*iree_profile_file_record_callback_t)(
     void* user_data, const iree_hal_profile_file_record_t* record,
     iree_host_size_t record_index);
 
+typedef struct iree_profile_typed_record_t {
+  // Source chunk containing this typed record.
+  const iree_hal_profile_file_record_t* chunk;
+  // Zero-based ordinal of this typed record within |chunk|.
+  iree_host_size_t record_index;
+  // Byte offset of this typed record within |chunk->payload|.
+  iree_host_size_t payload_offset;
+  // Minimum fixed header length requested by the parser.
+  iree_host_size_t minimum_record_length;
+  // Total byte length reported by the typed record prefix.
+  iree_host_size_t record_length;
+  // Full bytes covered by |record_length|.
+  iree_const_byte_span_t contents;
+  // Bytes after |minimum_record_length| and before |record_length|.
+  iree_const_byte_span_t inline_payload;
+  // Bytes after |record_length| through the end of the containing chunk.
+  iree_const_byte_span_t following_payload;
+} iree_profile_typed_record_t;
+
+typedef struct iree_profile_typed_record_iterator_t {
+  // Source chunk being iterated.
+  const iree_hal_profile_file_record_t* chunk;
+  // Minimum fixed header length to validate for each typed record.
+  iree_host_size_t minimum_record_length;
+  // Current byte offset into |chunk->payload|.
+  iree_host_size_t payload_offset;
+  // Zero-based ordinal for the next typed record.
+  iree_host_size_t record_index;
+} iree_profile_typed_record_iterator_t;
+
 typedef struct iree_profile_device_summary_t {
   // Session-local physical device ordinal.
   uint32_t physical_device_ordinal;
@@ -705,11 +735,18 @@ const char* iree_profile_record_type_name(
     iree_hal_profile_file_record_type_t record_type);
 void iree_profile_fprint_json_string(FILE* file, iree_string_view_t value);
 void iree_profile_fprint_hash_hex(FILE* file, const uint64_t hash[2]);
-iree_status_t iree_profile_payload_record_length(
-    iree_string_view_t content_type, iree_const_byte_span_t payload,
-    iree_host_size_t payload_offset, iree_host_size_t minimum_record_length,
-    iree_host_size_t* out_record_length);
 double iree_profile_sqrt_f64(double value);
+iree_status_t iree_profile_typed_record_parse(
+    const iree_hal_profile_file_record_t* chunk,
+    iree_host_size_t payload_offset, iree_host_size_t minimum_record_length,
+    iree_host_size_t record_index, iree_profile_typed_record_t* out_record);
+void iree_profile_typed_record_iterator_initialize(
+    const iree_hal_profile_file_record_t* chunk,
+    iree_host_size_t minimum_record_length,
+    iree_profile_typed_record_iterator_t* out_iterator);
+iree_status_t iree_profile_typed_record_iterator_next(
+    iree_profile_typed_record_iterator_t* iterator,
+    iree_profile_typed_record_t* out_record, bool* out_has_record);
 iree_status_t iree_profile_file_open(iree_string_view_t path,
                                      iree_allocator_t host_allocator,
                                      iree_profile_file_t* out_profile_file);
