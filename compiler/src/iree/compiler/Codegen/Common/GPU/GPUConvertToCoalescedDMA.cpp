@@ -274,11 +274,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
 
 /// Check if a tensor.pad is valid for DMA conversion.
 /// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
+/// TODO(#24156): Relax these checks by supporting individual cases.
 static bool isValidPadForDMA(tensor::PadOp pad) {
   // Verify pad constraints: low padding must be all zeros, pad value must be 0.
-  // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting a
-  // select on the loaded values from LDS to replace OOB zeros with the desired
-  // padding element.
   for (OpFoldResult low : pad.getMixedLowPad()) {
     if (!isConstantIntValue(low, 0)) {
       return false;
