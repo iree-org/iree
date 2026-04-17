@@ -307,6 +307,13 @@ void iree_tokenizer_free(iree_tokenizer_t* tokenizer);
 const iree_tokenizer_vocab_t* iree_tokenizer_vocab(
     const iree_tokenizer_t* tokenizer);
 
+// Returns the maximum number of special tokens the post-processor can emit
+// during a single encode call (prefix + infix + suffix). This is the number
+// of extra tokens beyond the model-produced content tokens. Returns 0 if no
+// post-processor is configured.
+iree_host_size_t iree_tokenizer_max_special_token_count(
+    const iree_tokenizer_t* tokenizer);
+
 // Returns the human-readable model type name (e.g., "BPE").
 // The returned string_view is valid for the lifetime of the tokenizer.
 iree_string_view_t iree_tokenizer_model_type_name(
@@ -536,6 +543,18 @@ void iree_tokenizer_encode_state_reset(iree_tokenizer_encode_state_t* state,
 // state is "clean" after processing. This is a lightweight query that does not
 // modify state.
 bool iree_tokenizer_encode_state_has_pending(
+    const iree_tokenizer_encode_state_t* state);
+
+// Returns an upper bound on the number of tokens that finalize() could produce.
+// This accounts for all pending data in the pipeline (ring buffer, segments,
+// model state, deferred special tokens, post-processor). The actual count may
+// be less due to BPE merges. Use this to size the output buffer for finalize.
+//
+// Callers SHOULD use this before finalize() because finalize is non-retryable:
+// it consumes pipeline state destructively, so RESOURCE_EXHAUSTED from an
+// undersized buffer is not recoverable. Allocating at least this many tokens
+// guarantees finalize will succeed.
+iree_host_size_t iree_tokenizer_encode_state_pending_token_bound(
     const iree_tokenizer_encode_state_t* state);
 
 // Feeds an input |chunk| to the encoder. Tokens that can be definitively
