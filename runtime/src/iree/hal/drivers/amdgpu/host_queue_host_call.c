@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 
 typedef struct iree_hal_amdgpu_host_call_state_t {
   // Resource header so existing reclaim cleanup owns this cold payload.
@@ -222,16 +223,24 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_host_call(
           queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
           IREE_ARRAYSIZE(operation_resources), out_ready, &submission);
   if (iree_status_is_ok(status) && *out_ready) {
-    iree_hal_amdgpu_host_queue_finish_barrier_submission(
-        queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
-        (iree_hal_amdgpu_reclaim_action_t){
-            .fn = iree_hal_amdgpu_host_call_execute,
-            .user_data = state,
-        },
-        operation_resources, IREE_ARRAYSIZE(operation_resources),
-        iree_hal_amdgpu_host_queue_post_commit_callback_null(),
-        /*resource_set=*/NULL, IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE,
-        &submission);
+    const uint64_t submission_id =
+        iree_hal_amdgpu_host_queue_finish_barrier_submission(
+            queue, &host_call_resolution, iree_hal_semaphore_list_empty(),
+            (iree_hal_amdgpu_reclaim_action_t){
+                .fn = iree_hal_amdgpu_host_call_execute,
+                .user_data = state,
+            },
+            operation_resources, IREE_ARRAYSIZE(operation_resources),
+            iree_hal_amdgpu_host_queue_post_commit_callback_null(),
+            /*resource_set=*/NULL,
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &submission);
+    iree_hal_amdgpu_host_queue_record_profile_queue_event(
+        queue, &host_call_resolution, signal_semaphore_list,
+        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+            .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL,
+            .submission_id = submission_id,
+            .operation_count = 1,
+        });
   }
   if (!iree_status_is_ok(status) || !*out_ready) {
     iree_hal_resource_release(&state->resource);

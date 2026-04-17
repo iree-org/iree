@@ -105,6 +105,10 @@ typedef struct iree_profile_summary_t {
   uint64_t clock_correlation_chunk_count;
   // Dispatch event chunks parsed.
   uint64_t dispatch_event_chunk_count;
+  // Queue event chunks parsed.
+  uint64_t queue_event_chunk_count;
+  // Queue event records parsed.
+  uint64_t queue_event_record_count;
   // Memory event chunks parsed.
   uint64_t memory_event_chunk_count;
   // Memory event records parsed.
@@ -231,6 +235,11 @@ typedef struct iree_profile_dispatch_queue_t {
   // Immutable queue metadata record borrowed from the profile bundle.
   iree_hal_profile_queue_record_t record;
 } iree_profile_dispatch_queue_t;
+
+typedef struct iree_profile_dispatch_queue_event_t {
+  // Immutable queue event record copied from the profile bundle.
+  iree_hal_profile_queue_event_t record;
+} iree_profile_dispatch_queue_event_t;
 
 typedef struct iree_profile_dispatch_device_t {
   // Session-local physical device ordinal.
@@ -375,6 +384,16 @@ typedef struct iree_profile_dispatch_context_t {
   iree_host_size_t queue_aggregate_count;
   // Capacity of |queue_aggregates| in entries.
   iree_host_size_t queue_aggregate_capacity;
+  // Dynamic array of queue operation event rows.
+  iree_profile_dispatch_queue_event_t* queue_events;
+  // Number of valid entries in |queue_events|.
+  iree_host_size_t queue_event_count;
+  // Capacity of |queue_events| in entries.
+  iree_host_size_t queue_event_capacity;
+  // Total queue operation records parsed before filtering.
+  uint64_t total_queue_event_count;
+  // Queue operation records matched by the active filter.
+  uint64_t matched_queue_event_count;
   // Total dispatch records parsed before filtering.
   uint64_t total_dispatch_count;
   // Dispatch records matched by the active filter.
@@ -601,6 +620,7 @@ static void iree_profile_dispatch_context_initialize(
 
 static void iree_profile_dispatch_context_deinitialize(
     iree_profile_dispatch_context_t* context) {
+  iree_allocator_free(context->host_allocator, context->queue_events);
   iree_allocator_free(context->host_allocator, context->queue_aggregates);
   iree_allocator_free(context->host_allocator, context->command_aggregates);
   iree_allocator_free(context->host_allocator, context->aggregates);
@@ -923,6 +943,22 @@ static iree_status_t iree_profile_dispatch_append_queue(
   iree_profile_dispatch_queue_t* queue_info =
       &context->queues[context->queue_count++];
   queue_info->record = *record;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_dispatch_append_queue_event(
+    iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_event_t* record) {
+  if (context->queue_event_count + 1 > context->queue_event_capacity) {
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        context->host_allocator,
+        iree_max((iree_host_size_t)64, context->queue_event_count + 1),
+        sizeof(context->queue_events[0]), &context->queue_event_capacity,
+        (void**)&context->queue_events));
+  }
+  iree_profile_dispatch_queue_event_t* event_info =
+      &context->queue_events[context->queue_event_count++];
+  event_info->record = *record;
   return iree_ok_status();
 }
 
@@ -1341,6 +1377,25 @@ static iree_status_t iree_profile_summary_process_memory_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_queue_event_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_queue_event_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      ++summary->queue_event_record_count;
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_record(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -1401,6 +1456,11 @@ static iree_status_t iree_profile_summary_process_record(
                  IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
     ++summary->dispatch_event_chunk_count;
     return iree_profile_summary_process_dispatch_event_records(summary, record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
+    ++summary->queue_event_chunk_count;
+    return iree_profile_summary_process_queue_event_records(summary, record);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
@@ -1475,25 +1535,29 @@ static void iree_profile_print_summary_text(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
-  fprintf(
-      file,
-      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-      " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
-      " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
-      " memory_events=%" PRIu64 " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
-      summary->device_chunk_count, summary->queue_chunk_count,
-      summary->executable_chunk_count, summary->executable_export_chunk_count,
-      summary->command_buffer_chunk_count,
-      summary->clock_correlation_chunk_count,
-      summary->dispatch_event_chunk_count, summary->memory_event_chunk_count,
-      summary->unknown_chunk_count, summary->truncated_chunk_count);
+  fprintf(file,
+          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
+          " queue_events=%" PRIu64 " memory_events=%" PRIu64 " unknown=%" PRIu64
+          " truncated=%" PRIu64 "\n",
+          summary->device_chunk_count, summary->queue_chunk_count,
+          summary->executable_chunk_count,
+          summary->executable_export_chunk_count,
+          summary->command_buffer_chunk_count,
+          summary->clock_correlation_chunk_count,
+          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+          summary->memory_event_chunk_count, summary->unknown_chunk_count,
+          summary->truncated_chunk_count);
   fprintf(file,
           "metadata_records: executables=%" PRIu64
           " executable_exports=%" PRIu64 " command_buffers=%" PRIu64 "\n",
           summary->executable_record_count,
           summary->executable_export_record_count,
           summary->command_buffer_record_count);
-  fprintf(file, "event_records: memory_events=%" PRIu64 "\n",
+  fprintf(file,
+          "event_records: queue_events=%" PRIu64 " memory_events=%" PRIu64 "\n",
+          summary->queue_event_record_count,
           summary->memory_event_record_count);
   fprintf(file, "devices:\n");
 
@@ -1578,7 +1642,8 @@ static void iree_profile_print_summary_jsonl(
       ",\"command_buffer_chunks\":%" PRIu64
       ",\"command_buffer_records\":%" PRIu64
       ",\"clock_correlation_chunks\":%" PRIu64
-      ",\"dispatch_event_chunks\":%" PRIu64 ",\"memory_event_chunks\":%" PRIu64
+      ",\"dispatch_event_chunks\":%" PRIu64 ",\"queue_event_chunks\":%" PRIu64
+      ",\"queue_event_records\":%" PRIu64 ",\"memory_event_chunks\":%" PRIu64
       ",\"memory_event_records\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
       ",\"truncated_chunks\":%" PRIu64 "}\n",
       summary->file_record_count, summary->session_begin_count,
@@ -1589,7 +1654,8 @@ static void iree_profile_print_summary_jsonl(
       summary->executable_export_record_count,
       summary->command_buffer_chunk_count, summary->command_buffer_record_count,
       summary->clock_correlation_chunk_count,
-      summary->dispatch_event_chunk_count, summary->memory_event_chunk_count,
+      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+      summary->queue_event_record_count, summary->memory_event_chunk_count,
       summary->memory_event_record_count, summary->unknown_chunk_count,
       summary->truncated_chunk_count);
 
@@ -1864,6 +1930,63 @@ static void iree_profile_dispatch_print_event_jsonl(
   fputs("}\n", file);
 }
 
+static const char* iree_profile_queue_event_type_name(
+    iree_hal_profile_queue_event_type_t type) {
+  switch (type) {
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER:
+      return "barrier";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH:
+      return "dispatch";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE:
+      return "execute";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY:
+      return "copy";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL:
+      return "fill";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_UPDATE:
+      return "update";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ:
+      return "read";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE:
+      return "write";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA:
+      return "alloca";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA:
+      return "dealloca";
+    case IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL:
+      return "host_call";
+    default:
+      return "unknown";
+  }
+}
+
+static const char* iree_profile_queue_dependency_strategy_name(
+    iree_hal_profile_queue_dependency_strategy_t strategy) {
+  switch (strategy) {
+    case IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE:
+      return "none";
+    case IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE:
+      return "inline";
+    case IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_DEVICE_BARRIER:
+      return "device_barrier";
+    case IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER:
+      return "software_defer";
+    default:
+      return "unknown";
+  }
+}
+
+static bool iree_profile_queue_event_matches(
+    const iree_hal_profile_queue_event_t* event, int64_t id_filter,
+    iree_string_view_t filter) {
+  if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+    return false;
+  }
+  iree_string_view_t type_name =
+      iree_make_cstring_view(iree_profile_queue_event_type_name(event->type));
+  return iree_profile_dispatch_key_matches(type_name, filter);
+}
+
 static iree_status_t iree_profile_dispatch_process_event_records(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -1957,6 +2080,46 @@ static iree_status_t iree_profile_dispatch_process_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_dispatch_process_queue_event_records(
+    iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
+    int64_t id_filter) {
+  iree_host_size_t payload_offset = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) &&
+         payload_offset < record->payload.data_length) {
+    iree_host_size_t record_length = 0;
+    status = iree_profile_payload_record_length(
+        record->content_type, record->payload, payload_offset,
+        sizeof(iree_hal_profile_queue_event_t), &record_length);
+    if (iree_status_is_ok(status)) {
+      iree_hal_profile_queue_event_t event;
+      memcpy(&event, record->payload.data + payload_offset, sizeof(event));
+      ++context->total_queue_event_count;
+      if (iree_profile_queue_event_matches(&event, id_filter, filter)) {
+        ++context->matched_queue_event_count;
+        const iree_profile_dispatch_queue_t* queue_info =
+            iree_profile_dispatch_find_queue(
+                context, event.physical_device_ordinal, event.queue_ordinal,
+                event.stream_id);
+        if (!queue_info) {
+          status = iree_make_status(
+              IREE_STATUS_DATA_LOSS,
+              "queue event references missing queue metadata "
+              "device=%u queue=%u stream=%" PRIu64 " submission=%" PRIu64,
+              event.physical_device_ordinal, event.queue_ordinal,
+              event.stream_id, event.submission_id);
+        }
+        if (iree_status_is_ok(status)) {
+          status = iree_profile_dispatch_append_queue_event(context, &event);
+        }
+      }
+      payload_offset += record_length;
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_dispatch_process_events_record(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -1967,6 +2130,12 @@ static iree_status_t iree_profile_dispatch_process_events_record(
   }
   if (!iree_string_view_equal(record->content_type,
                               IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
+    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE &&
+        iree_string_view_equal(record->content_type,
+                               IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
+      return iree_profile_dispatch_process_queue_event_records(
+          context, record, filter, id_filter);
+    }
     return iree_ok_status();
   }
   return iree_profile_dispatch_process_event_records(
@@ -2494,12 +2663,12 @@ static iree_status_t iree_profile_queue_print_text(
   fprintf(file, "IREE HAL profile queue summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   fprintf(file,
-          "queues=%" PRIhsz " submissions=%" PRIhsz
+          "queues=%" PRIhsz " queue_events=%" PRIhsz " submissions=%" PRIhsz
           " matched_dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
           "\n",
-          context->queue_count, context->queue_aggregate_count,
-          context->matched_dispatch_count, context->valid_dispatch_count,
-          context->invalid_dispatch_count);
+          context->queue_count, context->queue_event_count,
+          context->queue_aggregate_count, context->matched_dispatch_count,
+          context->valid_dispatch_count, context->invalid_dispatch_count);
 
   for (iree_host_size_t i = 0; i < context->queue_count; ++i) {
     const iree_hal_profile_queue_record_t* queue = &context->queues[i].record;
@@ -2539,6 +2708,29 @@ static iree_status_t iree_profile_queue_print_text(
       }
       fputc('\n', file);
     }
+    for (iree_host_size_t j = 0; j < context->queue_event_count; ++j) {
+      const iree_hal_profile_queue_event_t* event =
+          &context->queue_events[j].record;
+      if (event->physical_device_ordinal != queue->physical_device_ordinal ||
+          event->queue_ordinal != queue->queue_ordinal ||
+          event->stream_id != queue->stream_id) {
+        continue;
+      }
+      if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+        continue;
+      }
+      fprintf(
+          file,
+          "  event=%" PRIu64 " type=%s submission=%" PRIu64
+          " strategy=%s waits=%u signals=%u barriers=%u ops=%u bytes=%" PRIu64
+          "\n",
+          event->event_id, iree_profile_queue_event_type_name(event->type),
+          event->submission_id,
+          iree_profile_queue_dependency_strategy_name(
+              event->dependency_strategy),
+          event->wait_count, event->signal_count, event->barrier_count,
+          event->operation_count, event->payload_length);
+    }
   }
   return iree_ok_status();
 }
@@ -2549,12 +2741,13 @@ static iree_status_t iree_profile_queue_print_jsonl(
   fprintf(file, "{\"type\":\"queue_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
-          ",\"queues\":%" PRIhsz ",\"submissions\":%" PRIhsz
-          ",\"matched_dispatches\":%" PRIu64 ",\"valid_dispatches\":%" PRIu64
-          ",\"invalid_dispatches\":%" PRIu64 "}\n",
-          context->queue_count, context->queue_aggregate_count,
-          context->matched_dispatch_count, context->valid_dispatch_count,
-          context->invalid_dispatch_count);
+          ",\"queues\":%" PRIhsz ",\"queue_events\":%" PRIhsz
+          ",\"submissions\":%" PRIhsz ",\"matched_dispatches\":%" PRIu64
+          ",\"valid_dispatches\":%" PRIu64 ",\"invalid_dispatches\":%" PRIu64
+          "}\n",
+          context->queue_count, context->queue_event_count,
+          context->queue_aggregate_count, context->matched_dispatch_count,
+          context->valid_dispatch_count, context->invalid_dispatch_count);
 
   for (iree_host_size_t i = 0; i < context->queue_count; ++i) {
     const iree_hal_profile_queue_record_t* queue = &context->queues[i].record;
@@ -2594,6 +2787,30 @@ static iree_status_t iree_profile_queue_print_jsonl(
             has_clock_fit ? "true" : "false",
             has_clock_fit ? span_ticks * ns_per_tick : 0.0,
             has_clock_fit ? aggregate->total_ticks * ns_per_tick : 0.0);
+  }
+  for (iree_host_size_t i = 0; i < context->queue_event_count; ++i) {
+    const iree_hal_profile_queue_event_t* event =
+        &context->queue_events[i].record;
+    if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+      continue;
+    }
+    fprintf(
+        file,
+        "{\"type\":\"queue_event\",\"event_id\":%" PRIu64
+        ",\"op\":\"%s\",\"flags\":%u,\"dependency_strategy\":\"%s\""
+        ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+        ",\"allocation_id\":%" PRIu64
+        ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+        ",\"stream_id\":%" PRIu64 ",\"host_time_ns\":%" PRId64
+        ",\"wait_count\":%u,\"signal_count\":%u,\"barrier_count\":%u"
+        ",\"operation_count\":%u,\"payload_length\":%" PRIu64 "}\n",
+        event->event_id, iree_profile_queue_event_type_name(event->type),
+        event->flags,
+        iree_profile_queue_dependency_strategy_name(event->dependency_strategy),
+        event->submission_id, event->command_buffer_id, event->allocation_id,
+        event->physical_device_ordinal, event->queue_ordinal, event->stream_id,
+        event->host_time_ns, event->wait_count, event->signal_count,
+        event->barrier_count, event->operation_count, event->payload_length);
   }
   return iree_ok_status();
 }
@@ -3236,15 +3453,13 @@ static iree_status_t iree_profile_cat_file(iree_string_view_t path,
 static const char kIreeProfileUsage[] =
     "Inspects IREE HAL profile bundles.\n"
     "\n"
-    "A .ireeprof bundle is a HAL-native profiling artifact. It contains "
-    "session\n"
-    "metadata, physical-device and queue metadata, executable/export "
-    "metadata,\n"
-    "command-buffer metadata, clock-correlation samples, and "
-    "device-timestamped\n"
-    "dispatch events plus optional memory lifecycle events. The projection\n"
-    "commands below let you enter from the\n"
-    "object you care about and then cross-reference ids in JSONL.\n"
+    "A .ireeprof bundle is a HAL-native profiling artifact. It contains\n"
+    "session metadata, physical-device and queue metadata, executable/export\n"
+    "metadata, command-buffer metadata, clock-correlation samples, host\n"
+    "queue-operation events, device-timestamped dispatch events, and optional\n"
+    "memory lifecycle events. The projection commands below let you enter "
+    "from\n"
+    "the object you care about and then cross-reference ids in JSONL.\n"
     "\n"
     "Usage:\n"
     "  iree-profile summary [--format=text|jsonl] <file.ireeprof>\n"
@@ -3276,9 +3491,8 @@ static const char kIreeProfileUsage[] =
     "records\n"
     "               will appear when producers emit command-operation "
     "metadata.\n"
-    "  queue        Queue/submission dispatch spans. Today this is dispatch-\n"
-    "               derived; full queue operation records will appear when\n"
-    "               producers emit queue-operation events.\n"
+    "  queue        Queue operation events and dispatch-derived submission "
+    "spans.\n"
     "  memory       Memory lifecycle events and high-water summaries for "
     "slabs,\n"
     "               pools, and async queue allocations. Live-at-end counts\n"
@@ -3287,8 +3501,10 @@ static const char kIreeProfileUsage[] =
     "\n"
     "Important flags:\n"
     "  --format=text|jsonl     Text for humans, JSONL for tools and agents.\n"
-    "  --filter=pattern        Wildcard over dispatch/export keys, such as\n"
-    "                          '*softmax*'.\n"
+    "  --filter=pattern        Wildcard over dispatch/export keys or queue/"
+    "memory\n"
+    "                          event type names, such as '*softmax*' or "
+    "'copy'.\n"
     "  --id=N                  dispatch: event_id; executable: executable_id;\n"
     "                          command: command_buffer_id; memory: "
     "event_id or\n"
@@ -3303,7 +3519,7 @@ static const char kIreeProfileUsage[] =
     "Capture examples:\n"
     "  iree-benchmark-module --device=amdgpu --module=model.vmfb \\\n"
     "      --function=main --benchmark_min_time=20x \\\n"
-    "      --device_profiling_mode=dispatch \\\n"
+    "      --device_profiling_mode=queue \\\n"
     "      --device_profiling_output=/tmp/model.ireeprof\n"
     "\n"
     "Embedding examples:\n"
@@ -3317,8 +3533,8 @@ static const char kIreeProfileUsage[] =
     "  iree-profile dispatch --format=jsonl /tmp/model.ireeprof | \\\n"
     "      jq 'select(.type==\"dispatch_group\") | {key,avg_ns,count}'\n"
     "  iree-profile queue --format=jsonl /tmp/model.ireeprof | \\\n"
-    "      jq 'select(.type==\"queue_submission\") | \\\n"
-    "          {submission_id,span_ns,dispatches}'\n"
+    "      jq 'select(.type==\"queue_event\" or "
+    ".type==\"queue_submission\")'\n"
     "  iree-profile memory --format=jsonl /tmp/model.ireeprof | \\\n"
     "      jq 'select(.type==\"memory_device\") | \\\n"
     "          {physical_device_ordinal,current_queue_allocations,"
@@ -3344,13 +3560,13 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "\n"
       "## Capture\n"
       "\n"
-      "Capture from `iree-benchmark-module` with HAL dispatch profiling "
+      "Capture from `iree-benchmark-module` with HAL queue profiling "
       "enabled:\n"
       "\n"
       "```bash\n"
       "iree-benchmark-module --device=amdgpu --module=model.vmfb \\\n"
       "  --function=main --benchmark_min_time=20x \\\n"
-      "  --device_profiling_mode=dispatch \\\n"
+      "  --device_profiling_mode=queue \\\n"
       "  --device_profiling_output=/tmp/model.ireeprof\n"
       "```\n"
       "\n"
@@ -3367,7 +3583,7 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "IREE_RETURN_IF_ERROR(iree_hal_profile_file_sink_create(\n"
       "    file_handle, host_allocator, &sink));\n"
       "iree_hal_device_profiling_options_t options = {0};\n"
-      "options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;\n"
+      "options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;\n"
       "options.sink = sink;\n"
       "IREE_RETURN_IF_ERROR(iree_hal_device_profiling_begin(device, "
       "&options));\n"
@@ -3397,9 +3613,11 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "  producer to emit command-operation metadata.\n"
       "- `queue` groups dispatch-derived queue submissions by physical queue "
       "and\n"
-      "  `submission_id`. Full wait/signal/copy/fill/read/write/host-call "
-      "queue\n"
-      "  records require the producer to emit queue-operation events.\n"
+      "  `submission_id`, and emits host queue-operation events when the "
+      "producer\n"
+      "  provides them. Queue events include operation type, wait/signal "
+      "counts,\n"
+      "  dependency strategy, payload bytes, and related object ids.\n"
       "- `memory` summarizes slab/provider events, pool reservation events, "
       "and\n"
       "  async queue alloca/dealloca high-water behavior. With "
@@ -3425,8 +3643,8 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "- `command --format=jsonl` emits `command_summary`, `command_buffer`, "
       "and\n"
       "  `command_execution`.\n"
-      "- `queue --format=jsonl` emits `queue_summary`, `queue`, and\n"
-      "  `queue_submission`.\n"
+      "- `queue --format=jsonl` emits `queue_summary`, `queue`,\n"
+      "  `queue_submission`, and `queue_event`.\n"
       "- `memory --format=jsonl` emits `memory_event`, `memory_summary`, "
       "and\n"
       "  `memory_device`.\n"
@@ -3456,6 +3674,13 @@ static void iree_profile_print_agent_markdown(FILE* file) {
       "- `physical_device_ordinal`, `queue_ordinal`, and `stream_id` identify "
       "the\n"
       "  producing physical queue within the session.\n"
+      "- `queue_event.submission_id` joins queue operation metadata to "
+      "`queue_submission`\n"
+      "  and dispatch events. `queue_event.command_buffer_id` joins execute "
+      "events\n"
+      "  to `command_buffer`; `queue_event.allocation_id` joins alloca/"
+      "dealloca\n"
+      "  events to memory events.\n"
       "- `memory_event.submission_id` joins queue alloca/dealloca events to "
       "queue\n"
       "  submissions when nonzero. `memory_event.allocation_id` joins all "

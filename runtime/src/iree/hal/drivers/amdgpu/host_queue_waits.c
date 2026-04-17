@@ -226,6 +226,10 @@ void iree_hal_amdgpu_host_queue_resolve_waits(
   out_resolution->barrier_count = 0;
   out_resolution->needs_deferral = false;
   memset(out_resolution->reserved, 0, sizeof(out_resolution->reserved));
+  out_resolution->wait_count = wait_semaphore_list.count > UINT32_MAX
+                                   ? UINT32_MAX
+                                   : (uint32_t)wait_semaphore_list.count;
+  out_resolution->profile_event_flags = IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_NONE;
   out_resolution->inline_acquire_scope = IREE_HSA_FENCE_SCOPE_NONE;
   out_resolution->barrier_acquire_scope = IREE_HSA_FENCE_SCOPE_NONE;
 

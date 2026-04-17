@@ -21,6 +21,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_host_call.h"
 #include "iree/hal/drivers/amdgpu/host_queue_memory.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
@@ -667,12 +668,20 @@ struct iree_hal_amdgpu_pending_op_t {
       iree_hal_fill_flags_t flags;
     } fill;
     struct {
+      // Source buffer retained until the deferred copy operation issues.
       iree_hal_buffer_t* source_buffer;
+      // Source byte offset captured from queue_copy/read/write.
       iree_device_size_t source_offset;
+      // Target buffer retained until the deferred copy operation issues.
       iree_hal_buffer_t* target_buffer;
+      // Target byte offset captured from queue_copy/read/write.
       iree_device_size_t target_offset;
+      // Number of bytes copied by this queue operation.
       iree_device_size_t length;
+      // HAL copy flags captured from queue_copy/read/write.
       iree_hal_copy_flags_t flags;
+      // Queue profiling event type used when the copy submission issues.
+      iree_hal_profile_queue_event_type_t profile_event_type;
     } copy;
     struct {
       // Source data is copied into the arena (not a borrowed pointer).
@@ -1418,6 +1427,11 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
     resolution.barrier_count = 0;
     resolution.needs_deferral = false;
     memset(resolution.reserved, 0, sizeof(resolution.reserved));
+    resolution.wait_count = op->wait_semaphore_list.count > UINT32_MAX
+                                ? UINT32_MAX
+                                : (uint32_t)op->wait_semaphore_list.count;
+    resolution.profile_event_flags =
+        IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
     resolution.inline_acquire_scope = op->wait_semaphore_list.count > 0
                                           ? IREE_HSA_FENCE_SCOPE_SYSTEM
                                           : IREE_HSA_FENCE_SCOPE_NONE;
@@ -1438,8 +1452,8 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             queue, &resolution, op->signal_semaphore_list,
             op->copy.source_buffer, op->copy.source_offset,
             op->copy.target_buffer, op->copy.target_offset, op->copy.length,
-            op->copy.flags, IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE,
-            &ready);
+            op->copy.flags, op->copy.profile_event_type,
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready);
         if (iree_status_is_ok(status) && ready) {
           op->retained_resource_count = 0;
         }
@@ -1483,7 +1497,8 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
               /*operation_resource_count=*/0,
               iree_hal_amdgpu_host_queue_post_commit_callback_null(),
               /*resource_set=*/NULL,
-              IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready);
+              IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready,
+              /*out_submission_id=*/NULL);
           if (iree_status_is_ok(status) && ready) {
             op->retained_resource_count = 0;
           }
@@ -1531,7 +1546,8 @@ static void iree_hal_amdgpu_pending_op_issue(iree_hal_amdgpu_pending_op_t* op) {
             op->retained_resource_count,
             iree_hal_amdgpu_host_queue_post_commit_callback_null(),
             /*resource_set=*/NULL,
-            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready);
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_NONE, &ready,
+            /*out_submission_id=*/NULL);
         if (iree_status_is_ok(status) && ready) {
           op->retained_resource_count = 0;
         }
@@ -2772,6 +2788,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_copy(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_copy_flags_t flags,
+    iree_hal_profile_queue_event_type_t profile_event_type,
     iree_hal_amdgpu_pending_op_t** out_op) {
   uint16_t max_resources = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_count_reclaim_resources(
@@ -2789,20 +2806,19 @@ static iree_status_t iree_hal_amdgpu_host_queue_defer_copy(
   op->copy.target_offset = target_offset;
   op->copy.length = length;
   op->copy.flags = flags;
+  op->copy.profile_event_type = profile_event_type;
   *out_op = op;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_amdgpu_host_queue_copy(
-    iree_hal_amdgpu_virtual_queue_t* base_queue,
+iree_status_t iree_hal_amdgpu_host_queue_copy_buffer(
+    iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, iree_hal_copy_flags_t flags) {
-  iree_hal_amdgpu_host_queue_t* queue =
-      (iree_hal_amdgpu_host_queue_t*)base_queue;
-
+    iree_device_size_t length, iree_hal_copy_flags_t flags,
+    iree_hal_profile_queue_event_type_t profile_event_type) {
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_hal_amdgpu_wait_resolution_t resolution;
   iree_hal_amdgpu_host_queue_resolve_waits(queue, wait_semaphore_list,
@@ -2815,17 +2831,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_copy(
     status = iree_hal_amdgpu_host_queue_defer_copy(
         queue, &wait_semaphore_list, &signal_semaphore_list, source_buffer,
         source_offset, target_buffer, target_offset, length, flags,
-        &deferred_op);
+        profile_event_type, &deferred_op);
   } else {
     status = iree_hal_amdgpu_host_queue_submit_copy(
         queue, &resolution, signal_semaphore_list, source_buffer, source_offset,
-        target_buffer, target_offset, length, flags,
+        target_buffer, target_offset, length, flags, profile_event_type,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
     if (iree_status_is_ok(status) && !ready) {
       status = iree_hal_amdgpu_host_queue_defer_copy(
           queue, &wait_semaphore_list, &signal_semaphore_list, source_buffer,
           source_offset, target_buffer, target_offset, length, flags,
-          &deferred_op);
+          profile_event_type, &deferred_op);
       wait_for_capacity = wait_semaphore_list.count == 0;
     }
   }
@@ -2835,6 +2851,19 @@ static iree_status_t iree_hal_amdgpu_host_queue_copy(
     status = iree_hal_amdgpu_pending_op_start(deferred_op, wait_for_capacity);
   }
   return status;
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_copy(
+    iree_hal_amdgpu_virtual_queue_t* base_queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags) {
+  return iree_hal_amdgpu_host_queue_copy_buffer(
+      (iree_hal_amdgpu_host_queue_t*)base_queue, wait_semaphore_list,
+      signal_semaphore_list, source_buffer, source_offset, target_buffer,
+      target_offset, length, flags, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY);
 }
 
 // Captures an update operation into a pending op. Copies the source host data
@@ -3126,6 +3155,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
           export_ordinal, config, constants, bindings, flags, &deferred_op);
     }
   } else if (is_noop_dispatch) {
+    uint64_t submission_id = 0;
     status = iree_hal_amdgpu_host_queue_try_submit_barrier(
         queue, &resolution, signal_semaphore_list,
         (iree_hal_amdgpu_reclaim_action_t){0},
@@ -3133,7 +3163,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_dispatch(
         /*operation_resource_count=*/0,
         iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL,
-        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
+        &submission_id);
+    if (iree_status_is_ok(status) && ready) {
+      iree_hal_amdgpu_host_queue_record_profile_queue_event(
+          queue, &resolution, signal_semaphore_list,
+          &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+              .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH,
+              .submission_id = submission_id,
+              .operation_count = 0,
+          });
+    }
     if (iree_status_is_ok(status) && !ready) {
       status = iree_hal_amdgpu_host_queue_defer_execute(
           queue, &wait_semaphore_list, &signal_semaphore_list,
@@ -3206,6 +3246,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
           "(count=%" PRIhsz ")",
           binding_table.count);
     } else {
+      uint64_t submission_id = 0;
       status = iree_hal_amdgpu_host_queue_try_submit_barrier(
           queue, &resolution, signal_semaphore_list,
           (iree_hal_amdgpu_reclaim_action_t){0},
@@ -3213,7 +3254,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_execute(
           /*operation_resource_count=*/0,
           iree_hal_amdgpu_host_queue_post_commit_callback_null(),
           /*resource_set=*/NULL,
-          IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+          IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
+          &submission_id);
+      if (iree_status_is_ok(status) && ready) {
+        iree_hal_amdgpu_host_queue_record_profile_queue_event(
+            queue, &resolution, signal_semaphore_list,
+            &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+                .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER,
+                .submission_id = submission_id,
+                .operation_count = 0,
+            });
+      }
       if (iree_status_is_ok(status) && !ready) {
         status = iree_hal_amdgpu_host_queue_defer_execute(
             queue, &wait_semaphore_list, &signal_semaphore_list,
@@ -3333,7 +3384,8 @@ iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
         operation_resources, operation_resource_count,
         iree_hal_amdgpu_host_queue_post_commit_callback_null(),
         /*resource_set=*/NULL,
-        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
+        /*out_submission_id=*/NULL);
     if (iree_status_is_ok(status) && !ready) {
       status = iree_hal_amdgpu_host_queue_defer_host_action(
           queue, &wait_semaphore_list, action, operation_resources,

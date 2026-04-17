@@ -64,6 +64,10 @@ typedef struct iree_hal_amdgpu_wait_resolution_t {
   bool needs_deferral;
   // Padding reserved to keep the fence scopes aligned.
   uint8_t reserved[2];
+  // Number of wait semaphore edges represented by this resolution.
+  uint32_t wait_count;
+  // Queue profiling flags describing how this resolution was reached.
+  iree_hal_profile_queue_event_flags_t profile_event_flags;
   // Acquire scope required on the final operation packet for waits resolved
   // without dedicated wait-barrier packets.
   iree_hsa_fence_scope_t inline_acquire_scope;

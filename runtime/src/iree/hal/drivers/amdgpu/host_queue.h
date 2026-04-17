@@ -301,6 +301,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   struct {
     // True when ROCR should populate dispatch completion signal timestamps.
     uint32_t hsa_queue_timestamps_enabled : 1;
+    // True when host-side queue operation events should be recorded.
+    uint32_t queue_events_enabled : 1;
     // Serializes dispatch event batch mutation and flush.
     iree_slim_mutex_t event_mutex;
     // Borrowed fine-grained GPU-agent block pool backing raw signal storage.
@@ -506,6 +508,17 @@ iree_hal_amdgpu_host_queue_profiling_completion_signal(
                                                                  packet_id);
   return (iree_hsa_signal_t){.handle = (uint64_t)(uintptr_t)signal};
 }
+
+// Submits a buffer-copy payload through the queue with the requested queue
+// profiling event type.
+iree_status_t iree_hal_amdgpu_host_queue_copy_buffer(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, iree_hal_copy_flags_t flags,
+    iree_hal_profile_queue_event_type_t profile_event_type);
 
 // Enqueues a driver-owned host action ordered after |wait_semaphore_list|.
 // |action| uses the reclaim-action status ownership contract: OK means the

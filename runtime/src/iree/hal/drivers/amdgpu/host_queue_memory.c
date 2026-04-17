@@ -8,14 +8,9 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
-
-static uint32_t iree_hal_amdgpu_host_queue_profile_device_ordinal(
-    const iree_hal_amdgpu_host_queue_t* queue) {
-  return queue->device_ordinal <= UINT32_MAX ? (uint32_t)queue->device_ordinal
-                                             : UINT32_MAX;
-}
 
 static void iree_hal_amdgpu_host_queue_record_memory_event(
     iree_hal_amdgpu_host_queue_t* queue,
@@ -40,7 +35,7 @@ static void iree_hal_amdgpu_host_queue_record_memory_event(
   event.submission_id = submission_id;
   event.physical_device_ordinal =
       iree_hal_amdgpu_host_queue_profile_device_ordinal(queue);
-  event.queue_ordinal = iree_async_axis_queue_index(queue->axis);
+  event.queue_ordinal = iree_hal_amdgpu_host_queue_profile_queue_ordinal(queue);
   event.frontier_entry_count = frontier_entry_count;
   event.memory_type = params.type;
   event.buffer_usage = params.usage;
@@ -396,6 +391,15 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
         alloca_reservation->acquire_info.wait_frontier
             ? alloca_reservation->acquire_info.wait_frontier->entry_count
             : 0);
+    iree_hal_amdgpu_host_queue_record_profile_queue_event(
+        queue, &alloca_reservation->wait_resolution, signal_semaphore_list,
+        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+            .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA,
+            .submission_id = submission_epoch,
+            .allocation_id = (uint64_t)(uintptr_t)buffer,
+            .payload_length = iree_hal_buffer_byte_length(buffer),
+            .operation_count = 1,
+        });
   }
 
   if (!iree_status_is_ok(status)) {
@@ -463,5 +467,14 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
       /*pool=*/NULL, params, buffer, /*reservation=*/NULL,
       iree_hal_buffer_byte_length(buffer), submission_epoch,
       /*frontier_entry_count=*/0);
+  iree_hal_amdgpu_host_queue_record_profile_queue_event(
+      queue, resolution, signal_semaphore_list,
+      &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+          .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA,
+          .submission_id = submission_epoch,
+          .allocation_id = (uint64_t)(uintptr_t)buffer,
+          .payload_length = iree_hal_buffer_byte_length(buffer),
+          .operation_count = 1,
+      });
   return iree_ok_status();
 }

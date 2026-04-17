@@ -12,6 +12,7 @@
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 #include "iree/hal/drivers/amdgpu/slab_provider.h"
 
@@ -471,6 +472,14 @@ typedef enum iree_hal_amdgpu_staging_transfer_kind_e {
   IREE_HAL_AMDGPU_STAGING_TRANSFER_WRITE = 1,
 } iree_hal_amdgpu_staging_transfer_kind_t;
 
+static iree_hal_profile_queue_event_type_t
+iree_hal_amdgpu_staging_transfer_profile_event_type(
+    iree_hal_amdgpu_staging_transfer_kind_t kind) {
+  return kind == IREE_HAL_AMDGPU_STAGING_TRANSFER_READ
+             ? IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ
+             : IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE;
+}
+
 typedef uint32_t iree_hal_amdgpu_staging_transfer_flags_t;
 enum iree_hal_amdgpu_staging_transfer_flag_bits_e {
   IREE_HAL_AMDGPU_STAGING_TRANSFER_FLAG_NONE = 0u,
@@ -550,6 +559,8 @@ struct iree_hal_amdgpu_staging_transfer_t {
   uint32_t active_chunk_count;
   // Number of chunk records in |chunks|.
   uint32_t chunk_count;
+  // Number of wait semaphores supplied to the queue_read/write operation.
+  uint32_t profile_wait_count;
   // Direction of this transfer.
   iree_hal_amdgpu_staging_transfer_kind_t kind;
   // Transfer lifecycle flags from iree_hal_amdgpu_staging_transfer_flags_t.
@@ -631,13 +642,28 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_submit_signal_barrier(
 
   iree_slim_mutex_lock(&transfer->queue->submission_mutex);
   bool ready = false;
+  uint64_t submission_id = 0;
   iree_status_t status = iree_hal_amdgpu_host_queue_try_submit_barrier(
       transfer->queue, &resolution, transfer->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
       iree_hal_amdgpu_host_queue_post_commit_callback_null(),
       /*resource_set=*/NULL,
-      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
+      &submission_id);
+  if (iree_status_is_ok(status) && ready) {
+    iree_hal_amdgpu_wait_resolution_t profile_resolution = resolution;
+    profile_resolution.wait_count = transfer->profile_wait_count;
+    iree_hal_amdgpu_host_queue_record_profile_queue_event(
+        transfer->queue, &profile_resolution, transfer->signal_semaphore_list,
+        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+            .type = iree_hal_amdgpu_staging_transfer_profile_event_type(
+                transfer->kind),
+            .submission_id = submission_id,
+            .payload_length = transfer->requested_length,
+            .operation_count = 1,
+        });
+  }
   if (iree_status_is_ok(status) && !ready) {
     iree_hal_resource_retain(&transfer->resource);
     iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
@@ -1144,6 +1170,7 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_create(
     iree_hal_amdgpu_staging_transfer_kind_t kind, iree_hal_file_t* file,
     uint64_t file_offset, iree_hal_buffer_t* buffer,
     iree_device_size_t buffer_offset, iree_device_size_t length,
+    uint32_t profile_wait_count,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_amdgpu_staging_transfer_t** out_transfer) {
   *out_transfer = NULL;
@@ -1200,6 +1227,7 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_create(
   transfer->buffer_offset = buffer_offset;
   transfer->requested_length = length;
   transfer->chunk_count = queue->staging_pool->slot_count;
+  transfer->profile_wait_count = profile_wait_count;
   transfer->kind = kind;
   transfer->chunks = (iree_hal_amdgpu_staging_chunk_t*)(transfer + 1);
   for (uint32_t i = 0; i < transfer->chunk_count; ++i) {
@@ -1226,9 +1254,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_staged_transfer(
     uint64_t file_offset, iree_hal_buffer_t* buffer,
     iree_device_size_t buffer_offset, iree_device_size_t length) {
   iree_hal_amdgpu_staging_transfer_t* transfer = NULL;
+  const uint32_t profile_wait_count =
+      iree_hal_amdgpu_host_queue_profile_semaphore_count(wait_semaphore_list);
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_staging_transfer_create(
       queue, kind, file, file_offset, buffer, buffer_offset, length,
-      signal_semaphore_list, &transfer));
+      profile_wait_count, signal_semaphore_list, &transfer));
 
   iree_hal_resource_t* resources[1] = {&transfer->resource};
   iree_status_t status = iree_hal_amdgpu_host_queue_enqueue_host_action(

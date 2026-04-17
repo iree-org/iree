@@ -74,6 +74,10 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.dispatch-events")
 
+// Content type for an array of iree_hal_profile_queue_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.queue-events")
+
 // Content type for an array of iree_hal_profile_memory_event_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.memory-events")
@@ -374,6 +378,126 @@ iree_hal_profile_dispatch_event_default(void) {
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
   record.export_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Type of queue operation recorded by a HAL producer.
+typedef uint32_t iree_hal_profile_queue_event_type_t;
+enum iree_hal_profile_queue_event_type_e {
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE = 0u,
+
+  // Queue submission containing no payload beyond dependency/order effects.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER = 1u,
+
+  // Direct dispatch submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH = 2u,
+
+  // Reusable command buffer execution submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE = 3u,
+
+  // Device buffer copy submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY = 4u,
+
+  // Device buffer fill submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL = 5u,
+
+  // Host-to-device buffer update submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_UPDATE = 6u,
+
+  // HAL file read submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ = 7u,
+
+  // HAL file write submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE = 8u,
+
+  // Async allocation submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA = 9u,
+
+  // Async deallocation submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA = 10u,
+
+  // User-visible host callback submitted through a queue operation.
+  IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL = 11u,
+};
+
+// Bitfield specifying properties of one queue event record.
+typedef uint32_t iree_hal_profile_queue_event_flags_t;
+enum iree_hal_profile_queue_event_flag_bits_t {
+  IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_NONE = 0u,
+
+  // Queue operation was issued from software-deferred pending state.
+  IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED = 1u << 0,
+};
+
+// Strategy used to satisfy queue operation wait dependencies.
+typedef uint32_t iree_hal_profile_queue_dependency_strategy_t;
+enum iree_hal_profile_queue_dependency_strategy_e {
+  IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE = 0u,
+
+  // Wait dependencies were already satisfied or represented by the payload's
+  // own packet ordering, without a dedicated wait packet or host deferral.
+  IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE = 1u,
+
+  // Wait dependencies required one or more device-side barrier/wait packets.
+  IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_DEVICE_BARRIER = 2u,
+
+  // Wait dependencies or temporary resources required host-side deferral.
+  IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER = 3u,
+};
+
+// Host-timestamped queue operation event.
+//
+// Queue events describe submission-time behavior: which queue accepted an
+// operation, how dependency edges were represented, what user-visible
+// submission id was assigned, and how much payload the operation covered. The
+// timestamp is in IREE host monotonic time, not a device clock domain.
+typedef struct iree_hal_profile_queue_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of queue operation represented by this record.
+  iree_hal_profile_queue_event_type_t type;
+  // Flags describing queue operation properties.
+  iree_hal_profile_queue_event_flags_t flags;
+  // Strategy used for wait dependencies on this operation.
+  iree_hal_profile_queue_dependency_strategy_t dependency_strategy;
+  // Producer-defined event identifier unique within the queue event stream.
+  uint64_t event_id;
+  // IREE monotonic host timestamp in nanoseconds.
+  int64_t host_time_ns;
+  // Queue submission epoch associated with this operation, or 0 when absent.
+  uint64_t submission_id;
+  // Process-local command-buffer identifier, or 0 when not applicable.
+  uint64_t command_buffer_id;
+  // Producer-defined allocation identifier, or 0 when not applicable.
+  uint64_t allocation_id;
+  // Producer-defined stream identifier matching the queue metadata record.
+  uint64_t stream_id;
+  // Session-local physical device ordinal associated with this operation.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this operation.
+  uint32_t queue_ordinal;
+  // Number of wait semaphores supplied to the queue operation.
+  uint32_t wait_count;
+  // Number of signal semaphores supplied to the queue operation.
+  uint32_t signal_count;
+  // Number of dedicated dependency barrier packets emitted for this operation.
+  uint32_t barrier_count;
+  // Number of encoded payload operations represented by this queue operation.
+  uint32_t operation_count;
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+  // Reserved for future queue event fields; must be zero.
+  uint64_t reserved0;
+} iree_hal_profile_queue_event_t;
+
+// Returns a default queue operation event record.
+static inline iree_hal_profile_queue_event_t
+iree_hal_profile_queue_event_default(void) {
+  iree_hal_profile_queue_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
   return record;
 }
 

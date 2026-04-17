@@ -10,6 +10,7 @@
 
 #include "iree/async/operations/file.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/host_queue_staging.h"
 #include "iree/hal/drivers/amdgpu/host_queue_submission.h"
 
@@ -17,6 +18,14 @@ typedef enum iree_hal_amdgpu_file_action_kind_e {
   IREE_HAL_AMDGPU_FILE_ACTION_READ,
   IREE_HAL_AMDGPU_FILE_ACTION_WRITE,
 } iree_hal_amdgpu_file_action_kind_t;
+
+static iree_hal_profile_queue_event_type_t
+iree_hal_amdgpu_file_action_profile_event_type(
+    iree_hal_amdgpu_file_action_kind_t kind) {
+  return kind == IREE_HAL_AMDGPU_FILE_ACTION_READ
+             ? IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ
+             : IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE;
+}
 
 typedef struct iree_hal_amdgpu_file_action_state_t {
   // Resource header retained by the queue reclaim entry and async completion.
@@ -53,6 +62,9 @@ typedef struct iree_hal_amdgpu_file_action_state_t {
 
   // Total requested transfer length.
   iree_host_size_t requested_length;
+
+  // Number of wait semaphores supplied to the queue_read/write operation.
+  uint32_t profile_wait_count;
 
   // Total bytes transferred by completed async file operations.
   iree_host_size_t completed_length;
@@ -232,13 +244,27 @@ static iree_status_t iree_hal_amdgpu_file_action_submit_signal_barrier(
 
   iree_slim_mutex_lock(&state->queue->submission_mutex);
   bool ready = false;
+  uint64_t submission_id = 0;
   iree_status_t status = iree_hal_amdgpu_host_queue_try_submit_barrier(
       state->queue, &resolution, state->signal_semaphore_list,
       (iree_hal_amdgpu_reclaim_action_t){0},
       /*operation_resources=*/NULL, /*operation_resource_count=*/0,
       iree_hal_amdgpu_host_queue_post_commit_callback_null(),
       /*resource_set=*/NULL,
-      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready);
+      IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, &ready,
+      &submission_id);
+  if (iree_status_is_ok(status) && ready) {
+    iree_hal_amdgpu_wait_resolution_t profile_resolution = resolution;
+    profile_resolution.wait_count = state->profile_wait_count;
+    iree_hal_amdgpu_host_queue_record_profile_queue_event(
+        state->queue, &profile_resolution, state->signal_semaphore_list,
+        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+            .type = iree_hal_amdgpu_file_action_profile_event_type(state->kind),
+            .submission_id = submission_id,
+            .payload_length = state->requested_length,
+            .operation_count = 1,
+        });
+  }
   if (iree_status_is_ok(status) && !ready) {
     iree_hal_resource_retain(&state->resource);
     iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
@@ -439,6 +465,7 @@ static iree_status_t iree_hal_amdgpu_file_action_state_create(
     iree_hal_amdgpu_file_action_kind_t kind, iree_hal_file_t* file,
     uint64_t file_offset, iree_hal_buffer_t* buffer,
     iree_device_size_t buffer_offset, iree_device_size_t length,
+    uint32_t profile_wait_count,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_amdgpu_file_action_state_t** out_state) {
   *out_state = NULL;
@@ -465,6 +492,7 @@ static iree_status_t iree_hal_amdgpu_file_action_state_create(
   state->file_offset = file_offset;
   state->buffer_offset = buffer_offset;
   state->requested_length = (iree_host_size_t)length;
+  state->profile_wait_count = profile_wait_count;
   state->kind = kind;
 
   iree_status_t status = iree_hal_semaphore_list_clone(
@@ -487,9 +515,11 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_file_action(
     uint64_t file_offset, iree_hal_buffer_t* buffer,
     iree_device_size_t buffer_offset, iree_device_size_t length) {
   iree_hal_amdgpu_file_action_state_t* state = NULL;
+  const uint32_t profile_wait_count =
+      iree_hal_amdgpu_host_queue_profile_semaphore_count(wait_semaphore_list);
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_file_action_state_create(
       queue, kind, file, file_offset, buffer, buffer_offset, length,
-      signal_semaphore_list, &state));
+      profile_wait_count, signal_semaphore_list, &state));
 
   iree_hal_resource_t* resources[1] = {&state->resource};
   iree_status_t status = iree_hal_amdgpu_host_queue_enqueue_host_action(
@@ -543,10 +573,11 @@ iree_status_t iree_hal_amdgpu_host_queue_read_file(
         signal_semaphore_list, source_file, source_offset, target_buffer,
         target_offset, length);
   }
-  return queue->vtable->copy(queue, wait_semaphore_list, signal_semaphore_list,
-                             storage_buffer, source_device_offset,
-                             target_buffer, target_offset, length,
-                             IREE_HAL_COPY_FLAG_NONE);
+  return iree_hal_amdgpu_host_queue_copy_buffer(
+      (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
+      signal_semaphore_list, storage_buffer, source_device_offset,
+      target_buffer, target_offset, length, IREE_HAL_COPY_FLAG_NONE,
+      IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ);
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_write_file(
@@ -589,8 +620,9 @@ iree_status_t iree_hal_amdgpu_host_queue_write_file(
         signal_semaphore_list, source_buffer, source_offset, target_file,
         target_offset, length);
   }
-  return queue->vtable->copy(queue, wait_semaphore_list, signal_semaphore_list,
-                             source_buffer, source_offset, storage_buffer,
-                             target_device_offset, length,
-                             IREE_HAL_COPY_FLAG_NONE);
+  return iree_hal_amdgpu_host_queue_copy_buffer(
+      (iree_hal_amdgpu_host_queue_t*)queue, wait_semaphore_list,
+      signal_semaphore_list, source_buffer, source_offset, storage_buffer,
+      target_device_offset, length, IREE_HAL_COPY_FLAG_NONE,
+      IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE);
 }

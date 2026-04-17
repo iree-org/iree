@@ -247,8 +247,9 @@ uint16_t iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
 
 // Finishes a submission by transferring retained resources to the reclaim
 // entry, publishing queue/semaphore frontier state, committing the final
-// dispatch header, and ringing the doorbell. Caller must hold submission_mutex.
-void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+// dispatch header, ringing the doorbell, and returning the assigned queue
+// submission epoch. Caller must hold submission_mutex.
+uint64_t iree_hal_amdgpu_host_queue_finish_dispatch_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -259,9 +260,9 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
 
 // Finishes a PM4-IB payload submission by transferring retained resources to
 // the reclaim entry, publishing queue/semaphore frontier state, committing the
-// final PM4-IB packet header, and ringing the doorbell. Caller must hold
-// submission_mutex.
-void iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+// final PM4-IB packet header, ringing the doorbell, and returning the assigned
+// queue submission epoch. Caller must hold submission_mutex.
+uint64_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -281,7 +282,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
-    bool* out_ready);
+    bool* out_ready, uint64_t* out_submission_id);
 
 // Attempts to submit a barrier-only operation without waiting for temporary
 // ring capacity. On not-ready, no queue state or ownership is mutated.
@@ -296,7 +297,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
     iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
-    bool* out_ready);
+    bool* out_ready, uint64_t* out_submission_id);
 
 #ifdef __cplusplus
 }  // extern "C"

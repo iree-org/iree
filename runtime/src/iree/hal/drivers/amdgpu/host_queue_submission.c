@@ -701,7 +701,7 @@ uint64_t iree_hal_amdgpu_host_queue_finish_kernel_submission(
                                                    signal_semaphore_list);
 }
 
-void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+uint64_t iree_hal_amdgpu_host_queue_finish_dispatch_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -759,9 +759,10 @@ void iree_hal_amdgpu_host_queue_finish_dispatch_submission(
       &queue->aql_ring,
       submission->kernel.first_packet_id + submission->kernel.packet_count - 1);
   memset(submission, 0, sizeof(*submission));
+  return submission_epoch;
 }
 
-void iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+uint64_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -771,10 +772,11 @@ void iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission) {
   iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(queue, resolution,
                                                            &submission->kernel);
-  iree_hal_amdgpu_host_queue_finish_kernel_submission(
-      queue, resolution, signal_semaphore_list, operation_resources,
-      operation_resource_count, /*inout_resource_set=*/NULL, submission_flags,
-      &submission->kernel);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_finish_kernel_submission(
+          queue, resolution, signal_semaphore_list, operation_resources,
+          operation_resource_count, /*inout_resource_set=*/NULL,
+          submission_flags, &submission->kernel);
 
   uint16_t pm4_ib_setup = 0;
   uint16_t pm4_ib_header = iree_hal_amdgpu_aql_emit_pm4_ib(
@@ -790,6 +792,7 @@ void iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
       &queue->aql_ring,
       submission->kernel.first_packet_id + submission->kernel.packet_count - 1);
   memset(submission, 0, sizeof(*submission));
+  return submission_epoch;
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
@@ -801,7 +804,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
-    bool* out_ready) {
+    bool* out_ready, uint64_t* out_submission_id) {
   IREE_ASSERT_ARGUMENT(queue);
   IREE_ASSERT_ARGUMENT(resolution);
   IREE_ASSERT_ARGUMENT(dispatch_packet_template);
@@ -809,6 +812,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
   IREE_ASSERT_ARGUMENT(out_ready);
   IREE_ASSERT_LE(kernarg_length, sizeof(iree_hal_amdgpu_kernarg_block_t));
   *out_ready = false;
+  if (out_submission_id) *out_submission_id = 0;
 
   iree_hal_amdgpu_host_queue_dispatch_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
@@ -824,9 +828,11 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
           &submission.dispatch_slot->dispatch, dispatch_packet_template,
           submission.kernel.kernarg_blocks->data,
           submission.dispatch_completion_signal);
-  iree_hal_amdgpu_host_queue_finish_dispatch_submission(
-      queue, resolution, signal_semaphore_list, operation_resources,
-      operation_resource_count, submission_flags, &submission);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+          queue, resolution, signal_semaphore_list, operation_resources,
+          operation_resource_count, submission_flags, &submission);
+  if (out_submission_id) *out_submission_id = submission_epoch;
   return iree_ok_status();
 }
 
@@ -951,9 +957,10 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
     iree_hal_amdgpu_host_queue_post_commit_callback_t post_commit_callback,
     iree_hal_resource_set_t* resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
-    bool* out_ready) {
+    bool* out_ready, uint64_t* out_submission_id) {
   IREE_ASSERT_ARGUMENT(out_ready);
   *out_ready = false;
+  if (out_submission_id) *out_submission_id = 0;
 
   iree_hal_amdgpu_host_queue_barrier_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
@@ -961,9 +968,11 @@ iree_status_t iree_hal_amdgpu_host_queue_try_submit_barrier(
       out_ready, &submission));
   if (!*out_ready) return iree_ok_status();
 
-  (void)iree_hal_amdgpu_host_queue_finish_barrier_submission(
-      queue, resolution, signal_semaphore_list, pre_signal_action,
-      operation_resources, operation_resource_count, post_commit_callback,
-      resource_set, submission_flags, &submission);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_finish_barrier_submission(
+          queue, resolution, signal_semaphore_list, pre_signal_action,
+          operation_resources, operation_resource_count, post_commit_callback,
+          resource_set, submission_flags, &submission);
+  if (out_submission_id) *out_submission_id = submission_epoch;
   return iree_ok_status();
 }

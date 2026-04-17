@@ -139,6 +139,22 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     uint64_t memory_event_dropped_count;
     // Next nonzero memory event id assigned by this stream.
     uint64_t next_memory_event_id;
+    // Host-side queue operation event stream protected by |queue_event_mutex|.
+    iree_hal_profile_queue_event_t* queue_events;
+    // Mutex protecting queue event stream positions and dropped counts.
+    iree_slim_mutex_t queue_event_mutex;
+    // Allocated queue event ring capacity, always a power of two when nonzero.
+    iree_host_size_t queue_event_capacity;
+    // Mask used to wrap queue event stream positions.
+    iree_host_size_t queue_event_mask;
+    // Absolute queue event stream read position.
+    uint64_t queue_event_read_position;
+    // Absolute queue event stream write position.
+    uint64_t queue_event_write_position;
+    // Queue events dropped because the stream was full.
+    uint64_t queue_event_dropped_count;
+    // Next nonzero queue event id assigned by this stream.
+    uint64_t next_queue_event_id;
   } profiling;
 
   // Topology metadata assigned by the device group after construction.
@@ -188,5 +204,14 @@ bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
 void iree_hal_amdgpu_logical_device_record_profile_memory_event(
     iree_hal_device_t* base_device,
     const iree_hal_profile_memory_event_t* event);
+
+// Records one queue operation event into the active profiling stream.
+//
+// This never calls the sink directly. Events are buffered in host memory and
+// emitted by profiling_flush/end, making this safe for submission paths that
+// must not block on file or tool I/O.
+void iree_hal_amdgpu_logical_device_record_profile_queue_event(
+    iree_hal_device_t* base_device,
+    const iree_hal_profile_queue_event_t* event);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_

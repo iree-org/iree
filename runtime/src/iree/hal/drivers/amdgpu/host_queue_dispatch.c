@@ -13,6 +13,7 @@
 #include "iree/hal/drivers/amdgpu/device/profiling.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 
 typedef struct iree_hal_amdgpu_host_queue_dispatch_plan_t {
@@ -511,9 +512,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     submission.profile_harvest_setup =
         submission.profile_harvest_slot->dispatch.setup;
   }
-  iree_hal_amdgpu_host_queue_finish_dispatch_submission(
-      queue, resolution, signal_semaphore_list, operation_resources,
-      plan->operation_resource_count, submission_flags, &submission);
+  const uint64_t submission_epoch =
+      iree_hal_amdgpu_host_queue_finish_dispatch_submission(
+          queue, resolution, signal_semaphore_list, operation_resources,
+          plan->operation_resource_count, submission_flags, &submission);
+  iree_hal_amdgpu_host_queue_record_profile_queue_event(
+      queue, resolution, signal_semaphore_list,
+      &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+          .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH,
+          .submission_id = submission_epoch,
+          .operation_count = 1,
+      });
   return iree_ok_status();
 }
 
@@ -689,6 +698,13 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
   iree_hal_amdgpu_aql_ring_doorbell(
       &queue->aql_ring,
       submission.first_packet_id + submission.packet_count - 1);
+  iree_hal_amdgpu_host_queue_record_profile_queue_event(
+      queue, resolution, signal_semaphore_list,
+      &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+          .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH,
+          .submission_id = submission_epoch,
+          .operation_count = 1,
+      });
   return iree_ok_status();
 }
 

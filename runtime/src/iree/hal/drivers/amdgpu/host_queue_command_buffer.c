@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/device/profiling.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -1583,7 +1584,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_write_command_buffer_block(
   return status;
 }
 
-static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
+static uint64_t iree_hal_amdgpu_host_queue_finish_command_buffer_block(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -1647,6 +1648,7 @@ static void iree_hal_amdgpu_host_queue_finish_command_buffer_block(
       &queue->aql_ring,
       submission->first_packet_id + submission->packet_count - 1);
   memset(submission, 0, sizeof(*submission));
+  return submission_epoch;
 }
 
 static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
@@ -1749,12 +1751,22 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
           profile_events, profile_harvest_sources);
     }
     if (iree_status_is_ok(status)) {
-      iree_hal_amdgpu_host_queue_finish_command_buffer_block(
-          queue, resolution, signal_semaphore_list, block,
-          inout_binding_resource_set, pre_signal_action, operation_resources,
-          operation_resource_count, submission_flags, &submission,
-          packet_headers, packet_setups, profile_events, profile_harvest_packet,
-          profile_harvest_setup);
+      const uint64_t submission_id =
+          iree_hal_amdgpu_host_queue_finish_command_buffer_block(
+              queue, resolution, signal_semaphore_list, block,
+              inout_binding_resource_set, pre_signal_action,
+              operation_resources, operation_resource_count, submission_flags,
+              &submission, packet_headers, packet_setups, profile_events,
+              profile_harvest_packet, profile_harvest_setup);
+      iree_hal_amdgpu_host_queue_record_profile_queue_event(
+          queue, resolution, signal_semaphore_list,
+          &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+              .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE,
+              .submission_id = submission_id,
+              .command_buffer_id =
+                  iree_hal_amdgpu_aql_command_buffer_profile_id(command_buffer),
+              .operation_count = block->command_count,
+          });
     } else {
       iree_hal_amdgpu_host_queue_fail_kernel_submission(queue, &submission);
       iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue,
@@ -1976,12 +1988,13 @@ iree_hal_amdgpu_command_buffer_replay_submit_completion_packet(
     iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
         replay->queue, resolution, &submission);
     iree_hal_resource_t* replay_resource = &replay->resource;
-    iree_hal_amdgpu_host_queue_finish_kernel_submission(
-        replay->queue, resolution, replay->signal_semaphore_list,
-        &replay_resource, /*operation_resource_count=*/1,
-        /*inout_resource_set=*/NULL,
-        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
-        &submission);
+    const uint64_t submission_id =
+        iree_hal_amdgpu_host_queue_finish_kernel_submission(
+            replay->queue, resolution, replay->signal_semaphore_list,
+            &replay_resource, /*operation_resource_count=*/1,
+            /*inout_resource_set=*/NULL,
+            IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES,
+            &submission);
 
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
         &replay->queue->aql_ring,
@@ -1998,6 +2011,15 @@ iree_hal_amdgpu_command_buffer_replay_submit_completion_packet(
     iree_hal_amdgpu_aql_ring_doorbell(
         &replay->queue->aql_ring,
         submission.first_packet_id + submission.packet_count - 1);
+    iree_hal_amdgpu_host_queue_record_profile_queue_event(
+        replay->queue, resolution, replay->signal_semaphore_list,
+        &(iree_hal_amdgpu_host_queue_profile_event_info_t){
+            .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE,
+            .submission_id = submission_id,
+            .command_buffer_id = iree_hal_amdgpu_aql_command_buffer_profile_id(
+                replay->command_buffer),
+            .operation_count = 0,
+        });
     memset(&submission, 0, sizeof(submission));
     replay->current_block = NULL;
     iree_hal_amdgpu_command_buffer_replay_consume_wait_resolution(replay);
