@@ -355,13 +355,9 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_allocate_rodata_segment(
   *out_data = NULL;
   *out_rodata_ordinal = 0;
   uint8_t* rodata = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, byte_length);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_arena_allocate_aligned(&command_buffer->recording_arena,
-                                  iree_max((iree_host_size_t)1, byte_length),
-                                  alignment, (void**)&rodata));
+  IREE_RETURN_IF_ERROR(iree_arena_allocate_aligned(
+      &command_buffer->recording_arena,
+      iree_max((iree_host_size_t)1, byte_length), alignment, (void**)&rodata));
   iree_status_t status =
       iree_hal_amdgpu_aql_command_buffer_append_rodata_segment(
           command_buffer, rodata, byte_length, alignment, flags,
@@ -369,7 +365,6 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_allocate_rodata_segment(
   if (iree_status_is_ok(status)) {
     *out_data = rodata;
   }
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
