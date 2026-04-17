@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -607,11 +608,116 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
+/// Builds OR-chain of `cmpi uge(coords[d], dimSizes[d])` for every `d`
+/// where `padDims[d]` is true. Used for the INPUT outer-dim OOB path —
+/// coords here are expected post-pad_low subtraction so the unsigned
+/// compare catches both negative and past-end in a single check.
+/// Returns null when no dims are padded.
+static Value emitInputOuterOOB(OpBuilder &b, Location loc,
+                               ArrayRef<Value> coords,
+                               ArrayRef<int64_t> dimSizes,
+                               ArrayRef<bool> padDims) {
+  assert(coords.size() == dimSizes.size() && "coords/dimSizes rank mismatch");
+  assert(coords.size() == padDims.size() && "coords/padDims rank mismatch");
+  Value anyOOB;
+  for (int64_t d = 0, e = coords.size(); d < e; ++d) {
+    if (!padDims[d]) {
+      continue;
+    }
+    Value dimSize = arith::ConstantIndexOp::create(b, loc, dimSizes[d]);
+    Value isOOB = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::uge,
+                                        coords[d], dimSize);
+    anyOOB = anyOOB ? arith::OrIOp::create(b, loc, anyOOB, isOOB) : isOOB;
+  }
+  return anyOOB;
+}
+
+/// Builds OR-chain of `(coord[d] < pad_low[d]) || (coord[d] >= dim[d] -
+/// pad_high[d])` for every output dim with non-zero `pad_low[d]` or
+/// `pad_high[d]`. Used for the OUTPUT row OOB path — coords here are
+/// native output positions (NOT pad_low-shifted, unlike input coords).
+/// Skips the below-check when `pad_low[d]` is a constant 0; skips the
+/// above-check when `pad_high[d]` is a constant 0. Returns null when
+/// either OFR array is empty or all entries are zero.
+static Value emitOutputRowOOB(OpBuilder &b, Location loc,
+                              ArrayRef<Value> coords,
+                              ArrayRef<int64_t> dimSizes,
+                              ArrayRef<OpFoldResult> padLow,
+                              ArrayRef<OpFoldResult> padHigh) {
+  assert(coords.size() == dimSizes.size() && "coords/dimSizes rank mismatch");
+  if (padLow.empty() && padHigh.empty()) {
+    return Value();
+  }
+  // `padLow`/`padHigh` carry one OFR per full-rank output dim, while
+  // callers pass only the non-vectorized outer coords — so the OFR
+  // arrays are expected to be at least as long as `coords`, never equal.
+  assert(padLow.size() >= coords.size() && "padLow too short");
+  assert(padHigh.size() >= coords.size() && "padHigh too short");
+  Value anyOOB;
+  for (int64_t d = 0, e = coords.size(); d < e; ++d) {
+    bool hasLow = !isConstantIntValue(padLow[d], 0);
+    bool hasHigh = !isConstantIntValue(padHigh[d], 0);
+    if (!hasLow && !hasHigh) {
+      continue;
+    }
+    if (hasLow) {
+      Value padLowVal = getValueOrCreateConstantIndexOp(b, loc, padLow[d]);
+      Value isBelow = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::ult,
+                                            coords[d], padLowVal);
+      anyOOB = anyOOB
+                   ? arith::OrIOp::create(b, loc, anyOOB, isBelow).getResult()
+                   : isBelow;
+    }
+    if (hasHigh) {
+      Value dimSize = arith::ConstantIndexOp::create(b, loc, dimSizes[d]);
+      Value padHighVal = getValueOrCreateConstantIndexOp(b, loc, padHigh[d]);
+      Value validEnd = arith::SubIOp::create(b, loc, dimSize, padHighVal);
+      Value isAbove = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::uge,
+                                            coords[d], validEnd);
+      anyOOB = anyOOB
+                   ? arith::OrIOp::create(b, loc, anyOOB, isAbove).getResult()
+                   : isAbove;
+    }
+  }
+  return anyOOB;
+}
+
+/// Returns `a || v`, tolerating null operands. Null if both are null.
+static Value orNullable(OpBuilder &b, Location loc, Value a, Value v) {
+  if (!a) {
+    return v;
+  }
+  if (!v) {
+    return a;
+  }
+  return arith::OrIOp::create(b, loc, a, v);
+}
+
+/// Applies the OOB sentinel select: returns `flatIdx` when `anyOOB` is
+/// null, otherwise `select(anyOOB, sentinelVal, flatIdx)`.
+/// Sentinel is only meaningful when the downstream gather reads from an
+/// AMDGPU fat_raw_buffer under pad_value=0 (see the callsite in
+/// decomposeOperationAsyncCopyImpl).
+static Value applyFlatOOBSentinel(OpBuilder &b, Location loc, Value anyOOB,
+                                  Value sentinelVal, Value flatIdx) {
+  if (!anyOOB) {
+    return flatIdx;
+  }
+  return arith::SelectOp::create(b, loc, anyOOB, sentinelVal, flatIdx);
+}
+
 /// Structural precondition check for async-copy decomposition mode.
 static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
-  // Not padded.
+  // Padding is only supported when pad_value is statically zero. OOB
+  // positions rely on the AMDGPU fat_raw_buffer OOB-to-zero behavior in
+  // the DMA lowering, which naturally yields zero; any other pad value
+  // would require a post-load select to substitute the real value.
   if (im2colOp.hasPadding()) {
-    return false;
+    Value padVal = im2colOp.getPadValue();
+    if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
+                     matchPattern(padVal, m_Zero()))) {
+      return false;
+    }
   }
 
   // Identity output_perm and input_k_perm.
@@ -649,6 +755,15 @@ static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
   // willBeContiguousSlice helper does not tolerate a non-aligned constant
   // offset; keeping this guard first ensures we reject cleanly rather
   // than relying on chooseDimToVectorize's behavior.
+  //
+  // TODO: tighten this to cover non-constant k_off too. Today
+  // chooseDimToVectorize only proves tile-size alignment, which is weaker
+  // than C-alignment; for tile < C the decomposition silently re-reads
+  // columns [0:tile] of the collapsed source every iteration instead of
+  // advancing through C. The pipeline tests today mask this with all-1
+  // inputs. Fix either by rejecting non-C-aligned affine k_offs here, or
+  // by emitting an extract_slice on the collapsed source at decomposition
+  // time. See project_im2col_async_copy_gaps memory for details.
   SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
   int64_t numBatchDims = im2colOp.getBatchPos().size();
   int64_t numMDims = im2colOp.getNumMOutputDims();
@@ -671,6 +786,20 @@ static bool canDecomposeIm2colAsyncCopyImpl(Im2colOp im2colOp) {
     return false;
   }
   if (*vecDim != static_cast<int64_t>(outputType.getRank() - 1)) {
+    return false;
+  }
+
+  // Output padding on the vectorized (innermost) output dim cannot be
+  // masked by the flat-OOB sentinel: the gather reads the full [0:tile]
+  // C-slab contiguously. chooseDimToVectorize already skips candidates
+  // with non-zero output_pad_low on this dim; extend the rejection to
+  // non-zero output_pad_high too.
+  SmallVector<OpFoldResult> outPadLow = im2colOp.getMixedOutputPadLow();
+  SmallVector<OpFoldResult> outPadHigh = im2colOp.getMixedOutputPadHigh();
+  if (!outPadLow.empty() && !isConstantIntValue(outPadLow[*vecDim], 0)) {
+    return false;
+  }
+  if (!outPadHigh.empty() && !isConstantIntValue(outPadHigh[*vecDim], 0)) {
     return false;
   }
 
@@ -1025,8 +1154,7 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
   Value collapsedSource =
       tensor::CollapseShapeOp::create(b, loc, im2colOp.getInput(), srcReassoc);
 
-  // Step 2: Build a 1D index tensor by running a linalg.generic with a
-  // single parallel iterator over batchSize.
+  // Step 2: Build the 1D gather-index tensor.
   Type indexType = b.getIndexType();
   Value indexEmpty =
       tensor::EmptyOp::create(b, loc, ArrayRef<int64_t>{batchSize}, indexType);
@@ -1043,12 +1171,9 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
         // one. Size-1 non-vectorized K output dims contribute zero to
         // the delinearization because their basis entry is 1.
         Value flatIdx = linalg::IndexOp::create(nestedB, nestedLoc, 0);
-        SmallVector<OpFoldResult> iterBasis;
-        for (int64_t d = 0; d < outputRank - 1; ++d) {
-          iterBasis.push_back(nestedB.getIndexAttr(outputShape[d]));
-        }
+        SmallVector<OpFoldResult> iterBasis = getAsIndexOpFoldResult(
+            nestedB.getContext(), outputShape.drop_back());
 
-        // Delinearize to (outputRank - 1) positions.
         SmallVector<Value> nonVectorizedPositions;
         if (outputRank == 1) {
           // Rare: only the vectorized (and innermost) dim, no iteration
@@ -1064,9 +1189,8 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
           }
         }
 
-        // Assemble outputDimPositions for the helper: actual-output-dim
-        // order, length == outputRank, with a zero constant in the
-        // vectorized slot.
+        // Full-rank output positions with a zero constant in the
+        // vectorized slot (contract of `computeIm2colInputOffsets`).
         Value zero = arith::ConstantIndexOp::create(nestedB, nestedLoc, 0);
         SmallVector<Value> outputDimPositions;
         outputDimPositions.reserve(outputRank);
@@ -1078,19 +1202,68 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
         SmallVector<OpFoldResult> sliceOffsets = computeIm2colInputOffsets(
             nestedB, nestedLoc, im2colOp, outputDimPositions);
 
-        // Linearize sliceOffsets[0..inputRank-2] using
-        // inputShape[0..inputRank-2] to get the flat gather index into
-        // the collapsed source.
+        // Shift from padded to unpadded input coordinate space by
+        // subtracting input_pad_low. After this, coords may legitimately
+        // be negative (padded positions at the low edge) or >= inputShape
+        // (padded positions at the high edge) — both are OOB in unpadded
+        // space. Default-zero OFRs make this a no-op for unpadded dims
+        // (subOfrs folds x - 0 to x).
+        SmallVector<OpFoldResult> padLow(inputRank, nestedB.getIndexAttr(0));
+        SmallVector<OpFoldResult> padHigh(inputRank, nestedB.getIndexAttr(0));
+        SmallVector<OpFoldResult> inputPadLow = im2colOp.getMixedInputPadLow();
+        SmallVector<OpFoldResult> inputPadHigh =
+            im2colOp.getMixedInputPadHigh();
+        if (!inputPadLow.empty()) {
+          padLow = inputPadLow;
+          padHigh = inputPadHigh;
+        }
+        for (int64_t d = 0; d < inputRank; ++d) {
+          sliceOffsets[d] =
+              subOfrs(nestedB, nestedLoc, sliceOffsets[d], padLow[d]);
+        }
+
+        // Flat gather index into the collapsed source.
         SmallVector<Value> outerCoords;
-        SmallVector<OpFoldResult> outerBasis;
+        outerCoords.reserve(inputRank - 1);
         for (int64_t i = 0; i < inputRank - 1; ++i) {
           outerCoords.push_back(getValueOrCreateConstantIndexOp(
               nestedB, nestedLoc, sliceOffsets[i]));
-          outerBasis.push_back(nestedB.getIndexAttr(inputShape[i]));
         }
+        SmallVector<OpFoldResult> outerBasis = getAsIndexOpFoldResult(
+            nestedB.getContext(), inputShape.drop_back());
         Value flatGatherIdx = affine::AffineLinearizeIndexOp::create(
             nestedB, nestedLoc, outerCoords, outerBasis,
             /*disjoint=*/false);
+
+        // fat_raw_buffer's 1D OOB-to-zero bound check maps the sentinel
+        // flat index to a zero load, matching pad_value = 0.
+        ArrayRef<int64_t> outerDimSizes = inputShape.drop_back();
+        SmallVector<bool> padDims(inputRank - 1, false);
+        for (int64_t d = 0; d < inputRank - 1; ++d) {
+          padDims[d] = !isConstantIntValue(padLow[d], 0) ||
+                       !isConstantIntValue(padHigh[d], 0);
+        }
+        Value inputOOB = emitInputOuterOOB(nestedB, nestedLoc, outerCoords,
+                                           outerDimSizes, padDims);
+
+        // Output-row OOB: padded output positions (GEMM-alignment tails,
+        // etc.) route to the same sentinel as input OOB.
+        ArrayRef<int64_t> outputOuterDimSizes = outputShape.drop_back();
+        SmallVector<OpFoldResult> outputPadLow =
+            im2colOp.getMixedOutputPadLow();
+        SmallVector<OpFoldResult> outputPadHigh =
+            im2colOp.getMixedOutputPadHigh();
+        Value outputOOB =
+            emitOutputRowOOB(nestedB, nestedLoc, nonVectorizedPositions,
+                             outputOuterDimSizes, outputPadLow, outputPadHigh);
+
+        if (Value anyOOB =
+                orNullable(nestedB, nestedLoc, inputOOB, outputOOB)) {
+          Value sentinelVal = arith::ConstantIndexOp::create(
+              nestedB, nestedLoc, computeProduct(outerDimSizes));
+          flatGatherIdx = applyFlatOOBSentinel(nestedB, nestedLoc, anyOOB,
+                                               sentinelVal, flatGatherIdx);
+        }
 
         linalg::YieldOp::create(nestedB, nestedLoc, flatGatherIdx);
       });
