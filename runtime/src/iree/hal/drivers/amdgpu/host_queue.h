@@ -307,7 +307,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     iree_slim_mutex_t event_mutex;
     // Borrowed fine-grained GPU-agent block pool backing raw signal storage.
     iree_hal_amdgpu_block_pool_t* signal_block_pool;
-    // Host-side table of queue-owned GPU-agent raw signal blocks.
+    // Host-side table of queue-owned GPU-agent raw signal blocks indexed by
+    // dispatch event ring slot.
     iree_hal_amdgpu_block_t** signal_blocks;
     // Number of entries in |signal_blocks|.
     uint32_t signal_block_count;
@@ -477,15 +478,16 @@ iree_hal_amdgpu_host_queue_const_frontier(
   return (const iree_async_frontier_t*)&queue->frontier;
 }
 
-// Returns the raw profiling completion signal paired with |packet_id|'s AQL
-// slot. The returned pointer references queue-owned iree_amd_signal_t storage,
-// not a ROCR-created HSA signal, and must never be passed to host signal APIs
-// except as an AQL packet completion_signal handle. Valid only while HSA queue
-// timestamp profiling is enabled.
+// Returns the raw profiling completion signal paired with |event_position|'s
+// dispatch event ring slot. The returned pointer references queue-owned
+// iree_amd_signal_t storage, not a ROCR-created HSA signal, and must never be
+// passed to host signal APIs except as an AQL packet completion_signal handle.
+// Valid only while HSA queue timestamp profiling is enabled.
 static inline iree_amd_signal_t*
 iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
-    const iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id) {
-  const uint32_t signal_index = (uint32_t)(packet_id & queue->aql_ring.mask);
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position) {
+  const uint32_t signal_index =
+      (uint32_t)(event_position & queue->profiling.dispatch_event_mask);
   const uint32_t block_index =
       signal_index / queue->profiling.signals_per_block;
   const uint32_t block_signal_index =
@@ -498,14 +500,14 @@ iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
   return signal;
 }
 
-// Returns the raw profiling completion signal handle paired with |packet_id|'s
-// AQL slot.
+// Returns the raw profiling completion signal handle paired with
+// |event_position|'s dispatch event ring slot.
 static inline iree_hsa_signal_t
 iree_hal_amdgpu_host_queue_profiling_completion_signal(
-    const iree_hal_amdgpu_host_queue_t* queue, uint64_t packet_id) {
+    const iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position) {
   iree_amd_signal_t* signal =
-      iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(queue,
-                                                                 packet_id);
+      iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
+          queue, event_position);
   return (iree_hsa_signal_t){.handle = (uint64_t)(uintptr_t)signal};
 }
 

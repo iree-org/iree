@@ -82,8 +82,10 @@ typedef struct iree_hal_amdgpu_aql_ring_t {
   iree_atomic_int64_t* write_dispatch_id;
 
   // Read dispatch ID. Points into the hardware queue descriptor
-  // (iree_amd_queue_t.read_dispatch_id). Updated by the CP as it finishes
-  // processing packets. Used for backpressure spin-wait when the ring is full.
+  // (iree_amd_queue_t.read_dispatch_id). Advanced by the packet processor as
+  // queue slots become reusable. This is a packet-slot lifetime signal, not a
+  // proof that unrelated sidecar storage associated with a dispatch has been
+  // consumed by later queue work.
   const volatile int64_t* read_dispatch_id;
 } iree_hal_amdgpu_aql_ring_t;
 
@@ -134,7 +136,7 @@ static inline uint64_t iree_hal_amdgpu_aql_ring_reserve(
 
   // Backpressure: spin until the ring has space for all reserved slots.
   // The ring can hold (mask + 1) packets. The CP advances read_dispatch_id
-  // as it finishes processing packets.
+  // as packet slots become reusable.
   const uint64_t ring_capacity = (uint64_t)(ring->mask + 1);
   while (IREE_UNLIKELY(first_id + count -
                            (uint64_t)iree_atomic_load(

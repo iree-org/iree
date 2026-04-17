@@ -84,6 +84,7 @@ iree_cc_library(
     all_tests
   DEPS
     ::queue_alloca_test
+    ::queue_dispatch_test
     ::queue_host_call_test
     ::queue_transfer_test
     ::semaphore_submission_test

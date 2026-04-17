@@ -507,7 +507,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
             submission.profile_harvest_kernarg_blocks->data);
     sources[0].completion_signal =
         iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
-            queue, submission.dispatch_packet_id);
+            queue, profile_events.first_event_position);
     sources[0].event = event;
     submission.profile_harvest_setup =
         submission.profile_harvest_slot->dispatch.setup;
@@ -607,7 +607,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
   if (profile_dispatch_packet) {
     dispatch_completion_signal =
         iree_hal_amdgpu_host_queue_profiling_completion_signal(
-            queue, dispatch_packet_id);
+            queue, profile_events.first_event_position);
   }
   dispatch_packet->dispatch.completion_signal = dispatch_completion_signal;
 
@@ -655,7 +655,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
             profile_harvest_kernarg_data);
     sources[0].completion_signal =
         iree_hal_amdgpu_host_queue_profiling_completion_signal_ptr(
-            queue, dispatch_packet_id);
+            queue, profile_events.first_event_position);
     sources[0].event = event;
   }
 

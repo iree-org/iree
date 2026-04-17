@@ -512,7 +512,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
       out_submission->profile_events = profile_events;
       out_submission->dispatch_completion_signal =
           iree_hal_amdgpu_host_queue_profiling_completion_signal(
-              queue, dispatch_packet_id);
+              queue, profile_events.first_event_position);
       out_submission->profile_harvest_slot = iree_hal_amdgpu_aql_ring_packet(
           &queue->aql_ring, out_submission->kernel.first_packet_id +
                                 out_submission->kernel.packet_count - 1);
