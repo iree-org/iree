@@ -556,13 +556,25 @@ iree_hal_amdgpu_topology_initialize_from_gpu_agent_mask(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_query_available_agents(libhsa, &agents));
 
+  const iree_hal_amdgpu_gpu_agent_mask_t valid_gpu_agent_mask =
+      agents.gpu_agent_count >= 64 ? UINT64_MAX
+                                   : ((1ull << agents.gpu_agent_count) - 1ull);
+  if ((gpu_agent_mask & ~valid_gpu_agent_mask) != 0) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "GPU agent mask 0x%016" PRIx64
+                             " selects unavailable GPU ordinals; only %" PRIhsz
+                             " visible GPU agent(s) are available",
+                             gpu_agent_mask, agents.gpu_agent_count));
+  }
+
   // Initialize an empty topology.
   iree_hal_amdgpu_topology_initialize(out_topology);
 
   // Add each device to the topology.
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t gpu_ordinal = 0;
-       gpu_ordinal < IREE_ARRAYSIZE(agents.gpu_agents); ++gpu_ordinal) {
+  for (iree_host_size_t gpu_ordinal = 0; gpu_ordinal < agents.gpu_agent_count;
+       ++gpu_ordinal) {
     if ((gpu_agent_mask & (1ull << gpu_ordinal)) == 0) continue;
     status = iree_hal_amdgpu_topology_insert_gpu_agent_with_nearest_cpu_agent(
         out_topology, libhsa, agents.gpu_agents[gpu_ordinal]);
