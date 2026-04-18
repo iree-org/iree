@@ -393,6 +393,154 @@ static iree_status_t iree_profile_counter_emit_sample_jsonl(
   return iree_ok_status();
 }
 
+typedef struct iree_profile_counter_sample_state_t {
+  // Decoded counter sample record.
+  iree_hal_profile_counter_sample_record_t sample;
+  // Counter set metadata referenced by |sample|.
+  const iree_profile_counter_set_t* counter_set;
+  // Resolved executable export key for filtering and reporting.
+  iree_string_view_t key;
+  // Raw uint64_t counter sample values trailing |sample|.
+  iree_const_byte_span_t sample_values;
+  // True when the source chunk was marked truncated.
+  bool is_truncated;
+} iree_profile_counter_sample_state_t;
+
+static iree_status_t iree_profile_counter_sample_state_initialize(
+    const iree_profile_typed_record_t* typed_record, bool is_truncated,
+    iree_profile_counter_sample_state_t* out_state) {
+  memset(out_state, 0, sizeof(*out_state));
+  memcpy(&out_state->sample, typed_record->contents.data,
+         sizeof(out_state->sample));
+  out_state->sample_values =
+      iree_make_const_byte_span(typed_record->inline_payload.data,
+                                typed_record->inline_payload.data_length);
+  out_state->is_truncated = is_truncated;
+
+  iree_host_size_t values_length = 0;
+  if (!iree_host_size_checked_mul(out_state->sample.sample_value_count,
+                                  sizeof(uint64_t), &values_length) ||
+      values_length != typed_record->inline_payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter sample value count is inconsistent with record length");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_counter_sample_state_attach_metadata(
+    const iree_profile_counter_context_t* counter_context,
+    iree_profile_counter_sample_state_t* state) {
+  state->counter_set = iree_profile_counter_find_counter_set(
+      counter_context, state->sample.counter_set_id);
+  if (!state->counter_set) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter sample references missing counter-set metadata "
+        "sample=%" PRIu64 " counter_set=%" PRIu64,
+        state->sample.sample_id, state->sample.counter_set_id);
+  }
+  if (state->counter_set->record.sample_value_count !=
+      state->sample.sample_value_count) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter sample value count does not match counter-set metadata "
+        "sample=%" PRIu64 " counter_set=%" PRIu64,
+        state->sample.sample_id, state->sample.counter_set_id);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_counter_sample_state_resolve_key(
+    const iree_profile_model_t* model,
+    iree_profile_counter_sample_state_t* state, char* numeric_buffer,
+    iree_host_size_t numeric_buffer_capacity) {
+  return iree_profile_counter_resolve_sample_key(
+      model, &state->sample, numeric_buffer, numeric_buffer_capacity,
+      &state->key);
+}
+
+static iree_status_t iree_profile_counter_process_sample_counter(
+    iree_profile_counter_context_t* counter_context,
+    const iree_profile_counter_sample_state_t* state,
+    const iree_profile_counter_t* counter, iree_string_view_t filter,
+    iree_profile_counter_sample_callback_t sample_callback,
+    bool* out_matched_counter) {
+  *out_matched_counter = false;
+  if (!iree_profile_counter_filter_matches(state->counter_set, counter,
+                                           state->key, filter)) {
+    return iree_ok_status();
+  }
+
+  double value_sum = 0.0;
+  IREE_RETURN_IF_ERROR(iree_profile_counter_sum_value(
+      counter, &state->sample, state->sample_values.data, &value_sum));
+
+  iree_profile_counter_aggregate_t* aggregate = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_counter_get_aggregate(
+      counter_context, state->sample.physical_device_ordinal,
+      state->sample.queue_ordinal, state->sample.stream_id,
+      state->sample.counter_set_id, counter->record.counter_ordinal,
+      state->sample.executable_id, state->sample.export_ordinal,
+      state->sample.command_buffer_id, &aggregate));
+  iree_profile_counter_record_aggregate_sample(aggregate, counter,
+                                               &state->sample, value_sum);
+
+  if (sample_callback.fn) {
+    const iree_profile_counter_sample_row_t sample_row = {
+        .sample = &state->sample,
+        .counter_set = state->counter_set,
+        .counter = counter,
+        .key = state->key,
+        .sample_values = state->sample_values,
+        .value_sum = value_sum,
+        .is_truncated = state->is_truncated,
+    };
+    IREE_RETURN_IF_ERROR(
+        sample_callback.fn(sample_callback.user_data, &sample_row));
+  }
+  *out_matched_counter = true;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_counter_process_matching_sample(
+    iree_profile_counter_context_t* counter_context,
+    const iree_profile_counter_sample_state_t* state, iree_string_view_t filter,
+    int64_t id_filter, iree_profile_counter_sample_callback_t sample_callback,
+    bool* out_matched_sample) {
+  *out_matched_sample = false;
+  if (!iree_profile_counter_sample_matches_id(&state->sample, id_filter)) {
+    return iree_ok_status();
+  }
+
+  bool found_counter = false;
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       i < counter_context->counter_count && iree_status_is_ok(status); ++i) {
+    const iree_profile_counter_t* counter = &counter_context->counters[i];
+    if (counter->record.counter_set_id != state->sample.counter_set_id) {
+      continue;
+    }
+    found_counter = true;
+
+    bool matched_counter = false;
+    status = iree_profile_counter_process_sample_counter(
+        counter_context, state, counter, filter, sample_callback,
+        &matched_counter);
+    if (iree_status_is_ok(status) && matched_counter) {
+      *out_matched_sample = true;
+    }
+  }
+  if (iree_status_is_ok(status) && !found_counter) {
+    status = iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter sample references counter set with no counter metadata "
+        "sample=%" PRIu64 " counter_set=%" PRIu64,
+        state->sample.sample_id, state->sample.counter_set_id);
+  }
+  return status;
+}
+
 iree_status_t iree_profile_counter_process_sample_records(
     iree_profile_counter_context_t* counter_context,
     const iree_profile_model_t* model,
@@ -419,102 +567,26 @@ iree_status_t iree_profile_counter_process_sample_records(
                                                      &has_record);
     if (!iree_status_is_ok(status) || !has_record) break;
 
-    iree_hal_profile_counter_sample_record_t sample;
-    memcpy(&sample, typed_record.contents.data, sizeof(sample));
     ++counter_context->total_sample_count;
 
-    iree_host_size_t values_length = 0;
-    if (!iree_host_size_checked_mul(sample.sample_value_count, sizeof(uint64_t),
-                                    &values_length) ||
-        values_length != typed_record.inline_payload.data_length) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter sample value count is inconsistent with record length");
-    }
-
-    const iree_profile_counter_set_t* counter_set = NULL;
+    iree_profile_counter_sample_state_t sample_state;
+    status = iree_profile_counter_sample_state_initialize(
+        &typed_record, is_truncated, &sample_state);
     if (iree_status_is_ok(status)) {
-      counter_set = iree_profile_counter_find_counter_set(
-          counter_context, sample.counter_set_id);
-      if (!counter_set) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "counter sample references missing counter-set metadata "
-            "sample=%" PRIu64 " counter_set=%" PRIu64,
-            sample.sample_id, sample.counter_set_id);
-      }
+      status = iree_profile_counter_sample_state_attach_metadata(
+          counter_context, &sample_state);
     }
-    if (iree_status_is_ok(status) &&
-        counter_set->record.sample_value_count != sample.sample_value_count) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter sample value count does not match counter-set metadata "
-          "sample=%" PRIu64 " counter_set=%" PRIu64,
-          sample.sample_id, sample.counter_set_id);
-    }
-
     char numeric_buffer[128];
-    iree_string_view_t key = iree_string_view_empty();
     if (iree_status_is_ok(status)) {
-      status = iree_profile_counter_resolve_sample_key(
-          model, &sample, numeric_buffer, sizeof(numeric_buffer), &key);
+      status = iree_profile_counter_sample_state_resolve_key(
+          model, &sample_state, numeric_buffer, sizeof(numeric_buffer));
     }
 
     bool matched_sample = false;
-    const uint8_t* sample_values = typed_record.inline_payload.data;
-    if (iree_status_is_ok(status) &&
-        iree_profile_counter_sample_matches_id(&sample, id_filter)) {
-      bool found_counter = false;
-      for (iree_host_size_t i = 0;
-           i < counter_context->counter_count && iree_status_is_ok(status);
-           ++i) {
-        const iree_profile_counter_t* counter = &counter_context->counters[i];
-        if (counter->record.counter_set_id != sample.counter_set_id) {
-          continue;
-        }
-        found_counter = true;
-        if (!iree_profile_counter_filter_matches(counter_set, counter, key,
-                                                 filter)) {
-          continue;
-        }
-
-        double value_sum = 0.0;
-        status = iree_profile_counter_sum_value(counter, &sample, sample_values,
-                                                &value_sum);
-        if (iree_status_is_ok(status)) {
-          matched_sample = true;
-          iree_profile_counter_aggregate_t* aggregate = NULL;
-          status = iree_profile_counter_get_aggregate(
-              counter_context, sample.physical_device_ordinal,
-              sample.queue_ordinal, sample.stream_id, sample.counter_set_id,
-              counter->record.counter_ordinal, sample.executable_id,
-              sample.export_ordinal, sample.command_buffer_id, &aggregate);
-          if (iree_status_is_ok(status)) {
-            iree_profile_counter_record_aggregate_sample(aggregate, counter,
-                                                         &sample, value_sum);
-          }
-          if (iree_status_is_ok(status) && sample_callback.fn) {
-            const iree_profile_counter_sample_row_t sample_row = {
-                .sample = &sample,
-                .counter_set = counter_set,
-                .counter = counter,
-                .key = key,
-                .sample_values = iree_make_const_byte_span(
-                    sample_values, typed_record.inline_payload.data_length),
-                .value_sum = value_sum,
-                .is_truncated = is_truncated,
-            };
-            status = sample_callback.fn(sample_callback.user_data, &sample_row);
-          }
-        }
-      }
-      if (iree_status_is_ok(status) && !found_counter) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "counter sample references counter set with no counter metadata "
-            "sample=%" PRIu64 " counter_set=%" PRIu64,
-            sample.sample_id, sample.counter_set_id);
-      }
+    if (iree_status_is_ok(status)) {
+      status = iree_profile_counter_process_matching_sample(
+          counter_context, &sample_state, filter, id_filter, sample_callback,
+          &matched_sample);
     }
     if (iree_status_is_ok(status) && matched_sample) {
       ++counter_context->matched_sample_count;
