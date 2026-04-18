@@ -15,10 +15,9 @@
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
-#include "iree/hal/utils/profile_file.h"
-#include "iree/io/file_contents.h"
+#include "iree/tooling/profile/att/bundle.h"
+#include "iree/tooling/profile/att/util.h"
 #include "iree/tooling/profile/common.h"
-#include "iree/tooling/profile/reader.h"
 
 //===----------------------------------------------------------------------===//
 // ROCm trace-decoder ABI mirrors
@@ -225,94 +224,6 @@ typedef struct iree_profile_att_comgr_library_t {
       void* user_data, uint64_t* out_instruction_size);
 } iree_profile_att_comgr_library_t;
 
-//===----------------------------------------------------------------------===//
-// Profile bundle indexes
-//===----------------------------------------------------------------------===//
-
-typedef struct iree_profile_att_code_object_t {
-  // Producer-local executable identifier that owns this code object.
-  uint64_t executable_id;
-  // Producer-local code-object marker identifier used in ATT packets.
-  uint64_t code_object_id;
-  // Borrowed exact HSACO bytes from the mapped profile bundle.
-  iree_const_byte_span_t data;
-} iree_profile_att_code_object_t;
-
-typedef struct iree_profile_att_code_object_load_t {
-  // Session-local physical device ordinal where the code object was loaded.
-  uint32_t physical_device_ordinal;
-  // Producer-local executable identifier that owns this code object.
-  uint64_t executable_id;
-  // Producer-local code-object marker identifier used in ATT packets.
-  uint64_t code_object_id;
-  // AMD loader delta passed to the ROCm trace decoder as load address.
-  int64_t load_delta;
-  // Loaded code-object memory size reported by the AMD loader.
-  uint64_t load_size;
-} iree_profile_att_code_object_load_t;
-
-typedef struct iree_profile_att_export_t {
-  // Producer-local executable identifier that owns this export.
-  uint64_t executable_id;
-  // Export ordinal referenced by dispatch and trace records.
-  uint32_t export_ordinal;
-  // Borrowed export name bytes from the mapped profile bundle.
-  iree_string_view_t name;
-} iree_profile_att_export_t;
-
-typedef struct iree_profile_att_dispatch_t {
-  // Dispatch event record copied from the profile bundle.
-  iree_hal_profile_dispatch_event_t record;
-  // Physical device ordinal from the containing chunk metadata.
-  uint32_t physical_device_ordinal;
-  // Queue ordinal from the containing chunk metadata.
-  uint32_t queue_ordinal;
-} iree_profile_att_dispatch_t;
-
-typedef struct iree_profile_att_trace_t {
-  // Executable trace record copied from the profile bundle.
-  iree_hal_profile_executable_trace_record_t record;
-  // Borrowed raw ATT/SQTT trace bytes from the mapped profile bundle.
-  iree_const_byte_span_t data;
-} iree_profile_att_trace_t;
-
-typedef struct iree_profile_att_profile_t {
-  // Host allocator used for dynamic index arrays.
-  iree_allocator_t host_allocator;
-  // Mapped profile file contents retaining all borrowed record data.
-  iree_io_file_contents_t* file_contents;
-  // Dynamic array of embedded code-object images.
-  iree_profile_att_code_object_t* code_objects;
-  // Number of valid entries in |code_objects|.
-  iree_host_size_t code_object_count;
-  // Capacity of |code_objects| in entries.
-  iree_host_size_t code_object_capacity;
-  // Dynamic array of per-device code-object load records.
-  iree_profile_att_code_object_load_t* code_object_loads;
-  // Number of valid entries in |code_object_loads|.
-  iree_host_size_t code_object_load_count;
-  // Capacity of |code_object_loads| in entries.
-  iree_host_size_t code_object_load_capacity;
-  // Dynamic array of executable export names.
-  iree_profile_att_export_t* exports;
-  // Number of valid entries in |exports|.
-  iree_host_size_t export_count;
-  // Capacity of |exports| in entries.
-  iree_host_size_t export_capacity;
-  // Dynamic array of dispatch events.
-  iree_profile_att_dispatch_t* dispatches;
-  // Number of valid entries in |dispatches|.
-  iree_host_size_t dispatch_count;
-  // Capacity of |dispatches| in entries.
-  iree_host_size_t dispatch_capacity;
-  // Dynamic array of executable trace artifacts.
-  iree_profile_att_trace_t* traces;
-  // Number of valid entries in |traces|.
-  iree_host_size_t trace_count;
-  // Capacity of |traces| in entries.
-  iree_host_size_t trace_capacity;
-} iree_profile_att_profile_t;
-
 typedef struct iree_profile_att_pc_key_t {
   // Producer-local code-object marker identifier.
   uint64_t code_object_id;
@@ -386,34 +297,6 @@ typedef struct iree_profile_att_decode_state_t {
 //===----------------------------------------------------------------------===//
 // Generic helpers
 //===----------------------------------------------------------------------===//
-
-static iree_status_t iree_profile_att_grow_array(
-    iree_allocator_t host_allocator, iree_host_size_t element_count,
-    iree_host_size_t element_size, iree_host_size_t* inout_capacity,
-    void** inout_ptr) {
-  if (element_count <= *inout_capacity) return iree_ok_status();
-  return iree_allocator_grow_array(
-      host_allocator, iree_max((iree_host_size_t)16, element_count),
-      element_size, inout_capacity, inout_ptr);
-}
-
-static iree_status_t iree_profile_att_copy_cstring(
-    iree_string_view_t value, iree_allocator_t host_allocator,
-    char** out_string) {
-  *out_string = NULL;
-  char* string = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(host_allocator, value.size + 1, (void**)&string));
-  if (value.size > 0) memcpy(string, value.data, value.size);
-  string[value.size] = 0;
-  *out_string = string;
-  return iree_ok_status();
-}
-
-static iree_string_view_t iree_profile_att_cstring_view_or_empty(
-    const char* string) {
-  return string ? iree_make_cstring_view(string) : iree_string_view_empty();
-}
 
 static const char* iree_profile_att_instruction_category_name(
     uint32_t category) {
@@ -687,336 +570,6 @@ static iree_status_t iree_profile_att_make_comgr_status(
                           "status %d (%s)",
                           operation, (int)status,
                           status_string ? status_string : "unknown");
-}
-
-//===----------------------------------------------------------------------===//
-// Bundle parsing
-//===----------------------------------------------------------------------===//
-
-static void iree_profile_att_initialize(
-    iree_allocator_t host_allocator, iree_profile_att_profile_t* out_profile) {
-  memset(out_profile, 0, sizeof(*out_profile));
-  out_profile->host_allocator = host_allocator;
-}
-
-static void iree_profile_att_deinitialize(iree_profile_att_profile_t* profile) {
-  iree_allocator_t host_allocator = profile->host_allocator;
-  iree_allocator_free(host_allocator, profile->traces);
-  iree_allocator_free(host_allocator, profile->dispatches);
-  iree_allocator_free(host_allocator, profile->exports);
-  iree_allocator_free(host_allocator, profile->code_object_loads);
-  iree_allocator_free(host_allocator, profile->code_objects);
-  iree_io_file_contents_free(profile->file_contents);
-  memset(profile, 0, sizeof(*profile));
-}
-
-static iree_status_t iree_profile_att_append_code_object(
-    iree_profile_att_profile_t* profile,
-    iree_profile_att_code_object_t code_object) {
-  IREE_RETURN_IF_ERROR(iree_profile_att_grow_array(
-      profile->host_allocator, profile->code_object_count + 1,
-      sizeof(profile->code_objects[0]), &profile->code_object_capacity,
-      (void**)&profile->code_objects));
-  profile->code_objects[profile->code_object_count++] = code_object;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_append_code_object_load(
-    iree_profile_att_profile_t* profile,
-    iree_profile_att_code_object_load_t code_object_load) {
-  IREE_RETURN_IF_ERROR(iree_profile_att_grow_array(
-      profile->host_allocator, profile->code_object_load_count + 1,
-      sizeof(profile->code_object_loads[0]),
-      &profile->code_object_load_capacity,
-      (void**)&profile->code_object_loads));
-  profile->code_object_loads[profile->code_object_load_count++] =
-      code_object_load;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_append_export(
-    iree_profile_att_profile_t* profile,
-    iree_profile_att_export_t export_info) {
-  IREE_RETURN_IF_ERROR(iree_profile_att_grow_array(
-      profile->host_allocator, profile->export_count + 1,
-      sizeof(profile->exports[0]), &profile->export_capacity,
-      (void**)&profile->exports));
-  profile->exports[profile->export_count++] = export_info;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_append_dispatch(
-    iree_profile_att_profile_t* profile, iree_profile_att_dispatch_t dispatch) {
-  IREE_RETURN_IF_ERROR(iree_profile_att_grow_array(
-      profile->host_allocator, profile->dispatch_count + 1,
-      sizeof(profile->dispatches[0]), &profile->dispatch_capacity,
-      (void**)&profile->dispatches));
-  profile->dispatches[profile->dispatch_count++] = dispatch;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_append_trace(
-    iree_profile_att_profile_t* profile, iree_profile_att_trace_t trace) {
-  IREE_RETURN_IF_ERROR(iree_profile_att_grow_array(
-      profile->host_allocator, profile->trace_count + 1,
-      sizeof(profile->traces[0]), &profile->trace_capacity,
-      (void**)&profile->traces));
-  profile->traces[profile->trace_count++] = trace;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_parse_code_objects(
-    iree_profile_att_profile_t* profile,
-    const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_iterator_t iterator;
-  iree_profile_typed_record_iterator_initialize(
-      record, sizeof(iree_hal_profile_executable_code_object_record_t),
-      &iterator);
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status)) {
-    iree_profile_typed_record_t typed_record;
-    bool has_record = false;
-    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
-                                                     &has_record);
-    if (!iree_status_is_ok(status) || !has_record) break;
-
-    iree_hal_profile_executable_code_object_record_t code_object_record;
-    memcpy(&code_object_record, typed_record.contents.data,
-           sizeof(code_object_record));
-    if ((iree_host_size_t)code_object_record.data_length !=
-        typed_record.inline_payload.data_length) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "profile executable code-object chunk has an invalid record");
-    }
-    if (iree_status_is_ok(status)) {
-      iree_profile_att_code_object_t code_object = {
-          .executable_id = code_object_record.executable_id,
-          .code_object_id = code_object_record.code_object_id,
-          .data = typed_record.inline_payload,
-      };
-      status = iree_profile_att_append_code_object(profile, code_object);
-    }
-  }
-  return status;
-}
-
-static iree_status_t iree_profile_att_parse_code_object_loads(
-    iree_profile_att_profile_t* profile,
-    const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_iterator_t iterator;
-  iree_profile_typed_record_iterator_initialize(
-      record, sizeof(iree_hal_profile_executable_code_object_load_record_t),
-      &iterator);
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status)) {
-    iree_profile_typed_record_t typed_record;
-    bool has_record = false;
-    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
-                                                     &has_record);
-    if (!iree_status_is_ok(status) || !has_record) break;
-
-    iree_hal_profile_executable_code_object_load_record_t load_record;
-    memcpy(&load_record, typed_record.contents.data, sizeof(load_record));
-    if (typed_record.record_length != sizeof(load_record)) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "profile executable code-object load record has invalid length");
-    }
-    if (iree_status_is_ok(status)) {
-      iree_profile_att_code_object_load_t code_object_load = {
-          .physical_device_ordinal = load_record.physical_device_ordinal,
-          .executable_id = load_record.executable_id,
-          .code_object_id = load_record.code_object_id,
-          .load_delta = load_record.load_delta,
-          .load_size = load_record.load_size,
-      };
-      status =
-          iree_profile_att_append_code_object_load(profile, code_object_load);
-    }
-  }
-  return status;
-}
-
-static iree_status_t iree_profile_att_parse_exports(
-    iree_profile_att_profile_t* profile,
-    const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_iterator_t iterator;
-  iree_profile_typed_record_iterator_initialize(
-      record, sizeof(iree_hal_profile_executable_export_record_t), &iterator);
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status)) {
-    iree_profile_typed_record_t typed_record;
-    bool has_record = false;
-    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
-                                                     &has_record);
-    if (!iree_status_is_ok(status) || !has_record) break;
-
-    iree_hal_profile_executable_export_record_t export_record;
-    memcpy(&export_record, typed_record.contents.data, sizeof(export_record));
-    if ((iree_host_size_t)export_record.name_length !=
-        typed_record.inline_payload.data_length) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "profile executable export chunk has an invalid record");
-    }
-    if (iree_status_is_ok(status)) {
-      iree_profile_att_export_t export_info = {
-          .executable_id = export_record.executable_id,
-          .export_ordinal = export_record.export_ordinal,
-          .name = iree_make_string_view(
-              (const char*)typed_record.inline_payload.data,
-              typed_record.inline_payload.data_length),
-      };
-      status = iree_profile_att_append_export(profile, export_info);
-    }
-  }
-  return status;
-}
-
-static iree_status_t iree_profile_att_parse_dispatches(
-    iree_profile_att_profile_t* profile,
-    const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_iterator_t iterator;
-  iree_profile_typed_record_iterator_initialize(
-      record, sizeof(iree_hal_profile_dispatch_event_t), &iterator);
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status)) {
-    iree_profile_typed_record_t typed_record;
-    bool has_record = false;
-    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
-                                                     &has_record);
-    if (!iree_status_is_ok(status) || !has_record) break;
-
-    iree_profile_att_dispatch_t dispatch = {
-        .physical_device_ordinal = record->header.physical_device_ordinal,
-        .queue_ordinal = record->header.queue_ordinal,
-    };
-    memcpy(&dispatch.record, typed_record.contents.data,
-           sizeof(dispatch.record));
-    if (typed_record.record_length != sizeof(dispatch.record)) {
-      status =
-          iree_make_status(IREE_STATUS_DATA_LOSS,
-                           "profile dispatch event record has invalid length");
-    }
-    if (iree_status_is_ok(status)) {
-      status = iree_profile_att_append_dispatch(profile, dispatch);
-    }
-  }
-  return status;
-}
-
-static iree_status_t iree_profile_att_parse_trace(
-    iree_profile_att_profile_t* profile,
-    const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_t typed_record;
-  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
-      record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
-      &typed_record));
-  iree_hal_profile_executable_trace_record_t trace_record;
-  memcpy(&trace_record, typed_record.contents.data, sizeof(trace_record));
-  if ((iree_host_size_t)trace_record.data_length !=
-      typed_record.following_payload.data_length) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk has invalid trace record length");
-  }
-  iree_profile_att_trace_t trace = {
-      .record = trace_record,
-      .data = typed_record.following_payload,
-  };
-  return iree_profile_att_append_trace(profile, trace);
-}
-
-static iree_status_t iree_profile_att_parse_record(
-    void* user_data, const iree_hal_profile_file_record_t* record,
-    iree_host_size_t record_index) {
-  (void)record_index;
-  iree_profile_att_profile_t* profile = (iree_profile_att_profile_t*)user_data;
-  if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
-    return iree_ok_status();
-  }
-  if (iree_string_view_equal(
-          record->content_type,
-          IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS)) {
-    return iree_profile_att_parse_code_objects(profile, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS)) {
-    return iree_profile_att_parse_code_object_loads(profile, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-    return iree_profile_att_parse_exports(profile, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-    return iree_profile_att_parse_dispatches(profile, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
-    return iree_profile_att_parse_trace(profile, record);
-  }
-  return iree_ok_status();
-}
-
-static iree_status_t iree_profile_att_parse_file(
-    iree_string_view_t path, iree_profile_att_profile_t* profile) {
-  iree_profile_file_t profile_file;
-  IREE_RETURN_IF_ERROR(
-      iree_profile_file_open(path, profile->host_allocator, &profile_file));
-  // Trace payloads borrow from the mapped bundle, so the ATT profile retains
-  // the mapping instead of closing the generic reader at the end of parsing.
-  profile->file_contents = profile_file.contents;
-  iree_profile_file_record_callback_t record_callback = {
-      .fn = iree_profile_att_parse_record,
-      .user_data = profile,
-  };
-  return iree_profile_file_for_each_record(&profile_file, record_callback);
-}
-
-static const iree_profile_att_code_object_t* iree_profile_att_find_code_object(
-    const iree_profile_att_profile_t* profile, uint64_t executable_id,
-    uint64_t code_object_id) {
-  for (iree_host_size_t i = 0; i < profile->code_object_count; ++i) {
-    const iree_profile_att_code_object_t* code_object =
-        &profile->code_objects[i];
-    if (code_object->executable_id == executable_id &&
-        code_object->code_object_id == code_object_id) {
-      return code_object;
-    }
-  }
-  return NULL;
-}
-
-static const iree_profile_att_export_t* iree_profile_att_find_export(
-    const iree_profile_att_profile_t* profile, uint64_t executable_id,
-    uint32_t export_ordinal) {
-  for (iree_host_size_t i = 0; i < profile->export_count; ++i) {
-    const iree_profile_att_export_t* export_info = &profile->exports[i];
-    if (export_info->executable_id == executable_id &&
-        export_info->export_ordinal == export_ordinal) {
-      return export_info;
-    }
-  }
-  return NULL;
-}
-
-static const iree_profile_att_dispatch_t* iree_profile_att_find_dispatch(
-    const iree_profile_att_profile_t* profile,
-    const iree_profile_att_trace_t* trace) {
-  for (iree_host_size_t i = 0; i < profile->dispatch_count; ++i) {
-    const iree_profile_att_dispatch_t* dispatch = &profile->dispatches[i];
-    if (dispatch->record.event_id == trace->record.dispatch_event_id &&
-        dispatch->record.submission_id == trace->record.submission_id &&
-        dispatch->record.command_buffer_id == trace->record.command_buffer_id &&
-        dispatch->record.command_index == trace->record.command_index &&
-        dispatch->record.executable_id == trace->record.executable_id &&
-        dispatch->record.export_ordinal == trace->record.export_ordinal) {
-      return dispatch;
-    }
-  }
-  return NULL;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1461,8 +1014,8 @@ static iree_status_t iree_profile_att_load_trace_code_objects(
       continue;
     }
     const iree_profile_att_code_object_t* code_object =
-        iree_profile_att_find_code_object(profile, load->executable_id,
-                                          load->code_object_id);
+        iree_profile_att_profile_find_code_object(profile, load->executable_id,
+                                                  load->code_object_id);
     if (!code_object) {
       status =
           iree_make_status(IREE_STATUS_DATA_LOSS,
@@ -1553,8 +1106,9 @@ static bool iree_profile_att_trace_matches(
       trace->record.dispatch_event_id != (uint64_t)id) {
     return false;
   }
-  const iree_profile_att_export_t* export_info = iree_profile_att_find_export(
-      profile, trace->record.executable_id, trace->record.export_ordinal);
+  const iree_profile_att_export_t* export_info =
+      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
+                                           trace->record.export_ordinal);
   if (iree_string_view_is_empty(filter) ||
       iree_string_view_equal(filter, IREE_SV("*"))) {
     return true;
@@ -1567,10 +1121,11 @@ static void iree_profile_att_print_trace_header_text(
     const iree_profile_att_profile_t* profile,
     const iree_profile_att_trace_t* trace,
     const iree_profile_att_decode_state_t* state, FILE* file) {
-  const iree_profile_att_export_t* export_info = iree_profile_att_find_export(
-      profile, trace->record.executable_id, trace->record.export_ordinal);
+  const iree_profile_att_export_t* export_info =
+      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
+                                           trace->record.export_ordinal);
   const iree_profile_att_dispatch_t* dispatch =
-      iree_profile_att_find_dispatch(profile, trace);
+      iree_profile_att_profile_find_dispatch(profile, trace);
   fprintf(file, "ATT trace %" PRIu64 "\n", trace->record.trace_id);
   fprintf(file, "  executable=%" PRIu64 " export=%" PRIu32 " name=%.*s\n",
           trace->record.executable_id, trace->record.export_ordinal,
@@ -1642,10 +1197,11 @@ static iree_status_t iree_profile_att_print_trace_jsonl(
     const iree_profile_att_profile_t* profile,
     const iree_profile_att_trace_t* trace,
     iree_profile_att_decode_state_t* state, FILE* file) {
-  const iree_profile_att_export_t* export_info = iree_profile_att_find_export(
-      profile, trace->record.executable_id, trace->record.export_ordinal);
+  const iree_profile_att_export_t* export_info =
+      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
+                                           trace->record.export_ordinal);
   const iree_profile_att_dispatch_t* dispatch =
-      iree_profile_att_find_dispatch(profile, trace);
+      iree_profile_att_profile_find_dispatch(profile, trace);
   fprintf(file,
           "{\"type\":\"att_trace\",\"trace_id\":%" PRIu64
           ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
@@ -1786,13 +1342,13 @@ IREE_API_EXPORT iree_status_t iree_profile_att_file(
     FILE* file, iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_profile_att_profile_t profile;
-  iree_profile_att_initialize(host_allocator, &profile);
-  iree_status_t status = iree_profile_att_parse_file(path, &profile);
+  iree_profile_att_profile_initialize(host_allocator, &profile);
+  iree_status_t status = iree_profile_att_profile_parse_file(path, &profile);
   if (iree_status_is_ok(status)) {
     status = iree_profile_att_report_file(
         &profile, format, filter, id, rocm_library_path, file, host_allocator);
   }
-  iree_profile_att_deinitialize(&profile);
+  iree_profile_att_profile_deinitialize(&profile);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,18 +20,47 @@ if(IREE_HAL_DRIVER_AMDGPU)
 )
 
 iree_runtime_cc_library(
+    name = "util",
+    srcs = ["util.c"],
+    hdrs = ["util.h"],
+    deps = ["//runtime/src/iree/base"],
+)
+
+iree_runtime_cc_library(
+    name = "bundle",
+    srcs = ["bundle.c"],
+    hdrs = ["bundle.h"],
+    deps = [
+        ":util",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/tooling/profile:common",
+        "//runtime/src/iree/tooling/profile:reader",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "att",
     srcs = ["att.c"],
     hdrs = ["att.h"],
     deps = [
+        ":bundle",
+        ":util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:dynamic_library",
         "//runtime/src/iree/base/internal:path",
-        "//runtime/src/iree/hal/utils:profile_file",
-        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/tooling/profile:commands",
         "//runtime/src/iree/tooling/profile:common",
-        "//runtime/src/iree/tooling/profile:reader",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bundle_test",
+    srcs = ["bundle_test.cc"],
+    deps = [
+        ":bundle",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

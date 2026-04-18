@@ -14,21 +14,59 @@ if(IREE_HAL_DRIVER_AMDGPU)
 
 iree_cc_library(
   NAME
+    util
+  HDRS
+    "util.h"
+  SRCS
+    "util.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bundle
+  HDRS
+    "bundle.h"
+  SRCS
+    "bundle.c"
+  DEPS
+    ::util
+    iree::io::file_handle
+    iree::tooling::profile::common
+    iree::tooling::profile::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     att
   HDRS
     "att.h"
   SRCS
     "att.c"
   DEPS
+    ::bundle
+    ::util
     iree::base
     iree::base::internal::dynamic_library
     iree::base::internal::path
-    iree::hal::utils::profile_file
-    iree::io::file_handle
     iree::tooling::profile::commands
     iree::tooling::profile::common
-    iree::tooling::profile::reader
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    bundle_test
+  SRCS
+    "bundle_test.cc"
+  DEPS
+    ::bundle
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 endif()
