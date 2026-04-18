@@ -407,81 +407,111 @@ static bool iree_profile_memory_balance_close(
   return true;
 }
 
-static iree_status_t iree_profile_memory_record_device_event(
+static void iree_profile_memory_count_device_event(
     iree_profile_memory_device_t* device,
-    const iree_hal_profile_memory_event_t* event, bool close_materialization) {
+    const iree_hal_profile_memory_event_t* event) {
   ++device->event_count;
-  bool accounted = true;
   switch (event->type) {
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
       ++device->slab_acquire_count;
-      accounted = iree_profile_memory_balance_open(
-          &device->slab_allocation_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE:
       ++device->slab_release_count;
-      accounted = iree_profile_memory_balance_close(
-          &device->slab_allocation_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
       ++device->pool_reserve_count;
-      if (iree_all_bits_set(
-              event->flags,
-              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION)) {
-        accounted = iree_profile_memory_balance_open(
-            &device->pool_reservation_balance, event->length);
-      }
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE:
       ++device->pool_materialize_count;
-      accounted = iree_profile_memory_balance_open(
-          &device->pool_materialization_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
       ++device->pool_release_count;
-      accounted = iree_profile_memory_balance_close(
-          &device->pool_reservation_balance, event->length);
-      if (accounted && close_materialization) {
-        accounted = iree_profile_memory_balance_close(
-            &device->pool_materialization_balance, event->length);
-      }
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT:
       ++device->pool_wait_count;
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
       ++device->buffer_allocate_count;
-      accounted = iree_profile_memory_balance_open(
-          &device->buffer_allocation_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
       ++device->buffer_free_count;
-      accounted = iree_profile_memory_balance_close(
-          &device->buffer_allocation_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
       ++device->buffer_import_count;
-      accounted = iree_profile_memory_balance_open(
-          &device->buffer_import_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
       ++device->buffer_unimport_count;
-      accounted = iree_profile_memory_balance_close(
-          &device->buffer_import_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
       ++device->queue_alloca_count;
-      accounted = iree_profile_memory_balance_open(
-          &device->queue_inflight_balance, event->length);
       break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
       ++device->queue_dealloca_count;
-      accounted = iree_profile_memory_balance_close(
-          &device->queue_inflight_balance, event->length);
       break;
     default:
       break;
   }
+}
+
+static bool iree_profile_memory_apply_device_event_balance(
+    iree_profile_memory_device_t* device,
+    const iree_hal_profile_memory_event_t* event, bool close_materialization) {
+  switch (event->type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
+      return iree_profile_memory_balance_open(&device->slab_allocation_balance,
+                                              event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE:
+      return iree_profile_memory_balance_close(&device->slab_allocation_balance,
+                                               event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
+      if (iree_all_bits_set(
+              event->flags,
+              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION)) {
+        return iree_profile_memory_balance_open(
+            &device->pool_reservation_balance, event->length);
+      }
+      return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE:
+      return iree_profile_memory_balance_open(
+          &device->pool_materialization_balance, event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE: {
+      bool accounted = iree_profile_memory_balance_close(
+          &device->pool_reservation_balance, event->length);
+      if (accounted && close_materialization) {
+        accounted = iree_profile_memory_balance_close(
+            &device->pool_materialization_balance, event->length);
+      }
+      return accounted;
+    }
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+      return iree_profile_memory_balance_open(
+          &device->buffer_allocation_balance, event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+      return iree_profile_memory_balance_close(
+          &device->buffer_allocation_balance, event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+      return iree_profile_memory_balance_open(&device->buffer_import_balance,
+                                              event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      return iree_profile_memory_balance_close(&device->buffer_import_balance,
+                                               event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
+      return iree_profile_memory_balance_open(&device->queue_inflight_balance,
+                                              event->length);
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
+      return iree_profile_memory_balance_close(&device->queue_inflight_balance,
+                                               event->length);
+    default:
+      return true;
+  }
+}
+
+static iree_status_t iree_profile_memory_record_device_event(
+    iree_profile_memory_device_t* device,
+    const iree_hal_profile_memory_event_t* event, bool close_materialization) {
+  iree_profile_memory_count_device_event(device, event);
+  const bool accounted = iree_profile_memory_apply_device_event_balance(
+      device, event, close_materialization);
   if (!accounted) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "memory accounting overflow for event_id=%" PRIu64,
@@ -1020,6 +1050,37 @@ iree_profile_memory_resolve_device_lifetime(
   return lifetime;
 }
 
+static iree_status_t iree_profile_memory_context_accumulate_event(
+    iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event, bool is_truncated,
+    iree_profile_memory_event_callback_t event_callback) {
+  ++context->matched_event_count;
+  if (is_truncated) ++context->truncated_event_count;
+
+  const bool close_materialization =
+      iree_profile_memory_event_closes_materialization(context, event);
+  iree_profile_memory_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_memory_get_device(
+      context, event->physical_device_ordinal, &device));
+  IREE_RETURN_IF_ERROR(iree_profile_memory_record_device_event(
+      device, event, close_materialization));
+  IREE_RETURN_IF_ERROR(iree_profile_memory_record_pool_event(
+      context, event, close_materialization));
+  IREE_RETURN_IF_ERROR(
+      iree_profile_memory_record_pool_stats_event(context, event));
+  IREE_RETURN_IF_ERROR(iree_profile_memory_record_allocation_event(
+      context, event, close_materialization));
+
+  if (event_callback.fn) {
+    const iree_profile_memory_event_row_t event_row = {
+        .event = event,
+        .is_truncated = is_truncated,
+    };
+    return event_callback.fn(event_callback.user_data, &event_row);
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -1049,35 +1110,8 @@ iree_status_t iree_profile_memory_context_accumulate_record(
     memcpy(&event, typed_record.contents.data, sizeof(event));
     ++context->total_event_count;
     if (iree_profile_memory_event_matches(&event, id_filter, filter)) {
-      ++context->matched_event_count;
-      if (is_truncated) ++context->truncated_event_count;
-      const bool close_materialization =
-          iree_profile_memory_event_closes_materialization(context, &event);
-      iree_profile_memory_device_t* device = NULL;
-      status = iree_profile_memory_get_device(
-          context, event.physical_device_ordinal, &device);
-      if (iree_status_is_ok(status)) {
-        status = iree_profile_memory_record_device_event(device, &event,
-                                                         close_materialization);
-      }
-      if (iree_status_is_ok(status)) {
-        status = iree_profile_memory_record_pool_event(context, &event,
-                                                       close_materialization);
-      }
-      if (iree_status_is_ok(status)) {
-        status = iree_profile_memory_record_pool_stats_event(context, &event);
-      }
-      if (iree_status_is_ok(status)) {
-        status = iree_profile_memory_record_allocation_event(
-            context, &event, close_materialization);
-      }
-      if (iree_status_is_ok(status) && event_callback.fn) {
-        const iree_profile_memory_event_row_t event_row = {
-            .event = &event,
-            .is_truncated = is_truncated,
-        };
-        status = event_callback.fn(event_callback.user_data, &event_row);
-      }
+      status = iree_profile_memory_context_accumulate_event(
+          context, &event, is_truncated, event_callback);
     }
   }
   return status;
