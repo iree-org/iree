@@ -24,17 +24,16 @@ extern "C" {
 
 // Controls where the queue operates.
 typedef enum iree_hal_amdgpu_queue_placement_e {
-  // Automatically select where to place the queue based on whether the target
-  // CPU/GPU agent pair supports device placement requirements.
+  // Automatically select the best supported placement. Today this selects the
+  // host queue path because device-side queue scheduling is not implemented.
   IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY = 0,
   // Queue executes entirely on the host via iree_hal_amdgpu_host_queue_t.
   // This introduces additional latency on all queue operations but can operate
   // on systems without host/device atomics (PCIe atomics, xGMI, etc). It is
   // also useful for debugging.
   IREE_HAL_AMDGPU_QUEUE_PLACEMENT_HOST,
-  // Queue executes entirely on the device via iree_hal_amdgpu_device_queue_t.
-  // A scheduler kernel handles all queue entry processing without host
-  // involvement.
+  // Queue executes entirely on the device. Not implemented; requests for this
+  // explicit placement fail during device option verification.
   IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE,
 } iree_hal_amdgpu_queue_placement_t;
 
@@ -90,12 +89,9 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
     uint8_t frontier_capacity;
   } default_pool;
 
-  // Controls where queues are placed.
-  // Defaults to IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY and selects the optimal
-  // placement based on queried agent properties. If a placement is explicitly
-  // specified all physical devices will use that placement and if any do not
-  // support it initialization will fail (useful for forcing host placement
-  // during debugging/testing).
+  // Controls where queues are placed. ANY and HOST currently select host
+  // queues. DEVICE is reserved for future device-side scheduling and fails
+  // loudly until that path is implemented.
   iree_hal_amdgpu_queue_placement_t queue_placement;
 
   // Per-physical-device host queue policy.
@@ -119,11 +115,12 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // execution latency.
   uint64_t preallocate_pools : 1;
 
-  // Enables dispatch-level tracing (if device instrumentation is compiled in).
+  // Reserved for a future device-side execution trace stream. Unsupported
+  // today; enabling it fails option verification.
   uint64_t trace_execution : 1;
 
-  // Forces queues to run one entry at a time instead of overlapping or
-  // aggressively scheduling queue entries out-of-order.
+  // Reserved for a future exclusive queue scheduling mode. Unsupported today;
+  // enabling it fails option verification.
   uint64_t exclusive_execution : 1;
 
   // Forces cross-queue wait barriers to use software deferral instead of the
@@ -131,10 +128,8 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // conservative host-only fallback path.
   uint64_t force_wait_barrier_defer : 1;
 
-  // Uses HSA_WAIT_STATE_ACTIVE for up to the given duration before switching to
-  // HSA_WAIT_STATE_BLOCKED. Above zero this will increase CPU usage in cases
-  // where the waits are long and decrease latency in cases where the waits are
-  // short. When IREE_DURATION_INFINITE waits will use HSA_WAIT_STATE_ACTIVE.
+  // Reserved for future HSA active-wait tuning. Must be zero today because no
+  // wait path consumes it yet.
   iree_duration_t wait_active_for_ns;
 } iree_hal_amdgpu_logical_device_options_t;
 
@@ -142,9 +137,9 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
 IREE_API_EXPORT void iree_hal_amdgpu_logical_device_options_initialize(
     iree_hal_amdgpu_logical_device_options_t* out_options);
 
-// Parses |params| and updates |options|.
-// String views may be set to reference strings in the original parameters and
-// the caller must ensure the options does not outlive the storage.
+// Parses |params| and updates |options|. No AMDGPU logical-device string
+// parameters are currently supported; nonempty lists fail loudly instead of
+// being ignored.
 IREE_API_EXPORT iree_status_t iree_hal_amdgpu_logical_device_options_parse(
     iree_hal_amdgpu_logical_device_options_t* options,
     iree_string_pair_list_t params);
@@ -187,9 +182,8 @@ typedef struct iree_hal_amdgpu_driver_options_t {
 IREE_API_EXPORT void iree_hal_amdgpu_driver_options_initialize(
     iree_hal_amdgpu_driver_options_t* out_options);
 
-// Parses |params| and updates |options|.
-// String views may be set to reference strings in the original parameters and
-// the caller must ensure the options does not outlive the storage.
+// Parses |params| and updates |options|. No AMDGPU driver string parameters are
+// currently supported; nonempty lists fail loudly instead of being ignored.
 IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_options_parse(
     iree_hal_amdgpu_driver_options_t* options, iree_string_pair_list_t params);
 

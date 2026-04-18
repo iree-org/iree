@@ -347,7 +347,7 @@ iree_status_t iree_hal_amdgpu_physical_device_options_verify(
         IREE_STATUS_OUT_OF_RANGE,
         "large device block pool size invalid, expected a "
         "power-of-two greater than %d and got %" PRIhsz,
-        IREE_HAL_AMDGPU_PHYSICAL_DEVICE_LARGE_DEVICE_BLOCK_SIZE_DEFAULT,
+        IREE_HAL_AMDGPU_PHYSICAL_DEVICE_MIN_LARGE_DEVICE_BLOCK_SIZE,
         options->device_block_pools.large.block_size);
   }
 

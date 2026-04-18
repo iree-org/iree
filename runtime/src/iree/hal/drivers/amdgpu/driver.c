@@ -8,6 +8,7 @@
 
 #include "iree/base/internal/debugging.h"
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_driver_options_t
@@ -36,10 +37,14 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_options_parse(
   if (!params.count) return iree_ok_status();  // no-op
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): parameters.
+  const iree_string_pair_t* first_param = &params.pairs[0];
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "AMDGPU driver options do not support key/value parameter '%.*s'",
+      (int)first_param->key.size, first_param->key.data);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_driver_options_verify(
@@ -47,11 +52,12 @@ static iree_status_t iree_hal_amdgpu_driver_options_verify(
   IREE_ASSERT_ARGUMENT(options);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): verify that the parameters are within expected ranges and
-  // any requested features are supported.
+  iree_status_t status =
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options->default_device_options);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

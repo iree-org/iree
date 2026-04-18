@@ -202,6 +202,21 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    driver_options_test
+  SRCS
+    "driver_options_test.cc"
+  DEPS
+    ::amdgpu
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     host_queue_command_buffer_test
   SRCS
     "host_queue_command_buffer_test.cc"

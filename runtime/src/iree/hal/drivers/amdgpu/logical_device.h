@@ -202,6 +202,13 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
+// Verifies option feature knobs that are independent of HSA/topology queries.
+// Driver creation calls this before loading HSA so unsupported default-device
+// options fail without touching ROCR process-global state. Full logical device
+// verification still happens after topology discovery.
+iree_status_t iree_hal_amdgpu_logical_device_options_verify_supported_features(
+    const iree_hal_amdgpu_logical_device_options_t* options);
+
 // Returns true when memory lifecycle profiling records would be retained.
 //
 // Producers may use this to avoid preparing profiling payloads on hot paths.

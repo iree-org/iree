@@ -142,9 +142,54 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_logical_device_options_parse(
   if (!params.count) return iree_ok_status();  // no-op
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): parameters.
+  const iree_string_pair_t* first_param = &params.pairs[0];
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "AMDGPU logical device options do not support key/value parameter '%.*s'",
+      (int)first_param->key.size, first_param->key.data);
 
   IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_hal_amdgpu_logical_device_options_verify_supported_features(
+    const iree_hal_amdgpu_logical_device_options_t* options) {
+  IREE_ASSERT_ARGUMENT(options);
+  switch (options->queue_placement) {
+    case IREE_HAL_AMDGPU_QUEUE_PLACEMENT_ANY:
+    case IREE_HAL_AMDGPU_QUEUE_PLACEMENT_HOST:
+      break;
+    case IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE:
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "AMDGPU device queue placement is not implemented; use "
+          "queue_placement=any or queue_placement=host");
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid AMDGPU queue placement value %u",
+                              (uint32_t)options->queue_placement);
+  }
+  if (options->trace_execution) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "AMDGPU trace_execution is not implemented; use HAL profiling "
+        "executable traces for supported trace capture");
+  }
+  if (options->exclusive_execution) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "AMDGPU exclusive_execution is not implemented");
+  }
+  if (options->wait_active_for_ns < 0) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "AMDGPU wait_active_for_ns must be non-negative (got %" PRId64 ")",
+        options->wait_active_for_ns);
+  }
+  if (options->wait_active_for_ns != 0) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "AMDGPU wait_active_for_ns is not implemented; "
+                            "use 0");
+  }
   return iree_ok_status();
 }
 
@@ -156,8 +201,9 @@ static iree_status_t iree_hal_amdgpu_logical_device_options_verify(
   IREE_ASSERT_ARGUMENT(topology);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): verify that the parameters are within expected ranges and
-  // any requested features are supported.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_logical_device_options_verify_supported_features(
+              options));
 
   if (options->host_block_pools.small.block_size <
           IREE_HAL_AMDGPU_LOGICAL_DEVICE_MIN_SMALL_HOST_BLOCK_SIZE ||
