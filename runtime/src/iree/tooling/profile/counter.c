@@ -559,6 +559,27 @@ static iree_status_t iree_profile_counter_process_matching_sample(
   return status;
 }
 
+static iree_status_t iree_profile_counter_process_sample_record(
+    iree_profile_counter_context_t* counter_context,
+    const iree_profile_model_t* model,
+    const iree_profile_typed_record_t* typed_record, bool is_truncated,
+    iree_string_view_t filter, int64_t id_filter,
+    iree_profile_counter_sample_callback_t sample_callback,
+    bool* out_matched_sample) {
+  *out_matched_sample = false;
+  iree_profile_counter_sample_state_t sample_state;
+  IREE_RETURN_IF_ERROR(iree_profile_counter_sample_state_initialize(
+      typed_record, is_truncated, &sample_state));
+  IREE_RETURN_IF_ERROR(iree_profile_counter_sample_state_attach_metadata(
+      counter_context, &sample_state));
+  char numeric_buffer[128];
+  IREE_RETURN_IF_ERROR(iree_profile_counter_sample_state_resolve_key(
+      model, &sample_state, numeric_buffer, sizeof(numeric_buffer)));
+  return iree_profile_counter_process_matching_sample(
+      counter_context, &sample_state, filter, id_filter, sample_callback,
+      out_matched_sample);
+}
+
 iree_status_t iree_profile_counter_process_sample_records(
     iree_profile_counter_context_t* counter_context,
     const iree_profile_model_t* model,
@@ -587,25 +608,10 @@ iree_status_t iree_profile_counter_process_sample_records(
 
     ++counter_context->total_sample_count;
 
-    iree_profile_counter_sample_state_t sample_state;
-    status = iree_profile_counter_sample_state_initialize(
-        &typed_record, is_truncated, &sample_state);
-    if (iree_status_is_ok(status)) {
-      status = iree_profile_counter_sample_state_attach_metadata(
-          counter_context, &sample_state);
-    }
-    char numeric_buffer[128];
-    if (iree_status_is_ok(status)) {
-      status = iree_profile_counter_sample_state_resolve_key(
-          model, &sample_state, numeric_buffer, sizeof(numeric_buffer));
-    }
-
     bool matched_sample = false;
-    if (iree_status_is_ok(status)) {
-      status = iree_profile_counter_process_matching_sample(
-          counter_context, &sample_state, filter, id_filter, sample_callback,
-          &matched_sample);
-    }
+    status = iree_profile_counter_process_sample_record(
+        counter_context, model, &typed_record, is_truncated, filter, id_filter,
+        sample_callback, &matched_sample);
     if (iree_status_is_ok(status) && matched_sample) {
       ++counter_context->matched_sample_count;
       if (is_truncated) ++counter_context->truncated_sample_count;
