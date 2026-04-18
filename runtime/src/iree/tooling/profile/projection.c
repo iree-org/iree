@@ -26,6 +26,51 @@ static bool iree_profile_projection_try_fit_driver_host_cpu_clock(
       out_clock_fit);
 }
 
+typedef struct iree_profile_projection_dispatch_timing_t {
+  // True when the aggregate's device has a host CPU clock fit.
+  bool has_clock_fit;
+  // True when min/max/total tick values were converted to nanoseconds.
+  bool has_time_ns;
+  // Average dispatch duration in device ticks.
+  double average_ticks;
+  // Nanoseconds per device tick when |has_clock_fit| is true.
+  double ns_per_tick;
+  // Minimum dispatch duration in nanoseconds when |has_time_ns| is true.
+  int64_t minimum_ns;
+  // Maximum dispatch duration in nanoseconds when |has_time_ns| is true.
+  int64_t maximum_ns;
+  // Total dispatch duration in nanoseconds when |has_time_ns| is true.
+  int64_t total_ns;
+} iree_profile_projection_dispatch_timing_t;
+
+static iree_profile_projection_dispatch_timing_t
+iree_profile_projection_calculate_dispatch_timing(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_dispatch_aggregate_t* aggregate) {
+  iree_profile_projection_dispatch_timing_t timing = {0};
+  timing.average_ticks =
+      aggregate->valid_count
+          ? aggregate->total_ticks / (double)aggregate->valid_count
+          : 0.0;
+
+  iree_profile_model_clock_fit_t clock_fit;
+  timing.has_clock_fit = iree_profile_projection_try_fit_driver_host_cpu_clock(
+      context, aggregate->physical_device_ordinal, &clock_fit);
+  timing.ns_per_tick =
+      timing.has_clock_fit
+          ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+          : 0.0;
+  timing.has_time_ns =
+      timing.has_clock_fit && aggregate->valid_count != 0 &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          &clock_fit, aggregate->minimum_ticks, &timing.minimum_ns) &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          &clock_fit, aggregate->maximum_ticks, &timing.maximum_ns) &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          &clock_fit, aggregate->total_ticks, &timing.total_ns);
+  return timing;
+}
+
 static void iree_profile_dispatch_print_event_jsonl(
     const iree_profile_dispatch_event_row_t* row, FILE* file) {
   const iree_hal_profile_file_record_t* file_record = row->file_record;
@@ -397,9 +442,27 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
   return status;
 }
 
-static iree_status_t iree_profile_executable_print_text(
+static bool iree_profile_executable_matches_id(
+    const iree_hal_profile_executable_record_t* executable, int64_t id_filter) {
+  return id_filter < 0 || executable->executable_id == (uint64_t)id_filter;
+}
+
+static bool iree_profile_executable_export_matches_executable(
+    const iree_profile_model_export_t* export_info,
+    const iree_hal_profile_executable_record_t* executable) {
+  return export_info->executable_id == executable->executable_id;
+}
+
+static bool iree_profile_executable_dispatch_group_matches_export(
+    const iree_profile_dispatch_aggregate_t* aggregate,
+    const iree_profile_model_export_t* export_info) {
+  return aggregate->executable_id == export_info->executable_id &&
+         aggregate->export_ordinal == export_info->export_ordinal;
+}
+
+static void iree_profile_executable_print_text_header(
     const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
-    int64_t id_filter, FILE* file) {
+    FILE* file) {
   fprintf(file, "IREE HAL profile executable summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   fprintf(file,
@@ -409,112 +472,134 @@ static iree_status_t iree_profile_executable_print_text(
           context->model.executable_count, context->model.export_count,
           context->matched_dispatch_count, context->valid_dispatch_count,
           context->invalid_dispatch_count);
+}
+
+static void iree_profile_executable_print_text_executable(
+    const iree_hal_profile_executable_record_t* executable, FILE* file) {
+  const bool has_code_object_hash = iree_all_bits_set(
+      executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
+  fprintf(file, "executable %" PRIu64 ": exports=%u flags=%u ",
+          executable->executable_id, executable->export_count,
+          executable->flags);
+  fprintf(file, "code_object_hash=");
+  if (has_code_object_hash) {
+    iree_profile_fprint_hash_hex(file, executable->code_object_hash);
+  } else {
+    fprintf(file, "unavailable");
+  }
+  fputc('\n', file);
+}
+
+static void iree_profile_executable_print_text_export(
+    const iree_profile_model_export_t* export_info, iree_string_view_t key,
+    FILE* file) {
+  const bool has_pipeline_hash =
+      iree_all_bits_set(export_info->flags,
+                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+  fprintf(file,
+          "  export %u: %.*s flags=%u constants=%u bindings=%u "
+          "parameters=%u workgroup_size=%ux%ux%u pipeline_hash=",
+          export_info->export_ordinal, (int)key.size, key.data,
+          export_info->flags, export_info->constant_count,
+          export_info->binding_count, export_info->parameter_count,
+          export_info->workgroup_size[0], export_info->workgroup_size[1],
+          export_info->workgroup_size[2]);
+  if (has_pipeline_hash) {
+    iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
+  } else {
+    fprintf(file, "unavailable");
+  }
+  fputc('\n', file);
+}
+
+static void iree_profile_executable_print_text_dispatch_group(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_dispatch_aggregate_t* aggregate, FILE* file) {
+  const iree_profile_projection_dispatch_timing_t timing =
+      iree_profile_projection_calculate_dispatch_timing(context, aggregate);
+  fprintf(file,
+          "    device=%u dispatches=%" PRIu64 " valid=%" PRIu64
+          " invalid=%" PRIu64 " ticks[min/avg/max/total]=%" PRIu64
+          "/%.3f/%" PRIu64 "/%" PRIu64,
+          aggregate->physical_device_ordinal, aggregate->dispatch_count,
+          aggregate->valid_count, aggregate->invalid_count,
+          aggregate->valid_count ? aggregate->minimum_ticks : 0,
+          timing.average_ticks,
+          aggregate->valid_count ? aggregate->maximum_ticks : 0,
+          aggregate->total_ticks);
+  if (timing.has_time_ns) {
+    fprintf(file,
+            " ns[min/avg/max/total]=%" PRId64 "/%.3f/%" PRId64 "/%" PRId64,
+            timing.minimum_ns, timing.average_ticks * timing.ns_per_tick,
+            timing.maximum_ns, timing.total_ns);
+  }
+  fputc('\n', file);
+}
+
+static bool iree_profile_executable_print_text_dispatch_groups(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_export_t* export_info, FILE* file) {
+  bool has_aggregate = false;
+  for (iree_host_size_t i = 0; i < context->aggregate_count; ++i) {
+    const iree_profile_dispatch_aggregate_t* aggregate =
+        &context->aggregates[i];
+    if (!iree_profile_executable_dispatch_group_matches_export(aggregate,
+                                                               export_info)) {
+      continue;
+    }
+    has_aggregate = true;
+    iree_profile_executable_print_text_dispatch_group(context, aggregate, file);
+  }
+  return has_aggregate;
+}
+
+static void iree_profile_executable_print_text_exports(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_executable_record_t* executable,
+    iree_string_view_t filter, FILE* file) {
+  for (iree_host_size_t i = 0; i < context->model.export_count; ++i) {
+    const iree_profile_model_export_t* export_info = &context->model.exports[i];
+    if (!iree_profile_executable_export_matches_executable(export_info,
+                                                           executable)) {
+      continue;
+    }
+
+    char numeric_buffer[128];
+    iree_string_view_t key = iree_profile_model_format_export_key(
+        export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
+    if (!iree_profile_key_matches(key, filter)) {
+      continue;
+    }
+
+    iree_profile_executable_print_text_export(export_info, key, file);
+    if (!iree_profile_executable_print_text_dispatch_groups(
+            context, export_info, file)) {
+      fprintf(file, "    dispatches=0\n");
+    }
+  }
+}
+
+static iree_status_t iree_profile_executable_print_text(
+    const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
+    int64_t id_filter, FILE* file) {
+  iree_profile_executable_print_text_header(context, filter, file);
 
   for (iree_host_size_t i = 0; i < context->model.executable_count; ++i) {
     const iree_hal_profile_executable_record_t* executable =
         &context->model.executables[i].record;
-    if (id_filter >= 0 && executable->executable_id != (uint64_t)id_filter) {
+    if (!iree_profile_executable_matches_id(executable, id_filter)) {
       continue;
     }
-    const bool has_code_object_hash = iree_all_bits_set(
-        executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
-    fprintf(file, "executable %" PRIu64 ": exports=%u flags=%u ",
-            executable->executable_id, executable->export_count,
-            executable->flags);
-    fprintf(file, "code_object_hash=");
-    if (has_code_object_hash) {
-      iree_profile_fprint_hash_hex(file, executable->code_object_hash);
-    } else {
-      fprintf(file, "unavailable");
-    }
-    fputc('\n', file);
-    for (iree_host_size_t j = 0; j < context->model.export_count; ++j) {
-      const iree_profile_model_export_t* export_info =
-          &context->model.exports[j];
-      if (export_info->executable_id != executable->executable_id) continue;
-
-      char numeric_buffer[128];
-      iree_string_view_t key = iree_profile_model_format_export_key(
-          export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
-      if (!iree_profile_key_matches(key, filter)) continue;
-
-      const bool has_pipeline_hash = iree_all_bits_set(
-          export_info->flags,
-          IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
-      fprintf(file,
-              "  export %u: %.*s flags=%u constants=%u bindings=%u "
-              "parameters=%u workgroup_size=%ux%ux%u pipeline_hash=",
-              export_info->export_ordinal, (int)key.size, key.data,
-              export_info->flags, export_info->constant_count,
-              export_info->binding_count, export_info->parameter_count,
-              export_info->workgroup_size[0], export_info->workgroup_size[1],
-              export_info->workgroup_size[2]);
-      if (has_pipeline_hash) {
-        iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
-      } else {
-        fprintf(file, "unavailable");
-      }
-      fputc('\n', file);
-      bool has_aggregate = false;
-      for (iree_host_size_t k = 0; k < context->aggregate_count; ++k) {
-        const iree_profile_dispatch_aggregate_t* aggregate =
-            &context->aggregates[k];
-        if (aggregate->executable_id != export_info->executable_id ||
-            aggregate->export_ordinal != export_info->export_ordinal) {
-          continue;
-        }
-        has_aggregate = true;
-        iree_profile_model_clock_fit_t clock_fit;
-        const bool has_clock_fit =
-            iree_profile_projection_try_fit_driver_host_cpu_clock(
-                context, aggregate->physical_device_ordinal, &clock_fit);
-        const double ns_per_tick =
-            has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                          : 0.0;
-        const double average_ticks =
-            aggregate->valid_count
-                ? aggregate->total_ticks / (double)aggregate->valid_count
-                : 0.0;
-        int64_t minimum_ns = 0;
-        int64_t maximum_ns = 0;
-        int64_t total_ns = 0;
-        const bool has_time_ns =
-            has_clock_fit && aggregate->valid_count != 0 &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->total_ticks, &total_ns);
-        fprintf(file,
-                "    device=%u dispatches=%" PRIu64 " valid=%" PRIu64
-                " invalid=%" PRIu64 " ticks[min/avg/max/total]=%" PRIu64
-                "/%.3f/%" PRIu64 "/%" PRIu64,
-                aggregate->physical_device_ordinal, aggregate->dispatch_count,
-                aggregate->valid_count, aggregate->invalid_count,
-                aggregate->valid_count ? aggregate->minimum_ticks : 0,
-                average_ticks,
-                aggregate->valid_count ? aggregate->maximum_ticks : 0,
-                aggregate->total_ticks);
-        if (has_time_ns) {
-          fprintf(
-              file,
-              " ns[min/avg/max/total]=%" PRId64 "/%.3f/%" PRId64 "/%" PRId64,
-              minimum_ns, average_ticks * ns_per_tick, maximum_ns, total_ns);
-        }
-        fputc('\n', file);
-      }
-      if (!has_aggregate) {
-        fprintf(file, "    dispatches=0\n");
-      }
-    }
+    iree_profile_executable_print_text_executable(executable, file);
+    iree_profile_executable_print_text_exports(context, executable, filter,
+                                               file);
   }
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_executable_print_jsonl(
+static void iree_profile_executable_print_jsonl_summary(
     const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
-    int64_t id_filter, FILE* file) {
+    FILE* file) {
   fprintf(file, "{\"type\":\"executable_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
@@ -524,123 +609,151 @@ static iree_status_t iree_profile_executable_print_jsonl(
           context->model.executable_count, context->model.export_count,
           context->matched_dispatch_count, context->valid_dispatch_count,
           context->invalid_dispatch_count);
+}
 
+static void iree_profile_executable_print_jsonl_hash(const uint64_t hash[2],
+                                                     bool has_hash,
+                                                     FILE* file) {
+  if (has_hash) {
+    fputc('"', file);
+    iree_profile_fprint_hash_hex(file, hash);
+    fputc('"', file);
+  } else {
+    fprintf(file, "null");
+  }
+}
+
+static void iree_profile_executable_print_jsonl_executable(
+    const iree_hal_profile_executable_record_t* executable, FILE* file) {
+  const bool has_code_object_hash = iree_all_bits_set(
+      executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
+  fprintf(file,
+          "{\"type\":\"executable\",\"executable_id\":%" PRIu64
+          ",\"flags\":%u,\"export_count\":%u"
+          ",\"code_object_hash_present\":%s,\"code_object_hash\":",
+          executable->executable_id, executable->flags,
+          executable->export_count, has_code_object_hash ? "true" : "false");
+  iree_profile_executable_print_jsonl_hash(executable->code_object_hash,
+                                           has_code_object_hash, file);
+  fputs("}\n", file);
+}
+
+static void iree_profile_executable_print_jsonl_export(
+    const iree_profile_model_export_t* export_info, iree_string_view_t key,
+    FILE* file) {
+  const bool has_pipeline_hash =
+      iree_all_bits_set(export_info->flags,
+                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+  fprintf(file,
+          "{\"type\":\"executable_export\",\"executable_id\":%" PRIu64
+          ",\"export_ordinal\":%u,\"flags\":%u,\"key\":",
+          export_info->executable_id, export_info->export_ordinal,
+          export_info->flags);
+  iree_profile_fprint_json_string(file, key);
+  fprintf(file,
+          ",\"constant_count\":%u,\"binding_count\":%u"
+          ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
+          ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
+          export_info->constant_count, export_info->binding_count,
+          export_info->parameter_count, export_info->workgroup_size[0],
+          export_info->workgroup_size[1], export_info->workgroup_size[2],
+          has_pipeline_hash ? "true" : "false");
+  iree_profile_executable_print_jsonl_hash(export_info->pipeline_hash,
+                                           has_pipeline_hash, file);
+  fputs("}\n", file);
+}
+
+static void iree_profile_executable_print_jsonl_dispatch_group(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_dispatch_aggregate_t* aggregate, iree_string_view_t key,
+    FILE* file) {
+  const iree_profile_projection_dispatch_timing_t timing =
+      iree_profile_projection_calculate_dispatch_timing(context, aggregate);
+  fprintf(file,
+          "{\"type\":\"executable_export_dispatch_group\""
+          ",\"physical_device_ordinal\":%u"
+          ",\"executable_id\":%" PRIu64
+          ",\"export_ordinal\":%u"
+          ",\"key\":",
+          aggregate->physical_device_ordinal, aggregate->executable_id,
+          aggregate->export_ordinal);
+  iree_profile_fprint_json_string(file, key);
+  fprintf(file,
+          ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
+          ",\"invalid\":%" PRIu64 ",\"min_ticks\":%" PRIu64
+          ",\"avg_ticks\":%.3f,\"max_ticks\":%" PRIu64
+          ",\"total_ticks\":%" PRIu64
+          ",\"clock_fit_available\":%s"
+          ",\"time_ns_available\":%s"
+          ",\"min_ns\":%" PRId64
+          ",\"avg_ns\":%.3f"
+          ",\"max_ns\":%" PRId64 ",\"total_ns\":%" PRId64 "}\n",
+          aggregate->dispatch_count, aggregate->valid_count,
+          aggregate->invalid_count,
+          aggregate->valid_count ? aggregate->minimum_ticks : 0,
+          timing.average_ticks,
+          aggregate->valid_count ? aggregate->maximum_ticks : 0,
+          aggregate->total_ticks, timing.has_clock_fit ? "true" : "false",
+          timing.has_time_ns ? "true" : "false",
+          timing.has_time_ns ? timing.minimum_ns : 0,
+          timing.has_time_ns ? timing.average_ticks * timing.ns_per_tick : 0.0,
+          timing.has_time_ns ? timing.maximum_ns : 0,
+          timing.has_time_ns ? timing.total_ns : 0);
+}
+
+static void iree_profile_executable_print_jsonl_dispatch_groups(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_export_t* export_info, iree_string_view_t key,
+    FILE* file) {
+  for (iree_host_size_t i = 0; i < context->aggregate_count; ++i) {
+    const iree_profile_dispatch_aggregate_t* aggregate =
+        &context->aggregates[i];
+    if (!iree_profile_executable_dispatch_group_matches_export(aggregate,
+                                                               export_info)) {
+      continue;
+    }
+    iree_profile_executable_print_jsonl_dispatch_group(context, aggregate, key,
+                                                       file);
+  }
+}
+
+static void iree_profile_executable_print_jsonl_exports(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_executable_record_t* executable,
+    iree_string_view_t filter, FILE* file) {
+  for (iree_host_size_t i = 0; i < context->model.export_count; ++i) {
+    const iree_profile_model_export_t* export_info = &context->model.exports[i];
+    if (!iree_profile_executable_export_matches_executable(export_info,
+                                                           executable)) {
+      continue;
+    }
+
+    char numeric_buffer[128];
+    iree_string_view_t key = iree_profile_model_format_export_key(
+        export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
+    if (!iree_profile_key_matches(key, filter)) {
+      continue;
+    }
+
+    iree_profile_executable_print_jsonl_export(export_info, key, file);
+    iree_profile_executable_print_jsonl_dispatch_groups(context, export_info,
+                                                        key, file);
+  }
+}
+
+static iree_status_t iree_profile_executable_print_jsonl(
+    const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
+    int64_t id_filter, FILE* file) {
+  iree_profile_executable_print_jsonl_summary(context, filter, file);
   for (iree_host_size_t i = 0; i < context->model.executable_count; ++i) {
     const iree_hal_profile_executable_record_t* executable =
         &context->model.executables[i].record;
-    if (id_filter >= 0 && executable->executable_id != (uint64_t)id_filter) {
+    if (!iree_profile_executable_matches_id(executable, id_filter)) {
       continue;
     }
-    const bool has_code_object_hash = iree_all_bits_set(
-        executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
-    fprintf(file,
-            "{\"type\":\"executable\",\"executable_id\":%" PRIu64
-            ",\"flags\":%u,\"export_count\":%u"
-            ",\"code_object_hash_present\":%s,\"code_object_hash\":",
-            executable->executable_id, executable->flags,
-            executable->export_count, has_code_object_hash ? "true" : "false");
-    if (has_code_object_hash) {
-      fputc('"', file);
-      iree_profile_fprint_hash_hex(file, executable->code_object_hash);
-      fputc('"', file);
-    } else {
-      fprintf(file, "null");
-    }
-    fputs("}\n", file);
-    for (iree_host_size_t j = 0; j < context->model.export_count; ++j) {
-      const iree_profile_model_export_t* export_info =
-          &context->model.exports[j];
-      if (export_info->executable_id != executable->executable_id) continue;
-
-      char numeric_buffer[128];
-      iree_string_view_t key = iree_profile_model_format_export_key(
-          export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
-      if (!iree_profile_key_matches(key, filter)) continue;
-
-      const bool has_pipeline_hash = iree_all_bits_set(
-          export_info->flags,
-          IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
-      fprintf(file,
-              "{\"type\":\"executable_export\",\"executable_id\":%" PRIu64
-              ",\"export_ordinal\":%u,\"flags\":%u,\"key\":",
-              export_info->executable_id, export_info->export_ordinal,
-              export_info->flags);
-      iree_profile_fprint_json_string(file, key);
-      fprintf(file,
-              ",\"constant_count\":%u,\"binding_count\":%u"
-              ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
-              ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
-              export_info->constant_count, export_info->binding_count,
-              export_info->parameter_count, export_info->workgroup_size[0],
-              export_info->workgroup_size[1], export_info->workgroup_size[2],
-              has_pipeline_hash ? "true" : "false");
-      if (has_pipeline_hash) {
-        fputc('"', file);
-        iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
-        fputc('"', file);
-      } else {
-        fprintf(file, "null");
-      }
-      fputs("}\n", file);
-      for (iree_host_size_t k = 0; k < context->aggregate_count; ++k) {
-        const iree_profile_dispatch_aggregate_t* aggregate =
-            &context->aggregates[k];
-        if (aggregate->executable_id != export_info->executable_id ||
-            aggregate->export_ordinal != export_info->export_ordinal) {
-          continue;
-        }
-        iree_profile_model_clock_fit_t clock_fit;
-        const bool has_clock_fit =
-            iree_profile_projection_try_fit_driver_host_cpu_clock(
-                context, aggregate->physical_device_ordinal, &clock_fit);
-        const double ns_per_tick =
-            has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                          : 0.0;
-        const double average_ticks =
-            aggregate->valid_count
-                ? aggregate->total_ticks / (double)aggregate->valid_count
-                : 0.0;
-        int64_t minimum_ns = 0;
-        int64_t maximum_ns = 0;
-        int64_t total_ns = 0;
-        const bool has_time_ns =
-            has_clock_fit && aggregate->valid_count != 0 &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
-            iree_profile_model_clock_fit_scale_ticks_to_ns(
-                &clock_fit, aggregate->total_ticks, &total_ns);
-        fprintf(file,
-                "{\"type\":\"executable_export_dispatch_group\""
-                ",\"physical_device_ordinal\":%u"
-                ",\"executable_id\":%" PRIu64
-                ",\"export_ordinal\":%u"
-                ",\"key\":",
-                aggregate->physical_device_ordinal, aggregate->executable_id,
-                aggregate->export_ordinal);
-        iree_profile_fprint_json_string(file, key);
-        fprintf(file,
-                ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
-                ",\"invalid\":%" PRIu64 ",\"min_ticks\":%" PRIu64
-                ",\"avg_ticks\":%.3f,\"max_ticks\":%" PRIu64
-                ",\"total_ticks\":%" PRIu64
-                ",\"clock_fit_available\":%s"
-                ",\"time_ns_available\":%s"
-                ",\"min_ns\":%" PRId64
-                ",\"avg_ns\":%.3f"
-                ",\"max_ns\":%" PRId64 ",\"total_ns\":%" PRId64 "}\n",
-                aggregate->dispatch_count, aggregate->valid_count,
-                aggregate->invalid_count,
-                aggregate->valid_count ? aggregate->minimum_ticks : 0,
-                average_ticks,
-                aggregate->valid_count ? aggregate->maximum_ticks : 0,
-                aggregate->total_ticks, has_clock_fit ? "true" : "false",
-                has_time_ns ? "true" : "false", has_time_ns ? minimum_ns : 0,
-                has_time_ns ? average_ticks * ns_per_tick : 0.0,
-                has_time_ns ? maximum_ns : 0, has_time_ns ? total_ns : 0);
-      }
-    }
+    iree_profile_executable_print_jsonl_executable(executable, file);
+    iree_profile_executable_print_jsonl_exports(context, executable, filter,
+                                                file);
   }
   return iree_ok_status();
 }
