@@ -238,7 +238,8 @@ static iree_status_t iree_profile_dispatch_print_text(
         iree_profile_projection_try_fit_driver_host_cpu_clock(
             context, aggregate->physical_device_ordinal, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
 
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
@@ -327,7 +328,8 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
         iree_profile_projection_try_fit_driver_host_cpu_clock(
             context, aggregate->physical_device_ordinal, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
 
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
@@ -467,7 +469,8 @@ static iree_status_t iree_profile_executable_print_text(
             iree_profile_projection_try_fit_driver_host_cpu_clock(
                 context, aggregate->physical_device_ordinal, &clock_fit);
         const double ns_per_tick =
-            iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+            has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                          : 0.0;
         const double average_ticks =
             aggregate->valid_count
                 ? aggregate->total_ticks / (double)aggregate->valid_count
@@ -591,7 +594,8 @@ static iree_status_t iree_profile_executable_print_jsonl(
             iree_profile_projection_try_fit_driver_host_cpu_clock(
                 context, aggregate->physical_device_ordinal, &clock_fit);
         const double ns_per_tick =
-            iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+            has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                          : 0.0;
         const double average_ticks =
             aggregate->valid_count
                 ? aggregate->total_ticks / (double)aggregate->valid_count
@@ -698,7 +702,8 @@ static iree_status_t iree_profile_command_print_text(
           iree_profile_projection_try_fit_driver_host_cpu_clock(
               context, aggregate->physical_device_ordinal, &clock_fit);
       const double ns_per_tick =
-          iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+          has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                        : 0.0;
       int64_t total_dispatch_ns = 0;
       const bool has_total_dispatch_ns =
           has_clock_fit && aggregate->valid_count != 0 &&
@@ -784,7 +789,8 @@ static iree_status_t iree_profile_command_print_jsonl(
         iree_profile_projection_try_fit_driver_host_cpu_clock(
             context, aggregate->physical_device_ordinal, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
     int64_t total_dispatch_ns = 0;
     const bool has_total_dispatch_ns =
         has_clock_fit && aggregate->valid_count != 0 &&
@@ -855,7 +861,8 @@ static iree_status_t iree_profile_queue_print_text(
           iree_profile_projection_try_fit_driver_host_cpu_clock(
               context, aggregate->physical_device_ordinal, &clock_fit);
       const double ns_per_tick =
-          iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+          has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                        : 0.0;
       int64_t total_dispatch_ns = 0;
       const bool has_total_dispatch_ns =
           has_clock_fit && aggregate->valid_count != 0 &&
@@ -1005,7 +1012,8 @@ static iree_status_t iree_profile_queue_print_jsonl(
         iree_profile_projection_try_fit_driver_host_cpu_clock(
             context, aggregate->physical_device_ordinal, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
     int64_t total_dispatch_ns = 0;
     const bool has_total_dispatch_ns =
         has_clock_fit && aggregate->valid_count != 0 &&

@@ -760,9 +760,12 @@ static void iree_profile_print_summary_text(
     const bool has_clock_fit =
         iree_profile_device_summary_try_fit_clock_exact(device, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
     const double tick_frequency_hz =
-        iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit);
+        has_clock_fit
+            ? iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit)
+            : 0.0;
     const bool clock_covers_dispatches =
         iree_profile_device_summary_clock_covers_dispatches(device);
     const uint64_t valid_dispatch_count =
@@ -920,9 +923,12 @@ static void iree_profile_print_summary_jsonl(
     const bool has_clock_fit =
         iree_profile_device_summary_try_fit_clock_exact(device, &clock_fit);
     const double ns_per_tick =
-        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
+                      : 0.0;
     const double tick_frequency_hz =
-        iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit);
+        has_clock_fit
+            ? iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit)
+            : 0.0;
     const bool clock_covers_dispatches =
         iree_profile_device_summary_clock_covers_dispatches(device);
     const uint64_t valid_dispatch_count =
