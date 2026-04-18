@@ -1142,14 +1142,10 @@ static void iree_profile_queue_print_text_event(
       event->operation_count, event->payload_length);
 }
 
-static void iree_profile_queue_print_text_queue(
+static void iree_profile_queue_print_text_submissions_for_queue(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_queue_record_t* queue, int64_t id_filter,
     FILE* file) {
-  fprintf(file, "queue device=%u ordinal=%u stream=%" PRIu64 "\n",
-          queue->physical_device_ordinal, queue->queue_ordinal,
-          queue->stream_id);
-
   for (iree_host_size_t i = 0; i < context->queue_aggregate_count; ++i) {
     const iree_profile_dispatch_queue_aggregate_t* aggregate =
         &context->queue_aggregates[i];
@@ -1163,7 +1159,12 @@ static void iree_profile_queue_print_text_queue(
     }
     iree_profile_queue_print_text_submission(context, aggregate, file);
   }
+}
 
+static void iree_profile_queue_print_text_device_events_for_queue(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue, int64_t id_filter,
+    FILE* file) {
   for (iree_host_size_t i = 0;
        i < context->queue_query.queue_device_event_count; ++i) {
     const iree_hal_profile_queue_device_event_t* event =
@@ -1178,7 +1179,12 @@ static void iree_profile_queue_print_text_queue(
     }
     iree_profile_queue_print_text_device_event(context, event, file);
   }
+}
 
+static void iree_profile_queue_print_text_host_execution_events_for_queue(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue, int64_t id_filter,
+    FILE* file) {
   for (iree_host_size_t i = 0;
        i < context->queue_query.host_execution_event_count; ++i) {
     const iree_hal_profile_host_execution_event_t* event =
@@ -1193,7 +1199,12 @@ static void iree_profile_queue_print_text_queue(
     }
     iree_profile_queue_print_text_host_execution_event(event, file);
   }
+}
 
+static void iree_profile_queue_print_text_events_for_queue(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue, int64_t id_filter,
+    FILE* file) {
   for (iree_host_size_t i = 0; i < context->queue_query.queue_event_count;
        ++i) {
     const iree_hal_profile_queue_event_t* event =
@@ -1208,6 +1219,24 @@ static void iree_profile_queue_print_text_queue(
     }
     iree_profile_queue_print_text_event(event, file);
   }
+}
+
+static void iree_profile_queue_print_text_queue(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue, int64_t id_filter,
+    FILE* file) {
+  fprintf(file, "queue device=%u ordinal=%u stream=%" PRIu64 "\n",
+          queue->physical_device_ordinal, queue->queue_ordinal,
+          queue->stream_id);
+
+  iree_profile_queue_print_text_submissions_for_queue(context, queue, id_filter,
+                                                      file);
+  iree_profile_queue_print_text_device_events_for_queue(context, queue,
+                                                        id_filter, file);
+  iree_profile_queue_print_text_host_execution_events_for_queue(
+      context, queue, id_filter, file);
+  iree_profile_queue_print_text_events_for_queue(context, queue, id_filter,
+                                                 file);
 }
 
 static iree_status_t iree_profile_queue_print_text(
@@ -1450,6 +1479,57 @@ static iree_status_t iree_profile_projection_event_record(
       context->event_callback);
 }
 
+static iree_status_t iree_profile_projection_print(
+    const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
+    iree_profile_projection_mode_t projection_mode, int64_t id_filter,
+    bool emit_events, bool is_text, FILE* file) {
+  switch (projection_mode) {
+    case IREE_PROFILE_PROJECTION_MODE_DISPATCH:
+      if (is_text) {
+        return iree_profile_dispatch_print_text(context, filter, file);
+      }
+      iree_profile_dispatch_print_jsonl_summary(context, filter, emit_events,
+                                                file);
+      return emit_events
+                 ? iree_ok_status()
+                 : iree_profile_dispatch_print_jsonl_aggregates(context, file);
+    case IREE_PROFILE_PROJECTION_MODE_EXECUTABLE:
+      if (emit_events) {
+        iree_profile_dispatch_print_jsonl_summary(context, filter, emit_events,
+                                                  file);
+        return iree_ok_status();
+      }
+      return is_text ? iree_profile_executable_print_text(context, filter,
+                                                          id_filter, file)
+                     : iree_profile_executable_print_jsonl(context, filter,
+                                                           id_filter, file);
+    case IREE_PROFILE_PROJECTION_MODE_COMMAND:
+      if (emit_events) {
+        iree_profile_dispatch_print_jsonl_summary(context, filter, emit_events,
+                                                  file);
+        return iree_ok_status();
+      }
+      return is_text ? iree_profile_command_print_text(context, filter,
+                                                       id_filter, file)
+                     : iree_profile_command_print_jsonl(context, filter,
+                                                        id_filter, file);
+    case IREE_PROFILE_PROJECTION_MODE_QUEUE:
+      if (emit_events) {
+        iree_profile_dispatch_print_jsonl_summary(context, filter, emit_events,
+                                                  file);
+        return iree_ok_status();
+      }
+      return is_text ? iree_profile_queue_print_text(context, filter, id_filter,
+                                                     file)
+                     : iree_profile_queue_print_jsonl(context, filter,
+                                                      id_filter, file);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported profile projection mode %d",
+                              (int)projection_mode);
+  }
+}
+
 iree_status_t iree_profile_projection_file(
     iree_string_view_t path, iree_string_view_t format,
     iree_string_view_t filter, iree_profile_projection_mode_t projection_mode,
@@ -1497,61 +1577,9 @@ iree_status_t iree_profile_projection_file(
   }
 
   if (iree_status_is_ok(status)) {
-    switch (projection_mode) {
-      case IREE_PROFILE_PROJECTION_MODE_DISPATCH:
-        if (is_text) {
-          status = iree_profile_dispatch_print_text(&context, filter, file);
-        } else {
-          iree_profile_dispatch_print_jsonl_summary(&context, filter,
-                                                    emit_events, file);
-          if (!emit_events) {
-            status =
-                iree_profile_dispatch_print_jsonl_aggregates(&context, file);
-          }
-        }
-        break;
-      case IREE_PROFILE_PROJECTION_MODE_EXECUTABLE:
-        if (emit_events) {
-          iree_profile_dispatch_print_jsonl_summary(&context, filter,
-                                                    emit_events, file);
-        } else if (is_text) {
-          status = iree_profile_executable_print_text(&context, filter,
-                                                      id_filter, file);
-        } else {
-          status = iree_profile_executable_print_jsonl(&context, filter,
-                                                       id_filter, file);
-        }
-        break;
-      case IREE_PROFILE_PROJECTION_MODE_COMMAND:
-        if (emit_events) {
-          iree_profile_dispatch_print_jsonl_summary(&context, filter,
-                                                    emit_events, file);
-        } else if (is_text) {
-          status = iree_profile_command_print_text(&context, filter, id_filter,
-                                                   file);
-        } else {
-          status = iree_profile_command_print_jsonl(&context, filter, id_filter,
-                                                    file);
-        }
-        break;
-      case IREE_PROFILE_PROJECTION_MODE_QUEUE:
-        if (emit_events) {
-          iree_profile_dispatch_print_jsonl_summary(&context, filter,
-                                                    emit_events, file);
-        } else if (is_text) {
-          status =
-              iree_profile_queue_print_text(&context, filter, id_filter, file);
-        } else {
-          status =
-              iree_profile_queue_print_jsonl(&context, filter, id_filter, file);
-        }
-        break;
-      default:
-        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                  "unsupported profile projection mode %d",
-                                  (int)projection_mode);
-        break;
-    }
+    status =
+        iree_profile_projection_print(&context, filter, projection_mode,
+                                      id_filter, emit_events, is_text, file);
   }
 
   iree_profile_dispatch_context_deinitialize(&context);
