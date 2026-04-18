@@ -69,6 +69,44 @@ typedef struct iree_profile_explain_queue_summary_t {
   double max_gap_ticks;
 } iree_profile_explain_queue_summary_t;
 
+typedef struct iree_profile_explain_device_row_t {
+  // Device metadata row represented by these derived metrics.
+  const iree_profile_model_device_t* device;
+  // True when the device has a driver host CPU timestamp clock fit.
+  bool has_clock_fit;
+  // Nanoseconds per device tick when |has_clock_fit| is true.
+  double nanoseconds_per_tick;
+  // Device tick frequency in Hz when |has_clock_fit| is true.
+  double tick_frequency_hz;
+  // Visible span covered by valid queue dispatch intervals in device ticks.
+  double visible_span_ticks;
+  // Sum of valid dispatch durations for this device in device ticks.
+  uint64_t total_dispatch_ticks;
+  // Ratio of summed dispatch time to the visible queue span.
+  double active_over_visible_ratio;
+  // True when |total_dispatch_time_ns| was derived from the clock fit.
+  bool has_total_dispatch_time_ns;
+  // Sum of valid dispatch durations mapped to nanoseconds.
+  int64_t total_dispatch_time_ns;
+} iree_profile_explain_device_row_t;
+
+typedef struct iree_profile_explain_queue_row_t {
+  // Queue metadata row represented by these derived metrics.
+  const iree_hal_profile_queue_record_t* queue;
+  // Aggregate dispatch timing and gap summary for the queue.
+  iree_profile_explain_queue_summary_t summary;
+  // True when the queue device has a driver host CPU timestamp clock fit.
+  bool has_clock_fit;
+  // Nanoseconds per device tick when |has_clock_fit| is true.
+  double nanoseconds_per_tick;
+  // True when |total_dispatch_time_ns| was derived from the clock fit.
+  bool has_total_dispatch_time_ns;
+  // Sum of valid dispatch durations mapped to nanoseconds.
+  int64_t total_dispatch_time_ns;
+  // True when queue event records were present for gap analysis context.
+  bool gap_analysis_available;
+} iree_profile_explain_queue_row_t;
+
 typedef struct iree_profile_explain_queue_operation_totals_t {
   // Event counts indexed by iree_hal_profile_queue_event_type_t.
   uint64_t event_counts[IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL + 1];
@@ -260,6 +298,39 @@ static iree_status_t iree_profile_explain_total_dispatch_ticks_for_device(
   return iree_ok_status();
 }
 
+static iree_status_t iree_profile_explain_resolve_device_row(
+    const iree_profile_dispatch_context_t* context,
+    const iree_profile_model_device_t* device,
+    iree_profile_explain_device_row_t* out_row) {
+  memset(out_row, 0, sizeof(*out_row));
+  out_row->device = device;
+  iree_profile_model_clock_fit_t clock_fit;
+  out_row->has_clock_fit = iree_profile_model_device_try_fit_clock_exact(
+      device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      &clock_fit);
+  if (out_row->has_clock_fit) {
+    out_row->nanoseconds_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+    out_row->tick_frequency_hz =
+        iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit);
+  }
+  out_row->visible_span_ticks = iree_profile_explain_visible_span_ticks(
+      context, device->physical_device_ordinal);
+  IREE_RETURN_IF_ERROR(iree_profile_explain_total_dispatch_ticks_for_device(
+      context, device->physical_device_ordinal,
+      &out_row->total_dispatch_ticks));
+  out_row->active_over_visible_ratio =
+      out_row->visible_span_ticks > 0.0
+          ? (double)out_row->total_dispatch_ticks / out_row->visible_span_ticks
+          : 0.0;
+  out_row->has_total_dispatch_time_ns =
+      out_row->has_clock_fit && out_row->total_dispatch_ticks != 0 &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          &clock_fit, out_row->total_dispatch_ticks,
+          &out_row->total_dispatch_time_ns);
+  return iree_ok_status();
+}
+
 static bool iree_profile_explain_queue_aggregate_matches(
     const iree_hal_profile_queue_record_t* queue,
     const iree_profile_dispatch_queue_aggregate_t* aggregate) {
@@ -356,6 +427,32 @@ static iree_status_t iree_profile_explain_summarize_queue(
   return status;
 }
 
+static iree_status_t iree_profile_explain_resolve_queue_row(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue,
+    iree_allocator_t host_allocator,
+    iree_profile_explain_queue_row_t* out_row) {
+  memset(out_row, 0, sizeof(*out_row));
+  out_row->queue = queue;
+  IREE_RETURN_IF_ERROR(iree_profile_explain_summarize_queue(
+      context, queue, host_allocator, &out_row->summary));
+
+  iree_profile_model_clock_fit_t clock_fit;
+  out_row->has_clock_fit = iree_profile_explain_try_fit_driver_host_cpu_clock(
+      context, queue->physical_device_ordinal, &clock_fit);
+  if (out_row->has_clock_fit) {
+    out_row->nanoseconds_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+  }
+  out_row->has_total_dispatch_time_ns =
+      out_row->has_clock_fit && out_row->summary.valid_submission_count != 0 &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          &clock_fit, out_row->summary.total_dispatch_ticks,
+          &out_row->total_dispatch_time_ns);
+  out_row->gap_analysis_available = context->queue_query.queue_event_count != 0;
+  return iree_ok_status();
+}
+
 static void iree_profile_explain_print_hint_text(const char* severity,
                                                  const char* category,
                                                  const char* message,
@@ -426,45 +523,23 @@ static iree_status_t iree_profile_explain_print_text_devices(
   for (iree_host_size_t i = 0; i < dispatch_context->model.device_count; ++i) {
     const iree_profile_model_device_t* device =
         &dispatch_context->model.devices[i];
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock_exact(
-        device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
-        &clock_fit);
-    const double ns_per_tick =
-        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                      : 0.0;
-    const double tick_frequency_hz =
-        has_clock_fit
-            ? iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit)
-            : 0.0;
-    const double visible_span_ticks = iree_profile_explain_visible_span_ticks(
-        dispatch_context, device->physical_device_ordinal);
-    uint64_t total_dispatch_ticks = 0;
-    IREE_RETURN_IF_ERROR(iree_profile_explain_total_dispatch_ticks_for_device(
-        dispatch_context, device->physical_device_ordinal,
-        &total_dispatch_ticks));
-    const double active_ratio =
-        visible_span_ticks > 0.0
-            ? (double)total_dispatch_ticks / visible_span_ticks
-            : 0.0;
-    int64_t total_dispatch_ns = 0;
-    const bool has_total_dispatch_ns =
-        has_clock_fit && total_dispatch_ticks != 0 &&
-        iree_profile_model_clock_fit_scale_ticks_to_ns(
-            &clock_fit, total_dispatch_ticks, &total_dispatch_ns);
+    iree_profile_explain_device_row_t row;
+    IREE_RETURN_IF_ERROR(iree_profile_explain_resolve_device_row(
+        dispatch_context, device, &row));
     fprintf(file,
             "  device[%u]: clock_fit=%s clock_samples=%" PRIu64
             " visible_span_ticks=%.3f active_dispatch_ticks=%" PRIu64
             " active_over_visible=%.3f\n",
-            device->physical_device_ordinal, has_clock_fit ? "true" : "false",
-            device->clock_sample_count, visible_span_ticks,
-            total_dispatch_ticks, active_ratio);
-    if (has_total_dispatch_ns) {
+            row.device->physical_device_ordinal,
+            row.has_clock_fit ? "true" : "false",
+            row.device->clock_sample_count, row.visible_span_ticks,
+            row.total_dispatch_ticks, row.active_over_visible_ratio);
+    if (row.has_total_dispatch_time_ns) {
       fprintf(file,
               "    visible_span_ns=%.3f active_dispatch_ns=%" PRId64
               " tick_frequency_hz=%.3f\n",
-              visible_span_ticks * ns_per_tick, total_dispatch_ns,
-              tick_frequency_hz);
+              row.visible_span_ticks * row.nanoseconds_per_tick,
+              row.total_dispatch_time_ns, row.tick_frequency_hz);
     }
   }
   return iree_ok_status();
@@ -477,44 +552,32 @@ static iree_status_t iree_profile_explain_print_text_queues(
   for (iree_host_size_t i = 0; i < dispatch_context->model.queue_count; ++i) {
     const iree_hal_profile_queue_record_t* queue =
         &dispatch_context->model.queues[i].record;
-    iree_profile_explain_queue_summary_t queue_summary;
-    IREE_RETURN_IF_ERROR(iree_profile_explain_summarize_queue(
-        dispatch_context, queue, host_allocator, &queue_summary));
-
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit =
-        iree_profile_explain_try_fit_driver_host_cpu_clock(
-            dispatch_context, queue->physical_device_ordinal, &clock_fit);
-    const double ns_per_tick =
-        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                      : 0.0;
-    int64_t total_dispatch_ns = 0;
-    const bool has_total_dispatch_ns =
-        has_clock_fit && queue_summary.valid_submission_count != 0 &&
-        iree_profile_model_clock_fit_scale_ticks_to_ns(
-            &clock_fit, queue_summary.total_dispatch_ticks, &total_dispatch_ns);
+    iree_profile_explain_queue_row_t row;
+    IREE_RETURN_IF_ERROR(iree_profile_explain_resolve_queue_row(
+        dispatch_context, queue, host_allocator, &row));
     fprintf(file,
             "  queue device=%u ordinal=%u stream=%" PRIu64
             ": submissions=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
             " busy_ticks=%.3f"
             " total_dispatch_ticks=%" PRIu64,
-            queue->physical_device_ordinal, queue->queue_ordinal,
-            queue->stream_id, queue_summary.submission_count,
-            queue_summary.valid_submission_count,
-            queue_summary.invalid_submission_count, queue_summary.busy_ticks,
-            queue_summary.total_dispatch_ticks);
-    if (has_total_dispatch_ns) {
+            row.queue->physical_device_ordinal, row.queue->queue_ordinal,
+            row.queue->stream_id, row.summary.submission_count,
+            row.summary.valid_submission_count,
+            row.summary.invalid_submission_count, row.summary.busy_ticks,
+            row.summary.total_dispatch_ticks);
+    if (row.has_total_dispatch_time_ns) {
       fprintf(file, " busy_ns=%.3f total_dispatch_ns=%" PRId64,
-              queue_summary.busy_ticks * ns_per_tick, total_dispatch_ns);
+              row.summary.busy_ticks * row.nanoseconds_per_tick,
+              row.total_dispatch_time_ns);
     }
-    if (dispatch_context->queue_query.queue_event_count != 0) {
+    if (row.gap_analysis_available) {
       fprintf(file, " gaps=%" PRIu64 " total_gap_ticks=%.3f max_gap_ticks=%.3f",
-              queue_summary.gap_count, queue_summary.total_gap_ticks,
-              queue_summary.max_gap_ticks);
-      if (has_clock_fit) {
+              row.summary.gap_count, row.summary.total_gap_ticks,
+              row.summary.max_gap_ticks);
+      if (row.has_clock_fit) {
         fprintf(file, " total_gap_ns=%.3f max_gap_ns=%.3f",
-                queue_summary.total_gap_ticks * ns_per_tick,
-                queue_summary.max_gap_ticks * ns_per_tick);
+                row.summary.total_gap_ticks * row.nanoseconds_per_tick,
+                row.summary.max_gap_ticks * row.nanoseconds_per_tick);
       }
     } else {
       fprintf(file, " gaps=unavailable_without_queue_events");
@@ -774,28 +837,9 @@ static iree_status_t iree_profile_explain_print_jsonl_devices(
   for (iree_host_size_t i = 0; i < dispatch_context->model.device_count; ++i) {
     const iree_profile_model_device_t* device =
         &dispatch_context->model.devices[i];
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock_exact(
-        device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
-        &clock_fit);
-    const double ns_per_tick =
-        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                      : 0.0;
-    const double tick_frequency_hz =
-        has_clock_fit
-            ? iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit)
-            : 0.0;
-    const double visible_span_ticks = iree_profile_explain_visible_span_ticks(
-        dispatch_context, device->physical_device_ordinal);
-    uint64_t total_dispatch_ticks = 0;
-    IREE_RETURN_IF_ERROR(iree_profile_explain_total_dispatch_ticks_for_device(
-        dispatch_context, device->physical_device_ordinal,
-        &total_dispatch_ticks));
-    int64_t total_dispatch_ns = 0;
-    const bool has_total_dispatch_ns =
-        has_clock_fit && total_dispatch_ticks != 0 &&
-        iree_profile_model_clock_fit_scale_ticks_to_ns(
-            &clock_fit, total_dispatch_ticks, &total_dispatch_ns);
+    iree_profile_explain_device_row_t row;
+    IREE_RETURN_IF_ERROR(iree_profile_explain_resolve_device_row(
+        dispatch_context, device, &row));
     fprintf(file,
             "{\"type\":\"explain_device\",\"physical_device_ordinal\":%u"
             ",\"clock_fit_available\":%s,\"clock_samples\":%" PRIu64
@@ -805,16 +849,16 @@ static iree_status_t iree_profile_explain_print_jsonl_devices(
             ",\"tick_frequency_hz\":%.3f,\"visible_span_ns\":%.3f"
             ",\"active_dispatch_time_ns_available\":%s"
             ",\"active_dispatch_ns\":%" PRId64 "}\n",
-            device->physical_device_ordinal, has_clock_fit ? "true" : "false",
-            device->clock_sample_count, visible_span_ticks,
-            total_dispatch_ticks,
-            visible_span_ticks > 0.0
-                ? (double)total_dispatch_ticks / visible_span_ticks
+            row.device->physical_device_ordinal,
+            row.has_clock_fit ? "true" : "false",
+            row.device->clock_sample_count, row.visible_span_ticks,
+            row.total_dispatch_ticks, row.active_over_visible_ratio,
+            row.has_clock_fit ? row.tick_frequency_hz : 0.0,
+            row.has_clock_fit
+                ? row.visible_span_ticks * row.nanoseconds_per_tick
                 : 0.0,
-            has_clock_fit ? tick_frequency_hz : 0.0,
-            has_clock_fit ? visible_span_ticks * ns_per_tick : 0.0,
-            has_total_dispatch_ns ? "true" : "false",
-            has_total_dispatch_ns ? total_dispatch_ns : 0);
+            row.has_total_dispatch_time_ns ? "true" : "false",
+            row.has_total_dispatch_time_ns ? row.total_dispatch_time_ns : 0);
   }
   return iree_ok_status();
 }
@@ -825,24 +869,9 @@ static iree_status_t iree_profile_explain_print_jsonl_queues(
   for (iree_host_size_t i = 0; i < dispatch_context->model.queue_count; ++i) {
     const iree_hal_profile_queue_record_t* queue =
         &dispatch_context->model.queues[i].record;
-    iree_profile_explain_queue_summary_t queue_summary;
-    IREE_RETURN_IF_ERROR(iree_profile_explain_summarize_queue(
-        dispatch_context, queue, host_allocator, &queue_summary));
-
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit =
-        iree_profile_explain_try_fit_driver_host_cpu_clock(
-            dispatch_context, queue->physical_device_ordinal, &clock_fit);
-    const double ns_per_tick =
-        has_clock_fit ? iree_profile_model_clock_fit_ns_per_tick(&clock_fit)
-                      : 0.0;
-    int64_t total_dispatch_ns = 0;
-    const bool has_total_dispatch_ns =
-        has_clock_fit && queue_summary.valid_submission_count != 0 &&
-        iree_profile_model_clock_fit_scale_ticks_to_ns(
-            &clock_fit, queue_summary.total_dispatch_ticks, &total_dispatch_ns);
-    const bool gap_analysis_available =
-        dispatch_context->queue_query.queue_event_count != 0;
+    iree_profile_explain_queue_row_t row;
+    IREE_RETURN_IF_ERROR(iree_profile_explain_resolve_queue_row(
+        dispatch_context, queue, host_allocator, &row));
     fprintf(
         file,
         "{\"type\":\"explain_queue\",\"physical_device_ordinal\":%u"
@@ -856,22 +885,24 @@ static iree_status_t iree_profile_explain_print_jsonl_queues(
         ",\"gap_analysis_available\":%s,\"gaps\":%" PRIu64
         ",\"total_gap_ticks\":%.3f,\"max_gap_ticks\":%.3f"
         ",\"total_gap_ns\":%.3f,\"max_gap_ns\":%.3f}\n",
-        queue->physical_device_ordinal, queue->queue_ordinal, queue->stream_id,
-        queue_summary.submission_count, queue_summary.valid_submission_count,
-        queue_summary.invalid_submission_count, queue_summary.busy_ticks,
-        queue_summary.total_dispatch_ticks, has_clock_fit ? "true" : "false",
-        has_clock_fit ? queue_summary.busy_ticks * ns_per_tick : 0.0,
-        has_total_dispatch_ns ? "true" : "false",
-        has_total_dispatch_ns ? total_dispatch_ns : 0,
-        gap_analysis_available ? "true" : "false",
-        gap_analysis_available ? queue_summary.gap_count : 0,
-        gap_analysis_available ? queue_summary.total_gap_ticks : 0.0,
-        gap_analysis_available ? queue_summary.max_gap_ticks : 0.0,
-        gap_analysis_available && has_clock_fit
-            ? queue_summary.total_gap_ticks * ns_per_tick
+        row.queue->physical_device_ordinal, row.queue->queue_ordinal,
+        row.queue->stream_id, row.summary.submission_count,
+        row.summary.valid_submission_count,
+        row.summary.invalid_submission_count, row.summary.busy_ticks,
+        row.summary.total_dispatch_ticks, row.has_clock_fit ? "true" : "false",
+        row.has_clock_fit ? row.summary.busy_ticks * row.nanoseconds_per_tick
+                          : 0.0,
+        row.has_total_dispatch_time_ns ? "true" : "false",
+        row.has_total_dispatch_time_ns ? row.total_dispatch_time_ns : 0,
+        row.gap_analysis_available ? "true" : "false",
+        row.gap_analysis_available ? row.summary.gap_count : 0,
+        row.gap_analysis_available ? row.summary.total_gap_ticks : 0.0,
+        row.gap_analysis_available ? row.summary.max_gap_ticks : 0.0,
+        row.gap_analysis_available && row.has_clock_fit
+            ? row.summary.total_gap_ticks * row.nanoseconds_per_tick
             : 0.0,
-        gap_analysis_available && has_clock_fit
-            ? queue_summary.max_gap_ticks * ns_per_tick
+        row.gap_analysis_available && row.has_clock_fit
+            ? row.summary.max_gap_ticks * row.nanoseconds_per_tick
             : 0.0);
   }
   return iree_ok_status();
