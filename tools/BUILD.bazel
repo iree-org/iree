@@ -219,7 +219,8 @@ iree_runtime_cc_binary(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
-        "//runtime/src/iree/tooling/profile",
+        "//runtime/src/iree/tooling/profile:commands",
+        "//runtime/src/iree/tooling/profile:help",
     ] + select({
         "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["//runtime/src/iree/tooling/profile/att"],
         "//conditions:default": [],

@@ -12,42 +12,219 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    profile
+    common
   HDRS
-    "cat.h"
-    "commands.h"
     "common.h"
-    "counter.h"
-    "dispatch.h"
-    "explain.h"
-    "export.h"
-    "help.h"
-    "internal.h"
-    "memory.h"
-    "model.h"
-    "projection.h"
-    "queue_query.h"
-    "reader.h"
-    "summary.h"
   SRCS
-    "cat.c"
-    "commands.c"
     "common.c"
-    "counter.c"
-    "dispatch.c"
-    "explain.c"
-    "export.c"
-    "help.c"
-    "memory.c"
-    "model.c"
-    "projection.c"
-    "queue_query.c"
-    "reader.c"
-    "summary.c"
   DEPS
     iree::base
     iree::hal::utils::profile_file
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    reader
+  HDRS
+    "reader.h"
+  SRCS
+    "reader.c"
+  DEPS
+    ::common
     iree::io::file_handle
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    model
+  HDRS
+    "model.h"
+  SRCS
+    "model.c"
+  DEPS
+    ::common
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_query
+  HDRS
+    "queue_query.h"
+  SRCS
+    "queue_query.c"
+  DEPS
+    ::model
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch
+  HDRS
+    "dispatch.h"
+  SRCS
+    "dispatch.c"
+  DEPS
+    ::common
+    ::model
+    ::queue_query
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    counter
+  HDRS
+    "counter.h"
+  SRCS
+    "counter.c"
+  DEPS
+    ::common
+    ::model
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    memory
+  HDRS
+    "memory.h"
+  SRCS
+    "memory.c"
+  DEPS
+    ::common
+    ::model
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    summary
+  HDRS
+    "summary.h"
+  SRCS
+    "summary.c"
+  DEPS
+    ::common
+    ::model
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    cat
+  HDRS
+    "cat.h"
+  SRCS
+    "cat.c"
+  DEPS
+    ::common
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    projection
+  HDRS
+    "projection.h"
+  SRCS
+    "projection.c"
+  DEPS
+    ::dispatch
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    export
+  HDRS
+    "export.h"
+  SRCS
+    "export.c"
+  DEPS
+    ::common
+    ::memory
+    ::model
+    ::reader
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    explain
+  HDRS
+    "explain.h"
+  SRCS
+    "explain.c"
+  DEPS
+    ::common
+    ::dispatch
+    ::memory
+    ::reader
+    ::summary
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    help
+  HDRS
+    "help.h"
+  SRCS
+    "help.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    commands
+  HDRS
+    "commands.h"
+  SRCS
+    "commands.c"
+  DEPS
+    ::cat
+    ::counter
+    ::explain
+    ::export
+    ::memory
+    ::projection
+    ::summary
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    profile
+  DEPS
+    ::cat
+    ::commands
+    ::common
+    ::counter
+    ::dispatch
+    ::explain
+    ::export
+    ::help
+    ::memory
+    ::model
+    ::projection
+    ::queue_query
+    ::reader
+    ::summary
   PUBLIC
 )
 
@@ -57,9 +234,11 @@ iree_cc_test(
   SRCS
     "common_test.cc"
   DEPS
-    ::profile
+    ::counter
+    ::memory
+    ::model
+    ::reader
     iree::base
-    iree::hal::utils::profile_file
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -70,7 +249,7 @@ iree_cc_test(
   SRCS
     "commands_test.cc"
   DEPS
-    ::profile
+    ::commands
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

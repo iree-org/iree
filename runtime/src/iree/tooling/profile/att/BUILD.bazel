@@ -29,7 +29,9 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal/utils:profile_file",
         "//runtime/src/iree/io:file_handle",
-        "//runtime/src/iree/tooling/profile",
+        "//runtime/src/iree/tooling/profile:commands",
+        "//runtime/src/iree/tooling/profile:common",
+        "//runtime/src/iree/tooling/profile:reader",
     ],
 )
 

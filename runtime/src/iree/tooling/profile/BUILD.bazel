@@ -13,44 +13,175 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "profile",
-    srcs = [
-        "cat.c",
-        "commands.c",
-        "common.c",
-        "counter.c",
-        "dispatch.c",
-        "explain.c",
-        "export.c",
-        "help.c",
-        "memory.c",
-        "model.c",
-        "projection.c",
-        "queue_query.c",
-        "reader.c",
-        "summary.c",
-    ],
-    hdrs = [
-        "cat.h",
-        "commands.h",
-        "common.h",
-        "counter.h",
-        "dispatch.h",
-        "explain.h",
-        "export.h",
-        "help.h",
-        "internal.h",
-        "memory.h",
-        "model.h",
-        "projection.h",
-        "queue_query.h",
-        "reader.h",
-        "summary.h",
-    ],
+    name = "common",
+    srcs = ["common.c"],
+    hdrs = ["common.h"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal/utils:profile_file",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "reader",
+    srcs = ["reader.c"],
+    hdrs = ["reader.h"],
+    deps = [
+        ":common",
         "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "model",
+    srcs = ["model.c"],
+    hdrs = ["model.h"],
+    deps = [
+        ":common",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "queue_query",
+    srcs = ["queue_query.c"],
+    hdrs = ["queue_query.h"],
+    deps = [
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dispatch",
+    srcs = ["dispatch.c"],
+    hdrs = ["dispatch.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":queue_query",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "counter",
+    srcs = ["counter.c"],
+    hdrs = ["counter.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "memory",
+    srcs = ["memory.c"],
+    hdrs = ["memory.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "summary",
+    srcs = ["summary.c"],
+    hdrs = ["summary.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "cat",
+    srcs = ["cat.c"],
+    hdrs = ["cat.h"],
+    deps = [
+        ":common",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "projection",
+    srcs = ["projection.c"],
+    hdrs = ["projection.h"],
+    deps = [
+        ":dispatch",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "export",
+    srcs = ["export.c"],
+    hdrs = ["export.h"],
+    deps = [
+        ":common",
+        ":memory",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "explain",
+    srcs = ["explain.c"],
+    hdrs = ["explain.h"],
+    deps = [
+        ":common",
+        ":dispatch",
+        ":memory",
+        ":reader",
+        ":summary",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "help",
+    srcs = ["help.c"],
+    hdrs = ["help.h"],
+    deps = ["//runtime/src/iree/base"],
+)
+
+iree_runtime_cc_library(
+    name = "commands",
+    srcs = ["commands.c"],
+    hdrs = ["commands.h"],
+    deps = [
+        ":cat",
+        ":counter",
+        ":explain",
+        ":export",
+        ":memory",
+        ":projection",
+        ":summary",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "profile",
+    deps = [
+        ":cat",
+        ":commands",
+        ":common",
+        ":counter",
+        ":dispatch",
+        ":explain",
+        ":export",
+        ":help",
+        ":memory",
+        ":model",
+        ":projection",
+        ":queue_query",
+        ":reader",
+        ":summary",
     ],
 )
 
@@ -58,9 +189,11 @@ iree_runtime_cc_test(
     name = "common_test",
     srcs = ["common_test.cc"],
     deps = [
-        ":profile",
+        ":counter",
+        ":memory",
+        ":model",
+        ":reader",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/hal/utils:profile_file",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -70,7 +203,7 @@ iree_runtime_cc_test(
     name = "commands_test",
     srcs = ["commands_test.cc"],
     deps = [
-        ":profile",
+        ":commands",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

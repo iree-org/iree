@@ -275,7 +275,8 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::tooling::flags
-    iree::tooling::profile
+    iree::tooling::profile::commands
+    iree::tooling::profile::help
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )

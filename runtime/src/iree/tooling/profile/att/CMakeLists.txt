@@ -25,7 +25,9 @@ iree_cc_library(
     iree::base::internal::path
     iree::hal::utils::profile_file
     iree::io::file_handle
-    iree::tooling::profile
+    iree::tooling::profile::commands
+    iree::tooling::profile::common
+    iree::tooling::profile::reader
   PUBLIC
 )
 
