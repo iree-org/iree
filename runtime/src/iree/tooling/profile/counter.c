@@ -611,6 +611,55 @@ static iree_status_t iree_profile_counter_resolve_aggregate_key(
       out_key);
 }
 
+typedef struct iree_profile_counter_aggregate_row_t {
+  // Counter aggregate being rendered.
+  const iree_profile_counter_aggregate_t* aggregate;
+  // Counter set metadata referenced by |aggregate|.
+  const iree_profile_counter_set_t* counter_set;
+  // Counter metadata referenced by |aggregate|.
+  const iree_profile_counter_t* counter;
+  // Resolved executable export key for the aggregate.
+  iree_string_view_t key;
+  // Sample standard deviation for the aggregate's summed counter value.
+  double stddev;
+} iree_profile_counter_aggregate_row_t;
+
+static double iree_profile_counter_aggregate_stddev(
+    const iree_profile_counter_aggregate_t* aggregate) {
+  const double variance =
+      aggregate->sample_count > 1
+          ? aggregate->m2_value / (double)(aggregate->sample_count - 1)
+          : 0.0;
+  return iree_profile_sqrt_f64(variance);
+}
+
+static iree_status_t iree_profile_counter_resolve_aggregate_row(
+    const iree_profile_counter_context_t* counter_context,
+    const iree_profile_model_t* model,
+    const iree_profile_counter_aggregate_t* aggregate, char* numeric_buffer,
+    iree_host_size_t numeric_buffer_capacity,
+    iree_profile_counter_aggregate_row_t* out_row) {
+  memset(out_row, 0, sizeof(*out_row));
+  out_row->aggregate = aggregate;
+  out_row->counter_set = iree_profile_counter_find_counter_set(
+      counter_context, aggregate->counter_set_id);
+  out_row->counter = iree_profile_counter_find_counter(
+      counter_context, aggregate->counter_set_id, aggregate->counter_ordinal);
+  if (!out_row->counter_set || !out_row->counter) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter aggregate references missing metadata counter_set=%" PRIu64
+        " counter_ordinal=%u",
+        aggregate->counter_set_id, aggregate->counter_ordinal);
+  }
+
+  IREE_RETURN_IF_ERROR(iree_profile_counter_resolve_aggregate_key(
+      model, aggregate, numeric_buffer, numeric_buffer_capacity,
+      &out_row->key));
+  out_row->stddev = iree_profile_counter_aggregate_stddev(aggregate);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_counter_print_metadata_text(
     const iree_profile_counter_context_t* counter_context, FILE* file) {
   fprintf(file, "counter_sets:\n");
@@ -697,10 +746,9 @@ static void iree_profile_counter_print_metadata_jsonl(
   }
 }
 
-static iree_status_t iree_profile_counter_print_text(
+static void iree_profile_counter_print_text_summary(
     const iree_profile_counter_context_t* counter_context,
-    const iree_profile_model_t* model, iree_string_view_t filter,
-    int64_t id_filter, FILE* file) {
+    iree_string_view_t filter, int64_t id_filter, FILE* file) {
   fprintf(file, "IREE HAL profile counter summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   if (id_filter >= 0) {
@@ -715,71 +763,73 @@ static iree_status_t iree_profile_counter_print_text(
           counter_context->truncated_sample_count,
           counter_context->counter_set_count, counter_context->counter_count,
           counter_context->aggregate_count);
+}
 
-  IREE_RETURN_IF_ERROR(
-      iree_profile_counter_print_metadata_text(counter_context, file));
+static void iree_profile_counter_print_text_group(
+    const iree_profile_counter_aggregate_row_t* row, FILE* file) {
+  const iree_profile_counter_aggregate_t* aggregate = row->aggregate;
+  const iree_profile_counter_set_t* counter_set = row->counter_set;
+  const iree_profile_counter_t* counter = row->counter;
+  fprintf(file,
+          "  %.*s / %.*s.%.*s\n"
+          "    device=%u queue=%u stream=%" PRIu64 " command_buffer=%" PRIu64
+          " executable=%" PRIu64
+          " export=%u key=%.*s\n"
+          "    samples=%" PRIu64 " raw_values=%" PRIu64
+          " value[min/avg/stddev/max/total]=%.3f/%.3f/%.3f/%.3f/%.3f "
+          "unit=%s first_sample=%" PRIu64 " last_sample=%" PRIu64 "\n",
+          (int)counter_set->name.size, counter_set->name.data,
+          (int)counter->block_name.size, counter->block_name.data,
+          (int)counter->name.size, counter->name.data,
+          aggregate->physical_device_ordinal, aggregate->queue_ordinal,
+          aggregate->stream_id, aggregate->command_buffer_id,
+          aggregate->executable_id, aggregate->export_ordinal,
+          (int)row->key.size, row->key.data, aggregate->sample_count,
+          aggregate->raw_value_count,
+          aggregate->sample_count ? aggregate->minimum_value : 0.0,
+          aggregate->sample_count ? aggregate->mean_value : 0.0, row->stddev,
+          aggregate->sample_count ? aggregate->maximum_value : 0.0,
+          aggregate->total_value,
+          iree_profile_counter_unit_name(counter->record.unit),
+          aggregate->first_sample_id, aggregate->last_sample_id);
+}
 
+static iree_status_t iree_profile_counter_print_text_groups(
+    const iree_profile_counter_context_t* counter_context,
+    const iree_profile_model_t* model, FILE* file) {
   fprintf(file, "groups:\n");
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0;
        i < counter_context->aggregate_count && iree_status_is_ok(status); ++i) {
     const iree_profile_counter_aggregate_t* aggregate =
         &counter_context->aggregates[i];
-    const iree_profile_counter_set_t* counter_set =
-        iree_profile_counter_find_counter_set(counter_context,
-                                              aggregate->counter_set_id);
-    const iree_profile_counter_t* counter = iree_profile_counter_find_counter(
-        counter_context, aggregate->counter_set_id, aggregate->counter_ordinal);
-    if (!counter_set || !counter) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter aggregate references missing metadata counter_set=%" PRIu64
-          " counter_ordinal=%u",
-          aggregate->counter_set_id, aggregate->counter_ordinal);
-      continue;
-    }
-
     char numeric_buffer[128];
-    iree_string_view_t key = iree_string_view_empty();
-    status = iree_profile_counter_resolve_aggregate_key(
-        model, aggregate, numeric_buffer, sizeof(numeric_buffer), &key);
+    iree_profile_counter_aggregate_row_t row;
+    status = iree_profile_counter_resolve_aggregate_row(
+        counter_context, model, aggregate, numeric_buffer,
+        sizeof(numeric_buffer), &row);
     if (iree_status_is_ok(status)) {
-      const double variance =
-          aggregate->sample_count > 1
-              ? aggregate->m2_value / (double)(aggregate->sample_count - 1)
-              : 0.0;
-      const double stddev = iree_profile_sqrt_f64(variance);
-      fprintf(file,
-              "  %.*s / %.*s.%.*s\n"
-              "    device=%u queue=%u stream=%" PRIu64
-              " command_buffer=%" PRIu64 " executable=%" PRIu64
-              " export=%u key=%.*s\n"
-              "    samples=%" PRIu64 " raw_values=%" PRIu64
-              " value[min/avg/stddev/max/total]=%.3f/%.3f/%.3f/%.3f/%.3f "
-              "unit=%s first_sample=%" PRIu64 " last_sample=%" PRIu64 "\n",
-              (int)counter_set->name.size, counter_set->name.data,
-              (int)counter->block_name.size, counter->block_name.data,
-              (int)counter->name.size, counter->name.data,
-              aggregate->physical_device_ordinal, aggregate->queue_ordinal,
-              aggregate->stream_id, aggregate->command_buffer_id,
-              aggregate->executable_id, aggregate->export_ordinal,
-              (int)key.size, key.data, aggregate->sample_count,
-              aggregate->raw_value_count,
-              aggregate->sample_count ? aggregate->minimum_value : 0.0,
-              aggregate->sample_count ? aggregate->mean_value : 0.0, stddev,
-              aggregate->sample_count ? aggregate->maximum_value : 0.0,
-              aggregate->total_value,
-              iree_profile_counter_unit_name(counter->record.unit),
-              aggregate->first_sample_id, aggregate->last_sample_id);
+      iree_profile_counter_print_text_group(&row, file);
     }
   }
   return status;
 }
 
-static iree_status_t iree_profile_counter_print_jsonl(
+static iree_status_t iree_profile_counter_print_text(
     const iree_profile_counter_context_t* counter_context,
     const iree_profile_model_t* model, iree_string_view_t filter,
-    int64_t id_filter, bool emit_samples, FILE* file) {
+    int64_t id_filter, FILE* file) {
+  iree_profile_counter_print_text_summary(counter_context, filter, id_filter,
+                                          file);
+  IREE_RETURN_IF_ERROR(
+      iree_profile_counter_print_metadata_text(counter_context, file));
+  return iree_profile_counter_print_text_groups(counter_context, model, file);
+}
+
+static void iree_profile_counter_print_jsonl_summary(
+    const iree_profile_counter_context_t* counter_context,
+    iree_string_view_t filter, int64_t id_filter, bool emit_samples,
+    FILE* file) {
   fprintf(file, "{\"type\":\"counter_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
@@ -794,76 +844,77 @@ static iree_status_t iree_profile_counter_print_jsonl(
           counter_context->truncated_sample_count,
           counter_context->counter_set_count, counter_context->counter_count,
           counter_context->aggregate_count);
+}
 
-  iree_profile_counter_print_metadata_jsonl(counter_context, file);
+static void iree_profile_counter_print_jsonl_group(
+    const iree_profile_counter_aggregate_row_t* row, FILE* file) {
+  const iree_profile_counter_aggregate_t* aggregate = row->aggregate;
+  const iree_profile_counter_set_t* counter_set = row->counter_set;
+  const iree_profile_counter_t* counter = row->counter;
+  fprintf(file,
+          "{\"type\":\"counter_group\",\"physical_device_ordinal\":%u"
+          ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
+          ",\"counter_set_id\":%" PRIu64 ",\"counter_set\":",
+          aggregate->physical_device_ordinal, aggregate->queue_ordinal,
+          aggregate->stream_id, aggregate->counter_set_id);
+  iree_profile_fprint_json_string(file, counter_set->name);
+  fprintf(file,
+          ",\"counter_ordinal\":%u,\"counter\":", aggregate->counter_ordinal);
+  iree_profile_fprint_json_string(file, counter->name);
+  fprintf(file, ",\"block\":");
+  iree_profile_fprint_json_string(file, counter->block_name);
+  fprintf(file, ",\"unit\":");
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(
+                iree_profile_counter_unit_name(counter->record.unit)));
+  fprintf(file,
+          ",\"command_buffer_id\":%" PRIu64 ",\"executable_id\":%" PRIu64
+          ",\"export_ordinal\":%u"
+          ",\"key\":",
+          aggregate->command_buffer_id, aggregate->executable_id,
+          aggregate->export_ordinal);
+  iree_profile_fprint_json_string(file, row->key);
+  fprintf(file,
+          ",\"samples\":%" PRIu64 ",\"raw_values\":%" PRIu64
+          ",\"min\":%.3f,\"avg\":%.3f,\"stddev\":%.3f"
+          ",\"max\":%.3f,\"sum\":%.3f"
+          ",\"first_sample_id\":%" PRIu64 ",\"last_sample_id\":%" PRIu64 "}\n",
+          aggregate->sample_count, aggregate->raw_value_count,
+          aggregate->sample_count ? aggregate->minimum_value : 0.0,
+          aggregate->sample_count ? aggregate->mean_value : 0.0, row->stddev,
+          aggregate->sample_count ? aggregate->maximum_value : 0.0,
+          aggregate->total_value, aggregate->first_sample_id,
+          aggregate->last_sample_id);
+}
 
+static iree_status_t iree_profile_counter_print_jsonl_groups(
+    const iree_profile_counter_context_t* counter_context,
+    const iree_profile_model_t* model, FILE* file) {
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0;
        i < counter_context->aggregate_count && iree_status_is_ok(status); ++i) {
     const iree_profile_counter_aggregate_t* aggregate =
         &counter_context->aggregates[i];
-    const iree_profile_counter_set_t* counter_set =
-        iree_profile_counter_find_counter_set(counter_context,
-                                              aggregate->counter_set_id);
-    const iree_profile_counter_t* counter = iree_profile_counter_find_counter(
-        counter_context, aggregate->counter_set_id, aggregate->counter_ordinal);
-    if (!counter_set || !counter) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter aggregate references missing metadata counter_set=%" PRIu64
-          " counter_ordinal=%u",
-          aggregate->counter_set_id, aggregate->counter_ordinal);
-      continue;
-    }
-
     char numeric_buffer[128];
-    iree_string_view_t key = iree_string_view_empty();
-    status = iree_profile_counter_resolve_aggregate_key(
-        model, aggregate, numeric_buffer, sizeof(numeric_buffer), &key);
+    iree_profile_counter_aggregate_row_t row;
+    status = iree_profile_counter_resolve_aggregate_row(
+        counter_context, model, aggregate, numeric_buffer,
+        sizeof(numeric_buffer), &row);
     if (iree_status_is_ok(status)) {
-      const double variance =
-          aggregate->sample_count > 1
-              ? aggregate->m2_value / (double)(aggregate->sample_count - 1)
-              : 0.0;
-      const double stddev = iree_profile_sqrt_f64(variance);
-      fprintf(file,
-              "{\"type\":\"counter_group\",\"physical_device_ordinal\":%u"
-              ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
-              ",\"counter_set_id\":%" PRIu64 ",\"counter_set\":",
-              aggregate->physical_device_ordinal, aggregate->queue_ordinal,
-              aggregate->stream_id, aggregate->counter_set_id);
-      iree_profile_fprint_json_string(file, counter_set->name);
-      fprintf(file, ",\"counter_ordinal\":%u,\"counter\":",
-              aggregate->counter_ordinal);
-      iree_profile_fprint_json_string(file, counter->name);
-      fprintf(file, ",\"block\":");
-      iree_profile_fprint_json_string(file, counter->block_name);
-      fprintf(file, ",\"unit\":");
-      iree_profile_fprint_json_string(
-          file, iree_make_cstring_view(
-                    iree_profile_counter_unit_name(counter->record.unit)));
-      fprintf(file,
-              ",\"command_buffer_id\":%" PRIu64 ",\"executable_id\":%" PRIu64
-              ",\"export_ordinal\":%u"
-              ",\"key\":",
-              aggregate->command_buffer_id, aggregate->executable_id,
-              aggregate->export_ordinal);
-      iree_profile_fprint_json_string(file, key);
-      fprintf(file,
-              ",\"samples\":%" PRIu64 ",\"raw_values\":%" PRIu64
-              ",\"min\":%.3f,\"avg\":%.3f,\"stddev\":%.3f"
-              ",\"max\":%.3f,\"sum\":%.3f"
-              ",\"first_sample_id\":%" PRIu64 ",\"last_sample_id\":%" PRIu64
-              "}\n",
-              aggregate->sample_count, aggregate->raw_value_count,
-              aggregate->sample_count ? aggregate->minimum_value : 0.0,
-              aggregate->sample_count ? aggregate->mean_value : 0.0, stddev,
-              aggregate->sample_count ? aggregate->maximum_value : 0.0,
-              aggregate->total_value, aggregate->first_sample_id,
-              aggregate->last_sample_id);
+      iree_profile_counter_print_jsonl_group(&row, file);
     }
   }
   return status;
+}
+
+static iree_status_t iree_profile_counter_print_jsonl(
+    const iree_profile_counter_context_t* counter_context,
+    const iree_profile_model_t* model, iree_string_view_t filter,
+    int64_t id_filter, bool emit_samples, FILE* file) {
+  iree_profile_counter_print_jsonl_summary(counter_context, filter, id_filter,
+                                           emit_samples, file);
+  iree_profile_counter_print_metadata_jsonl(counter_context, file);
+  return iree_profile_counter_print_jsonl_groups(counter_context, model, file);
 }
 
 typedef struct iree_profile_counter_parse_context_t {
