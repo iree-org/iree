@@ -439,21 +439,17 @@ iree_status_t iree_hal_create_devices_from_flags(
 
 IREE_FLAG(
     string, device_profiling_mode, "",
-    "HAL device profiling mode as a comma-separated list drawn from ['queue', "
-    "'dispatch', 'executable', 'trace']\n"
-    "or empty to disable profiling. HAL implementations may require\n"
-    "additional flags in order to configure profiling support on their\n"
-    "devices.");
-IREE_FLAG(
-    string, device_profiling_file, "",
-    "Optional file path/prefix for profiling file output. Some\n"
-    "implementations may require a file name in order to capture profiling\n"
-    "information.");
+    "HAL device profiling data families as a comma-separated list drawn from\n"
+    "['queue-events', 'host-execution', 'device-queue-events',\n"
+    "'dispatch-events', 'memory-events', 'counters',\n"
+    "'executable-metadata', 'executable-traces'] or empty to disable\n"
+    "profiling. HAL implementations may require additional flags in order to\n"
+    "configure profiling support on their devices.");
 IREE_FLAG(
     string, device_profiling_output, "",
-    "Optional path for a raw IREE HAL profiling bundle. The output is written\n"
-    "by tooling using a generic profile sink and does not change the\n"
-    "implementation-specific meaning of --device_profiling_file.");
+    "Path for a raw IREE HAL profiling bundle. Required when\n"
+    "--device_profiling_mode is nonempty. The output is written by tooling\n"
+    "using a generic profile sink.");
 IREE_FLAG(
     string, device_profiling_filter_export, "",
     "Optional glob pattern selecting executable export names that should emit\n"
@@ -482,6 +478,17 @@ IREE_FLAG_LIST(
     "be\n"
     "specified multiple times; the selected HAL driver decides which counter\n"
     "names and combinations are supported.");
+
+IREE_FLAG(
+    string, device_capture_tool, "",
+    "Optional external profiler/tool capture provider such as 'renderdoc' or\n"
+    "'metal'. External captures produce provider-specific artifacts and are\n"
+    "separate from HAL-native --device_profiling_mode output.");
+IREE_FLAG(string, device_capture_file, "",
+          "Optional provider-specific external capture output path or path "
+          "template.");
+IREE_FLAG(string, device_capture_label, "",
+          "Optional provider-specific external capture range label.");
 
 static iree_status_t iree_hal_profile_capture_filter_set_u32_from_flag(
     int64_t flag_value, iree_hal_profile_capture_filter_flags_t flag,
@@ -553,34 +560,71 @@ static iree_status_t iree_hal_profile_sink_create_from_flags(
   return status;
 }
 
-static iree_status_t iree_hal_device_profiling_mode_from_flags(
-    iree_hal_device_profiling_mode_t* out_mode) {
-  *out_mode = IREE_HAL_DEVICE_PROFILING_MODE_NONE;
+static iree_status_t iree_hal_device_profiling_data_families_from_flags(
+    iree_hal_device_profiling_data_families_t* out_data_families) {
+  *out_data_families = IREE_HAL_DEVICE_PROFILING_DATA_NONE;
   iree_string_view_t remaining =
       iree_string_view_trim(iree_make_cstring_view(FLAG_device_profiling_mode));
   while (remaining.size != 0) {
-    iree_string_view_t mode_part = iree_string_view_empty();
-    iree_string_view_split(remaining, ',', &mode_part, &remaining);
-    mode_part = iree_string_view_trim(mode_part);
-    if (mode_part.size == 0) {
+    iree_string_view_t family_part = iree_string_view_empty();
+    iree_string_view_split(remaining, ',', &family_part, &remaining);
+    family_part = iree_string_view_trim(family_part);
+    if (family_part.size == 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "--device_profiling_mode contains an empty mode");
-    } else if (iree_string_view_equal(mode_part, IREE_SV("queue"))) {
-      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
-    } else if (iree_string_view_equal(mode_part, IREE_SV("dispatch"))) {
-      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
-    } else if (iree_string_view_equal(mode_part, IREE_SV("executable"))) {
-      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
-    } else if (iree_string_view_equal(mode_part, IREE_SV("trace"))) {
-      *out_mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES;
+                              "--device_profiling_mode contains an empty data "
+                              "family");
+    } else if (iree_string_view_equal(family_part, IREE_SV("queue-events"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS;
+    } else if (iree_string_view_equal(family_part, IREE_SV("host-execution"))) {
+      *out_data_families |=
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS;
+    } else if (iree_string_view_equal(family_part,
+                                      IREE_SV("device-queue-events"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
+    } else if (iree_string_view_equal(family_part,
+                                      IREE_SV("dispatch-events"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+    } else if (iree_string_view_equal(family_part, IREE_SV("memory-events"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
+    } else if (iree_string_view_equal(family_part, IREE_SV("counters"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES;
+    } else if (iree_string_view_equal(family_part,
+                                      IREE_SV("executable-metadata"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
+    } else if (iree_string_view_equal(family_part,
+                                      IREE_SV("executable-traces"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES;
     } else {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unsupported profiling mode '%.*s'",
-                              (int)mode_part.size, mode_part.data);
+                              "unsupported profiling data family '%.*s'",
+                              (int)family_part.size, family_part.data);
     }
     remaining = iree_string_view_trim(remaining);
   }
   return iree_ok_status();
+}
+
+static bool iree_hal_device_profiling_filter_flags_present(void) {
+  return strlen(FLAG_device_profiling_filter_export) != 0 ||
+         FLAG_device_profiling_filter_command_buffer >= 0 ||
+         FLAG_device_profiling_filter_command_index >= 0 ||
+         FLAG_device_profiling_filter_physical_device >= 0 ||
+         FLAG_device_profiling_filter_queue >= 0;
+}
+
+static bool iree_hal_device_external_capture_flags_present(void) {
+  return strlen(FLAG_device_capture_tool) != 0 ||
+         strlen(FLAG_device_capture_file) != 0 ||
+         strlen(FLAG_device_capture_label) != 0;
+}
+
+static iree_status_t iree_hal_device_external_capture_begin_from_flags(
+    iree_hal_device_t* device) {
+  iree_hal_device_external_capture_options_t options = {0};
+  options.provider = iree_make_cstring_view(FLAG_device_capture_tool);
+  options.file_path = iree_make_cstring_view(FLAG_device_capture_file);
+  options.label = iree_make_cstring_view(FLAG_device_capture_label);
+  return iree_hal_device_external_capture_begin(device, &options);
 }
 
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
@@ -589,19 +633,45 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   const iree_flag_string_list_t counter_names =
       FLAG_device_profiling_counter_list();
   iree_hal_device_profiling_options_t options = {0};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_device_profiling_mode_from_flags(&options.mode));
-  if (options.mode == IREE_HAL_DEVICE_PROFILING_MODE_NONE) {
+  IREE_RETURN_IF_ERROR(iree_hal_device_profiling_data_families_from_flags(
+      &options.data_families));
+  const bool external_capture_requested = strlen(FLAG_device_capture_tool) != 0;
+  if (!external_capture_requested &&
+      iree_hal_device_external_capture_flags_present()) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--device_capture_file and --device_capture_label "
+                            "require --device_capture_tool");
+  }
+  if (options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
     if (counter_names.count != 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "--device_profiling_counter requires "
+                              "--device_profiling_mode=counters");
+    }
+    if (strlen(FLAG_device_profiling_output) != 0 ||
+        iree_hal_device_profiling_filter_flags_present()) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "--device_profiling_counter requires --device_profiling_mode");
+          "--device_profiling_output and --device_profiling_filter_* require "
+          "--device_profiling_mode");
     }
-    return iree_ok_status();
+    return external_capture_requested
+               ? iree_hal_device_external_capture_begin_from_flags(device)
+               : iree_ok_status();
+  }
+  if (counter_names.count != 0 &&
+      !iree_any_bit_set(options.data_families,
+                        IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--device_profiling_counter requires --device_profiling_mode=counters");
+  }
+  if (strlen(FLAG_device_profiling_output) == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--device_profiling_mode requires "
+                            "--device_profiling_output");
   }
 
-  // We don't validate the file path as each tool has their own style.
-  options.file_path = FLAG_device_profiling_file;
   IREE_RETURN_IF_ERROR(
       iree_hal_profile_capture_filter_from_flags(&options.capture_filter));
   iree_hal_profile_counter_set_selection_t counter_set = {0};
@@ -615,9 +685,17 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   iree_hal_profile_sink_t* sink = NULL;
   iree_status_t status =
       iree_hal_profile_sink_create_from_flags(iree_allocator_system(), &sink);
+  bool native_profile_active = false;
   if (iree_status_is_ok(status)) {
     options.sink = sink;
     status = iree_hal_device_profiling_begin(device, &options);
+    native_profile_active = iree_status_is_ok(status);
+  }
+  if (iree_status_is_ok(status) && external_capture_requested) {
+    status = iree_hal_device_external_capture_begin_from_flags(device);
+  }
+  if (!iree_status_is_ok(status) && native_profile_active) {
+    status = iree_status_join(status, iree_hal_device_profiling_end(device));
   }
   iree_hal_profile_sink_release(sink);
   return status;
@@ -625,6 +703,12 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
 
 iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device) {
   if (!device) return iree_ok_status();
-  if (strlen(FLAG_device_profiling_mode) == 0) return iree_ok_status();
-  return iree_hal_device_profiling_end(device);
+  iree_status_t status = iree_ok_status();
+  if (strlen(FLAG_device_capture_tool) != 0) {
+    status = iree_hal_device_external_capture_end(device);
+  }
+  if (strlen(FLAG_device_profiling_mode) != 0) {
+    status = iree_status_join(status, iree_hal_device_profiling_end(device));
+  }
+  return status;
 }

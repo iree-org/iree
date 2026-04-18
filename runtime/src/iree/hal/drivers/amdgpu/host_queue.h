@@ -292,13 +292,16 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // of issuing new AQL packets.
   bool is_shutting_down;
 
-  // Profiling mode state for this queue. Mutated only by device profiling
-  // begin/end while the profiling API's idle-device precondition is held.
+  // Profiling data-family state for this queue. Mutated only by device
+  // profiling begin/end while the profiling API's idle-device precondition is
+  // held.
   struct {
     // True when ROCR should populate dispatch completion signal timestamps.
     uint32_t hsa_queue_timestamps_enabled : 1;
     // True when host-side queue operation events should be recorded.
     uint32_t queue_events_enabled : 1;
+    // True when device-timestamped queue operation events should be recorded.
+    uint32_t queue_device_events_enabled : 1;
     // Serializes dispatch event batch mutation and flush.
     iree_slim_mutex_t event_mutex;
     // Borrowed fine-grained GPU-agent block pool backing raw signal storage.

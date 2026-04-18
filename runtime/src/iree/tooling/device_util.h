@@ -52,13 +52,15 @@ iree_status_t iree_hal_create_devices_from_flags(
 iree_status_t iree_hal_device_set_default_channel_provider(
     iree_hal_device_t* device);
 
-// Equivalent to iree_hal_device_profiling_begin with options sourced from
-// command line flags. No-op if profiling is not enabled.
+// Begins any HAL-native profiling and external capture ranges requested by
+// command line flags. No-op if neither profiling nor external capture is
+// enabled.
 // Must be matched with a call to iree_hal_end_profiling_from_flags.
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device);
 
-// Equivalent to iree_hal_device_profiling_end with options sourced from
-// command line flags. No-op if profiling is not enabled.
+// Ends any HAL-native profiling and external capture ranges requested by
+// command line flags. No-op if neither profiling nor external capture is
+// enabled.
 iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device);
 
 #ifdef __cplusplus

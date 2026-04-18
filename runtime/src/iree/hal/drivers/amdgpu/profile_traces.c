@@ -83,8 +83,7 @@ typedef struct iree_hal_amdgpu_profile_trace_collect_context_t {
 
 static bool iree_hal_amdgpu_profile_trace_mode_requested(
     const iree_hal_device_profiling_options_t* options) {
-  return iree_any_bit_set(options->mode,
-                          IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_TRACES);
+  return iree_hal_device_profiling_options_requests_executable_traces(options);
 }
 
 static iree_status_t iree_hal_amdgpu_profile_trace_create_packets(

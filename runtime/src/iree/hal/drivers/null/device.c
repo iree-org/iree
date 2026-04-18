@@ -654,9 +654,9 @@ static iree_status_t iree_hal_null_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
-  // TODO(null): set implementation-defined device or global profiling modes.
-  // This will be paired with a profiling_end call at some point in the future.
-  // Hosting applications may periodically call profiling_flush.
+  // TODO(null): set implementation-defined device or global profiling data
+  // families. This will be paired with a profiling_end call at some point in
+  // the future. Hosting applications may periodically call profiling_flush.
   (void)device;
   iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                           "device profiling not implemented");

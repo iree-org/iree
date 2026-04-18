@@ -526,7 +526,7 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_session = NULL;
 
-  if (!iree_hal_device_profiling_options_have_counter_sets(options)) {
+  if (!iree_hal_device_profiling_options_requests_counter_samples(options)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }

@@ -108,6 +108,18 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
+    name = "device_test",
+    srcs = ["device_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/testing:mock_device",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "string_util_test",
     srcs = ["string_util_test.cc"],
     deps = [

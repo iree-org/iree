@@ -85,6 +85,19 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    device_test
+  SRCS
+    "device_test.cc"
+  DEPS
+    ::hal
+    iree::base
+    iree::hal::testing::mock_device
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     string_util_test
   SRCS
     "string_util_test.cc"

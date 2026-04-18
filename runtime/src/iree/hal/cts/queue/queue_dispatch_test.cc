@@ -71,10 +71,10 @@ class DeviceProfilingScope {
     }
   }
 
-  iree_status_t Begin(iree_hal_device_profiling_mode_t mode,
+  iree_status_t Begin(iree_hal_device_profiling_data_families_t data_families,
                       iree_hal_profile_sink_t* sink = nullptr) {
     iree_hal_device_profiling_options_t options = {0};
-    options.mode = mode;
+    options.data_families = data_families;
     options.sink = sink;
     return Begin(&options);
   }
@@ -468,11 +468,11 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
 
   DeviceProfilingScope profiling(device_);
   iree_status_t profiling_status =
-      profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                       TestProfileSinkAsBase(&sink));
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
@@ -513,27 +513,16 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
 
   IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
   IREE_ASSERT_OK(profiling.End());
-  if (sink.begin_count == 0) {
-    EXPECT_EQ(0, sink.end_count);
-    EXPECT_EQ(0, sink.device_metadata_count);
-    EXPECT_EQ(0, sink.queue_metadata_count);
-    EXPECT_EQ(0, sink.clock_correlation_count);
-    EXPECT_EQ(0, sink.dispatch_event_count);
-    EXPECT_FALSE(sink.saw_device_metadata);
-    EXPECT_FALSE(sink.saw_queue_metadata);
-    EXPECT_FALSE(sink.write_after_end);
-  } else {
-    EXPECT_EQ(1, sink.begin_count);
-    EXPECT_EQ(1, sink.end_count);
-    EXPECT_EQ(1, sink.device_metadata_count);
-    EXPECT_EQ(1, sink.queue_metadata_count);
-    EXPECT_GE(sink.clock_correlation_count, 3);
-    EXPECT_GE(sink.dispatch_event_count, 1);
-    EXPECT_TRUE(sink.saw_device_metadata);
-    EXPECT_TRUE(sink.saw_queue_metadata);
-    EXPECT_FALSE(sink.write_after_end);
-    ExpectDispatchEventsWithinClockCorrelationRange(sink);
-  }
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.clock_correlation_count, 3);
+  EXPECT_GE(sink.dispatch_event_count, 1);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+  ExpectDispatchEventsWithinClockCorrelationRange(sink);
 }
 
 // Capture filters must not perturb direct queue dispatch semantics or
@@ -543,7 +532,8 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
   TestProfileSinkInitialize(&sink);
 
   iree_hal_device_profiling_options_t profiling_options = {0};
-  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
   profiling_options.sink = TestProfileSinkAsBase(&sink);
   profiling_options.capture_filter.flags =
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
@@ -553,7 +543,7 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
   iree_status_t profiling_status = profiling.Begin(&profiling_options);
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
@@ -594,17 +584,11 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
 
   IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
   IREE_ASSERT_OK(profiling.End());
-  if (sink.begin_count == 0) {
-    EXPECT_EQ(0, sink.end_count);
-    EXPECT_EQ(0, sink.dispatch_event_count);
-    EXPECT_FALSE(sink.write_after_end);
-  } else {
-    EXPECT_EQ(1, sink.begin_count);
-    EXPECT_EQ(1, sink.end_count);
-    EXPECT_EQ(0, sink.dispatch_event_count);
-    EXPECT_TRUE(sink.dispatch_events.empty());
-    EXPECT_FALSE(sink.write_after_end);
-  }
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(0, sink.dispatch_event_count);
+  EXPECT_TRUE(sink.dispatch_events.empty());
+  EXPECT_FALSE(sink.write_after_end);
 }
 
 // Zero-workgroup dispatches are no-ops that still participate in semaphore
@@ -853,38 +837,27 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
 
     DeviceProfilingScope profiling(device_);
     iree_status_t profiling_status =
-        profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+        profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                         TestProfileSinkAsBase(&sink));
     if (IsProfilingUnsupported(profiling_status)) {
       iree_status_free(profiling_status);
-      GTEST_SKIP() << "device profiling mode unsupported by backend";
+      GTEST_SKIP() << "device profiling data family unsupported by backend";
     }
     IREE_ASSERT_OK(profiling_status);
 
     RunIndirectQueueDispatch(flags);
 
     IREE_ASSERT_OK(profiling.End());
-    if (sink.begin_count == 0) {
-      EXPECT_EQ(0, sink.end_count);
-      EXPECT_EQ(0, sink.device_metadata_count);
-      EXPECT_EQ(0, sink.queue_metadata_count);
-      EXPECT_EQ(0, sink.clock_correlation_count);
-      EXPECT_EQ(0, sink.dispatch_event_count);
-      EXPECT_FALSE(sink.saw_device_metadata);
-      EXPECT_FALSE(sink.saw_queue_metadata);
-      EXPECT_FALSE(sink.write_after_end);
-    } else {
-      EXPECT_EQ(1, sink.begin_count);
-      EXPECT_EQ(1, sink.end_count);
-      EXPECT_EQ(1, sink.device_metadata_count);
-      EXPECT_EQ(1, sink.queue_metadata_count);
-      EXPECT_GE(sink.clock_correlation_count, 2);
-      EXPECT_GE(sink.dispatch_event_count, 1);
-      EXPECT_TRUE(sink.saw_device_metadata);
-      EXPECT_TRUE(sink.saw_queue_metadata);
-      EXPECT_FALSE(sink.write_after_end);
-      ExpectDispatchEventsWithinClockCorrelationRange(sink);
-    }
+    EXPECT_EQ(1, sink.begin_count);
+    EXPECT_EQ(1, sink.end_count);
+    EXPECT_EQ(1, sink.device_metadata_count);
+    EXPECT_EQ(1, sink.queue_metadata_count);
+    EXPECT_GE(sink.clock_correlation_count, 2);
+    EXPECT_GE(sink.dispatch_event_count, 1);
+    EXPECT_TRUE(sink.saw_device_metadata);
+    EXPECT_TRUE(sink.saw_queue_metadata);
+    EXPECT_FALSE(sink.write_after_end);
+    ExpectDispatchEventsWithinClockCorrelationRange(sink);
   }
 
   iree_hal_executable_cache_t* executable_cache_ = nullptr;

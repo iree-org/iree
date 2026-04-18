@@ -435,7 +435,7 @@ void iree_hal_amdgpu_host_queue_retire_profile_dispatch_events(
 
 bool iree_hal_amdgpu_host_queue_should_profile_queue_device_events(
     const iree_hal_amdgpu_host_queue_t* queue) {
-  return queue->profiling.queue_events_enabled &&
+  return queue->profiling.queue_device_events_enabled &&
          queue->profiling.queue_device_events;
 }
 

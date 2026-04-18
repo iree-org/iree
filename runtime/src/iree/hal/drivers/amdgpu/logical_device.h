@@ -29,6 +29,10 @@ typedef struct iree_hal_amdgpu_profile_trace_session_t
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_host_block_pools_t
 //===----------------------------------------------------------------------===//
@@ -116,18 +120,16 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Active profiling session state. Mutated only by the HAL profiling
   // begin/end API while its idle-device precondition is held.
   struct {
-    // Active profiling modes, or NONE when profiling is disabled.
-    iree_hal_device_profiling_mode_t mode;
-    // Operation filter selecting heavy profiling artifacts for this session.
-    iree_hal_profile_capture_filter_t capture_filter;
+    // Owned profiling options for the active session.
+    iree_hal_device_profiling_options_t options;
+    // Opaque storage backing borrowed pointers in |options|, or NULL.
+    iree_hal_device_profiling_options_storage_t* options_storage;
     // Process-local profiling session identifier assigned at begin.
     uint64_t session_id;
-    // Next process-local clock-correlation sample identifier.
+    // Next session-local clock-correlation sample identifier.
     uint64_t next_clock_correlation_sample_id;
     // Cursor tracking metadata side-table chunks emitted in this session.
     iree_hal_amdgpu_profile_metadata_cursor_t metadata_cursor;
-    // Retained programmatic sink receiving HAL-native profiling chunks.
-    iree_hal_profile_sink_t* sink;
     // Hardware counter session active for selected dispatches, or NULL.
     iree_hal_amdgpu_profile_counter_session_t* counter_session;
     // Executable trace session active for selected dispatches, or NULL.
@@ -245,5 +247,9 @@ bool iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
 void iree_hal_amdgpu_logical_device_record_profile_queue_event(
     iree_hal_device_t* base_device,
     const iree_hal_profile_queue_event_t* event);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_

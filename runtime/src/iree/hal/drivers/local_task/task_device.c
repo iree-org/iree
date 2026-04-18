@@ -880,36 +880,21 @@ static iree_status_t iree_hal_task_device_queue_flush(
 static iree_status_t iree_hal_task_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  if (iree_hal_device_profiling_options_have_executable_traces(options)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "local-task executable trace profiling is not implemented");
-  }
-  if (iree_hal_device_profiling_options_have_counter_sets(options)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "local-task hardware counter profiling is not implemented");
-  }
-  // Unimplemented (and that's ok).
-  // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
-  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
-  // Capturing things like:
-  //   PERF_COUNT_HW_CPU_CYCLES / PERF_COUNT_HW_INSTRUCTIONS
-  //   PERF_COUNT_HW_CACHE_REFERENCES / PERF_COUNT_HW_CACHE_MISSES
-  //   etc
-  // TODO(benvanik): shared iree/hal/local/profiling implementation of this.
-  return iree_ok_status();
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local-task HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_task_device_profiling_flush(
     iree_hal_device_t* base_device) {
-  // Unimplemented (and that's ok).
+  // This backend does not buffer HAL-native profiling data.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_task_device_profiling_end(
     iree_hal_device_t* base_device) {
-  // Unimplemented (and that's ok).
+  // This backend does not hold HAL-native profiling session resources.
   return iree_ok_status();
 }
 

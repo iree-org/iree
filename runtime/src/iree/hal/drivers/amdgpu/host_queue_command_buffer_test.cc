@@ -8,11 +8,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/drivers/amdgpu/aql_command_buffer.h"
+#include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
@@ -251,10 +253,10 @@ class DeviceProfilingScope {
     }
   }
 
-  iree_status_t Begin(iree_hal_device_profiling_mode_t mode,
+  iree_status_t Begin(iree_hal_device_profiling_data_families_t data_families,
                       iree_hal_profile_sink_t* sink) {
     iree_hal_device_profiling_options_t options = {0};
-    options.mode = mode;
+    options.data_families = data_families;
     options.sink = sink;
     return Begin(&options);
   }
@@ -690,7 +692,9 @@ static iree_status_t BeginHardwareCounterProfiling(
       /*.counter_names=*/counter_names,
   };
   iree_hal_device_profiling_options_t profiling_options = {0};
-  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+      IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES;
   profiling_options.sink = CommandBufferProfileSinkAsBase(sink);
   profiling_options.counter_set_count = 1;
   profiling_options.counter_sets = &counter_set;
@@ -1315,6 +1319,25 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
   iree_hal_executable_cache_release(executable_cache);
 }
 
+TEST_F(HostQueueCommandBufferTest, SinklessProfilingBeginFails) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  IREE_ASSERT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_hal_device_profiling_begin(
+                            test_device.base_device(), &profiling_options));
+  IREE_EXPECT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_EXPECT_OK(iree_hal_device_profiling_end(test_device.base_device()));
+}
+
 TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
@@ -1328,11 +1351,11 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   CommandBufferProfileSinkInitialize(&sink);
   DeviceProfilingScope profiling(test_device.base_device());
   iree_status_t profiling_status =
-      profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                       CommandBufferProfileSinkAsBase(&sink));
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
@@ -1641,7 +1664,8 @@ TEST_F(HostQueueCommandBufferTest,
   CommandBufferProfileSink sink = {};
   CommandBufferProfileSinkInitialize(&sink);
   iree_hal_device_profiling_options_t profiling_options = {0};
-  profiling_options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
   profiling_options.sink = CommandBufferProfileSinkAsBase(&sink);
   profiling_options.capture_filter.flags =
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX;
@@ -1650,7 +1674,7 @@ TEST_F(HostQueueCommandBufferTest,
   iree_status_t profiling_status = profiling.Begin(&profiling_options);
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
@@ -1766,6 +1790,57 @@ TEST_F(HostQueueCommandBufferTest,
 }
 
 TEST_F(HostQueueCommandBufferTest,
+       DispatchProfileFilterCopiesExecutableExportPattern) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  std::string export_pattern = "scale_*";
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  profiling_options.sink = CommandBufferProfileSinkAsBase(&sink);
+  profiling_options.capture_filter.flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
+  profiling_options.capture_filter.executable_export_pattern =
+      iree_make_string_view(export_pattern.data(), export_pattern.size());
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status = profiling.Begin(&profiling_options);
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  export_pattern.assign("nomatch");
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  const uint64_t executable_id =
+      iree_hal_amdgpu_executable_profile_id(executable);
+  EXPECT_TRUE(iree_hal_amdgpu_logical_device_should_profile_dispatch(
+      test_device.logical_device(), executable_id, /*export_ordinal=*/0,
+      /*command_buffer_id=*/0, /*command_index=*/0,
+      /*physical_device_ordinal=*/0, /*queue_ordinal=*/0));
+
+  IREE_ASSERT_OK(profiling.End());
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest,
        ProfiledDispatchReservationFailsWhenCapacityExceeded) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
@@ -1781,11 +1856,11 @@ TEST_F(HostQueueCommandBufferTest,
   CommandBufferProfileSinkInitialize(&sink);
   DeviceProfilingScope profiling(test_device.base_device());
   iree_status_t profiling_status =
-      profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                       CommandBufferProfileSinkAsBase(&sink));
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
@@ -1822,11 +1897,11 @@ TEST_F(HostQueueCommandBufferTest,
   CommandBufferProfileSinkInitialize(&sink);
   DeviceProfilingScope profiling(test_device.base_device());
   iree_status_t profiling_status =
-      profiling.Begin(IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                       CommandBufferProfileSinkAsBase(&sink));
   if (IsProfilingUnsupported(profiling_status)) {
     iree_status_free(profiling_status);
-    GTEST_SKIP() << "device profiling mode unsupported by backend";
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
   }
   IREE_ASSERT_OK(profiling_status);
 
