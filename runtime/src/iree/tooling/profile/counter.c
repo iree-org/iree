@@ -125,6 +125,68 @@ static iree_status_t iree_profile_counter_get_aggregate(
   return iree_ok_status();
 }
 
+static iree_status_t iree_profile_counter_decode_counter_set_record(
+    const iree_profile_typed_record_t* typed_record,
+    iree_profile_counter_set_t* out_counter_set) {
+  iree_hal_profile_counter_set_record_t record_value;
+  memcpy(&record_value, typed_record->contents.data, sizeof(record_value));
+  if ((iree_host_size_t)record_value.name_length !=
+      typed_record->inline_payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter set name length is inconsistent with record length");
+  }
+
+  *out_counter_set = (iree_profile_counter_set_t){
+      .record = record_value,
+      .name =
+          iree_make_string_view((const char*)typed_record->inline_payload.data,
+                                typed_record->inline_payload.data_length),
+  };
+  return iree_ok_status();
+}
+
+static iree_status_t iree_profile_counter_decode_counter_record(
+    const iree_profile_counter_context_t* context,
+    const iree_profile_typed_record_t* typed_record,
+    iree_profile_counter_t* out_counter) {
+  iree_hal_profile_counter_record_t record_value;
+  memcpy(&record_value, typed_record->contents.data, sizeof(record_value));
+  iree_host_size_t trailing_length = 0;
+  if (!iree_host_size_checked_add(record_value.block_name_length,
+                                  record_value.name_length, &trailing_length) ||
+      !iree_host_size_checked_add(
+          trailing_length, record_value.description_length, &trailing_length) ||
+      trailing_length != typed_record->inline_payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "counter string lengths are inconsistent with record length");
+  }
+  if (!iree_profile_counter_find_counter_set(context,
+                                             record_value.counter_set_id)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "counter references missing counter-set metadata "
+                            "counter_set=%" PRIu64 " counter_ordinal=%u",
+                            record_value.counter_set_id,
+                            record_value.counter_ordinal);
+  }
+
+  const char* string_base = (const char*)typed_record->inline_payload.data;
+  *out_counter = (iree_profile_counter_t){
+      .record = record_value,
+      .block_name =
+          iree_make_string_view(string_base, record_value.block_name_length),
+      .name =
+          iree_make_string_view(string_base + record_value.block_name_length,
+                                record_value.name_length),
+      .description =
+          iree_make_string_view(string_base + record_value.block_name_length +
+                                    record_value.name_length,
+                                record_value.description_length),
+  };
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_counter_process_counter_set_records(
     iree_profile_counter_context_t* context,
     const iree_hal_profile_file_record_t* record) {
@@ -139,21 +201,10 @@ static iree_status_t iree_profile_counter_process_counter_set_records(
                                                      &has_record);
     if (!iree_status_is_ok(status) || !has_record) break;
 
-    iree_hal_profile_counter_set_record_t record_value;
-    memcpy(&record_value, typed_record.contents.data, sizeof(record_value));
-    if ((iree_host_size_t)record_value.name_length !=
-        typed_record.inline_payload.data_length) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter set name length is inconsistent with record length");
-    }
+    iree_profile_counter_set_t counter_set;
+    status = iree_profile_counter_decode_counter_set_record(&typed_record,
+                                                            &counter_set);
     if (iree_status_is_ok(status)) {
-      iree_profile_counter_set_t counter_set = {
-          .record = record_value,
-          .name = iree_make_string_view(
-              (const char*)typed_record.inline_payload.data,
-              typed_record.inline_payload.data_length),
-      };
       status = iree_profile_counter_append_counter_set(context, &counter_set);
     }
   }
@@ -174,43 +225,10 @@ static iree_status_t iree_profile_counter_process_counter_records(
                                                      &has_record);
     if (!iree_status_is_ok(status) || !has_record) break;
 
-    iree_hal_profile_counter_record_t record_value;
-    memcpy(&record_value, typed_record.contents.data, sizeof(record_value));
-    iree_host_size_t trailing_length = 0;
-    if (!iree_host_size_checked_add(record_value.block_name_length,
-                                    record_value.name_length,
-                                    &trailing_length) ||
-        !iree_host_size_checked_add(trailing_length,
-                                    record_value.description_length,
-                                    &trailing_length) ||
-        trailing_length != typed_record.inline_payload.data_length) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter string lengths are inconsistent with record length");
-    }
-    if (iree_status_is_ok(status) &&
-        !iree_profile_counter_find_counter_set(context,
-                                               record_value.counter_set_id)) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "counter references missing counter-set metadata "
-          "counter_set=%" PRIu64 " counter_ordinal=%u",
-          record_value.counter_set_id, record_value.counter_ordinal);
-    }
+    iree_profile_counter_t counter;
+    status = iree_profile_counter_decode_counter_record(context, &typed_record,
+                                                        &counter);
     if (iree_status_is_ok(status)) {
-      const char* string_base = (const char*)typed_record.inline_payload.data;
-      iree_profile_counter_t counter = {
-          .record = record_value,
-          .block_name = iree_make_string_view(string_base,
-                                              record_value.block_name_length),
-          .name = iree_make_string_view(
-              string_base + record_value.block_name_length,
-              record_value.name_length),
-          .description = iree_make_string_view(
-              string_base + record_value.block_name_length +
-                  record_value.name_length,
-              record_value.description_length),
-      };
       status = iree_profile_counter_append_counter(context, &counter);
     }
   }
