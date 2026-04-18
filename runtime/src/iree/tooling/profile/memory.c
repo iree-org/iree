@@ -621,20 +621,9 @@ static iree_status_t iree_profile_memory_record_pool_stats_event(
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_memory_record_allocation_event(
-    iree_profile_memory_context_t* context,
-    const iree_hal_profile_memory_event_t* event, bool close_materialization) {
-  iree_profile_memory_lifecycle_kind_t kind = 0;
-  if (!iree_profile_memory_event_allocation_kind(event, &kind)) {
-    return iree_ok_status();
-  }
-
-  const uint64_t pool_id =
-      iree_profile_memory_resolve_pool_id(context, event, kind);
-  iree_profile_memory_allocation_t* allocation = NULL;
-  IREE_RETURN_IF_ERROR(iree_profile_memory_get_allocation(
-      context, kind, event->physical_device_ordinal, event->allocation_id,
-      pool_id, &allocation));
+static void iree_profile_memory_update_allocation_metadata(
+    iree_profile_memory_allocation_t* allocation,
+    const iree_hal_profile_memory_event_t* event) {
   if (allocation->first_event_id == 0) {
     allocation->first_event_id = event->event_id;
     allocation->first_host_time_ns = event->host_time_ns;
@@ -654,6 +643,11 @@ static iree_status_t iree_profile_memory_record_allocation_event(
   allocation->flags |= event->flags;
   allocation->memory_type |= event->memory_type;
   allocation->buffer_usage |= event->buffer_usage;
+}
+
+static void iree_profile_memory_count_allocation_event(
+    iree_profile_memory_allocation_t* allocation,
+    const iree_hal_profile_memory_event_t* event) {
   ++allocation->event_count;
   if (event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT) {
     ++allocation->wait_count;
@@ -661,6 +655,24 @@ static iree_status_t iree_profile_memory_record_allocation_event(
              IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
     ++allocation->materialize_count;
   }
+}
+
+static iree_status_t iree_profile_memory_record_allocation_event(
+    iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event, bool close_materialization) {
+  iree_profile_memory_lifecycle_kind_t kind = 0;
+  if (!iree_profile_memory_event_allocation_kind(event, &kind)) {
+    return iree_ok_status();
+  }
+
+  const uint64_t pool_id =
+      iree_profile_memory_resolve_pool_id(context, event, kind);
+  iree_profile_memory_allocation_t* allocation = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_memory_get_allocation(
+      context, kind, event->physical_device_ordinal, event->allocation_id,
+      pool_id, &allocation));
+  iree_profile_memory_update_allocation_metadata(allocation, event);
+  iree_profile_memory_count_allocation_event(allocation, event);
 
   const bool accounted = iree_profile_memory_apply_lifecycle_balances(
       event, close_materialization, &allocation->lifecycle_balance,
