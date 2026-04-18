@@ -26,6 +26,16 @@ static void iree_hal_amdgpu_host_queue_populate_memory_event_pool_stats(
   event->pool_slab_count = stats.slab_count;
 }
 
+static uint64_t iree_hal_amdgpu_host_queue_memory_profile_allocation_id(
+    iree_hal_buffer_t* buffer) {
+  return iree_hal_amdgpu_transient_buffer_profile_allocation_id(buffer);
+}
+
+static uint64_t iree_hal_amdgpu_host_queue_memory_profile_session_id(
+    iree_hal_buffer_t* buffer) {
+  return iree_hal_amdgpu_transient_buffer_profile_session_id(buffer);
+}
+
 static void iree_hal_amdgpu_host_queue_record_memory_event(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_profile_memory_event_type_t type,
@@ -44,7 +54,8 @@ static void iree_hal_amdgpu_host_queue_record_memory_event(
   event.type = type;
   event.flags = flags;
   event.result = result;
-  event.allocation_id = (uint64_t)(uintptr_t)buffer;
+  event.allocation_id =
+      iree_hal_amdgpu_host_queue_memory_profile_allocation_id(buffer);
   event.pool_id = (uint64_t)(uintptr_t)pool;
   event.submission_id = submission_id;
   event.physical_device_ordinal =
@@ -65,8 +76,9 @@ static void iree_hal_amdgpu_host_queue_record_memory_event(
     }
   }
   iree_hal_amdgpu_host_queue_populate_memory_event_pool_stats(pool, &event);
-  iree_hal_amdgpu_logical_device_record_profile_memory_event(
-      queue->logical_device, &event);
+  iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+      queue->logical_device,
+      iree_hal_amdgpu_host_queue_memory_profile_session_id(buffer), &event);
 }
 
 typedef struct iree_hal_amdgpu_host_queue_release_reservation_state_t {
@@ -213,6 +225,14 @@ iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_transient_buffer_create(
       placement, *params, allocation_size, allocation_size,
       queue->transient_buffer_pool, out_buffer));
+  uint64_t session_id = 0;
+  const uint64_t allocation_id =
+      iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+          queue->logical_device, &session_id);
+  if (allocation_id != 0) {
+    iree_hal_amdgpu_transient_buffer_set_profile_allocation(
+        *out_buffer, session_id, allocation_id);
+  }
   *out_allocation_pool = allocation_pool;
   return iree_ok_status();
 }
@@ -353,7 +373,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
   };
   iree_hal_amdgpu_host_queue_profile_event_info_t profile_event_info = {
       .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA,
-      .allocation_id = (uint64_t)(uintptr_t)buffer,
+      .allocation_id =
+          iree_hal_amdgpu_host_queue_memory_profile_allocation_id(buffer),
       .payload_length = iree_hal_buffer_byte_length(buffer),
       .operation_count = 1,
   };
@@ -459,7 +480,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dealloca(
   };
   iree_hal_amdgpu_host_queue_profile_event_info_t profile_event_info = {
       .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA,
-      .allocation_id = (uint64_t)(uintptr_t)buffer,
+      .allocation_id =
+          iree_hal_amdgpu_host_queue_memory_profile_allocation_id(buffer),
       .payload_length = iree_hal_buffer_byte_length(buffer),
       .operation_count = 1,
   };

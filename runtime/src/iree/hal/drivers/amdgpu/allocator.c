@@ -68,8 +68,29 @@ typedef struct iree_hal_amdgpu_imported_host_release_data_t {
   // Unowned libhsa handle used to unlock the imported host allocation.
   const iree_hal_amdgpu_libhsa_t* libhsa;
 
+  // Unowned logical device used to record the paired unimport event.
+  iree_hal_device_t* profile_device;
+
   // Original host allocation pointer passed to hsa_amd_memory_lock.
   void* host_ptr;
+
+  // Length of the imported host allocation in bytes.
+  iree_device_size_t length;
+
+  // HAL memory type bits used to expose the imported buffer.
+  iree_hal_memory_type_t memory_type;
+
+  // HAL buffer usage bits used to expose the imported buffer.
+  iree_hal_buffer_usage_t buffer_usage;
+
+  // Profiling session id owning |profile_allocation_id|.
+  uint64_t profile_session_id;
+
+  // Session-local allocation id for the import/unimport lifecycle.
+  uint64_t profile_allocation_id;
+
+  // Session-local physical device ordinal attributed to this import.
+  uint32_t profile_physical_device_ordinal;
 
   // Host allocator used to release this thunk after buffer destruction.
   iree_allocator_t host_allocator;
@@ -396,6 +417,54 @@ static void iree_hal_amdgpu_allocator_record_buffer_allocate(
   }
 }
 
+static void iree_hal_amdgpu_allocator_record_buffer_import(
+    iree_hal_amdgpu_allocator_t* allocator, iree_hal_buffer_params_t params,
+    const iree_hal_external_buffer_t* external_buffer,
+    iree_hal_amdgpu_imported_host_release_data_t* release_data) {
+  uint64_t session_id = 0;
+  const uint64_t allocation_id =
+      iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+          (iree_hal_device_t*)allocator->logical_device, &session_id);
+  if (allocation_id == 0) {
+    return;
+  }
+
+  uint32_t physical_device_ordinal = UINT32_MAX;
+  iree_host_size_t selected_device_ordinal = 0;
+  const iree_hal_queue_affinity_t queue_affinity =
+      params.queue_affinity ? params.queue_affinity
+                            : IREE_HAL_QUEUE_AFFINITY_ANY;
+  if (iree_hal_amdgpu_allocator_select_device_ordinal(
+          allocator, queue_affinity, &selected_device_ordinal)) {
+    physical_device_ordinal = (uint32_t)selected_device_ordinal;
+  }
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT;
+  event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED;
+  event.allocation_id = allocation_id;
+  event.backing_id =
+      (uint64_t)(uintptr_t)external_buffer->handle.host_allocation.ptr;
+  event.physical_device_ordinal = physical_device_ordinal;
+  event.memory_type = params.type;
+  event.buffer_usage = params.usage;
+  event.length = external_buffer->size;
+  event.alignment = 1;
+  if (!iree_hal_amdgpu_logical_device_record_profile_memory_event(
+          (iree_hal_device_t*)allocator->logical_device, &event)) {
+    return;
+  }
+
+  release_data->profile_device = (iree_hal_device_t*)allocator->logical_device;
+  release_data->length = external_buffer->size;
+  release_data->memory_type = params.type;
+  release_data->buffer_usage = params.usage;
+  release_data->profile_session_id = session_id;
+  release_data->profile_allocation_id = allocation_id;
+  release_data->profile_physical_device_ordinal = physical_device_ordinal;
+}
+
 static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -526,6 +595,21 @@ static void iree_hal_amdgpu_allocator_release_imported_host(
 
   IREE_IGNORE_ERROR(
       iree_hsa_amd_memory_unlock(IREE_LIBHSA(data->libhsa), data->host_ptr));
+  if (data->profile_allocation_id != 0) {
+    iree_hal_profile_memory_event_t event =
+        iree_hal_profile_memory_event_default();
+    event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT;
+    event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED;
+    event.allocation_id = data->profile_allocation_id;
+    event.backing_id = (uint64_t)(uintptr_t)data->host_ptr;
+    event.physical_device_ordinal = data->profile_physical_device_ordinal;
+    event.memory_type = data->memory_type;
+    event.buffer_usage = data->buffer_usage;
+    event.length = data->length;
+    event.alignment = 1;
+    iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+        data->profile_device, data->profile_session_id, &event);
+  }
   if (data->caller_release_callback.fn) {
     data->caller_release_callback.fn(data->caller_release_callback.user_data,
                                      buffer);
@@ -633,12 +717,19 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
     status =
         iree_allocator_malloc(allocator->host_allocator, sizeof(*release_data),
                               (void**)&release_data);
+    if (iree_status_is_ok(status)) {
+      memset(release_data, 0, sizeof(*release_data));
+    }
   }
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     release_data->libhsa = allocator->libhsa;
     release_data->host_ptr = host_ptr;
+    release_data->length = external_buffer->size;
+    release_data->memory_type = compat_params.type;
+    release_data->buffer_usage = compat_params.usage;
+    release_data->profile_physical_device_ordinal = UINT32_MAX;
     release_data->host_allocator = allocator->host_allocator;
     release_data->caller_release_callback = release_callback;
     iree_hal_buffer_release_callback_t imported_release_callback = {
@@ -660,6 +751,8 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
   }
 
   if (iree_status_is_ok(status)) {
+    iree_hal_amdgpu_allocator_record_buffer_import(
+        allocator, compat_params, external_buffer, release_data);
     *out_buffer = buffer;
   } else {
     if (release_data) {

@@ -35,6 +35,10 @@ const char* iree_profile_memory_event_type_name(
       return "buffer_allocate";
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
       return "buffer_free";
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+      return "buffer_import";
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      return "buffer_unimport";
     default:
       return "unknown";
   }
@@ -51,6 +55,8 @@ static const char* iree_profile_memory_lifecycle_kind_name(
       return "queue_allocation";
     case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION:
       return "buffer_allocation";
+    case IREE_PROFILE_MEMORY_LIFECYCLE_KIND_IMPORTED_BUFFER:
+      return "imported_buffer";
     default:
       return "unknown";
   }
@@ -83,6 +89,10 @@ static bool iree_profile_memory_event_allocation_kind(
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
       *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION;
       return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_IMPORTED_BUFFER;
+      return true;
     default:
       return false;
   }
@@ -110,6 +120,10 @@ static bool iree_profile_memory_event_pool_kind(
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
       *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION;
       return true;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      *out_kind = IREE_PROFILE_MEMORY_LIFECYCLE_KIND_IMPORTED_BUFFER;
+      return true;
     default:
       return false;
   }
@@ -120,6 +134,7 @@ static bool iree_profile_memory_event_opens_lifecycle(
   switch (event->type) {
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE:
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
       return true;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
@@ -137,6 +152,7 @@ static bool iree_profile_memory_event_closes_lifecycle(
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
       return true;
     default:
       return false;
@@ -443,6 +459,16 @@ static iree_status_t iree_profile_memory_record_device_event(
       accounted = iree_profile_memory_balance_close(
           &device->buffer_allocation_balance, event->length);
       break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+      ++device->buffer_import_count;
+      accounted = iree_profile_memory_balance_open(
+          &device->buffer_import_balance, event->length);
+      break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      ++device->buffer_unimport_count;
+      accounted = iree_profile_memory_balance_close(
+          &device->buffer_import_balance, event->length);
+      break;
     case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
       ++device->queue_alloca_count;
       accounted = iree_profile_memory_balance_open(
@@ -584,6 +610,7 @@ static iree_status_t iree_profile_memory_record_allocation_event(
   }
   allocation->backing_id =
       allocation->backing_id ? allocation->backing_id : event->backing_id;
+  allocation->flags |= event->flags;
   allocation->memory_type |= event->memory_type;
   allocation->buffer_usage |= event->buffer_usage;
   ++allocation->event_count;
@@ -638,7 +665,7 @@ static void iree_profile_memory_print_event_jsonl(
           ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
           ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
           ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64
-          ",\"pool_stats_available\":%s"
+          ",\"externally_owned\":%s,\"pool_stats_available\":%s"
           ",\"pool_bytes_reserved\":%" PRIu64 ",\"pool_bytes_free\":%" PRIu64
           ",\"pool_bytes_committed\":%" PRIu64 ",\"pool_budget_limit\":%" PRIu64
           ",\"pool_reservation_count\":%u"
@@ -648,6 +675,10 @@ static void iree_profile_memory_print_event_jsonl(
           event->submission_id, event->physical_device_ordinal,
           event->queue_ordinal, event->frontier_entry_count, event->memory_type,
           event->buffer_usage, event->offset, event->length, event->alignment,
+          iree_all_bits_set(event->flags,
+                            IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
+              ? "true"
+              : "false",
           iree_profile_memory_event_has_pool_stats(event) ? "true" : "false",
           event->pool_bytes_reserved, event->pool_bytes_free,
           event->pool_bytes_committed, event->pool_budget_limit,
@@ -1056,13 +1087,15 @@ static iree_status_t iree_profile_memory_print_text(
             "/%" PRIu64 " pool_reserve/materialize/release/wait=%" PRIu64
             "/%" PRIu64 "/%" PRIu64 "/%" PRIu64
             " queue_alloca/dealloca=%" PRIu64 "/%" PRIu64
-            " buffer_allocate/free=%" PRIu64 "/%" PRIu64 "\n",
+            " buffer_allocate/free=%" PRIu64 "/%" PRIu64
+            " buffer_import/unimport=%" PRIu64 "/%" PRIu64 "\n",
             device->physical_device_ordinal, device->event_count,
             device->slab_acquire_count, device->slab_release_count,
             device->pool_reserve_count, device->pool_materialize_count,
             device->pool_release_count, device->pool_wait_count,
             device->queue_alloca_count, device->queue_dealloca_count,
-            device->buffer_allocate_count, device->buffer_free_count);
+            device->buffer_allocate_count, device->buffer_free_count,
+            device->buffer_import_count, device->buffer_unimport_count);
     iree_profile_memory_print_balance_text(file, "slab_provider_events",
                                            &device->slab_allocation_balance);
     iree_profile_memory_print_balance_text(file, "pool_reservations",
@@ -1073,6 +1106,8 @@ static iree_status_t iree_profile_memory_print_text(
                                            &device->queue_inflight_balance);
     iree_profile_memory_print_balance_text(file, "buffer_allocations",
                                            &device->buffer_allocation_balance);
+    iree_profile_memory_print_balance_text(file, "buffer_imports",
+                                           &device->buffer_import_balance);
   }
   for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
     const iree_profile_memory_pool_t* pool = &context->pools[i];
@@ -1136,16 +1171,22 @@ static iree_status_t iree_profile_memory_print_text(
       fprintf(
           file,
           "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
-          " backing=%" PRIu64 "]: events=%" PRIu64 " waits=%" PRIu64
-          " materializes=%" PRIu64 " open_at_end=%s current_bytes=%" PRIu64
-          " high_water_bytes=%" PRIu64 " opened_bytes=%" PRIu64
-          " closed_bytes=%" PRIu64 " partial_closes=%" PRIu64
-          " partial_close_bytes=%" PRIu64 " first_event=%" PRIu64
-          " last_event=%" PRIu64 " duration_ns=%" PRId64 "\n",
+          " backing=%" PRIu64 " externally_owned=%s]: events=%" PRIu64
+          " waits=%" PRIu64 " materializes=%" PRIu64
+          " open_at_end=%s current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
+          " opened_bytes=%" PRIu64 " closed_bytes=%" PRIu64
+          " partial_closes=%" PRIu64 " partial_close_bytes=%" PRIu64
+          " first_event=%" PRIu64 " last_event=%" PRIu64 " duration_ns=%" PRId64
+          "\n",
           iree_profile_memory_lifecycle_kind_name(allocation->kind),
           allocation->physical_device_ordinal, allocation->allocation_id,
-          allocation->pool_id, allocation->backing_id, allocation->event_count,
-          allocation->wait_count, allocation->materialize_count,
+          allocation->pool_id, allocation->backing_id,
+          iree_all_bits_set(allocation->flags,
+                            IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
+              ? "true"
+              : "false",
+          allocation->event_count, allocation->wait_count,
+          allocation->materialize_count,
           iree_profile_memory_allocation_open_at_end(allocation) ? "true"
                                                                  : "false",
           allocation->lifecycle_balance.current_bytes,
@@ -1214,13 +1255,15 @@ static void iree_profile_memory_print_jsonl_summary(
             ",\"pool_materializes\":%" PRIu64 ",\"pool_releases\":%" PRIu64
             ",\"pool_waits\":%" PRIu64 ",\"queue_allocas\":%" PRIu64
             ",\"queue_deallocas\":%" PRIu64 ",\"buffer_allocates\":%" PRIu64
-            ",\"buffer_frees\":%" PRIu64,
+            ",\"buffer_frees\":%" PRIu64 ",\"buffer_imports\":%" PRIu64
+            ",\"buffer_unimports\":%" PRIu64,
             device->physical_device_ordinal, device->event_count,
             device->slab_acquire_count, device->slab_release_count,
             device->pool_reserve_count, device->pool_materialize_count,
             device->pool_release_count, device->pool_wait_count,
             device->queue_alloca_count, device->queue_dealloca_count,
-            device->buffer_allocate_count, device->buffer_free_count);
+            device->buffer_allocate_count, device->buffer_free_count,
+            device->buffer_import_count, device->buffer_unimport_count);
     iree_profile_memory_fprint_balance_json_fields(
         file, "slab", &device->slab_allocation_balance);
     iree_profile_memory_fprint_balance_json_fields(
@@ -1231,6 +1274,8 @@ static void iree_profile_memory_print_jsonl_summary(
         file, "queue_inflight", &device->queue_inflight_balance);
     iree_profile_memory_fprint_balance_json_fields(
         file, "buffer", &device->buffer_allocation_balance);
+    iree_profile_memory_fprint_balance_json_fields(
+        file, "imported_buffer", &device->buffer_import_balance);
     fprintf(file, "}\n");
   }
   for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
@@ -1292,6 +1337,7 @@ static void iree_profile_memory_print_jsonl_summary(
         file,
         ",\"physical_device_ordinal\":%u,\"allocation_id\":%" PRIu64
         ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
+        ",\"externally_owned\":%s"
         ",\"memory_type\":%" PRIu64 ",\"buffer_usage\":%" PRIu64
         ",\"events\":%" PRIu64 ",\"waits\":%" PRIu64
         ",\"materializes\":%" PRIu64
@@ -1311,9 +1357,14 @@ static void iree_profile_memory_print_jsonl_summary(
         ",\"device_lifetime_time_ns_available\":%s"
         ",\"device_lifetime_duration_ns\":%" PRId64,
         allocation->physical_device_ordinal, allocation->allocation_id,
-        allocation->pool_id, allocation->backing_id, allocation->memory_type,
-        allocation->buffer_usage, allocation->event_count,
-        allocation->wait_count, allocation->materialize_count,
+        allocation->pool_id, allocation->backing_id,
+        iree_all_bits_set(allocation->flags,
+                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
+            ? "true"
+            : "false",
+        allocation->memory_type, allocation->buffer_usage,
+        allocation->event_count, allocation->wait_count,
+        allocation->materialize_count,
         iree_profile_memory_allocation_open_at_end(allocation) ? "true"
                                                                : "false",
         allocation->first_event_id, allocation->last_event_id,

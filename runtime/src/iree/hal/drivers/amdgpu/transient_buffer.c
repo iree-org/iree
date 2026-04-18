@@ -41,6 +41,12 @@ struct iree_hal_amdgpu_transient_buffer_t {
   // single-owner bookkeeping for reservation release/decommit, not a queue-use
   // lifetime validator; queue operation order is expressed by semaphores.
   iree_atomic_int32_t dealloca_queued;
+
+  // Profiling session id owning |profile_allocation_id|.
+  uint64_t profile_session_id;
+
+  // Session-local profiling allocation id for this queue_alloca lifecycle.
+  uint64_t profile_allocation_id;
 };
 
 static const iree_hal_buffer_vtable_t iree_hal_amdgpu_transient_buffer_vtable;
@@ -256,6 +262,8 @@ iree_status_t iree_hal_amdgpu_transient_buffer_create(
   memset(&buffer->reservation, 0, sizeof(buffer->reservation));
   iree_atomic_store(&buffer->reservation_armed, 0, iree_memory_order_relaxed);
   iree_atomic_store(&buffer->dealloca_queued, 0, iree_memory_order_relaxed);
+  buffer->profile_session_id = 0;
+  buffer->profile_allocation_id = 0;
 
   *out_buffer = &buffer->base;
   IREE_TRACE_ZONE_END(z0);
@@ -265,6 +273,29 @@ iree_status_t iree_hal_amdgpu_transient_buffer_create(
 bool iree_hal_amdgpu_transient_buffer_isa(const iree_hal_buffer_t* buffer) {
   return iree_hal_resource_is(&buffer->resource,
                               &iree_hal_amdgpu_transient_buffer_vtable);
+}
+
+void iree_hal_amdgpu_transient_buffer_set_profile_allocation(
+    iree_hal_buffer_t* base_buffer, uint64_t session_id,
+    uint64_t allocation_id) {
+  iree_hal_amdgpu_transient_buffer_t* buffer =
+      iree_hal_amdgpu_transient_buffer_cast(base_buffer);
+  buffer->profile_session_id = session_id;
+  buffer->profile_allocation_id = allocation_id;
+}
+
+uint64_t iree_hal_amdgpu_transient_buffer_profile_allocation_id(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_amdgpu_transient_buffer_t* buffer =
+      iree_hal_amdgpu_transient_buffer_cast(base_buffer);
+  return buffer->profile_allocation_id;
+}
+
+uint64_t iree_hal_amdgpu_transient_buffer_profile_session_id(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_amdgpu_transient_buffer_t* buffer =
+      iree_hal_amdgpu_transient_buffer_cast(base_buffer);
+  return buffer->profile_session_id;
 }
 
 void iree_hal_amdgpu_transient_buffer_attach_reservation(
@@ -421,6 +452,8 @@ static void iree_hal_amdgpu_transient_buffer_destroy(
                                                        /*death_frontier=*/NULL);
 
   iree_atomic_store(&buffer->dealloca_queued, 0, iree_memory_order_relaxed);
+  buffer->profile_session_id = 0;
+  buffer->profile_allocation_id = 0;
   iree_hal_amdgpu_transient_buffer_pool_release(pool, buffer);
   IREE_TRACE_ZONE_END(z0);
 }

@@ -65,6 +65,12 @@ typedef struct iree_profile_memory_device_t {
   uint64_t buffer_free_count;
   // Synchronous HAL buffer allocations opened and closed in the capture window.
   iree_profile_memory_balance_t buffer_allocation_balance;
+  // Externally-owned HAL buffer import events matched for this device.
+  uint64_t buffer_import_count;
+  // Externally-owned HAL buffer unimport events matched for this device.
+  uint64_t buffer_unimport_count;
+  // Imported external buffer visibility opened and closed in the capture.
+  iree_profile_memory_balance_t buffer_import_balance;
   // Queue alloca events matched for this device.
   uint64_t queue_alloca_count;
   // Queue dealloca events matched for this device.
@@ -82,6 +88,8 @@ typedef enum iree_profile_memory_lifecycle_kind_e {
   IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION = 2,
   // Direct synchronous HAL buffer lifecycle.
   IREE_PROFILE_MEMORY_LIFECYCLE_KIND_BUFFER_ALLOCATION = 3,
+  // Externally-owned HAL buffer import lifecycle.
+  IREE_PROFILE_MEMORY_LIFECYCLE_KIND_IMPORTED_BUFFER = 4,
 } iree_profile_memory_lifecycle_kind_t;
 
 typedef struct iree_profile_memory_pool_t {
@@ -142,6 +150,8 @@ typedef struct iree_profile_memory_allocation_t {
   uint64_t pool_id;
   // Producer-defined backing allocation or slab identifier.
   uint64_t backing_id;
+  // Combined memory-event flags observed for this allocation row.
+  uint32_t flags;
   // HAL memory type bits observed for this allocation.
   uint64_t memory_type;
   // HAL buffer usage bits observed for this allocation.

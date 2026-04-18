@@ -85,6 +85,22 @@ iree_status_t iree_hal_amdgpu_transient_buffer_create(
 // Returns true if |buffer| is an AMDGPU transient wrapper.
 bool iree_hal_amdgpu_transient_buffer_isa(const iree_hal_buffer_t* buffer);
 
+// Tags |buffer| with the profiling identity for its queue_alloca lifecycle.
+//
+// The id is session-local and joins pool-reservation, queue alloca/dealloca,
+// queue-event, and eventual pool-release records for the same transient
+// allocation. The wrapper clears the id when it returns to its pool.
+void iree_hal_amdgpu_transient_buffer_set_profile_allocation(
+    iree_hal_buffer_t* buffer, uint64_t session_id, uint64_t allocation_id);
+
+// Returns the session-local profiling allocation id for |buffer|, or 0.
+uint64_t iree_hal_amdgpu_transient_buffer_profile_allocation_id(
+    iree_hal_buffer_t* buffer);
+
+// Returns the profiling session id owning the allocation id for |buffer|, or 0.
+uint64_t iree_hal_amdgpu_transient_buffer_profile_session_id(
+    iree_hal_buffer_t* buffer);
+
 // Attaches a queue-owned pool reservation to |buffer|.
 //
 // |pool| is borrowed and must outlive the transient buffer. |reservation|

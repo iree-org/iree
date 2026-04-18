@@ -63,6 +63,17 @@ typedef struct iree_hal_amdgpu_slab_provider_t {
   iree_atomic_int64_t total_released;
 } iree_hal_amdgpu_slab_provider_t;
 
+typedef struct iree_hal_amdgpu_slab_handle_t {
+  // HSA allocation byte length used when releasing the slab.
+  iree_device_size_t allocation_size;
+
+  // Profiling session id owning |profile_allocation_id|.
+  uint64_t profile_session_id;
+
+  // Session-local allocation id for the slab acquire/release lifecycle.
+  uint64_t profile_allocation_id;
+} iree_hal_amdgpu_slab_handle_t;
+
 static const iree_hal_slab_provider_vtable_t
     iree_hal_amdgpu_slab_provider_vtable;
 
@@ -80,28 +91,40 @@ iree_hal_amdgpu_slab_provider_const_cast(
   return (const iree_hal_amdgpu_slab_provider_t*)base_provider;
 }
 
-static void iree_hal_amdgpu_slab_provider_record_memory_event(
+static bool iree_hal_amdgpu_slab_provider_record_memory_event(
     iree_hal_amdgpu_slab_provider_t* provider,
-    iree_hal_profile_memory_event_type_t type, const void* backing_ptr,
-    iree_device_size_t length) {
-  if (!iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
-          provider->device)) {
-    return;
+    iree_hal_profile_memory_event_type_t type,
+    iree_hal_amdgpu_slab_handle_t* slab_handle, const void* backing_ptr) {
+  uint64_t session_id = slab_handle->profile_session_id;
+  uint64_t allocation_id = slab_handle->profile_allocation_id;
+  if (type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE) {
+    allocation_id =
+        iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+            provider->device, &session_id);
+    if (allocation_id == 0) return false;
+  } else if (allocation_id == 0) {
+    return false;
   }
 
   iree_hal_profile_memory_event_t event =
       iree_hal_profile_memory_event_default();
   event.type = type;
-  event.allocation_id = (uint64_t)(uintptr_t)backing_ptr;
+  event.allocation_id = allocation_id;
   event.pool_id = (uint64_t)(uintptr_t)provider;
   event.backing_id = (uint64_t)(uintptr_t)backing_ptr;
   event.physical_device_ordinal = provider->physical_device_ordinal;
   event.memory_type = provider->memory_type;
   event.buffer_usage = provider->supported_usage;
-  event.length = length;
+  event.length = slab_handle->allocation_size;
   event.alignment = provider->allocation_alignment;
-  iree_hal_amdgpu_logical_device_record_profile_memory_event(provider->device,
-                                                             &event);
+  const bool recorded =
+      iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+          provider->device, session_id, &event);
+  if (recorded && type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE) {
+    slab_handle->profile_session_id = session_id;
+    slab_handle->profile_allocation_id = allocation_id;
+  }
+  return recorded;
 }
 
 IREE_API_EXPORT iree_status_t
@@ -295,10 +318,20 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
                 (uint64_t)min_length, (uint64_t)provider->allocation_granule));
   }
 
+  iree_hal_amdgpu_slab_handle_t* slab_handle = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      provider->host_allocator, sizeof(*slab_handle), (void**)&slab_handle);
+  if (iree_status_is_ok(status)) {
+    memset(slab_handle, 0, sizeof(*slab_handle));
+    slab_handle->allocation_size = allocation_size;
+  }
+
   void* base_ptr = NULL;
-  iree_status_t status = iree_hsa_amd_memory_pool_allocate(
-      IREE_LIBHSA(provider->libhsa), provider->memory_pool,
-      (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &base_ptr);
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_amd_memory_pool_allocate(
+        IREE_LIBHSA(provider->libhsa), provider->memory_pool,
+        (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &base_ptr);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hsa_amd_agents_allow_access(
         IREE_LIBHSA(provider->libhsa),
@@ -313,16 +346,19 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
     // be larger due to runtime granule rounding, but exposing that padding here
     // would incorrectly inflate HAL buffer byte lengths in pass-through pools.
     out_slab->length = min_length;
-    out_slab->provider_handle = allocation_size;
+    out_slab->provider_handle = (uint64_t)(uintptr_t)slab_handle;
     iree_hal_memory_trace_alloc(&provider->trace, base_ptr, allocation_size);
     iree_atomic_fetch_add(&provider->total_acquired, 1,
                           iree_memory_order_relaxed);
     iree_hal_amdgpu_slab_provider_record_memory_event(
-        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE, base_ptr,
-        allocation_size);
+        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE, slab_handle,
+        base_ptr);
   } else if (base_ptr) {
     IREE_IGNORE_ERROR(
         iree_hsa_amd_memory_pool_free(IREE_LIBHSA(provider->libhsa), base_ptr));
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(provider->host_allocator, slab_handle);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -336,12 +372,15 @@ static void iree_hal_amdgpu_slab_provider_release_slab(
       iree_hal_amdgpu_slab_provider_cast(base_provider);
   IREE_TRACE_ZONE_BEGIN(z0);
   if (slab->base_ptr) {
+    iree_hal_amdgpu_slab_handle_t* slab_handle =
+        (iree_hal_amdgpu_slab_handle_t*)(uintptr_t)slab->provider_handle;
     iree_hal_amdgpu_slab_provider_record_memory_event(
-        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE,
-        slab->base_ptr, (iree_device_size_t)slab->provider_handle);
+        provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE, slab_handle,
+        slab->base_ptr);
     iree_hal_memory_trace_free(&provider->trace, slab->base_ptr);
     IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
         IREE_LIBHSA(provider->libhsa), slab->base_ptr));
+    iree_allocator_free(provider->host_allocator, slab_handle);
     iree_atomic_fetch_add(&provider->total_released, 1,
                           iree_memory_order_relaxed);
   }

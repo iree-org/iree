@@ -13,7 +13,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 6
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 7
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -712,36 +712,40 @@ static iree_status_t iree_profile_export_process_memory_event_records(
     iree_profile_fprint_json_string(
         file, iree_make_cstring_view(
                   iree_profile_memory_event_type_name(memory_event.type)));
-    fprintf(file,
-            ",\"event_type_value\":%u,\"flags\":%u,\"result\":%u"
-            ",\"host_time_ns\":%" PRId64 ",\"allocation_id\":%" PRIu64
-            ",\"host_time_domain\":\"iree_host_time_ns\""
-            ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
-            ",\"submission_id\":%" PRIu64
-            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-            ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
-            ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
-            ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64
-            ",\"pool_stats_available\":%s"
-            ",\"pool_bytes_reserved\":%" PRIu64 ",\"pool_bytes_free\":%" PRIu64
-            ",\"pool_bytes_committed\":%" PRIu64
-            ",\"pool_budget_limit\":%" PRIu64
-            ",\"pool_reservation_count\":%u"
-            ",\"pool_slab_count\":%u}\n",
-            memory_event.type, memory_event.flags, memory_event.result,
-            memory_event.host_time_ns, memory_event.allocation_id,
-            memory_event.pool_id, memory_event.backing_id,
-            memory_event.submission_id, memory_event.physical_device_ordinal,
-            memory_event.queue_ordinal, memory_event.frontier_entry_count,
-            memory_event.memory_type, memory_event.buffer_usage,
-            memory_event.offset, memory_event.length, memory_event.alignment,
-            iree_all_bits_set(memory_event.flags,
-                              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS)
-                ? "true"
-                : "false",
-            memory_event.pool_bytes_reserved, memory_event.pool_bytes_free,
-            memory_event.pool_bytes_committed, memory_event.pool_budget_limit,
-            memory_event.pool_reservation_count, memory_event.pool_slab_count);
+    fprintf(
+        file,
+        ",\"event_type_value\":%u,\"flags\":%u,\"result\":%u"
+        ",\"host_time_ns\":%" PRId64 ",\"allocation_id\":%" PRIu64
+        ",\"host_time_domain\":\"iree_host_time_ns\""
+        ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
+        ",\"submission_id\":%" PRIu64
+        ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+        ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
+        ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
+        ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64
+        ",\"externally_owned\":%s,\"pool_stats_available\":%s"
+        ",\"pool_bytes_reserved\":%" PRIu64 ",\"pool_bytes_free\":%" PRIu64
+        ",\"pool_bytes_committed\":%" PRIu64 ",\"pool_budget_limit\":%" PRIu64
+        ",\"pool_reservation_count\":%u"
+        ",\"pool_slab_count\":%u}\n",
+        memory_event.type, memory_event.flags, memory_event.result,
+        memory_event.host_time_ns, memory_event.allocation_id,
+        memory_event.pool_id, memory_event.backing_id,
+        memory_event.submission_id, memory_event.physical_device_ordinal,
+        memory_event.queue_ordinal, memory_event.frontier_entry_count,
+        memory_event.memory_type, memory_event.buffer_usage,
+        memory_event.offset, memory_event.length, memory_event.alignment,
+        iree_all_bits_set(memory_event.flags,
+                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
+            ? "true"
+            : "false",
+        iree_all_bits_set(memory_event.flags,
+                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS)
+            ? "true"
+            : "false",
+        memory_event.pool_bytes_reserved, memory_event.pool_bytes_free,
+        memory_event.pool_bytes_committed, memory_event.pool_budget_limit,
+        memory_event.pool_reservation_count, memory_event.pool_slab_count);
   }
   return status;
 }

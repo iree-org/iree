@@ -86,6 +86,10 @@ static void AppendMemoryEvent(std::vector<uint8_t>* payload,
       event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION;
       event.submission_id = event_id;
       break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT:
+      event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED;
+      break;
     default:
       break;
   }
@@ -362,6 +366,38 @@ TEST(ProfileMemoryTest, RecordsPoolStatSnapshots) {
   EXPECT_EQ(1u, pool->pool_reservation_high_water_count);
   EXPECT_EQ(1u, pool->pool_slab_count);
   EXPECT_EQ(1u, pool->pool_slab_high_water_count);
+
+  iree_profile_memory_context_deinitialize(&context);
+}
+
+TEST(ProfileMemoryTest, SeparatesImportedBufferBytes) {
+  std::vector<uint8_t> payload;
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT,
+                    1, 11, 0, 4096);
+  AppendMemoryEvent(&payload,
+                    IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT, 2, 11,
+                    0, 4096);
+  iree_hal_profile_file_record_t chunk = MakeMemoryChunk(payload);
+
+  iree_profile_memory_context_t context;
+  iree_profile_memory_context_initialize(iree_allocator_system(), &context);
+  IREE_ASSERT_OK(iree_profile_memory_context_accumulate_record(
+      &context, &chunk, IREE_SV("*"), -1, false, nullptr));
+
+  ASSERT_EQ(1u, context.device_count);
+  const iree_profile_memory_device_t* device = &context.devices[0];
+  EXPECT_EQ(1u, device->buffer_import_count);
+  EXPECT_EQ(1u, device->buffer_unimport_count);
+  EXPECT_EQ(0u, device->buffer_allocation_balance.total_open_count);
+  EXPECT_EQ(0u, device->buffer_import_balance.current_bytes);
+  EXPECT_EQ(4096u, device->buffer_import_balance.high_water_bytes);
+
+  ASSERT_EQ(1u, context.allocation_count);
+  const iree_profile_memory_allocation_t* allocation = &context.allocations[0];
+  EXPECT_EQ(IREE_PROFILE_MEMORY_LIFECYCLE_KIND_IMPORTED_BUFFER,
+            allocation->kind);
+  EXPECT_TRUE(iree_all_bits_set(
+      allocation->flags, IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED));
 
   iree_profile_memory_context_deinitialize(&context);
 }

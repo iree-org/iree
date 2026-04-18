@@ -945,6 +945,12 @@ enum iree_hal_profile_memory_event_type_e {
 
   // Synchronous HAL buffer free.
   IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE = 10u,
+
+  // Device-visible externally-owned buffer imported into the HAL.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_IMPORT = 11u,
+
+  // Device-visible externally-owned buffer released from the HAL.
+  IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_UNIMPORT = 12u,
 };
 
 // Bitfield specifying properties of one memory lifecycle event.
@@ -966,16 +972,22 @@ enum iree_hal_profile_memory_event_flag_bits_t {
 
   // Event carries an atomic pool-stat snapshot.
   IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS = 1u << 4,
+
+  // Event describes memory whose backing allocation is externally owned.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED = 1u << 5,
 };
 
 // Host-timestamped memory lifecycle event.
 //
 // Memory events describe allocations, reservations, and queue-visible
 // allocation operations. The timestamp is in IREE host monotonic time, not a
-// device clock domain. Producer-defined ids are stable only within one profile
-// session and are intended for joining records in the same bundle. Pool-stat
-// snapshots, when present, describe the pool state after the event's
-// producer-visible mutation.
+// device clock domain. |allocation_id| is a producer-defined session-local
+// lifecycle identifier and is the primary join key for memory events. |pool_id|
+// and |backing_id| are producer-defined implementation identifiers used for
+// drilldown; they may be raw addresses, provider handles, or driver objects and
+// must not be treated as allocation lifecycle identities. Pool-stat snapshots,
+// when present, describe the pool state after the event's producer-visible
+// mutation.
 typedef struct iree_hal_profile_memory_event_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
@@ -989,11 +1001,11 @@ typedef struct iree_hal_profile_memory_event_t {
   uint64_t event_id;
   // IREE monotonic host timestamp in nanoseconds.
   int64_t host_time_ns;
-  // Producer-defined allocation identifier for related memory events.
+  // Producer-defined session-local allocation lifecycle identifier.
   uint64_t allocation_id;
-  // Producer-defined pool or provider identifier for related memory events.
+  // Producer-defined pool or provider implementation identifier.
   uint64_t pool_id;
-  // Producer-defined backing allocation or slab identifier.
+  // Producer-defined backing allocation, address, or slab identifier.
   uint64_t backing_id;
   // Queue submission epoch associated with this event, or 0 when not queued.
   uint64_t submission_id;
