@@ -601,34 +601,39 @@ static iree_status_t iree_profile_model_process_clock_records(
   return status;
 }
 
+typedef iree_status_t (*iree_profile_model_chunk_processor_fn_t)(
+    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record);
+
+typedef struct iree_profile_model_chunk_route_t {
+  // Profile chunk content type handled by this route.
+  iree_string_view_t content_type;
+  // Processor used to add the chunk's metadata rows to the model.
+  iree_profile_model_chunk_processor_fn_t process;
+} iree_profile_model_chunk_route_t;
+
 iree_status_t iree_profile_model_process_metadata_record(
     iree_profile_model_t* model, const iree_hal_profile_file_record_t* record) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
     return iree_ok_status();
   }
-  if (iree_string_view_equal(record->content_type,
-                             IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
-    return iree_profile_model_process_queue_records(model, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
-    return iree_profile_model_process_executable_records(model, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-    return iree_profile_model_process_export_records(model, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
-    return iree_profile_model_process_command_buffer_records(model, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
-    return iree_profile_model_process_command_operation_records(model, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
-    return iree_profile_model_process_clock_records(model, record);
+  const iree_profile_model_chunk_route_t routes[] = {
+      {IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES,
+       iree_profile_model_process_queue_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES,
+       iree_profile_model_process_executable_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
+       iree_profile_model_process_export_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS,
+       iree_profile_model_process_command_buffer_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS,
+       iree_profile_model_process_command_operation_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS,
+       iree_profile_model_process_clock_records},
+  };
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(routes); ++i) {
+    if (iree_string_view_equal(record->content_type, routes[i].content_type)) {
+      return routes[i].process(model, record);
+    }
   }
   return iree_ok_status();
 }
