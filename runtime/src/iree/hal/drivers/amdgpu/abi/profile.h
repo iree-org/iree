@@ -33,13 +33,13 @@ typedef struct iree_hal_amdgpu_profile_dispatch_event_t {
   uint32_t record_length;
   // Flags describing how the dispatch was produced.
   iree_hal_amdgpu_profile_dispatch_event_flags_t flags;
-  // Producer-defined event identifier unique within the chunk stream.
+  // Producer-defined event identifier unique within the dispatch event stream.
   uint64_t event_id;
   // Queue submission epoch containing this dispatch.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 for direct queue dispatch.
+  // Session-local command-buffer identifier, or 0 for direct queue dispatch.
   uint64_t command_buffer_id;
-  // Process-local executable identifier, or 0 when unavailable.
+  // Session-local executable identifier, or 0 when unavailable.
   uint64_t executable_id;
   // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
   uint32_t command_index;
@@ -100,11 +100,12 @@ typedef struct iree_hal_amdgpu_profile_queue_device_event_t {
   uint32_t flags;
   // Reserved for future queue device event fields; must be zero.
   uint32_t reserved0;
-  // Producer-defined event identifier unique within the chunk stream.
+  // Producer-defined event identifier unique within the queue device event
+  // stream.
   uint64_t event_id;
   // Queue submission epoch containing this device event.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when not applicable.
+  // Session-local command-buffer identifier, or 0 when not applicable.
   uint64_t command_buffer_id;
   // Producer-defined allocation identifier, or 0 when not applicable.
   uint64_t allocation_id;

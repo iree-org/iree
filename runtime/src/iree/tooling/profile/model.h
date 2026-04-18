@@ -15,7 +15,7 @@ extern "C" {
 
 // Executable export metadata indexed by executable id and export ordinal.
 typedef struct iree_profile_model_export_t {
-  // Producer-local executable identifier owning this export.
+  // Session-local executable identifier owning this export.
   uint64_t executable_id;
   // Flags specifying which optional export fields are populated.
   iree_hal_profile_executable_export_flags_t flags;
@@ -36,13 +36,13 @@ typedef struct iree_profile_model_export_t {
   iree_string_view_t name;
 } iree_profile_model_export_t;
 
-// Executable metadata indexed by producer-local executable id.
+// Executable metadata indexed by session-local executable id.
 typedef struct iree_profile_model_executable_t {
   // Immutable executable metadata record borrowed from the profile bundle.
   iree_hal_profile_executable_record_t record;
 } iree_profile_model_executable_t;
 
-// Command-buffer metadata indexed by producer-local command-buffer id.
+// Command-buffer metadata indexed by session-local command-buffer id.
 typedef struct iree_profile_model_command_buffer_t {
   // Immutable command-buffer metadata record borrowed from the profile bundle.
   iree_hal_profile_command_buffer_record_t record;
@@ -71,6 +71,12 @@ typedef struct iree_profile_model_queue_device_event_t {
   // Immutable queue device event record copied from the profile bundle.
   iree_hal_profile_queue_device_event_t record;
 } iree_profile_model_queue_device_event_t;
+
+// Host-timestamped execution span retained by the active profile query.
+typedef struct iree_profile_model_host_execution_event_t {
+  // Immutable host execution event record copied from the profile bundle.
+  iree_hal_profile_host_execution_event_t record;
+} iree_profile_model_host_execution_event_t;
 
 // Per-physical-device clock-correlation state.
 typedef struct iree_profile_model_device_t {
@@ -136,6 +142,12 @@ typedef struct iree_profile_model_t {
   iree_host_size_t queue_device_event_count;
   // Capacity of |queue_device_events| in entries.
   iree_host_size_t queue_device_event_capacity;
+  // Dynamic array of query-selected host execution span rows.
+  iree_profile_model_host_execution_event_t* host_execution_events;
+  // Number of valid entries in |host_execution_events|.
+  iree_host_size_t host_execution_event_count;
+  // Capacity of |host_execution_events| in entries.
+  iree_host_size_t host_execution_event_capacity;
   // Total queue operation records parsed before filtering.
   uint64_t total_queue_event_count;
   // Queue operation records matched by the active filter.
@@ -144,6 +156,10 @@ typedef struct iree_profile_model_t {
   uint64_t total_queue_device_event_count;
   // Device-timestamped queue operation records matched by the active filter.
   uint64_t matched_queue_device_event_count;
+  // Host execution span records parsed before filtering.
+  uint64_t total_host_execution_event_count;
+  // Host execution span records matched by the active filter.
+  uint64_t matched_host_execution_event_count;
 } iree_profile_model_t;
 
 // Initializes |out_model| for profile metadata and query-selected event rows.
@@ -218,6 +234,11 @@ iree_status_t iree_profile_model_process_queue_event_records(
 
 // Processes device-timestamped queue operation records into |model|.
 iree_status_t iree_profile_model_process_queue_device_event_records(
+    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
+    iree_string_view_t filter, int64_t id_filter);
+
+// Processes host execution span records into |model|.
+iree_status_t iree_profile_model_process_host_execution_event_records(
     iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
     iree_string_view_t filter, int64_t id_filter);
 

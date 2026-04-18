@@ -209,11 +209,11 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t private_segment_size;
   // AQL dispatch packet group segment size field.
   uint32_t group_segment_size;
-  // Producer-local profile executable id used for event attribution.
-  uint32_t executable_id;
+  // Session-local profile executable id used for event attribution.
+  uint64_t executable_id;
 } iree_hal_amdgpu_command_buffer_dispatch_command_t;
 IREE_AMDGPU_STATIC_ASSERT(
-    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 72,
+    sizeof(iree_hal_amdgpu_command_buffer_dispatch_command_t) == 80,
     "dispatch command size must remain qword aligned");
 
 // Fill command record.

@@ -454,6 +454,40 @@ static iree_status_t iree_profile_summary_process_queue_device_event_records(
       &summary->queue_device_event_record_count);
 }
 
+static iree_status_t iree_profile_summary_process_host_execution_event_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_host_execution_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_host_execution_event_t event;
+    memcpy(&event, typed_record.contents.data, sizeof(event));
+    ++summary->host_execution_event_record_count;
+    if (event.start_host_time_ns < 0 ||
+        event.end_host_time_ns < event.start_host_time_ns) {
+      ++summary->invalid_host_execution_event_record_count;
+      continue;
+    }
+    const uint64_t duration_ns =
+        (uint64_t)(event.end_host_time_ns - event.start_host_time_ns);
+    if (duration_ns > UINT64_MAX - summary->total_host_execution_duration_ns) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "profile host execution duration counter overflowed");
+    }
+    summary->total_host_execution_duration_ns += duration_ns;
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_event_relationship_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -551,6 +585,12 @@ iree_status_t iree_profile_summary_process_record(
     ++summary->queue_device_event_chunk_count;
     return iree_profile_summary_process_queue_device_event_records(summary,
                                                                    record);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
+    ++summary->host_execution_event_chunk_count;
+    return iree_profile_summary_process_host_execution_event_records(summary,
+                                                                     record);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
@@ -651,33 +691,35 @@ static void iree_profile_print_summary_text(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
-  fprintf(
-      file,
-      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-      " executable_code_objects=%" PRIu64
-      " executable_code_object_loads=%" PRIu64 " executable_exports=%" PRIu64
-      " command_buffers=%" PRIu64 " command_operations=%" PRIu64
-      " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
-      " queue_events=%" PRIu64 " queue_device_events=%" PRIu64
-      " memory_events=%" PRIu64 " event_relationships=%" PRIu64
-      " counter_sets=%" PRIu64 " counters=%" PRIu64 " counter_samples=%" PRIu64
-      " executable_traces=%" PRIu64 " unknown=%" PRIu64 " truncated=%" PRIu64
-      "\n",
-      summary->device_chunk_count, summary->queue_chunk_count,
-      summary->executable_chunk_count,
-      summary->executable_code_object_chunk_count,
-      summary->executable_code_object_load_chunk_count,
-      summary->executable_export_chunk_count,
-      summary->command_buffer_chunk_count,
-      summary->command_operation_chunk_count,
-      summary->clock_correlation_chunk_count,
-      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
-      summary->queue_device_event_chunk_count,
-      summary->memory_event_chunk_count,
-      summary->event_relationship_chunk_count, summary->counter_set_chunk_count,
-      summary->counter_chunk_count, summary->counter_sample_chunk_count,
-      summary->executable_trace_chunk_count, summary->unknown_chunk_count,
-      summary->truncated_chunk_count);
+  fprintf(file,
+          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+          " executable_code_objects=%" PRIu64
+          " executable_code_object_loads=%" PRIu64
+          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
+          " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
+          " queue_device_events=%" PRIu64 " host_execution_events=%" PRIu64
+          " memory_events=%" PRIu64 " event_relationships=%" PRIu64
+          " counter_sets=%" PRIu64 " counters=%" PRIu64
+          " counter_samples=%" PRIu64 " executable_traces=%" PRIu64
+          " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
+          summary->device_chunk_count, summary->queue_chunk_count,
+          summary->executable_chunk_count,
+          summary->executable_code_object_chunk_count,
+          summary->executable_code_object_load_chunk_count,
+          summary->executable_export_chunk_count,
+          summary->command_buffer_chunk_count,
+          summary->command_operation_chunk_count,
+          summary->clock_correlation_chunk_count,
+          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+          summary->queue_device_event_chunk_count,
+          summary->host_execution_event_chunk_count,
+          summary->memory_event_chunk_count,
+          summary->event_relationship_chunk_count,
+          summary->counter_set_chunk_count, summary->counter_chunk_count,
+          summary->counter_sample_chunk_count,
+          summary->executable_trace_chunk_count, summary->unknown_chunk_count,
+          summary->truncated_chunk_count);
   fprintf(file,
           "metadata_records: executables=%" PRIu64
           " executable_code_objects=%" PRIu64
@@ -692,10 +734,16 @@ static void iree_profile_print_summary_text(
           summary->command_operation_record_count);
   fprintf(file,
           "event_records: queue_events=%" PRIu64 " queue_device_events=%" PRIu64
-          " memory_events=%" PRIu64 " event_relationships=%" PRIu64
-          " counter_samples=%" PRIu64 " executable_traces=%" PRIu64 "\n",
+          " host_execution_events=%" PRIu64
+          " invalid_host_execution_events=%" PRIu64
+          " host_execution_duration_ns=%" PRIu64 " memory_events=%" PRIu64
+          " event_relationships=%" PRIu64 " counter_samples=%" PRIu64
+          " executable_traces=%" PRIu64 "\n",
           summary->queue_event_record_count,
           summary->queue_device_event_record_count,
+          summary->host_execution_event_record_count,
+          summary->invalid_host_execution_event_record_count,
+          summary->total_host_execution_duration_ns,
           summary->memory_event_record_count,
           summary->event_relationship_record_count,
           summary->counter_sample_record_count,
@@ -802,6 +850,10 @@ static void iree_profile_print_summary_jsonl(
       ",\"queue_event_records\":%" PRIu64
       ",\"queue_device_event_chunks\":%" PRIu64
       ",\"queue_device_event_records\":%" PRIu64
+      ",\"host_execution_event_chunks\":%" PRIu64
+      ",\"host_execution_event_records\":%" PRIu64
+      ",\"invalid_host_execution_event_records\":%" PRIu64
+      ",\"total_host_execution_duration_ns\":%" PRIu64
       ",\"memory_event_chunks\":%" PRIu64 ",\"memory_event_records\":%" PRIu64
       ",\"event_relationship_chunks\":%" PRIu64
       ",\"event_relationship_records\":%" PRIu64
@@ -833,6 +885,10 @@ static void iree_profile_print_summary_jsonl(
       summary->queue_event_record_count,
       summary->queue_device_event_chunk_count,
       summary->queue_device_event_record_count,
+      summary->host_execution_event_chunk_count,
+      summary->host_execution_event_record_count,
+      summary->invalid_host_execution_event_record_count,
+      summary->total_host_execution_duration_ns,
       summary->memory_event_chunk_count, summary->memory_event_record_count,
       summary->event_relationship_chunk_count,
       summary->event_relationship_record_count,

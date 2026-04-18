@@ -449,11 +449,6 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
 
   const uint64_t executable_id = registry->next_executable_id;
   iree_status_t status = iree_ok_status();
-  if (IREE_UNLIKELY(executable_id > UINT32_MAX)) {
-    status = iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "profile executable id exceeds command buffer storage");
-  }
 
   if (iree_status_is_ok(status) && registry->executable_record_count + 1 >
                                        registry->executable_record_capacity) {

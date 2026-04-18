@@ -13,7 +13,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 3
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 4
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -560,6 +560,83 @@ static iree_status_t iree_profile_export_process_queue_device_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_export_process_host_execution_event_records(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_host_execution_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_host_execution_event_t host_event;
+    memcpy(&host_event, typed_record.contents.data, sizeof(host_event));
+    const bool is_valid =
+        host_event.start_host_time_ns >= 0 &&
+        host_event.end_host_time_ns >= host_event.start_host_time_ns;
+    const int64_t duration_ns =
+        is_valid ? host_event.end_host_time_ns - host_event.start_host_time_ns
+                 : 0;
+    iree_string_view_t key = iree_string_view_empty();
+    char numeric_buffer[128];
+    const bool has_dispatch_key = host_event.executable_id != 0 &&
+                                  host_event.export_ordinal != UINT32_MAX;
+    if (has_dispatch_key) {
+      status = iree_profile_model_resolve_dispatch_key(
+          model, host_event.physical_device_ordinal, host_event.executable_id,
+          host_event.export_ordinal, numeric_buffer, sizeof(numeric_buffer),
+          &key);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_profile_export_print_prefix(file, "host_execution_event",
+                                       record_index);
+      fprintf(file,
+              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+              ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
+              ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+              ",\"command_index\":%u,\"executable_id\":%" PRIu64
+              ",\"export_ordinal\":%u,\"allocation_id\":%" PRIu64 ",\"op\":",
+              host_event.physical_device_ordinal, host_event.queue_ordinal,
+              host_event.stream_id, host_event.event_id,
+              host_event.submission_id, host_event.command_buffer_id,
+              host_event.command_index, host_event.executable_id,
+              host_event.export_ordinal, host_event.allocation_id);
+      iree_profile_fprint_json_string(
+          file, iree_make_cstring_view(
+                    iree_profile_queue_event_type_name(host_event.type)));
+      fprintf(file, ",\"key\":");
+      if (has_dispatch_key) {
+        iree_profile_fprint_json_string(file, key);
+      } else {
+        fprintf(file, "null");
+      }
+      fprintf(file,
+              ",\"type_value\":%u,\"flags\":%u,\"status_code\":%u"
+              ",\"workgroup_count\":[%u,%u,%u]"
+              ",\"workgroup_size\":[%u,%u,%u]"
+              ",\"host_time_domain\":\"iree_host_time_ns\""
+              ",\"start_host_time_ns\":%" PRId64
+              ",\"end_host_time_ns\":%" PRId64 ",\"duration_ns\":%" PRId64
+              ",\"valid\":%s"
+              ",\"payload_length\":%" PRIu64 ",\"operation_count\":%u}\n",
+              host_event.type, host_event.flags, host_event.status_code,
+              host_event.workgroup_count[0], host_event.workgroup_count[1],
+              host_event.workgroup_count[2], host_event.workgroup_size[0],
+              host_event.workgroup_size[1], host_event.workgroup_size[2],
+              host_event.start_host_time_ns, host_event.end_host_time_ns,
+              duration_ns, is_valid ? "true" : "false",
+              host_event.payload_length, host_event.operation_count);
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_export_process_queue_event_records(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
@@ -983,6 +1060,11 @@ static iree_status_t iree_profile_export_process_decoded_record(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
     return iree_profile_export_process_queue_device_event_records(
+        model, record, record_index, file);
+  } else if (iree_string_view_equal(
+                 record->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
+    return iree_profile_export_process_host_execution_event_records(
         model, record, record_index, file);
   } else if (iree_string_view_equal(
                  record->content_type,

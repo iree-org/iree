@@ -17,6 +17,7 @@ void iree_profile_model_initialize(iree_allocator_t host_allocator,
 }
 
 void iree_profile_model_deinitialize(iree_profile_model_t* model) {
+  iree_allocator_free(model->host_allocator, model->host_execution_events);
   iree_allocator_free(model->host_allocator, model->queue_device_events);
   iree_allocator_free(model->host_allocator, model->queue_events);
   iree_allocator_free(model->host_allocator, model->devices);
@@ -333,6 +334,24 @@ static iree_status_t iree_profile_model_append_queue_device_event(
   return iree_ok_status();
 }
 
+static iree_status_t iree_profile_model_append_host_execution_event(
+    iree_profile_model_t* model,
+    const iree_hal_profile_host_execution_event_t* record) {
+  if (model->host_execution_event_count + 1 >
+      model->host_execution_event_capacity) {
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        model->host_allocator,
+        iree_max((iree_host_size_t)64, model->host_execution_event_count + 1),
+        sizeof(model->host_execution_events[0]),
+        &model->host_execution_event_capacity,
+        (void**)&model->host_execution_events));
+  }
+  iree_profile_model_host_execution_event_t* event_info =
+      &model->host_execution_events[model->host_execution_event_count++];
+  event_info->record = *record;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_model_process_queue_records(
     iree_profile_model_t* model, const iree_hal_profile_file_record_t* record) {
   iree_profile_typed_record_iterator_t iterator;
@@ -605,6 +624,10 @@ const char* iree_profile_event_relationship_type_name(
       return "queue_submission_dispatch";
     case IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_QUEUE_DEVICE_EVENT:
       return "queue_submission_queue_device_event";
+    case IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_EVENT_HOST_EXECUTION_EVENT:
+      return "queue_event_host_execution_event";
+    case IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_HOST_EXECUTION_EVENT:
+      return "queue_submission_host_execution_event";
     default:
       return "unknown";
   }
@@ -627,31 +650,39 @@ const char* iree_profile_event_endpoint_type_name(
       return "artifact";
     case IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_DEVICE_EVENT:
       return "queue_device_event";
+    case IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_HOST_EXECUTION_EVENT:
+      return "host_execution_event";
     default:
       return "unknown";
   }
 }
 
-static bool iree_profile_model_queue_event_matches(
-    const iree_hal_profile_queue_event_t* event, int64_t id_filter,
-    iree_string_view_t filter) {
-  if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+static bool iree_profile_model_queue_operation_matches(
+    iree_hal_profile_queue_event_type_t type, uint64_t submission_id,
+    int64_t id_filter, iree_string_view_t filter) {
+  if (id_filter >= 0 && submission_id != (uint64_t)id_filter) {
     return false;
   }
   iree_string_view_t type_name =
-      iree_make_cstring_view(iree_profile_queue_event_type_name(event->type));
+      iree_make_cstring_view(iree_profile_queue_event_type_name(type));
   return iree_profile_key_matches(type_name, filter);
 }
 
-static bool iree_profile_model_queue_device_event_matches(
-    const iree_hal_profile_queue_device_event_t* event, int64_t id_filter,
-    iree_string_view_t filter) {
-  if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
-    return false;
+static iree_status_t iree_profile_model_verify_event_queue(
+    const iree_profile_model_t* model, const char* event_kind,
+    uint32_t physical_device_ordinal, uint32_t queue_ordinal,
+    uint64_t stream_id, uint64_t submission_id) {
+  const iree_profile_model_queue_t* queue_info = iree_profile_model_find_queue(
+      model, physical_device_ordinal, queue_ordinal, stream_id);
+  if (!queue_info) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "%s references missing queue metadata "
+                            "device=%u queue=%u stream=%" PRIu64
+                            " submission=%" PRIu64,
+                            event_kind, physical_device_ordinal, queue_ordinal,
+                            stream_id, submission_id);
   }
-  iree_string_view_t type_name =
-      iree_make_cstring_view(iree_profile_queue_event_type_name(event->type));
-  return iree_profile_key_matches(type_name, filter);
+  return iree_ok_status();
 }
 
 iree_status_t iree_profile_model_process_queue_event_records(
@@ -679,19 +710,12 @@ iree_status_t iree_profile_model_process_queue_event_records(
     iree_hal_profile_queue_event_t event;
     memcpy(&event, typed_record.contents.data, sizeof(event));
     ++model->total_queue_event_count;
-    if (iree_profile_model_queue_event_matches(&event, id_filter, filter)) {
+    if (iree_profile_model_queue_operation_matches(
+            event.type, event.submission_id, id_filter, filter)) {
       ++model->matched_queue_event_count;
-      const iree_profile_model_queue_t* queue_info =
-          iree_profile_model_find_queue(model, event.physical_device_ordinal,
-                                        event.queue_ordinal, event.stream_id);
-      if (!queue_info) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "queue event references missing queue metadata "
-            "device=%u queue=%u stream=%" PRIu64 " submission=%" PRIu64,
-            event.physical_device_ordinal, event.queue_ordinal, event.stream_id,
-            event.submission_id);
-      }
+      status = iree_profile_model_verify_event_queue(
+          model, "queue event", event.physical_device_ordinal,
+          event.queue_ordinal, event.stream_id, event.submission_id);
       if (iree_status_is_ok(status)) {
         status = iree_profile_model_append_queue_event(model, &event);
       }
@@ -726,28 +750,59 @@ iree_status_t iree_profile_model_process_queue_device_event_records(
     iree_hal_profile_queue_device_event_t event;
     memcpy(&event, typed_record.contents.data, sizeof(event));
     ++model->total_queue_device_event_count;
-    if (iree_profile_model_queue_device_event_matches(&event, id_filter,
-                                                      filter)) {
+    if (iree_profile_model_queue_operation_matches(
+            event.type, event.submission_id, id_filter, filter)) {
       ++model->matched_queue_device_event_count;
       iree_profile_model_device_t* device = NULL;
       status = iree_profile_model_ensure_device(
           model, event.physical_device_ordinal, &device);
-      const iree_profile_model_queue_t* queue_info = NULL;
       if (iree_status_is_ok(status)) {
-        queue_info =
-            iree_profile_model_find_queue(model, event.physical_device_ordinal,
-                                          event.queue_ordinal, event.stream_id);
-      }
-      if (iree_status_is_ok(status) && !queue_info) {
-        status = iree_make_status(
-            IREE_STATUS_DATA_LOSS,
-            "queue device event references missing queue metadata "
-            "device=%u queue=%u stream=%" PRIu64 " submission=%" PRIu64,
-            event.physical_device_ordinal, event.queue_ordinal, event.stream_id,
-            event.submission_id);
+        status = iree_profile_model_verify_event_queue(
+            model, "queue device event", event.physical_device_ordinal,
+            event.queue_ordinal, event.stream_id, event.submission_id);
       }
       if (iree_status_is_ok(status)) {
         status = iree_profile_model_append_queue_device_event(model, &event);
+      }
+    }
+  }
+  return status;
+}
+
+iree_status_t iree_profile_model_process_host_execution_event_records(
+    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
+    iree_string_view_t filter, int64_t id_filter) {
+  if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
+    return iree_ok_status();
+  }
+  if (!iree_string_view_equal(
+          record->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
+    return iree_ok_status();
+  }
+
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_host_execution_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_host_execution_event_t event;
+    memcpy(&event, typed_record.contents.data, sizeof(event));
+    ++model->total_host_execution_event_count;
+    if (iree_profile_model_queue_operation_matches(
+            event.type, event.submission_id, id_filter, filter)) {
+      ++model->matched_host_execution_event_count;
+      status = iree_profile_model_verify_event_queue(
+          model, "host execution event", event.physical_device_ordinal,
+          event.queue_ordinal, event.stream_id, event.submission_id);
+      if (iree_status_is_ok(status)) {
+        status = iree_profile_model_append_host_execution_event(model, &event);
       }
     }
   }

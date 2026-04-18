@@ -96,6 +96,10 @@ enum iree_hal_profile_chunk_flag_bits_t {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.queue-device-events")
 
+// Content type for an array of iree_hal_profile_host_execution_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.host-execution-events")
+
 // Content type for an array of iree_hal_profile_memory_event_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.memory-events")
@@ -229,14 +233,15 @@ enum iree_hal_profile_executable_flag_bits_t {
 // Session-level executable description.
 //
 // Producers should emit executable records before dispatch event records that
-// reference |executable_id|. The id is a compact producer-local key; consumers
-// should use code-object hashes when present for cross-process correlation.
+// reference |executable_id|. The id is a compact producer-defined key that is
+// unique within the profiling session; consumers should use code-object hashes
+// when present for cross-session or cross-process correlation.
 typedef struct iree_hal_profile_executable_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
   // Flags specifying which optional executable fields are populated.
   iree_hal_profile_executable_flags_t flags;
-  // Producer-local executable identifier referenced by dispatch events.
+  // Session-local executable identifier referenced by dispatch events.
   uint64_t executable_id;
   // Number of export records associated with this executable.
   uint32_t export_count;
@@ -275,9 +280,9 @@ typedef struct iree_hal_profile_executable_code_object_record_t {
   uint32_t record_length;
   // Flags specifying which optional code-object fields are populated.
   iree_hal_profile_executable_code_object_flags_t flags;
-  // Producer-local executable identifier owning this code object.
+  // Session-local executable identifier owning this code object.
   uint64_t executable_id;
-  // Producer-local code-object marker identifier used by hardware traces.
+  // Session-local code-object marker identifier used by hardware traces.
   uint64_t code_object_id;
   // Byte length of the trailing code-object image.
   uint64_t data_length;
@@ -305,9 +310,9 @@ typedef struct iree_hal_profile_executable_code_object_load_record_t {
   uint32_t record_length;
   // Session-local physical device ordinal owning this loaded code object.
   uint32_t physical_device_ordinal;
-  // Producer-local executable identifier owning this code object.
+  // Session-local executable identifier owning this code object.
   uint64_t executable_id;
-  // Producer-local code-object marker identifier used by hardware traces.
+  // Session-local code-object marker identifier used by hardware traces.
   uint64_t code_object_id;
   // Loader-provided code-object load delta used for PC translation.
   int64_t load_delta;
@@ -343,7 +348,7 @@ typedef struct iree_hal_profile_executable_export_record_t {
   uint32_t record_length;
   // Flags specifying which optional export fields are populated.
   iree_hal_profile_executable_export_flags_t flags;
-  // Producer-local executable identifier owning this export.
+  // Session-local executable identifier owning this export.
   uint64_t executable_id;
   // Export ordinal used by dispatch events.
   uint32_t export_ordinal;
@@ -387,7 +392,7 @@ typedef struct iree_hal_profile_command_buffer_record_t {
   uint32_t record_length;
   // Flags specifying which optional command-buffer fields are populated.
   iree_hal_profile_command_buffer_flags_t flags;
-  // Producer-local command-buffer identifier referenced by dispatch events.
+  // Session-local command-buffer identifier referenced by dispatch events.
   uint64_t command_buffer_id;
   // HAL command-buffer mode bits used to create the command buffer.
   uint64_t mode;
@@ -484,13 +489,13 @@ typedef struct iree_hal_profile_command_operation_record_t {
   iree_hal_profile_command_operation_flags_t flags;
   // Command ordinal within |command_buffer_id|.
   uint32_t command_index;
-  // Process-local command-buffer identifier.
+  // Session-local command-buffer identifier.
   uint64_t command_buffer_id;
   // Producer-local command block ordinal containing this operation.
   uint32_t block_ordinal;
   // Command ordinal within |block_ordinal|.
   uint32_t block_command_ordinal;
-  // Process-local executable identifier, or 0 when not applicable.
+  // Session-local executable identifier, or 0 when not applicable.
   uint64_t executable_id;
   // Executable export ordinal, or UINT32_MAX when not applicable.
   uint32_t export_ordinal;
@@ -617,13 +622,13 @@ typedef struct iree_hal_profile_dispatch_event_t {
   uint32_t record_length;
   // Flags describing how the dispatch was produced.
   iree_hal_profile_dispatch_event_flags_t flags;
-  // Producer-defined event identifier unique within the chunk stream.
+  // Producer-defined event identifier unique within the dispatch event stream.
   uint64_t event_id;
   // Queue submission epoch containing this dispatch.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 for direct queue dispatch.
+  // Session-local command-buffer identifier, or 0 for direct queue dispatch.
   uint64_t command_buffer_id;
-  // Process-local executable identifier, or 0 when unavailable.
+  // Session-local executable identifier, or 0 when unavailable.
   uint64_t executable_id;
   // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
   uint32_t command_index;
@@ -735,7 +740,7 @@ typedef struct iree_hal_profile_queue_event_t {
   int64_t host_time_ns;
   // Queue submission epoch associated with this operation, or 0 when absent.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when not applicable.
+  // Session-local command-buffer identifier, or 0 when not applicable.
   uint64_t command_buffer_id;
   // Producer-defined allocation identifier, or 0 when not applicable.
   uint64_t allocation_id;
@@ -786,11 +791,12 @@ typedef struct iree_hal_profile_queue_device_event_t {
   iree_hal_profile_queue_event_flags_t flags;
   // Reserved for future queue device event fields; must be zero.
   uint32_t reserved0;
-  // Producer-defined event identifier unique within the chunk stream.
+  // Producer-defined event identifier unique within the queue device event
+  // stream.
   uint64_t event_id;
   // Queue submission epoch containing this device event.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when not applicable.
+  // Session-local command-buffer identifier, or 0 when not applicable.
   uint64_t command_buffer_id;
   // Producer-defined allocation identifier, or 0 when not applicable.
   uint64_t allocation_id;
@@ -820,6 +826,88 @@ iree_hal_profile_queue_device_event_default(void) {
   record.record_length = sizeof(record);
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one host execution span.
+typedef uint32_t iree_hal_profile_host_execution_event_flags_t;
+enum iree_hal_profile_host_execution_event_flag_bits_t {
+  IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_NONE = 0u,
+
+  // Execution was produced by a reusable command buffer.
+  IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER = 1u << 0,
+
+  // Workgroup counts were loaded indirectly before execution.
+  IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS = 1u << 1,
+
+  // Execution completed from a deferred callback or worker rather than inline
+  // in the queue submission call.
+  IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_DEFERRED = 1u << 2,
+};
+
+// Host-timestamped queue operation execution span.
+//
+// Host execution events describe complete spans observed in IREE's host clock
+// domain. CPU/local producers use these for dispatch, command-buffer execute,
+// transfer, allocation, and host-call work that is not device-timestamped.
+// Producers must not emit partial in-flight spans as complete records.
+typedef struct iree_hal_profile_host_execution_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Kind of queue operation represented by this span.
+  iree_hal_profile_queue_event_type_t type;
+  // Flags describing host execution properties.
+  iree_hal_profile_host_execution_event_flags_t flags;
+  // IREE status code for terminal execution result, or UINT32_MAX if unknown.
+  uint32_t status_code;
+  // Producer-defined event identifier unique within the host execution event
+  // stream.
+  uint64_t event_id;
+  // Queue submission epoch containing this span, or 0 when absent.
+  uint64_t submission_id;
+  // Session-local command-buffer identifier, or 0 when not applicable.
+  uint64_t command_buffer_id;
+  // Session-local executable identifier, or 0 when not applicable.
+  uint64_t executable_id;
+  // Producer-defined allocation identifier, or 0 when not applicable.
+  uint64_t allocation_id;
+  // Producer-defined stream identifier matching the queue metadata record.
+  uint64_t stream_id;
+  // Session-local physical device ordinal associated with this span.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal associated with this span, or UINT32_MAX.
+  uint32_t queue_ordinal;
+  // Command ordinal within a command buffer, or UINT32_MAX when absent.
+  uint32_t command_index;
+  // Executable export ordinal, or UINT32_MAX when absent.
+  uint32_t export_ordinal;
+  // Workgroup counts submitted for dispatch-like spans.
+  uint32_t workgroup_count[3];
+  // Workgroup sizes submitted for dispatch-like spans.
+  uint32_t workgroup_size[3];
+  // IREE monotonic host timestamp when execution started.
+  int64_t start_host_time_ns;
+  // IREE monotonic host timestamp when execution completed.
+  int64_t end_host_time_ns;
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+  // Number of encoded payload operations represented by this span.
+  uint32_t operation_count;
+  // Reserved for future host execution fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_host_execution_event_t;
+
+// Returns a default host-timestamped execution span record.
+static inline iree_hal_profile_host_execution_event_t
+iree_hal_profile_host_execution_event_default(void) {
+  iree_hal_profile_host_execution_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.status_code = UINT32_MAX;
+  record.physical_device_ordinal = UINT32_MAX;
+  record.queue_ordinal = UINT32_MAX;
+  record.command_index = UINT32_MAX;
+  record.export_ordinal = UINT32_MAX;
   return record;
 }
 
@@ -947,9 +1035,30 @@ enum iree_hal_profile_event_relationship_type_e {
   // A queue submission contains a device-side queue operation event.
   IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_QUEUE_DEVICE_EVENT =
       2u,
+
+  // A host queue event corresponds to a host execution span.
+  IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_EVENT_HOST_EXECUTION_EVENT =
+      3u,
+
+  // A queue submission contains a host execution span.
+  IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_HOST_EXECUTION_EVENT =
+      4u,
 };
 
 // Type of profile entity referenced by a relationship endpoint.
+//
+// Endpoint identifiers use the table below:
+// - QUEUE_SUBMISSION: primary id is the queue submission id.
+// - QUEUE_EVENT: primary id is iree_hal_profile_queue_event_t.event_id.
+// - DISPATCH_EVENT: primary id is iree_hal_profile_dispatch_event_t.event_id.
+// - COMMAND_OPERATION: primary id is command_buffer_id and secondary id is
+//   command_index.
+// - MEMORY_EVENT: primary id is iree_hal_profile_memory_event_t.event_id.
+// - ARTIFACT: primary id is producer-defined artifact id.
+// - QUEUE_DEVICE_EVENT: primary id is
+//   iree_hal_profile_queue_device_event_t.event_id.
+// - HOST_EXECUTION_EVENT: primary id is
+//   iree_hal_profile_host_execution_event_t.event_id.
 typedef uint32_t iree_hal_profile_event_endpoint_type_t;
 enum iree_hal_profile_event_endpoint_type_e {
   IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_NONE = 0u,
@@ -975,6 +1084,9 @@ enum iree_hal_profile_event_endpoint_type_e {
 
   // Device queue event identified by event id.
   IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_DEVICE_EVENT = 7u,
+
+  // Host execution event identified by event id.
+  IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_HOST_EXECUTION_EVENT = 8u,
 };
 
 // Relationship between two profile entities.
@@ -982,12 +1094,19 @@ enum iree_hal_profile_event_endpoint_type_e {
 // Relationship records make cross-record joins explicit in the raw profile
 // bundle. Viewers should use these records for arrows, flows, and drilldown
 // links instead of reconstructing relationships from coincidental matching ids.
+//
+// Relationship ids are producer-defined and unique within the tuple of
+// |physical_device_ordinal|, |queue_ordinal|, and |stream_id| for the profiling
+// session. Endpoint ids follow the endpoint-type table above and are
+// interpreted within the same device/queue/stream tuple unless the endpoint
+// type explicitly names a wider namespace, such as executable ids or
+// command-buffer ids stored in the referenced record.
 typedef struct iree_hal_profile_event_relationship_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
   // Kind of relationship represented by this record.
   iree_hal_profile_event_relationship_type_t type;
-  // Producer-defined relationship id unique within this endpoint scope.
+  // Producer-defined relationship id unique within this stream scope.
   uint64_t relationship_id;
   // Source endpoint kind.
   iree_hal_profile_event_endpoint_type_t source_type;
@@ -1054,11 +1173,12 @@ typedef struct iree_hal_profile_capture_filter_t {
   // Flags selecting which fields below participate in matching.
   iree_hal_profile_capture_filter_flags_t flags;
 
-  // Glob pattern matched with iree_string_view_match_pattern against an
-  // executable export name.
+  // Borrowed glob pattern matched with iree_string_view_match_pattern against
+  // an executable export name. Profile sessions retaining this filter after
+  // begin must copy the pattern into session-owned storage.
   iree_string_view_t executable_export_pattern;
 
-  // Process-local command-buffer identifier to match.
+  // Session-local command-buffer identifier to match.
   uint64_t command_buffer_id;
 
   // Zero-based command-buffer operation index to match.
@@ -1286,9 +1406,9 @@ typedef struct iree_hal_profile_counter_sample_record_t {
   uint64_t dispatch_event_id;
   // Queue submission epoch associated with this sample, or 0 when absent.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when absent.
+  // Session-local command-buffer identifier, or 0 when absent.
   uint64_t command_buffer_id;
-  // Process-local executable identifier, or 0 when absent.
+  // Session-local executable identifier, or 0 when absent.
   uint64_t executable_id;
   // Producer-defined stream identifier matching queue metadata, or 0.
   uint64_t stream_id;
@@ -1363,9 +1483,9 @@ typedef struct iree_hal_profile_executable_trace_record_t {
   uint64_t dispatch_event_id;
   // Queue submission epoch associated with this trace, or 0 when absent.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when absent.
+  // Session-local command-buffer identifier, or 0 when absent.
   uint64_t command_buffer_id;
-  // Process-local executable identifier, or 0 when absent.
+  // Session-local executable identifier, or 0 when absent.
   uint64_t executable_id;
   // Producer-defined stream identifier matching queue metadata, or 0.
   uint64_t stream_id;
@@ -1406,9 +1526,9 @@ typedef struct iree_hal_profile_chunk_metadata_t {
   uint64_t stream_id;
   // Producer-defined event identifier associated with this chunk, or 0.
   uint64_t event_id;
-  // Process-local executable identifier associated with this chunk, or 0.
+  // Session-local executable identifier associated with this chunk, or 0.
   uint64_t executable_id;
-  // Process-local command-buffer identifier associated with this chunk, or 0.
+  // Session-local command-buffer identifier associated with this chunk, or 0.
   uint64_t command_buffer_id;
   // Physical device ordinal associated with this chunk, or UINT32_MAX.
   uint32_t physical_device_ordinal;

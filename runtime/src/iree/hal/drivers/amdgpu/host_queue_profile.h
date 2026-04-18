@@ -21,7 +21,7 @@ typedef struct iree_hal_amdgpu_host_queue_profile_event_info_t {
   iree_hal_profile_queue_event_flags_t flags;
   // Queue submission epoch assigned by the operation.
   uint64_t submission_id;
-  // Process-local command-buffer identifier, or 0 when not applicable.
+  // Session-local command-buffer identifier, or 0 when not applicable.
   uint64_t command_buffer_id;
   // Producer-defined allocation identifier, or 0 when not applicable.
   uint64_t allocation_id;

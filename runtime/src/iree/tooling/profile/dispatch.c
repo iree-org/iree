@@ -460,6 +460,13 @@ iree_status_t iree_profile_dispatch_process_events_record(
       return iree_profile_model_process_queue_device_event_records(
           &context->model, record, filter, id_filter);
     }
+    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE &&
+        iree_string_view_equal(
+            record->content_type,
+            IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
+      return iree_profile_model_process_host_execution_event_records(
+          &context->model, record, filter, id_filter);
+    }
     return iree_ok_status();
   }
   return iree_profile_dispatch_process_event_records(

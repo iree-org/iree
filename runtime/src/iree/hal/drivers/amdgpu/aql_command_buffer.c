@@ -2000,7 +2000,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
   dispatch_command->group_segment_size =
       kernel_args->group_segment_size + config.dynamic_workgroup_local_memory;
   dispatch_command->executable_id =
-      (uint32_t)iree_hal_amdgpu_executable_profile_id(executable);
+      iree_hal_amdgpu_executable_profile_id(executable);
 
   if (binding_sources && !uses_custom_direct_arguments) {
     IREE_RETURN_IF_ERROR(

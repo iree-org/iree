@@ -715,11 +715,12 @@ static iree_status_t iree_profile_queue_print_text(
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   fprintf(file,
           "queues=%" PRIhsz " queue_events=%" PRIhsz
-          " queue_device_events=%" PRIhsz " submissions=%" PRIhsz
-          " matched_dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
-          "\n",
+          " queue_device_events=%" PRIhsz " host_execution_events=%" PRIhsz
+          " submissions=%" PRIhsz " matched_dispatches=%" PRIu64
+          " valid=%" PRIu64 " invalid=%" PRIu64 "\n",
           context->model.queue_count, context->model.queue_event_count,
           context->model.queue_device_event_count,
+          context->model.host_execution_event_count,
           context->queue_aggregate_count, context->matched_dispatch_count,
           context->valid_dispatch_count, context->invalid_dispatch_count);
 
@@ -799,6 +800,32 @@ static iree_status_t iree_profile_queue_print_text(
       }
       fputc('\n', file);
     }
+    for (iree_host_size_t j = 0; j < context->model.host_execution_event_count;
+         ++j) {
+      const iree_hal_profile_host_execution_event_t* event =
+          &context->model.host_execution_events[j].record;
+      if (event->physical_device_ordinal != queue->physical_device_ordinal ||
+          event->queue_ordinal != queue->queue_ordinal ||
+          event->stream_id != queue->stream_id) {
+        continue;
+      }
+      if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+        continue;
+      }
+      const bool is_valid =
+          event->start_host_time_ns >= 0 &&
+          event->end_host_time_ns >= event->start_host_time_ns;
+      const int64_t duration_ns =
+          is_valid ? event->end_host_time_ns - event->start_host_time_ns : 0;
+      fprintf(file,
+              "  host_execution_event=%" PRIu64 " type=%s submission=%" PRIu64
+              " command_buffer=%" PRIu64 " allocation=%" PRIu64
+              " ops=%u ns=%" PRId64 " valid=%s\n",
+              event->event_id, iree_profile_queue_event_type_name(event->type),
+              event->submission_id, event->command_buffer_id,
+              event->allocation_id, event->operation_count, duration_ns,
+              is_valid ? "true" : "false");
+    }
     for (iree_host_size_t j = 0; j < context->model.queue_event_count; ++j) {
       const iree_hal_profile_queue_event_t* event =
           &context->model.queue_events[j].record;
@@ -833,11 +860,13 @@ static iree_status_t iree_profile_queue_print_jsonl(
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
           ",\"queues\":%" PRIhsz ",\"queue_events\":%" PRIhsz
-          ",\"queue_device_events\":%" PRIhsz ",\"submissions\":%" PRIhsz
+          ",\"queue_device_events\":%" PRIhsz
+          ",\"host_execution_events\":%" PRIhsz ",\"submissions\":%" PRIhsz
           ",\"matched_dispatches\":%" PRIu64 ",\"valid_dispatches\":%" PRIu64
           ",\"invalid_dispatches\":%" PRIu64 "}\n",
           context->model.queue_count, context->model.queue_event_count,
           context->model.queue_device_event_count,
+          context->model.host_execution_event_count,
           context->queue_aggregate_count, context->matched_dispatch_count,
           context->valid_dispatch_count, context->invalid_dispatch_count);
 
@@ -917,6 +946,39 @@ static iree_status_t iree_profile_queue_print_jsonl(
             duration_ticks, is_valid ? "true" : "false",
             has_clock_fit ? "true" : "false",
             has_clock_fit ? (double)duration_ticks * ns_per_tick : 0.0);
+  }
+  for (iree_host_size_t i = 0; i < context->model.host_execution_event_count;
+       ++i) {
+    const iree_hal_profile_host_execution_event_t* event =
+        &context->model.host_execution_events[i].record;
+    if (id_filter >= 0 && event->submission_id != (uint64_t)id_filter) {
+      continue;
+    }
+    const bool is_valid = event->start_host_time_ns >= 0 &&
+                          event->end_host_time_ns >= event->start_host_time_ns;
+    const int64_t duration_ns =
+        is_valid ? event->end_host_time_ns - event->start_host_time_ns : 0;
+    fprintf(file,
+            "{\"type\":\"host_execution_event\",\"event_id\":%" PRIu64
+            ",\"op\":\"%s\",\"flags\":%u,\"status_code\":%u"
+            ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+            ",\"command_index\":%u,\"executable_id\":%" PRIu64
+            ",\"export_ordinal\":%u,\"allocation_id\":%" PRIu64
+            ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+            ",\"stream_id\":%" PRIu64
+            ",\"operation_count\":%u"
+            ",\"payload_length\":%" PRIu64
+            ",\"host_time_domain\":\"iree_host_time_ns\""
+            ",\"start_host_time_ns\":%" PRId64 ",\"end_host_time_ns\":%" PRId64
+            ",\"duration_ns\":%" PRId64 ",\"valid\":%s}\n",
+            event->event_id, iree_profile_queue_event_type_name(event->type),
+            event->flags, event->status_code, event->submission_id,
+            event->command_buffer_id, event->command_index,
+            event->executable_id, event->export_ordinal, event->allocation_id,
+            event->physical_device_ordinal, event->queue_ordinal,
+            event->stream_id, event->operation_count, event->payload_length,
+            event->start_host_time_ns, event->end_host_time_ns, duration_ns,
+            is_valid ? "true" : "false");
   }
   for (iree_host_size_t i = 0; i < context->model.queue_event_count; ++i) {
     const iree_hal_profile_queue_event_t* event =

@@ -107,6 +107,14 @@ typedef struct iree_profile_summary_t {
   uint64_t queue_device_event_chunk_count;
   // Queue device event records parsed.
   uint64_t queue_device_event_record_count;
+  // Host execution event chunks parsed.
+  uint64_t host_execution_event_chunk_count;
+  // Host execution event records parsed.
+  uint64_t host_execution_event_record_count;
+  // Host execution records with unusable or reversed timestamps.
+  uint64_t invalid_host_execution_event_record_count;
+  // Sum of valid host execution durations in nanoseconds.
+  uint64_t total_host_execution_duration_ns;
   // Profile event relationship chunks parsed.
   uint64_t event_relationship_chunk_count;
   // Profile event relationship records parsed.
