@@ -260,6 +260,75 @@ static iree_status_t iree_profile_explain_total_dispatch_ticks_for_device(
   return iree_ok_status();
 }
 
+static bool iree_profile_explain_queue_aggregate_matches(
+    const iree_hal_profile_queue_record_t* queue,
+    const iree_profile_dispatch_queue_aggregate_t* aggregate) {
+  return aggregate->physical_device_ordinal == queue->physical_device_ordinal &&
+         aggregate->queue_ordinal == queue->queue_ordinal &&
+         aggregate->stream_id == queue->stream_id;
+}
+
+static iree_status_t iree_profile_explain_collect_queue_intervals(
+    const iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_queue_record_t* queue,
+    iree_profile_explain_interval_t* intervals,
+    iree_host_size_t* inout_interval_count,
+    iree_profile_explain_queue_summary_t* summary) {
+  for (iree_host_size_t i = 0; i < context->queue_aggregate_count; ++i) {
+    const iree_profile_dispatch_queue_aggregate_t* aggregate =
+        &context->queue_aggregates[i];
+    if (!iree_profile_explain_queue_aggregate_matches(queue, aggregate)) {
+      continue;
+    }
+
+    ++summary->submission_count;
+    if (!iree_profile_explain_accumulate_ticks(&summary->total_dispatch_ticks,
+                                               aggregate->total_ticks)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "queue summary dispatch tick total overflow device=%u queue=%u"
+          " stream=%" PRIu64,
+          queue->physical_device_ordinal, queue->queue_ordinal,
+          queue->stream_id);
+    }
+    if (aggregate->valid_count != 0) {
+      ++summary->valid_submission_count;
+      intervals[(*inout_interval_count)++] = (iree_profile_explain_interval_t){
+          aggregate->earliest_start_tick, aggregate->latest_end_tick};
+    }
+    if (aggregate->invalid_count != 0) {
+      ++summary->invalid_submission_count;
+    }
+  }
+  return iree_ok_status();
+}
+
+static void iree_profile_explain_merge_queue_intervals(
+    iree_profile_explain_interval_t* intervals, iree_host_size_t interval_count,
+    iree_profile_explain_queue_summary_t* summary) {
+  if (interval_count == 0) return;
+  qsort(intervals, interval_count, sizeof(intervals[0]),
+        iree_profile_explain_compare_interval);
+
+  uint64_t merged_start_tick = intervals[0].start_tick;
+  uint64_t merged_end_tick = intervals[0].end_tick;
+  for (iree_host_size_t i = 1; i < interval_count; ++i) {
+    if (intervals[i].start_tick <= merged_end_tick) {
+      merged_end_tick = iree_max(merged_end_tick, intervals[i].end_tick);
+      continue;
+    }
+    summary->busy_ticks += (double)(merged_end_tick - merged_start_tick);
+    const uint64_t gap_ticks = intervals[i].start_tick - merged_end_tick;
+    ++summary->gap_count;
+    summary->total_gap_ticks += (double)gap_ticks;
+    summary->max_gap_ticks =
+        iree_max(summary->max_gap_ticks, (double)gap_ticks);
+    merged_start_tick = intervals[i].start_tick;
+    merged_end_tick = intervals[i].end_tick;
+  }
+  summary->busy_ticks += (double)(merged_end_tick - merged_start_tick);
+}
+
 static iree_status_t iree_profile_explain_summarize_queue(
     const iree_profile_dispatch_context_t* context,
     const iree_hal_profile_queue_record_t* queue,
@@ -275,58 +344,12 @@ static iree_status_t iree_profile_explain_summarize_queue(
 
   iree_host_size_t interval_count = 0;
   if (iree_status_is_ok(status)) {
-    for (iree_host_size_t i = 0;
-         i < context->queue_aggregate_count && iree_status_is_ok(status); ++i) {
-      const iree_profile_dispatch_queue_aggregate_t* aggregate =
-          &context->queue_aggregates[i];
-      if (aggregate->physical_device_ordinal !=
-              queue->physical_device_ordinal ||
-          aggregate->queue_ordinal != queue->queue_ordinal ||
-          aggregate->stream_id != queue->stream_id) {
-        continue;
-      }
-      out_summary->submission_count += 1;
-      if (!iree_profile_explain_accumulate_ticks(
-              &out_summary->total_dispatch_ticks, aggregate->total_ticks)) {
-        status = iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "queue summary dispatch tick total overflow device=%u queue=%u"
-            " stream=%" PRIu64,
-            queue->physical_device_ordinal, queue->queue_ordinal,
-            queue->stream_id);
-      }
-      if (aggregate->valid_count != 0) {
-        out_summary->valid_submission_count += 1;
-        intervals[interval_count++] = (iree_profile_explain_interval_t){
-            aggregate->earliest_start_tick, aggregate->latest_end_tick};
-      }
-      if (aggregate->invalid_count != 0) {
-        out_summary->invalid_submission_count += 1;
-      }
-    }
+    status = iree_profile_explain_collect_queue_intervals(
+        context, queue, intervals, &interval_count, out_summary);
   }
-
-  if (iree_status_is_ok(status) && interval_count != 0) {
-    qsort(intervals, interval_count, sizeof(intervals[0]),
-          iree_profile_explain_compare_interval);
-
-    uint64_t merged_start_tick = intervals[0].start_tick;
-    uint64_t merged_end_tick = intervals[0].end_tick;
-    for (iree_host_size_t i = 1; i < interval_count; ++i) {
-      if (intervals[i].start_tick <= merged_end_tick) {
-        merged_end_tick = iree_max(merged_end_tick, intervals[i].end_tick);
-        continue;
-      }
-      out_summary->busy_ticks += (double)(merged_end_tick - merged_start_tick);
-      const uint64_t gap_ticks = intervals[i].start_tick - merged_end_tick;
-      ++out_summary->gap_count;
-      out_summary->total_gap_ticks += (double)gap_ticks;
-      out_summary->max_gap_ticks =
-          iree_max(out_summary->max_gap_ticks, (double)gap_ticks);
-      merged_start_tick = intervals[i].start_tick;
-      merged_end_tick = intervals[i].end_tick;
-    }
-    out_summary->busy_ticks += (double)(merged_end_tick - merged_start_tick);
+  if (iree_status_is_ok(status)) {
+    iree_profile_explain_merge_queue_intervals(intervals, interval_count,
+                                               out_summary);
   }
 
   iree_allocator_free(host_allocator, intervals);
