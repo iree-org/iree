@@ -13,6 +13,29 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_profile_memory_balance_t {
+  // Number of lifecycle instances open after applying matched events.
+  uint64_t current_count;
+  // Maximum number of simultaneously open lifecycle instances.
+  uint64_t high_water_count;
+  // Number of opening transitions observed in the matched event stream.
+  uint64_t total_open_count;
+  // Number of closing transitions observed in the matched event stream.
+  uint64_t total_close_count;
+  // Closing transitions whose matching open was outside the matched stream.
+  uint64_t partial_close_count;
+  // Bytes open after applying matched events.
+  uint64_t current_bytes;
+  // Maximum simultaneously open bytes.
+  uint64_t high_water_bytes;
+  // Cumulative bytes opened by matched events.
+  uint64_t total_open_bytes;
+  // Cumulative bytes closed by matched events.
+  uint64_t total_close_bytes;
+  // Closing bytes whose matching open was outside the matched stream.
+  uint64_t partial_close_bytes;
+} iree_profile_memory_balance_t;
+
 typedef struct iree_profile_memory_device_t {
   // Session-local physical device ordinal.
   uint32_t physical_device_ordinal;
@@ -22,10 +45,8 @@ typedef struct iree_profile_memory_device_t {
   uint64_t slab_acquire_count;
   // Slab release events matched for this device.
   uint64_t slab_release_count;
-  // Current slab allocations after applying matched slab events.
-  uint64_t current_slab_allocation_count;
-  // Maximum current slab allocations observed while applying matched events.
-  uint64_t high_water_slab_allocation_count;
+  // Slab-provider backing allocations opened and closed in the capture window.
+  iree_profile_memory_balance_t slab_allocation_balance;
   // Pool reservation events matched for this device.
   uint64_t pool_reserve_count;
   // Pool materialization events matched for this device.
@@ -34,58 +55,22 @@ typedef struct iree_profile_memory_device_t {
   uint64_t pool_release_count;
   // Pool wait events matched for this device.
   uint64_t pool_wait_count;
+  // Pool bytes reserved from acquire until release.
+  iree_profile_memory_balance_t pool_reservation_balance;
+  // Pool reservations observed materialized into concrete HAL buffer views.
+  iree_profile_memory_balance_t pool_materialization_balance;
   // Synchronous HAL buffer allocation events matched for this device.
   uint64_t buffer_allocate_count;
   // Synchronous HAL buffer free events matched for this device.
   uint64_t buffer_free_count;
-  // Current live synchronous buffer allocations after matched events.
-  uint64_t current_buffer_allocation_count;
-  // Maximum live synchronous buffer allocations observed.
-  uint64_t high_water_buffer_allocation_count;
-  // Current live pool reservations after applying matched pool events.
-  uint64_t current_pool_reservation_count;
-  // Maximum live pool reservations observed while applying matched events.
-  uint64_t high_water_pool_reservation_count;
-  // Current pool reservation bytes after matched reserve/release events.
-  uint64_t current_pool_reserved_bytes;
-  // Maximum pool reservation bytes observed while applying matched events.
-  uint64_t high_water_pool_reserved_bytes;
-  // Total bytes reserved by matched pool reserve events.
-  uint64_t total_pool_reserved_bytes;
-  // Total bytes released by matched pool release events.
-  uint64_t total_pool_released_bytes;
+  // Synchronous HAL buffer allocations opened and closed in the capture window.
+  iree_profile_memory_balance_t buffer_allocation_balance;
   // Queue alloca events matched for this device.
   uint64_t queue_alloca_count;
   // Queue dealloca events matched for this device.
   uint64_t queue_dealloca_count;
-  // Current live queue allocations after applying matched queue events.
-  uint64_t current_queue_allocation_count;
-  // Maximum live queue allocations observed while applying matched events.
-  uint64_t high_water_queue_allocation_count;
-  // Current slab bytes after applying matched slab events.
-  uint64_t current_slab_bytes;
-  // Maximum current slab bytes observed while applying matched slab events.
-  uint64_t high_water_slab_bytes;
-  // Total slab bytes acquired by matched slab events.
-  uint64_t total_slab_acquired_bytes;
-  // Total slab bytes released by matched slab events.
-  uint64_t total_slab_released_bytes;
-  // Current queue-allocation bytes after matched alloca/dealloca events.
-  uint64_t current_queue_bytes;
-  // Maximum queue-allocation bytes observed while applying matched events.
-  uint64_t high_water_queue_bytes;
-  // Total bytes allocated by matched queue alloca events.
-  uint64_t total_queue_alloca_bytes;
-  // Total bytes deallocated by matched queue dealloca events.
-  uint64_t total_queue_dealloca_bytes;
-  // Current synchronous buffer bytes after matched allocate/free events.
-  uint64_t current_buffer_bytes;
-  // Maximum synchronous buffer bytes observed while applying matched events.
-  uint64_t high_water_buffer_bytes;
-  // Total synchronous buffer bytes allocated by matched events.
-  uint64_t total_buffer_allocate_bytes;
-  // Total synchronous buffer bytes freed by matched events.
-  uint64_t total_buffer_free_bytes;
+  // Queue-visible allocation bytes between queue_alloca and queue_dealloca.
+  iree_profile_memory_balance_t queue_inflight_balance;
 } iree_profile_memory_device_t;
 
 typedef enum iree_profile_memory_lifecycle_kind_e {
@@ -116,18 +101,10 @@ typedef struct iree_profile_memory_pool_t {
   uint64_t wait_count;
   // Materialize events attributed to this pool/provider.
   uint64_t materialize_count;
-  // Current live allocation/reservation/slab count.
-  uint64_t current_allocation_count;
-  // Maximum live allocation/reservation/slab count.
-  uint64_t high_water_allocation_count;
-  // Current live bytes in this pool/provider aggregate.
-  uint64_t current_bytes;
-  // Maximum live bytes in this pool/provider aggregate.
-  uint64_t high_water_bytes;
-  // Cumulative bytes acquired/allocated/reserved.
-  uint64_t total_allocate_bytes;
-  // Cumulative bytes released/freed/deallocated.
-  uint64_t total_free_bytes;
+  // Lifecycle balance for this pool/provider row's |kind|.
+  iree_profile_memory_balance_t lifecycle_balance;
+  // Materialization balance for pool reservation rows.
+  iree_profile_memory_balance_t materialization_balance;
 } iree_profile_memory_pool_t;
 
 typedef struct iree_profile_memory_allocation_t {
@@ -163,14 +140,10 @@ typedef struct iree_profile_memory_allocation_t {
   uint64_t wait_count;
   // Materialize events in this lifecycle.
   uint64_t materialize_count;
-  // Current live bytes after matched events.
-  uint64_t current_bytes;
-  // Maximum live bytes observed after matched events.
-  uint64_t high_water_bytes;
-  // Cumulative bytes acquired/allocated/reserved.
-  uint64_t total_allocate_bytes;
-  // Cumulative bytes released/freed/deallocated.
-  uint64_t total_free_bytes;
+  // Lifecycle balance for this allocation row's |kind|.
+  iree_profile_memory_balance_t lifecycle_balance;
+  // Materialization balance for pool reservation rows.
+  iree_profile_memory_balance_t materialization_balance;
 } iree_profile_memory_allocation_t;
 
 typedef struct iree_profile_memory_context_t {

@@ -11,6 +11,7 @@
 
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/tooling/profile/memory.h"
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
@@ -35,6 +36,13 @@ static iree_hal_profile_file_record_t MakeChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeMemoryChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS;
+  return chunk;
+}
+
 static void AppendRecord(std::vector<uint8_t>* payload, uint32_t value,
                          std::initializer_list<uint8_t> inline_payload) {
   test_profile_record_t record;
@@ -49,6 +57,42 @@ static void AppendRecord(std::vector<uint8_t>* payload, uint32_t value,
     memcpy(payload->data() + offset + sizeof(record), inline_payload.begin(),
            inline_payload.size());
   }
+}
+
+static void AppendMemoryEvent(std::vector<uint8_t>* payload,
+                              iree_hal_profile_memory_event_type_t event_type,
+                              uint64_t event_id, uint64_t allocation_id,
+                              uint64_t pool_id, uint64_t length) {
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = event_type;
+  event.event_id = event_id;
+  event.allocation_id = allocation_id;
+  event.pool_id = pool_id;
+  event.physical_device_ordinal = 0;
+  event.queue_ordinal = 0;
+  event.memory_type = 1;
+  event.buffer_usage = 1;
+  event.length = length;
+  event.alignment = 1;
+  switch (event_type) {
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE:
+      event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION;
+      break;
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA:
+    case IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA:
+      event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION;
+      event.submission_id = event_id;
+      break;
+    default:
+      break;
+  }
+
+  const iree_host_size_t offset = payload->size();
+  payload->resize(offset + sizeof(event));
+  memcpy(payload->data() + offset, &event, sizeof(event));
 }
 
 TEST(ProfileTypedRecordTest, IteratesTypedRecords) {
@@ -222,6 +266,42 @@ TEST(ProfileClockFitTest, FitsIreeHostTimeFromBracketMidpoints) {
   int64_t time_ns = 0;
   EXPECT_TRUE(iree_profile_model_clock_fit_map_tick(&fit, 1005, &time_ns));
   EXPECT_EQ(136, time_ns);
+}
+
+TEST(ProfileMemoryTest, SeparatesReserveMaterializedAndInflightBytes) {
+  std::vector<uint8_t> payload;
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
+                    1, 99, 7, 64);
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE,
+                    2, 1, 7, 256);
+  AppendMemoryEvent(&payload,
+                    IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE, 3, 1,
+                    7, 256);
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA,
+                    4, 1, 7, 40);
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA,
+                    5, 1, 7, 40);
+  AppendMemoryEvent(&payload, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
+                    6, 1, 7, 256);
+  iree_hal_profile_file_record_t chunk = MakeMemoryChunk(payload);
+
+  iree_profile_memory_context_t context;
+  iree_profile_memory_context_initialize(iree_allocator_system(), &context);
+  IREE_ASSERT_OK(iree_profile_memory_context_accumulate_record(
+      &context, &chunk, IREE_SV("*"), -1, false, nullptr));
+
+  ASSERT_EQ(1u, context.device_count);
+  const iree_profile_memory_device_t* device = &context.devices[0];
+  EXPECT_EQ(0u, device->pool_reservation_balance.current_bytes);
+  EXPECT_EQ(256u, device->pool_reservation_balance.high_water_bytes);
+  EXPECT_EQ(64u, device->pool_reservation_balance.partial_close_bytes);
+  EXPECT_EQ(0u, device->pool_materialization_balance.current_bytes);
+  EXPECT_EQ(256u, device->pool_materialization_balance.high_water_bytes);
+  EXPECT_EQ(0u, device->pool_materialization_balance.partial_close_count);
+  EXPECT_EQ(0u, device->queue_inflight_balance.current_bytes);
+  EXPECT_EQ(40u, device->queue_inflight_balance.high_water_bytes);
+
+  iree_profile_memory_context_deinitialize(&context);
 }
 
 }  // namespace

@@ -581,11 +581,16 @@ static iree_status_t iree_profile_explain_print_text(
       const iree_profile_memory_device_t* device = &memory_context->devices[i];
       fprintf(file,
               "  device[%u]: slab_high_water=%" PRIu64
-              " pool_high_water=%" PRIu64 " queue_high_water=%" PRIu64
+              " pool_reserved_high_water=%" PRIu64
+              " pool_materialized_high_water=%" PRIu64
+              " queue_inflight_high_water=%" PRIu64
               " buffer_high_water=%" PRIu64 " pool_waits=%" PRIu64 "\n",
-              device->physical_device_ordinal, device->high_water_slab_bytes,
-              device->high_water_pool_reserved_bytes,
-              device->high_water_queue_bytes, device->high_water_buffer_bytes,
+              device->physical_device_ordinal,
+              device->slab_allocation_balance.high_water_bytes,
+              device->pool_reservation_balance.high_water_bytes,
+              device->pool_materialization_balance.high_water_bytes,
+              device->queue_inflight_balance.high_water_bytes,
+              device->buffer_allocation_balance.high_water_bytes,
               device->pool_wait_count);
     }
 
@@ -906,13 +911,17 @@ static iree_status_t iree_profile_explain_print_jsonl(
               "{\"type\":\"explain_memory_pressure\""
               ",\"physical_device_ordinal\":%u"
               ",\"slab_high_water_bytes\":%" PRIu64
-              ",\"pool_high_water_bytes\":%" PRIu64
-              ",\"queue_high_water_bytes\":%" PRIu64
+              ",\"pool_reserved_high_water_bytes\":%" PRIu64
+              ",\"pool_materialized_high_water_bytes\":%" PRIu64
+              ",\"queue_inflight_high_water_bytes\":%" PRIu64
               ",\"buffer_high_water_bytes\":%" PRIu64 ",\"pool_waits\":%" PRIu64
               "}\n",
-              device->physical_device_ordinal, device->high_water_slab_bytes,
-              device->high_water_pool_reserved_bytes,
-              device->high_water_queue_bytes, device->high_water_buffer_bytes,
+              device->physical_device_ordinal,
+              device->slab_allocation_balance.high_water_bytes,
+              device->pool_reservation_balance.high_water_bytes,
+              device->pool_materialization_balance.high_water_bytes,
+              device->queue_inflight_balance.high_water_bytes,
+              device->buffer_allocation_balance.high_water_bytes,
               device->pool_wait_count);
     }
 
