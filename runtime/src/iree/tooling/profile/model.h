@@ -60,24 +60,6 @@ typedef struct iree_profile_model_queue_t {
   iree_hal_profile_queue_record_t record;
 } iree_profile_model_queue_t;
 
-// Host-timestamped queue event retained by the active profile query.
-typedef struct iree_profile_model_queue_event_t {
-  // Immutable queue event record copied from the profile bundle.
-  iree_hal_profile_queue_event_t record;
-} iree_profile_model_queue_event_t;
-
-// Device-timestamped queue event retained by the active profile query.
-typedef struct iree_profile_model_queue_device_event_t {
-  // Immutable queue device event record copied from the profile bundle.
-  iree_hal_profile_queue_device_event_t record;
-} iree_profile_model_queue_device_event_t;
-
-// Host-timestamped execution span retained by the active profile query.
-typedef struct iree_profile_model_host_execution_event_t {
-  // Immutable host execution event record copied from the profile bundle.
-  iree_hal_profile_host_execution_event_t record;
-} iree_profile_model_host_execution_event_t;
-
 // Per-physical-device clock-correlation state.
 typedef struct iree_profile_model_device_t {
   // Session-local physical device ordinal.
@@ -119,9 +101,9 @@ typedef struct iree_profile_model_clock_fit_t {
   uint64_t time_span_ns;
 } iree_profile_model_clock_fit_t;
 
-// Shared profile metadata and query-selected event rows.
+// Shared profile metadata side tables.
 typedef struct iree_profile_model_t {
-  // Host allocator used for dynamic side tables and query rows.
+  // Host allocator used for dynamic side tables.
   iree_allocator_t host_allocator;
   // Dynamic array of executable side-table entries.
   iree_profile_model_executable_t* executables;
@@ -159,39 +141,9 @@ typedef struct iree_profile_model_t {
   iree_host_size_t device_count;
   // Capacity of |devices| in entries.
   iree_host_size_t device_capacity;
-  // Dynamic array of query-selected queue operation event rows.
-  iree_profile_model_queue_event_t* queue_events;
-  // Number of valid entries in |queue_events|.
-  iree_host_size_t queue_event_count;
-  // Capacity of |queue_events| in entries.
-  iree_host_size_t queue_event_capacity;
-  // Dynamic array of query-selected device-timestamped queue event rows.
-  iree_profile_model_queue_device_event_t* queue_device_events;
-  // Number of valid entries in |queue_device_events|.
-  iree_host_size_t queue_device_event_count;
-  // Capacity of |queue_device_events| in entries.
-  iree_host_size_t queue_device_event_capacity;
-  // Dynamic array of query-selected host execution span rows.
-  iree_profile_model_host_execution_event_t* host_execution_events;
-  // Number of valid entries in |host_execution_events|.
-  iree_host_size_t host_execution_event_count;
-  // Capacity of |host_execution_events| in entries.
-  iree_host_size_t host_execution_event_capacity;
-  // Total queue operation records parsed before filtering.
-  uint64_t total_queue_event_count;
-  // Queue operation records matched by the active filter.
-  uint64_t matched_queue_event_count;
-  // Device-timestamped queue operation records parsed before filtering.
-  uint64_t total_queue_device_event_count;
-  // Device-timestamped queue operation records matched by the active filter.
-  uint64_t matched_queue_device_event_count;
-  // Host execution span records parsed before filtering.
-  uint64_t total_host_execution_event_count;
-  // Host execution span records matched by the active filter.
-  uint64_t matched_host_execution_event_count;
 } iree_profile_model_t;
 
-// Initializes |out_model| for profile metadata and query-selected event rows.
+// Initializes |out_model| for profile metadata side tables.
 void iree_profile_model_initialize(iree_allocator_t host_allocator,
                                    iree_profile_model_t* out_model);
 
@@ -291,21 +243,6 @@ iree_status_t iree_profile_model_resolve_command_operation_key(
 // Processes one metadata record into the shared profile model side tables.
 iree_status_t iree_profile_model_process_metadata_record(
     iree_profile_model_t* model, const iree_hal_profile_file_record_t* record);
-
-// Processes host-timestamped queue operation records into |model|.
-iree_status_t iree_profile_model_process_queue_event_records(
-    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
-    iree_string_view_t filter, int64_t id_filter);
-
-// Processes device-timestamped queue operation records into |model|.
-iree_status_t iree_profile_model_process_queue_device_event_records(
-    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
-    iree_string_view_t filter, int64_t id_filter);
-
-// Processes host execution span records into |model|.
-iree_status_t iree_profile_model_process_host_execution_event_records(
-    iree_profile_model_t* model, const iree_hal_profile_file_record_t* record,
-    iree_string_view_t filter, int64_t id_filter);
 
 // Returns the unsigned distance between two device timestamp ticks.
 double iree_profile_model_span_ticks(uint64_t earliest_start_tick,

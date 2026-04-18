@@ -16,6 +16,8 @@ void iree_profile_dispatch_context_initialize(
   memset(out_context, 0, sizeof(*out_context));
   out_context->host_allocator = host_allocator;
   iree_profile_model_initialize(host_allocator, &out_context->model);
+  iree_profile_queue_event_query_initialize(host_allocator,
+                                            &out_context->queue_query);
 }
 
 void iree_profile_dispatch_context_deinitialize(
@@ -23,6 +25,7 @@ void iree_profile_dispatch_context_deinitialize(
   iree_allocator_free(context->host_allocator, context->queue_aggregates);
   iree_allocator_free(context->host_allocator, context->command_aggregates);
   iree_allocator_free(context->host_allocator, context->aggregates);
+  iree_profile_queue_event_query_deinitialize(&context->queue_query);
   iree_profile_model_deinitialize(&context->model);
   memset(context, 0, sizeof(*context));
 }
@@ -481,25 +484,9 @@ iree_status_t iree_profile_dispatch_process_events_record(
   }
   if (!iree_string_view_equal(record->content_type,
                               IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE &&
-        iree_string_view_equal(record->content_type,
-                               IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
-      return iree_profile_model_process_queue_event_records(
-          &context->model, record, filter, id_filter);
-    }
-    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE &&
-        iree_string_view_equal(
-            record->content_type,
-            IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
-      return iree_profile_model_process_queue_device_event_records(
-          &context->model, record, filter, id_filter);
-    }
-    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE &&
-        iree_string_view_equal(
-            record->content_type,
-            IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
-      return iree_profile_model_process_host_execution_event_records(
-          &context->model, record, filter, id_filter);
+    if (projection_mode == IREE_PROFILE_PROJECTION_MODE_QUEUE) {
+      return iree_profile_queue_event_query_process_record(
+          &context->queue_query, &context->model, record, filter, id_filter);
     }
     return iree_ok_status();
   }

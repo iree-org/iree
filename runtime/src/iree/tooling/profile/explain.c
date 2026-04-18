@@ -169,9 +169,10 @@ static iree_status_t iree_profile_explain_collect_export_ranks(
 static void iree_profile_explain_accumulate_queue_operation_totals(
     const iree_profile_dispatch_context_t* context, uint64_t event_counts[],
     uint64_t payload_bytes[], uint64_t strategy_counts[]) {
-  for (iree_host_size_t i = 0; i < context->model.queue_event_count; ++i) {
+  for (iree_host_size_t i = 0; i < context->queue_query.queue_event_count;
+       ++i) {
     const iree_hal_profile_queue_event_t* event =
-        &context->model.queue_events[i].record;
+        &context->queue_query.queue_events[i].record;
     if (event->type <= IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL) {
       ++event_counts[event->type];
       payload_bytes[event->type] += event->payload_length;
@@ -359,7 +360,7 @@ static iree_status_t iree_profile_explain_print_text(
             dispatch_context->valid_dispatch_count,
             dispatch_context->invalid_dispatch_count,
             dispatch_context->model.queue_count,
-            dispatch_context->model.queue_event_count,
+            dispatch_context->queue_query.queue_event_count,
             dispatch_context->model.command_buffer_count,
             dispatch_context->model.command_operation_count,
             memory_context->matched_event_count);
@@ -451,7 +452,7 @@ static iree_status_t iree_profile_explain_print_text(
           fprintf(file, " busy_ns=%.3f total_dispatch_ns=%" PRId64,
                   busy_ticks * ns_per_tick, total_dispatch_ns);
         }
-        if (dispatch_context->model.queue_event_count != 0) {
+        if (dispatch_context->queue_query.queue_event_count != 0) {
           fprintf(file,
                   " gaps=%" PRIu64 " total_gap_ticks=%.3f max_gap_ticks=%.3f",
                   gap_count, total_gap_ticks, max_gap_ticks);
@@ -551,7 +552,7 @@ static iree_status_t iree_profile_explain_print_text(
             "queue operations: events=%" PRIhsz
             " strategies none/inline/device_barrier/software_defer=%" PRIu64
             "/%" PRIu64 "/%" PRIu64 "/%" PRIu64 "\n",
-            dispatch_context->model.queue_event_count,
+            dispatch_context->queue_query.queue_event_count,
             strategy_counts[IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE],
             strategy_counts[IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE],
             strategy_counts
@@ -617,7 +618,7 @@ static iree_status_t iree_profile_explain_print_text(
           "excluded from timing totals",
           file);
     }
-    if (dispatch_context->model.queue_event_count == 0) {
+    if (dispatch_context->queue_query.queue_event_count == 0) {
       iree_profile_explain_print_hint_text(
           "info", "queue",
           "queue event records are absent; queue dependency and gap hints are "
@@ -674,7 +675,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
             dispatch_context->valid_dispatch_count,
             dispatch_context->invalid_dispatch_count,
             dispatch_context->model.queue_count,
-            dispatch_context->model.queue_event_count,
+            dispatch_context->queue_query.queue_event_count,
             dispatch_context->model.command_buffer_count,
             dispatch_context->model.command_operation_count,
             memory_context->matched_event_count);
@@ -754,7 +755,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
             iree_profile_model_clock_fit_scale_ticks_to_ns(
                 &clock_fit, total_dispatch_ticks, &total_dispatch_ns);
         const bool gap_analysis_available =
-            dispatch_context->model.queue_event_count != 0;
+            dispatch_context->queue_query.queue_event_count != 0;
         fprintf(file,
                 "{\"type\":\"explain_queue\",\"physical_device_ordinal\":%u"
                 ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
@@ -887,7 +888,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
             ",\"dispatches\":%" PRIu64 ",\"executes\":%" PRIu64
             ",\"allocas\":%" PRIu64 ",\"deallocas\":%" PRIu64
             ",\"host_calls\":%" PRIu64 "}\n",
-            dispatch_context->model.queue_event_count,
+            dispatch_context->queue_query.queue_event_count,
             strategy_counts[IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE],
             strategy_counts[IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE],
             strategy_counts
@@ -947,7 +948,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
           "excluded from timing totals",
           file);
     }
-    if (dispatch_context->model.queue_event_count == 0) {
+    if (dispatch_context->queue_query.queue_event_count == 0) {
       iree_profile_explain_print_hint_jsonl(
           "info", "queue",
           "queue event records are absent; queue dependency and gap hints are "
@@ -1017,7 +1018,8 @@ static iree_status_t iree_profile_explain_event_record(
   if (record->header.record_type == IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK &&
       iree_string_view_equal(record->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
-    IREE_RETURN_IF_ERROR(iree_profile_model_process_queue_event_records(
+    IREE_RETURN_IF_ERROR(iree_profile_queue_event_query_process_record(
+        &context->dispatch_context->queue_query,
         &context->dispatch_context->model, record, IREE_SV("*"),
         /*id_filter=*/-1));
   }

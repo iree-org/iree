@@ -9,6 +9,7 @@
 
 #include "iree/tooling/profile/common.h"
 #include "iree/tooling/profile/model.h"
+#include "iree/tooling/profile/queue_query.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,8 +125,10 @@ typedef struct iree_profile_dispatch_top_event_t {
 typedef struct iree_profile_dispatch_context_t {
   // Host allocator used for dynamic aggregate rows.
   iree_allocator_t host_allocator;
-  // Shared metadata and query-selected non-dispatch event rows.
+  // Shared metadata side tables.
   iree_profile_model_t model;
+  // Filtered queue-operation query used by queue and explain projections.
+  iree_profile_queue_event_query_t queue_query;
   // Dynamic array of aggregate dispatch rows.
   iree_profile_dispatch_aggregate_t* aggregates;
   // Number of valid entries in |aggregates|.

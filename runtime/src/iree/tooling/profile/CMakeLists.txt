@@ -26,6 +26,7 @@ iree_cc_library(
     "memory.h"
     "model.h"
     "projection.h"
+    "queue_query.h"
     "reader.h"
     "summary.h"
   SRCS
@@ -40,6 +41,7 @@ iree_cc_library(
     "memory.c"
     "model.c"
     "projection.c"
+    "queue_query.c"
     "reader.c"
     "summary.c"
   DEPS
