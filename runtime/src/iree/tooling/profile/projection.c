@@ -15,6 +15,17 @@ static bool iree_profile_command_operation_filter_matches(
          iree_profile_key_matches(key, filter);
 }
 
+static bool iree_profile_projection_try_fit_driver_host_cpu_clock(
+    const iree_profile_dispatch_context_t* context,
+    uint32_t physical_device_ordinal,
+    iree_profile_model_clock_fit_t* out_clock_fit) {
+  const iree_profile_model_device_t* device =
+      iree_profile_model_find_device(&context->model, physical_device_ordinal);
+  return iree_profile_model_device_try_fit_clock_exact(
+      device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      out_clock_fit);
+}
+
 static iree_status_t iree_profile_command_count_matching_operations(
     const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
     int64_t id_filter, iree_host_size_t* out_operation_count) {
@@ -779,14 +790,15 @@ static iree_status_t iree_profile_queue_print_text(
                             event->end_tick >= event->start_tick;
       const uint64_t duration_ticks =
           is_valid ? event->end_tick - event->start_tick : 0;
-      const iree_profile_model_device_t* device =
-          iree_profile_model_find_device(&context->model,
-                                         event->physical_device_ordinal);
-      double ns_per_tick = 0.0;
-      double tick_frequency_hz = 0.0;
-      const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-          device, &ns_per_tick, &tick_frequency_hz);
-      (void)tick_frequency_hz;
+      iree_profile_model_clock_fit_t clock_fit;
+      const bool has_clock_fit =
+          iree_profile_projection_try_fit_driver_host_cpu_clock(
+              context, event->physical_device_ordinal, &clock_fit);
+      int64_t duration_ns = 0;
+      const bool has_duration_ns =
+          is_valid && has_clock_fit &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, duration_ticks, &duration_ns);
       fprintf(file,
               "  device_event=%" PRIu64 " type=%s submission=%" PRIu64
               " command_buffer=%" PRIu64 " allocation=%" PRIu64
@@ -795,8 +807,8 @@ static iree_status_t iree_profile_queue_print_text(
               event->submission_id, event->command_buffer_id,
               event->allocation_id, event->operation_count, duration_ticks,
               is_valid ? "true" : "false");
-      if (has_clock_fit) {
-        fprintf(file, " ns=%.3f", (double)duration_ticks * ns_per_tick);
+      if (has_duration_ns) {
+        fprintf(file, " ns=%" PRId64, duration_ns);
       }
       fputc('\n', file);
     }
@@ -920,13 +932,14 @@ static iree_status_t iree_profile_queue_print_jsonl(
                           event->end_tick >= event->start_tick;
     const uint64_t duration_ticks =
         is_valid ? event->end_tick - event->start_tick : 0;
-    const iree_profile_model_device_t* device = iree_profile_model_find_device(
-        &context->model, event->physical_device_ordinal);
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
-    (void)tick_frequency_hz;
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_projection_try_fit_driver_host_cpu_clock(
+            context, event->physical_device_ordinal, &clock_fit);
+    int64_t duration_ns = 0;
+    const bool has_duration_ns = is_valid && has_clock_fit &&
+                                 iree_profile_model_clock_fit_scale_ticks_to_ns(
+                                     &clock_fit, duration_ticks, &duration_ns);
     fprintf(file,
             "{\"type\":\"queue_device_event\",\"event_id\":%" PRIu64
             ",\"op\":\"%s\",\"flags\":%u,\"submission_id\":%" PRIu64
@@ -937,7 +950,7 @@ static iree_status_t iree_profile_queue_print_jsonl(
             ",\"payload_length\":%" PRIu64 ",\"start_tick\":%" PRIu64
             ",\"end_tick\":%" PRIu64 ",\"duration_ticks\":%" PRIu64
             ",\"valid\":%s"
-            ",\"clock_fit_available\":%s,\"duration_ns\":%.3f}\n",
+            ",\"clock_fit_available\":%s,\"duration_ns\":%" PRId64 "}\n",
             event->event_id, iree_profile_queue_event_type_name(event->type),
             event->flags, event->submission_id, event->command_buffer_id,
             event->allocation_id, event->physical_device_ordinal,
@@ -945,7 +958,7 @@ static iree_status_t iree_profile_queue_print_jsonl(
             event->payload_length, event->start_tick, event->end_tick,
             duration_ticks, is_valid ? "true" : "false",
             has_clock_fit ? "true" : "false",
-            has_clock_fit ? (double)duration_ticks * ns_per_tick : 0.0);
+            has_duration_ns ? duration_ns : 0);
   }
   for (iree_host_size_t i = 0; i < context->model.host_execution_event_count;
        ++i) {

@@ -300,11 +300,16 @@ static void iree_profile_dispatch_record_top_event(
 static void iree_profile_dispatch_print_event_jsonl(
     const iree_hal_profile_file_record_t* file_record,
     const iree_hal_profile_dispatch_event_t* event, iree_string_view_t key,
-    double ns_per_tick, bool has_clock_fit, FILE* file) {
+    const iree_profile_model_clock_fit_t* clock_fit, bool has_clock_fit,
+    FILE* file) {
   const bool is_valid = event->start_tick != 0 && event->end_tick != 0 &&
                         event->end_tick >= event->start_tick;
   const uint64_t duration_ticks =
       is_valid ? event->end_tick - event->start_tick : 0;
+  int64_t duration_ns = 0;
+  const bool has_duration_ns = has_clock_fit && is_valid &&
+                               iree_profile_model_clock_fit_scale_ticks_to_ns(
+                                   clock_fit, duration_ticks, &duration_ns);
 
   fprintf(file,
           "{\"type\":\"dispatch_event\",\"physical_device_ordinal\":%u"
@@ -334,12 +339,11 @@ static void iree_profile_dispatch_print_event_jsonl(
           is_valid ? "true" : "false");
   fprintf(file, ",\"clock_fit_available\":%s",
           has_clock_fit ? "true" : "false");
-  fprintf(
-      file,
-      ",\"device_tick_domain\":\"device_tick\""
-      ",\"duration_time_domain\":\"device_tick_duration_ns\""
-      ",\"duration_ns\":%.3f",
-      has_clock_fit && is_valid ? (double)duration_ticks * ns_per_tick : 0.0);
+  fprintf(file,
+          ",\"device_tick_domain\":\"device_tick\""
+          ",\"duration_time_domain\":\"device_tick_duration_ns\""
+          ",\"duration_ns\":%" PRId64,
+          has_duration_ns ? duration_ns : 0);
   fputs("}\n", file);
 }
 
@@ -352,11 +356,10 @@ static iree_status_t iree_profile_dispatch_process_event_records(
   iree_profile_model_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_profile_model_ensure_device(
       &context->model, record->header.physical_device_ordinal, &device));
-  double ns_per_tick = 0.0;
-  double tick_frequency_hz = 0.0;
-  const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-      device, &ns_per_tick, &tick_frequency_hz);
-  (void)tick_frequency_hz;
+  iree_profile_model_clock_fit_t clock_fit;
+  const bool has_clock_fit = iree_profile_model_device_try_fit_clock_exact(
+      device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      &clock_fit);
 
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
@@ -398,8 +401,8 @@ static iree_status_t iree_profile_dispatch_process_event_records(
         ++context->invalid_dispatch_count;
       }
       if (emit_events) {
-        iree_profile_dispatch_print_event_jsonl(
-            record, &event, key, ns_per_tick, has_clock_fit, file);
+        iree_profile_dispatch_print_event_jsonl(record, &event, key, &clock_fit,
+                                                has_clock_fit, file);
       } else {
         iree_profile_dispatch_aggregate_t* aggregate = NULL;
         status = iree_profile_dispatch_get_aggregate(

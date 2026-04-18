@@ -90,6 +90,35 @@ typedef struct iree_profile_model_device_t {
   iree_hal_profile_clock_correlation_record_t last_clock_sample;
 } iree_profile_model_device_t;
 
+// Host clock domain selected as the target for a device-clock fit.
+typedef uint32_t iree_profile_model_clock_time_domain_t;
+enum iree_profile_model_clock_time_domain_e {
+  IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS = 0u,
+  IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_IREE_HOST_TIME_NS = 1u,
+};
+
+// Exact linear fit between a device clock and one host nanosecond clock.
+typedef struct iree_profile_model_clock_fit_t {
+  // Target host clock domain used by |first_time_ns| and |last_time_ns|.
+  iree_profile_model_clock_time_domain_t time_domain;
+  // First clock-correlation sample id used for the fit.
+  uint64_t first_sample_id;
+  // Last clock-correlation sample id used for the fit.
+  uint64_t last_sample_id;
+  // First device tick used for the fit.
+  uint64_t first_device_tick;
+  // Last device tick used for the fit.
+  uint64_t last_device_tick;
+  // First host timestamp used for the fit.
+  int64_t first_time_ns;
+  // Last host timestamp used for the fit.
+  int64_t last_time_ns;
+  // Device tick distance between the first and last samples.
+  uint64_t device_tick_span;
+  // Host nanosecond distance between the first and last samples.
+  uint64_t time_span_ns;
+} iree_profile_model_clock_fit_t;
+
 // Shared profile metadata and query-selected event rows.
 typedef struct iree_profile_model_t {
   // Host allocator used for dynamic side tables and query rows.
@@ -200,9 +229,45 @@ iree_profile_model_find_command_buffer(const iree_profile_model_t* model,
                                        uint64_t command_buffer_id);
 
 // Fits a linear device-tick to nanosecond conversion for |device|.
+//
+// The returned fit preserves the raw rational mapping:
+//
+//   time_ns = first_time_ns +
+//       round((device_tick - first_device_tick) * time_span_ns /
+//             device_tick_span)
+//
+// Consumers that need event timestamps should use
+// iree_profile_model_clock_fit_map_tick so large timestamp values stay in
+// integer arithmetic until the final rounded nanosecond.
+bool iree_profile_model_device_try_fit_clock_exact(
+    const iree_profile_model_device_t* device,
+    iree_profile_model_clock_time_domain_t time_domain,
+    iree_profile_model_clock_fit_t* out_fit);
+
+// Fits a linear device-tick to driver host CPU nanosecond conversion for
+// display-only aggregate statistics.
 bool iree_profile_model_device_try_fit_clock(
     const iree_profile_model_device_t* device, double* out_ns_per_tick,
     double* out_tick_frequency_hz);
+
+// Maps |device_tick| through |fit| and rounds to the nearest host nanosecond.
+bool iree_profile_model_clock_fit_map_tick(
+    const iree_profile_model_clock_fit_t* fit, uint64_t device_tick,
+    int64_t* out_time_ns);
+
+// Converts |device_tick_count| through |fit| and rounds to the nearest
+// nanosecond duration.
+bool iree_profile_model_clock_fit_scale_ticks_to_ns(
+    const iree_profile_model_clock_fit_t* fit, uint64_t device_tick_count,
+    int64_t* out_duration_ns);
+
+// Returns the fitted nanoseconds per device tick as a display value.
+double iree_profile_model_clock_fit_ns_per_tick(
+    const iree_profile_model_clock_fit_t* fit);
+
+// Returns the fitted device tick frequency in Hz as a display value.
+double iree_profile_model_clock_fit_tick_frequency_hz(
+    const iree_profile_model_clock_fit_t* fit);
 
 // Formats an executable export key into |numeric_buffer| when unnamed.
 iree_string_view_t iree_profile_model_format_export_key(

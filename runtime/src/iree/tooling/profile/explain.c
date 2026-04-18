@@ -92,6 +92,17 @@ static int iree_profile_explain_compare_interval(const void* lhs,
   return 0;
 }
 
+static bool iree_profile_explain_try_fit_driver_host_cpu_clock(
+    const iree_profile_dispatch_context_t* context,
+    uint32_t physical_device_ordinal,
+    iree_profile_model_clock_fit_t* out_clock_fit) {
+  const iree_profile_model_device_t* device =
+      iree_profile_model_find_device(&context->model, physical_device_ordinal);
+  return iree_profile_model_device_try_fit_clock_exact(
+      device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      out_clock_fit);
+}
+
 static iree_status_t iree_profile_explain_collect_export_ranks(
     const iree_profile_dispatch_context_t* context,
     iree_allocator_t host_allocator,
@@ -456,14 +467,15 @@ static iree_status_t iree_profile_explain_print_text(
          i < dispatch_context->top_dispatch_count && iree_status_is_ok(status);
          ++i) {
       const iree_profile_dispatch_top_event_t* top_event = &top_dispatches[i];
-      const iree_profile_model_device_t* device =
-          iree_profile_model_find_device(&dispatch_context->model,
-                                         top_event->physical_device_ordinal);
-      double ns_per_tick = 0.0;
-      double tick_frequency_hz = 0.0;
-      const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-          device, &ns_per_tick, &tick_frequency_hz);
-      (void)tick_frequency_hz;
+      iree_profile_model_clock_fit_t clock_fit;
+      const bool has_clock_fit =
+          iree_profile_explain_try_fit_driver_host_cpu_clock(
+              dispatch_context, top_event->physical_device_ordinal, &clock_fit);
+      int64_t duration_ns = 0;
+      const bool has_duration_ns =
+          has_clock_fit &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, top_event->duration_ticks, &duration_ns);
       char numeric_buffer[128];
       iree_string_view_t key = iree_string_view_empty();
       status = iree_profile_model_resolve_dispatch_key(
@@ -479,9 +491,8 @@ static iree_status_t iree_profile_explain_print_text(
                 top_event->event.submission_id, (int)key.size, key.data,
                 top_event->physical_device_ordinal, top_event->queue_ordinal,
                 top_event->stream_id, top_event->duration_ticks);
-        if (has_clock_fit) {
-          fprintf(file, " duration_ns=%.3f",
-                  (double)top_event->duration_ticks * ns_per_tick);
+        if (has_duration_ns) {
+          fprintf(file, " duration_ns=%" PRId64, duration_ns);
         }
         fputc('\n', file);
       }
@@ -757,14 +768,15 @@ static iree_status_t iree_profile_explain_print_jsonl(
          i < dispatch_context->top_dispatch_count && iree_status_is_ok(status);
          ++i) {
       const iree_profile_dispatch_top_event_t* top_event = &top_dispatches[i];
-      const iree_profile_model_device_t* device =
-          iree_profile_model_find_device(&dispatch_context->model,
-                                         top_event->physical_device_ordinal);
-      double ns_per_tick = 0.0;
-      double tick_frequency_hz = 0.0;
-      const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-          device, &ns_per_tick, &tick_frequency_hz);
-      (void)tick_frequency_hz;
+      iree_profile_model_clock_fit_t clock_fit;
+      const bool has_clock_fit =
+          iree_profile_explain_try_fit_driver_host_cpu_clock(
+              dispatch_context, top_event->physical_device_ordinal, &clock_fit);
+      int64_t duration_ns = 0;
+      const bool has_duration_ns =
+          has_clock_fit &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, top_event->duration_ticks, &duration_ns);
       char numeric_buffer[128];
       iree_string_view_t key = iree_string_view_empty();
       status = iree_profile_model_resolve_dispatch_key(
@@ -784,10 +796,9 @@ static iree_status_t iree_profile_explain_print_jsonl(
         iree_profile_fprint_json_string(file, key);
         fprintf(file,
                 ",\"duration_ticks\":%" PRIu64
-                ",\"clock_fit_available\":%s,\"duration_ns\":%.3f}\n",
+                ",\"clock_fit_available\":%s,\"duration_ns\":%" PRId64 "}\n",
                 top_event->duration_ticks, has_clock_fit ? "true" : "false",
-                has_clock_fit ? (double)top_event->duration_ticks * ns_per_tick
-                              : 0.0);
+                has_duration_ns ? duration_ns : 0);
       }
     }
 

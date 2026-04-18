@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 TRUSTED_PACKET_SEQUENCE_ID = 1001
 UINT64_MASK = (1 << 64) - 1
 UINT32_MAX = (1 << 32) - 1
@@ -71,8 +71,8 @@ class DeviceClockMapper:
             return self.first_host_time_ns + (device_tick - self.first_device_tick)
         host_delta = self.last_host_time_ns - self.first_host_time_ns
         relative_tick_delta = device_tick - self.first_device_tick
-        return self.first_host_time_ns + round(
-            relative_tick_delta * host_delta / tick_delta
+        return self.first_host_time_ns + round_ratio(
+            relative_tick_delta * host_delta, tick_delta
         )
 
 
@@ -187,6 +187,14 @@ def parse_integer(value: Any, default: int = 0) -> int:
 def parse_ordinal(value: Any, default: int = -1) -> int:
     ordinal = parse_integer(value, default)
     return default if ordinal == UINT32_MAX else ordinal
+
+
+def round_ratio(numerator: int, denominator: int) -> int:
+    if denominator <= 0:
+        raise ValueError(f"invalid ratio denominator: {denominator}")
+    if numerator >= 0:
+        return (numerator + denominator // 2) // denominator
+    return -((-numerator + denominator // 2) // denominator)
 
 
 def timestamp_midpoint(record: dict[str, Any]) -> int | None:

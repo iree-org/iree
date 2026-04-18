@@ -128,38 +128,180 @@ iree_profile_model_find_command_buffer(const iree_profile_model_t* model,
   return NULL;
 }
 
-bool iree_profile_model_device_try_fit_clock(
-    const iree_profile_model_device_t* device, double* out_ns_per_tick,
-    double* out_tick_frequency_hz) {
-  *out_ns_per_tick = 0.0;
-  *out_tick_frequency_hz = 0.0;
+static bool iree_profile_model_host_time_midpoint(
+    const iree_hal_profile_clock_correlation_record_t* sample,
+    int64_t* out_time_ns) {
+  if (!iree_all_bits_set(
+          sample->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET) ||
+      sample->host_time_begin_ns < 0 ||
+      sample->host_time_end_ns < sample->host_time_begin_ns) {
+    return false;
+  }
+  *out_time_ns = sample->host_time_begin_ns +
+                 (sample->host_time_end_ns - sample->host_time_begin_ns) / 2;
+  return true;
+}
+
+static bool iree_profile_model_sample_time_ns(
+    const iree_hal_profile_clock_correlation_record_t* sample,
+    iree_profile_model_clock_time_domain_t time_domain, int64_t* out_time_ns) {
+  switch (time_domain) {
+    case IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS:
+      if (!iree_all_bits_set(
+              sample->flags,
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP) ||
+          sample->host_cpu_timestamp_ns > INT64_MAX) {
+        return false;
+      }
+      *out_time_ns = (int64_t)sample->host_cpu_timestamp_ns;
+      return true;
+    case IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_IREE_HOST_TIME_NS:
+      return iree_profile_model_host_time_midpoint(sample, out_time_ns);
+    default:
+      return false;
+  }
+}
+
+bool iree_profile_model_device_try_fit_clock_exact(
+    const iree_profile_model_device_t* device,
+    iree_profile_model_clock_time_domain_t time_domain,
+    iree_profile_model_clock_fit_t* out_fit) {
+  memset(out_fit, 0, sizeof(*out_fit));
   if (!device || device->clock_sample_count < 2) return false;
 
   const iree_hal_profile_clock_correlation_record_t* first =
       &device->first_clock_sample;
   const iree_hal_profile_clock_correlation_record_t* last =
       &device->last_clock_sample;
-  if (!iree_all_bits_set(
-          first->flags,
-          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
-              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP) ||
-      !iree_all_bits_set(
-          last->flags,
-          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
-              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP)) {
+  if (!iree_all_bits_set(first->flags,
+                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
+      !iree_all_bits_set(last->flags,
+                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
+    return false;
+  }
+  int64_t first_time_ns = 0;
+  int64_t last_time_ns = 0;
+  if (!iree_profile_model_sample_time_ns(first, time_domain, &first_time_ns) ||
+      !iree_profile_model_sample_time_ns(last, time_domain, &last_time_ns)) {
     return false;
   }
   if (last->device_tick <= first->device_tick ||
-      last->host_cpu_timestamp_ns <= first->host_cpu_timestamp_ns) {
+      last_time_ns <= first_time_ns) {
     return false;
   }
 
-  const double device_delta_ticks =
-      (double)(last->device_tick - first->device_tick);
-  const double host_delta_ns =
-      (double)(last->host_cpu_timestamp_ns - first->host_cpu_timestamp_ns);
-  *out_ns_per_tick = host_delta_ns / device_delta_ticks;
-  *out_tick_frequency_hz = 1000000000.0 / *out_ns_per_tick;
+  out_fit->time_domain = time_domain;
+  out_fit->first_sample_id = first->sample_id;
+  out_fit->last_sample_id = last->sample_id;
+  out_fit->first_device_tick = first->device_tick;
+  out_fit->last_device_tick = last->device_tick;
+  out_fit->first_time_ns = first_time_ns;
+  out_fit->last_time_ns = last_time_ns;
+  out_fit->device_tick_span = last->device_tick - first->device_tick;
+  out_fit->time_span_ns = (uint64_t)(last_time_ns - first_time_ns);
+  return true;
+}
+
+static bool iree_profile_model_round_mul_div_u64(uint64_t value,
+                                                 uint64_t numerator,
+                                                 uint64_t denominator,
+                                                 uint64_t* out_result) {
+  *out_result = 0;
+  if (denominator == 0) return false;
+  if (value == 0 || numerator == 0) return true;
+
+#if defined(__SIZEOF_INT128__)
+  __uint128_t product = (__uint128_t)value * (__uint128_t)numerator;
+  product += denominator / 2;
+  __uint128_t quotient = product / denominator;
+  if (quotient > UINT64_MAX) return false;
+  *out_result = (uint64_t)quotient;
+  return true;
+#else
+  const uint64_t whole = value / denominator;
+  const uint64_t remainder = value % denominator;
+  if (whole > UINT64_MAX / numerator) return false;
+  uint64_t scaled = whole * numerator;
+  if (remainder != 0) {
+    if (remainder > UINT64_MAX / numerator) return false;
+    uint64_t fractional_product = remainder * numerator;
+    if (fractional_product > UINT64_MAX - denominator / 2) return false;
+    uint64_t fractional = (fractional_product + denominator / 2) / denominator;
+    if (scaled > UINT64_MAX - fractional) return false;
+    scaled += fractional;
+  }
+  *out_result = scaled;
+  return true;
+#endif  // defined(__SIZEOF_INT128__)
+}
+
+bool iree_profile_model_clock_fit_scale_ticks_to_ns(
+    const iree_profile_model_clock_fit_t* fit, uint64_t device_tick_count,
+    int64_t* out_duration_ns) {
+  *out_duration_ns = 0;
+  if (!fit || fit->device_tick_span == 0) return false;
+  uint64_t duration_ns = 0;
+  if (!iree_profile_model_round_mul_div_u64(
+          device_tick_count, fit->time_span_ns, fit->device_tick_span,
+          &duration_ns) ||
+      duration_ns > INT64_MAX) {
+    return false;
+  }
+  *out_duration_ns = (int64_t)duration_ns;
+  return true;
+}
+
+bool iree_profile_model_clock_fit_map_tick(
+    const iree_profile_model_clock_fit_t* fit, uint64_t device_tick,
+    int64_t* out_time_ns) {
+  *out_time_ns = 0;
+  if (!fit || fit->device_tick_span == 0) return false;
+
+  const bool after_base = device_tick >= fit->first_device_tick;
+  const uint64_t tick_delta = after_base ? device_tick - fit->first_device_tick
+                                         : fit->first_device_tick - device_tick;
+  int64_t time_delta_ns = 0;
+  if (!iree_profile_model_clock_fit_scale_ticks_to_ns(fit, tick_delta,
+                                                      &time_delta_ns)) {
+    return false;
+  }
+
+  if (after_base) {
+    if (fit->first_time_ns > INT64_MAX - time_delta_ns) return false;
+    *out_time_ns = fit->first_time_ns + time_delta_ns;
+  } else {
+    if (fit->first_time_ns < INT64_MIN + time_delta_ns) return false;
+    *out_time_ns = fit->first_time_ns - time_delta_ns;
+  }
+  return true;
+}
+
+double iree_profile_model_clock_fit_ns_per_tick(
+    const iree_profile_model_clock_fit_t* fit) {
+  if (!fit || fit->device_tick_span == 0) return 0.0;
+  return (double)fit->time_span_ns / (double)fit->device_tick_span;
+}
+
+double iree_profile_model_clock_fit_tick_frequency_hz(
+    const iree_profile_model_clock_fit_t* fit) {
+  const double ns_per_tick = iree_profile_model_clock_fit_ns_per_tick(fit);
+  return ns_per_tick > 0.0 ? 1000000000.0 / ns_per_tick : 0.0;
+}
+
+bool iree_profile_model_device_try_fit_clock(
+    const iree_profile_model_device_t* device, double* out_ns_per_tick,
+    double* out_tick_frequency_hz) {
+  *out_ns_per_tick = 0.0;
+  *out_tick_frequency_hz = 0.0;
+  iree_profile_model_clock_fit_t fit;
+  if (!iree_profile_model_device_try_fit_clock_exact(
+          device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+          &fit)) {
+    return false;
+  }
+  *out_ns_per_tick = iree_profile_model_clock_fit_ns_per_tick(&fit);
+  *out_tick_frequency_hz = iree_profile_model_clock_fit_tick_frequency_hz(&fit);
   return true;
 }
 
