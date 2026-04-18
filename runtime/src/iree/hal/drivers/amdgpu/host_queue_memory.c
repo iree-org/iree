@@ -93,7 +93,8 @@ static void iree_hal_amdgpu_host_queue_decommit_transient_buffer(
 }
 
 static void iree_hal_amdgpu_host_queue_release_transient_buffer_reservation(
-    void* user_data, const iree_async_frontier_t* queue_frontier) {
+    void* user_data, const iree_async_frontier_t* queue_frontier,
+    uint64_t submission_id) {
   iree_hal_amdgpu_host_queue_release_reservation_state_t* state =
       (iree_hal_amdgpu_host_queue_release_reservation_state_t*)user_data;
   iree_hal_pool_t* pool = NULL;
@@ -117,8 +118,8 @@ static void iree_hal_amdgpu_host_queue_release_transient_buffer_reservation(
     iree_hal_amdgpu_host_queue_record_memory_event(
         state->queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
         IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX, pool,
-        params, state->buffer, &reservation, length,
-        /*submission_id=*/0, queue_frontier ? queue_frontier->entry_count : 0);
+        params, state->buffer, &reservation, length, submission_id,
+        queue_frontier ? queue_frontier->entry_count : 0);
   }
 }
 

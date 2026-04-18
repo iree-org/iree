@@ -1195,7 +1195,8 @@ uint64_t iree_hal_amdgpu_host_queue_finish_barrier_submission(
   }
   if (post_commit_callback.fn) {
     post_commit_callback.fn(post_commit_callback.user_data,
-                            iree_hal_amdgpu_host_queue_const_frontier(queue));
+                            iree_hal_amdgpu_host_queue_const_frontier(queue),
+                            submission_epoch);
   }
   if (complete_with_queue_device_event) {
     iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot =

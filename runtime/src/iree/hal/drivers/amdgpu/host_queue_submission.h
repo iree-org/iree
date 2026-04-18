@@ -18,12 +18,14 @@ typedef struct iree_hal_amdgpu_host_queue_profile_event_info_t
     iree_hal_amdgpu_host_queue_profile_event_info_t;
 
 typedef void(IREE_API_PTR* iree_hal_amdgpu_host_queue_post_commit_fn_t)(
-    void* user_data, const iree_async_frontier_t* queue_frontier);
+    void* user_data, const iree_async_frontier_t* queue_frontier,
+    uint64_t submission_id);
 
 // Optional callback invoked after queue frontier state has advanced and before
 // the completion packet is published.
 typedef struct iree_hal_amdgpu_host_queue_post_commit_callback_t {
-  // Function invoked with the queue frontier visible after commit.
+  // Function invoked with the queue frontier and submission id visible after
+  // commit.
   iree_hal_amdgpu_host_queue_post_commit_fn_t fn;
 
   // Opaque user data passed to |fn|.
