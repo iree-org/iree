@@ -955,7 +955,7 @@ static void iree_profile_print_summary_text(
   iree_profile_print_summary_text_devices(summary, file);
 }
 
-static void iree_profile_print_summary_jsonl_summary(
+static void iree_profile_print_summary_jsonl_record_fields(
     const iree_profile_summary_t* summary, FILE* file) {
   fprintf(file,
           "{\"type\":\"summary\",\"file_records\":%" PRIu64
@@ -964,6 +964,10 @@ static void iree_profile_print_summary_jsonl_summary(
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
           summary->unknown_record_count);
+}
+
+static void iree_profile_print_summary_jsonl_metadata_fields(
+    const iree_profile_summary_t* summary, FILE* file) {
   fprintf(file,
           ",\"device_chunks\":%" PRIu64 ",\"queue_chunks\":%" PRIu64
           ",\"executable_chunks\":%" PRIu64 ",\"executable_records\":%" PRIu64
@@ -993,6 +997,10 @@ static void iree_profile_print_summary_jsonl_summary(
           summary->command_operation_chunk_count,
           summary->command_operation_record_count,
           summary->clock_correlation_chunk_count);
+}
+
+static void iree_profile_print_summary_jsonl_execution_fields(
+    const iree_profile_summary_t* summary, FILE* file) {
   fprintf(file,
           ",\"dispatch_event_chunks\":%" PRIu64
           ",\"queue_event_chunks\":%" PRIu64 ",\"queue_event_records\":%" PRIu64
@@ -1017,6 +1025,10 @@ static void iree_profile_print_summary_jsonl_summary(
           summary->memory_event_chunk_count, summary->memory_event_record_count,
           summary->event_relationship_chunk_count,
           summary->event_relationship_record_count);
+}
+
+static void iree_profile_print_summary_jsonl_counter_trace_fields(
+    const iree_profile_summary_t* summary, FILE* file) {
   fprintf(file,
           ",\"counter_set_chunks\":%" PRIu64 ",\"counter_set_records\":%" PRIu64
           ",\"counter_chunks\":%" PRIu64 ",\"counter_records\":%" PRIu64
@@ -1034,6 +1046,14 @@ static void iree_profile_print_summary_jsonl_summary(
           summary->executable_trace_record_count,
           summary->executable_trace_data_bytes, summary->unknown_chunk_count,
           summary->truncated_chunk_count);
+}
+
+static void iree_profile_print_summary_jsonl_summary(
+    const iree_profile_summary_t* summary, FILE* file) {
+  iree_profile_print_summary_jsonl_record_fields(summary, file);
+  iree_profile_print_summary_jsonl_metadata_fields(summary, file);
+  iree_profile_print_summary_jsonl_execution_fields(summary, file);
+  iree_profile_print_summary_jsonl_counter_trace_fields(summary, file);
 }
 
 static void iree_profile_print_summary_jsonl_device(
