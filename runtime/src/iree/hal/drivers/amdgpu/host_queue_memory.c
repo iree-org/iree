@@ -12,6 +12,20 @@
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/transient_buffer.h"
 
+static void iree_hal_amdgpu_host_queue_populate_memory_event_pool_stats(
+    iree_hal_pool_t* pool, iree_hal_profile_memory_event_t* event) {
+  if (!pool) return;
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool, &stats);
+  event->flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS;
+  event->pool_bytes_reserved = stats.bytes_reserved;
+  event->pool_bytes_free = stats.bytes_free;
+  event->pool_bytes_committed = stats.bytes_committed;
+  event->pool_budget_limit = stats.budget_limit;
+  event->pool_reservation_count = stats.reservation_count;
+  event->pool_slab_count = stats.slab_count;
+}
+
 static void iree_hal_amdgpu_host_queue_record_memory_event(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_profile_memory_event_type_t type,
@@ -50,6 +64,7 @@ static void iree_hal_amdgpu_host_queue_record_memory_event(
       event.length = reservation->length;
     }
   }
+  iree_hal_amdgpu_host_queue_populate_memory_event_pool_stats(pool, &event);
   iree_hal_amdgpu_logical_device_record_profile_memory_event(
       queue->logical_device, &event);
 }
@@ -83,22 +98,28 @@ static void iree_hal_amdgpu_host_queue_release_transient_buffer_reservation(
       (iree_hal_amdgpu_host_queue_release_reservation_state_t*)user_data;
   iree_hal_pool_t* pool = NULL;
   iree_hal_pool_reservation_t reservation;
-  if (iree_hal_amdgpu_transient_buffer_query_reservation(state->buffer, &pool,
-                                                         &reservation)) {
-    iree_hal_buffer_params_t params = {
+  const bool has_reservation =
+      iree_hal_amdgpu_transient_buffer_query_reservation(state->buffer, &pool,
+                                                         &reservation);
+  iree_hal_buffer_params_t params = {0};
+  iree_device_size_t length = 0;
+  if (has_reservation) {
+    params = (iree_hal_buffer_params_t){
         .type = iree_hal_buffer_memory_type(state->buffer),
         .access = iree_hal_buffer_allowed_access(state->buffer),
         .usage = iree_hal_buffer_allowed_usage(state->buffer),
     };
-    iree_hal_amdgpu_host_queue_record_memory_event(
-        state->queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
-        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX, pool,
-        params, state->buffer, &reservation,
-        iree_hal_buffer_byte_length(state->buffer),
-        /*submission_id=*/0, queue_frontier ? queue_frontier->entry_count : 0);
+    length = iree_hal_buffer_byte_length(state->buffer);
   }
   iree_hal_amdgpu_transient_buffer_release_reservation(state->buffer,
                                                        queue_frontier);
+  if (has_reservation) {
+    iree_hal_amdgpu_host_queue_record_memory_event(
+        state->queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX, pool,
+        params, state->buffer, &reservation, length,
+        /*submission_id=*/0, queue_frontier ? queue_frontier->entry_count : 0);
+  }
 }
 
 static iree_hal_pool_t* iree_hal_amdgpu_host_queue_resolve_pool(
@@ -250,6 +271,9 @@ iree_status_t iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
       if (!iree_all_bits_set(flags,
                              IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)) {
+        iree_hal_pool_release_reservation(
+            allocation_pool, &out_reservation->reservation,
+            out_reservation->acquire_info.wait_frontier);
         iree_hal_amdgpu_host_queue_record_memory_event(
             queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
             IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION |
@@ -260,9 +284,6 @@ iree_status_t iree_hal_amdgpu_host_queue_acquire_alloca_reservation(
             out_reservation->acquire_info.wait_frontier
                 ? out_reservation->acquire_info.wait_frontier->entry_count
                 : 0);
-        iree_hal_pool_release_reservation(
-            allocation_pool, &out_reservation->reservation,
-            out_reservation->acquire_info.wait_frontier);
         return iree_make_status(
             IREE_STATUS_RESOURCE_EXHAUSTED,
             "queue_alloca recycled pool memory requires "
@@ -342,6 +363,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
           IREE_ARRAYSIZE(operation_resources), &profile_event_info, out_ready,
           &submission);
   if (!iree_status_is_ok(status) || !*out_ready) {
+    iree_hal_pool_release_reservation(allocation_pool,
+                                      &alloca_reservation->reservation,
+                                      reservation_failure_frontier);
     iree_hal_amdgpu_host_queue_record_memory_event(
         queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
         IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION,
@@ -351,9 +375,6 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
         alloca_reservation->acquire_info.wait_frontier
             ? alloca_reservation->acquire_info.wait_frontier->entry_count
             : 0);
-    iree_hal_pool_release_reservation(allocation_pool,
-                                      &alloca_reservation->reservation,
-                                      reservation_failure_frontier);
     return status;
   }
 
@@ -407,6 +428,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
 
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_host_queue_fail_barrier_submission(queue, &submission);
+    iree_hal_pool_release_reservation(allocation_pool,
+                                      &alloca_reservation->reservation,
+                                      reservation_failure_frontier);
     iree_hal_amdgpu_host_queue_record_memory_event(
         queue, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
         IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION,
@@ -416,9 +440,6 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_alloca_reservation(
         alloca_reservation->acquire_info.wait_frontier
             ? alloca_reservation->acquire_info.wait_frontier->entry_count
             : 0);
-    iree_hal_pool_release_reservation(allocation_pool,
-                                      &alloca_reservation->reservation,
-                                      reservation_failure_frontier);
   }
   return status;
 }

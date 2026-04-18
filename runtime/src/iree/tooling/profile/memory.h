@@ -101,6 +101,30 @@ typedef struct iree_profile_memory_pool_t {
   uint64_t wait_count;
   // Materialize events attributed to this pool/provider.
   uint64_t materialize_count;
+  // Number of pool-stat snapshots captured for this pool row.
+  uint64_t pool_stats_sample_count;
+  // Last sampled pool bytes occupied by live reservations.
+  uint64_t pool_bytes_reserved;
+  // Highest sampled pool bytes occupied by live reservations.
+  uint64_t pool_bytes_reserved_high_water;
+  // Last sampled pool bytes available for reservation.
+  uint64_t pool_bytes_free;
+  // Lowest sampled pool bytes available for reservation.
+  uint64_t pool_bytes_free_low_water;
+  // Last sampled pool physical bytes committed.
+  uint64_t pool_bytes_committed;
+  // Highest sampled pool physical bytes committed.
+  uint64_t pool_bytes_committed_high_water;
+  // Last sampled pool budget limit in bytes, or 0 for unlimited.
+  uint64_t pool_budget_limit;
+  // Last sampled live reservation count.
+  uint32_t pool_reservation_count;
+  // Highest sampled live reservation count.
+  uint32_t pool_reservation_high_water_count;
+  // Last sampled committed slab count.
+  uint32_t pool_slab_count;
+  // Highest sampled committed slab count.
+  uint32_t pool_slab_high_water_count;
   // Lifecycle balance for this pool/provider row's |kind|.
   iree_profile_memory_balance_t lifecycle_balance;
   // Materialization balance for pool reservation rows.

@@ -312,6 +312,12 @@ static bool iree_profile_memory_event_matches(
   return iree_profile_key_matches(type_name, filter);
 }
 
+static bool iree_profile_memory_event_has_pool_stats(
+    const iree_hal_profile_memory_event_t* event) {
+  return iree_all_bits_set(event->flags,
+                           IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS);
+}
+
 static bool iree_profile_memory_event_closes_materialization(
     const iree_profile_memory_context_t* context,
     const iree_hal_profile_memory_event_t* event) {
@@ -507,6 +513,47 @@ static iree_status_t iree_profile_memory_record_pool_event(
   return iree_ok_status();
 }
 
+static iree_status_t iree_profile_memory_record_pool_stats_event(
+    iree_profile_memory_context_t* context,
+    const iree_hal_profile_memory_event_t* event) {
+  if (!iree_profile_memory_event_has_pool_stats(event) || event->pool_id == 0) {
+    return iree_ok_status();
+  }
+
+  iree_profile_memory_pool_t* pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_profile_memory_get_pool(
+      context, IREE_PROFILE_MEMORY_LIFECYCLE_KIND_POOL_RESERVATION,
+      event->physical_device_ordinal, event->pool_id, event->memory_type,
+      &pool));
+  const bool first_sample = pool->pool_stats_sample_count == 0;
+  if (!iree_profile_memory_add_u64(&pool->pool_stats_sample_count, 1)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "memory pool stats sample overflow for event_id=%" PRIu64,
+        event->event_id);
+  }
+  pool->buffer_usage |= event->buffer_usage;
+  pool->pool_bytes_reserved = event->pool_bytes_reserved;
+  pool->pool_bytes_reserved_high_water = iree_max(
+      pool->pool_bytes_reserved_high_water, event->pool_bytes_reserved);
+  pool->pool_bytes_free = event->pool_bytes_free;
+  pool->pool_bytes_free_low_water =
+      first_sample
+          ? event->pool_bytes_free
+          : iree_min(pool->pool_bytes_free_low_water, event->pool_bytes_free);
+  pool->pool_bytes_committed = event->pool_bytes_committed;
+  pool->pool_bytes_committed_high_water = iree_max(
+      pool->pool_bytes_committed_high_water, event->pool_bytes_committed);
+  pool->pool_budget_limit = event->pool_budget_limit;
+  pool->pool_reservation_count = event->pool_reservation_count;
+  pool->pool_reservation_high_water_count = iree_max(
+      pool->pool_reservation_high_water_count, event->pool_reservation_count);
+  pool->pool_slab_count = event->pool_slab_count;
+  pool->pool_slab_high_water_count =
+      iree_max(pool->pool_slab_high_water_count, event->pool_slab_count);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_memory_record_allocation_event(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_memory_event_t* event, bool close_materialization) {
@@ -590,12 +637,21 @@ static void iree_profile_memory_print_event_jsonl(
           ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
           ",\"frontier_entry_count\":%u,\"memory_type\":%" PRIu64
           ",\"buffer_usage\":%" PRIu64 ",\"offset\":%" PRIu64
-          ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64 "}\n",
+          ",\"length\":%" PRIu64 ",\"alignment\":%" PRIu64
+          ",\"pool_stats_available\":%s"
+          ",\"pool_bytes_reserved\":%" PRIu64 ",\"pool_bytes_free\":%" PRIu64
+          ",\"pool_bytes_committed\":%" PRIu64 ",\"pool_budget_limit\":%" PRIu64
+          ",\"pool_reservation_count\":%u"
+          ",\"pool_slab_count\":%u}\n",
           event->type, event->flags, event->result, event->host_time_ns,
           event->allocation_id, event->pool_id, event->backing_id,
           event->submission_id, event->physical_device_ordinal,
           event->queue_ordinal, event->frontier_entry_count, event->memory_type,
-          event->buffer_usage, event->offset, event->length, event->alignment);
+          event->buffer_usage, event->offset, event->length, event->alignment,
+          iree_profile_memory_event_has_pool_stats(event) ? "true" : "false",
+          event->pool_bytes_reserved, event->pool_bytes_free,
+          event->pool_bytes_committed, event->pool_budget_limit,
+          event->pool_reservation_count, event->pool_slab_count);
 }
 
 static bool iree_profile_memory_allocation_open_at_end(
@@ -949,6 +1005,9 @@ iree_status_t iree_profile_memory_context_accumulate_record(
                                                        close_materialization);
       }
       if (iree_status_is_ok(status)) {
+        status = iree_profile_memory_record_pool_stats_event(context, &event);
+      }
+      if (iree_status_is_ok(status)) {
         status = iree_profile_memory_record_allocation_event(
             context, &event, close_materialization);
       }
@@ -1041,6 +1100,25 @@ static iree_status_t iree_profile_memory_print_text(
               " materialized_high_water_bytes=%" PRIu64,
               pool->materialization_balance.current_count,
               pool->materialization_balance.high_water_bytes);
+    }
+    if (pool->pool_stats_sample_count != 0) {
+      fprintf(
+          file,
+          " pool_stats_samples=%" PRIu64 " pool_bytes_reserved=%" PRIu64
+          " pool_bytes_reserved_high_water=%" PRIu64 " pool_bytes_free=%" PRIu64
+          " pool_bytes_free_low_water=%" PRIu64 " pool_bytes_committed=%" PRIu64
+          " pool_bytes_committed_high_water=%" PRIu64
+          " pool_budget_limit=%" PRIu64
+          " pool_reservations=%u"
+          " pool_reservation_high_water=%u"
+          " pool_slabs=%u"
+          " pool_slab_high_water=%u",
+          pool->pool_stats_sample_count, pool->pool_bytes_reserved,
+          pool->pool_bytes_reserved_high_water, pool->pool_bytes_free,
+          pool->pool_bytes_free_low_water, pool->pool_bytes_committed,
+          pool->pool_bytes_committed_high_water, pool->pool_budget_limit,
+          pool->pool_reservation_count, pool->pool_reservation_high_water_count,
+          pool->pool_slab_count, pool->pool_slab_high_water_count);
     }
     fputc('\n', file);
   }
@@ -1173,6 +1251,27 @@ static void iree_profile_memory_print_jsonl_summary(
                                                    &pool->lifecycle_balance);
     iree_profile_memory_fprint_balance_json_fields(
         file, "materialized", &pool->materialization_balance);
+    fprintf(
+        file,
+        ",\"pool_stats_available\":%s"
+        ",\"pool_stats_samples\":%" PRIu64 ",\"pool_bytes_reserved\":%" PRIu64
+        ",\"pool_bytes_reserved_high_water\":%" PRIu64
+        ",\"pool_bytes_free\":%" PRIu64
+        ",\"pool_bytes_free_low_water\":%" PRIu64
+        ",\"pool_bytes_committed\":%" PRIu64
+        ",\"pool_bytes_committed_high_water\":%" PRIu64
+        ",\"pool_budget_limit\":%" PRIu64
+        ",\"pool_reservation_count\":%u"
+        ",\"pool_reservation_high_water_count\":%u"
+        ",\"pool_slab_count\":%u"
+        ",\"pool_slab_high_water_count\":%u",
+        pool->pool_stats_sample_count != 0 ? "true" : "false",
+        pool->pool_stats_sample_count, pool->pool_bytes_reserved,
+        pool->pool_bytes_reserved_high_water, pool->pool_bytes_free,
+        pool->pool_bytes_free_low_water, pool->pool_bytes_committed,
+        pool->pool_bytes_committed_high_water, pool->pool_budget_limit,
+        pool->pool_reservation_count, pool->pool_reservation_high_water_count,
+        pool->pool_slab_count, pool->pool_slab_high_water_count);
     fprintf(file, "}\n");
   }
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {

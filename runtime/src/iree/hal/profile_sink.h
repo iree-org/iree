@@ -963,6 +963,9 @@ enum iree_hal_profile_memory_event_flag_bits_t {
 
   // Event references an actual pool reservation.
   IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION = 1u << 3,
+
+  // Event carries an atomic pool-stat snapshot.
+  IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS = 1u << 4,
 };
 
 // Host-timestamped memory lifecycle event.
@@ -970,7 +973,9 @@ enum iree_hal_profile_memory_event_flag_bits_t {
 // Memory events describe allocations, reservations, and queue-visible
 // allocation operations. The timestamp is in IREE host monotonic time, not a
 // device clock domain. Producer-defined ids are stable only within one profile
-// session and are intended for joining records in the same bundle.
+// session and are intended for joining records in the same bundle. Pool-stat
+// snapshots, when present, describe the pool state after the event's
+// producer-visible mutation.
 typedef struct iree_hal_profile_memory_event_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
@@ -1010,6 +1015,18 @@ typedef struct iree_hal_profile_memory_event_t {
   uint64_t length;
   // Requested or guaranteed byte alignment for the allocation.
   uint64_t alignment;
+  // Pool bytes currently occupied by live reservations, when present.
+  uint64_t pool_bytes_reserved;
+  // Pool bytes currently free or available for reservation, when present.
+  uint64_t pool_bytes_free;
+  // Pool physical memory committed in slabs or pages, when present.
+  uint64_t pool_bytes_committed;
+  // Pool budget limit in bytes, or 0 for unlimited, when present.
+  uint64_t pool_budget_limit;
+  // Pool live reservation count, when present.
+  uint32_t pool_reservation_count;
+  // Pool committed slab count, when present.
+  uint32_t pool_slab_count;
 } iree_hal_profile_memory_event_t;
 
 // Returns a default memory lifecycle event record.
