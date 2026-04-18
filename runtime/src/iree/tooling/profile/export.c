@@ -55,6 +55,63 @@ static bool iree_profile_export_try_get_driver_host_cpu_clock_fit(
       out_fit);
 }
 
+typedef struct iree_profile_export_device_time_t {
+  // True when the source tick pair is non-zero and ordered.
+  bool is_valid;
+  // Raw device tick delta when the source tick pair is valid.
+  uint64_t duration_ticks;
+  // True when the source ticks were mapped into the driver host CPU time
+  // domain.
+  bool has_derived_time;
+  // First clock correlation sample used by the fitted mapping.
+  uint64_t clock_fit_first_sample_id;
+  // Last clock correlation sample used by the fitted mapping.
+  uint64_t clock_fit_last_sample_id;
+  // Source start tick mapped to driver host CPU timestamp nanoseconds.
+  int64_t start_driver_host_cpu_time_ns;
+  // Source end tick mapped to driver host CPU timestamp nanoseconds.
+  int64_t end_driver_host_cpu_time_ns;
+  // Derived duration in nanoseconds when the clock mapping is available.
+  int64_t duration_ns;
+} iree_profile_export_device_time_t;
+
+static iree_profile_export_device_time_t
+iree_profile_export_calculate_device_time(const iree_profile_model_t* model,
+                                          uint32_t physical_device_ordinal,
+                                          uint64_t start_tick,
+                                          uint64_t end_tick) {
+  iree_profile_export_device_time_t device_time;
+  memset(&device_time, 0, sizeof(device_time));
+  device_time.is_valid =
+      start_tick != 0 && end_tick != 0 && end_tick >= start_tick;
+  if (!device_time.is_valid) return device_time;
+
+  device_time.duration_ticks = end_tick - start_tick;
+  iree_profile_model_clock_fit_t clock_fit;
+  if (!iree_profile_export_try_get_driver_host_cpu_clock_fit(
+          model, physical_device_ordinal, &clock_fit)) {
+    return device_time;
+  }
+  int64_t start_driver_host_cpu_time_ns = 0;
+  int64_t end_driver_host_cpu_time_ns = 0;
+  if (!iree_profile_model_clock_fit_map_tick(&clock_fit, start_tick,
+                                             &start_driver_host_cpu_time_ns) ||
+      !iree_profile_model_clock_fit_map_tick(&clock_fit, end_tick,
+                                             &end_driver_host_cpu_time_ns) ||
+      end_driver_host_cpu_time_ns < start_driver_host_cpu_time_ns) {
+    return device_time;
+  }
+
+  device_time.has_derived_time = true;
+  device_time.clock_fit_first_sample_id = clock_fit.first_sample_id;
+  device_time.clock_fit_last_sample_id = clock_fit.last_sample_id;
+  device_time.start_driver_host_cpu_time_ns = start_driver_host_cpu_time_ns;
+  device_time.end_driver_host_cpu_time_ns = end_driver_host_cpu_time_ns;
+  device_time.duration_ns =
+      end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns;
+  return device_time;
+}
+
 static void iree_profile_export_print_session_record(
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
@@ -87,8 +144,10 @@ static void iree_profile_export_print_diagnostic(
 }
 
 static iree_status_t iree_profile_export_process_device_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_device_record_t), &iterator);
@@ -126,8 +185,10 @@ static iree_status_t iree_profile_export_process_device_records(
 }
 
 static iree_status_t iree_profile_export_process_queue_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_queue_record_t), &iterator);
@@ -152,8 +213,10 @@ static iree_status_t iree_profile_export_process_queue_records(
 }
 
 static iree_status_t iree_profile_export_process_executable_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_executable_record_t), &iterator);
@@ -188,8 +251,10 @@ static iree_status_t iree_profile_export_process_executable_records(
 }
 
 static iree_status_t iree_profile_export_process_executable_export_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_executable_export_record_t), &iterator);
@@ -241,8 +306,10 @@ static iree_status_t iree_profile_export_process_executable_export_records(
 }
 
 static iree_status_t iree_profile_export_process_command_buffer_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_command_buffer_record_t), &iterator);
@@ -340,8 +407,10 @@ static iree_status_t iree_profile_export_process_command_operation_records(
 }
 
 static iree_status_t iree_profile_export_process_clock_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_clock_correlation_record_t), &iterator);
@@ -401,30 +470,10 @@ static iree_status_t iree_profile_export_process_dispatch_records(
     iree_hal_profile_dispatch_event_t dispatch_record;
     memcpy(&dispatch_record, typed_record.contents.data,
            sizeof(dispatch_record));
-    const bool is_valid =
-        dispatch_record.start_tick != 0 && dispatch_record.end_tick != 0 &&
-        dispatch_record.end_tick >= dispatch_record.start_tick;
-    const uint64_t duration_ticks =
-        is_valid ? dispatch_record.end_tick - dispatch_record.start_tick : 0;
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit =
-        iree_profile_export_try_get_driver_host_cpu_clock_fit(
-            model, record->header.physical_device_ordinal, &clock_fit);
-    int64_t start_driver_host_cpu_time_ns = 0;
-    int64_t end_driver_host_cpu_time_ns = 0;
-    const bool has_derived_time =
-        is_valid && has_clock_fit &&
-        iree_profile_model_clock_fit_map_tick(&clock_fit,
-                                              dispatch_record.start_tick,
-                                              &start_driver_host_cpu_time_ns) &&
-        iree_profile_model_clock_fit_map_tick(&clock_fit,
-                                              dispatch_record.end_tick,
-                                              &end_driver_host_cpu_time_ns) &&
-        end_driver_host_cpu_time_ns >= start_driver_host_cpu_time_ns;
-    const int64_t derived_duration_ns =
-        has_derived_time
-            ? end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns
-            : 0;
+    const iree_profile_export_device_time_t device_time =
+        iree_profile_export_calculate_device_time(
+            model, record->header.physical_device_ordinal,
+            dispatch_record.start_tick, dispatch_record.end_tick);
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_model_resolve_dispatch_key(
@@ -466,13 +515,13 @@ static iree_status_t iree_profile_export_process_dispatch_records(
           dispatch_record.workgroup_count[1],
           dispatch_record.workgroup_count[2], dispatch_record.workgroup_size[0],
           dispatch_record.workgroup_size[1], dispatch_record.workgroup_size[2],
-          dispatch_record.start_tick, dispatch_record.end_tick, duration_ticks,
-          is_valid ? "true" : "false", has_derived_time ? "true" : "false",
-          has_derived_time ? clock_fit.first_sample_id : 0,
-          has_derived_time ? clock_fit.last_sample_id : 0,
-          has_derived_time ? start_driver_host_cpu_time_ns : 0,
-          has_derived_time ? end_driver_host_cpu_time_ns : 0,
-          derived_duration_ns);
+          dispatch_record.start_tick, dispatch_record.end_tick,
+          device_time.duration_ticks, device_time.is_valid ? "true" : "false",
+          device_time.has_derived_time ? "true" : "false",
+          device_time.clock_fit_first_sample_id,
+          device_time.clock_fit_last_sample_id,
+          device_time.start_driver_host_cpu_time_ns,
+          device_time.end_driver_host_cpu_time_ns, device_time.duration_ns);
     }
   }
   return status;
@@ -496,32 +545,10 @@ static iree_status_t iree_profile_export_process_queue_device_event_records(
     iree_hal_profile_queue_device_event_t queue_device_event;
     memcpy(&queue_device_event, typed_record.contents.data,
            sizeof(queue_device_event));
-    const bool is_valid =
-        queue_device_event.start_tick != 0 &&
-        queue_device_event.end_tick != 0 &&
-        queue_device_event.end_tick >= queue_device_event.start_tick;
-    const uint64_t duration_ticks =
-        is_valid ? queue_device_event.end_tick - queue_device_event.start_tick
-                 : 0;
-    iree_profile_model_clock_fit_t clock_fit;
-    const bool has_clock_fit =
-        iree_profile_export_try_get_driver_host_cpu_clock_fit(
-            model, queue_device_event.physical_device_ordinal, &clock_fit);
-    int64_t start_driver_host_cpu_time_ns = 0;
-    int64_t end_driver_host_cpu_time_ns = 0;
-    const bool has_derived_time =
-        is_valid && has_clock_fit &&
-        iree_profile_model_clock_fit_map_tick(&clock_fit,
-                                              queue_device_event.start_tick,
-                                              &start_driver_host_cpu_time_ns) &&
-        iree_profile_model_clock_fit_map_tick(&clock_fit,
-                                              queue_device_event.end_tick,
-                                              &end_driver_host_cpu_time_ns) &&
-        end_driver_host_cpu_time_ns >= start_driver_host_cpu_time_ns;
-    const int64_t derived_duration_ns =
-        has_derived_time
-            ? end_driver_host_cpu_time_ns - start_driver_host_cpu_time_ns
-            : 0;
+    const iree_profile_export_device_time_t device_time =
+        iree_profile_export_calculate_device_time(
+            model, queue_device_event.physical_device_ordinal,
+            queue_device_event.start_tick, queue_device_event.end_tick);
     iree_profile_export_print_prefix(file, "queue_device_event", record_index);
     fprintf(file,
             ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
@@ -556,13 +583,13 @@ static iree_status_t iree_profile_export_process_queue_device_event_records(
             queue_device_event.type, queue_device_event.flags,
             queue_device_event.payload_length,
             queue_device_event.operation_count, queue_device_event.start_tick,
-            queue_device_event.end_tick, duration_ticks,
-            is_valid ? "true" : "false", has_derived_time ? "true" : "false",
-            has_derived_time ? clock_fit.first_sample_id : 0,
-            has_derived_time ? clock_fit.last_sample_id : 0,
-            has_derived_time ? start_driver_host_cpu_time_ns : 0,
-            has_derived_time ? end_driver_host_cpu_time_ns : 0,
-            derived_duration_ns);
+            queue_device_event.end_tick, device_time.duration_ticks,
+            device_time.is_valid ? "true" : "false",
+            device_time.has_derived_time ? "true" : "false",
+            device_time.clock_fit_first_sample_id,
+            device_time.clock_fit_last_sample_id,
+            device_time.start_driver_host_cpu_time_ns,
+            device_time.end_driver_host_cpu_time_ns, device_time.duration_ns);
   }
   return status;
 }
@@ -645,8 +672,10 @@ static iree_status_t iree_profile_export_process_host_execution_event_records(
 }
 
 static iree_status_t iree_profile_export_process_queue_event_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_queue_event_t), &iterator);
@@ -691,8 +720,10 @@ static iree_status_t iree_profile_export_process_queue_event_records(
 }
 
 static iree_status_t iree_profile_export_process_memory_event_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_memory_event_t), &iterator);
@@ -751,8 +782,10 @@ static iree_status_t iree_profile_export_process_memory_event_records(
 }
 
 static iree_status_t iree_profile_export_process_event_relationship_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_event_relationship_record_t), &iterator);
@@ -800,8 +833,10 @@ static iree_status_t iree_profile_export_process_event_relationship_records(
 }
 
 static iree_status_t iree_profile_export_process_counter_set_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_counter_set_record_t), &iterator);
@@ -844,8 +879,10 @@ static iree_status_t iree_profile_export_process_counter_set_records(
 }
 
 static iree_status_t iree_profile_export_process_counter_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_counter_record_t), &iterator);
@@ -905,8 +942,10 @@ static iree_status_t iree_profile_export_process_counter_records(
 }
 
 static iree_status_t iree_profile_export_process_counter_sample_records(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_counter_sample_record_t), &iterator);
@@ -970,8 +1009,10 @@ static const char* iree_profile_executable_trace_format_name(
 }
 
 static iree_status_t iree_profile_export_process_executable_trace_record(
+    const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
+  (void)model;
   iree_profile_typed_record_t typed_record;
   IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
       record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
@@ -1012,6 +1053,70 @@ static iree_status_t iree_profile_export_process_executable_trace_record(
   return iree_ok_status();
 }
 
+typedef iree_status_t (*iree_profile_export_chunk_processor_fn_t)(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file);
+
+typedef struct iree_profile_export_chunk_route_t {
+  // Profile chunk content type handled by this route.
+  iree_string_view_t content_type;
+  // Processor used to emit zero or more interchange rows for the chunk.
+  iree_profile_export_chunk_processor_fn_t process;
+} iree_profile_export_chunk_route_t;
+
+static iree_status_t iree_profile_export_process_chunk_record(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  const iree_profile_export_chunk_route_t routes[] = {
+      {IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES,
+       iree_profile_export_process_device_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES,
+       iree_profile_export_process_queue_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES,
+       iree_profile_export_process_executable_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
+       iree_profile_export_process_executable_export_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS,
+       iree_profile_export_process_command_buffer_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS,
+       iree_profile_export_process_command_operation_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS,
+       iree_profile_export_process_clock_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS,
+       iree_profile_export_process_dispatch_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
+       iree_profile_export_process_queue_event_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS,
+       iree_profile_export_process_queue_device_event_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
+       iree_profile_export_process_host_execution_event_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
+       iree_profile_export_process_memory_event_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS,
+       iree_profile_export_process_event_relationship_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS,
+       iree_profile_export_process_counter_set_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS,
+       iree_profile_export_process_counter_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES,
+       iree_profile_export_process_counter_sample_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES,
+       iree_profile_export_process_executable_trace_record},
+  };
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(routes); ++i) {
+    if (iree_string_view_equal(record->content_type, routes[i].content_type)) {
+      return routes[i].process(model, record, record_index, file);
+    }
+  }
+
+  iree_profile_export_print_diagnostic(
+      record_index, "warning", "unknown_chunk", record->content_type,
+      "unknown profile chunk content type", file);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_export_process_decoded_record(
     const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
@@ -1037,94 +1142,8 @@ static iree_status_t iree_profile_export_process_decoded_record(
         "chunk was marked truncated by the producer", file);
   }
 
-  if (iree_string_view_equal(record->content_type,
-                             IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES)) {
-    return iree_profile_export_process_device_records(record, record_index,
-                                                      file);
-  } else if (iree_string_view_equal(record->content_type,
-                                    IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
-    return iree_profile_export_process_queue_records(record, record_index,
-                                                     file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
-    return iree_profile_export_process_executable_records(record, record_index,
-                                                          file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-    return iree_profile_export_process_executable_export_records(
-        record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
-    return iree_profile_export_process_command_buffer_records(
-        record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
-    return iree_profile_export_process_command_operation_records(
-        model, record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
-    return iree_profile_export_process_clock_records(record, record_index,
-                                                     file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-    return iree_profile_export_process_dispatch_records(model, record,
-                                                        record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
-    return iree_profile_export_process_queue_event_records(record, record_index,
-                                                           file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
-    return iree_profile_export_process_queue_device_event_records(
-        model, record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
-    return iree_profile_export_process_host_execution_event_records(
-        model, record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
-    return iree_profile_export_process_memory_event_records(record,
-                                                            record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS)) {
-    return iree_profile_export_process_event_relationship_records(
-        record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS)) {
-    return iree_profile_export_process_counter_set_records(record, record_index,
-                                                           file);
-  } else if (iree_string_view_equal(record->content_type,
-                                    IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS)) {
-    return iree_profile_export_process_counter_records(record, record_index,
-                                                       file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
-    return iree_profile_export_process_counter_sample_records(
-        record, record_index, file);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
-    return iree_profile_export_process_executable_trace_record(
-        record, record_index, file);
-  }
-
-  iree_profile_export_print_diagnostic(
-      record_index, "warning", "unknown_chunk", record->content_type,
-      "unknown profile chunk content type", file);
-  return iree_ok_status();
+  return iree_profile_export_process_chunk_record(model, record, record_index,
+                                                  file);
 }
 
 typedef struct iree_profile_export_parse_context_t {
