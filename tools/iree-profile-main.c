@@ -21,15 +21,14 @@
 #endif  // IREE_PROFILE_HAVE_AMDGPU_ATT
 
 IREE_FLAG(string, format, "text",
-          "Output format for profile commands: one of `text` or `jsonl`.");
+          "Output format for the selected command. Report commands support "
+          "`text` and `jsonl`; export supports `ireeperf-jsonl`.");
 IREE_FLAG(string, filter, "*",
-          "Name/key wildcard filter for profile projection output.");
+          "Name/key wildcard filter for commands that consume named rows.");
 IREE_FLAG(string, output, "-",
           "Output file path for export commands, or `-` for stdout.");
 IREE_FLAG(int64_t, id, -1,
-          "Optional id filter for projection commands: dispatch event id, "
-          "executable id, command-buffer id, memory event/allocation id, or "
-          "queue submission id.");
+          "Optional id filter interpreted by commands that accept ids.");
 IREE_FLAG(bool, dispatch_events, false,
           "Emits individual dispatch event rows for projection commands with "
           "`--format=jsonl`.");
@@ -113,12 +112,15 @@ int main(int argc, char** argv) {
         .emit_counter_samples = FLAG_counter_samples,
         .host_allocator = host_allocator,
     };
-    const iree_profile_command_invocation_t invocation = {
-        .input_path = input_path,
-        .output_file = stdout,
-        .options = &options,
-    };
-    status = command->run(&invocation);
+    status = iree_profile_command_validate_options(command, &options);
+    if (iree_status_is_ok(status)) {
+      const iree_profile_command_invocation_t invocation = {
+          .input_path = input_path,
+          .output_file = stdout,
+          .options = &options,
+      };
+      status = command->run(&invocation);
+    }
   }
 
   fflush(stdout);

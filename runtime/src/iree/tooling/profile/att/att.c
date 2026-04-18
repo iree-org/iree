@@ -1807,9 +1807,15 @@ static iree_status_t iree_profile_att_run(
 }
 
 static const iree_profile_command_t kIreeProfileAttCommand = {
-    "att",
-    "Decode AMDGPU ATT/SQTT traces and annotate decoded instructions.",
-    iree_profile_att_run,
+    .name = "att",
+    .summary =
+        "Decode AMDGPU ATT/SQTT traces and annotate decoded instructions.",
+    .supported_formats =
+        IREE_PROFILE_COMMAND_FORMAT_TEXT | IREE_PROFILE_COMMAND_FORMAT_JSONL,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_FILTER |
+                        IREE_PROFILE_COMMAND_OPTION_ID |
+                        IREE_PROFILE_COMMAND_OPTION_ROCM_LIBRARY_PATH,
+    .run = iree_profile_att_run,
 };
 
 const iree_profile_command_t* iree_profile_att_command(void) {

@@ -34,6 +34,27 @@ typedef struct iree_profile_command_options_t {
   iree_allocator_t host_allocator;
 } iree_profile_command_options_t;
 
+// Bitmask of output encodings a command can produce.
+enum iree_profile_command_format_bits_e {
+  IREE_PROFILE_COMMAND_FORMAT_NONE = 0u,
+  IREE_PROFILE_COMMAND_FORMAT_TEXT = 1u << 0,
+  IREE_PROFILE_COMMAND_FORMAT_JSONL = 1u << 1,
+  IREE_PROFILE_COMMAND_FORMAT_IREEPERF_JSONL = 1u << 2,
+};
+typedef uint32_t iree_profile_command_format_bits_t;
+
+// Bitmask of shared command options a command consumes.
+enum iree_profile_command_option_bits_e {
+  IREE_PROFILE_COMMAND_OPTION_NONE = 0u,
+  IREE_PROFILE_COMMAND_OPTION_FILTER = 1u << 0,
+  IREE_PROFILE_COMMAND_OPTION_ID = 1u << 1,
+  IREE_PROFILE_COMMAND_OPTION_OUTPUT = 1u << 2,
+  IREE_PROFILE_COMMAND_OPTION_DISPATCH_EVENTS = 1u << 3,
+  IREE_PROFILE_COMMAND_OPTION_COUNTER_SAMPLES = 1u << 4,
+  IREE_PROFILE_COMMAND_OPTION_ROCM_LIBRARY_PATH = 1u << 5,
+};
+typedef uint32_t iree_profile_command_option_bits_t;
+
 typedef struct iree_profile_command_invocation_t {
   // Input .ireeprof bundle path.
   iree_string_view_t input_path;
@@ -51,6 +72,10 @@ typedef struct iree_profile_command_t {
   const char* name;
   // One-line human-readable command summary.
   const char* summary;
+  // Output formats accepted by this command.
+  iree_profile_command_format_bits_t supported_formats;
+  // Shared command options consumed by this command.
+  iree_profile_command_option_bits_t accepted_options;
   // Runs the command for one input profile bundle.
   iree_profile_command_run_fn_t run;
 } iree_profile_command_t;
@@ -65,6 +90,11 @@ const iree_profile_command_t* iree_profile_export_command(void);
 const iree_profile_command_t* iree_profile_memory_command(void);
 const iree_profile_command_t* iree_profile_queue_command(void);
 const iree_profile_command_t* iree_profile_summary_command(void);
+
+// Validates |options| against |command| without opening the input bundle.
+iree_status_t iree_profile_command_validate_options(
+    const iree_profile_command_t* command,
+    const iree_profile_command_options_t* options);
 
 const iree_profile_command_t* iree_profile_find_command(
     const iree_profile_command_t* const* commands,

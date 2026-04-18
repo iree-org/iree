@@ -14,6 +14,42 @@
 #include "iree/tooling/profile/projection.h"
 #include "iree/tooling/profile/summary.h"
 
+#define IREE_PROFILE_COMMAND_REPORT_FORMATS \
+  (IREE_PROFILE_COMMAND_FORMAT_TEXT | IREE_PROFILE_COMMAND_FORMAT_JSONL)
+
+#define IREE_PROFILE_COMMAND_PROJECTION_OPTIONS                          \
+  (IREE_PROFILE_COMMAND_OPTION_FILTER | IREE_PROFILE_COMMAND_OPTION_ID | \
+   IREE_PROFILE_COMMAND_OPTION_DISPATCH_EVENTS)
+
+static iree_profile_command_format_bits_t iree_profile_command_format_bit(
+    iree_string_view_t format) {
+  if (iree_string_view_equal(format, IREE_SV("text"))) {
+    return IREE_PROFILE_COMMAND_FORMAT_TEXT;
+  } else if (iree_string_view_equal(format, IREE_SV("jsonl"))) {
+    return IREE_PROFILE_COMMAND_FORMAT_JSONL;
+  } else if (iree_string_view_equal(format, IREE_SV("ireeperf-jsonl"))) {
+    return IREE_PROFILE_COMMAND_FORMAT_IREEPERF_JSONL;
+  }
+  return IREE_PROFILE_COMMAND_FORMAT_NONE;
+}
+
+static bool iree_profile_command_accepts_option(
+    const iree_profile_command_t* command,
+    iree_profile_command_option_bits_t option) {
+  return iree_all_bits_set(command->accepted_options, option);
+}
+
+static bool iree_profile_command_filter_is_default(iree_string_view_t filter) {
+  return iree_string_view_is_empty(filter) ||
+         iree_string_view_equal(filter, IREE_SV("*"));
+}
+
+static bool iree_profile_command_output_path_is_default(
+    iree_string_view_t output_path) {
+  return iree_string_view_is_empty(output_path) ||
+         iree_string_view_equal(output_path, IREE_SV("-"));
+}
+
 static iree_status_t iree_profile_run_cat(
     const iree_profile_command_invocation_t* invocation) {
   return iree_profile_cat_file(
@@ -97,34 +133,79 @@ static iree_status_t iree_profile_run_queue(
 }
 
 static const iree_profile_command_t kIreeProfileCatCommand = {
-    "cat", "Raw bundle record dump for format archaeology/debugging.",
-    iree_profile_run_cat};
+    .name = "cat",
+    .summary = "Raw bundle record dump for format archaeology/debugging.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_NONE,
+    .run = iree_profile_run_cat,
+};
 static const iree_profile_command_t kIreeProfileCommandCommand = {
-    "command", "Recorded command-buffer operations and execution spans.",
-    iree_profile_run_command};
+    .name = "command",
+    .summary = "Recorded command-buffer operations and execution spans.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
+    .run = iree_profile_run_command,
+};
 static const iree_profile_command_t kIreeProfileCounterCommand = {
-    "counter", "Hardware counter metadata and sample aggregates.",
-    iree_profile_run_counter};
+    .name = "counter",
+    .summary = "Hardware counter metadata and sample aggregates.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_FILTER |
+                        IREE_PROFILE_COMMAND_OPTION_ID |
+                        IREE_PROFILE_COMMAND_OPTION_COUNTER_SAMPLES,
+    .run = iree_profile_run_counter,
+};
 static const iree_profile_command_t kIreeProfileDispatchCommand = {
-    "dispatch", "Per-export dispatch timing aggregates or event rows.",
-    iree_profile_run_dispatch};
+    .name = "dispatch",
+    .summary = "Per-export dispatch timing aggregates or event rows.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
+    .run = iree_profile_run_dispatch,
+};
 static const iree_profile_command_t kIreeProfileExecutableCommand = {
-    "executable", "Executable/export catalog joined with dispatch timing.",
-    iree_profile_run_executable};
+    .name = "executable",
+    .summary = "Executable/export catalog joined with dispatch timing.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
+    .run = iree_profile_run_executable,
+};
 static const iree_profile_command_t kIreeProfileExplainCommand = {
-    "explain", "Opinionated bottleneck summary and evidence-backed hints.",
-    iree_profile_run_explain};
+    .name = "explain",
+    .summary = "Opinionated bottleneck summary and evidence-backed hints.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options =
+        IREE_PROFILE_COMMAND_OPTION_FILTER | IREE_PROFILE_COMMAND_OPTION_ID,
+    .run = iree_profile_run_explain,
+};
 static const iree_profile_command_t kIreeProfileExportCommand = {
-    "export", "Decoded tooling interchange export.", iree_profile_run_export};
+    .name = "export",
+    .summary = "Decoded tooling interchange export.",
+    .supported_formats = IREE_PROFILE_COMMAND_FORMAT_IREEPERF_JSONL,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_OUTPUT,
+    .run = iree_profile_run_export,
+};
 static const iree_profile_command_t kIreeProfileMemoryCommand = {
-    "memory", "Memory lifecycle events and high-water summaries.",
-    iree_profile_run_memory};
+    .name = "memory",
+    .summary = "Memory lifecycle events and high-water summaries.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options =
+        IREE_PROFILE_COMMAND_OPTION_FILTER | IREE_PROFILE_COMMAND_OPTION_ID,
+    .run = iree_profile_run_memory,
+};
 static const iree_profile_command_t kIreeProfileQueueCommand = {
-    "queue", "Queue operation events and dispatch-derived submission spans.",
-    iree_profile_run_queue};
+    .name = "queue",
+    .summary = "Queue operation events and dispatch-derived submission spans.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
+    .run = iree_profile_run_queue,
+};
 static const iree_profile_command_t kIreeProfileSummaryCommand = {
-    "summary", "Bundle health, metadata counts, clock fit, and timing totals.",
-    iree_profile_run_summary};
+    .name = "summary",
+    .summary = "Bundle health, metadata counts, clock fit, and timing totals.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_NONE,
+    .run = iree_profile_run_summary,
+};
 
 const iree_profile_command_t* iree_profile_cat_command(void) {
   return &kIreeProfileCatCommand;
@@ -155,6 +236,77 @@ const iree_profile_command_t* iree_profile_queue_command(void) {
 }
 const iree_profile_command_t* iree_profile_summary_command(void) {
   return &kIreeProfileSummaryCommand;
+}
+
+iree_status_t iree_profile_command_validate_options(
+    const iree_profile_command_t* command,
+    const iree_profile_command_options_t* options) {
+  const iree_profile_command_format_bits_t format =
+      iree_profile_command_format_bit(options->format);
+  if (!iree_any_bit_set(command->supported_formats, format)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "iree-profile command '%s' does not support "
+                            "--format=%.*s",
+                            command->name, (int)options->format.size,
+                            options->format.data);
+  }
+  if (!iree_profile_command_filter_is_default(options->filter) &&
+      !iree_profile_command_accepts_option(
+          command, IREE_PROFILE_COMMAND_OPTION_FILTER)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "iree-profile command '%s' does not support "
+                            "--filter",
+                            command->name);
+  }
+  if (options->id >= 0 && !iree_profile_command_accepts_option(
+                              command, IREE_PROFILE_COMMAND_OPTION_ID)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "iree-profile command '%s' does not support --id",
+                            command->name);
+  }
+  if (!iree_profile_command_output_path_is_default(options->output_path) &&
+      !iree_profile_command_accepts_option(
+          command, IREE_PROFILE_COMMAND_OPTION_OUTPUT)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "iree-profile command '%s' does not support "
+                            "--output",
+                            command->name);
+  }
+  if (options->emit_dispatch_events) {
+    if (!iree_profile_command_accepts_option(
+            command, IREE_PROFILE_COMMAND_OPTION_DISPATCH_EVENTS)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "iree-profile command '%s' does not support "
+                              "--dispatch_events",
+                              command->name);
+    }
+    if (format != IREE_PROFILE_COMMAND_FORMAT_JSONL) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "--dispatch_events requires --format=jsonl");
+    }
+  }
+  if (options->emit_counter_samples) {
+    if (!iree_profile_command_accepts_option(
+            command, IREE_PROFILE_COMMAND_OPTION_COUNTER_SAMPLES)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "iree-profile command '%s' does not support "
+                              "--counter_samples",
+                              command->name);
+    }
+    if (format != IREE_PROFILE_COMMAND_FORMAT_JSONL) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "--counter_samples requires --format=jsonl");
+    }
+  }
+  if (!iree_string_view_is_empty(options->rocm_library_path) &&
+      !iree_profile_command_accepts_option(
+          command, IREE_PROFILE_COMMAND_OPTION_ROCM_LIBRARY_PATH)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "iree-profile command '%s' does not support "
+                            "--rocm_library_path",
+                            command->name);
+  }
+  return iree_ok_status();
 }
 
 const iree_profile_command_t* iree_profile_find_command(
