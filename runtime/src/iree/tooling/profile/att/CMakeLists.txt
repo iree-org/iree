@@ -99,6 +99,23 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    decode
+  HDRS
+    "decode.h"
+  SRCS
+    "decode.c"
+  DEPS
+    ::bundle
+    ::comgr
+    ::disassembly
+    ::rocprofiler
+    ::util
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     att
   HDRS
     "att.h"
@@ -107,10 +124,9 @@ iree_cc_library(
   DEPS
     ::bundle
     ::comgr
-    ::disassembly
+    ::decode
     ::rocm
     ::rocprofiler
-    ::util
     iree::base
     iree::tooling::profile::commands
     iree::tooling::profile::common

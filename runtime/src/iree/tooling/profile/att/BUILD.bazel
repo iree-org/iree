@@ -85,16 +85,29 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "decode",
+    srcs = ["decode.c"],
+    hdrs = ["decode.h"],
+    deps = [
+        ":bundle",
+        ":comgr",
+        ":disassembly",
+        ":rocprofiler",
+        ":util",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "att",
     srcs = ["att.c"],
     hdrs = ["att.h"],
     deps = [
         ":bundle",
         ":comgr",
-        ":disassembly",
+        ":decode",
         ":rocm",
         ":rocprofiler",
-        ":util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/tooling/profile:commands",
         "//runtime/src/iree/tooling/profile:common",
