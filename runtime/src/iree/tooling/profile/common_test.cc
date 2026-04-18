@@ -18,10 +18,6 @@
 
 namespace {
 
-using ::iree::Status;
-using ::iree::StatusCode;
-using ::iree::testing::status::StatusIs;
-
 typedef struct test_profile_record_t {
   uint32_t record_length;
   uint32_t value;
@@ -312,9 +308,10 @@ TEST(ProfileTypedRecordTest, RejectsTruncatedRecord) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
 
   iree_profile_typed_record_t record;
-  EXPECT_THAT(Status(iree_profile_typed_record_parse(
-                  &chunk, 0, sizeof(test_profile_record_t), 0, &record)),
-              StatusIs(StatusCode::kDataLoss));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_typed_record_parse(&chunk, 0, sizeof(test_profile_record_t),
+                                      0, &record));
 }
 
 TEST(ProfileTypedRecordTest, RejectsShortRecordLength) {
@@ -324,9 +321,10 @@ TEST(ProfileTypedRecordTest, RejectsShortRecordLength) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
 
   iree_profile_typed_record_t record;
-  EXPECT_THAT(Status(iree_profile_typed_record_parse(
-                  &chunk, 0, sizeof(test_profile_record_t), 0, &record)),
-              StatusIs(StatusCode::kDataLoss));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_typed_record_parse(&chunk, 0, sizeof(test_profile_record_t),
+                                      0, &record));
 }
 
 TEST(ProfileTypedRecordTest, RejectsOversizedRecordLength) {
@@ -336,9 +334,10 @@ TEST(ProfileTypedRecordTest, RejectsOversizedRecordLength) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
 
   iree_profile_typed_record_t record;
-  EXPECT_THAT(Status(iree_profile_typed_record_parse(
-                  &chunk, 0, sizeof(test_profile_record_t), 0, &record)),
-              StatusIs(StatusCode::kDataLoss));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_typed_record_parse(&chunk, 0, sizeof(test_profile_record_t),
+                                      0, &record));
 }
 
 static iree_hal_profile_clock_correlation_record_t MakeClockSample(

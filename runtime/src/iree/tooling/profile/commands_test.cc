@@ -13,10 +13,6 @@
 
 namespace {
 
-using ::iree::Status;
-using ::iree::StatusCode;
-using ::iree::testing::status::StatusIs;
-
 static iree_profile_command_options_t DefaultOptions() {
   iree_profile_command_options_t options;
   memset(&options, 0, sizeof(options));
@@ -41,9 +37,9 @@ TEST(ProfileCommandValidationTest, AcceptsReportFormats) {
 
 TEST(ProfileCommandValidationTest, ExportUsesInterchangeFormat) {
   iree_profile_command_options_t options = DefaultOptions();
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_export_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_export_command(), &options));
 
   options.format = IREE_SV("ireeperf-jsonl");
   options.output_path = IREE_SV("profile.ireeperf.jsonl");
@@ -54,29 +50,29 @@ TEST(ProfileCommandValidationTest, ExportUsesInterchangeFormat) {
 TEST(ProfileCommandValidationTest, RejectsOptionsUnusedByCommand) {
   iree_profile_command_options_t options = DefaultOptions();
   options.filter = IREE_SV("copy");
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_summary_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_summary_command(), &options));
 
   options = DefaultOptions();
   options.output_path = IREE_SV("profile.ireeperf.jsonl");
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_cat_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_cat_command(), &options));
 
   options = DefaultOptions();
   options.rocm_library_path = IREE_SV("/opt/rocm/lib");
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_dispatch_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_dispatch_command(), &options));
 }
 
 TEST(ProfileCommandValidationTest, DetailRowsRequireJsonl) {
   iree_profile_command_options_t options = DefaultOptions();
   options.emit_dispatch_events = true;
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_dispatch_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_dispatch_command(), &options));
 
   options.format = IREE_SV("jsonl");
   IREE_ASSERT_OK(iree_profile_command_validate_options(
@@ -84,9 +80,9 @@ TEST(ProfileCommandValidationTest, DetailRowsRequireJsonl) {
 
   options = DefaultOptions();
   options.emit_counter_samples = true;
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_counter_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_counter_command(), &options));
 
   options.format = IREE_SV("jsonl");
   IREE_ASSERT_OK(iree_profile_command_validate_options(
@@ -97,16 +93,16 @@ TEST(ProfileCommandValidationTest, RejectsDetailRowsOnWrongCommandFamily) {
   iree_profile_command_options_t options = DefaultOptions();
   options.format = IREE_SV("jsonl");
   options.emit_dispatch_events = true;
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_counter_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_counter_command(), &options));
 
   options = DefaultOptions();
   options.format = IREE_SV("jsonl");
   options.emit_counter_samples = true;
-  EXPECT_THAT(Status(iree_profile_command_validate_options(
-                  iree_profile_dispatch_command(), &options)),
-              StatusIs(StatusCode::kInvalidArgument));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_profile_command_validate_options(
+                            iree_profile_dispatch_command(), &options));
 }
 
 TEST(ProfileCommandValidationTest, FindCommandUsesProvidedRegistry) {
