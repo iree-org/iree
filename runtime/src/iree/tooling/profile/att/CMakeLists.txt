@@ -84,6 +84,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    disassembly
+  HDRS
+    "disassembly.h"
+  SRCS
+    "disassembly.c"
+  DEPS
+    ::bundle
+    ::comgr
+    ::util
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     att
   HDRS
     "att.h"
@@ -92,6 +107,7 @@ iree_cc_library(
   DEPS
     ::bundle
     ::comgr
+    ::disassembly
     ::rocm
     ::rocprofiler
     ::util

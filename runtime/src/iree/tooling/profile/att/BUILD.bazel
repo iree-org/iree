@@ -73,12 +73,25 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "disassembly",
+    srcs = ["disassembly.c"],
+    hdrs = ["disassembly.h"],
+    deps = [
+        ":bundle",
+        ":comgr",
+        ":util",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "att",
     srcs = ["att.c"],
     hdrs = ["att.h"],
     deps = [
         ":bundle",
         ":comgr",
+        ":disassembly",
         ":rocm",
         ":rocprofiler",
         ":util",
