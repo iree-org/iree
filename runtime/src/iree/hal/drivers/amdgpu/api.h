@@ -171,7 +171,8 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_logical_device_create(
 // use.
 typedef struct iree_hal_amdgpu_driver_options_t {
   // Search paths (directories or files) for finding the HSA runtime shared
-  // library.
+  // library. Driver creation clones these strings; callers only need to keep
+  // them live until iree_hal_amdgpu_driver_create returns.
   iree_string_view_list_t libhsa_search_paths;
 
   // Default device options when none are provided during device creation.

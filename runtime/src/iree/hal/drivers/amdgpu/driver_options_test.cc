@@ -39,6 +39,39 @@ TEST(AmdgpuDriverOptionsTest, LogicalDeviceParamsAreRejectedUntilDefined) {
                                       }));
 }
 
+TEST(AmdgpuDriverOptionsTest, RejectsMissingSearchPathStorageBeforeLoadingHsa) {
+  iree_hal_amdgpu_driver_options_t options;
+  iree_hal_amdgpu_driver_options_initialize(&options);
+  options.libhsa_search_paths = (iree_string_view_list_t){
+      .count = 1,
+      .values = NULL,
+  };
+
+  iree_hal_driver_t* driver = NULL;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_amdgpu_driver_create(IREE_SV("amdgpu"), &options,
+                                    iree_allocator_system(), &driver));
+  iree_hal_driver_release(driver);
+}
+
+TEST(AmdgpuDriverOptionsTest, RejectsMissingSearchPathDataBeforeLoadingHsa) {
+  iree_hal_amdgpu_driver_options_t options;
+  iree_hal_amdgpu_driver_options_initialize(&options);
+  const iree_string_view_t search_path = iree_make_string_view(NULL, 1);
+  options.libhsa_search_paths = (iree_string_view_list_t){
+      .count = 1,
+      .values = &search_path,
+  };
+
+  iree_hal_driver_t* driver = NULL;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_amdgpu_driver_create(IREE_SV("amdgpu"), &options,
+                                    iree_allocator_system(), &driver));
+  iree_hal_driver_release(driver);
+}
+
 static iree_status_t CreateDriverWithDefaultDeviceOptions(
     const iree_hal_amdgpu_logical_device_options_t* device_options) {
   iree_hal_amdgpu_driver_options_t options;

@@ -55,6 +55,26 @@ static iree_status_t iree_hal_amdgpu_driver_options_verify(
   iree_status_t status =
       iree_hal_amdgpu_logical_device_options_verify_supported_features(
           &options->default_device_options);
+  if (iree_status_is_ok(status) && options->libhsa_search_paths.count &&
+      !options->libhsa_search_paths.values) {
+    status =
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "AMDGPU libhsa search path list has count %" PRIhsz
+                         " but no value storage",
+                         options->libhsa_search_paths.count);
+  }
+  for (iree_host_size_t i = 0;
+       i < options->libhsa_search_paths.count && iree_status_is_ok(status);
+       ++i) {
+    const iree_string_view_t search_path =
+        options->libhsa_search_paths.values[i];
+    if (search_path.size && !search_path.data) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "AMDGPU libhsa search path %" PRIhsz
+                                " has a nonzero length and no storage",
+                                i);
+    }
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -207,15 +227,20 @@ static iree_status_t iree_hal_amdgpu_driver_append_topology_device_infos(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_driver_t {
+  // HAL resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for driver-owned allocations.
   iree_allocator_t host_allocator;
 
+  // Stable driver identifier stored inline after this struct.
   iree_string_view_t identifier;
+  // Driver options with retained string views pointing into trailing storage.
   iree_hal_amdgpu_driver_options_t options;
 
+  // Retained HSA runtime handle used for enumeration and device creation.
   iree_hal_amdgpu_libhsa_t libhsa;
 
-  // + trailing identifier string storage
+  // + trailing libhsa_search_paths table, identifier, and search path strings.
 } iree_hal_amdgpu_driver_t;
 
 static const iree_hal_driver_vtable_t iree_hal_amdgpu_driver_vtable;
@@ -257,21 +282,57 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_driver_options_verify(options));
 
+  iree_host_size_t search_path_storage_size = 0;
+  for (iree_host_size_t i = 0; i < options->libhsa_search_paths.count; ++i) {
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            search_path_storage_size,
+            options->libhsa_search_paths.values[i].size,
+            &search_path_storage_size))) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                               "AMDGPU libhsa search path storage overflow"));
+    }
+  }
+
+  iree_host_size_t search_paths_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t search_path_storage_offset = 0;
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              iree_sizeof_struct(iree_hal_amdgpu_driver_t), &total_size,
+              IREE_STRUCT_FIELD(options->libhsa_search_paths.count,
+                                iree_string_view_t, &search_paths_offset),
+              IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset),
+              IREE_STRUCT_FIELD(search_path_storage_size, char,
+                                &search_path_storage_offset)));
+
   iree_hal_amdgpu_driver_t* driver = NULL;
-  iree_host_size_t total_size = sizeof(*driver) + identifier.size;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
+  memset(driver, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_amdgpu_driver_vtable,
                                &driver->resource);
   driver->host_allocator = host_allocator;
-  iree_string_view_append_to_buffer(
-      identifier, &driver->identifier,
-      (char*)driver + total_size - identifier.size);
-
-  // TODO(benvanik): if there are any string fields then they will need to be
-  // retained as well (similar to the identifier they can be tagged on to the
-  // end of the driver struct).
+  iree_string_view_append_to_buffer(identifier, &driver->identifier,
+                                    (char*)driver + identifier_offset);
   memcpy(&driver->options, options, sizeof(*options));
+  if (options->libhsa_search_paths.count) {
+    iree_string_view_t* search_paths =
+        (iree_string_view_t*)((uint8_t*)driver + search_paths_offset);
+    char* search_path_storage = (char*)driver + search_path_storage_offset;
+    for (iree_host_size_t i = 0; i < options->libhsa_search_paths.count; ++i) {
+      const iree_string_view_t source_path =
+          options->libhsa_search_paths.values[i];
+      iree_string_view_append_to_buffer(source_path, &search_paths[i],
+                                        search_path_storage);
+      search_path_storage += source_path.size;
+    }
+    driver->options.libhsa_search_paths = (iree_string_view_list_t){
+        .count = options->libhsa_search_paths.count, .values = search_paths};
+  } else {
+    driver->options.libhsa_search_paths = iree_string_view_list_empty();
+  }
 
   // Load HSA. The HSA runtime shared library may already be loaded and we
   // retain a copy during creation to ensure it doesn't get unloaded.
