@@ -685,6 +685,13 @@ static void iree_profile_memory_print_event_jsonl(
           event->pool_reservation_count, event->pool_slab_count);
 }
 
+static iree_status_t iree_profile_memory_emit_event_jsonl(
+    void* user_data, const iree_profile_memory_event_row_t* row) {
+  FILE* file = (FILE*)user_data;
+  iree_profile_memory_print_event_jsonl(row->event, file);
+  return iree_ok_status();
+}
+
 static bool iree_profile_memory_allocation_open_at_end(
     const iree_profile_memory_allocation_t* allocation) {
   return allocation->lifecycle_balance.current_bytes != 0 ||
@@ -994,7 +1001,7 @@ iree_profile_memory_resolve_device_lifetime(
 iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
-    int64_t id_filter, bool emit_events, FILE* file) {
+    int64_t id_filter, iree_profile_memory_event_callback_t event_callback) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
     return iree_ok_status();
   }
@@ -1042,10 +1049,12 @@ iree_status_t iree_profile_memory_context_accumulate_record(
         status = iree_profile_memory_record_allocation_event(
             context, &event, close_materialization);
       }
-      if (iree_status_is_ok(status)) {
-        if (emit_events) {
-          iree_profile_memory_print_event_jsonl(&event, file);
-        }
+      if (iree_status_is_ok(status) && event_callback.fn) {
+        const iree_profile_memory_event_row_t event_row = {
+            .event = &event,
+            .is_truncated = is_truncated,
+        };
+        status = event_callback.fn(event_callback.user_data, &event_row);
       }
     }
   }
@@ -1400,12 +1409,10 @@ typedef struct iree_profile_memory_parse_context_t {
   iree_string_view_t filter;
   // Optional event/allocation identifier filter, or -1 when disabled.
   int64_t id_filter;
-  // True when raw event rows should be streamed while parsing.
-  bool emit_events;
+  // Optional callback receiving matched raw memory events.
+  iree_profile_memory_event_callback_t event_callback;
   // True when queue-device rows are needed for allocation lifetime joins.
   bool capture_queue_device_events;
-  // Output stream receiving raw event rows when enabled.
-  FILE* file;
 } iree_profile_memory_parse_context_t;
 
 static iree_status_t iree_profile_memory_record(
@@ -1423,7 +1430,7 @@ static iree_status_t iree_profile_memory_record(
   }
   return iree_profile_memory_context_accumulate_record(
       context->memory_context, record, context->filter, context->id_filter,
-      context->emit_events, context->file);
+      context->event_callback);
 }
 
 iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
@@ -1451,15 +1458,18 @@ iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
   iree_profile_memory_queue_device_event_index_t queue_device_index;
   iree_profile_memory_queue_device_event_index_initialize(
       &model, host_allocator, &queue_device_index);
+  const iree_profile_memory_event_callback_t event_callback = {
+      .fn = is_jsonl ? iree_profile_memory_emit_event_jsonl : NULL,
+      .user_data = file,
+  };
   iree_profile_memory_parse_context_t parse_context = {
       .memory_context = &context,
       .model = &model,
       .queue_device_index = &queue_device_index,
       .filter = filter,
       .id_filter = id_filter,
-      .emit_events = is_jsonl,
+      .event_callback = event_callback,
       .capture_queue_device_events = capture_queue_device_events,
-      .file = file,
   };
   iree_profile_file_record_callback_t record_callback = {
       .fn = iree_profile_memory_record,

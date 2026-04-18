@@ -213,6 +213,23 @@ typedef struct iree_profile_memory_context_t {
   uint64_t truncated_event_count;
 } iree_profile_memory_context_t;
 
+typedef struct iree_profile_memory_event_row_t {
+  // Memory event record valid only for the callback duration.
+  const iree_hal_profile_memory_event_t* event;
+  // True when the source chunk was marked truncated by the producer.
+  bool is_truncated;
+} iree_profile_memory_event_row_t;
+
+typedef iree_status_t (*iree_profile_memory_event_callback_fn_t)(
+    void* user_data, const iree_profile_memory_event_row_t* row);
+
+typedef struct iree_profile_memory_event_callback_t {
+  // Optional callback invoked for each matched memory event row.
+  iree_profile_memory_event_callback_fn_t fn;
+  // Opaque user data passed to |fn|.
+  void* user_data;
+} iree_profile_memory_event_callback_t;
+
 // Returns the stable text spelling used for memory event JSON/text output.
 const char* iree_profile_memory_event_type_name(
     iree_hal_profile_memory_event_type_t type);
@@ -234,12 +251,12 @@ void iree_profile_memory_context_deinitialize(
 //
 // Non-memory records are ignored. |filter| matches the memory event key fields,
 // and |id_filter| restricts the matched allocation/event id when non-negative.
-// If |emit_events| is true then each matched memory event is also written as a
-// JSONL row to |file| before the aggregate report is generated.
+// When |event_callback.fn| is non-NULL, each matched memory event is delivered
+// to the callback after the aggregate state has been updated.
 iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
-    int64_t id_filter, bool emit_events, FILE* file);
+    int64_t id_filter, iree_profile_memory_event_callback_t event_callback);
 
 //===----------------------------------------------------------------------===//
 // File-level reporting

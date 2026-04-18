@@ -12,14 +12,14 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-static void iree_profile_counter_context_initialize(
+void iree_profile_counter_context_initialize(
     iree_allocator_t host_allocator,
     iree_profile_counter_context_t* out_context) {
   memset(out_context, 0, sizeof(*out_context));
   out_context->host_allocator = host_allocator;
 }
 
-static void iree_profile_counter_context_deinitialize(
+void iree_profile_counter_context_deinitialize(
     iree_profile_counter_context_t* context) {
   iree_allocator_free(context->host_allocator, context->aggregates);
   iree_allocator_free(context->host_allocator, context->counters);
@@ -217,7 +217,7 @@ static iree_status_t iree_profile_counter_process_counter_records(
   return status;
 }
 
-static iree_status_t iree_profile_counter_process_metadata_record(
+iree_status_t iree_profile_counter_process_metadata_record(
     iree_profile_counter_context_t* context,
     const iree_hal_profile_file_record_t* record) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
@@ -384,11 +384,20 @@ static void iree_profile_counter_print_sample_jsonl(
   fputs("}\n", file);
 }
 
-static iree_status_t iree_profile_counter_process_sample_records(
+static iree_status_t iree_profile_counter_emit_sample_jsonl(
+    void* user_data, const iree_profile_counter_sample_row_t* row) {
+  FILE* file = (FILE*)user_data;
+  iree_profile_counter_print_sample_jsonl(
+      row->sample, row->counter_set, row->counter, row->key,
+      row->sample_values.data, row->value_sum, file);
+  return iree_ok_status();
+}
+
+iree_status_t iree_profile_counter_process_sample_records(
     iree_profile_counter_context_t* counter_context,
     const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
-    int64_t id_filter, bool emit_samples, FILE* file) {
+    int64_t id_filter, iree_profile_counter_sample_callback_t sample_callback) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
     return iree_ok_status();
   }
@@ -484,10 +493,18 @@ static iree_status_t iree_profile_counter_process_sample_records(
             iree_profile_counter_record_aggregate_sample(aggregate, counter,
                                                          &sample, value_sum);
           }
-          if (iree_status_is_ok(status) && emit_samples) {
-            iree_profile_counter_print_sample_jsonl(&sample, counter_set,
-                                                    counter, key, sample_values,
-                                                    value_sum, file);
+          if (iree_status_is_ok(status) && sample_callback.fn) {
+            const iree_profile_counter_sample_row_t sample_row = {
+                .sample = &sample,
+                .counter_set = counter_set,
+                .counter = counter,
+                .key = key,
+                .sample_values = iree_make_const_byte_span(
+                    sample_values, typed_record.inline_payload.data_length),
+                .value_sum = value_sum,
+                .is_truncated = is_truncated,
+            };
+            status = sample_callback.fn(sample_callback.user_data, &sample_row);
           }
         }
       }
@@ -786,10 +803,8 @@ typedef struct iree_profile_counter_parse_context_t {
   iree_string_view_t filter;
   // Optional entity identifier filter, or -1 when disabled.
   int64_t id_filter;
-  // True when raw sample rows should be streamed while parsing.
-  bool emit_samples;
-  // Output stream receiving raw sample rows when enabled.
-  FILE* file;
+  // Optional callback receiving matched raw counter samples.
+  iree_profile_counter_sample_callback_t sample_callback;
 } iree_profile_counter_parse_context_t;
 
 static iree_status_t iree_profile_counter_metadata_record(
@@ -812,7 +827,7 @@ static iree_status_t iree_profile_counter_sample_record(
       (iree_profile_counter_parse_context_t*)user_data;
   return iree_profile_counter_process_sample_records(
       context->counter_context, context->model, record, context->filter,
-      context->id_filter, context->emit_samples, context->file);
+      context->id_filter, context->sample_callback);
 }
 
 iree_status_t iree_profile_counter_file(iree_string_view_t path,
@@ -841,13 +856,16 @@ iree_status_t iree_profile_counter_file(iree_string_view_t path,
   iree_profile_model_initialize(host_allocator, &model);
   iree_profile_counter_context_t counter_context;
   iree_profile_counter_context_initialize(host_allocator, &counter_context);
+  const iree_profile_counter_sample_callback_t sample_callback = {
+      .fn = emit_samples ? iree_profile_counter_emit_sample_jsonl : NULL,
+      .user_data = file,
+  };
   iree_profile_counter_parse_context_t parse_context = {
       .model = &model,
       .counter_context = &counter_context,
       .filter = filter,
       .id_filter = id_filter,
-      .emit_samples = emit_samples,
-      .file = file,
+      .sample_callback = sample_callback,
   };
   iree_profile_file_record_callback_t record_callback = {
       .fn = iree_profile_counter_metadata_record,

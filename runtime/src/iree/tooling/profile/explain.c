@@ -989,8 +989,6 @@ typedef struct iree_profile_explain_parse_context_t {
   iree_string_view_t filter;
   // Optional entity identifier filter, or -1 when disabled.
   int64_t id_filter;
-  // Output stream passed to shared parsers that support raw event emission.
-  FILE* file;
 } iree_profile_explain_parse_context_t;
 
 static iree_status_t iree_profile_explain_metadata_record(
@@ -1011,10 +1009,11 @@ static iree_status_t iree_profile_explain_event_record(
   (void)record_index;
   iree_profile_explain_parse_context_t* context =
       (iree_profile_explain_parse_context_t*)user_data;
+  const iree_profile_dispatch_event_callback_t dispatch_event_callback = {0};
   IREE_RETURN_IF_ERROR(iree_profile_dispatch_process_events_record(
       context->dispatch_context, record, context->filter,
       IREE_PROFILE_PROJECTION_MODE_DISPATCH, context->id_filter,
-      /*emit_events=*/false, context->file));
+      /*aggregate_events=*/true, dispatch_event_callback));
   if (record->header.record_type == IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK &&
       iree_string_view_equal(record->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
@@ -1023,9 +1022,10 @@ static iree_status_t iree_profile_explain_event_record(
         &context->dispatch_context->model, record, IREE_SV("*"),
         /*id_filter=*/-1));
   }
+  const iree_profile_memory_event_callback_t memory_event_callback = {0};
   return iree_profile_memory_context_accumulate_record(
       context->memory_context, record, IREE_SV("*"), /*id_filter=*/-1,
-      /*emit_events=*/false, context->file);
+      memory_event_callback);
 }
 
 iree_status_t iree_profile_explain_file(iree_string_view_t path,
@@ -1057,7 +1057,6 @@ iree_status_t iree_profile_explain_file(iree_string_view_t path,
       .memory_context = &memory_context,
       .filter = filter,
       .id_filter = id_filter,
-      .file = file,
   };
   iree_profile_file_record_callback_t record_callback = {
       .fn = iree_profile_explain_metadata_record,

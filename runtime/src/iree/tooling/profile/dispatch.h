@@ -122,6 +122,29 @@ typedef struct iree_profile_dispatch_top_event_t {
   iree_hal_profile_dispatch_event_t event;
 } iree_profile_dispatch_top_event_t;
 
+typedef struct iree_profile_dispatch_event_row_t {
+  // Profile chunk containing |event| and valid only for the callback duration.
+  const iree_hal_profile_file_record_t* file_record;
+  // Dispatch event record valid only for the callback duration.
+  const iree_hal_profile_dispatch_event_t* event;
+  // Resolved executable/export key valid only for the callback duration.
+  iree_string_view_t key;
+  // Device clock fit valid only when |has_clock_fit| is true.
+  const iree_profile_model_clock_fit_t* clock_fit;
+  // True when |clock_fit| can translate raw device ticks to nanoseconds.
+  bool has_clock_fit;
+} iree_profile_dispatch_event_row_t;
+
+typedef iree_status_t (*iree_profile_dispatch_event_callback_fn_t)(
+    void* user_data, const iree_profile_dispatch_event_row_t* row);
+
+typedef struct iree_profile_dispatch_event_callback_t {
+  // Optional callback invoked for each matched dispatch event row.
+  iree_profile_dispatch_event_callback_fn_t fn;
+  // Opaque user data passed to |fn|.
+  void* user_data;
+} iree_profile_dispatch_event_callback_t;
+
 typedef struct iree_profile_dispatch_context_t {
   // Host allocator used for dynamic aggregate rows.
   iree_allocator_t host_allocator;
@@ -171,12 +194,17 @@ void iree_profile_dispatch_context_initialize(
 void iree_profile_dispatch_context_deinitialize(
     iree_profile_dispatch_context_t* context);
 
-// Processes one event record into dispatch/queue aggregates.
+// Processes dispatch/queue event records from one profile file record.
+//
+// When |aggregate_events| is true, matched dispatches update aggregate arrays
+// owned by |context|. When |event_callback.fn| is non-NULL, each matched
+// dispatch event is delivered to the callback before returning from this call.
 iree_status_t iree_profile_dispatch_process_events_record(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     iree_profile_projection_mode_t projection_mode, int64_t id_filter,
-    bool emit_events, FILE* file);
+    bool aggregate_events,
+    iree_profile_dispatch_event_callback_t event_callback);
 
 #ifdef __cplusplus
 }  // extern "C"

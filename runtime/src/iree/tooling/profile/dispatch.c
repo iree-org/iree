@@ -313,61 +313,12 @@ static void iree_profile_dispatch_record_top_event(
   top_event->event = *event;
 }
 
-static void iree_profile_dispatch_print_event_jsonl(
-    const iree_hal_profile_file_record_t* file_record,
-    const iree_hal_profile_dispatch_event_t* event, iree_string_view_t key,
-    const iree_profile_model_clock_fit_t* clock_fit, bool has_clock_fit,
-    FILE* file) {
-  const bool is_valid = event->start_tick != 0 && event->end_tick != 0 &&
-                        event->end_tick >= event->start_tick;
-  const uint64_t duration_ticks =
-      is_valid ? event->end_tick - event->start_tick : 0;
-  int64_t duration_ns = 0;
-  const bool has_duration_ns = has_clock_fit && is_valid &&
-                               iree_profile_model_clock_fit_scale_ticks_to_ns(
-                                   clock_fit, duration_ticks, &duration_ns);
-
-  fprintf(file,
-          "{\"type\":\"dispatch_event\",\"physical_device_ordinal\":%u"
-          ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
-          ",\"event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64,
-          file_record->header.physical_device_ordinal,
-          file_record->header.queue_ordinal, file_record->header.stream_id,
-          event->event_id, event->submission_id);
-  fprintf(file,
-          ",\"command_buffer_id\":%" PRIu64
-          ",\"command_index\":%u"
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u",
-          event->command_buffer_id, event->command_index, event->executable_id,
-          event->export_ordinal);
-  fprintf(file, ",\"key\":");
-  iree_profile_fprint_json_string(file, key);
-  fprintf(file,
-          ",\"flags\":%u,\"workgroup_count\":[%u,%u,%u]"
-          ",\"workgroup_size\":[%u,%u,%u]",
-          event->flags, event->workgroup_count[0], event->workgroup_count[1],
-          event->workgroup_count[2], event->workgroup_size[0],
-          event->workgroup_size[1], event->workgroup_size[2]);
-  fprintf(file,
-          ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
-          ",\"duration_ticks\":%" PRIu64 ",\"valid\":%s",
-          event->start_tick, event->end_tick, duration_ticks,
-          is_valid ? "true" : "false");
-  fprintf(file, ",\"clock_fit_available\":%s",
-          has_clock_fit ? "true" : "false");
-  fprintf(file,
-          ",\"device_tick_domain\":\"device_tick\""
-          ",\"duration_time_domain\":\"device_tick_duration_ns\""
-          ",\"duration_ns\":%" PRId64,
-          has_duration_ns ? duration_ns : 0);
-  fputs("}\n", file);
-}
-
 static iree_status_t iree_profile_dispatch_process_event_records(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     iree_profile_projection_mode_t projection_mode, int64_t id_filter,
-    bool emit_events, FILE* file) {
+    bool aggregate_events,
+    iree_profile_dispatch_event_callback_t event_callback) {
   const iree_profile_model_t* model = &context->model;
   iree_profile_model_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_profile_model_ensure_device(
@@ -416,10 +367,17 @@ static iree_status_t iree_profile_dispatch_process_event_records(
       } else {
         ++context->invalid_dispatch_count;
       }
-      if (emit_events) {
-        iree_profile_dispatch_print_event_jsonl(record, &event, key, &clock_fit,
-                                                has_clock_fit, file);
-      } else {
+      if (event_callback.fn) {
+        const iree_profile_dispatch_event_row_t event_row = {
+            .file_record = record,
+            .event = &event,
+            .key = key,
+            .clock_fit = &clock_fit,
+            .has_clock_fit = has_clock_fit,
+        };
+        status = event_callback.fn(event_callback.user_data, &event_row);
+      }
+      if (iree_status_is_ok(status) && aggregate_events) {
         iree_profile_dispatch_aggregate_t* aggregate = NULL;
         status = iree_profile_dispatch_get_aggregate(
             context, record->header.physical_device_ordinal,
@@ -478,7 +436,8 @@ iree_status_t iree_profile_dispatch_process_events_record(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
     iree_profile_projection_mode_t projection_mode, int64_t id_filter,
-    bool emit_events, FILE* file) {
+    bool aggregate_events,
+    iree_profile_dispatch_event_callback_t event_callback) {
   if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
     return iree_ok_status();
   }
@@ -491,5 +450,6 @@ iree_status_t iree_profile_dispatch_process_events_record(
     return iree_ok_status();
   }
   return iree_profile_dispatch_process_event_records(
-      context, record, filter, projection_mode, id_filter, emit_events, file);
+      context, record, filter, projection_mode, id_filter, aggregate_events,
+      event_callback);
 }

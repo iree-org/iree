@@ -26,6 +26,63 @@ static bool iree_profile_projection_try_fit_driver_host_cpu_clock(
       out_clock_fit);
 }
 
+static void iree_profile_dispatch_print_event_jsonl(
+    const iree_profile_dispatch_event_row_t* row, FILE* file) {
+  const iree_hal_profile_file_record_t* file_record = row->file_record;
+  const iree_hal_profile_dispatch_event_t* event = row->event;
+  const bool is_valid = event->start_tick != 0 && event->end_tick != 0 &&
+                        event->end_tick >= event->start_tick;
+  const uint64_t duration_ticks =
+      is_valid ? event->end_tick - event->start_tick : 0;
+  int64_t duration_ns = 0;
+  const bool has_duration_ns =
+      row->has_clock_fit && is_valid &&
+      iree_profile_model_clock_fit_scale_ticks_to_ns(
+          row->clock_fit, duration_ticks, &duration_ns);
+
+  fprintf(file,
+          "{\"type\":\"dispatch_event\",\"physical_device_ordinal\":%u"
+          ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
+          ",\"event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64,
+          file_record->header.physical_device_ordinal,
+          file_record->header.queue_ordinal, file_record->header.stream_id,
+          event->event_id, event->submission_id);
+  fprintf(file,
+          ",\"command_buffer_id\":%" PRIu64
+          ",\"command_index\":%u"
+          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u",
+          event->command_buffer_id, event->command_index, event->executable_id,
+          event->export_ordinal);
+  fprintf(file, ",\"key\":");
+  iree_profile_fprint_json_string(file, row->key);
+  fprintf(file,
+          ",\"flags\":%u,\"workgroup_count\":[%u,%u,%u]"
+          ",\"workgroup_size\":[%u,%u,%u]",
+          event->flags, event->workgroup_count[0], event->workgroup_count[1],
+          event->workgroup_count[2], event->workgroup_size[0],
+          event->workgroup_size[1], event->workgroup_size[2]);
+  fprintf(file,
+          ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
+          ",\"duration_ticks\":%" PRIu64 ",\"valid\":%s",
+          event->start_tick, event->end_tick, duration_ticks,
+          is_valid ? "true" : "false");
+  fprintf(file, ",\"clock_fit_available\":%s",
+          row->has_clock_fit ? "true" : "false");
+  fprintf(file,
+          ",\"device_tick_domain\":\"device_tick\""
+          ",\"duration_time_domain\":\"device_tick_duration_ns\""
+          ",\"duration_ns\":%" PRId64,
+          has_duration_ns ? duration_ns : 0);
+  fputs("}\n", file);
+}
+
+static iree_status_t iree_profile_projection_emit_dispatch_event(
+    void* user_data, const iree_profile_dispatch_event_row_t* row) {
+  FILE* file = (FILE*)user_data;
+  iree_profile_dispatch_print_event_jsonl(row, file);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_command_count_matching_operations(
     const iree_profile_dispatch_context_t* context, iree_string_view_t filter,
     int64_t id_filter, iree_host_size_t* out_operation_count) {
@@ -1084,10 +1141,10 @@ typedef struct iree_profile_projection_parse_context_t {
   iree_profile_projection_mode_t projection_mode;
   // Optional entity identifier filter, or -1 when disabled.
   int64_t id_filter;
-  // True when raw event rows should be streamed while parsing.
-  bool emit_events;
-  // Output stream receiving raw event rows when enabled.
-  FILE* file;
+  // True when matched dispatches should update aggregate arrays.
+  bool aggregate_events;
+  // Optional callback receiving matched raw dispatch events.
+  iree_profile_dispatch_event_callback_t event_callback;
 } iree_profile_projection_parse_context_t;
 
 static iree_status_t iree_profile_projection_metadata_record(
@@ -1108,8 +1165,8 @@ static iree_status_t iree_profile_projection_event_record(
       (iree_profile_projection_parse_context_t*)user_data;
   return iree_profile_dispatch_process_events_record(
       context->dispatch_context, record, context->filter,
-      context->projection_mode, context->id_filter, context->emit_events,
-      context->file);
+      context->projection_mode, context->id_filter, context->aggregate_events,
+      context->event_callback);
 }
 
 iree_status_t iree_profile_projection_file(
@@ -1135,13 +1192,17 @@ iree_status_t iree_profile_projection_file(
 
   iree_profile_dispatch_context_t context;
   iree_profile_dispatch_context_initialize(host_allocator, &context);
+  const iree_profile_dispatch_event_callback_t event_callback = {
+      .fn = emit_events ? iree_profile_projection_emit_dispatch_event : NULL,
+      .user_data = file,
+  };
   iree_profile_projection_parse_context_t parse_context = {
       .dispatch_context = &context,
       .filter = filter,
       .projection_mode = projection_mode,
       .id_filter = id_filter,
-      .emit_events = emit_events,
-      .file = file,
+      .aggregate_events = !emit_events,
+      .event_callback = event_callback,
   };
   iree_profile_file_record_callback_t record_callback = {
       .fn = iree_profile_projection_metadata_record,
