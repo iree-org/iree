@@ -39,15 +39,50 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "rocm",
+    srcs = ["rocm.c"],
+    hdrs = ["rocm.h"],
+    deps = [
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/base/internal:path",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "rocprofiler",
+    srcs = ["rocprofiler.c"],
+    hdrs = ["rocprofiler.h"],
+    deps = [
+        ":rocm",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:dynamic_library",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "comgr",
+    srcs = ["comgr.c"],
+    hdrs = ["comgr.h"],
+    deps = [
+        ":rocm",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:dynamic_library",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "att",
     srcs = ["att.c"],
     hdrs = ["att.h"],
     deps = [
         ":bundle",
+        ":comgr",
+        ":rocm",
+        ":rocprofiler",
         ":util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:dynamic_library",
-        "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/tooling/profile:commands",
         "//runtime/src/iree/tooling/profile:common",
     ],
@@ -58,6 +93,17 @@ iree_runtime_cc_test(
     srcs = ["bundle_test.cc"],
     deps = [
         ":bundle",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "rocm_test",
+    srcs = ["rocm_test.cc"],
+    deps = [
+        ":rocm",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

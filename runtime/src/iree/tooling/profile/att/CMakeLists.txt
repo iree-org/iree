@@ -41,6 +41,49 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    rocm
+  HDRS
+    "rocm.h"
+  SRCS
+    "rocm.c"
+  DEPS
+    ::util
+    iree::base
+    iree::base::internal::dynamic_library
+    iree::base::internal::path
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    rocprofiler
+  HDRS
+    "rocprofiler.h"
+  SRCS
+    "rocprofiler.c"
+  DEPS
+    ::rocm
+    iree::base
+    iree::base::internal::dynamic_library
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    comgr
+  HDRS
+    "comgr.h"
+  SRCS
+    "comgr.c"
+  DEPS
+    ::rocm
+    iree::base
+    iree::base::internal::dynamic_library
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     att
   HDRS
     "att.h"
@@ -48,10 +91,11 @@ iree_cc_library(
     "att.c"
   DEPS
     ::bundle
+    ::comgr
+    ::rocm
+    ::rocprofiler
     ::util
     iree::base
-    iree::base::internal::dynamic_library
-    iree::base::internal::path
     iree::tooling::profile::commands
     iree::tooling::profile::common
   PUBLIC
@@ -64,6 +108,18 @@ iree_cc_test(
     "bundle_test.cc"
   DEPS
     ::bundle
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    rocm_test
+  SRCS
+    "rocm_test.cc"
+  DEPS
+    ::rocm
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
