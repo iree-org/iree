@@ -1223,63 +1223,87 @@ static void iree_profile_memory_print_text_pools(
   }
 }
 
+typedef struct iree_profile_memory_allocation_row_t {
+  // Source allocation aggregate being rendered.
+  const iree_profile_memory_allocation_t* allocation;
+  // True when the allocation lifecycle is still open after matched events.
+  bool is_open_at_end;
+  // True when the allocation wraps externally-owned memory.
+  bool is_externally_owned;
+  // Host timestamp delta between the first and last matched events.
+  int64_t duration_ns;
+  // Queue-device lifetime joined from alloca/dealloca device events.
+  iree_profile_memory_device_lifetime_t device_lifetime;
+} iree_profile_memory_allocation_row_t;
+
+static iree_profile_memory_allocation_row_t
+iree_profile_memory_resolve_allocation_row(
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    const iree_profile_memory_allocation_t* allocation) {
+  iree_profile_memory_allocation_row_t row;
+  memset(&row, 0, sizeof(row));
+  row.allocation = allocation;
+  row.is_open_at_end = iree_profile_memory_allocation_open_at_end(allocation);
+  row.is_externally_owned = iree_all_bits_set(
+      allocation->flags, IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED);
+  row.duration_ns =
+      allocation->last_host_time_ns >= allocation->first_host_time_ns
+          ? allocation->last_host_time_ns - allocation->first_host_time_ns
+          : 0;
+  row.device_lifetime = iree_profile_memory_resolve_device_lifetime(
+      queue_device_index, allocation);
+  return row;
+}
+
 static void iree_profile_memory_print_text_allocations(
     const iree_profile_memory_context_t* context,
     const iree_profile_memory_queue_device_event_index_t* queue_device_index,
     FILE* file) {
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
-    const iree_profile_memory_allocation_t* allocation =
-        &context->allocations[i];
-    const int64_t duration_ns =
-        allocation->last_host_time_ns >= allocation->first_host_time_ns
-            ? allocation->last_host_time_ns - allocation->first_host_time_ns
-            : 0;
-    const iree_profile_memory_device_lifetime_t device_lifetime =
-        iree_profile_memory_resolve_device_lifetime(queue_device_index,
-                                                    allocation);
-    fprintf(
-        file,
-        "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
-        " backing=%" PRIu64 " externally_owned=%s]: events=%" PRIu64
-        " waits=%" PRIu64 " materializes=%" PRIu64
-        " open_at_end=%s current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
-        " opened_bytes=%" PRIu64 " closed_bytes=%" PRIu64
-        " partial_closes=%" PRIu64 " partial_close_bytes=%" PRIu64
-        " first_event=%" PRIu64 " last_event=%" PRIu64 " duration_ns=%" PRId64
-        "\n",
-        iree_profile_memory_lifecycle_kind_name(allocation->kind),
-        allocation->physical_device_ordinal, allocation->allocation_id,
-        allocation->pool_id, allocation->backing_id,
-        iree_all_bits_set(allocation->flags,
-                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
-            ? "true"
-            : "false",
-        allocation->event_count, allocation->wait_count,
-        allocation->materialize_count,
-        iree_profile_memory_allocation_open_at_end(allocation) ? "true"
-                                                               : "false",
-        allocation->lifecycle_balance.current_bytes,
-        allocation->lifecycle_balance.high_water_bytes,
-        allocation->lifecycle_balance.total_open_bytes,
-        allocation->lifecycle_balance.total_close_bytes,
-        allocation->lifecycle_balance.partial_close_count,
-        allocation->lifecycle_balance.partial_close_bytes,
-        allocation->first_event_id, allocation->last_event_id, duration_ns);
+    const iree_profile_memory_allocation_row_t row =
+        iree_profile_memory_resolve_allocation_row(queue_device_index,
+                                                   &context->allocations[i]);
+    const iree_profile_memory_allocation_t* allocation = row.allocation;
+    const iree_profile_memory_device_lifetime_t* device_lifetime =
+        &row.device_lifetime;
+    fprintf(file,
+            "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
+            " backing=%" PRIu64 " externally_owned=%s]: events=%" PRIu64
+            " waits=%" PRIu64 " materializes=%" PRIu64
+            " open_at_end=%s current_bytes=%" PRIu64
+            " high_water_bytes=%" PRIu64 " opened_bytes=%" PRIu64
+            " closed_bytes=%" PRIu64 " partial_closes=%" PRIu64
+            " partial_close_bytes=%" PRIu64 " first_event=%" PRIu64
+            " last_event=%" PRIu64 " duration_ns=%" PRId64 "\n",
+            iree_profile_memory_lifecycle_kind_name(allocation->kind),
+            allocation->physical_device_ordinal, allocation->allocation_id,
+            allocation->pool_id, allocation->backing_id,
+            row.is_externally_owned ? "true" : "false", allocation->event_count,
+            allocation->wait_count, allocation->materialize_count,
+            row.is_open_at_end ? "true" : "false",
+            allocation->lifecycle_balance.current_bytes,
+            allocation->lifecycle_balance.high_water_bytes,
+            allocation->lifecycle_balance.total_open_bytes,
+            allocation->lifecycle_balance.total_close_bytes,
+            allocation->lifecycle_balance.partial_close_count,
+            allocation->lifecycle_balance.partial_close_bytes,
+            allocation->first_event_id, allocation->last_event_id,
+            row.duration_ns);
     if (allocation->kind ==
         IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
       fprintf(file,
               "  device_lifetime: available=%s alloca_event=%" PRIu64
               " dealloca_event=%" PRIu64 " duration_ticks=%" PRIu64,
-              device_lifetime.is_valid ? "true" : "false",
-              device_lifetime.alloca_event
-                  ? device_lifetime.alloca_event->event_id
+              device_lifetime->is_valid ? "true" : "false",
+              device_lifetime->alloca_event
+                  ? device_lifetime->alloca_event->event_id
                   : 0,
-              device_lifetime.dealloca_event
-                  ? device_lifetime.dealloca_event->event_id
+              device_lifetime->dealloca_event
+                  ? device_lifetime->dealloca_event->event_id
                   : 0,
-              device_lifetime.duration_ticks);
-      if (device_lifetime.has_duration_ns) {
-        fprintf(file, " duration_ns=%" PRId64, device_lifetime.duration_ns);
+              device_lifetime->duration_ticks);
+      if (device_lifetime->has_duration_ns) {
+        fprintf(file, " duration_ns=%" PRId64, device_lifetime->duration_ns);
       }
       fputc('\n', file);
     }
@@ -1409,15 +1433,12 @@ static void iree_profile_memory_print_jsonl_allocations(
     const iree_profile_memory_queue_device_event_index_t* queue_device_index,
     FILE* file) {
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
-    const iree_profile_memory_allocation_t* allocation =
-        &context->allocations[i];
-    const int64_t duration_ns =
-        allocation->last_host_time_ns >= allocation->first_host_time_ns
-            ? allocation->last_host_time_ns - allocation->first_host_time_ns
-            : 0;
-    const iree_profile_memory_device_lifetime_t device_lifetime =
-        iree_profile_memory_resolve_device_lifetime(queue_device_index,
-                                                    allocation);
+    const iree_profile_memory_allocation_row_t row =
+        iree_profile_memory_resolve_allocation_row(queue_device_index,
+                                                   &context->allocations[i]);
+    const iree_profile_memory_allocation_t* allocation = row.allocation;
+    const iree_profile_memory_device_lifetime_t* device_lifetime =
+        &row.device_lifetime;
     fprintf(file, "{\"type\":\"memory_allocation\",\"kind\":");
     iree_profile_fprint_json_string(
         file, iree_make_cstring_view(
@@ -1447,29 +1468,24 @@ static void iree_profile_memory_print_jsonl_allocations(
         ",\"device_lifetime_duration_ns\":%" PRId64,
         allocation->physical_device_ordinal, allocation->allocation_id,
         allocation->pool_id, allocation->backing_id,
-        iree_all_bits_set(allocation->flags,
-                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
-            ? "true"
-            : "false",
-        allocation->memory_type, allocation->buffer_usage,
-        allocation->event_count, allocation->wait_count,
-        allocation->materialize_count,
-        iree_profile_memory_allocation_open_at_end(allocation) ? "true"
-                                                               : "false",
-        allocation->first_event_id, allocation->last_event_id,
-        allocation->first_host_time_ns, allocation->last_host_time_ns,
-        duration_ns, allocation->first_submission_id,
-        allocation->last_submission_id, allocation->first_queue_ordinal,
-        allocation->last_queue_ordinal,
-        device_lifetime.alloca_event ? device_lifetime.alloca_event->event_id
-                                     : 0,
-        device_lifetime.dealloca_event
-            ? device_lifetime.dealloca_event->event_id
+        row.is_externally_owned ? "true" : "false", allocation->memory_type,
+        allocation->buffer_usage, allocation->event_count,
+        allocation->wait_count, allocation->materialize_count,
+        row.is_open_at_end ? "true" : "false", allocation->first_event_id,
+        allocation->last_event_id, allocation->first_host_time_ns,
+        allocation->last_host_time_ns, row.duration_ns,
+        allocation->first_submission_id, allocation->last_submission_id,
+        allocation->first_queue_ordinal, allocation->last_queue_ordinal,
+        device_lifetime->alloca_event ? device_lifetime->alloca_event->event_id
+                                      : 0,
+        device_lifetime->dealloca_event
+            ? device_lifetime->dealloca_event->event_id
             : 0,
-        device_lifetime.is_valid ? "true" : "false", device_lifetime.start_tick,
-        device_lifetime.end_tick, device_lifetime.duration_ticks,
-        device_lifetime.has_duration_ns ? "true" : "false",
-        device_lifetime.has_duration_ns ? device_lifetime.duration_ns : 0);
+        device_lifetime->is_valid ? "true" : "false",
+        device_lifetime->start_tick, device_lifetime->end_tick,
+        device_lifetime->duration_ticks,
+        device_lifetime->has_duration_ns ? "true" : "false",
+        device_lifetime->has_duration_ns ? device_lifetime->duration_ns : 0);
     iree_profile_memory_fprint_balance_json_fields(
         file, "lifecycle", &allocation->lifecycle_balance);
     iree_profile_memory_fprint_balance_json_fields(
