@@ -407,6 +407,31 @@ static bool iree_profile_memory_balance_close(
   return true;
 }
 
+static bool iree_profile_memory_apply_lifecycle_balances(
+    const iree_hal_profile_memory_event_t* event, bool close_materialization,
+    iree_profile_memory_balance_t* lifecycle_balance,
+    iree_profile_memory_balance_t* materialization_balance) {
+  bool accounted = true;
+  if (iree_profile_memory_event_opens_lifecycle(event)) {
+    accounted =
+        iree_profile_memory_balance_open(lifecycle_balance, event->length);
+  } else if (iree_profile_memory_event_closes_lifecycle(event)) {
+    accounted =
+        iree_profile_memory_balance_close(lifecycle_balance, event->length);
+  }
+
+  if (accounted &&
+      event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
+    accounted = iree_profile_memory_balance_open(materialization_balance,
+                                                 event->length);
+  } else if (accounted && close_materialization &&
+             event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE) {
+    accounted = iree_profile_memory_balance_close(materialization_balance,
+                                                  event->length);
+  }
+  return accounted;
+}
+
 static void iree_profile_memory_count_device_event(
     iree_profile_memory_device_t* device,
     const iree_hal_profile_memory_event_t* event) {
@@ -543,23 +568,9 @@ static iree_status_t iree_profile_memory_record_pool_event(
     ++pool->materialize_count;
   }
 
-  bool accounted = true;
-  if (iree_profile_memory_event_opens_lifecycle(event)) {
-    accounted = iree_profile_memory_balance_open(&pool->lifecycle_balance,
-                                                 event->length);
-  } else if (iree_profile_memory_event_closes_lifecycle(event)) {
-    accounted = iree_profile_memory_balance_close(&pool->lifecycle_balance,
-                                                  event->length);
-  }
-  if (accounted &&
-      event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
-    accounted = iree_profile_memory_balance_open(&pool->materialization_balance,
-                                                 event->length);
-  } else if (accounted && close_materialization &&
-             event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE) {
-    accounted = iree_profile_memory_balance_close(
-        &pool->materialization_balance, event->length);
-  }
+  const bool accounted = iree_profile_memory_apply_lifecycle_balances(
+      event, close_materialization, &pool->lifecycle_balance,
+      &pool->materialization_balance);
   if (!accounted) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
@@ -651,23 +662,9 @@ static iree_status_t iree_profile_memory_record_allocation_event(
     ++allocation->materialize_count;
   }
 
-  bool accounted = true;
-  if (iree_profile_memory_event_opens_lifecycle(event)) {
-    accounted = iree_profile_memory_balance_open(&allocation->lifecycle_balance,
-                                                 event->length);
-  } else if (iree_profile_memory_event_closes_lifecycle(event)) {
-    accounted = iree_profile_memory_balance_close(
-        &allocation->lifecycle_balance, event->length);
-  }
-  if (accounted &&
-      event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE) {
-    accounted = iree_profile_memory_balance_open(
-        &allocation->materialization_balance, event->length);
-  } else if (accounted && close_materialization &&
-             event->type == IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE) {
-    accounted = iree_profile_memory_balance_close(
-        &allocation->materialization_balance, event->length);
-  }
+  const bool accounted = iree_profile_memory_apply_lifecycle_balances(
+      event, close_materialization, &allocation->lifecycle_balance,
+      &allocation->materialization_balance);
   if (!accounted) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
