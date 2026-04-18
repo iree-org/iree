@@ -704,6 +704,28 @@ static uint64_t iree_profile_memory_allocation_partial_close_count(
          allocation->materialization_balance.partial_close_count;
 }
 
+typedef struct iree_profile_memory_overview_t {
+  // Allocation lifecycles with bytes or materializations still open.
+  uint64_t open_allocation_lifecycle_count;
+  // Partial close transitions across all allocation lifecycles.
+  uint64_t partial_lifecycle_close_count;
+} iree_profile_memory_overview_t;
+
+static iree_profile_memory_overview_t iree_profile_memory_compute_overview(
+    const iree_profile_memory_context_t* context) {
+  iree_profile_memory_overview_t overview;
+  memset(&overview, 0, sizeof(overview));
+  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+    if (iree_profile_memory_allocation_open_at_end(&context->allocations[i])) {
+      ++overview.open_allocation_lifecycle_count;
+    }
+    overview.partial_lifecycle_close_count +=
+        iree_profile_memory_allocation_partial_close_count(
+            &context->allocations[i]);
+  }
+  return overview;
+}
+
 static void iree_profile_memory_print_balance_text(
     FILE* file, const char* name,
     const iree_profile_memory_balance_t* balance) {
@@ -1061,20 +1083,10 @@ iree_status_t iree_profile_memory_context_accumulate_record(
   return status;
 }
 
-static iree_status_t iree_profile_memory_print_text(
+static void iree_profile_memory_print_text_header(
     const iree_profile_memory_context_t* context,
-    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
-    iree_string_view_t filter, int64_t id_filter, FILE* file) {
-  uint64_t live_allocation_count = 0;
-  uint64_t partial_close_count = 0;
-  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
-    if (iree_profile_memory_allocation_open_at_end(&context->allocations[i])) {
-      ++live_allocation_count;
-    }
-    partial_close_count += iree_profile_memory_allocation_partial_close_count(
-        &context->allocations[i]);
-  }
-
+    const iree_profile_memory_overview_t* overview, iree_string_view_t filter,
+    int64_t id_filter, FILE* file) {
   fprintf(file, "IREE HAL profile memory summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
   if (id_filter >= 0) {
@@ -1087,8 +1099,13 @@ static iree_status_t iree_profile_memory_print_text(
           " partial_closes=%" PRIu64 "\n",
           context->total_event_count, context->matched_event_count,
           context->truncated_event_count, context->device_count,
-          context->pool_count, context->allocation_count, live_allocation_count,
-          partial_close_count);
+          context->pool_count, context->allocation_count,
+          overview->open_allocation_lifecycle_count,
+          overview->partial_lifecycle_close_count);
+}
+
+static void iree_profile_memory_print_text_devices(
+    const iree_profile_memory_context_t* context, FILE* file) {
   for (iree_host_size_t i = 0; i < context->device_count; ++i) {
     const iree_profile_memory_device_t* device = &context->devices[i];
     fprintf(file,
@@ -1118,6 +1135,10 @@ static iree_status_t iree_profile_memory_print_text(
     iree_profile_memory_print_balance_text(file, "buffer_imports",
                                            &device->buffer_import_balance);
   }
+}
+
+static void iree_profile_memory_print_text_pools(
+    const iree_profile_memory_context_t* context, FILE* file) {
   for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
     const iree_profile_memory_pool_t* pool = &context->pools[i];
     fprintf(file,
@@ -1166,82 +1187,92 @@ static iree_status_t iree_profile_memory_print_text(
     }
     fputc('\n', file);
   }
-  if (id_filter >= 0) {
-    for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
-      const iree_profile_memory_allocation_t* allocation =
-          &context->allocations[i];
-      const int64_t duration_ns =
-          allocation->last_host_time_ns >= allocation->first_host_time_ns
-              ? allocation->last_host_time_ns - allocation->first_host_time_ns
-              : 0;
-      const iree_profile_memory_device_lifetime_t device_lifetime =
-          iree_profile_memory_resolve_device_lifetime(queue_device_index,
-                                                      allocation);
-      fprintf(
-          file,
-          "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
-          " backing=%" PRIu64 " externally_owned=%s]: events=%" PRIu64
-          " waits=%" PRIu64 " materializes=%" PRIu64
-          " open_at_end=%s current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
-          " opened_bytes=%" PRIu64 " closed_bytes=%" PRIu64
-          " partial_closes=%" PRIu64 " partial_close_bytes=%" PRIu64
-          " first_event=%" PRIu64 " last_event=%" PRIu64 " duration_ns=%" PRId64
-          "\n",
-          iree_profile_memory_lifecycle_kind_name(allocation->kind),
-          allocation->physical_device_ordinal, allocation->allocation_id,
-          allocation->pool_id, allocation->backing_id,
-          iree_all_bits_set(allocation->flags,
-                            IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
-              ? "true"
-              : "false",
-          allocation->event_count, allocation->wait_count,
-          allocation->materialize_count,
-          iree_profile_memory_allocation_open_at_end(allocation) ? "true"
-                                                                 : "false",
-          allocation->lifecycle_balance.current_bytes,
-          allocation->lifecycle_balance.high_water_bytes,
-          allocation->lifecycle_balance.total_open_bytes,
-          allocation->lifecycle_balance.total_close_bytes,
-          allocation->lifecycle_balance.partial_close_count,
-          allocation->lifecycle_balance.partial_close_bytes,
-          allocation->first_event_id, allocation->last_event_id, duration_ns);
-      if (allocation->kind ==
-          IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
-        fprintf(file,
-                "  device_lifetime: available=%s alloca_event=%" PRIu64
-                " dealloca_event=%" PRIu64 " duration_ticks=%" PRIu64,
-                device_lifetime.is_valid ? "true" : "false",
-                device_lifetime.alloca_event
-                    ? device_lifetime.alloca_event->event_id
-                    : 0,
-                device_lifetime.dealloca_event
-                    ? device_lifetime.dealloca_event->event_id
-                    : 0,
-                device_lifetime.duration_ticks);
-        if (device_lifetime.has_duration_ns) {
-          fprintf(file, " duration_ns=%" PRId64, device_lifetime.duration_ns);
-        }
-        fputc('\n', file);
+}
+
+static void iree_profile_memory_print_text_allocations(
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    FILE* file) {
+  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
+    const iree_profile_memory_allocation_t* allocation =
+        &context->allocations[i];
+    const int64_t duration_ns =
+        allocation->last_host_time_ns >= allocation->first_host_time_ns
+            ? allocation->last_host_time_ns - allocation->first_host_time_ns
+            : 0;
+    const iree_profile_memory_device_lifetime_t device_lifetime =
+        iree_profile_memory_resolve_device_lifetime(queue_device_index,
+                                                    allocation);
+    fprintf(
+        file,
+        "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
+        " backing=%" PRIu64 " externally_owned=%s]: events=%" PRIu64
+        " waits=%" PRIu64 " materializes=%" PRIu64
+        " open_at_end=%s current_bytes=%" PRIu64 " high_water_bytes=%" PRIu64
+        " opened_bytes=%" PRIu64 " closed_bytes=%" PRIu64
+        " partial_closes=%" PRIu64 " partial_close_bytes=%" PRIu64
+        " first_event=%" PRIu64 " last_event=%" PRIu64 " duration_ns=%" PRId64
+        "\n",
+        iree_profile_memory_lifecycle_kind_name(allocation->kind),
+        allocation->physical_device_ordinal, allocation->allocation_id,
+        allocation->pool_id, allocation->backing_id,
+        iree_all_bits_set(allocation->flags,
+                          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_EXTERNALLY_OWNED)
+            ? "true"
+            : "false",
+        allocation->event_count, allocation->wait_count,
+        allocation->materialize_count,
+        iree_profile_memory_allocation_open_at_end(allocation) ? "true"
+                                                               : "false",
+        allocation->lifecycle_balance.current_bytes,
+        allocation->lifecycle_balance.high_water_bytes,
+        allocation->lifecycle_balance.total_open_bytes,
+        allocation->lifecycle_balance.total_close_bytes,
+        allocation->lifecycle_balance.partial_close_count,
+        allocation->lifecycle_balance.partial_close_bytes,
+        allocation->first_event_id, allocation->last_event_id, duration_ns);
+    if (allocation->kind ==
+        IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
+      fprintf(file,
+              "  device_lifetime: available=%s alloca_event=%" PRIu64
+              " dealloca_event=%" PRIu64 " duration_ticks=%" PRIu64,
+              device_lifetime.is_valid ? "true" : "false",
+              device_lifetime.alloca_event
+                  ? device_lifetime.alloca_event->event_id
+                  : 0,
+              device_lifetime.dealloca_event
+                  ? device_lifetime.dealloca_event->event_id
+                  : 0,
+              device_lifetime.duration_ticks);
+      if (device_lifetime.has_duration_ns) {
+        fprintf(file, " duration_ns=%" PRId64, device_lifetime.duration_ns);
       }
+      fputc('\n', file);
     }
+  }
+}
+
+static iree_status_t iree_profile_memory_print_text(
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    iree_string_view_t filter, int64_t id_filter, FILE* file) {
+  const iree_profile_memory_overview_t overview =
+      iree_profile_memory_compute_overview(context);
+  iree_profile_memory_print_text_header(context, &overview, filter, id_filter,
+                                        file);
+  iree_profile_memory_print_text_devices(context, file);
+  iree_profile_memory_print_text_pools(context, file);
+  if (id_filter >= 0) {
+    iree_profile_memory_print_text_allocations(context, queue_device_index,
+                                               file);
   }
   return iree_ok_status();
 }
 
-static void iree_profile_memory_print_jsonl_summary(
+static void iree_profile_memory_print_jsonl_header(
     const iree_profile_memory_context_t* context,
-    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
-    iree_string_view_t filter, int64_t id_filter, FILE* file) {
-  uint64_t live_allocation_count = 0;
-  uint64_t partial_close_count = 0;
-  for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
-    if (iree_profile_memory_allocation_open_at_end(&context->allocations[i])) {
-      ++live_allocation_count;
-    }
-    partial_close_count += iree_profile_memory_allocation_partial_close_count(
-        &context->allocations[i]);
-  }
-
+    const iree_profile_memory_overview_t* overview, iree_string_view_t filter,
+    int64_t id_filter, FILE* file) {
   fprintf(file, "{\"type\":\"memory_summary\",\"filter\":");
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
@@ -1253,8 +1284,13 @@ static void iree_profile_memory_print_jsonl_summary(
           ",\"partial_lifecycle_closes\":%" PRIu64 "}\n",
           id_filter, context->total_event_count, context->matched_event_count,
           context->truncated_event_count, context->device_count,
-          context->pool_count, context->allocation_count, live_allocation_count,
-          partial_close_count);
+          context->pool_count, context->allocation_count,
+          overview->open_allocation_lifecycle_count,
+          overview->partial_lifecycle_close_count);
+}
+
+static void iree_profile_memory_print_jsonl_devices(
+    const iree_profile_memory_context_t* context, FILE* file) {
   for (iree_host_size_t i = 0; i < context->device_count; ++i) {
     const iree_profile_memory_device_t* device = &context->devices[i];
     fprintf(file,
@@ -1287,6 +1323,10 @@ static void iree_profile_memory_print_jsonl_summary(
         file, "imported_buffer", &device->buffer_import_balance);
     fprintf(file, "}\n");
   }
+}
+
+static void iree_profile_memory_print_jsonl_pools(
+    const iree_profile_memory_context_t* context, FILE* file) {
   for (iree_host_size_t i = 0; i < context->pool_count; ++i) {
     const iree_profile_memory_pool_t* pool = &context->pools[i];
     fprintf(file, "{\"type\":\"memory_pool\",\"kind\":");
@@ -1328,6 +1368,12 @@ static void iree_profile_memory_print_jsonl_summary(
         pool->pool_slab_count, pool->pool_slab_high_water_count);
     fprintf(file, "}\n");
   }
+}
+
+static void iree_profile_memory_print_jsonl_allocations(
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    FILE* file) {
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
     const iree_profile_memory_allocation_t* allocation =
         &context->allocations[i];
@@ -1396,6 +1442,20 @@ static void iree_profile_memory_print_jsonl_summary(
         file, "materialized", &allocation->materialization_balance);
     fprintf(file, "}\n");
   }
+}
+
+static void iree_profile_memory_print_jsonl_summary(
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    iree_string_view_t filter, int64_t id_filter, FILE* file) {
+  const iree_profile_memory_overview_t overview =
+      iree_profile_memory_compute_overview(context);
+  iree_profile_memory_print_jsonl_header(context, &overview, filter, id_filter,
+                                         file);
+  iree_profile_memory_print_jsonl_devices(context, file);
+  iree_profile_memory_print_jsonl_pools(context, file);
+  iree_profile_memory_print_jsonl_allocations(context, queue_device_index,
+                                              file);
 }
 
 typedef struct iree_profile_memory_parse_context_t {
