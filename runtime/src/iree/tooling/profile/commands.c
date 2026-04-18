@@ -50,6 +50,24 @@ static bool iree_profile_command_output_path_is_default(
          iree_string_view_equal(output_path, IREE_SV("-"));
 }
 
+static iree_status_t iree_profile_command_require_option(
+    const iree_profile_command_t* command,
+    iree_profile_command_option_bits_t option, const char* flag_name) {
+  if (iree_profile_command_accepts_option(command, option)) {
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "iree-profile command '%s' does not support %s",
+                          command->name, flag_name);
+}
+
+static iree_status_t iree_profile_command_require_jsonl_format(
+    iree_profile_command_format_bits_t format, const char* flag_name) {
+  if (format == IREE_PROFILE_COMMAND_FORMAT_JSONL) return iree_ok_status();
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "%s requires --format=jsonl", flag_name);
+}
+
 static iree_status_t iree_profile_run_cat(
     const iree_profile_command_invocation_t* invocation) {
   return iree_profile_cat_file(
@@ -250,61 +268,36 @@ iree_status_t iree_profile_command_validate_options(
                             command->name, (int)options->format.size,
                             options->format.data);
   }
-  if (!iree_profile_command_filter_is_default(options->filter) &&
-      !iree_profile_command_accepts_option(
-          command, IREE_PROFILE_COMMAND_OPTION_FILTER)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "iree-profile command '%s' does not support "
-                            "--filter",
-                            command->name);
+  if (!iree_profile_command_filter_is_default(options->filter)) {
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_FILTER, "--filter"));
   }
-  if (options->id >= 0 && !iree_profile_command_accepts_option(
-                              command, IREE_PROFILE_COMMAND_OPTION_ID)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "iree-profile command '%s' does not support --id",
-                            command->name);
+  if (options->id >= 0) {
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_ID, "--id"));
   }
-  if (!iree_profile_command_output_path_is_default(options->output_path) &&
-      !iree_profile_command_accepts_option(
-          command, IREE_PROFILE_COMMAND_OPTION_OUTPUT)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "iree-profile command '%s' does not support "
-                            "--output",
-                            command->name);
+  if (!iree_profile_command_output_path_is_default(options->output_path)) {
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_OUTPUT, "--output"));
   }
   if (options->emit_dispatch_events) {
-    if (!iree_profile_command_accepts_option(
-            command, IREE_PROFILE_COMMAND_OPTION_DISPATCH_EVENTS)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "iree-profile command '%s' does not support "
-                              "--dispatch_events",
-                              command->name);
-    }
-    if (format != IREE_PROFILE_COMMAND_FORMAT_JSONL) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "--dispatch_events requires --format=jsonl");
-    }
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_DISPATCH_EVENTS,
+        "--dispatch_events"));
+    IREE_RETURN_IF_ERROR(
+        iree_profile_command_require_jsonl_format(format, "--dispatch_events"));
   }
   if (options->emit_counter_samples) {
-    if (!iree_profile_command_accepts_option(
-            command, IREE_PROFILE_COMMAND_OPTION_COUNTER_SAMPLES)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "iree-profile command '%s' does not support "
-                              "--counter_samples",
-                              command->name);
-    }
-    if (format != IREE_PROFILE_COMMAND_FORMAT_JSONL) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "--counter_samples requires --format=jsonl");
-    }
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_COUNTER_SAMPLES,
+        "--counter_samples"));
+    IREE_RETURN_IF_ERROR(
+        iree_profile_command_require_jsonl_format(format, "--counter_samples"));
   }
-  if (!iree_string_view_is_empty(options->rocm_library_path) &&
-      !iree_profile_command_accepts_option(
-          command, IREE_PROFILE_COMMAND_OPTION_ROCM_LIBRARY_PATH)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "iree-profile command '%s' does not support "
-                            "--rocm_library_path",
-                            command->name);
+  if (!iree_string_view_is_empty(options->rocm_library_path)) {
+    IREE_RETURN_IF_ERROR(iree_profile_command_require_option(
+        command, IREE_PROFILE_COMMAND_OPTION_ROCM_LIBRARY_PATH,
+        "--rocm_library_path"));
   }
   return iree_ok_status();
 }
