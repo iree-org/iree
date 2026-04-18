@@ -174,7 +174,7 @@ void iree_profile_fprint_usage(FILE* file) {
   fputs(kIreeProfileUsage, file);
 }
 
-void iree_profile_print_agent_markdown(FILE* file) {
+static void iree_profile_print_agent_markdown_capture(FILE* file) {
   fputs(
       "# IREE HAL Profiling With iree-profile\n"
       "\n"
@@ -217,7 +217,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "IREE_RETURN_IF_ERROR(iree_hal_device_profiling_end(device));\n"
       "iree_hal_profile_sink_release(sink);\n"
       "iree_io_file_handle_release(file_handle);\n"
-      "```\n"
+      "```\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_commands(FILE* file) {
+  fputs(
       "\n"
       "## Commands\n"
       "\n"
@@ -295,7 +300,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "  adapters, telemetry upload, database import, and optional renderers "
       "such as Perfetto or "
       "SQLite.\n"
-      "- `cat` dumps raw bundle records and is mainly for format debugging.\n"
+      "- `cat` dumps raw bundle records and is mainly for format debugging.\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_jsonl_contracts(FILE* file) {
+  fputs(
       "\n"
       "## JSONL Contracts\n"
       "\n"
@@ -323,7 +333,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "export\n"
       "streams and on `type` for command report streams; do not merge the "
       "two\n"
-      "families as if they had one row namespace.\n"
+      "families as if they had one row namespace.\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_jsonl_record_types(FILE* file) {
+  fputs(
       "\n"
       "## JSONL Record Types\n"
       "\n"
@@ -361,7 +376,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "  `queue_event`, `queue_device_event`, `memory_event`, "
       "`event_relationship`, "
       "`counter_set`,\n"
-      "  `counter`, `counter_sample`, and `diagnostic`.\n"
+      "  `counter`, `counter_sample`, and `diagnostic`.\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_cross_references(FILE* file) {
+  fputs(
       "\n"
       "## Cross-Reference Keys\n"
       "\n"
@@ -432,7 +452,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "  `memory_device`\n"
       "  live/high-water fields are computed over the capture window, so "
       "they\n"
-      "  need not balance to zero if buffers outlive profiling.\n"
+      "  need not balance to zero if buffers outlive profiling.\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_recipes(FILE* file) {
+  fputs(
       "\n"
       "## Recipes\n"
       "\n"
@@ -585,7 +610,12 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "iree-profile executable --format=jsonl /tmp/model.ireeprof | \\\n"
       "  jq 'select(.type==\"executable_export\") | \\\n"
       "      {executable_id,export_ordinal,key,binding_count,workgroup_size}'\n"
-      "```\n"
+      "```\n",
+      file);
+}
+
+static void iree_profile_print_agent_markdown_notes(FILE* file) {
+  fputs(
       "\n"
       "## Notes For Agents\n"
       "\n"
@@ -603,6 +633,16 @@ void iree_profile_print_agent_markdown(FILE* file) {
       "current\n"
       "dispatch-derived projections.\n",
       file);
+}
+
+void iree_profile_print_agent_markdown(FILE* file) {
+  iree_profile_print_agent_markdown_capture(file);
+  iree_profile_print_agent_markdown_commands(file);
+  iree_profile_print_agent_markdown_jsonl_contracts(file);
+  iree_profile_print_agent_markdown_jsonl_record_types(file);
+  iree_profile_print_agent_markdown_cross_references(file);
+  iree_profile_print_agent_markdown_recipes(file);
+  iree_profile_print_agent_markdown_notes(file);
 }
 
 const char* iree_profile_usage_text(void) { return kIreeProfileUsage; }
