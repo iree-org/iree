@@ -1175,6 +1175,8 @@ static iree_status_t iree_profile_export_ireeperf_jsonl_file(
     fprintf(file,
             "{\"schema_version\":%d,\"record_type\":\"schema\""
             ",\"format\":\"ireeperf-jsonl\""
+            ",\"contract\":\"schema_versioned_interchange\""
+            ",\"row_key\":\"record_type\""
             ",\"source_format\":\"ireeprof\""
             ",\"source_version_major\":%u,\"source_version_minor\":%u"
             ",\"time_domains\":{"

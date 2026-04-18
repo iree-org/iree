@@ -13,8 +13,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Reads a profile bundle from |path| and writes an interop export to
-// |output_path|.
+// Reads a profile bundle from |path| and writes a schema-versioned decoded
+// interchange export to |output_path|. Unlike command-local JSONL reports,
+// export rows use a stable |record_type| namespace for downstream tooling.
 iree_status_t iree_profile_export_file(iree_string_view_t path,
                                        iree_string_view_t format,
                                        iree_string_view_t output_path,
