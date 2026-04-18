@@ -22,6 +22,7 @@ import collections
 import dataclasses
 import decimal
 import hashlib
+import heapq
 import json
 from pathlib import Path
 from typing import Any, Iterable
@@ -81,6 +82,20 @@ class TimelineEvent:
     timestamp_ns: int
     sort_key: tuple[Any, ...]
     callback: Any
+
+
+@dataclasses.dataclass
+class PendingSlice:
+    lane_family: str
+    record_family: str
+    sequence_index: int
+    start_time_ns: int
+    end_time_ns: int
+    physical_device_ordinal: int
+    queue_ordinal: int
+    name: str
+    annotations: dict[str, Any]
+    flow_ids: tuple[int, ...]
 
 
 @dataclasses.dataclass
@@ -146,18 +161,24 @@ class TrackRegistry:
 
 
 class LaneAllocator:
-    """Assigns overlapping slices to sibling tracks."""
+    """Assigns start-time-sorted overlapping slices to sibling tracks."""
 
     def __init__(self):
-        self._lane_end_times: list[int] = []
+        self._active_lanes: list[tuple[int, int]] = []
+        self._free_lanes: list[int] = []
+        self._lane_count = 0
 
     def allocate(self, start_time_ns: int, end_time_ns: int) -> int:
-        for lane_index, lane_end_time_ns in enumerate(self._lane_end_times):
-            if start_time_ns >= lane_end_time_ns:
-                self._lane_end_times[lane_index] = end_time_ns
-                return lane_index
-        self._lane_end_times.append(end_time_ns)
-        return len(self._lane_end_times) - 1
+        while self._active_lanes and start_time_ns >= self._active_lanes[0][0]:
+            _, lane_index = heapq.heappop(self._active_lanes)
+            heapq.heappush(self._free_lanes, lane_index)
+        if self._free_lanes:
+            lane_index = heapq.heappop(self._free_lanes)
+        else:
+            lane_index = self._lane_count
+            self._lane_count += 1
+        heapq.heappush(self._active_lanes, (end_time_ns, lane_index))
+        return lane_index
 
 
 def import_perfetto() -> PerfettoImports:
@@ -577,6 +598,7 @@ def build_trace(
         collections.defaultdict(LaneAllocator)
     )
     timeline_events: list[TimelineEvent] = []
+    pending_slices: list[PendingSlice] = []
     all_timestamp_ns: list[int] = []
 
     flow_ids_by_endpoint: dict[tuple[str, int, int, int, int], list[int]] = (
@@ -748,6 +770,33 @@ def build_trace(
             return ()
         return tuple(flow_ids_by_endpoint.get(endpoint_key, ()))
 
+    def append_pending_slice(
+        *,
+        lane_family: str,
+        record_family: str,
+        start_time_ns: int,
+        end_time_ns: int,
+        physical_device_ordinal: int,
+        queue_ordinal: int,
+        name: str,
+        annotations: dict[str, Any],
+        flow_ids: Iterable[int],
+    ) -> None:
+        pending_slices.append(
+            PendingSlice(
+                lane_family=lane_family,
+                record_family=record_family,
+                sequence_index=len(pending_slices),
+                start_time_ns=start_time_ns,
+                end_time_ns=end_time_ns,
+                physical_device_ordinal=physical_device_ordinal,
+                queue_ordinal=queue_ordinal,
+                name=name,
+                annotations=annotations,
+                flow_ids=tuple(flow_ids),
+            )
+        )
+
     for record in records:
         record_type = record.get("record_type")
         if record_type == "dispatch_event":
@@ -765,22 +814,16 @@ def build_trace(
             ensure_queue_tracks(
                 physical_device_ordinal, queue_ordinal, record.get("stream_id")
             )
-            lane_index = dispatch_lane_allocators[
-                (physical_device_ordinal, queue_ordinal)
-            ].allocate(start_time_ns, end_time_ns)
-            track_uuid = define_dispatch_lane(
-                physical_device_ordinal, queue_ordinal, lane_index
-            )
             name = str(record.get("key") or f"dispatch[{record.get('event_id', 0)}]")
             annotations = event_annotations(record)
             annotations["iree_perfetto_time_domain"] = time_domain
-            append_slice_events(
+            append_pending_slice(
+                lane_family="dispatch",
                 record_family="dispatch",
                 start_time_ns=start_time_ns,
                 end_time_ns=end_time_ns,
                 physical_device_ordinal=physical_device_ordinal,
                 queue_ordinal=queue_ordinal,
-                track_uuid=track_uuid,
                 name=name,
                 annotations=annotations,
                 flow_ids=endpoint_flow_ids(record, "dispatch_event"),
@@ -801,22 +844,16 @@ def build_trace(
             ensure_queue_tracks(
                 physical_device_ordinal, queue_ordinal, record.get("stream_id")
             )
-            lane_index = queue_device_lane_allocators[
-                (physical_device_ordinal, queue_ordinal)
-            ].allocate(start_time_ns, end_time_ns)
-            track_uuid = define_queue_device_lane(
-                physical_device_ordinal, queue_ordinal, lane_index
-            )
             name = f"queue-device:{record.get('op', 'event')}"
             annotations = event_annotations(record)
             annotations["iree_perfetto_time_domain"] = time_domain
-            append_slice_events(
+            append_pending_slice(
+                lane_family="queue_device",
                 record_family="queue_device",
                 start_time_ns=start_time_ns,
                 end_time_ns=end_time_ns,
                 physical_device_ordinal=physical_device_ordinal,
                 queue_ordinal=queue_ordinal,
-                track_uuid=track_uuid,
                 name=name,
                 annotations=annotations,
                 flow_ids=endpoint_flow_ids(record, "queue_device_event"),
@@ -839,12 +876,6 @@ def build_trace(
             ensure_queue_tracks(
                 physical_device_ordinal, queue_ordinal, record.get("stream_id")
             )
-            lane_index = host_execution_lane_allocators[
-                (physical_device_ordinal, queue_ordinal)
-            ].allocate(start_time_ns, end_time_ns)
-            track_uuid = define_host_execution_lane(
-                physical_device_ordinal, queue_ordinal, lane_index
-            )
             name = f"host:{record.get('op', 'event')}"
             if record.get("key"):
                 name = str(record["key"])
@@ -852,13 +883,13 @@ def build_trace(
             annotations["iree_perfetto_time_domain"] = record.get(
                 "host_time_domain", "iree_host_time_ns"
             )
-            append_slice_events(
+            append_pending_slice(
+                lane_family="host_execution",
                 record_family="host_execution",
                 start_time_ns=start_time_ns,
                 end_time_ns=end_time_ns,
                 physical_device_ordinal=physical_device_ordinal,
                 queue_ordinal=queue_ordinal,
-                track_uuid=track_uuid,
                 name=name,
                 annotations=annotations,
                 flow_ids=endpoint_flow_ids(record, "host_execution_event"),
@@ -987,6 +1018,65 @@ def build_trace(
                 )
             )
             stats.diagnostic_instants += 1
+
+    # Allocate lanes after collecting all slices so large traces avoid the
+    # quadratic "scan every lane for every slice" case and remain correct even
+    # when records arrive out of timestamp order.
+    for pending_slice in sorted(
+        pending_slices,
+        key=lambda pending_slice: (
+            pending_slice.lane_family,
+            pending_slice.physical_device_ordinal,
+            pending_slice.queue_ordinal,
+            pending_slice.start_time_ns,
+            pending_slice.end_time_ns,
+            pending_slice.sequence_index,
+        ),
+    ):
+        allocator_key = (
+            pending_slice.physical_device_ordinal,
+            pending_slice.queue_ordinal,
+        )
+        if pending_slice.lane_family == "dispatch":
+            lane_index = dispatch_lane_allocators[allocator_key].allocate(
+                pending_slice.start_time_ns, pending_slice.end_time_ns
+            )
+            track_uuid = define_dispatch_lane(
+                pending_slice.physical_device_ordinal,
+                pending_slice.queue_ordinal,
+                lane_index,
+            )
+        elif pending_slice.lane_family == "queue_device":
+            lane_index = queue_device_lane_allocators[allocator_key].allocate(
+                pending_slice.start_time_ns, pending_slice.end_time_ns
+            )
+            track_uuid = define_queue_device_lane(
+                pending_slice.physical_device_ordinal,
+                pending_slice.queue_ordinal,
+                lane_index,
+            )
+        elif pending_slice.lane_family == "host_execution":
+            lane_index = host_execution_lane_allocators[allocator_key].allocate(
+                pending_slice.start_time_ns, pending_slice.end_time_ns
+            )
+            track_uuid = define_host_execution_lane(
+                pending_slice.physical_device_ordinal,
+                pending_slice.queue_ordinal,
+                lane_index,
+            )
+        else:
+            raise ValueError(f"unknown slice lane family: {pending_slice.lane_family}")
+        append_slice_events(
+            record_family=pending_slice.record_family,
+            start_time_ns=pending_slice.start_time_ns,
+            end_time_ns=pending_slice.end_time_ns,
+            physical_device_ordinal=pending_slice.physical_device_ordinal,
+            queue_ordinal=pending_slice.queue_ordinal,
+            track_uuid=track_uuid,
+            name=pending_slice.name,
+            annotations=pending_slice.annotations,
+            flow_ids=pending_slice.flow_ids,
+        )
 
     queue_allocation_bytes: dict[tuple[int, int], int] = collections.defaultdict(int)
     for record in sorted(
