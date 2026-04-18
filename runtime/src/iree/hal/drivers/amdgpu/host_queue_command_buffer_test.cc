@@ -136,6 +136,19 @@ static iree_status_t CreateHostVisibleDispatchBuffer(
                                             out_buffer);
 }
 
+static iree_status_t CreateHostVisibleIndirectParameterBuffer(
+    iree_hal_allocator_t* allocator, iree_device_size_t buffer_size,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
+                 IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+  return iree_hal_allocator_allocate_buffer(allocator, params, buffer_size,
+                                            out_buffer);
+}
+
 static iree_const_byte_span_t FindCtsExecutableData(
     iree_string_view_t file_name) {
   const iree_file_toc_t* toc = iree_cts_testdata_amdgpu_create();
@@ -892,6 +905,79 @@ TEST_F(HostQueueCommandBufferTest,
   EXPECT_EQ(summary.packet_count, 2u);
   EXPECT_EQ(summary.barrier_packet_count, 1u);
   EXPECT_FALSE(AqlHeaderHasBarrier(summary.first_packet_header));
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       PacketSummaryBarriersIndirectParameterPatchDispatch) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(queue, nullptr);
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_multi_workgroup_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer.out()));
+  Ref<iree_hal_buffer_t> parameter_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleIndirectParameterBuffer(
+      test_device.allocator(), /*buffer_size=*/3 * sizeof(uint32_t),
+      parameter_buffer.out()));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  iree_hal_buffer_ref_t binding_refs[1] = {
+      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(output_buffer)),
+  };
+  const iree_hal_buffer_ref_list_t bindings = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs),
+      /*values=*/binding_refs,
+  };
+  iree_hal_dispatch_config_t config =
+      iree_hal_make_static_dispatch_config(4, 1, 1);
+  config.workgroup_count_ref = iree_hal_make_buffer_ref(
+      parameter_buffer, /*offset=*/0, 3 * sizeof(uint32_t));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable, /*entry_point=*/0, config,
+      iree_const_byte_span_empty(), bindings,
+      IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  const iree_hal_amdgpu_aql_program_t* program =
+      iree_hal_amdgpu_aql_command_buffer_program(command_buffer);
+  ASSERT_NE(program->first_block, nullptr);
+  ASSERT_EQ(program->first_block->aql_packet_count, 2u);
+
+  iree_hal_amdgpu_wait_resolution_t resolution = {0};
+  iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t summary = {0};
+  IREE_ASSERT_OK(
+      iree_hal_amdgpu_host_queue_summarize_command_buffer_block_packets(
+          queue, &resolution, iree_hal_semaphore_list_empty(),
+          program->first_block, &summary));
+  EXPECT_EQ(summary.packet_count, 2u);
+  EXPECT_EQ(summary.barrier_packet_count, 2u);
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.first_packet_header));
   EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
 
   iree_hal_executable_release(executable);

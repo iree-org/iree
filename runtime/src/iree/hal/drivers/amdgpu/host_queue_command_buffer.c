@@ -1093,11 +1093,14 @@ iree_status_t iree_hal_amdgpu_host_queue_summarize_command_buffer_block_packets(
                     command;
         if (iree_hal_amdgpu_host_queue_dispatch_uses_indirect_parameters(
                 dispatch_command)) {
+          // The patch dispatch publishes the following dispatch packet header.
+          // It must retire before the CP observes that following slot.
           const uint16_t patch_header = iree_hal_amdgpu_aql_make_header(
               IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
               iree_hal_amdgpu_host_queue_command_buffer_packet_control(
                   queue, resolution, signal_semaphore_list,
-                  out_summary->packet_count, has_pending_execution_barrier,
+                  out_summary->packet_count,
+                  /*has_execution_barrier=*/true,
                   /*is_final_packet=*/false));
           iree_hal_amdgpu_host_queue_accumulate_packet_summary(out_summary,
                                                                patch_header);
@@ -1869,12 +1872,14 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_emit_indirect_dispatch(
     }
     iree_hal_amdgpu_host_queue_replay_emit_profile_source(
         context, dispatch_command, profile.profile_dispatch_packet, state);
+    // The patch dispatch publishes the following dispatch packet header, so it
+    // must retire before the CP observes that slot.
     context->packet_headers[patch_packet_index] =
         iree_hal_amdgpu_aql_make_header(
             IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
             iree_hal_amdgpu_host_queue_replay_emit_packet_control(
                 context, patch_packet_index,
-                state->has_pending_execution_barrier,
+                /*has_execution_barrier=*/true,
                 /*is_final_packet=*/false));
     // The patch dispatch publishes the target dispatch header after it has
     // updated dynamic workgroup counts on device.
