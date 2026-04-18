@@ -134,6 +134,10 @@ typedef struct iree_profile_memory_allocation_t {
   uint64_t first_submission_id;
   // Last nonzero queue submission id associated with this allocation.
   uint64_t last_submission_id;
+  // Queue ordinal associated with |first_submission_id|, or UINT32_MAX.
+  uint32_t first_queue_ordinal;
+  // Queue ordinal associated with |last_submission_id|, or UINT32_MAX.
+  uint32_t last_queue_ordinal;
   // Number of matched events in this lifecycle.
   uint64_t event_count;
   // Wait events in this lifecycle.

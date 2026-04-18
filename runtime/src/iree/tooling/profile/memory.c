@@ -6,8 +6,10 @@
 
 #include "iree/tooling/profile/memory.h"
 
+#include <stdlib.h>
 #include <string.h>
 
+#include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
 const char* iree_profile_memory_event_type_name(
@@ -253,6 +255,8 @@ static iree_status_t iree_profile_memory_get_allocation(
   allocation->physical_device_ordinal = physical_device_ordinal;
   allocation->allocation_id = allocation_id;
   allocation->pool_id = pool_id;
+  allocation->first_queue_ordinal = UINT32_MAX;
+  allocation->last_queue_ordinal = UINT32_MAX;
   *out_allocation = allocation;
   return iree_ok_status();
 }
@@ -525,9 +529,11 @@ static iree_status_t iree_profile_memory_record_allocation_event(
   allocation->last_host_time_ns = event->host_time_ns;
   if (allocation->first_submission_id == 0 && event->submission_id != 0) {
     allocation->first_submission_id = event->submission_id;
+    allocation->first_queue_ordinal = event->queue_ordinal;
   }
   if (event->submission_id != 0) {
     allocation->last_submission_id = event->submission_id;
+    allocation->last_queue_ordinal = event->queue_ordinal;
   }
   allocation->backing_id =
       allocation->backing_id ? allocation->backing_id : event->backing_id;
@@ -636,6 +642,268 @@ static void iree_profile_memory_fprint_balance_json_fields(
       balance->total_close_bytes, prefix, balance->partial_close_bytes);
 }
 
+typedef struct iree_profile_memory_device_lifetime_t {
+  // Device event for the queue alloca operation, if available.
+  const iree_hal_profile_queue_device_event_t* alloca_event;
+  // Device event for the queue dealloca operation, if available.
+  const iree_hal_profile_queue_device_event_t* dealloca_event;
+  // True when |start_tick|, |end_tick|, and |duration_ticks| are valid.
+  bool is_valid;
+  // Device tick at which the queue allocation lifetime begins.
+  uint64_t start_tick;
+  // Device tick at which the queue allocation lifetime ends.
+  uint64_t end_tick;
+  // Device tick duration from alloca start through dealloca completion.
+  uint64_t duration_ticks;
+  // True when |duration_ns| was scaled through a clock fit.
+  bool has_duration_ns;
+  // Duration in nanoseconds when |has_duration_ns| is true.
+  int64_t duration_ns;
+} iree_profile_memory_device_lifetime_t;
+
+typedef struct iree_profile_memory_queue_device_event_index_t {
+  // Profile model owning queue metadata and clock-correlation samples.
+  const iree_profile_model_t* model;
+  // Host allocator used for |events|.
+  iree_allocator_t host_allocator;
+  // Queue alloca/dealloca device events sorted by lookup key.
+  iree_hal_profile_queue_device_event_t* events;
+  // Number of valid entries in |events|.
+  iree_host_size_t event_count;
+  // Capacity of |events| in entries.
+  iree_host_size_t event_capacity;
+} iree_profile_memory_queue_device_event_index_t;
+
+typedef struct iree_profile_memory_queue_device_event_key_t {
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal within |physical_device_ordinal|.
+  uint32_t queue_ordinal;
+  // Queue event type being resolved.
+  iree_hal_profile_queue_event_type_t type;
+  // Queue submission epoch containing the device event.
+  uint64_t submission_id;
+  // Producer-defined allocation identifier carried by the event.
+  uint64_t allocation_id;
+} iree_profile_memory_queue_device_event_key_t;
+
+static int iree_profile_memory_compare_u32(uint32_t lhs, uint32_t rhs) {
+  return (lhs > rhs) - (lhs < rhs);
+}
+
+static int iree_profile_memory_compare_u64(uint64_t lhs, uint64_t rhs) {
+  return (lhs > rhs) - (lhs < rhs);
+}
+
+static int iree_profile_memory_compare_queue_device_event_to_key(
+    const iree_hal_profile_queue_device_event_t* event,
+    const iree_profile_memory_queue_device_event_key_t* key) {
+  int cmp = iree_profile_memory_compare_u32(event->physical_device_ordinal,
+                                            key->physical_device_ordinal);
+  if (cmp != 0) return cmp;
+  cmp =
+      iree_profile_memory_compare_u32(event->queue_ordinal, key->queue_ordinal);
+  if (cmp != 0) return cmp;
+  cmp = iree_profile_memory_compare_u32(event->type, key->type);
+  if (cmp != 0) return cmp;
+  cmp =
+      iree_profile_memory_compare_u64(event->submission_id, key->submission_id);
+  if (cmp != 0) return cmp;
+  return iree_profile_memory_compare_u64(event->allocation_id,
+                                         key->allocation_id);
+}
+
+static int iree_profile_memory_compare_queue_device_events(
+    const void* lhs_ptr, const void* rhs_ptr) {
+  const iree_hal_profile_queue_device_event_t* lhs =
+      (const iree_hal_profile_queue_device_event_t*)lhs_ptr;
+  const iree_hal_profile_queue_device_event_t* rhs =
+      (const iree_hal_profile_queue_device_event_t*)rhs_ptr;
+  iree_profile_memory_queue_device_event_key_t rhs_key = {
+      .physical_device_ordinal = rhs->physical_device_ordinal,
+      .queue_ordinal = rhs->queue_ordinal,
+      .type = rhs->type,
+      .submission_id = rhs->submission_id,
+      .allocation_id = rhs->allocation_id,
+  };
+  int cmp =
+      iree_profile_memory_compare_queue_device_event_to_key(lhs, &rhs_key);
+  if (cmp != 0) return cmp;
+  return iree_profile_memory_compare_u64(lhs->event_id, rhs->event_id);
+}
+
+static void iree_profile_memory_queue_device_event_index_initialize(
+    const iree_profile_model_t* model, iree_allocator_t host_allocator,
+    iree_profile_memory_queue_device_event_index_t* out_index) {
+  memset(out_index, 0, sizeof(*out_index));
+  out_index->model = model;
+  out_index->host_allocator = host_allocator;
+}
+
+static void iree_profile_memory_queue_device_event_index_deinitialize(
+    iree_profile_memory_queue_device_event_index_t* index) {
+  iree_allocator_free(index->host_allocator, index->events);
+  memset(index, 0, sizeof(*index));
+}
+
+static bool iree_profile_memory_queue_device_event_is_memory_lifetime_event(
+    const iree_hal_profile_queue_device_event_t* event) {
+  return event->type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA ||
+         event->type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA;
+}
+
+static iree_status_t iree_profile_memory_queue_device_event_index_append(
+    iree_profile_memory_queue_device_event_index_t* index,
+    const iree_hal_profile_queue_device_event_t* event) {
+  if (index->event_count + 1 > index->event_capacity) {
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        index->host_allocator,
+        iree_max((iree_host_size_t)64, index->event_count + 1),
+        sizeof(index->events[0]), &index->event_capacity,
+        (void**)&index->events));
+  }
+  index->events[index->event_count++] = *event;
+  return iree_ok_status();
+}
+
+static iree_status_t
+iree_profile_memory_queue_device_event_index_process_record(
+    iree_profile_memory_queue_device_event_index_t* index,
+    const iree_hal_profile_file_record_t* record) {
+  if (record->header.record_type != IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
+    return iree_ok_status();
+  }
+  if (!iree_string_view_equal(
+          record->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
+    return iree_ok_status();
+  }
+
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_queue_device_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_queue_device_event_t event;
+    memcpy(&event, typed_record.contents.data, sizeof(event));
+    if (!iree_profile_memory_queue_device_event_is_memory_lifetime_event(
+            &event)) {
+      continue;
+    }
+    if (!iree_profile_model_find_queue(index->model,
+                                       event.physical_device_ordinal,
+                                       event.queue_ordinal, event.stream_id)) {
+      return iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "queue device event references missing queue "
+          "metadata device=%u queue=%u stream=%" PRIu64 " submission=%" PRIu64,
+          event.physical_device_ordinal, event.queue_ordinal, event.stream_id,
+          event.submission_id);
+    }
+    status = iree_profile_memory_queue_device_event_index_append(index, &event);
+  }
+  return status;
+}
+
+static void iree_profile_memory_queue_device_event_index_sort(
+    iree_profile_memory_queue_device_event_index_t* index) {
+  if (index->event_count <= 1) return;
+  qsort(index->events, index->event_count, sizeof(index->events[0]),
+        iree_profile_memory_compare_queue_device_events);
+}
+
+static bool iree_profile_memory_queue_device_event_is_valid(
+    const iree_hal_profile_queue_device_event_t* event) {
+  return event && event->start_tick != 0 && event->end_tick != 0 &&
+         event->end_tick >= event->start_tick;
+}
+
+static const iree_hal_profile_queue_device_event_t*
+iree_profile_memory_find_queue_device_event(
+    const iree_profile_memory_queue_device_event_index_t* index,
+    const iree_profile_memory_allocation_t* allocation, uint64_t submission_id,
+    uint32_t queue_ordinal, iree_hal_profile_queue_event_type_t event_type) {
+  if (!index || submission_id == 0 || queue_ordinal == UINT32_MAX) {
+    return NULL;
+  }
+  iree_profile_memory_queue_device_event_key_t key = {
+      .physical_device_ordinal = allocation->physical_device_ordinal,
+      .queue_ordinal = queue_ordinal,
+      .type = event_type,
+      .submission_id = submission_id,
+      .allocation_id = allocation->allocation_id,
+  };
+
+  iree_host_size_t low = 0;
+  iree_host_size_t high = index->event_count;
+  while (low < high) {
+    const iree_host_size_t mid = low + (high - low) / 2;
+    const int cmp = iree_profile_memory_compare_queue_device_event_to_key(
+        &index->events[mid], &key);
+    if (cmp < 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  if (low == index->event_count) return NULL;
+  return iree_profile_memory_compare_queue_device_event_to_key(
+             &index->events[low], &key) == 0
+             ? &index->events[low]
+             : NULL;
+}
+
+static iree_profile_memory_device_lifetime_t
+iree_profile_memory_resolve_device_lifetime(
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    const iree_profile_memory_allocation_t* allocation) {
+  iree_profile_memory_device_lifetime_t lifetime;
+  memset(&lifetime, 0, sizeof(lifetime));
+  if (allocation->kind != IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
+    return lifetime;
+  }
+
+  lifetime.alloca_event = iree_profile_memory_find_queue_device_event(
+      queue_device_index, allocation, allocation->first_submission_id,
+      allocation->first_queue_ordinal,
+      IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA);
+  lifetime.dealloca_event = iree_profile_memory_find_queue_device_event(
+      queue_device_index, allocation, allocation->last_submission_id,
+      allocation->last_queue_ordinal,
+      IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA);
+  if (!iree_profile_memory_queue_device_event_is_valid(lifetime.alloca_event) ||
+      !iree_profile_memory_queue_device_event_is_valid(
+          lifetime.dealloca_event)) {
+    return lifetime;
+  }
+  if (lifetime.dealloca_event->end_tick < lifetime.alloca_event->start_tick) {
+    return lifetime;
+  }
+
+  lifetime.is_valid = true;
+  lifetime.start_tick = lifetime.alloca_event->start_tick;
+  lifetime.end_tick = lifetime.dealloca_event->end_tick;
+  lifetime.duration_ticks = lifetime.end_tick - lifetime.start_tick;
+  const iree_profile_model_device_t* device = iree_profile_model_find_device(
+      queue_device_index ? queue_device_index->model : NULL,
+      allocation->physical_device_ordinal);
+  iree_profile_model_clock_fit_t clock_fit;
+  if (device &&
+      iree_profile_model_device_try_fit_clock_exact(
+          device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+          &clock_fit)) {
+    lifetime.has_duration_ns = iree_profile_model_clock_fit_scale_ticks_to_ns(
+        &clock_fit, lifetime.duration_ticks, &lifetime.duration_ns);
+  }
+  return lifetime;
+}
+
 iree_status_t iree_profile_memory_context_accumulate_record(
     iree_profile_memory_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -695,8 +963,9 @@ iree_status_t iree_profile_memory_context_accumulate_record(
 }
 
 static iree_status_t iree_profile_memory_print_text(
-    const iree_profile_memory_context_t* context, iree_string_view_t filter,
-    int64_t id_filter, FILE* file) {
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    iree_string_view_t filter, int64_t id_filter, FILE* file) {
   uint64_t live_allocation_count = 0;
   uint64_t partial_close_count = 0;
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
@@ -783,6 +1052,9 @@ static iree_status_t iree_profile_memory_print_text(
           allocation->last_host_time_ns >= allocation->first_host_time_ns
               ? allocation->last_host_time_ns - allocation->first_host_time_ns
               : 0;
+      const iree_profile_memory_device_lifetime_t device_lifetime =
+          iree_profile_memory_resolve_device_lifetime(queue_device_index,
+                                                      allocation);
       fprintf(
           file,
           "allocation[%s device=%u id=%" PRIu64 " pool=%" PRIu64
@@ -805,14 +1077,33 @@ static iree_status_t iree_profile_memory_print_text(
           allocation->lifecycle_balance.partial_close_count,
           allocation->lifecycle_balance.partial_close_bytes,
           allocation->first_event_id, allocation->last_event_id, duration_ns);
+      if (allocation->kind ==
+          IREE_PROFILE_MEMORY_LIFECYCLE_KIND_QUEUE_ALLOCATION) {
+        fprintf(file,
+                "  device_lifetime: available=%s alloca_event=%" PRIu64
+                " dealloca_event=%" PRIu64 " duration_ticks=%" PRIu64,
+                device_lifetime.is_valid ? "true" : "false",
+                device_lifetime.alloca_event
+                    ? device_lifetime.alloca_event->event_id
+                    : 0,
+                device_lifetime.dealloca_event
+                    ? device_lifetime.dealloca_event->event_id
+                    : 0,
+                device_lifetime.duration_ticks);
+        if (device_lifetime.has_duration_ns) {
+          fprintf(file, " duration_ns=%" PRId64, device_lifetime.duration_ns);
+        }
+        fputc('\n', file);
+      }
     }
   }
   return iree_ok_status();
 }
 
 static void iree_profile_memory_print_jsonl_summary(
-    const iree_profile_memory_context_t* context, iree_string_view_t filter,
-    int64_t id_filter, FILE* file) {
+    const iree_profile_memory_context_t* context,
+    const iree_profile_memory_queue_device_event_index_t* queue_device_index,
+    iree_string_view_t filter, int64_t id_filter, FILE* file) {
   uint64_t live_allocation_count = 0;
   uint64_t partial_close_count = 0;
   for (iree_host_size_t i = 0; i < context->allocation_count; ++i) {
@@ -891,33 +1182,55 @@ static void iree_profile_memory_print_jsonl_summary(
         allocation->last_host_time_ns >= allocation->first_host_time_ns
             ? allocation->last_host_time_ns - allocation->first_host_time_ns
             : 0;
+    const iree_profile_memory_device_lifetime_t device_lifetime =
+        iree_profile_memory_resolve_device_lifetime(queue_device_index,
+                                                    allocation);
     fprintf(file, "{\"type\":\"memory_allocation\",\"kind\":");
     iree_profile_fprint_json_string(
         file, iree_make_cstring_view(
                   iree_profile_memory_lifecycle_kind_name(allocation->kind)));
-    fprintf(file,
-            ",\"physical_device_ordinal\":%u,\"allocation_id\":%" PRIu64
-            ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
-            ",\"memory_type\":%" PRIu64 ",\"buffer_usage\":%" PRIu64
-            ",\"events\":%" PRIu64 ",\"waits\":%" PRIu64
-            ",\"materializes\":%" PRIu64
-            ",\"open_at_end\":%s"
-            ",\"first_event_id\":%" PRIu64 ",\"last_event_id\":%" PRIu64
-            ",\"first_host_time_ns\":%" PRId64 ",\"last_host_time_ns\":%" PRId64
-            ",\"host_time_domain\":\"iree_host_time_ns\""
-            ",\"duration_ns\":%" PRId64 ",\"first_submission_id\":%" PRIu64
-            ",\"last_submission_id\":%" PRIu64,
-            allocation->physical_device_ordinal, allocation->allocation_id,
-            allocation->pool_id, allocation->backing_id,
-            allocation->memory_type, allocation->buffer_usage,
-            allocation->event_count, allocation->wait_count,
-            allocation->materialize_count,
-            iree_profile_memory_allocation_open_at_end(allocation) ? "true"
-                                                                   : "false",
-            allocation->first_event_id, allocation->last_event_id,
-            allocation->first_host_time_ns, allocation->last_host_time_ns,
-            duration_ns, allocation->first_submission_id,
-            allocation->last_submission_id);
+    fprintf(
+        file,
+        ",\"physical_device_ordinal\":%u,\"allocation_id\":%" PRIu64
+        ",\"pool_id\":%" PRIu64 ",\"backing_id\":%" PRIu64
+        ",\"memory_type\":%" PRIu64 ",\"buffer_usage\":%" PRIu64
+        ",\"events\":%" PRIu64 ",\"waits\":%" PRIu64
+        ",\"materializes\":%" PRIu64
+        ",\"open_at_end\":%s"
+        ",\"first_event_id\":%" PRIu64 ",\"last_event_id\":%" PRIu64
+        ",\"first_host_time_ns\":%" PRId64 ",\"last_host_time_ns\":%" PRId64
+        ",\"host_time_domain\":\"iree_host_time_ns\""
+        ",\"duration_ns\":%" PRId64 ",\"first_submission_id\":%" PRIu64
+        ",\"last_submission_id\":%" PRIu64
+        ",\"first_queue_ordinal\":%u,\"last_queue_ordinal\":%u"
+        ",\"alloca_device_event_id\":%" PRIu64
+        ",\"dealloca_device_event_id\":%" PRIu64
+        ",\"device_lifetime_available\":%s"
+        ",\"device_lifetime_start_tick\":%" PRIu64
+        ",\"device_lifetime_end_tick\":%" PRIu64
+        ",\"device_lifetime_duration_ticks\":%" PRIu64
+        ",\"device_lifetime_time_ns_available\":%s"
+        ",\"device_lifetime_duration_ns\":%" PRId64,
+        allocation->physical_device_ordinal, allocation->allocation_id,
+        allocation->pool_id, allocation->backing_id, allocation->memory_type,
+        allocation->buffer_usage, allocation->event_count,
+        allocation->wait_count, allocation->materialize_count,
+        iree_profile_memory_allocation_open_at_end(allocation) ? "true"
+                                                               : "false",
+        allocation->first_event_id, allocation->last_event_id,
+        allocation->first_host_time_ns, allocation->last_host_time_ns,
+        duration_ns, allocation->first_submission_id,
+        allocation->last_submission_id, allocation->first_queue_ordinal,
+        allocation->last_queue_ordinal,
+        device_lifetime.alloca_event ? device_lifetime.alloca_event->event_id
+                                     : 0,
+        device_lifetime.dealloca_event
+            ? device_lifetime.dealloca_event->event_id
+            : 0,
+        device_lifetime.is_valid ? "true" : "false", device_lifetime.start_tick,
+        device_lifetime.end_tick, device_lifetime.duration_ticks,
+        device_lifetime.has_duration_ns ? "true" : "false",
+        device_lifetime.has_duration_ns ? device_lifetime.duration_ns : 0);
     iree_profile_memory_fprint_balance_json_fields(
         file, "lifecycle", &allocation->lifecycle_balance);
     iree_profile_memory_fprint_balance_json_fields(
@@ -929,12 +1242,18 @@ static void iree_profile_memory_print_jsonl_summary(
 typedef struct iree_profile_memory_parse_context_t {
   // Aggregation state populated by memory-event records.
   iree_profile_memory_context_t* memory_context;
+  // Metadata used to validate queues and scale device ticks.
+  iree_profile_model_t* model;
+  // Compact queue-device event index used by memory lifetime joins.
+  iree_profile_memory_queue_device_event_index_t* queue_device_index;
   // Optional glob filter applied to memory event rows.
   iree_string_view_t filter;
   // Optional event/allocation identifier filter, or -1 when disabled.
   int64_t id_filter;
   // True when raw event rows should be streamed while parsing.
   bool emit_events;
+  // True when queue-device rows are needed for allocation lifetime joins.
+  bool capture_queue_device_events;
   // Output stream receiving raw event rows when enabled.
   FILE* file;
 } iree_profile_memory_parse_context_t;
@@ -945,6 +1264,13 @@ static iree_status_t iree_profile_memory_record(
   (void)record_index;
   iree_profile_memory_parse_context_t* context =
       (iree_profile_memory_parse_context_t*)user_data;
+  if (context->capture_queue_device_events) {
+    IREE_RETURN_IF_ERROR(
+        iree_profile_model_process_metadata_record(context->model, record));
+    IREE_RETURN_IF_ERROR(
+        iree_profile_memory_queue_device_event_index_process_record(
+            context->queue_device_index, record));
+  }
   return iree_profile_memory_context_accumulate_record(
       context->memory_context, record, context->filter, context->id_filter,
       context->emit_events, context->file);
@@ -967,13 +1293,22 @@ iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
   IREE_RETURN_IF_ERROR(
       iree_profile_file_open(path, host_allocator, &profile_file));
 
+  const bool capture_queue_device_events = is_jsonl || id_filter >= 0;
   iree_profile_memory_context_t context;
   iree_profile_memory_context_initialize(host_allocator, &context);
+  iree_profile_model_t model;
+  iree_profile_model_initialize(host_allocator, &model);
+  iree_profile_memory_queue_device_event_index_t queue_device_index;
+  iree_profile_memory_queue_device_event_index_initialize(
+      &model, host_allocator, &queue_device_index);
   iree_profile_memory_parse_context_t parse_context = {
       .memory_context = &context,
+      .model = &model,
+      .queue_device_index = &queue_device_index,
       .filter = filter,
       .id_filter = id_filter,
       .emit_events = is_jsonl,
+      .capture_queue_device_events = capture_queue_device_events,
       .file = file,
   };
   iree_profile_file_record_callback_t record_callback = {
@@ -983,16 +1318,22 @@ iree_status_t iree_profile_memory_report_file(iree_string_view_t path,
   iree_status_t status =
       iree_profile_file_for_each_record(&profile_file, record_callback);
 
+  if (iree_status_is_ok(status) && capture_queue_device_events) {
+    iree_profile_memory_queue_device_event_index_sort(&queue_device_index);
+  }
   if (iree_status_is_ok(status)) {
     if (is_text) {
-      status =
-          iree_profile_memory_print_text(&context, filter, id_filter, file);
+      status = iree_profile_memory_print_text(&context, &queue_device_index,
+                                              filter, id_filter, file);
     } else {
-      iree_profile_memory_print_jsonl_summary(&context, filter, id_filter,
-                                              file);
+      iree_profile_memory_print_jsonl_summary(&context, &queue_device_index,
+                                              filter, id_filter, file);
     }
   }
 
+  iree_profile_memory_queue_device_event_index_deinitialize(
+      &queue_device_index);
+  iree_profile_model_deinitialize(&model);
   iree_profile_memory_context_deinitialize(&context);
   iree_profile_file_close(&profile_file);
   return status;
