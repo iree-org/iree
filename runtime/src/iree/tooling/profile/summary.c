@@ -6,6 +6,7 @@
 
 #include "iree/tooling/profile/summary.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #include "iree/tooling/profile/model.h"
@@ -513,6 +514,129 @@ static iree_status_t iree_profile_summary_process_event_relationship_records(
       &summary->event_relationship_record_count);
 }
 
+typedef iree_status_t (*iree_profile_summary_chunk_processor_fn_t)(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record);
+
+typedef struct iree_profile_summary_chunk_route_t {
+  // Content type matched against chunk records.
+  iree_string_view_t content_type;
+  // Byte offset of the summary chunk counter incremented for this content type.
+  iree_host_size_t chunk_count_offset;
+  // Processor invoked after the chunk counter is incremented.
+  iree_profile_summary_chunk_processor_fn_t process;
+} iree_profile_summary_chunk_route_t;
+
+#define IREE_PROFILE_SUMMARY_CHUNK_ROUTE(content_type, counter_field, \
+                                         process_fn)                  \
+  {                                                                   \
+      content_type,                                                   \
+      offsetof(iree_profile_summary_t, counter_field),                \
+      process_fn,                                                     \
+  }
+
+static uint64_t* iree_profile_summary_chunk_counter(
+    iree_profile_summary_t* summary,
+    const iree_profile_summary_chunk_route_t* route) {
+  return (uint64_t*)((uint8_t*)summary + route->chunk_count_offset);
+}
+
+static iree_status_t iree_profile_summary_process_chunk_record(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  const iree_profile_summary_chunk_route_t iree_profile_summary_chunk_routes[] =
+      {
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES, device_chunk_count,
+              iree_profile_summary_process_device_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES, queue_chunk_count,
+              iree_profile_summary_process_queue_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES, executable_chunk_count,
+              iree_profile_summary_process_executable_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS,
+              executable_code_object_chunk_count,
+              iree_profile_summary_process_executable_code_object_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS,
+              executable_code_object_load_chunk_count,
+              iree_profile_summary_process_executable_code_object_load_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
+              executable_export_chunk_count,
+              iree_profile_summary_process_executable_export_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS,
+              command_buffer_chunk_count,
+              iree_profile_summary_process_command_buffer_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS,
+              command_operation_chunk_count,
+              iree_profile_summary_process_command_operation_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS,
+              clock_correlation_chunk_count,
+              iree_profile_summary_process_clock_correlation_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS,
+              dispatch_event_chunk_count,
+              iree_profile_summary_process_dispatch_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
+              queue_event_chunk_count,
+              iree_profile_summary_process_queue_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS,
+              queue_device_event_chunk_count,
+              iree_profile_summary_process_queue_device_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
+              host_execution_event_chunk_count,
+              iree_profile_summary_process_host_execution_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
+              memory_event_chunk_count,
+              iree_profile_summary_process_memory_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS,
+              event_relationship_chunk_count,
+              iree_profile_summary_process_event_relationship_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS,
+              counter_set_chunk_count,
+              iree_profile_summary_process_counter_set_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS, counter_chunk_count,
+              iree_profile_summary_process_counter_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES,
+              counter_sample_chunk_count,
+              iree_profile_summary_process_counter_sample_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES,
+              executable_trace_chunk_count,
+              iree_profile_summary_process_executable_trace_record),
+      };
+
+  for (iree_host_size_t i = 0;
+       i < IREE_ARRAYSIZE(iree_profile_summary_chunk_routes); ++i) {
+    const iree_profile_summary_chunk_route_t* route =
+        &iree_profile_summary_chunk_routes[i];
+    if (!iree_string_view_equal(record->content_type, route->content_type)) {
+      continue;
+    }
+    ++*iree_profile_summary_chunk_counter(summary, route);
+    return route->process(summary, record);
+  }
+
+  ++summary->unknown_chunk_count;
+  return iree_ok_status();
+}
+
+#undef IREE_PROFILE_SUMMARY_CHUNK_ROUTE
+
 iree_status_t iree_profile_summary_process_record(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -538,111 +662,7 @@ iree_status_t iree_profile_summary_process_record(
     ++summary->truncated_chunk_count;
   }
 
-  if (iree_string_view_equal(record->content_type,
-                             IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES)) {
-    ++summary->device_chunk_count;
-    return iree_profile_summary_process_device_records(summary, record);
-  } else if (iree_string_view_equal(record->content_type,
-                                    IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
-    ++summary->queue_chunk_count;
-    return iree_profile_summary_process_queue_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
-    ++summary->executable_chunk_count;
-    return iree_profile_summary_process_executable_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECTS)) {
-    ++summary->executable_code_object_chunk_count;
-    return iree_profile_summary_process_executable_code_object_records(summary,
-                                                                       record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS)) {
-    ++summary->executable_code_object_load_chunk_count;
-    return iree_profile_summary_process_executable_code_object_load_records(
-        summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-    ++summary->executable_export_chunk_count;
-    return iree_profile_summary_process_executable_export_records(summary,
-                                                                  record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
-    ++summary->command_buffer_chunk_count;
-    return iree_profile_summary_process_command_buffer_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
-    ++summary->command_operation_chunk_count;
-    return iree_profile_summary_process_command_operation_records(summary,
-                                                                  record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
-    ++summary->clock_correlation_chunk_count;
-    return iree_profile_summary_process_clock_correlation_records(summary,
-                                                                  record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
-    ++summary->dispatch_event_chunk_count;
-    return iree_profile_summary_process_dispatch_event_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
-    ++summary->queue_event_chunk_count;
-    return iree_profile_summary_process_queue_event_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
-    ++summary->queue_device_event_chunk_count;
-    return iree_profile_summary_process_queue_device_event_records(summary,
-                                                                   record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
-    ++summary->host_execution_event_chunk_count;
-    return iree_profile_summary_process_host_execution_event_records(summary,
-                                                                     record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
-    ++summary->memory_event_chunk_count;
-    return iree_profile_summary_process_memory_event_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS)) {
-    ++summary->event_relationship_chunk_count;
-    return iree_profile_summary_process_event_relationship_records(summary,
-                                                                   record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SETS)) {
-    ++summary->counter_set_chunk_count;
-    return iree_profile_summary_process_counter_set_records(summary, record);
-  } else if (iree_string_view_equal(record->content_type,
-                                    IREE_HAL_PROFILE_CONTENT_TYPE_COUNTERS)) {
-    ++summary->counter_chunk_count;
-    return iree_profile_summary_process_counter_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
-    ++summary->counter_sample_chunk_count;
-    return iree_profile_summary_process_counter_sample_records(summary, record);
-  } else if (iree_string_view_equal(
-                 record->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES)) {
-    ++summary->executable_trace_chunk_count;
-    return iree_profile_summary_process_executable_trace_record(summary,
-                                                                record);
-  }
-
-  ++summary->unknown_chunk_count;
-  return iree_ok_status();
+  return iree_profile_summary_process_chunk_record(summary, record);
 }
 
 static bool iree_profile_device_summary_try_fit_clock_exact(
