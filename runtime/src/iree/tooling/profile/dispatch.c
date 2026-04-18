@@ -194,7 +194,14 @@ static iree_status_t iree_profile_dispatch_get_queue_aggregate(
   return iree_ok_status();
 }
 
-static void iree_profile_dispatch_record_aggregate_event(
+static bool iree_profile_dispatch_accumulate_ticks(uint64_t* total_ticks,
+                                                   uint64_t duration_ticks) {
+  if (duration_ticks > UINT64_MAX - *total_ticks) return false;
+  *total_ticks += duration_ticks;
+  return true;
+}
+
+static bool iree_profile_dispatch_record_aggregate_event(
     iree_profile_dispatch_aggregate_t* aggregate,
     const iree_hal_profile_dispatch_event_t* event) {
   ++aggregate->dispatch_count;
@@ -206,7 +213,7 @@ static void iree_profile_dispatch_record_aggregate_event(
   if (event->start_tick == 0 || event->end_tick == 0 ||
       event->end_tick < event->start_tick) {
     ++aggregate->invalid_count;
-    return;
+    return true;
   }
 
   const uint64_t duration_ticks = event->end_tick - event->start_tick;
@@ -217,47 +224,53 @@ static void iree_profile_dispatch_record_aggregate_event(
       iree_max(aggregate->latest_end_tick, event->end_tick);
   aggregate->minimum_ticks = iree_min(aggregate->minimum_ticks, duration_ticks);
   aggregate->maximum_ticks = iree_max(aggregate->maximum_ticks, duration_ticks);
-  aggregate->total_ticks += (double)duration_ticks;
+  if (!iree_profile_dispatch_accumulate_ticks(&aggregate->total_ticks,
+                                              duration_ticks)) {
+    return false;
+  }
 
   const double duration = (double)duration_ticks;
   const double delta = duration - aggregate->mean_ticks;
   aggregate->mean_ticks += delta / (double)aggregate->valid_count;
   const double delta2 = duration - aggregate->mean_ticks;
   aggregate->m2_ticks += delta * delta2;
+  return true;
 }
 
-static void iree_profile_dispatch_record_command_aggregate_event(
+static bool iree_profile_dispatch_record_command_aggregate_event(
     iree_profile_dispatch_command_aggregate_t* aggregate,
     const iree_hal_profile_dispatch_event_t* event) {
   ++aggregate->dispatch_count;
   if (event->start_tick == 0 || event->end_tick == 0 ||
       event->end_tick < event->start_tick) {
     ++aggregate->invalid_count;
-    return;
+    return true;
   }
   ++aggregate->valid_count;
   aggregate->earliest_start_tick =
       iree_min(aggregate->earliest_start_tick, event->start_tick);
   aggregate->latest_end_tick =
       iree_max(aggregate->latest_end_tick, event->end_tick);
-  aggregate->total_ticks += (double)(event->end_tick - event->start_tick);
+  return iree_profile_dispatch_accumulate_ticks(
+      &aggregate->total_ticks, event->end_tick - event->start_tick);
 }
 
-static void iree_profile_dispatch_record_queue_aggregate_event(
+static bool iree_profile_dispatch_record_queue_aggregate_event(
     iree_profile_dispatch_queue_aggregate_t* aggregate,
     const iree_hal_profile_dispatch_event_t* event) {
   ++aggregate->dispatch_count;
   if (event->start_tick == 0 || event->end_tick == 0 ||
       event->end_tick < event->start_tick) {
     ++aggregate->invalid_count;
-    return;
+    return true;
   }
   ++aggregate->valid_count;
   aggregate->earliest_start_tick =
       iree_min(aggregate->earliest_start_tick, event->start_tick);
   aggregate->latest_end_tick =
       iree_max(aggregate->latest_end_tick, event->end_tick);
-  aggregate->total_ticks += (double)(event->end_tick - event->start_tick);
+  return iree_profile_dispatch_accumulate_ticks(
+      &aggregate->total_ticks, event->end_tick - event->start_tick);
 }
 
 static void iree_profile_dispatch_record_top_event(
@@ -408,8 +421,14 @@ static iree_status_t iree_profile_dispatch_process_event_records(
         status = iree_profile_dispatch_get_aggregate(
             context, record->header.physical_device_ordinal,
             event.executable_id, event.export_ordinal, &aggregate);
-        if (iree_status_is_ok(status)) {
-          iree_profile_dispatch_record_aggregate_event(aggregate, &event);
+        if (iree_status_is_ok(status) &&
+            !iree_profile_dispatch_record_aggregate_event(aggregate, &event)) {
+          status =
+              iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                               "dispatch aggregate tick total overflow "
+                               "device=%u executable=%" PRIu64 " export=%u",
+                               record->header.physical_device_ordinal,
+                               event.executable_id, event.export_ordinal);
         }
         if (iree_status_is_ok(status) && event.command_buffer_id != 0) {
           iree_profile_dispatch_command_aggregate_t* command_aggregate = NULL;
@@ -418,9 +437,14 @@ static iree_status_t iree_profile_dispatch_process_event_records(
               record->header.physical_device_ordinal,
               record->header.queue_ordinal, record->header.stream_id,
               &command_aggregate);
-          if (iree_status_is_ok(status)) {
-            iree_profile_dispatch_record_command_aggregate_event(
-                command_aggregate, &event);
+          if (iree_status_is_ok(status) &&
+              !iree_profile_dispatch_record_command_aggregate_event(
+                  command_aggregate, &event)) {
+            status = iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "command aggregate tick total overflow command_buffer=%" PRIu64
+                " submission=%" PRIu64,
+                event.command_buffer_id, event.submission_id);
           }
         }
         if (iree_status_is_ok(status)) {
@@ -429,9 +453,16 @@ static iree_status_t iree_profile_dispatch_process_event_records(
               context, record->header.physical_device_ordinal,
               record->header.queue_ordinal, record->header.stream_id,
               event.submission_id, &queue_aggregate);
-          if (iree_status_is_ok(status)) {
-            iree_profile_dispatch_record_queue_aggregate_event(queue_aggregate,
-                                                               &event);
+          if (iree_status_is_ok(status) &&
+              !iree_profile_dispatch_record_queue_aggregate_event(
+                  queue_aggregate, &event)) {
+            status = iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "queue aggregate tick total overflow device=%u queue=%u"
+                " stream=%" PRIu64 " submission=%" PRIu64,
+                record->header.physical_device_ordinal,
+                record->header.queue_ordinal, record->header.stream_id,
+                event.submission_id);
           }
         }
       }

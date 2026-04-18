@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
 void iree_profile_summary_initialize(iree_allocator_t host_allocator,
@@ -75,18 +76,28 @@ static void iree_profile_summary_record_clock_sample(
   }
 }
 
-static void iree_profile_summary_record_dispatch_event(
+static bool iree_profile_summary_accumulate_ticks(uint64_t* total_ticks,
+                                                  uint64_t duration_ticks) {
+  if (duration_ticks > UINT64_MAX - *total_ticks) return false;
+  *total_ticks += duration_ticks;
+  return true;
+}
+
+static bool iree_profile_summary_record_dispatch_event(
     iree_profile_device_summary_t* device,
     const iree_hal_profile_dispatch_event_t* record) {
   ++device->dispatch_event_count;
   if (record->start_tick == 0 || record->end_tick == 0 ||
       record->end_tick < record->start_tick) {
     ++device->invalid_dispatch_event_count;
-    return;
+    return true;
   }
 
   const uint64_t duration_ticks = record->end_tick - record->start_tick;
-  device->total_dispatch_ticks += (double)duration_ticks;
+  if (!iree_profile_summary_accumulate_ticks(&device->total_dispatch_ticks,
+                                             duration_ticks)) {
+    return false;
+  }
   device->earliest_dispatch_start_tick =
       iree_min(device->earliest_dispatch_start_tick, record->start_tick);
   device->latest_dispatch_end_tick =
@@ -95,6 +106,7 @@ static void iree_profile_summary_record_dispatch_event(
       iree_min(device->minimum_dispatch_ticks, duration_ticks);
   device->maximum_dispatch_ticks =
       iree_max(device->maximum_dispatch_ticks, duration_ticks);
+  return true;
 }
 
 static iree_status_t iree_profile_summary_count_typed_records(
@@ -301,7 +313,12 @@ static iree_status_t iree_profile_summary_process_dispatch_event_records(
     iree_hal_profile_dispatch_event_t dispatch_record;
     memcpy(&dispatch_record, typed_record.contents.data,
            sizeof(dispatch_record));
-    iree_profile_summary_record_dispatch_event(device, &dispatch_record);
+    if (!iree_profile_summary_record_dispatch_event(device, &dispatch_record)) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "device summary dispatch tick total overflow device=%u",
+          record->header.physical_device_ordinal);
+    }
   }
   return status;
 }
@@ -628,39 +645,18 @@ iree_status_t iree_profile_summary_process_record(
   return iree_ok_status();
 }
 
-static bool iree_profile_device_summary_try_fit_clock(
-    const iree_profile_device_summary_t* device, double* out_ns_per_tick,
-    double* out_tick_frequency_hz) {
-  *out_ns_per_tick = 0.0;
-  *out_tick_frequency_hz = 0.0;
-  if (device->clock_sample_count < 2) return false;
-
-  const iree_hal_profile_clock_correlation_record_t* first =
-      &device->first_clock_sample;
-  const iree_hal_profile_clock_correlation_record_t* last =
-      &device->last_clock_sample;
-  if (!iree_all_bits_set(
-          first->flags,
-          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
-              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP) ||
-      !iree_all_bits_set(
-          last->flags,
-          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
-              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP)) {
-    return false;
-  }
-  if (last->device_tick <= first->device_tick ||
-      last->host_cpu_timestamp_ns <= first->host_cpu_timestamp_ns) {
-    return false;
-  }
-
-  const double device_delta_ticks =
-      (double)(last->device_tick - first->device_tick);
-  const double host_delta_ns =
-      (double)(last->host_cpu_timestamp_ns - first->host_cpu_timestamp_ns);
-  *out_ns_per_tick = host_delta_ns / device_delta_ticks;
-  *out_tick_frequency_hz = 1000000000.0 / *out_ns_per_tick;
-  return true;
+static bool iree_profile_device_summary_try_fit_clock_exact(
+    const iree_profile_device_summary_t* device,
+    iree_profile_model_clock_fit_t* out_clock_fit) {
+  iree_profile_model_device_t model_device;
+  memset(&model_device, 0, sizeof(model_device));
+  model_device.physical_device_ordinal = device->physical_device_ordinal;
+  model_device.clock_sample_count = device->clock_sample_count;
+  model_device.first_clock_sample = device->first_clock_sample;
+  model_device.last_clock_sample = device->last_clock_sample;
+  return iree_profile_model_device_try_fit_clock_exact(
+      &model_device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      out_clock_fit);
 }
 
 static bool iree_profile_device_summary_clock_covers_dispatches(
@@ -760,10 +756,13 @@ static void iree_profile_print_summary_text(
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
     const iree_profile_device_summary_t* device = &summary->devices[i];
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_device_summary_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_device_summary_try_fit_clock_exact(device, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+    const double tick_frequency_hz =
+        iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit);
     const bool clock_covers_dispatches =
         iree_profile_device_summary_clock_covers_dispatches(device);
     const uint64_t valid_dispatch_count =
@@ -809,17 +808,32 @@ static void iree_profile_print_summary_text(
               clock_covers_dispatches ? "true" : "false");
       fprintf(file,
               "    dispatch_ticks: min=%" PRIu64 " avg=%.3f max=%" PRIu64
-              " total=%.3f\n",
+              " total=%" PRIu64 "\n",
               device->minimum_dispatch_ticks, average_ticks,
               device->maximum_dispatch_ticks, device->total_dispatch_ticks);
       if (has_clock_fit) {
-        fprintf(file,
-                "    dispatch_time_ns: min=%.3f avg=%.3f max=%.3f"
-                " total=%.3f\n",
-                (double)device->minimum_dispatch_ticks * ns_per_tick,
-                average_ticks * ns_per_tick,
-                (double)device->maximum_dispatch_ticks * ns_per_tick,
-                device->total_dispatch_ticks * ns_per_tick);
+        int64_t minimum_dispatch_ns = 0;
+        int64_t maximum_dispatch_ns = 0;
+        int64_t total_dispatch_ns = 0;
+        const bool has_dispatch_ns =
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, device->minimum_dispatch_ticks,
+                &minimum_dispatch_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, device->maximum_dispatch_ticks,
+                &maximum_dispatch_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, device->total_dispatch_ticks, &total_dispatch_ns);
+        if (has_dispatch_ns) {
+          fprintf(file,
+                  "    dispatch_time_ns: min=%" PRId64
+                  " avg=%.3f"
+                  " max=%" PRId64 " total=%" PRId64 "\n",
+                  minimum_dispatch_ns, average_ticks * ns_per_tick,
+                  maximum_dispatch_ns, total_dispatch_ns);
+        } else {
+          fprintf(file, "    dispatch_time_ns: unavailable\n");
+        }
       }
     }
   }
@@ -902,10 +916,13 @@ static void iree_profile_print_summary_jsonl(
 
   for (iree_host_size_t i = 0; i < summary->device_count; ++i) {
     const iree_profile_device_summary_t* device = &summary->devices[i];
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_device_summary_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_device_summary_try_fit_clock_exact(device, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+    const double tick_frequency_hz =
+        iree_profile_model_clock_fit_tick_frequency_hz(&clock_fit);
     const bool clock_covers_dispatches =
         iree_profile_device_summary_clock_covers_dispatches(device);
     const uint64_t valid_dispatch_count =
@@ -914,49 +931,58 @@ static void iree_profile_print_summary_jsonl(
         valid_dispatch_count
             ? device->total_dispatch_ticks / (double)valid_dispatch_count
             : 0.0;
-    fprintf(file,
-            "{\"type\":\"device_summary\",\"physical_device_ordinal\":%u"
-            ",\"device_records\":%u,\"queue_records\":%u,\"queues\":%u"
-            ",\"clock_samples\":%" PRIu64
-            ",\"clock_fit_available\":%s"
-            ",\"ns_per_tick\":%.9f,\"tick_frequency_hz\":%.3f"
-            ",\"min_clock_uncertainty_ns\":%" PRId64
-            ",\"max_clock_uncertainty_ns\":%" PRId64 ",\"dispatches\":%" PRIu64
-            ",\"valid_dispatches\":%" PRIu64 ",\"invalid_dispatches\":%" PRIu64
-            ",\"min_dispatch_ticks\":%" PRIu64
-            ",\"avg_dispatch_ticks\":%.3f"
-            ",\"max_dispatch_ticks\":%" PRIu64
-            ",\"total_dispatch_ticks\":%.3f"
-            ",\"earliest_dispatch_start_tick\":%" PRIu64
-            ",\"latest_dispatch_end_tick\":%" PRIu64
-            ",\"dispatch_ticks_covered_by_clock_samples\":%s"
-            ",\"min_dispatch_ns\":%.3f,\"avg_dispatch_ns\":%.3f"
-            ",\"max_dispatch_ns\":%.3f,\"total_dispatch_ns\":%.3f}\n",
-            device->physical_device_ordinal, device->device_record_count,
-            device->queue_record_count, device->queue_count,
-            device->clock_sample_count, has_clock_fit ? "true" : "false",
-            ns_per_tick, tick_frequency_hz,
-            device->minimum_clock_uncertainty_ns == INT64_MAX
-                ? 0
-                : device->minimum_clock_uncertainty_ns,
-            device->maximum_clock_uncertainty_ns, device->dispatch_event_count,
-            valid_dispatch_count, device->invalid_dispatch_event_count,
-            valid_dispatch_count ? device->minimum_dispatch_ticks : 0,
-            average_ticks,
-            valid_dispatch_count ? device->maximum_dispatch_ticks : 0,
-            device->total_dispatch_ticks,
-            valid_dispatch_count ? device->earliest_dispatch_start_tick : 0,
-            valid_dispatch_count ? device->latest_dispatch_end_tick : 0,
-            clock_covers_dispatches ? "true" : "false",
-            has_clock_fit && valid_dispatch_count
-                ? (double)device->minimum_dispatch_ticks * ns_per_tick
-                : 0.0,
-            has_clock_fit && valid_dispatch_count ? average_ticks * ns_per_tick
-                                                  : 0.0,
-            has_clock_fit && valid_dispatch_count
-                ? (double)device->maximum_dispatch_ticks * ns_per_tick
-                : 0.0,
-            has_clock_fit ? device->total_dispatch_ticks * ns_per_tick : 0.0);
+    int64_t minimum_dispatch_ns = 0;
+    int64_t maximum_dispatch_ns = 0;
+    int64_t total_dispatch_ns = 0;
+    const bool has_dispatch_ns =
+        has_clock_fit && valid_dispatch_count &&
+        iree_profile_model_clock_fit_scale_ticks_to_ns(
+            &clock_fit, device->minimum_dispatch_ticks, &minimum_dispatch_ns) &&
+        iree_profile_model_clock_fit_scale_ticks_to_ns(
+            &clock_fit, device->maximum_dispatch_ticks, &maximum_dispatch_ns) &&
+        iree_profile_model_clock_fit_scale_ticks_to_ns(
+            &clock_fit, device->total_dispatch_ticks, &total_dispatch_ns);
+    fprintf(
+        file,
+        "{\"type\":\"device_summary\",\"physical_device_ordinal\":%u"
+        ",\"device_records\":%u,\"queue_records\":%u,\"queues\":%u"
+        ",\"clock_samples\":%" PRIu64
+        ",\"clock_fit_available\":%s"
+        ",\"ns_per_tick\":%.9f,\"tick_frequency_hz\":%.3f"
+        ",\"min_clock_uncertainty_ns\":%" PRId64
+        ",\"max_clock_uncertainty_ns\":%" PRId64 ",\"dispatches\":%" PRIu64
+        ",\"valid_dispatches\":%" PRIu64 ",\"invalid_dispatches\":%" PRIu64
+        ",\"min_dispatch_ticks\":%" PRIu64
+        ",\"avg_dispatch_ticks\":%.3f"
+        ",\"max_dispatch_ticks\":%" PRIu64 ",\"total_dispatch_ticks\":%" PRIu64
+        ",\"earliest_dispatch_start_tick\":%" PRIu64
+        ",\"latest_dispatch_end_tick\":%" PRIu64
+        ",\"dispatch_ticks_covered_by_clock_samples\":%s"
+        ",\"dispatch_time_available\":%s"
+        ",\"min_dispatch_ns\":%" PRId64
+        ",\"avg_dispatch_ns\":%.3f"
+        ",\"max_dispatch_ns\":%" PRId64 ",\"total_dispatch_ns\":%" PRId64 "}\n",
+        device->physical_device_ordinal, device->device_record_count,
+        device->queue_record_count, device->queue_count,
+        device->clock_sample_count, has_clock_fit ? "true" : "false",
+        ns_per_tick, tick_frequency_hz,
+        device->minimum_clock_uncertainty_ns == INT64_MAX
+            ? 0
+            : device->minimum_clock_uncertainty_ns,
+        device->maximum_clock_uncertainty_ns, device->dispatch_event_count,
+        valid_dispatch_count, device->invalid_dispatch_event_count,
+        valid_dispatch_count ? device->minimum_dispatch_ticks : 0,
+        average_ticks,
+        valid_dispatch_count ? device->maximum_dispatch_ticks : 0,
+        device->total_dispatch_ticks,
+        valid_dispatch_count ? device->earliest_dispatch_start_tick : 0,
+        valid_dispatch_count ? device->latest_dispatch_end_tick : 0,
+        clock_covers_dispatches ? "true" : "false",
+        has_dispatch_ns ? "true" : "false",
+        has_dispatch_ns ? minimum_dispatch_ns : 0,
+        has_dispatch_ns ? average_ticks * ns_per_tick : 0.0,
+        has_dispatch_ns ? maximum_dispatch_ns : 0,
+        has_dispatch_ns ? total_dispatch_ns : 0);
   }
 }
 

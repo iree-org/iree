@@ -37,7 +37,7 @@ typedef struct iree_profile_device_summary_t {
   // Number of dispatch records with unusable or reversed timestamps.
   uint64_t invalid_dispatch_event_count;
   // Sum of valid dispatch durations in raw device ticks.
-  double total_dispatch_ticks;
+  uint64_t total_dispatch_ticks;
   // Earliest valid dispatch start tick seen for this physical device.
   uint64_t earliest_dispatch_start_tick;
   // Latest valid dispatch end tick seen for this physical device.

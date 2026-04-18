@@ -176,12 +176,12 @@ static iree_status_t iree_profile_dispatch_print_text(
        i < context->aggregate_count && iree_status_is_ok(status); ++i) {
     const iree_profile_dispatch_aggregate_t* aggregate =
         &context->aggregates[i];
-    const iree_profile_model_device_t* device = iree_profile_model_find_device(
-        &context->model, aggregate->physical_device_ordinal);
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_projection_try_fit_driver_host_cpu_clock(
+            context, aggregate->physical_device_ordinal, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
 
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
@@ -195,6 +195,17 @@ static iree_status_t iree_profile_dispatch_print_text(
               ? aggregate->m2_ticks / (double)(aggregate->valid_count - 1)
               : 0.0;
       const double stddev_ticks = iree_profile_sqrt_f64(variance_ticks);
+      int64_t minimum_ns = 0;
+      int64_t maximum_ns = 0;
+      int64_t total_ns = 0;
+      const bool has_time_ns =
+          has_clock_fit && aggregate->valid_count != 0 &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->total_ticks, &total_ns);
       fprintf(file, "  %.*s\n", (int)key.size, key.data);
       fprintf(file,
               "    device=%u executable=%" PRIu64 " export=%u count=%" PRIu64
@@ -205,18 +216,16 @@ static iree_status_t iree_profile_dispatch_print_text(
       if (aggregate->valid_count != 0) {
         fprintf(file,
                 "    ticks: min=%" PRIu64 " avg=%.3f stddev=%.3f max=%" PRIu64
-                " total=%.3f\n",
+                " total=%" PRIu64 "\n",
                 aggregate->minimum_ticks, aggregate->mean_ticks, stddev_ticks,
                 aggregate->maximum_ticks, aggregate->total_ticks);
-        if (has_clock_fit) {
+        if (has_time_ns) {
           fprintf(file,
-                  "    time_ns: min=%.3f avg=%.3f stddev=%.3f max=%.3f"
-                  " total=%.3f\n",
-                  (double)aggregate->minimum_ticks * ns_per_tick,
-                  aggregate->mean_ticks * ns_per_tick,
-                  stddev_ticks * ns_per_tick,
-                  (double)aggregate->maximum_ticks * ns_per_tick,
-                  aggregate->total_ticks * ns_per_tick);
+                  "    time_ns: min=%" PRId64
+                  " avg=%.3f stddev=%.3f"
+                  " max=%" PRId64 " total=%" PRId64 "\n",
+                  minimum_ns, aggregate->mean_ticks * ns_per_tick,
+                  stddev_ticks * ns_per_tick, maximum_ns, total_ns);
         } else {
           fprintf(file, "    time_ns: unavailable\n");
         }
@@ -256,13 +265,12 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
        i < context->aggregate_count && iree_status_is_ok(status); ++i) {
     const iree_profile_dispatch_aggregate_t* aggregate =
         &context->aggregates[i];
-    const iree_profile_model_device_t* device = iree_profile_model_find_device(
-        &context->model, aggregate->physical_device_ordinal);
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
-    (void)tick_frequency_hz;
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_projection_try_fit_driver_host_cpu_clock(
+            context, aggregate->physical_device_ordinal, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
 
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
@@ -276,6 +284,17 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
               ? aggregate->m2_ticks / (double)(aggregate->valid_count - 1)
               : 0.0;
       const double stddev_ticks = iree_profile_sqrt_f64(variance_ticks);
+      int64_t minimum_ns = 0;
+      int64_t maximum_ns = 0;
+      int64_t total_ns = 0;
+      const bool has_time_ns =
+          has_clock_fit && aggregate->valid_count != 0 &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->total_ticks, &total_ns);
       fprintf(file,
               "{\"type\":\"dispatch_group\",\"physical_device_ordinal\":%u"
               ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u,\"key\":",
@@ -286,7 +305,7 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
               ",\"count\":%" PRIu64 ",\"valid\":%" PRIu64
               ",\"invalid\":%" PRIu64 ",\"min_ticks\":%" PRIu64
               ",\"avg_ticks\":%.3f,\"stddev_ticks\":%.3f"
-              ",\"max_ticks\":%" PRIu64 ",\"total_ticks\":%.3f",
+              ",\"max_ticks\":%" PRIu64 ",\"total_ticks\":%" PRIu64,
               aggregate->dispatch_count, aggregate->valid_count,
               aggregate->invalid_count,
               aggregate->valid_count ? aggregate->minimum_ticks : 0,
@@ -297,19 +316,15 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
       fprintf(file, ",\"clock_fit_available\":%s",
               has_clock_fit ? "true" : "false");
       fprintf(file,
-              ",\"min_ns\":%.3f,\"avg_ns\":%.3f,\"stddev_ns\":%.3f"
-              ",\"max_ns\":%.3f,\"total_ns\":%.3f",
-              has_clock_fit && aggregate->valid_count
-                  ? (double)aggregate->minimum_ticks * ns_per_tick
-                  : 0.0,
-              has_clock_fit && aggregate->valid_count
-                  ? aggregate->mean_ticks * ns_per_tick
-                  : 0.0,
-              has_clock_fit ? stddev_ticks * ns_per_tick : 0.0,
-              has_clock_fit && aggregate->valid_count
-                  ? (double)aggregate->maximum_ticks * ns_per_tick
-                  : 0.0,
-              has_clock_fit ? aggregate->total_ticks * ns_per_tick : 0.0);
+              ",\"time_ns_available\":%s"
+              ",\"min_ns\":%" PRId64
+              ",\"avg_ns\":%.3f"
+              ",\"stddev_ns\":%.3f,\"max_ns\":%" PRId64
+              ",\"total_ns\":%" PRId64,
+              has_time_ns ? "true" : "false", has_time_ns ? minimum_ns : 0,
+              has_time_ns ? aggregate->mean_ticks * ns_per_tick : 0.0,
+              has_time_ns ? stddev_ticks * ns_per_tick : 0.0,
+              has_time_ns ? maximum_ns : 0, has_time_ns ? total_ns : 0);
       fprintf(
           file,
           ",\"last_workgroup_count\":[%u,%u,%u]"
@@ -390,37 +405,42 @@ static iree_status_t iree_profile_executable_print_text(
           continue;
         }
         has_aggregate = true;
-        const iree_profile_model_device_t* device =
-            iree_profile_model_find_device(&context->model,
-                                           aggregate->physical_device_ordinal);
-        double ns_per_tick = 0.0;
-        double tick_frequency_hz = 0.0;
-        const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-            device, &ns_per_tick, &tick_frequency_hz);
+        iree_profile_model_clock_fit_t clock_fit;
+        const bool has_clock_fit =
+            iree_profile_projection_try_fit_driver_host_cpu_clock(
+                context, aggregate->physical_device_ordinal, &clock_fit);
+        const double ns_per_tick =
+            iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
         const double average_ticks =
             aggregate->valid_count
                 ? aggregate->total_ticks / (double)aggregate->valid_count
                 : 0.0;
+        int64_t minimum_ns = 0;
+        int64_t maximum_ns = 0;
+        int64_t total_ns = 0;
+        const bool has_time_ns =
+            has_clock_fit && aggregate->valid_count != 0 &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->total_ticks, &total_ns);
         fprintf(file,
                 "    device=%u dispatches=%" PRIu64 " valid=%" PRIu64
                 " invalid=%" PRIu64 " ticks[min/avg/max/total]=%" PRIu64
-                "/%.3f/%" PRIu64 "/%.3f",
+                "/%.3f/%" PRIu64 "/%" PRIu64,
                 aggregate->physical_device_ordinal, aggregate->dispatch_count,
                 aggregate->valid_count, aggregate->invalid_count,
                 aggregate->valid_count ? aggregate->minimum_ticks : 0,
                 average_ticks,
                 aggregate->valid_count ? aggregate->maximum_ticks : 0,
                 aggregate->total_ticks);
-        if (has_clock_fit) {
-          fprintf(file, " ns[min/avg/max/total]=%.3f/%.3f/%.3f/%.3f",
-                  aggregate->valid_count
-                      ? (double)aggregate->minimum_ticks * ns_per_tick
-                      : 0.0,
-                  average_ticks * ns_per_tick,
-                  aggregate->valid_count
-                      ? (double)aggregate->maximum_ticks * ns_per_tick
-                      : 0.0,
-                  aggregate->total_ticks * ns_per_tick);
+        if (has_time_ns) {
+          fprintf(
+              file,
+              " ns[min/avg/max/total]=%" PRId64 "/%.3f/%" PRId64 "/%" PRId64,
+              minimum_ns, average_ticks * ns_per_tick, maximum_ns, total_ns);
         }
         fputc('\n', file);
       }
@@ -509,17 +529,27 @@ static iree_status_t iree_profile_executable_print_jsonl(
             aggregate->export_ordinal != export_info->export_ordinal) {
           continue;
         }
-        const iree_profile_model_device_t* device =
-            iree_profile_model_find_device(&context->model,
-                                           aggregate->physical_device_ordinal);
-        double ns_per_tick = 0.0;
-        double tick_frequency_hz = 0.0;
-        const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-            device, &ns_per_tick, &tick_frequency_hz);
+        iree_profile_model_clock_fit_t clock_fit;
+        const bool has_clock_fit =
+            iree_profile_projection_try_fit_driver_host_cpu_clock(
+                context, aggregate->physical_device_ordinal, &clock_fit);
+        const double ns_per_tick =
+            iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
         const double average_ticks =
             aggregate->valid_count
                 ? aggregate->total_ticks / (double)aggregate->valid_count
                 : 0.0;
+        int64_t minimum_ns = 0;
+        int64_t maximum_ns = 0;
+        int64_t total_ns = 0;
+        const bool has_time_ns =
+            has_clock_fit && aggregate->valid_count != 0 &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->minimum_ticks, &minimum_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->maximum_ticks, &maximum_ns) &&
+            iree_profile_model_clock_fit_scale_ticks_to_ns(
+                &clock_fit, aggregate->total_ticks, &total_ns);
         fprintf(file,
                 "{\"type\":\"executable_export_dispatch_group\""
                 ",\"physical_device_ordinal\":%u"
@@ -533,23 +563,21 @@ static iree_status_t iree_profile_executable_print_jsonl(
                 ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
                 ",\"invalid\":%" PRIu64 ",\"min_ticks\":%" PRIu64
                 ",\"avg_ticks\":%.3f,\"max_ticks\":%" PRIu64
-                ",\"total_ticks\":%.3f,\"clock_fit_available\":%s"
-                ",\"min_ns\":%.3f,\"avg_ns\":%.3f,\"max_ns\":%.3f"
-                ",\"total_ns\":%.3f}\n",
+                ",\"total_ticks\":%" PRIu64
+                ",\"clock_fit_available\":%s"
+                ",\"time_ns_available\":%s"
+                ",\"min_ns\":%" PRId64
+                ",\"avg_ns\":%.3f"
+                ",\"max_ns\":%" PRId64 ",\"total_ns\":%" PRId64 "}\n",
                 aggregate->dispatch_count, aggregate->valid_count,
                 aggregate->invalid_count,
                 aggregate->valid_count ? aggregate->minimum_ticks : 0,
                 average_ticks,
                 aggregate->valid_count ? aggregate->maximum_ticks : 0,
                 aggregate->total_ticks, has_clock_fit ? "true" : "false",
-                has_clock_fit && aggregate->valid_count
-                    ? (double)aggregate->minimum_ticks * ns_per_tick
-                    : 0.0,
-                has_clock_fit ? average_ticks * ns_per_tick : 0.0,
-                has_clock_fit && aggregate->valid_count
-                    ? (double)aggregate->maximum_ticks * ns_per_tick
-                    : 0.0,
-                has_clock_fit ? aggregate->total_ticks * ns_per_tick : 0.0);
+                has_time_ns ? "true" : "false", has_time_ns ? minimum_ns : 0,
+                has_time_ns ? average_ticks * ns_per_tick : 0.0,
+                has_time_ns ? maximum_ns : 0, has_time_ns ? total_ns : 0);
       }
     }
   }
@@ -608,26 +636,30 @@ static iree_status_t iree_profile_command_print_text(
       if (aggregate->command_buffer_id != command_buffer->command_buffer_id) {
         continue;
       }
-      const iree_profile_model_device_t* device =
-          iree_profile_model_find_device(&context->model,
-                                         aggregate->physical_device_ordinal);
-      double ns_per_tick = 0.0;
-      double tick_frequency_hz = 0.0;
-      const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-          device, &ns_per_tick, &tick_frequency_hz);
+      iree_profile_model_clock_fit_t clock_fit;
+      const bool has_clock_fit =
+          iree_profile_projection_try_fit_driver_host_cpu_clock(
+              context, aggregate->physical_device_ordinal, &clock_fit);
+      const double ns_per_tick =
+          iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+      int64_t total_dispatch_ns = 0;
+      const bool has_total_dispatch_ns =
+          has_clock_fit && aggregate->valid_count != 0 &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->total_ticks, &total_dispatch_ns);
       const double span_ticks = iree_profile_model_span_ticks(
           aggregate->earliest_start_tick, aggregate->latest_end_tick);
       fprintf(file,
               "  submission=%" PRIu64 " queue=%u stream=%" PRIu64
               " dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
-              " span_ticks=%.3f total_dispatch_ticks=%.3f",
+              " span_ticks=%.3f total_dispatch_ticks=%" PRIu64,
               aggregate->submission_id, aggregate->queue_ordinal,
               aggregate->stream_id, aggregate->dispatch_count,
               aggregate->valid_count, aggregate->invalid_count, span_ticks,
               aggregate->total_ticks);
-      if (has_clock_fit) {
-        fprintf(file, " span_ns=%.3f total_dispatch_ns=%.3f",
-                span_ticks * ns_per_tick, aggregate->total_ticks * ns_per_tick);
+      if (has_total_dispatch_ns) {
+        fprintf(file, " span_ns=%.3f total_dispatch_ns=%" PRId64,
+                span_ticks * ns_per_tick, total_dispatch_ns);
       }
       fputc('\n', file);
     }
@@ -690,12 +722,17 @@ static iree_status_t iree_profile_command_print_jsonl(
     if (id_filter >= 0 && aggregate->command_buffer_id != (uint64_t)id_filter) {
       continue;
     }
-    const iree_profile_model_device_t* device = iree_profile_model_find_device(
-        &context->model, aggregate->physical_device_ordinal);
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_projection_try_fit_driver_host_cpu_clock(
+            context, aggregate->physical_device_ordinal, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+    int64_t total_dispatch_ns = 0;
+    const bool has_total_dispatch_ns =
+        has_clock_fit && aggregate->valid_count != 0 &&
+        iree_profile_model_clock_fit_scale_ticks_to_ns(
+            &clock_fit, aggregate->total_ticks, &total_dispatch_ns);
     const double span_ticks = iree_profile_model_span_ticks(
         aggregate->earliest_start_tick, aggregate->latest_end_tick);
     fprintf(file,
@@ -706,15 +743,18 @@ static iree_status_t iree_profile_command_print_jsonl(
             ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
             ",\"invalid\":%" PRIu64
             ",\"span_ticks\":%.3f"
-            ",\"total_dispatch_ticks\":%.3f,\"clock_fit_available\":%s"
-            ",\"span_ns\":%.3f,\"total_dispatch_ns\":%.3f}\n",
+            ",\"total_dispatch_ticks\":%" PRIu64
+            ",\"clock_fit_available\":%s"
+            ",\"total_dispatch_time_ns_available\":%s"
+            ",\"span_ns\":%.3f,\"total_dispatch_ns\":%" PRId64 "}\n",
             aggregate->command_buffer_id, aggregate->submission_id,
             aggregate->physical_device_ordinal, aggregate->queue_ordinal,
             aggregate->stream_id, aggregate->dispatch_count,
             aggregate->valid_count, aggregate->invalid_count, span_ticks,
             aggregate->total_ticks, has_clock_fit ? "true" : "false",
+            has_total_dispatch_ns ? "true" : "false",
             has_clock_fit ? span_ticks * ns_per_tick : 0.0,
-            has_clock_fit ? aggregate->total_ticks * ns_per_tick : 0.0);
+            has_total_dispatch_ns ? total_dispatch_ns : 0);
   }
   return status;
 }
@@ -753,24 +793,29 @@ static iree_status_t iree_profile_queue_print_text(
       if (id_filter >= 0 && aggregate->submission_id != (uint64_t)id_filter) {
         continue;
       }
-      const iree_profile_model_device_t* device =
-          iree_profile_model_find_device(&context->model,
-                                         aggregate->physical_device_ordinal);
-      double ns_per_tick = 0.0;
-      double tick_frequency_hz = 0.0;
-      const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-          device, &ns_per_tick, &tick_frequency_hz);
+      iree_profile_model_clock_fit_t clock_fit;
+      const bool has_clock_fit =
+          iree_profile_projection_try_fit_driver_host_cpu_clock(
+              context, aggregate->physical_device_ordinal, &clock_fit);
+      const double ns_per_tick =
+          iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+      int64_t total_dispatch_ns = 0;
+      const bool has_total_dispatch_ns =
+          has_clock_fit && aggregate->valid_count != 0 &&
+          iree_profile_model_clock_fit_scale_ticks_to_ns(
+              &clock_fit, aggregate->total_ticks, &total_dispatch_ns);
       const double span_ticks = iree_profile_model_span_ticks(
           aggregate->earliest_start_tick, aggregate->latest_end_tick);
       fprintf(file,
               "  submission=%" PRIu64 " dispatches=%" PRIu64 " valid=%" PRIu64
-              " invalid=%" PRIu64 " span_ticks=%.3f total_dispatch_ticks=%.3f",
+              " invalid=%" PRIu64
+              " span_ticks=%.3f total_dispatch_ticks=%" PRIu64,
               aggregate->submission_id, aggregate->dispatch_count,
               aggregate->valid_count, aggregate->invalid_count, span_ticks,
               aggregate->total_ticks);
-      if (has_clock_fit) {
-        fprintf(file, " span_ns=%.3f total_dispatch_ns=%.3f",
-                span_ticks * ns_per_tick, aggregate->total_ticks * ns_per_tick);
+      if (has_total_dispatch_ns) {
+        fprintf(file, " span_ns=%.3f total_dispatch_ns=%" PRId64,
+                span_ticks * ns_per_tick, total_dispatch_ns);
       }
       fputc('\n', file);
     }
@@ -897,12 +942,17 @@ static iree_status_t iree_profile_queue_print_jsonl(
     if (id_filter >= 0 && aggregate->submission_id != (uint64_t)id_filter) {
       continue;
     }
-    const iree_profile_model_device_t* device = iree_profile_model_find_device(
-        &context->model, aggregate->physical_device_ordinal);
-    double ns_per_tick = 0.0;
-    double tick_frequency_hz = 0.0;
-    const bool has_clock_fit = iree_profile_model_device_try_fit_clock(
-        device, &ns_per_tick, &tick_frequency_hz);
+    iree_profile_model_clock_fit_t clock_fit;
+    const bool has_clock_fit =
+        iree_profile_projection_try_fit_driver_host_cpu_clock(
+            context, aggregate->physical_device_ordinal, &clock_fit);
+    const double ns_per_tick =
+        iree_profile_model_clock_fit_ns_per_tick(&clock_fit);
+    int64_t total_dispatch_ns = 0;
+    const bool has_total_dispatch_ns =
+        has_clock_fit && aggregate->valid_count != 0 &&
+        iree_profile_model_clock_fit_scale_ticks_to_ns(
+            &clock_fit, aggregate->total_ticks, &total_dispatch_ns);
     const double span_ticks = iree_profile_model_span_ticks(
         aggregate->earliest_start_tick, aggregate->latest_end_tick);
     fprintf(file,
@@ -910,16 +960,18 @@ static iree_status_t iree_profile_queue_print_jsonl(
             ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
             ",\"stream_id\":%" PRIu64 ",\"dispatches\":%" PRIu64
             ",\"valid\":%" PRIu64 ",\"invalid\":%" PRIu64
-            ",\"span_ticks\":%.3f,\"total_dispatch_ticks\":%.3f"
-            ",\"clock_fit_available\":%s,\"span_ns\":%.3f"
-            ",\"total_dispatch_ns\":%.3f}\n",
+            ",\"span_ticks\":%.3f,\"total_dispatch_ticks\":%" PRIu64
+            ",\"clock_fit_available\":%s"
+            ",\"total_dispatch_time_ns_available\":%s"
+            ",\"span_ns\":%.3f,\"total_dispatch_ns\":%" PRId64 "}\n",
             aggregate->submission_id, aggregate->physical_device_ordinal,
             aggregate->queue_ordinal, aggregate->stream_id,
             aggregate->dispatch_count, aggregate->valid_count,
             aggregate->invalid_count, span_ticks, aggregate->total_ticks,
             has_clock_fit ? "true" : "false",
+            has_total_dispatch_ns ? "true" : "false",
             has_clock_fit ? span_ticks * ns_per_tick : 0.0,
-            has_clock_fit ? aggregate->total_ticks * ns_per_tick : 0.0);
+            has_total_dispatch_ns ? total_dispatch_ns : 0);
   }
   for (iree_host_size_t i = 0; i < context->model.queue_device_event_count;
        ++i) {

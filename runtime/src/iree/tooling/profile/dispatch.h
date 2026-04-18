@@ -49,7 +49,7 @@ typedef struct iree_profile_dispatch_aggregate_t {
   // Maximum valid dispatch duration in raw device ticks.
   uint64_t maximum_ticks;
   // Sum of valid dispatch durations in raw device ticks.
-  double total_ticks;
+  uint64_t total_ticks;
   // Running mean of valid dispatch durations in raw device ticks.
   double mean_ticks;
   // Running sum of squares of differences from |mean_ticks|.
@@ -82,7 +82,7 @@ typedef struct iree_profile_dispatch_command_aggregate_t {
   // Latest valid dispatch end tick in this aggregate row.
   uint64_t latest_end_tick;
   // Sum of valid dispatch durations in raw device ticks.
-  double total_ticks;
+  uint64_t total_ticks;
 } iree_profile_dispatch_command_aggregate_t;
 
 typedef struct iree_profile_dispatch_queue_aggregate_t {
@@ -105,7 +105,7 @@ typedef struct iree_profile_dispatch_queue_aggregate_t {
   // Latest valid dispatch end tick in this aggregate row.
   uint64_t latest_end_tick;
   // Sum of valid dispatch durations in raw device ticks.
-  double total_ticks;
+  uint64_t total_ticks;
 } iree_profile_dispatch_queue_aggregate_t;
 
 typedef struct iree_profile_dispatch_top_event_t {
