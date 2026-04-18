@@ -15,6 +15,7 @@
 # platforms (e.g. Android), so they are tagged "hostonly".
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_python//python:defs.bzl", "py_test")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
 
 package(
@@ -25,8 +26,25 @@ package(
 
 exports_files([
     "iree-profile-render",
+    "iree_profile_render/__init__.py",
+    "iree_profile_render/backends.py",
+    "iree_profile_render/common.py",
+    "iree_profile_render/perfetto.py",
     "lit.cfg.py",
 ])
+
+py_test(
+    name = "iree_profile_render_test",
+    srcs = [
+        "iree_profile_render/__init__.py",
+        "iree_profile_render/backends.py",
+        "iree_profile_render/common.py",
+        "iree_profile_render/perfetto.py",
+        "iree_profile_render_test.py",
+    ],
+    imports = ["."],
+    main = "iree_profile_render_test.py",
+)
 
 iree_runtime_cc_binary(
     name = "iree-benchmark-executable",
