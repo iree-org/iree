@@ -481,8 +481,11 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // iree_async_frontier_t's layout with a fixed-size entries array in place
   // of the FAM.
   struct {
+    // Number of valid entries in |entries|.
     uint8_t entry_count;
+    // Reserved bytes matching iree_async_frontier_t's fixed header layout.
     uint8_t reserved[7];
+    // Inline frontier entries storing the queue's accumulated dependencies.
     iree_async_frontier_entry_t
         entries[IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY];
   } frontier;

@@ -24,10 +24,15 @@
 // #include "iree/hal/drivers/amdgpu/device/tracing.h"
 typedef uint32_t iree_hal_amdgpu_trace_color_t;
 typedef struct iree_hal_amdgpu_trace_src_loc_t {
+  // Trace label shown by device-side instrumentation.
   const char* name;
+  // Source function name for the trace location.
   const char* function;
+  // Source file path for the trace location.
   const char* file;
+  // One-based source line for the trace location.
   uint32_t line;
+  // Packed trace color used by the device-side tracing ABI.
   iree_hal_amdgpu_trace_color_t color;
 } iree_hal_amdgpu_trace_src_loc_t;
 
@@ -36,7 +41,9 @@ typedef struct iree_hal_amdgpu_trace_src_loc_t {
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_agent_available_isas_t {
+  // Number of valid entries in |values|.
   iree_host_size_t count;
+  // Fixed-capacity ISA list populated by HSA iteration callbacks.
   hsa_isa_t values[32];
 } iree_hal_amdgpu_agent_available_isas_t;
 static hsa_status_t iree_hal_amdgpu_iterate_agent_isa(hsa_isa_t isa,
@@ -197,9 +204,9 @@ iree_status_t iree_hal_amdgpu_executable_format_supported(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_device_limits_t {
-  // HSA_ISA_INFO_WORKGROUP_MAX_SIZE
+  // Maximum total workgroup size from HSA_ISA_INFO_WORKGROUP_MAX_SIZE.
   uint32_t max_workgroup_size;
-  // HSA_ISA_INFO_WORKGROUP_MAX_DIM
+  // Maximum workgroup size per dimension from HSA_ISA_INFO_WORKGROUP_MAX_DIM.
   uint16_t max_workgroup_size_per_dim[3];
 } iree_hal_amdgpu_device_limits_t;
 static iree_status_t iree_hal_amdgpu_query_device_limits(
@@ -1020,7 +1027,9 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_dispatch_descriptor(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_executable_t {
+  // HAL executable resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for executable-owned metadata tables.
   iree_allocator_t host_allocator;
 
   // Unowned HSA API handle. Must remain valid for the lifetime of the

@@ -49,11 +49,17 @@ enum iree_hal_amdgpu_last_signal_flag_bits_e {
 // update and to an even value after. Readers retry if the sequence is odd
 // (write in progress) or changed between the start and end of the read.
 typedef struct iree_hal_amdgpu_last_signal_t {
+  // Seqlock sequence counter; odd means a writer is updating payload fields.
   iree_atomic_int32_t sequence;
+  // Cached signal validity and producer-frontier precision flags.
   iree_hal_amdgpu_last_signal_flags_t flags;
+  // Reserved bytes kept zero so the payload stays naturally aligned.
   uint8_t reserved[3];
+  // Producer queue axis that submitted the last cached signal.
   iree_async_axis_t producer_axis;
+  // Producer queue epoch associated with the last cached signal.
   uint64_t epoch;
+  // Semaphore payload value signaled at |producer_axis|/|epoch|.
   uint64_t value;
 } iree_hal_amdgpu_last_signal_t;
 

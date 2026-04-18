@@ -832,7 +832,9 @@ typedef enum iree_hal_amdgpu_pending_op_lifecycle_e {
 // The timepoint callback decrements the operation's atomic wait counter;
 // the last callback to fire issues (or fails) the operation.
 typedef struct iree_hal_amdgpu_wait_entry_t {
+  // Async semaphore timepoint registration owned by this wait entry.
   iree_async_semaphore_timepoint_t timepoint;
+  // Pending operation whose wait_count is decremented by this callback.
   iree_hal_amdgpu_pending_op_t* operation;
   // Set to 1 after the callback's final access to this entry/op completes.
   // Queue shutdown spins on this for callbacks that were already detached from
@@ -859,7 +861,7 @@ typedef struct iree_hal_amdgpu_alloca_memory_wait_t {
   // Set to 1 after the callback's final access to this wait/op completes.
   iree_atomic_int32_t callback_complete;
 
-  // State for a held reservation blocked on a pool death frontier.
+  // Held-reservation wait state blocked on a pool death frontier.
   struct {
     // Queue-owned reservation held while waiting for its death frontier.
     iree_hal_pool_reservation_t reservation;
@@ -871,7 +873,7 @@ typedef struct iree_hal_amdgpu_alloca_memory_wait_t {
     iree_async_frontier_waiter_t waiter;
   } frontier;
 
-  // State for reservation retry after pool release notifications.
+  // Pool notification retry state for reservation attempts.
   struct {
     // Borrowed notification returned by the pool.
     iree_async_notification_t* notification;
@@ -907,6 +909,7 @@ struct iree_hal_amdgpu_pending_op_t {
 
   // Intrusive linked list for the queue's pending list (cleanup/shutdown).
   iree_hal_amdgpu_pending_op_t* next;
+  // Back-pointer to the previous link field for O(1) unlink.
   iree_hal_amdgpu_pending_op_t** prev_next;
 
   // Completion-thread retry queued when submission capacity is temporarily
@@ -956,14 +959,22 @@ struct iree_hal_amdgpu_pending_op_t {
   // Operation payload selector.
   iree_hal_amdgpu_pending_op_type_t type;
   union {
+    // Captured queue_fill payload.
     struct {
+      // Target buffer retained until the deferred fill operation issues.
       iree_hal_buffer_t* target_buffer;
+      // Target byte offset captured from queue_fill.
       iree_device_size_t target_offset;
+      // Number of bytes filled by this queue operation.
       iree_device_size_t length;
+      // Fill pattern bits captured in the low bytes.
       uint64_t pattern_bits;
+      // Fill pattern length in bytes.
       iree_host_size_t pattern_length;
+      // HAL fill flags captured from queue_fill.
       iree_hal_fill_flags_t flags;
     } fill;
+    // Captured queue_copy/read/write payload.
     struct {
       // Source buffer retained until the deferred copy operation issues.
       iree_hal_buffer_t* source_buffer;
@@ -980,22 +991,35 @@ struct iree_hal_amdgpu_pending_op_t {
       // Queue profiling event type used when the copy submission issues.
       iree_hal_profile_queue_event_type_t profile_event_type;
     } copy;
+    // Captured queue_update payload.
     struct {
       // Source data is copied into the arena (not a borrowed pointer).
       const void* source_data;
+      // Target buffer retained until the deferred update operation issues.
       iree_hal_buffer_t* target_buffer;
+      // Target byte offset captured from queue_update.
       iree_device_size_t target_offset;
+      // Number of bytes copied from |source_data|.
       iree_device_size_t length;
+      // HAL update flags captured from queue_update.
       iree_hal_update_flags_t flags;
     } update;
+    // Captured queue_dispatch payload.
     struct {
+      // Executable retained until the deferred dispatch operation issues.
       iree_hal_executable_t* executable;
+      // Export ordinal captured from queue_dispatch.
       iree_hal_executable_export_ordinal_t export_ordinal;
+      // Dispatch workgroup configuration captured from queue_dispatch.
       iree_hal_dispatch_config_t config;
-      iree_const_byte_span_t constants;     // Arena-allocated copy.
-      iree_hal_buffer_ref_list_t bindings;  // Arena-allocated copy.
+      // Arena-owned copy of dispatch constants.
+      iree_const_byte_span_t constants;
+      // Arena-owned copy of dispatch buffer references.
+      iree_hal_buffer_ref_list_t bindings;
+      // HAL dispatch flags captured from queue_dispatch.
       iree_hal_dispatch_flags_t flags;
     } dispatch;
+    // Captured queue_execute payload.
     struct {
       // Command buffer retained until the deferred execute operation issues.
       iree_hal_command_buffer_t* command_buffer;
@@ -1009,6 +1033,7 @@ struct iree_hal_amdgpu_pending_op_t {
       // HAL execute flags captured from queue_execute.
       iree_hal_execute_flags_t flags;
     } execute;
+    // Captured queue_alloca payload.
     struct {
       // Borrowed pool resolved during queue_alloca capture. The pool owner
       // must outlive all queued transient allocations.
@@ -1032,15 +1057,23 @@ struct iree_hal_amdgpu_pending_op_t {
       // Cold memory-readiness sidecar allocated only after user waits resolve.
       iree_hal_amdgpu_alloca_memory_wait_t* memory_wait;
     } alloca_op;
+    // Captured queue_dealloca payload.
     struct {
+      // Transient buffer retained until the deferred dealloca operation issues.
       iree_hal_buffer_t* buffer;
     } dealloca;
+    // Captured queue_host_call payload.
     struct {
+      // Host callback and user data captured from queue_host_call.
       iree_hal_host_call_t call;
+      // Host call arguments copied by value.
       uint64_t args[4];
+      // HAL host-call flags captured from queue_host_call.
       iree_hal_host_call_flags_t flags;
     } host_call;
+    // Captured driver host-action payload.
     struct {
+      // Driver-owned completion-thread action ordered by queue semaphores.
       iree_hal_amdgpu_reclaim_action_t action;
     } host_action;
   };

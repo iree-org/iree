@@ -1392,6 +1392,173 @@ static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
   IREE_TRACE_ZONE_END(z0);
 }
 
+static void iree_hal_amdgpu_logical_device_translate_physical_options(
+    const iree_hal_amdgpu_logical_device_options_t* options,
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_hal_amdgpu_physical_device_options_t* out_options) {
+  iree_hal_amdgpu_physical_device_options_initialize(out_options);
+  out_options->device_block_pools.small.block_size =
+      options->device_block_pools.small.block_size;
+  out_options->device_block_pools.small.initial_capacity =
+      options->device_block_pools.small.initial_capacity;
+  out_options->device_block_pools.large.block_size =
+      options->device_block_pools.large.block_size;
+  out_options->device_block_pools.large.initial_capacity =
+      options->device_block_pools.large.initial_capacity;
+  out_options->default_pool.range_length = options->default_pool.range_length;
+  out_options->default_pool.alignment = options->default_pool.alignment;
+  out_options->default_pool.frontier_capacity =
+      options->default_pool.frontier_capacity;
+  out_options->host_block_pool_initial_capacity =
+      options->preallocate_pools ? 16 : 0;
+  out_options->host_queue_count = topology->gpu_agent_queue_count;
+  out_options->host_queue_aql_capacity = options->host_queues.aql_capacity;
+  out_options->host_queue_notification_capacity =
+      options->host_queues.notification_capacity;
+  out_options->host_queue_kernarg_capacity =
+      options->host_queues.kernarg_capacity;
+  out_options->force_wait_barrier_defer = options->force_wait_barrier_defer;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_verify_physical_options(
+    const iree_hal_amdgpu_physical_device_options_t* options,
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology) {
+  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+    hsa_agent_t gpu_agent = topology->gpu_agents[i];
+    hsa_agent_t cpu_agent = topology->cpu_agents[topology->gpu_cpu_map[i]];
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_physical_device_options_verify(options, libhsa,
+                                                       cpu_agent, gpu_agent),
+        "verifying GPU agent %" PRIhsz " meets required options", i);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_allocate_storage(
+    iree_string_view_t identifier, const iree_hal_amdgpu_topology_t* topology,
+    iree_host_size_t physical_device_size, iree_allocator_t host_allocator,
+    iree_hal_amdgpu_logical_device_t** out_logical_device) {
+  *out_logical_device = NULL;
+
+  iree_hal_amdgpu_logical_device_t* logical_device = NULL;
+  iree_host_size_t physical_device_data_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(*logical_device), &total_size,
+      IREE_STRUCT_FIELD(topology->gpu_agent_count,
+                        iree_hal_amdgpu_physical_device_t*, NULL),
+      IREE_STRUCT_ARRAY_FIELD_ALIGNED(
+          topology->gpu_agent_count, physical_device_size, uint8_t,
+          iree_max_align_t, &physical_device_data_offset),
+      IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset)));
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, total_size,
+                                             (void**)&logical_device));
+  memset(logical_device, 0, total_size);
+  iree_hal_resource_initialize(&iree_hal_amdgpu_logical_device_vtable,
+                               &logical_device->resource);
+  iree_string_view_append_to_buffer(identifier, &logical_device->identifier,
+                                    (char*)logical_device + identifier_offset);
+  logical_device->host_allocator = host_allocator;
+  logical_device->failure_status = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
+  logical_device->next_profile_session_id = 1;
+  iree_hal_amdgpu_profile_metadata_initialize(
+      host_allocator, &logical_device->profile_metadata);
+  iree_slim_mutex_initialize(&logical_device->profiling.memory_event_mutex);
+  iree_slim_mutex_initialize(&logical_device->profiling.queue_event_mutex);
+
+  // Setup physical device table first so failure cleanup has a valid table.
+  logical_device->physical_device_count = topology->gpu_agent_count;
+  uint8_t* physical_device_base =
+      (uint8_t*)logical_device + physical_device_data_offset;
+  for (iree_host_size_t i = 0, queue_index = 0;
+       i < logical_device->physical_device_count; ++i) {
+    logical_device->physical_devices[i] =
+        (iree_hal_amdgpu_physical_device_t*)physical_device_base;
+    physical_device_base += physical_device_size;
+    for (iree_host_size_t j = 0; j < topology->gpu_agent_queue_count;
+         ++j, ++queue_index) {
+      iree_hal_queue_affinity_or_into(logical_device->queue_affinity_mask,
+                                      1ull << queue_index);
+    }
+  }
+
+  *out_logical_device = logical_device;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_initialize_host_resources(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    const iree_hal_amdgpu_logical_device_options_t* options,
+    iree_async_proactor_pool_t* proactor_pool,
+    iree_allocator_t host_allocator) {
+  logical_device->proactor_pool = proactor_pool;
+  iree_async_proactor_pool_retain(logical_device->proactor_pool);
+
+  iree_arena_block_pool_initialize(options->host_block_pools.small.block_size,
+                                   host_allocator,
+                                   &logical_device->host_block_pools.small);
+  iree_arena_block_pool_initialize(options->host_block_pools.large.block_size,
+                                   host_allocator,
+                                   &logical_device->host_block_pools.large);
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_program_block_pool_initialize(
+      options->host_block_pools.command_buffer.usable_block_size,
+      host_allocator, &logical_device->host_block_pools.command_buffer));
+  return iree_async_proactor_pool_get(logical_device->proactor_pool, 0,
+                                      &logical_device->proactor);
+}
+
+static iree_status_t
+iree_hal_amdgpu_logical_device_initialize_system_and_allocator(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    const iree_hal_amdgpu_logical_device_options_t* options,
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_allocator_t host_allocator) {
+  iree_hal_amdgpu_system_options_t system_options = {
+      .trace_execution = options->trace_execution,
+      .exclusive_execution = options->exclusive_execution,
+  };
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_system_allocate(libhsa, topology, system_options,
+                                      host_allocator, &logical_device->system));
+  return iree_hal_amdgpu_allocator_create(
+      logical_device, &logical_device->system->libhsa,
+      &logical_device->system->topology, host_allocator,
+      &logical_device->device_allocator);
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_initialize_physical_devices(
+    iree_hal_amdgpu_logical_device_t* logical_device,
+    const iree_hal_amdgpu_topology_t* topology,
+    const iree_hal_amdgpu_physical_device_options_t* options,
+    iree_allocator_t host_allocator) {
+  for (iree_host_size_t device_ordinal = 0;
+       device_ordinal < logical_device->physical_device_count;
+       ++device_ordinal) {
+    const iree_host_size_t host_ordinal = topology->gpu_cpu_map[device_ordinal];
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_physical_device_initialize(
+        (iree_hal_device_t*)logical_device, logical_device->system, options,
+        logical_device->proactor, host_ordinal,
+        &logical_device->system->host_memory_pools[host_ordinal],
+        device_ordinal, host_allocator,
+        logical_device->physical_devices[device_ordinal]));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_warmup_host_pools(
+    iree_hal_amdgpu_logical_device_t* logical_device) {
+  IREE_RETURN_IF_ERROR(iree_arena_block_pool_preallocate(
+      &logical_device->host_block_pools.small, 16));
+  IREE_RETURN_IF_ERROR(iree_arena_block_pool_preallocate(
+      &logical_device->host_block_pools.large, 16));
+  return iree_arena_block_pool_preallocate(
+      &logical_device->host_block_pools.command_buffer, 16);
+}
+
 iree_status_t iree_hal_amdgpu_logical_device_create(
     iree_string_view_t identifier,
     const iree_hal_amdgpu_logical_device_options_t* options,
@@ -1419,176 +1586,46 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       iree_hal_amdgpu_logical_device_options_verify(options, libhsa, topology),
       "verifying logical device options");
 
-  // Copy options relevant during construction.
-  //
-  // TODO(benvanik): maybe expose these on the public API? feels like too much
-  // churn for too little benefit - option parsing is still possible, though.
   iree_hal_amdgpu_physical_device_options_t physical_device_options = {0};
-  iree_hal_amdgpu_physical_device_options_initialize(&physical_device_options);
-  physical_device_options.device_block_pools.small.block_size =
-      options->device_block_pools.small.block_size;
-  physical_device_options.device_block_pools.small.initial_capacity =
-      options->device_block_pools.small.initial_capacity;
-  physical_device_options.device_block_pools.large.block_size =
-      options->device_block_pools.large.block_size;
-  physical_device_options.device_block_pools.large.initial_capacity =
-      options->device_block_pools.large.initial_capacity;
-  physical_device_options.default_pool.range_length =
-      options->default_pool.range_length;
-  physical_device_options.default_pool.alignment =
-      options->default_pool.alignment;
-  physical_device_options.default_pool.frontier_capacity =
-      options->default_pool.frontier_capacity;
-  physical_device_options.host_block_pool_initial_capacity =
-      options->preallocate_pools ? 16 : 0;
-  physical_device_options.host_queue_count = topology->gpu_agent_queue_count;
-  physical_device_options.host_queue_aql_capacity =
-      options->host_queues.aql_capacity;
-  physical_device_options.host_queue_notification_capacity =
-      options->host_queues.notification_capacity;
-  physical_device_options.host_queue_kernarg_capacity =
-      options->host_queues.kernarg_capacity;
-  physical_device_options.force_wait_barrier_defer =
-      options->force_wait_barrier_defer;
+  iree_hal_amdgpu_logical_device_translate_physical_options(
+      options, topology, &physical_device_options);
 
   // Verify all GPU agents meet the required physical device options. Each
   // embedded physical device has the same layout because all physical devices
   // in one logical device share the same host-queue options.
   const iree_host_size_t physical_device_size =
       iree_hal_amdgpu_physical_device_calculate_size(&physical_device_options);
-  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
-    hsa_agent_t gpu_agent = topology->gpu_agents[i];
-    hsa_agent_t cpu_agent = topology->cpu_agents[topology->gpu_cpu_map[i]];
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_hal_amdgpu_physical_device_options_verify(
-            &physical_device_options, libhsa, cpu_agent, gpu_agent),
-        "verifying GPU agent %" PRIhsz " meets required options", i);
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_amdgpu_logical_device_verify_physical_options(
+          &physical_device_options, libhsa, topology),
+      "verifying physical device options");
 
   // Allocate the logical device and all nested physical device data structures.
   iree_hal_amdgpu_logical_device_t* logical_device = NULL;
-  iree_host_size_t physical_device_data_offset = 0;
-  iree_host_size_t identifier_offset = 0;
-  iree_host_size_t total_size = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, IREE_STRUCT_LAYOUT(
-              sizeof(*logical_device), &total_size,
-              IREE_STRUCT_FIELD(topology->gpu_agent_count,
-                                iree_hal_amdgpu_physical_device_t*, NULL),
-              IREE_STRUCT_ARRAY_FIELD_ALIGNED(
-                  topology->gpu_agent_count, physical_device_size, uint8_t,
-                  iree_max_align_t, &physical_device_data_offset),
-              IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset)));
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size,
-                                (void**)&logical_device));
-  memset(logical_device, 0, total_size);
-  iree_hal_resource_initialize(&iree_hal_amdgpu_logical_device_vtable,
-                               &logical_device->resource);
-  iree_string_view_append_to_buffer(identifier, &logical_device->identifier,
-                                    (char*)logical_device + identifier_offset);
-  logical_device->host_allocator = host_allocator;
-  logical_device->failure_status = IREE_ATOMIC_VAR_INIT(0);
+      z0, iree_hal_amdgpu_logical_device_allocate_storage(
+              identifier, topology, physical_device_size, host_allocator,
+              &logical_device));
 
-  // Retain the proactor pool. A proactor is acquired after block pools are
-  // initialized so failure cleanup can always deinitialize the pools.
-  logical_device->proactor_pool = create_params->proactor_pool;
-  iree_async_proactor_pool_retain(logical_device->proactor_pool);
-  iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
-  logical_device->next_profile_session_id = 1;
-  iree_hal_amdgpu_profile_metadata_initialize(
-      host_allocator, &logical_device->profile_metadata);
-  iree_slim_mutex_initialize(&logical_device->profiling.memory_event_mutex);
-  iree_slim_mutex_initialize(&logical_device->profiling.queue_event_mutex);
-
-  // Setup physical device table.
-  // We need to initialize this first so that any failure cleanup has a valid
-  // table.
-  logical_device->physical_device_count = topology->gpu_agent_count;
-  uint8_t* physical_device_base =
-      (uint8_t*)logical_device + physical_device_data_offset;
-  for (iree_host_size_t i = 0, queue_index = 0;
-       i < logical_device->physical_device_count; ++i) {
-    logical_device->physical_devices[i] =
-        (iree_hal_amdgpu_physical_device_t*)physical_device_base;
-    physical_device_base += physical_device_size;
-    for (iree_host_size_t j = 0; j < topology->gpu_agent_queue_count;
-         ++j, ++queue_index) {
-      iree_hal_queue_affinity_or_into(logical_device->queue_affinity_mask,
-                                      1ull << queue_index);
-    }
-  }
-
-  // Block pools used by subsequent data structures.
-  iree_arena_block_pool_initialize(options->host_block_pools.small.block_size,
-                                   host_allocator,
-                                   &logical_device->host_block_pools.small);
-  iree_arena_block_pool_initialize(options->host_block_pools.large.block_size,
-                                   host_allocator,
-                                   &logical_device->host_block_pools.large);
-  iree_status_t status = iree_hal_amdgpu_aql_program_block_pool_initialize(
-      options->host_block_pools.command_buffer.usable_block_size,
-      host_allocator, &logical_device->host_block_pools.command_buffer);
+  iree_status_t status =
+      iree_hal_amdgpu_logical_device_initialize_host_resources(
+          logical_device, options, create_params->proactor_pool,
+          host_allocator);
   if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_get(logical_device->proactor_pool, 0,
-                                          &logical_device->proactor);
+    status = iree_hal_amdgpu_logical_device_initialize_system_and_allocator(
+        logical_device, options, libhsa, topology, host_allocator);
   }
-
-  // Instantiate system container for agents used by the logical device. Loads
-  // fixed per-agent resources like the device library.
-  iree_hal_amdgpu_system_options_t system_options = {
-      .trace_execution = options->trace_execution,
-      .exclusive_execution = options->exclusive_execution,
-  };
   if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_system_allocate(libhsa, topology, system_options,
-                                             host_allocator,
-                                             &logical_device->system);
-  }
-  iree_hal_amdgpu_system_t* system = logical_device->system;
-
-  // Create the device allocator backed by HSA memory pools.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_allocator_create(
-        logical_device, &system->libhsa, &system->topology, host_allocator,
-        &logical_device->device_allocator);
-  }
-
-  // Initialize physical devices for each GPU agent in the topology.
-  // Their order matches the original but each may represent more than one
-  // logical queue affinity bit.
-  if (iree_status_is_ok(status)) {
-    for (iree_host_size_t device_ordinal = 0;
-         device_ordinal < logical_device->physical_device_count;
-         ++device_ordinal) {
-      const iree_host_size_t host_ordinal =
-          topology->gpu_cpu_map[device_ordinal];
-      status = iree_hal_amdgpu_physical_device_initialize(
-          (iree_hal_device_t*)logical_device, system, &physical_device_options,
-          logical_device->proactor, host_ordinal,
-          &system->host_memory_pools[host_ordinal], device_ordinal,
-          host_allocator, logical_device->physical_devices[device_ordinal]);
-      if (!iree_status_is_ok(status)) break;
-    }
+    status = iree_hal_amdgpu_logical_device_initialize_physical_devices(
+        logical_device, topology, &physical_device_options, host_allocator);
   }
 
   // If requested then warmup pools that we expect to grow on the first usage of
   // the backend. The first use may need more than the warmup provides here but
   // that's ok - users can warmup if they want.
-  if (options->preallocate_pools) {
-    if (iree_status_is_ok(status)) {
-      status = iree_arena_block_pool_preallocate(
-          &logical_device->host_block_pools.small, 16);
-    }
-    if (iree_status_is_ok(status)) {
-      status = iree_arena_block_pool_preallocate(
-          &logical_device->host_block_pools.large, 16);
-    }
-    if (iree_status_is_ok(status)) {
-      status = iree_arena_block_pool_preallocate(
-          &logical_device->host_block_pools.command_buffer, 16);
-    }
+  if (iree_status_is_ok(status) && options->preallocate_pools) {
+    status = iree_hal_amdgpu_logical_device_warmup_host_pools(logical_device);
   }
 
   if (iree_status_is_ok(status)) {

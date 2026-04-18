@@ -277,8 +277,8 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_create(
   *out_driver = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): verify options; this may be moved after any libraries are
-  // loaded so the verification can use underlying implementation queries.
+  // Reject unsupported public options before loading HSA or touching vendor
+  // state. Device-dependent verification happens during logical-device create.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_driver_options_verify(options));
 

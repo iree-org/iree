@@ -24,7 +24,9 @@
 // emit iree_status_t errors. Instead we iterate over all and then do things in
 // local for-loops.
 typedef struct iree_hal_amdgpu_hsa_memory_pool_list_t {
+  // Number of valid entries in |values|.
   iree_host_size_t count;
+  // Fixed-capacity memory-pool list populated by HSA iteration callbacks.
   hsa_amd_memory_pool_t values[32];
 } iree_hal_amdgpu_hsa_memory_pool_list_t;
 static hsa_status_t iree_hal_amdgpu_iterate_hsa_memory_pool(
@@ -137,7 +139,9 @@ static iree_status_t iree_hal_amdgpu_system_populate_host_memory_pools(
 // emit iree_status_t errors. Instead we iterate over all and then do things in
 // local for-loops.
 typedef struct iree_hal_amdgpu_hsa_region_list_t {
+  // Number of valid entries in |values|.
   iree_host_size_t count;
+  // Fixed-capacity region list populated by HSA iteration callbacks.
   hsa_region_t values[32];
 } iree_hal_amdgpu_hsa_region_list_t;
 static hsa_status_t iree_hal_amdgpu_iterate_hsa_region(hsa_region_t region,
