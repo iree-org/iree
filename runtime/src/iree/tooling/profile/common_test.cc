@@ -437,6 +437,24 @@ TEST(ProfileSummaryTest, AccumulatesDroppedRecordsFromTruncatedChunks) {
   iree_profile_summary_deinitialize(&summary);
 }
 
+TEST(ProfileSummaryTest, RejectsMalformedHostExecutionEventRecord) {
+  std::vector<uint8_t> payload(sizeof(uint32_t), 0);
+  iree_hal_profile_file_record_t chunk = MakeHostExecutionEventsChunk(payload);
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_summary_process_record(&summary, &chunk));
+
+  EXPECT_EQ(1u, summary.chunk_count);
+  EXPECT_EQ(1u, summary.host_execution_event_chunk_count);
+  EXPECT_EQ(0u, summary.host_execution_event_record_count);
+  EXPECT_EQ(0u, summary.invalid_host_execution_event_record_count);
+  EXPECT_EQ(0u, summary.total_host_execution_duration_ns);
+
+  iree_profile_summary_deinitialize(&summary);
+}
+
 TEST(ProfileQueueQueryTest, RecordsZeroPayloadTruncatedChunks) {
   std::vector<uint8_t> payload;
   iree_hal_profile_file_record_t chunk = MakeQueueEventsChunk(payload);
@@ -455,6 +473,26 @@ TEST(ProfileQueueQueryTest, RecordsZeroPayloadTruncatedChunks) {
   EXPECT_EQ(0u, query.total_queue_event_count);
   EXPECT_EQ(0u, query.matched_queue_event_count);
   EXPECT_EQ(0u, query.queue_event_count);
+
+  iree_profile_queue_event_query_deinitialize(&query);
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileQueueQueryTest, RejectsMalformedHostExecutionEventRecord) {
+  std::vector<uint8_t> payload(sizeof(uint32_t), 0);
+  iree_hal_profile_file_record_t chunk = MakeHostExecutionEventsChunk(payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  iree_profile_queue_event_query_t query;
+  iree_profile_queue_event_query_initialize(iree_allocator_system(), &query);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_queue_event_query_process_record(
+                            &query, &model, &chunk, IREE_SV("*"), -1));
+
+  EXPECT_EQ(0u, query.total_host_execution_event_count);
+  EXPECT_EQ(0u, query.matched_host_execution_event_count);
+  EXPECT_EQ(0u, query.host_execution_event_count);
 
   iree_profile_queue_event_query_deinitialize(&query);
   iree_profile_model_deinitialize(&model);
