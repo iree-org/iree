@@ -22,6 +22,22 @@ bool StringViewEqual(iree_string_view_t lhs, const char* rhs) {
   return iree_string_view_equal(lhs, iree_make_cstring_view(rhs));
 }
 
+void InitializeValidProfileFileHeader(
+    iree_hal_profile_file_header_t* file_header) {
+  memset(file_header, 0, sizeof(*file_header));
+  file_header->magic = IREE_HAL_PROFILE_FILE_MAGIC;
+  file_header->version_major = IREE_HAL_PROFILE_FILE_VERSION_MAJOR;
+  file_header->version_minor = IREE_HAL_PROFILE_FILE_VERSION_MINOR;
+  file_header->header_length = sizeof(*file_header);
+}
+
+std::vector<uint8_t> MakeProfileFileHeaderStorage() {
+  std::vector<uint8_t> storage(sizeof(iree_hal_profile_file_header_t), 0);
+  InitializeValidProfileFileHeader(
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data()));
+  return storage;
+}
+
 TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   std::vector<uint8_t> storage(4096, 0);
   iree_io_file_handle_t* file_handle = nullptr;
@@ -177,6 +193,21 @@ TEST(ProfileFileParseTest, RejectsBadMagic) {
           &file_header, &offset));
 }
 
+TEST(ProfileFileParseTest, RejectsNonZeroFileFlags) {
+  std::vector<uint8_t> storage = MakeProfileFileHeaderStorage();
+  auto* file_header =
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
+  file_header->flags = 1;
+
+  iree_hal_profile_file_header_t parsed_header;
+  iree_host_size_t offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_hal_profile_file_parse_header(
+          iree_make_const_byte_span(storage.data(), storage.size()),
+          &parsed_header, &offset));
+}
+
 TEST(ProfileFileParseTest, RejectsTruncatedRecord) {
   std::vector<uint8_t> storage(
       sizeof(iree_hal_profile_file_header_t) +
@@ -184,10 +215,7 @@ TEST(ProfileFileParseTest, RejectsTruncatedRecord) {
       0);
   auto* file_header =
       reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
-  file_header->magic = IREE_HAL_PROFILE_FILE_MAGIC;
-  file_header->version_major = IREE_HAL_PROFILE_FILE_VERSION_MAJOR;
-  file_header->version_minor = IREE_HAL_PROFILE_FILE_VERSION_MINOR;
-  file_header->header_length = sizeof(*file_header);
+  InitializeValidProfileFileHeader(file_header);
 
   auto* record_header =
       reinterpret_cast<iree_hal_profile_file_record_header_t*>(
@@ -196,6 +224,38 @@ TEST(ProfileFileParseTest, RejectsTruncatedRecord) {
   record_header->payload_length = 1;
   record_header->header_length = sizeof(*record_header);
   record_header->record_type = IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK;
+
+  iree_hal_profile_file_header_t parsed_header;
+  iree_host_size_t offset = 0;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_header(
+      iree_make_const_byte_span(storage.data(), storage.size()), &parsed_header,
+      &offset));
+
+  iree_hal_profile_file_record_t record;
+  iree_host_size_t next_offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_hal_profile_file_parse_record(
+          iree_make_const_byte_span(storage.data(), storage.size()), offset,
+          &record, &next_offset));
+}
+
+TEST(ProfileFileParseTest, RejectsNonZeroRecordFlags) {
+  std::vector<uint8_t> storage(
+      sizeof(iree_hal_profile_file_header_t) +
+          sizeof(iree_hal_profile_file_record_header_t),
+      0);
+  auto* file_header =
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
+  InitializeValidProfileFileHeader(file_header);
+
+  auto* record_header =
+      reinterpret_cast<iree_hal_profile_file_record_header_t*>(
+          storage.data() + sizeof(*file_header));
+  record_header->record_length = sizeof(*record_header);
+  record_header->header_length = sizeof(*record_header);
+  record_header->record_type = IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK;
+  record_header->flags = 1;
 
   iree_hal_profile_file_header_t parsed_header;
   iree_host_size_t offset = 0;

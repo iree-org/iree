@@ -221,6 +221,10 @@ iree_hal_profile_file_parse_header(iree_const_byte_span_t file_contents,
     return iree_make_status(IREE_STATUS_DATA_LOSS,
                             "profile file header extends past file end");
   }
+  if (IREE_UNLIKELY(header.flags != 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file reserved flags must be zero");
+  }
 
   *out_header = header;
   *out_record_offset = header.header_length;
@@ -256,6 +260,10 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_parse_record(
   const uint8_t* record_base = file_contents.data + record_offset;
   iree_hal_profile_file_record_header_t header;
   memcpy(&header, record_base, sizeof(header));
+  if (IREE_UNLIKELY(header.flags != 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile record reserved flags must be zero");
+  }
   if (IREE_UNLIKELY(header.record_length > IREE_HOST_SIZE_MAX)) {
     return iree_make_status(IREE_STATUS_DATA_LOSS,
                             "profile record length exceeds host size");
