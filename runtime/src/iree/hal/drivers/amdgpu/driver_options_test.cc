@@ -39,6 +39,13 @@ TEST(AmdgpuDriverOptionsTest, LogicalDeviceParamsAreRejectedUntilDefined) {
                                       }));
 }
 
+TEST(AmdgpuDriverOptionsTest, DefaultsDoNotRetainProfileArtifacts) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+
+  EXPECT_EQ(options.profiling.retain_executable_code_object_images, 0u);
+}
+
 TEST(AmdgpuDriverOptionsTest, RejectsMissingSearchPathStorageBeforeLoadingHsa) {
   iree_hal_amdgpu_driver_options_t options;
   iree_hal_amdgpu_driver_options_initialize(&options);
@@ -118,6 +125,14 @@ TEST(AmdgpuDriverOptionsTest, RejectsExclusiveExecutionBeforeLoadingHsa) {
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
                         CreateDriverWithDefaultDeviceOptions(&options));
+}
+
+TEST(AmdgpuDriverOptionsTest, AllowsProfileArtifactRetentionBeforeLoadingHsa) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.profiling.retain_executable_code_object_images = 1;
+
+  IREE_ASSERT_OK(CreateDriverWithDefaultDeviceOptions(&options));
 }
 
 TEST(AmdgpuDriverOptionsTest, RejectsNegativeActiveWaitBeforeLoadingHsa) {

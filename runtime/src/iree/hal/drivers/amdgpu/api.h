@@ -119,6 +119,15 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // today; enabling it fails option verification.
   uint64_t trace_execution : 1;
 
+  // Profiling metadata retention policy.
+  struct {
+    // Retains exact executable code-object image bytes and loader load ranges
+    // in logical-device profile metadata for every prepared executable. Normal
+    // dispatch timing and aggregate statistics only need executable/export
+    // identity and do not require this heavy artifact storage.
+    uint64_t retain_executable_code_object_images : 1;
+  } profiling;
+
   // Reserved for a future exclusive queue scheduling mode. Unsupported today;
   // enabling it fails option verification.
   uint64_t exclusive_execution : 1;

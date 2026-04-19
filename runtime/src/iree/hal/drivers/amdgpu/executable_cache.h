@@ -25,11 +25,16 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 //
 // |libhsa| and |topology| are captured by-reference and must remain valid for
 // the lifetime of the cache.
+//
+// If |retain_executable_code_object_images| is true, exact code-object image
+// bytes and loader load ranges are retained in profile metadata for every
+// prepared executable.
 iree_status_t iree_hal_amdgpu_executable_cache_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_string_view_t identifier, iree_allocator_t host_allocator,
+    bool retain_executable_code_object_images, iree_string_view_t identifier,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_EXECUTABLE_CACHE_H_

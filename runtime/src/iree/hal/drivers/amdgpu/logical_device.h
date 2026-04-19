@@ -86,6 +86,9 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Durable profiling metadata registered by cold executable/command-buffer
   // construction paths.
   iree_hal_amdgpu_profile_metadata_registry_t profile_metadata;
+  // Whether executable cache creation should retain exact code-object image
+  // artifacts for all prepared executables.
+  bool retain_executable_code_object_images;
 
   // Stable device identifier string stored inline after this struct.
   iree_string_view_t identifier;

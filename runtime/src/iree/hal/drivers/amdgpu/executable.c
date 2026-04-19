@@ -1280,7 +1280,7 @@ static iree_status_t iree_hal_amdgpu_executable_register_profile_metadata(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_const_byte_span_t code_object_data,
+    iree_const_byte_span_t code_object_data, bool retain_profile_artifacts,
     iree_hal_amdgpu_executable_t* executable) {
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_register_executable(
       profile_metadata, executable->kernel_count, executable->export_infos,
@@ -1289,10 +1289,12 @@ static iree_status_t iree_hal_amdgpu_executable_register_profile_metadata(
       &executable->profile_id));
 
   // Code-object image and loader load-range capture is optional for normal
-  // execution. Trace profiling validates these artifacts when it needs to emit
-  // hardware code-object markers.
-  IREE_IGNORE_ERROR(iree_hal_amdgpu_executable_register_profile_artifacts(
-      libhsa, topology, profile_metadata, code_object_data, executable));
+  // execution, but explicit retention requests must succeed while the borrowed
+  // code-object bytes are still in scope.
+  if (retain_profile_artifacts) {
+    return iree_hal_amdgpu_executable_register_profile_artifacts(
+        libhsa, topology, profile_metadata, code_object_data, executable);
+  }
   return iree_ok_status();
 }
 
@@ -1729,7 +1731,8 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_amdgpu_device_limits_t* limits, hsa_agent_t any_device_agent,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+    bool retain_profile_artifacts, iree_allocator_t host_allocator,
+    iree_hal_executable_t** out_executable) {
   *out_executable = NULL;
 
   iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
@@ -1844,7 +1847,8 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_executable_register_profile_metadata(
-        libhsa, topology, profile_metadata, code_object_data, executable);
+        libhsa, topology, profile_metadata, code_object_data,
+        retain_profile_artifacts, executable);
   }
 
   // Invalidate the kernel object pointer in all host args so that we don't
@@ -1869,7 +1873,8 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_raw_hsaco(
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_amdgpu_device_limits_t* limits, hsa_agent_t any_device_agent,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+    bool retain_profile_artifacts, iree_allocator_t host_allocator,
+    iree_hal_executable_t** out_executable) {
   *out_executable = NULL;
 
   iree_const_byte_span_t code_object_data = executable_params->executable_data;
@@ -1943,7 +1948,8 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_raw_hsaco(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_executable_register_profile_metadata(
-        libhsa, topology, profile_metadata, code_object_data, executable);
+        libhsa, topology, profile_metadata, code_object_data,
+        retain_profile_artifacts, executable);
   }
 
   // Invalidate the kernel object pointer in all host args so that we don't
@@ -1967,7 +1973,8 @@ iree_status_t iree_hal_amdgpu_executable_create(
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+    bool retain_profile_artifacts, iree_allocator_t host_allocator,
+    iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(profile_metadata);
   IREE_ASSERT_ARGUMENT(out_executable);
@@ -2016,11 +2023,13 @@ iree_status_t iree_hal_amdgpu_executable_create(
           executable_params->executable_data)) {
     status = iree_hal_amdgpu_executable_create_from_flatbuffer(
         libhsa, topology, executable_params, &limits, any_device_agent,
-        profile_metadata, host_allocator, out_executable);
+        profile_metadata, retain_profile_artifacts, host_allocator,
+        out_executable);
   } else {
     status = iree_hal_amdgpu_executable_create_from_raw_hsaco(
         libhsa, topology, executable_params, &limits, any_device_agent,
-        profile_metadata, host_allocator, out_executable);
+        profile_metadata, retain_profile_artifacts, host_allocator,
+        out_executable);
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_executable_release(*out_executable);

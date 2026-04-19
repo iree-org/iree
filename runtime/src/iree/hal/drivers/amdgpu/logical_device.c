@@ -1610,6 +1610,8 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       z0, iree_hal_amdgpu_logical_device_allocate_storage(
               identifier, topology, physical_device_size, host_allocator,
               &logical_device));
+  logical_device->retain_executable_code_object_images =
+      options->profiling.retain_executable_code_object_images;
 
   iree_status_t status =
       iree_hal_amdgpu_logical_device_initialize_host_resources(
@@ -2273,7 +2275,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_executable_cache(
       iree_hal_amdgpu_logical_device_cast(base_device);
   return iree_hal_amdgpu_executable_cache_create(
       &logical_device->system->libhsa, &logical_device->system->topology,
-      &logical_device->profile_metadata, identifier,
+      &logical_device->profile_metadata,
+      logical_device->retain_executable_code_object_images, identifier,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
