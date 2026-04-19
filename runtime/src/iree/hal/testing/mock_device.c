@@ -341,16 +341,6 @@ static iree_status_t iree_hal_mock_device_external_capture_end(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
 }
 
-static iree_status_t iree_hal_mock_device_query_statistics(
-    iree_hal_device_t* base_device,
-    const iree_hal_statistics_query_options_t* options,
-    iree_hal_statistics_row_callback_t callback) {
-  (void)base_device;
-  (void)options;
-  (void)callback;
-  return iree_ok_status();
-}
-
 //===----------------------------------------------------------------------===//
 // Vtable
 //===----------------------------------------------------------------------===//
@@ -393,5 +383,4 @@ static const iree_hal_device_vtable_t iree_hal_mock_device_vtable = {
     .profiling_end = iree_hal_mock_device_profiling_end,
     .external_capture_begin = iree_hal_mock_device_external_capture_begin,
     .external_capture_end = iree_hal_mock_device_external_capture_end,
-    .query_statistics = iree_hal_mock_device_query_statistics,
 };

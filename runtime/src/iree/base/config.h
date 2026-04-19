@@ -188,14 +188,6 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #define IREE_STATISTICS_ENABLE 1
 #endif  // !IREE_STATISTICS_ENABLE
 
-#if !defined(IREE_HAL_STATISTICS_ENABLE)
-// Conditionally enables HAL producer-side aggregate statistics accounting.
-//
-// The public HAL statistics query API remains available when this is disabled,
-// but statistics-only fields and hot-path accounting helpers compile out.
-#define IREE_HAL_STATISTICS_ENABLE IREE_STATISTICS_ENABLE
-#endif  // !IREE_HAL_STATISTICS_ENABLE
-
 //===----------------------------------------------------------------------===//
 // Tracing
 //===----------------------------------------------------------------------===//

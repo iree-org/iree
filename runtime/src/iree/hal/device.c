@@ -14,7 +14,6 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
-#include "iree/hal/statistics_internal.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
@@ -582,56 +581,6 @@ iree_hal_device_profiling_end(iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, profiling_end)(device);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_device_query_statistics(
-    iree_hal_device_t* device,
-    const iree_hal_statistics_query_options_t* options,
-    iree_hal_statistics_row_callback_t callback) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(options);
-
-  if (options->requested_families == IREE_HAL_STATISTICS_FAMILY_NONE) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "statistics query requires at least one requested family");
-  }
-  if (iree_any_bit_set(options->requested_families,
-                       ~IREE_HAL_STATISTICS_FAMILY_ALL)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "unsupported statistics family bits 0x%" PRIx64,
-        options->requested_families & ~IREE_HAL_STATISTICS_FAMILY_ALL);
-  }
-
-  const iree_hal_statistics_query_flags_t supported_flags =
-      IREE_HAL_STATISTICS_QUERY_FLAG_EXACT |
-      IREE_HAL_STATISTICS_QUERY_FLAG_DRAIN |
-      IREE_HAL_STATISTICS_QUERY_FLAG_RESET_AFTER_QUERY;
-  if (iree_any_bit_set(options->flags, ~supported_flags)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported statistics query flags 0x%x",
-                            options->flags & ~supported_flags);
-  }
-  if (options->reserved0 != 0 || options->reserved1 != 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "statistics query reserved fields must be zero");
-  }
-  if (!callback.fn) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "statistics query row callback is required");
-  }
-  if (options->export_ordinal != IREE_HAL_STATISTICS_ORDINAL_ANY &&
-      !options->executable) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "statistics query export ordinal filter requires an executable filter");
-  }
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status =
-      _VTABLE_DISPATCH(device, query_statistics)(device, options, callback);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

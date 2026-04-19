@@ -2837,16 +2837,6 @@ static iree_status_t iree_hal_hip_device_external_capture_end(
                           "HIP external capture not implemented");
 }
 
-static iree_status_t iree_hal_hip_device_query_statistics(
-    iree_hal_device_t* base_device,
-    const iree_hal_statistics_query_options_t* options,
-    iree_hal_statistics_row_callback_t callback) {
-  (void)base_device;
-  (void)options;
-  (void)callback;
-  return iree_ok_status();
-}
-
 static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .destroy = iree_hal_hip_device_destroy,
     .id = iree_hal_hip_device_id,
@@ -2885,7 +2875,6 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .profiling_end = iree_hal_hip_device_profiling_end,
     .external_capture_begin = iree_hal_hip_device_external_capture_begin,
     .external_capture_end = iree_hal_hip_device_external_capture_end,
-    .query_statistics = iree_hal_hip_device_query_statistics,
 };
 
 static const iree_hal_stream_tracing_device_interface_vtable_t

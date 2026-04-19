@@ -69,8 +69,6 @@ iree_cc_library(
     "resource.h"
     "semaphore.c"
     "semaphore.h"
-    "statistics.h"
-    "statistics_internal.h"
     "string_util.c"
     "string_util.h"
     "topology.c"
@@ -110,19 +108,6 @@ iree_cc_test(
     ::hal
     iree::base
     iree::base::internal::span
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    statistics_internal_test
-  SRCS
-    "statistics_internal.h"
-    "statistics_internal_test.cc"
-  DEPS
-    ::hal
-    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
