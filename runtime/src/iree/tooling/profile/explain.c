@@ -498,10 +498,10 @@ static void iree_profile_explain_print_text_header(
   fprintf(file,
           "health: records=%" PRIu64 " chunks=%" PRIu64
           " unknown_records=%" PRIu64 " unknown_chunks=%" PRIu64
-          " truncated_chunks=%" PRIu64 "\n",
+          " truncated_chunks=%" PRIu64 " dropped_records=%" PRIu64 "\n",
           summary->file_record_count, summary->chunk_count,
           summary->unknown_record_count, summary->unknown_chunk_count,
-          summary->truncated_chunk_count);
+          summary->truncated_chunk_count, summary->dropped_record_count);
   fprintf(file,
           "coverage: dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
           " queues=%" PRIhsz " queue_events=%" PRIhsz
@@ -811,25 +811,26 @@ static void iree_profile_explain_print_jsonl_summary(
     const iree_profile_summary_t* summary,
     const iree_profile_dispatch_context_t* dispatch_context,
     const iree_profile_memory_context_t* memory_context, FILE* file) {
-  fprintf(
-      file,
-      "{\"type\":\"explain_summary\",\"file_records\":%" PRIu64
-      ",\"chunk_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
-      ",\"unknown_chunks\":%" PRIu64 ",\"truncated_chunks\":%" PRIu64
-      ",\"dispatches\":%" PRIu64 ",\"valid_dispatches\":%" PRIu64
-      ",\"invalid_dispatches\":%" PRIu64 ",\"queues\":%" PRIhsz
-      ",\"queue_events\":%" PRIhsz ",\"command_buffers\":%" PRIhsz
-      ",\"command_operations\":%" PRIhsz ",\"memory_events\":%" PRIu64 "}\n",
-      summary->file_record_count, summary->chunk_count,
-      summary->unknown_record_count, summary->unknown_chunk_count,
-      summary->truncated_chunk_count, dispatch_context->matched_dispatch_count,
-      dispatch_context->valid_dispatch_count,
-      dispatch_context->invalid_dispatch_count,
-      dispatch_context->model.queue_count,
-      dispatch_context->queue_query.queue_event_count,
-      dispatch_context->model.command_buffer_count,
-      dispatch_context->model.command_operation_count,
-      memory_context->matched_event_count);
+  fprintf(file,
+          "{\"type\":\"explain_summary\",\"file_records\":%" PRIu64
+          ",\"chunk_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
+          ",\"unknown_chunks\":%" PRIu64 ",\"truncated_chunks\":%" PRIu64
+          ",\"dropped_records\":%" PRIu64 ",\"dispatches\":%" PRIu64
+          ",\"valid_dispatches\":%" PRIu64 ",\"invalid_dispatches\":%" PRIu64
+          ",\"queues\":%" PRIhsz ",\"queue_events\":%" PRIhsz
+          ",\"command_buffers\":%" PRIhsz ",\"command_operations\":%" PRIhsz
+          ",\"memory_events\":%" PRIu64 "}\n",
+          summary->file_record_count, summary->chunk_count,
+          summary->unknown_record_count, summary->unknown_chunk_count,
+          summary->truncated_chunk_count, summary->dropped_record_count,
+          dispatch_context->matched_dispatch_count,
+          dispatch_context->valid_dispatch_count,
+          dispatch_context->invalid_dispatch_count,
+          dispatch_context->model.queue_count,
+          dispatch_context->queue_query.queue_event_count,
+          dispatch_context->model.command_buffer_count,
+          dispatch_context->model.command_operation_count,
+          memory_context->matched_event_count);
 }
 
 static iree_status_t iree_profile_explain_print_jsonl_devices(

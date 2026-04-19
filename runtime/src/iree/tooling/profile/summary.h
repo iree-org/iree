@@ -69,6 +69,8 @@ typedef struct iree_profile_summary_t {
   uint64_t unknown_record_count;
   // Chunks with the truncated flag set.
   uint64_t truncated_chunk_count;
+  // Producer-reported typed records omitted from truncated chunks.
+  uint64_t dropped_record_count;
   // Device metadata chunks parsed.
   uint64_t device_chunk_count;
   // Queue metadata chunks parsed.

@@ -41,6 +41,8 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   session_metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_SESSION;
   session_metadata.name = IREE_SV("test-session");
   session_metadata.session_id = 42;
+  session_metadata.flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  session_metadata.dropped_record_count = 99;
   IREE_ASSERT_OK(iree_hal_profile_sink_begin_session(sink, &session_metadata));
 
   const uint32_t first_payload = 0x12345678u;
@@ -61,6 +63,7 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   chunk_metadata.physical_device_ordinal = 11;
   chunk_metadata.queue_ordinal = 12;
   chunk_metadata.flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  chunk_metadata.dropped_record_count = 13;
   IREE_ASSERT_OK(iree_hal_profile_sink_write(sink, &chunk_metadata, 2, iovecs));
 
   IREE_ASSERT_OK(iree_hal_profile_sink_end_session(sink, &session_metadata,
@@ -85,6 +88,8 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_BEGIN,
             begin_record.header.record_type);
   EXPECT_EQ(42u, begin_record.header.session_id);
+  EXPECT_EQ(0u, begin_record.header.chunk_flags);
+  EXPECT_EQ(0u, begin_record.header.dropped_record_count);
   EXPECT_TRUE(StringViewEqual(begin_record.content_type,
                               "application/vnd.iree.hal.profile.session"));
   EXPECT_TRUE(StringViewEqual(begin_record.name, "test-session"));
@@ -105,6 +110,7 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   EXPECT_EQ(12u, chunk_record.header.queue_ordinal);
   EXPECT_EQ(IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED,
             chunk_record.header.chunk_flags);
+  EXPECT_EQ(13u, chunk_record.header.dropped_record_count);
   EXPECT_TRUE(
       StringViewEqual(chunk_record.content_type, "application/vnd.iree.test"));
   EXPECT_TRUE(StringViewEqual(chunk_record.name, "test-chunk"));
@@ -122,6 +128,8 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END,
             end_record.header.record_type);
   EXPECT_EQ(42u, end_record.header.session_id);
+  EXPECT_EQ(0u, end_record.header.chunk_flags);
+  EXPECT_EQ(0u, end_record.header.dropped_record_count);
   EXPECT_EQ((uint32_t)IREE_STATUS_CANCELLED,
             end_record.header.session_status_code);
   EXPECT_TRUE(StringViewEqual(end_record.content_type,

@@ -13,7 +13,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 7
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 8
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -141,6 +141,19 @@ static void iree_profile_export_print_diagnostic(
   fprintf(file, ",\"message\":");
   iree_profile_fprint_json_string(file, iree_make_cstring_view(message));
   fputs("}\n", file);
+}
+
+static void iree_profile_export_print_truncated_chunk_diagnostic(
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_profile_export_print_prefix(file, "diagnostic", record_index);
+  fprintf(file, ",\"severity\":\"error\",\"category\":\"truncated_chunk\"");
+  fprintf(file, ",\"content_type\":");
+  iree_profile_fprint_json_string(file, record->content_type);
+  fprintf(file,
+          ",\"message\":\"chunk was marked truncated by the producer\""
+          ",\"dropped_records\":%" PRIu64 "}\n",
+          record->header.dropped_record_count);
 }
 
 static iree_status_t iree_profile_export_process_device_records(
@@ -1142,9 +1155,8 @@ static iree_status_t iree_profile_export_process_decoded_record(
 
   if (iree_any_bit_set(record->header.chunk_flags,
                        IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED)) {
-    iree_profile_export_print_diagnostic(
-        record_index, "error", "truncated_chunk", record->content_type,
-        "chunk was marked truncated by the producer", file);
+    iree_profile_export_print_truncated_chunk_diagnostic(record, record_index,
+                                                         file);
   }
 
   return iree_profile_export_process_chunk_record(model, record, record_index,

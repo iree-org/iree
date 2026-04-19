@@ -238,6 +238,7 @@ iree_cc_test(
     ::memory
     ::model
     ::reader
+    ::summary
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

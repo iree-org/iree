@@ -22,7 +22,7 @@ extern "C" {
 #define IREE_HAL_PROFILE_FILE_VERSION_MAJOR 1u
 
 // Minor version of the IREE HAL profile bundle file format.
-#define IREE_HAL_PROFILE_FILE_VERSION_MINOR 2u
+#define IREE_HAL_PROFILE_FILE_VERSION_MINOR 3u
 
 // File header stored at byte 0 of every IREE HAL profile bundle.
 typedef struct iree_hal_profile_file_header_t {
@@ -80,18 +80,18 @@ typedef struct iree_hal_profile_file_record_header_t {
   uint32_t physical_device_ordinal;
   // Queue ordinal from iree_hal_profile_chunk_metadata_t.
   uint32_t queue_ordinal;
-  // Chunk flags from iree_hal_profile_chunk_metadata_t.
+  // Chunk flags from iree_hal_profile_chunk_metadata_t for CHUNK records,
+  // otherwise zero.
   iree_hal_profile_chunk_flags_t chunk_flags;
+  // Dropped record count from iree_hal_profile_chunk_metadata_t for CHUNK
+  // records, otherwise zero.
+  uint64_t dropped_record_count;
   // Session end status code for SESSION_END records, otherwise zero.
   uint32_t session_status_code;
   // Type of this file record.
   iree_hal_profile_file_record_type_t record_type;
   // Reserved for future record-level flags; must be zero.
   uint16_t flags;
-  // Reserved for future record fields; must be zero.
-  uint32_t reserved0;
-  // Reserved for future record fields; must be zero.
-  uint32_t reserved1;
 } iree_hal_profile_file_record_header_t;
 
 // Borrowed view of a parsed profile bundle record.

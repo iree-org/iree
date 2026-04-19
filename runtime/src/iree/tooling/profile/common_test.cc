@@ -15,6 +15,7 @@
 #include "iree/tooling/profile/memory.h"
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
+#include "iree/tooling/profile/summary.h"
 
 namespace {
 
@@ -372,6 +373,21 @@ TEST(ProfileTypedRecordTest, RejectsOversizedRecordLength) {
       IREE_STATUS_DATA_LOSS,
       iree_profile_typed_record_parse(&chunk, 0, sizeof(test_profile_record_t),
                                       0, &record));
+}
+
+TEST(ProfileSummaryTest, AccumulatesDroppedRecordsFromTruncatedChunks) {
+  std::vector<uint8_t> payload;
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.header.record_type = IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK;
+  chunk.header.chunk_flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  chunk.header.dropped_record_count = 7;
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  IREE_ASSERT_OK(iree_profile_summary_process_record(&summary, &chunk));
+  EXPECT_EQ(1u, summary.truncated_chunk_count);
+  EXPECT_EQ(7u, summary.dropped_record_count);
+  iree_profile_summary_deinitialize(&summary);
 }
 
 static iree_hal_profile_clock_correlation_record_t MakeClockSample(

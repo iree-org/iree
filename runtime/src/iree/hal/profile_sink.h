@@ -38,7 +38,9 @@ enum iree_hal_profile_chunk_flag_bits_t {
 
   // Chunk contents are partial because the producer dropped or truncated data.
   // The chunk is still structurally valid, but consumers must not treat it as
-  // a complete representation of the selected range.
+  // a complete representation of the selected range. Producers that know the
+  // number of omitted typed records should report it in
+  // iree_hal_profile_chunk_metadata_t::dropped_record_count.
   IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED = 1ull << 0,
 };
 
@@ -1582,6 +1584,10 @@ typedef struct iree_hal_profile_chunk_metadata_t {
   uint32_t queue_ordinal;
   // Flags describing chunk completeness and producer behavior.
   iree_hal_profile_chunk_flags_t flags;
+  // Number of typed records omitted from this chunk stream, or 0 when unknown
+  // or not truncated. Producers should set
+  // IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED when this is nonzero.
+  uint64_t dropped_record_count;
 } iree_hal_profile_chunk_metadata_t;
 
 // Returns default profiling chunk metadata.

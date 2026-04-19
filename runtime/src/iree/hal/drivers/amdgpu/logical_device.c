@@ -919,6 +919,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_write_profile_memory_events(
     metadata.session_id = session_id;
     if (dropped_event_count != 0) {
       metadata.flags |= IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+      metadata.dropped_record_count = dropped_event_count;
     }
 
     iree_const_byte_span_t iovec =
@@ -994,6 +995,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_write_profile_queue_events(
     metadata.session_id = session_id;
     if (dropped_event_count != 0) {
       metadata.flags |= IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+      metadata.dropped_record_count = dropped_event_count;
     }
 
     iree_const_byte_span_t iovec =

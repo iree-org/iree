@@ -96,6 +96,16 @@ static iree_status_t iree_hal_profile_file_sink_write_record(
   IREE_RETURN_IF_ERROR(iree_hal_profile_file_calculate_record_layout(
       metadata, iovec_count, iovecs, &record_length, &payload_length));
 
+  iree_hal_profile_chunk_flags_t chunk_flags = 0;
+  uint64_t dropped_record_count = 0;
+  if (record_type == IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK) {
+    chunk_flags = metadata->flags;
+    dropped_record_count = metadata->dropped_record_count;
+    if (dropped_record_count != 0) {
+      chunk_flags |= IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+    }
+  }
+
   iree_hal_profile_file_record_header_t header = {
       .record_length = record_length,
       .payload_length = payload_length,
@@ -109,12 +119,11 @@ static iree_status_t iree_hal_profile_file_sink_write_record(
       .name_length = (uint32_t)metadata->name.size,
       .physical_device_ordinal = metadata->physical_device_ordinal,
       .queue_ordinal = metadata->queue_ordinal,
-      .chunk_flags = metadata->flags,
+      .chunk_flags = chunk_flags,
+      .dropped_record_count = dropped_record_count,
       .session_status_code = (uint32_t)session_status_code,
       .record_type = record_type,
       .flags = 0,
-      .reserved0 = 0,
-      .reserved1 = 0,
   };
 
   IREE_RETURN_IF_ERROR(

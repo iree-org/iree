@@ -660,6 +660,7 @@ iree_status_t iree_profile_summary_process_record(
   if (iree_any_bit_set(record->header.chunk_flags,
                        IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED)) {
     ++summary->truncated_chunk_count;
+    summary->dropped_record_count += record->header.dropped_record_count;
   }
 
   return iree_profile_summary_process_chunk_record(summary, record);
@@ -780,35 +781,35 @@ static void iree_profile_print_summary_text_records(
 
 static void iree_profile_print_summary_text_chunks(
     const iree_profile_summary_t* summary, FILE* file) {
-  fprintf(file,
-          "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
-          " executable_code_objects=%" PRIu64
-          " executable_code_object_loads=%" PRIu64
-          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
-          " command_operations=%" PRIu64 " clock_correlations=%" PRIu64
-          " dispatch_events=%" PRIu64 " queue_events=%" PRIu64
-          " queue_device_events=%" PRIu64 " host_execution_events=%" PRIu64
-          " memory_events=%" PRIu64 " event_relationships=%" PRIu64
-          " counter_sets=%" PRIu64 " counters=%" PRIu64
-          " counter_samples=%" PRIu64 " executable_traces=%" PRIu64
-          " unknown=%" PRIu64 " truncated=%" PRIu64 "\n",
-          summary->device_chunk_count, summary->queue_chunk_count,
-          summary->executable_chunk_count,
-          summary->executable_code_object_chunk_count,
-          summary->executable_code_object_load_chunk_count,
-          summary->executable_export_chunk_count,
-          summary->command_buffer_chunk_count,
-          summary->command_operation_chunk_count,
-          summary->clock_correlation_chunk_count,
-          summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
-          summary->queue_device_event_chunk_count,
-          summary->host_execution_event_chunk_count,
-          summary->memory_event_chunk_count,
-          summary->event_relationship_chunk_count,
-          summary->counter_set_chunk_count, summary->counter_chunk_count,
-          summary->counter_sample_chunk_count,
-          summary->executable_trace_chunk_count, summary->unknown_chunk_count,
-          summary->truncated_chunk_count);
+  fprintf(
+      file,
+      "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
+      " executable_code_objects=%" PRIu64
+      " executable_code_object_loads=%" PRIu64 " executable_exports=%" PRIu64
+      " command_buffers=%" PRIu64 " command_operations=%" PRIu64
+      " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
+      " queue_events=%" PRIu64 " queue_device_events=%" PRIu64
+      " host_execution_events=%" PRIu64 " memory_events=%" PRIu64
+      " event_relationships=%" PRIu64 " counter_sets=%" PRIu64
+      " counters=%" PRIu64 " counter_samples=%" PRIu64
+      " executable_traces=%" PRIu64 " unknown=%" PRIu64 " truncated=%" PRIu64
+      " dropped_records=%" PRIu64 "\n",
+      summary->device_chunk_count, summary->queue_chunk_count,
+      summary->executable_chunk_count,
+      summary->executable_code_object_chunk_count,
+      summary->executable_code_object_load_chunk_count,
+      summary->executable_export_chunk_count,
+      summary->command_buffer_chunk_count,
+      summary->command_operation_chunk_count,
+      summary->clock_correlation_chunk_count,
+      summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
+      summary->queue_device_event_chunk_count,
+      summary->host_execution_event_chunk_count,
+      summary->memory_event_chunk_count,
+      summary->event_relationship_chunk_count, summary->counter_set_chunk_count,
+      summary->counter_chunk_count, summary->counter_sample_chunk_count,
+      summary->executable_trace_chunk_count, summary->unknown_chunk_count,
+      summary->truncated_chunk_count, summary->dropped_record_count);
 }
 
 static void iree_profile_print_summary_text_metadata_records(
@@ -1029,23 +1030,23 @@ static void iree_profile_print_summary_jsonl_execution_fields(
 
 static void iree_profile_print_summary_jsonl_counter_trace_fields(
     const iree_profile_summary_t* summary, FILE* file) {
-  fprintf(file,
-          ",\"counter_set_chunks\":%" PRIu64 ",\"counter_set_records\":%" PRIu64
-          ",\"counter_chunks\":%" PRIu64 ",\"counter_records\":%" PRIu64
-          ",\"counter_sample_chunks\":%" PRIu64
-          ",\"counter_sample_records\":%" PRIu64
-          ",\"executable_trace_chunks\":%" PRIu64
-          ",\"executable_trace_records\":%" PRIu64
-          ",\"executable_trace_data_bytes\":%" PRIu64
-          ",\"unknown_chunks\":%" PRIu64 ",\"truncated_chunks\":%" PRIu64 "}\n",
-          summary->counter_set_chunk_count, summary->counter_set_record_count,
-          summary->counter_chunk_count, summary->counter_record_count,
-          summary->counter_sample_chunk_count,
-          summary->counter_sample_record_count,
-          summary->executable_trace_chunk_count,
-          summary->executable_trace_record_count,
-          summary->executable_trace_data_bytes, summary->unknown_chunk_count,
-          summary->truncated_chunk_count);
+  fprintf(
+      file,
+      ",\"counter_set_chunks\":%" PRIu64 ",\"counter_set_records\":%" PRIu64
+      ",\"counter_chunks\":%" PRIu64 ",\"counter_records\":%" PRIu64
+      ",\"counter_sample_chunks\":%" PRIu64
+      ",\"counter_sample_records\":%" PRIu64
+      ",\"executable_trace_chunks\":%" PRIu64
+      ",\"executable_trace_records\":%" PRIu64
+      ",\"executable_trace_data_bytes\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
+      ",\"truncated_chunks\":%" PRIu64 ",\"dropped_records\":%" PRIu64 "}\n",
+      summary->counter_set_chunk_count, summary->counter_set_record_count,
+      summary->counter_chunk_count, summary->counter_record_count,
+      summary->counter_sample_chunk_count, summary->counter_sample_record_count,
+      summary->executable_trace_chunk_count,
+      summary->executable_trace_record_count,
+      summary->executable_trace_data_bytes, summary->unknown_chunk_count,
+      summary->truncated_chunk_count, summary->dropped_record_count);
 }
 
 static void iree_profile_print_summary_jsonl_summary(
