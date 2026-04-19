@@ -111,6 +111,13 @@ static iree_hal_profile_file_record_t MakeCommandOperationsChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeDispatchEventsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS;
+  return chunk;
+}
+
 static void AppendRecord(std::vector<uint8_t>* payload, uint32_t value,
                          std::initializer_list<uint8_t> inline_payload) {
   test_profile_record_t record;
@@ -603,6 +610,53 @@ TEST(ProfileSummaryTest, RecordsFirstNonOkSessionEndStatus) {
   EXPECT_EQ(7u, summary.first_non_ok_stream_id);
   EXPECT_EQ(8u, summary.first_non_ok_event_id);
   EXPECT_EQ(IREE_STATUS_CANCELLED, summary.first_non_ok_session_status_code);
+  iree_profile_summary_deinitialize(&summary);
+}
+
+TEST(ProfileSummaryTest, SeparatesHostDurationsFromDeviceDispatchTicks) {
+  std::vector<uint8_t> dispatch_payload;
+  iree_hal_profile_dispatch_event_t dispatch =
+      iree_hal_profile_dispatch_event_default();
+  dispatch.start_tick = 10;
+  dispatch.end_tick = 30;
+  AppendPlainRecord(&dispatch_payload, dispatch);
+  dispatch.start_tick = 50;
+  dispatch.end_tick = 40;
+  AppendPlainRecord(&dispatch_payload, dispatch);
+  iree_hal_profile_file_record_t dispatch_chunk =
+      MakeDispatchEventsChunk(dispatch_payload);
+  dispatch_chunk.header.physical_device_ordinal = 2;
+
+  std::vector<uint8_t> host_execution_payload;
+  iree_hal_profile_host_execution_event_t host_execution =
+      iree_hal_profile_host_execution_event_default();
+  host_execution.start_host_time_ns = 100;
+  host_execution.end_host_time_ns = 175;
+  AppendPlainRecord(&host_execution_payload, host_execution);
+  host_execution.start_host_time_ns = 200;
+  host_execution.end_host_time_ns = 150;
+  AppendPlainRecord(&host_execution_payload, host_execution);
+  iree_hal_profile_file_record_t host_execution_chunk =
+      MakeHostExecutionEventsChunk(host_execution_payload);
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  IREE_ASSERT_OK(
+      iree_profile_summary_process_record(&summary, &dispatch_chunk));
+  IREE_ASSERT_OK(
+      iree_profile_summary_process_record(&summary, &host_execution_chunk));
+
+  ASSERT_EQ(1u, summary.device_count);
+  const iree_profile_device_summary_t* device = &summary.devices[0];
+  EXPECT_EQ(2u, device->physical_device_ordinal);
+  EXPECT_EQ(2u, device->dispatch_event_count);
+  EXPECT_EQ(1u, device->invalid_dispatch_event_count);
+  EXPECT_EQ(20u, device->total_dispatch_ticks);
+  EXPECT_EQ(0u, summary.queue_device_event_record_count);
+  EXPECT_EQ(2u, summary.host_execution_event_record_count);
+  EXPECT_EQ(1u, summary.invalid_host_execution_event_record_count);
+  EXPECT_EQ(75u, summary.total_host_execution_duration_ns);
+
   iree_profile_summary_deinitialize(&summary);
 }
 
