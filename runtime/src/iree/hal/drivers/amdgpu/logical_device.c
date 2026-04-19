@@ -16,6 +16,8 @@
 #include "iree/hal/drivers/amdgpu/aql_program_builder.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/executable_cache.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_counters.h"
 #include "iree/hal/drivers/amdgpu/profile_traces.h"
@@ -1053,10 +1055,9 @@ static void iree_hal_amdgpu_logical_device_set_queue_profiling_enabled(
     iree_hal_amdgpu_physical_device_t* physical_device =
         logical_device->physical_devices[i];
     for (iree_host_size_t j = 0; j < physical_device->host_queue_count; ++j) {
-      physical_device->host_queues[j].profiling.queue_events_enabled =
-          queue_events_enabled;
-      physical_device->host_queues[j].profiling.queue_device_events_enabled =
-          queue_device_events_enabled;
+      iree_hal_amdgpu_host_queue_set_profile_events_enabled(
+          &physical_device->host_queues[j], queue_events_enabled,
+          queue_device_events_enabled);
     }
   }
 }

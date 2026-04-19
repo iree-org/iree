@@ -10,6 +10,7 @@
 
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_aqlprofile.h"
@@ -918,7 +919,8 @@ iree_hal_amdgpu_host_queue_profile_counter_slot(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position,
     uint32_t counter_set_ordinal) {
   const uint32_t event_index =
-      (uint32_t)(event_position & queue->profiling.dispatch_event_mask);
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_index(queue,
+                                                              event_position);
   const iree_host_size_t slot_index =
       (iree_host_size_t)event_index * queue->profiling.counter_set_count +
       counter_set_ordinal;
@@ -933,7 +935,9 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_counters(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (IREE_UNLIKELY(!queue->profiling.dispatch_event_capacity)) {
+  const uint32_t dispatch_event_capacity =
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue);
+  if (IREE_UNLIKELY(!dispatch_event_capacity)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -955,8 +959,7 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_counters(
 
   iree_host_size_t slot_count = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-          queue->profiling.dispatch_event_capacity, session->counter_set_count,
-          &slot_count))) {
+          dispatch_event_capacity, session->counter_set_count, &slot_count))) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "AMDGPU counter sample slot count overflow");
@@ -990,7 +993,8 @@ void iree_hal_amdgpu_host_queue_disable_profile_counters(
   iree_hal_amdgpu_profile_counter_session_t* session =
       queue->profiling.counter_session;
   const iree_host_size_t slot_count =
-      (iree_host_size_t)queue->profiling.dispatch_event_capacity *
+      (iree_host_size_t)
+          iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue) *
       queue->profiling.counter_set_count;
   for (iree_host_size_t i = 0; i < slot_count; ++i) {
     iree_hal_amdgpu_profile_counter_destroy_packets(

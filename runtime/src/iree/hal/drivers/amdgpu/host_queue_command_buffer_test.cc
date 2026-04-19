@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/amdgpu/aql_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
@@ -1951,10 +1952,12 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(profiling_status);
 
   iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation = {0};
+  const uint32_t dispatch_event_capacity =
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue);
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_status_t status =
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, queue->profiling.dispatch_event_capacity + 1, &reservation);
+          queue, dispatch_event_capacity + 1, &reservation);
   iree_slim_mutex_unlock(&queue->submission_mutex);
   IREE_ASSERT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
   EXPECT_EQ(0u, reservation.event_count);

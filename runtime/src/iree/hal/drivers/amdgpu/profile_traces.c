@@ -10,6 +10,7 @@
 
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_aqlprofile.h"
@@ -263,7 +264,8 @@ static iree_hal_amdgpu_profile_trace_slot_t*
 iree_hal_amdgpu_host_queue_profile_trace_slot(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t event_position) {
   const uint32_t event_index =
-      (uint32_t)(event_position & queue->profiling.dispatch_event_mask);
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_index(queue,
+                                                              event_position);
   return &queue->profiling.trace_slots[event_index];
 }
 
@@ -275,7 +277,9 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_traces(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (IREE_UNLIKELY(!queue->profiling.dispatch_event_capacity)) {
+  const uint32_t dispatch_event_capacity =
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue);
+  if (IREE_UNLIKELY(!dispatch_event_capacity)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -300,7 +304,7 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_traces(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, IREE_STRUCT_LAYOUT(
               0, &slot_storage_size,
-              IREE_STRUCT_FIELD(queue->profiling.dispatch_event_capacity,
+              IREE_STRUCT_FIELD(dispatch_event_capacity,
                                 iree_hal_amdgpu_profile_trace_slot_t, NULL)));
   iree_hal_amdgpu_profile_trace_slot_t* slots = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -322,7 +326,9 @@ void iree_hal_amdgpu_host_queue_disable_profile_traces(
 
   iree_hal_amdgpu_profile_trace_session_t* session =
       queue->profiling.trace_session;
-  for (uint32_t i = 0; i < queue->profiling.dispatch_event_capacity; ++i) {
+  const uint32_t dispatch_event_capacity =
+      iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue);
+  for (uint32_t i = 0; i < dispatch_event_capacity; ++i) {
     iree_hal_amdgpu_profile_trace_destroy_packets(
         &session->libaqlprofile, &queue->profiling.trace_slots[i].handle);
     iree_hal_amdgpu_profile_trace_destroy_packets(

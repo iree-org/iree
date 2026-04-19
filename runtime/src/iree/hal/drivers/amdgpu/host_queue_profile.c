@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 
+#include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 
 uint32_t iree_hal_amdgpu_host_queue_profile_device_ordinal(
@@ -32,6 +33,13 @@ uint32_t iree_hal_amdgpu_host_queue_profile_semaphore_count(
     const iree_hal_semaphore_list_t semaphore_list) {
   return semaphore_list.count > UINT32_MAX ? UINT32_MAX
                                            : (uint32_t)semaphore_list.count;
+}
+
+void iree_hal_amdgpu_host_queue_set_profile_events_enabled(
+    iree_hal_amdgpu_host_queue_t* queue, bool queue_events_enabled,
+    bool queue_device_events_enabled) {
+  queue->profiling.queue_events_enabled = queue_events_enabled;
+  queue->profiling.queue_device_events_enabled = queue_device_events_enabled;
 }
 
 iree_hal_amdgpu_profile_queue_device_event_t*

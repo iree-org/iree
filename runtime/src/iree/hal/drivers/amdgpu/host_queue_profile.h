@@ -47,6 +47,11 @@ uint64_t iree_hal_amdgpu_host_queue_profile_stream_id(
 uint32_t iree_hal_amdgpu_host_queue_profile_semaphore_count(
     const iree_hal_semaphore_list_t semaphore_list);
 
+// Sets queue-local profile event recording flags for an active session.
+void iree_hal_amdgpu_host_queue_set_profile_events_enabled(
+    iree_hal_amdgpu_host_queue_t* queue, bool queue_events_enabled,
+    bool queue_device_events_enabled);
+
 // Initializes one reserved device-timestamped queue operation event.
 iree_hal_amdgpu_profile_queue_device_event_t*
 iree_hal_amdgpu_host_queue_initialize_profile_queue_device_event(
