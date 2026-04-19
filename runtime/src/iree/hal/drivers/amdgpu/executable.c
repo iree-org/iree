@@ -617,6 +617,42 @@ static iree_status_t iree_hal_amdgpu_executable_load_module(
   return status;
 }
 
+static iree_status_t iree_hal_amdgpu_executable_add_trace_string_storage(
+    flatbuffers_string_t value, iree_host_size_t* inout_total_size) {
+  if (!value) return iree_ok_status();
+  const iree_host_size_t value_length = flatbuffers_string_len(value);
+  if (value_length == 0) return iree_ok_status();
+
+  iree_host_size_t storage_size = 0;
+  if (!iree_host_size_checked_add(value_length, 1, &storage_size) ||
+      !iree_host_size_checked_add(*inout_total_size, storage_size,
+                                  inout_total_size)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "AMDGPU executable trace source location storage size overflow");
+  }
+  return iree_ok_status();
+}
+
+static const char* iree_hal_amdgpu_executable_copy_trace_string(
+    flatbuffers_string_t value, char** inout_char_buffer) {
+  if (!value) return NULL;
+  const iree_host_size_t value_length = flatbuffers_string_len(value);
+  if (value_length == 0) return NULL;
+
+  char* storage = *inout_char_buffer;
+  memcpy(storage, value, value_length);
+  storage[value_length] = 0;
+  *inout_char_buffer = storage + value_length + 1;
+  return storage;
+}
+
+static bool iree_hal_amdgpu_trace_src_loc_has_data(
+    const iree_hal_amdgpu_trace_src_loc_t* trace_src_loc) {
+  return trace_src_loc && (trace_src_loc->function || trace_src_loc->file ||
+                           trace_src_loc->line != 0);
+}
+
 typedef struct iree_hal_amdgpu_executable_find_loaded_code_object_state_t {
   // Borrowed HSA API table used for loader extension queries.
   const iree_hal_amdgpu_libhsa_t* libhsa;
@@ -803,7 +839,6 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
 // process.
 static iree_status_t iree_hal_amdgpu_executable_intern_trace_locs(
     iree_hal_amdgpu_ExportDef_vec_t export_defs,
-    iree_allocator_t host_allocator,
     iree_hal_amdgpu_trace_src_loc_t** out_export_locs) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -812,23 +847,38 @@ static iree_status_t iree_hal_amdgpu_executable_intern_trace_locs(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, export_count);
 
   // Sum up the total storage required for all information.
-  iree_host_size_t total_size =
-      export_count * sizeof(iree_hal_amdgpu_trace_src_loc_t);
+  iree_host_size_t total_size = 0;
+  if (!iree_host_size_checked_mul(
+          export_count, sizeof(iree_hal_amdgpu_trace_src_loc_t), &total_size)) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_OUT_OF_RANGE,
+                "AMDGPU executable trace source location table size overflow"));
+  }
   for (iree_host_size_t i = 0; i < export_count; ++i) {
     iree_hal_amdgpu_ExportDef_table_t export_def =
         iree_hal_amdgpu_ExportDef_vec_at(export_defs, i);
     iree_hal_debug_ExportDef_table_t debug_def =
         iree_hal_amdgpu_ExportDef_debug_info_get(export_def);
-    total_size +=
-        flatbuffers_string_len(iree_hal_debug_ExportDef_name_get(debug_def)) +
-        1;
+    if (!debug_def) continue;
+
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_amdgpu_executable_add_trace_string_storage(
+                iree_hal_debug_ExportDef_name_get(debug_def), &total_size));
     iree_hal_debug_FileLineLocDef_table_t loc_def =
         iree_hal_debug_ExportDef_location_get(debug_def);
     if (loc_def) {
-      total_size += flatbuffers_string_len(
-                        iree_hal_debug_FileLineLocDef_filename_get(loc_def)) +
-                    1;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_amdgpu_executable_add_trace_string_storage(
+                  iree_hal_debug_FileLineLocDef_filename_get(loc_def),
+                  &total_size));
     }
+  }
+
+  if (total_size == 0) {
+    *out_export_locs = NULL;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
   }
 
   // Allocate persistent storage.
@@ -836,6 +886,14 @@ static iree_status_t iree_hal_amdgpu_executable_intern_trace_locs(
   IREE_LEAK_CHECK_DISABLE_PUSH();
   export_locs = (iree_hal_amdgpu_trace_src_loc_t*)malloc(total_size);
   IREE_LEAK_CHECK_DISABLE_POP();
+  if (!export_locs) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(
+                IREE_STATUS_RESOURCE_EXHAUSTED,
+                "AMDGPU executable trace source location storage allocation "
+                "failed"));
+  }
+  memset(export_locs, 0, total_size);
   char* char_buffer = (char*)&export_locs[export_count];
 
   // Populate table and fill the buffer. The only pointers used are those
@@ -848,23 +906,16 @@ static iree_status_t iree_hal_amdgpu_executable_intern_trace_locs(
         iree_hal_amdgpu_ExportDef_vec_at(export_defs, i);
     iree_hal_debug_ExportDef_table_t debug_def =
         iree_hal_amdgpu_ExportDef_debug_info_get(export_def);
+    if (!debug_def) continue;
 
-    flatbuffers_string_t function =
-        iree_hal_debug_ExportDef_name_get(debug_def);
-    iree_host_size_t function_len = flatbuffers_string_len(function);
-    memcpy(char_buffer, function, function_len);
-    export_loc->function = char_buffer;
-    char_buffer += function_len + 1;
+    export_loc->function = iree_hal_amdgpu_executable_copy_trace_string(
+        iree_hal_debug_ExportDef_name_get(debug_def), &char_buffer);
 
     iree_hal_debug_FileLineLocDef_table_t loc_def =
         iree_hal_debug_ExportDef_location_get(debug_def);
     if (loc_def) {
-      flatbuffers_string_t file =
-          iree_hal_debug_FileLineLocDef_filename_get(loc_def);
-      iree_host_size_t file_len = flatbuffers_string_len(file);
-      memcpy(char_buffer, file, file_len);
-      export_loc->file = char_buffer;
-      char_buffer += file_len + 1;
+      export_loc->file = iree_hal_amdgpu_executable_copy_trace_string(
+          iree_hal_debug_FileLineLocDef_filename_get(loc_def), &char_buffer);
       export_loc->line = iree_hal_debug_FileLineLocDef_line_get(loc_def);
     }
 
@@ -1739,8 +1790,11 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_flatbuffer_kernel_args(
         iree_hal_amdgpu_ExportDef_binding_flags_get(export_def);
     const uint16_t binding_count =
         (uint16_t)iree_hal_amdgpu_BindingBits_vec_len(binding_bits);
-    const iree_hal_amdgpu_trace_src_loc_t* export_loc =
-        export_locs ? &export_locs[kernel_ordinal] : NULL;
+    const iree_hal_amdgpu_trace_src_loc_t* export_loc = NULL;
+    if (export_locs &&
+        iree_hal_amdgpu_trace_src_loc_has_data(&export_locs[kernel_ordinal])) {
+      export_loc = &export_locs[kernel_ordinal];
+    }
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
             libhsa, symbol, workgroup_size, constant_count, binding_count,
@@ -1872,8 +1926,8 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
   iree_hal_amdgpu_trace_src_loc_t* export_locs = NULL;
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   if (iree_status_is_ok(status)) {
-    status = iree_hal_amdgpu_executable_intern_trace_locs(
-        export_defs, host_allocator, &export_locs);
+    status =
+        iree_hal_amdgpu_executable_intern_trace_locs(export_defs, &export_locs);
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
