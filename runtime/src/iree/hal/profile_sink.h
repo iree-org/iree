@@ -140,6 +140,9 @@ enum iree_hal_profile_chunk_flag_bits_t {
 // HAL profile records intentionally preserve raw timestamps in their native
 // clock domains. Consumers must not compare absolute timestamps from different
 // domains unless a clock-correlation record explicitly connects those domains.
+// Producers must not populate fields from a different clock domain as a
+// fallback: a host-timestamped span belongs in a host-time record, and a
+// device-timestamped span requires a real device tick.
 //
 // Canonical domain names used by JSONL tooling exports:
 //
@@ -597,6 +600,9 @@ enum iree_hal_profile_clock_correlation_flag_bits_t {
 // session when device-timestamped event records are present. Consumers should
 // treat the host bracket as uncertainty around the driver-provided sample and
 // should not assume one sample is sufficient to determine clock drift.
+// Producers must only set flags for clock samples that were actually obtained
+// and validated; failed, unsupported, or implausible samples must be omitted or
+// reported as errors instead of encoded as zero-valued correlations.
 typedef struct iree_hal_profile_clock_correlation_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
@@ -883,7 +889,8 @@ enum iree_hal_profile_host_execution_event_flag_bits_t {
 // Host execution events describe complete spans observed in IREE's host clock
 // domain. CPU/local producers use these for dispatch, command-buffer execute,
 // transfer, allocation, and host-call work that is not device-timestamped.
-// Producers must not emit partial in-flight spans as complete records.
+// Producers must not emit partial in-flight spans as complete records and must
+// only emit spans whose end time is greater than or equal to their start time.
 typedef struct iree_hal_profile_host_execution_event_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
