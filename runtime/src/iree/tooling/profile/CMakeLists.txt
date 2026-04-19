@@ -234,12 +234,80 @@ iree_cc_test(
   SRCS
     "common_test.cc"
   DEPS
-    ::counter
-    ::memory
+    ::common
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    reader_test
+  SRCS
+    "reader_test.cc"
+  DEPS
+    ::reader
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    model_test
+  SRCS
+    "model_test.cc"
+  DEPS
+    ::model
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    queue_query_test
+  SRCS
+    "queue_query_test.cc"
+  DEPS
     ::model
     ::queue_query
-    ::reader
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    summary_test
+  SRCS
+    "summary_test.cc"
+  DEPS
     ::summary
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    counter_test
+  SRCS
+    "counter_test.cc"
+  DEPS
+    ::counter
+    ::model
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    memory_test
+  SRCS
+    "memory_test.cc"
+  DEPS
+    ::memory
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

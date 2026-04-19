@@ -189,12 +189,74 @@ iree_runtime_cc_test(
     name = "common_test",
     srcs = ["common_test.cc"],
     deps = [
-        ":counter",
-        ":memory",
+        ":common",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "reader_test",
+    srcs = ["reader_test.cc"],
+    deps = [
+        ":reader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "model_test",
+    srcs = ["model_test.cc"],
+    deps = [
+        ":model",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_query_test",
+    srcs = ["queue_query_test.cc"],
+    deps = [
         ":model",
         ":queue_query",
-        ":reader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "summary_test",
+    srcs = ["summary_test.cc"],
+    deps = [
         ":summary",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "counter_test",
+    srcs = ["counter_test.cc"],
+    deps = [
+        ":counter",
+        ":model",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "memory_test",
+    srcs = ["memory_test.cc"],
+    deps = [
+        ":memory",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

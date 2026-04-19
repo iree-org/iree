@@ -1,0 +1,223 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/tooling/profile/model.h"
+
+#include <cstdint>
+#include <cstring>
+#include <vector>
+
+#include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
+
+namespace {
+
+static iree_hal_profile_file_record_t MakeChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk;
+  memset(&chunk, 0, sizeof(chunk));
+  chunk.header.record_type = IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK;
+  chunk.content_type = IREE_SV("application/vnd.iree.test");
+  chunk.payload = iree_make_const_byte_span(payload.data(), payload.size());
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeCommandBuffersChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeCommandOperationsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS;
+  return chunk;
+}
+
+template <typename T>
+static void AppendPlainRecord(std::vector<uint8_t>* payload, const T& record) {
+  const iree_host_size_t offset = payload->size();
+  payload->resize(offset + sizeof(record));
+  memcpy(payload->data() + offset, &record, sizeof(record));
+}
+
+static void AppendCommandBuffer(std::vector<uint8_t>* payload,
+                                uint64_t command_buffer_id) {
+  iree_hal_profile_command_buffer_record_t record =
+      iree_hal_profile_command_buffer_record_default();
+  record.command_buffer_id = command_buffer_id;
+  record.physical_device_ordinal = 0;
+  AppendPlainRecord(payload, record);
+}
+
+static void AppendCommandOperation(
+    std::vector<uint8_t>* payload,
+    const iree_hal_profile_command_operation_record_t& record) {
+  AppendPlainRecord(payload, record);
+}
+
+static iree_hal_profile_clock_correlation_record_t MakeClockSample(
+    uint64_t sample_id, uint64_t device_tick, uint64_t host_cpu_timestamp_ns) {
+  iree_hal_profile_clock_correlation_record_t sample =
+      iree_hal_profile_clock_correlation_record_default();
+  sample.flags = IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+                 IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP;
+  sample.sample_id = sample_id;
+  sample.device_tick = device_tick;
+  sample.host_cpu_timestamp_ns = host_cpu_timestamp_ns;
+  return sample;
+}
+
+TEST(ProfileClockFitTest, MapsTicksWithIntegerRounding) {
+  iree_profile_model_device_t device;
+  memset(&device, 0, sizeof(device));
+  device.clock_sample_count = 2;
+  device.first_clock_sample =
+      MakeClockSample(10, (1ull << 60) + 3, 900000000000000000ull);
+  device.last_clock_sample =
+      MakeClockSample(11, (1ull << 60) + 10, 900000000000000010ull);
+
+  iree_profile_model_clock_fit_t fit;
+  ASSERT_TRUE(iree_profile_model_device_try_fit_clock_exact(
+      &device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      &fit));
+  EXPECT_EQ(10u, fit.first_sample_id);
+  EXPECT_EQ(11u, fit.last_sample_id);
+  EXPECT_EQ(7u, fit.device_tick_span);
+  EXPECT_EQ(10u, fit.time_span_ns);
+
+  int64_t time_ns = 0;
+  EXPECT_TRUE(
+      iree_profile_model_clock_fit_map_tick(&fit, (1ull << 60) + 6, &time_ns));
+  EXPECT_EQ(900000000000000004ll, time_ns);
+  EXPECT_TRUE(
+      iree_profile_model_clock_fit_map_tick(&fit, (1ull << 60), &time_ns));
+  EXPECT_EQ(899999999999999996ll, time_ns);
+
+  int64_t duration_ns = 0;
+  EXPECT_TRUE(
+      iree_profile_model_clock_fit_scale_ticks_to_ns(&fit, 7, &duration_ns));
+  EXPECT_EQ(10, duration_ns);
+  EXPECT_TRUE(
+      iree_profile_model_clock_fit_scale_ticks_to_ns(&fit, 4, &duration_ns));
+  EXPECT_EQ(6, duration_ns);
+}
+
+TEST(ProfileClockFitTest, FitsIreeHostTimeFromBracketMidpoints) {
+  iree_profile_model_device_t device;
+  memset(&device, 0, sizeof(device));
+  device.clock_sample_count = 2;
+  device.first_clock_sample = MakeClockSample(1, 1000, 5000);
+  device.first_clock_sample.flags |=
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET;
+  device.first_clock_sample.host_time_begin_ns = 100;
+  device.first_clock_sample.host_time_end_ns = 103;
+  device.last_clock_sample = MakeClockSample(2, 1010, 6000);
+  device.last_clock_sample.flags |=
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET;
+  device.last_clock_sample.host_time_begin_ns = 170;
+  device.last_clock_sample.host_time_end_ns = 173;
+
+  iree_profile_model_clock_fit_t fit;
+  ASSERT_TRUE(iree_profile_model_device_try_fit_clock_exact(
+      &device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_IREE_HOST_TIME_NS, &fit));
+  EXPECT_EQ(101, fit.first_time_ns);
+  EXPECT_EQ(171, fit.last_time_ns);
+
+  int64_t time_ns = 0;
+  EXPECT_TRUE(iree_profile_model_clock_fit_map_tick(&fit, 1005, &time_ns));
+  EXPECT_EQ(136, time_ns);
+}
+
+TEST(ProfileModelTest, AcceptsLinearCommandOperationsWithoutBlockStructure) {
+  std::vector<uint8_t> command_buffer_payload;
+  AppendCommandBuffer(&command_buffer_payload, 1);
+  iree_hal_profile_file_record_t command_buffer_chunk =
+      MakeCommandBuffersChunk(command_buffer_payload);
+
+  iree_hal_profile_command_operation_record_t operation =
+      iree_hal_profile_command_operation_record_default();
+  operation.type = IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
+  operation.command_buffer_id = 1;
+  operation.command_index = 0;
+
+  std::vector<uint8_t> command_operation_payload;
+  AppendCommandOperation(&command_operation_payload, operation);
+  iree_hal_profile_file_record_t command_operation_chunk =
+      MakeCommandOperationsChunk(command_operation_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_ASSERT_OK(iree_profile_model_process_metadata_record(
+      &model, &command_buffer_chunk));
+  IREE_ASSERT_OK(iree_profile_model_process_metadata_record(
+      &model, &command_operation_chunk));
+  ASSERT_EQ(1u, model.command_operation_count);
+  EXPECT_FALSE(iree_hal_profile_command_operation_has_block_structure(
+      &model.command_operations[0].record));
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, RejectsCommandOperationBlockFieldsWithoutFlag) {
+  std::vector<uint8_t> command_buffer_payload;
+  AppendCommandBuffer(&command_buffer_payload, 1);
+  iree_hal_profile_file_record_t command_buffer_chunk =
+      MakeCommandBuffersChunk(command_buffer_payload);
+
+  iree_hal_profile_command_operation_record_t operation =
+      iree_hal_profile_command_operation_record_default();
+  operation.type = IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
+  operation.command_buffer_id = 1;
+  operation.command_index = 0;
+  operation.block_ordinal = 2;
+  operation.block_command_ordinal = 3;
+
+  std::vector<uint8_t> command_operation_payload;
+  AppendCommandOperation(&command_operation_payload, operation);
+  iree_hal_profile_file_record_t command_operation_chunk =
+      MakeCommandOperationsChunk(command_operation_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_ASSERT_OK(iree_profile_model_process_metadata_record(
+      &model, &command_buffer_chunk));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_model_process_metadata_record(
+                            &model, &command_operation_chunk));
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, RejectsBlockStructureWithoutBlockCoordinates) {
+  std::vector<uint8_t> command_buffer_payload;
+  AppendCommandBuffer(&command_buffer_payload, 1);
+  iree_hal_profile_file_record_t command_buffer_chunk =
+      MakeCommandBuffersChunk(command_buffer_payload);
+
+  iree_hal_profile_command_operation_record_t operation =
+      iree_hal_profile_command_operation_record_default();
+  operation.type = IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
+  operation.command_buffer_id = 1;
+  operation.command_index = 0;
+  operation.flags = IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_BLOCK_STRUCTURE;
+
+  std::vector<uint8_t> command_operation_payload;
+  AppendCommandOperation(&command_operation_payload, operation);
+  iree_hal_profile_file_record_t command_operation_chunk =
+      MakeCommandOperationsChunk(command_operation_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_ASSERT_OK(iree_profile_model_process_metadata_record(
+      &model, &command_buffer_chunk));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_model_process_metadata_record(
+                            &model, &command_operation_chunk));
+  iree_profile_model_deinitialize(&model);
+}
+
+}  // namespace
