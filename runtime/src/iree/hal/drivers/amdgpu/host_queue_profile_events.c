@@ -237,8 +237,8 @@ void iree_hal_amdgpu_host_queue_deallocate_profile_events(
     iree_hal_amdgpu_host_queue_t* queue) {
   if (!queue->profiling.event_storage) return;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-      IREE_LIBHSA(queue->libhsa), queue->profiling.event_storage));
+  iree_hal_amdgpu_hsa_cleanup_assert_success(iree_hsa_amd_memory_pool_free_raw(
+      queue->libhsa, queue->profiling.event_storage));
   queue->profiling.event_storage = NULL;
   queue->profiling.event_storage_size = 0;
   queue->profiling.dispatch_events = NULL;

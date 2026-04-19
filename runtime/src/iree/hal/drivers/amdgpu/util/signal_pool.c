@@ -48,8 +48,10 @@ static iree_status_t iree_hal_amdgpu_host_signal_pool_grow(
   } else {
     // Destroy any signals we created before the failure.
     for (iree_host_size_t i = 0; i < created_count; ++i) {
-      IREE_IGNORE_ERROR(iree_hsa_signal_destroy(
-          IREE_LIBHSA(pool->libhsa), pool->free_signals[pool->free_count + i]));
+      status = iree_status_join(
+          status,
+          iree_hsa_signal_destroy(IREE_LIBHSA(pool->libhsa),
+                                  pool->free_signals[pool->free_count + i]));
     }
   }
 
@@ -100,8 +102,8 @@ void iree_hal_amdgpu_host_signal_pool_deinitialize(
 
   // Destroy all signals via the free list.
   for (iree_host_size_t i = 0; i < pool->free_count; ++i) {
-    IREE_IGNORE_ERROR(iree_hsa_signal_destroy(IREE_LIBHSA(pool->libhsa),
-                                              pool->free_signals[i]));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_signal_destroy_raw(pool->libhsa, pool->free_signals[i]));
   }
 
   iree_allocator_free(pool->host_allocator, pool->free_signals);

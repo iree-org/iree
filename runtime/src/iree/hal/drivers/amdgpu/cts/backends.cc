@@ -18,7 +18,7 @@ static iree_status_t CreateAmdgpuDevice(
   iree_status_t status = iree_hal_amdgpu_driver_module_register(
       iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
-    iree_status_ignore(status);
+    (void)iree_status_consume_code(status);
     status = iree_ok_status();
   }
 

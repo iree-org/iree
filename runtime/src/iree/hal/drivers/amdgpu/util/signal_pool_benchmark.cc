@@ -26,13 +26,13 @@ class SignalPoolBenchmark : public benchmark::Fixture {
         IREE_HAL_AMDGPU_LIBHSA_FLAG_NONE, iree_string_view_list_empty(),
         host_allocator_, &libhsa_);
     if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+      iree_status_free(status);
       return;
     }
     status =
         iree_hal_amdgpu_topology_initialize_with_defaults(&libhsa_, &topology_);
     if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+      iree_status_free(status);
       iree_hal_amdgpu_libhsa_deinitialize(&libhsa_);
       return;
     }

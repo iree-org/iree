@@ -245,8 +245,8 @@ void iree_hal_amdgpu_notification_ring_deinitialize(
   }
 
   if (ring->epoch.signal.handle) {
-    IREE_IGNORE_ERROR(
-        iree_hsa_signal_destroy(IREE_LIBHSA(ring->libhsa), ring->epoch.signal));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_signal_destroy_raw(ring->libhsa, ring->epoch.signal));
     ring->epoch.signal.handle = 0;
   }
   iree_allocator_free(ring->host_allocator, ring->storage);

@@ -163,8 +163,9 @@ static iree_status_t iree_hal_amdgpu_block_pool_grow(
       block_pool->free_blocks_head = block;
     }
   } else {
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-        IREE_LIBHSA(block_pool->libhsa), base_ptr));
+    status = iree_status_join(
+        status, iree_hsa_amd_memory_pool_free(IREE_LIBHSA(block_pool->libhsa),
+                                              base_ptr));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -215,8 +216,9 @@ void iree_hal_amdgpu_block_pool_trim(iree_hal_amdgpu_block_pool_t* block_pool) {
     if (allocation->used_count == 0) {
       // No blocks outstanding - can free and remove from the allocation list.
       iree_hal_memory_trace_free(&block_pool->trace, allocation->base_ptr);
-      IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-          IREE_LIBHSA(block_pool->libhsa), allocation->base_ptr));
+      iree_hal_amdgpu_hsa_cleanup_assert_success(
+          iree_hsa_amd_memory_pool_free_raw(block_pool->libhsa,
+                                            allocation->base_ptr));
       if (allocation == block_pool->allocations_head) {
         IREE_ASSERT(!prev_allocation);
         block_pool->allocations_head = next_allocation;

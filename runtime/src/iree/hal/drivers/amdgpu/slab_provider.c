@@ -354,7 +354,8 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
         provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_ACQUIRE, slab_handle,
         base_ptr);
   } else if (base_ptr) {
-    IREE_IGNORE_ERROR(
+    status = iree_status_join(
+        status,
         iree_hsa_amd_memory_pool_free(IREE_LIBHSA(provider->libhsa), base_ptr));
   }
   if (!iree_status_is_ok(status)) {
@@ -378,8 +379,8 @@ static void iree_hal_amdgpu_slab_provider_release_slab(
         provider, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_SLAB_RELEASE, slab_handle,
         slab->base_ptr);
     iree_hal_memory_trace_free(&provider->trace, slab->base_ptr);
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-        IREE_LIBHSA(provider->libhsa), slab->base_ptr));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_memory_pool_free_raw(provider->libhsa, slab->base_ptr));
     iree_allocator_free(provider->host_allocator, slab_handle);
     iree_atomic_fetch_add(&provider->total_released, 1,
                           iree_memory_order_relaxed);

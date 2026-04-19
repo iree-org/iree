@@ -70,8 +70,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_allocate_pm4_ib_slots(
     memset(pm4_ib_slots, 0, pm4_ib_size);
     out_queue->pm4_ib_slots = pm4_ib_slots;
   } else {
-    IREE_IGNORE_ERROR(
-        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), pm4_ib_slots));
+    status = iree_status_join(status, iree_hsa_amd_memory_pool_free(
+                                          IREE_LIBHSA(libhsa), pm4_ib_slots));
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -519,8 +519,8 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   // Destroy the hardware queue before the remaining host-side resources so the
   // HSA runtime cannot race a late error callback against signal teardown.
   if (queue->hardware_queue) {
-    IREE_IGNORE_ERROR(iree_hsa_queue_destroy(IREE_LIBHSA(queue->libhsa),
-                                             queue->hardware_queue));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_queue_destroy_raw(queue->libhsa, queue->hardware_queue));
     queue->hardware_queue = NULL;
   }
 
@@ -584,8 +584,8 @@ void iree_hal_amdgpu_host_queue_deinitialize(
                                             &queue->kernarg_ring);
 
   if (queue->pm4_ib_slots) {
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(IREE_LIBHSA(queue->libhsa),
-                                                    queue->pm4_ib_slots));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_memory_pool_free_raw(queue->libhsa, queue->pm4_ib_slots));
     queue->pm4_ib_slots = NULL;
   }
 
@@ -593,8 +593,8 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   iree_hal_amdgpu_host_queue_deallocate_profile_events(queue);
 
   if (queue->completion_thread_stop_signal.handle) {
-    IREE_IGNORE_ERROR(iree_hsa_signal_destroy(
-        IREE_LIBHSA(queue->libhsa), queue->completion_thread_stop_signal));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(iree_hsa_signal_destroy_raw(
+        queue->libhsa, queue->completion_thread_stop_signal));
     queue->completion_thread_stop_signal.handle = 0;
   }
 

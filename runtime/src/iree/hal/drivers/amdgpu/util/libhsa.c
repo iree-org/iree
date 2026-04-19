@@ -248,7 +248,7 @@ static iree_status_t iree_hal_amdgpu_libhsa_load_symbols(
   return iree_ok_status();
 }
 
-static bool iree_hal_amdgpu_libhsa_try_load_library_from_file(
+static iree_status_t iree_hal_amdgpu_libhsa_try_load_library_from_file(
     iree_hal_amdgpu_libhsa_flags_t flags, const char* file_path,
     iree_string_builder_t* error_builder, iree_allocator_t host_allocator,
     iree_dynamic_library_t** out_library) {
@@ -263,14 +263,17 @@ static bool iree_hal_amdgpu_libhsa_try_load_library_from_file(
 
   // Append error message to the status builder.
   if (!iree_status_is_ok(status)) {
-    IREE_IGNORE_ERROR(iree_string_builder_append_format(
-        error_builder, "\n  Tried: %s\n    ", file_path));
-    IREE_IGNORE_ERROR(iree_string_builder_append_status(error_builder, status));
+    iree_status_t load_status = status;
+    status = iree_string_builder_append_format(
+        error_builder, "\n  Tried: %s\n    ", file_path);
+    if (iree_status_is_ok(status)) {
+      status = iree_string_builder_append_status(error_builder, load_status);
+    }
+    iree_status_free(load_status);
   }
 
-  iree_status_ignore(status);
   IREE_TRACE_ZONE_END(z0);
-  return *out_library != NULL;
+  return status;
 }
 
 static const char* iree_hal_amdgpu_libhsa_names[] = {
@@ -288,7 +291,7 @@ static const char* iree_hal_amdgpu_libhsa_names[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-static bool iree_hal_amdgpu_libhsa_try_load_library_from_path(
+static iree_status_t iree_hal_amdgpu_libhsa_try_load_library_from_path(
     iree_hal_amdgpu_libhsa_flags_t flags, iree_string_view_t path_fragment,
     iree_string_builder_t* error_builder, iree_allocator_t host_allocator,
     iree_dynamic_library_t** out_library) {
@@ -301,38 +304,43 @@ static bool iree_hal_amdgpu_libhsa_try_load_library_from_path(
   // we do that locally in a heap-allocated NUL-terminated string builder.
   iree_string_builder_t path_builder;
   iree_string_builder_initialize(host_allocator, &path_builder);
+  iree_status_t status = iree_ok_status();
 
   if (iree_file_path_is_dynamic_library(path_fragment)) {
     // User provided a filename - try to use it directly. If it's an absolute
     // file path the system will try that and otherwise it'll search all library
     // paths for the given filename.
-    iree_status_ignore(
-        iree_string_builder_append_string(&path_builder, path_fragment));
-    iree_hal_amdgpu_libhsa_try_load_library_from_file(
-        flags, iree_string_builder_buffer(&path_builder), error_builder,
-        host_allocator, out_library);
-  } else {
-    // Join the provided path with each canonical name and try that.
-    iree_string_builder_reset(&path_builder);
-    for (iree_host_size_t i = 0;
-         i < IREE_ARRAYSIZE(iree_hal_amdgpu_libhsa_names) && !*out_library;
-         ++i) {
-      iree_status_ignore(iree_string_builder_append_format(
-          &path_builder, "%.*s/%s", (int)path_fragment.size, path_fragment.data,
-          iree_hal_amdgpu_libhsa_names[i]));
-      path_builder.size = iree_file_path_canonicalize(
-          (char*)iree_string_builder_buffer(&path_builder),
-          iree_string_builder_size(&path_builder));
-      iree_hal_amdgpu_libhsa_try_load_library_from_file(
+    status = iree_string_builder_append_string(&path_builder, path_fragment);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_libhsa_try_load_library_from_file(
           flags, iree_string_builder_buffer(&path_builder), error_builder,
           host_allocator, out_library);
+    }
+  } else {
+    // Join the provided path with each canonical name and try that.
+    for (iree_host_size_t i = 0;
+         iree_status_is_ok(status) &&
+         i < IREE_ARRAYSIZE(iree_hal_amdgpu_libhsa_names) && !*out_library;
+         ++i) {
+      iree_string_builder_reset(&path_builder);
+      status = iree_string_builder_append_format(
+          &path_builder, "%.*s/%s", (int)path_fragment.size, path_fragment.data,
+          iree_hal_amdgpu_libhsa_names[i]);
+      if (iree_status_is_ok(status)) {
+        path_builder.size = iree_file_path_canonicalize(
+            (char*)iree_string_builder_buffer(&path_builder),
+            iree_string_builder_size(&path_builder));
+        status = iree_hal_amdgpu_libhsa_try_load_library_from_file(
+            flags, iree_string_builder_buffer(&path_builder), error_builder,
+            host_allocator, out_library);
+      }
     }
   }
 
   iree_string_builder_deinitialize(&path_builder);
 
   IREE_TRACE_ZONE_END(z0);
-  return *out_library != NULL;
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_libhsa_load_library(
@@ -349,11 +357,13 @@ static iree_status_t iree_hal_amdgpu_libhsa_load_library(
   iree_string_builder_initialize(host_allocator, &error_builder);
 
   iree_dynamic_library_t* library = NULL;
+  iree_status_t status = iree_ok_status();
 
   // If the caller provided explicit paths we always try to use those first.
   // This allows a hosting application to handle overrides as they see fit.
-  for (iree_host_size_t i = 0; i < search_paths.count && !library; ++i) {
-    iree_hal_amdgpu_libhsa_try_load_library_from_path(
+  for (iree_host_size_t i = 0;
+       iree_status_is_ok(status) && i < search_paths.count && !library; ++i) {
+    status = iree_hal_amdgpu_libhsa_try_load_library_from_path(
         flags, search_paths.values[i], &error_builder, host_allocator,
         &library);
   }
@@ -363,27 +373,27 @@ static iree_status_t iree_hal_amdgpu_libhsa_load_library(
   // recompile their application/pass through flags down into IREE.
   iree_string_view_t env_path =
       iree_make_cstring_view(getenv("IREE_HAL_AMDGPU_LIBHSA_PATH"));
-  if (!library && !iree_string_view_is_empty(env_path)) {
-    iree_hal_amdgpu_libhsa_try_load_library_from_path(
+  if (iree_status_is_ok(status) && !library &&
+      !iree_string_view_is_empty(env_path)) {
+    status = iree_hal_amdgpu_libhsa_try_load_library_from_path(
         flags, env_path, &error_builder, host_allocator, &library);
   }
 
   // Fallback (that is the common case) and try loading with the canonical
   // library names from the system search paths.
-  if (!library) {
+  if (iree_status_is_ok(status) && !library) {
     for (iree_host_size_t i = 0;
-         i < IREE_ARRAYSIZE(iree_hal_amdgpu_libhsa_names) && !library; ++i) {
-      if (iree_hal_amdgpu_libhsa_try_load_library_from_file(
-              flags, iree_hal_amdgpu_libhsa_names[i], &error_builder,
-              host_allocator, &library)) {
-        break;
-      }
+         iree_status_is_ok(status) &&
+         i < IREE_ARRAYSIZE(iree_hal_amdgpu_libhsa_names) && !library;
+         ++i) {
+      status = iree_hal_amdgpu_libhsa_try_load_library_from_file(
+          flags, iree_hal_amdgpu_libhsa_names[i], &error_builder,
+          host_allocator, &library);
     }
   }
 
   // If no library was found emit the full failure status.
-  iree_status_t status = iree_ok_status();
-  if (!library) {
+  if (iree_status_is_ok(status) && !library) {
     status =
         iree_make_status(IREE_STATUS_NOT_FOUND,
                          "HSA/ROCR-Runtime library not found; ensure it is "
@@ -399,18 +409,25 @@ static iree_status_t iree_hal_amdgpu_libhsa_load_library(
     if (!iree_status_is_ok(status) && out_libhsa->hsa_init) {
       iree_string_builder_t annotation_builder;
       iree_string_builder_initialize(host_allocator, &annotation_builder);
-      IREE_IGNORE_ERROR(iree_dynamic_library_append_symbol_path_to_builder(
-          out_libhsa->hsa_init, &annotation_builder));
-      status = iree_status_annotate_f(
-          status, "using %.*s",
-          (int)iree_string_builder_size(&annotation_builder),
-          iree_string_builder_buffer(&annotation_builder));
+      iree_status_t annotation_status =
+          iree_dynamic_library_append_symbol_path_to_builder(
+              out_libhsa->hsa_init, &annotation_builder);
+      if (iree_status_is_ok(annotation_status)) {
+        status = iree_status_annotate_f(
+            status, "using %.*s",
+            (int)iree_string_builder_size(&annotation_builder),
+            iree_string_builder_buffer(&annotation_builder));
+      } else {
+        status = iree_status_join(status, annotation_status);
+      }
       iree_string_builder_deinitialize(&annotation_builder);
     }
   }
 
   if (iree_status_is_ok(status)) {
     out_libhsa->library = library;
+  } else {
+    iree_dynamic_library_release(library);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -510,7 +527,7 @@ IREE_API_EXPORT void iree_hal_amdgpu_libhsa_deinitialize(
   // Decrement HSA ref count; others may still have it loaded/in-use.
   if (libhsa->initialized) {
     IREE_LEAK_CHECK_DISABLE_PUSH();
-    IREE_IGNORE_ERROR(iree_hsa_shut_down(IREE_LIBHSA(libhsa)));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(iree_hsa_shut_down_raw(libhsa));
     IREE_LEAK_CHECK_DISABLE_POP();
   }
 
@@ -605,13 +622,17 @@ IREE_API_EXPORT iree_status_t iree_status_from_hsa_status(
 // all the iree_hsa_* methods directly to the HSA functions.
 #define IREE_HAL_AMDGPU_LIBHSA_PFN_hsa_status_t(trace_category, result_type,  \
                                                 symbol, decl, args)           \
+  hsa_status_t iree_##symbol##_raw(                                           \
+      const iree_hal_amdgpu_libhsa_t* IREE_RESTRICT libhsa _COMMA_DECL(       \
+          decl)) {                                                            \
+    return IREE_HAL_AMDGPU_LIBHSA_LIBPTR(libhsa) symbol(args);                \
+  }                                                                           \
   iree_status_t iree_##symbol(                                                \
       const iree_hal_amdgpu_libhsa_t* IREE_RESTRICT libhsa, const char* file, \
       const uint32_t line _COMMA_DECL(decl)) {                                \
     IREE_HAL_AMDGPU_LIBHSA_TRACE_ZONE_BEGIN_##trace_category(z0);             \
                                                                               \
-    hsa_status_t hsa_status =                                                 \
-        IREE_HAL_AMDGPU_LIBHSA_LIBPTR(libhsa) symbol(args);                   \
+    hsa_status_t hsa_status = iree_##symbol##_raw(libhsa _COMMA_ARGS(args));  \
                                                                               \
     iree_status_t iree_status = iree_ok_status();                             \
     if (IREE_UNLIKELY(hsa_status != HSA_STATUS_SUCCESS &&                     \
@@ -667,5 +688,7 @@ IREE_API_EXPORT iree_status_t iree_status_from_hsa_status(
 #define DECL(...) __VA_ARGS__
 #define ARGS(...) __VA_ARGS__
 #define _COMMA_DECL(...) __VA_OPT__(, ) __VA_ARGS__
+#define _COMMA_ARGS(...) __VA_OPT__(, ) __VA_ARGS__
 #include "iree/hal/drivers/amdgpu/util/libhsa_tables.h"  // IWYU pragma: export
+#undef _COMMA_ARGS
 #undef _COMMA_DECL

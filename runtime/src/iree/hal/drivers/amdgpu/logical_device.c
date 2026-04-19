@@ -1337,8 +1337,8 @@ static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
   if (!iree_atomic_compare_exchange_strong(
           &logical_device->failure_status, &current_value, (intptr_t)status,
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    // Previous status was not OK; drop our new status.
-    IREE_IGNORE_ERROR(status);
+    // Previous status was not OK; the sticky slot owns only the first failure.
+    iree_status_free(status);
   }
 
   IREE_TRACE_ZONE_END(z0);

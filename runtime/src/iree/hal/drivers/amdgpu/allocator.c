@@ -555,8 +555,9 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     *out_buffer = buffer;
   } else {
     if (host_ptr) {
-      IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-          IREE_LIBHSA(allocator->libhsa), host_ptr));
+      status = iree_status_join(
+          status, iree_hsa_amd_memory_pool_free(IREE_LIBHSA(allocator->libhsa),
+                                                host_ptr));
     }
     iree_hal_buffer_release(buffer);
   }
@@ -589,8 +590,8 @@ static void iree_hal_amdgpu_allocator_release_imported_host(
       (iree_hal_amdgpu_imported_host_release_data_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_IGNORE_ERROR(
-      iree_hsa_amd_memory_unlock(IREE_LIBHSA(data->libhsa), data->host_ptr));
+  iree_hal_amdgpu_hsa_cleanup_assert_success(
+      iree_hsa_amd_memory_unlock_raw(data->libhsa, data->host_ptr));
   if (data->profile_allocation_id != 0) {
     iree_hal_profile_memory_event_t event =
         iree_hal_profile_memory_event_default();
@@ -755,7 +756,8 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
       iree_allocator_free(allocator->host_allocator, release_data);
     }
     if (agent_ptr) {
-      IREE_IGNORE_ERROR(
+      status = iree_status_join(
+          status,
           iree_hsa_amd_memory_unlock(IREE_LIBHSA(allocator->libhsa), host_ptr));
     }
     iree_hal_buffer_release(buffer);

@@ -123,8 +123,9 @@ static void iree_hal_amdgpu_staging_allocation_release(
       (iree_hal_amdgpu_staging_allocation_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (allocation->allocation_base) {
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-        IREE_LIBHSA(allocation->libhsa), allocation->allocation_base));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_memory_pool_free_raw(allocation->libhsa,
+                                          allocation->allocation_base));
   }
   iree_allocator_free(allocation->host_allocator, allocation);
   IREE_TRACE_ZONE_END(z0);

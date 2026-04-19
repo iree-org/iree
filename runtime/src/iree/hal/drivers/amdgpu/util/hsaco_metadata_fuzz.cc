@@ -105,7 +105,7 @@ static void iree_hal_amdgpu_hsaco_metadata_fuzz_parse(
   if (iree_status_is_ok(status)) {
     iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
   } else {
-    iree_status_ignore(status);
+    iree_status_free(status);
   }
 }
 

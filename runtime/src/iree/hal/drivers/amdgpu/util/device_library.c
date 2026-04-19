@@ -267,20 +267,33 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
 #if IREE_STATUS_MODE >= 2
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator, &builder);
-    IREE_IGNORE_ERROR(iree_string_builder_append_string(
-        &builder, IREE_SV("available in runtime build: [")));
-    IREE_IGNORE_ERROR(iree_file_toc_append_names_to_builder(
-        iree_hal_amdgpu_device_binaries_create(),
-        iree_hal_amdgpu_device_binaries_size(), &builder));
-    IREE_IGNORE_ERROR(iree_string_builder_append_string(
-        &builder, IREE_SV("], supported by agent: [")));
-    IREE_IGNORE_ERROR(iree_hal_amdgpu_agent_available_isas_append_to_builder(
-        libhsa, &available_isas, &builder));
-    IREE_IGNORE_ERROR(
-        iree_string_builder_append_string(&builder, IREE_SV("]")));
-    status = iree_status_annotate_f(status, "%.*s",
-                                    (int)iree_string_builder_size(&builder),
-                                    iree_string_builder_buffer(&builder));
+    iree_status_t annotation_status = iree_string_builder_append_string(
+        &builder, IREE_SV("available in runtime build: ["));
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status = iree_file_toc_append_names_to_builder(
+          iree_hal_amdgpu_device_binaries_create(),
+          iree_hal_amdgpu_device_binaries_size(), &builder);
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status = iree_string_builder_append_string(
+          &builder, IREE_SV("], supported by agent: ["));
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status =
+          iree_hal_amdgpu_agent_available_isas_append_to_builder(
+              libhsa, &available_isas, &builder);
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status =
+          iree_string_builder_append_string(&builder, IREE_SV("]"));
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      status = iree_status_annotate_f(status, "%.*s",
+                                      (int)iree_string_builder_size(&builder),
+                                      iree_string_builder_buffer(&builder));
+    } else {
+      status = iree_status_join(status, annotation_status);
+    }
     iree_string_builder_deinitialize(&builder);
 #endif  // IREE_STATUS_MODE >= 2
   }
@@ -368,8 +381,9 @@ iree_status_t iree_hal_amdgpu_device_library_initialize(
   }
 
   // Release the reader now that the executable has been fully loaded.
-  IREE_IGNORE_ERROR(iree_hsa_code_object_reader_destroy(IREE_LIBHSA(libhsa),
-                                                        code_object_reader));
+  status =
+      iree_status_join(status, iree_hsa_code_object_reader_destroy(
+                                   IREE_LIBHSA(libhsa), code_object_reader));
 
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_device_library_deinitialize(out_library);
@@ -384,8 +398,8 @@ void iree_hal_amdgpu_device_library_deinitialize(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (library->executable.handle) {
-    IREE_IGNORE_ERROR(iree_hsa_executable_destroy(IREE_LIBHSA(library->libhsa),
-                                                  library->executable));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_executable_destroy_raw(library->libhsa, library->executable));
   }
 
   memset(library, 0, sizeof(*library));

@@ -158,7 +158,7 @@ static iree_status_t iree_hal_amdgpu_libaqlprofile_load_symbols(
   return iree_ok_status();
 }
 
-static bool iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
+static iree_status_t iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
     const char* file_path, iree_string_builder_t* error_builder,
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library) {
   IREE_ASSERT_ARGUMENT(out_library);
@@ -169,17 +169,20 @@ static bool iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
   iree_status_t status = iree_dynamic_library_load_from_file(
       file_path, IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, out_library);
   if (!iree_status_is_ok(status)) {
-    IREE_IGNORE_ERROR(iree_string_builder_append_format(
-        error_builder, "\n  Tried: %s\n    ", file_path));
-    IREE_IGNORE_ERROR(iree_string_builder_append_status(error_builder, status));
+    iree_status_t load_status = status;
+    status = iree_string_builder_append_format(
+        error_builder, "\n  Tried: %s\n    ", file_path);
+    if (iree_status_is_ok(status)) {
+      status = iree_string_builder_append_status(error_builder, load_status);
+    }
+    iree_status_free(load_status);
   }
 
-  iree_status_ignore(status);
   IREE_TRACE_ZONE_END(z0);
-  return *out_library != NULL;
+  return status;
 }
 
-static bool iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
+static iree_status_t iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
     iree_string_view_t path_fragment, iree_string_builder_t* error_builder,
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library) {
   IREE_ASSERT_ARGUMENT(out_library);
@@ -189,35 +192,40 @@ static bool iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
 
   iree_string_builder_t path_builder;
   iree_string_builder_initialize(host_allocator, &path_builder);
+  iree_status_t status = iree_ok_status();
 
   if (iree_file_path_is_dynamic_library(path_fragment)) {
-    IREE_IGNORE_ERROR(
-        iree_string_builder_append_string(&path_builder, path_fragment));
-    iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
-        iree_string_builder_buffer(&path_builder), error_builder,
-        host_allocator, out_library);
+    status = iree_string_builder_append_string(&path_builder, path_fragment);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
+          iree_string_builder_buffer(&path_builder), error_builder,
+          host_allocator, out_library);
+    }
   } else {
     for (iree_host_size_t i = 0;
+         iree_status_is_ok(status) &&
          i < IREE_ARRAYSIZE(iree_hal_amdgpu_libaqlprofile_names) &&
          !*out_library;
          ++i) {
       iree_string_builder_reset(&path_builder);
-      IREE_IGNORE_ERROR(iree_string_builder_append_format(
+      status = iree_string_builder_append_format(
           &path_builder, "%.*s/%s", (int)path_fragment.size, path_fragment.data,
-          iree_hal_amdgpu_libaqlprofile_names[i]));
-      path_builder.size = iree_file_path_canonicalize(
-          (char*)iree_string_builder_buffer(&path_builder),
-          iree_string_builder_size(&path_builder));
-      iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
-          iree_string_builder_buffer(&path_builder), error_builder,
-          host_allocator, out_library);
+          iree_hal_amdgpu_libaqlprofile_names[i]);
+      if (iree_status_is_ok(status)) {
+        path_builder.size = iree_file_path_canonicalize(
+            (char*)iree_string_builder_buffer(&path_builder),
+            iree_string_builder_size(&path_builder));
+        status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
+            iree_string_builder_buffer(&path_builder), error_builder,
+            host_allocator, out_library);
+      }
     }
   }
 
   iree_string_builder_deinitialize(&path_builder);
 
   IREE_TRACE_ZONE_END(z0);
-  return *out_library != NULL;
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_libaqlprofile_try_load_adjacent_to_libhsa(
@@ -235,7 +243,7 @@ static iree_status_t iree_hal_amdgpu_libaqlprofile_try_load_adjacent_to_libhsa(
     iree_string_view_t libhsa_path = iree_string_builder_view(&path_builder);
     iree_string_view_t libhsa_dirname = iree_file_path_dirname(libhsa_path);
     if (!iree_string_view_is_empty(libhsa_dirname)) {
-      iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
+      status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
           libhsa_dirname, error_builder, host_allocator, out_library);
     }
   }
@@ -260,28 +268,31 @@ iree_status_t iree_hal_amdgpu_libaqlprofile_initialize(
   iree_string_builder_initialize(host_allocator, &error_builder);
 
   iree_dynamic_library_t* library = NULL;
-  for (iree_host_size_t i = 0; i < search_paths.count && !library; ++i) {
-    iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       iree_status_is_ok(status) && i < search_paths.count && !library; ++i) {
+    status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
         search_paths.values[i], &error_builder, host_allocator, &library);
   }
 
   iree_string_view_t env_path =
       iree_make_cstring_view(getenv("IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH"));
-  if (!library && !iree_string_view_is_empty(env_path)) {
-    iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
+  if (iree_status_is_ok(status) && !library &&
+      !iree_string_view_is_empty(env_path)) {
+    status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_path(
         env_path, &error_builder, host_allocator, &library);
   }
 
-  iree_status_t status = iree_ok_status();
-  if (!library) {
+  if (iree_status_is_ok(status) && !library) {
     status = iree_hal_amdgpu_libaqlprofile_try_load_adjacent_to_libhsa(
         libhsa, &error_builder, host_allocator, &library);
   }
-  if (!library) {
+  if (iree_status_is_ok(status) && !library) {
     for (iree_host_size_t i = 0;
+         iree_status_is_ok(status) &&
          i < IREE_ARRAYSIZE(iree_hal_amdgpu_libaqlprofile_names) && !library;
          ++i) {
-      iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
+      status = iree_hal_amdgpu_libaqlprofile_try_load_library_from_file(
           iree_hal_amdgpu_libaqlprofile_names[i], &error_builder,
           host_allocator, &library);
     }

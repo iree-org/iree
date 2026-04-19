@@ -561,13 +561,15 @@ static iree_status_t iree_hal_amdgpu_executable_load_module(
   }
 
   // Release the reader now that the executable has been fully loaded.
-  IREE_IGNORE_ERROR(iree_hsa_code_object_reader_destroy(IREE_LIBHSA(libhsa),
-                                                        code_object_reader));
+  status =
+      iree_status_join(status, iree_hsa_code_object_reader_destroy(
+                                   IREE_LIBHSA(libhsa), code_object_reader));
 
   if (iree_status_is_ok(status)) {
     *out_handle = handle;
   } else if (handle.handle) {
-    IREE_IGNORE_ERROR(iree_hsa_executable_destroy(IREE_LIBHSA(libhsa), handle));
+    status = iree_status_join(
+        status, iree_hsa_executable_destroy(IREE_LIBHSA(libhsa), handle));
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -883,7 +885,8 @@ static iree_status_t iree_hal_amdgpu_executable_upload_resolved_kernel_table(
   if (iree_status_is_ok(status)) {
     *out_device_kernel_args = device_kernel_args;
   } else {
-    IREE_IGNORE_ERROR(
+    status = iree_status_join(
+        status,
         iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), device_kernel_args));
   }
   IREE_TRACE_ZONE_END(z0);
@@ -2057,14 +2060,14 @@ static void iree_hal_amdgpu_executable_destroy(
        device_ordinal < executable->device_count; ++device_ordinal) {
     void* kernel_args = (void*)executable->device_kernel_args[device_ordinal];
     if (kernel_args) {
-      IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-          IREE_LIBHSA(executable->libhsa), kernel_args));
+      iree_hal_amdgpu_hsa_cleanup_assert_success(
+          iree_hsa_amd_memory_pool_free_raw(executable->libhsa, kernel_args));
     }
   }
 
   if (executable->handle.handle) {
-    IREE_IGNORE_ERROR(iree_hsa_executable_destroy(
-        IREE_LIBHSA(executable->libhsa), executable->handle));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(iree_hsa_executable_destroy_raw(
+        executable->libhsa, executable->handle));
   }
 
   iree_allocator_free(host_allocator, executable);

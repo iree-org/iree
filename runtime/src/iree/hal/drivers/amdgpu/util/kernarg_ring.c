@@ -80,8 +80,8 @@ iree_status_t iree_hal_amdgpu_kernarg_ring_initialize(
       IREE_LIBHSA(libhsa), /*num_agents=*/1, &device_agent, /*flags=*/NULL,
       out_ring->base);
   if (!iree_status_is_ok(status)) {
-    IREE_IGNORE_ERROR(
-        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), out_ring->base));
+    status = iree_status_join(status, iree_hsa_amd_memory_pool_free(
+                                          IREE_LIBHSA(libhsa), out_ring->base));
     memset(out_ring, 0, sizeof(*out_ring));
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, status,
@@ -119,8 +119,8 @@ void iree_hal_amdgpu_kernarg_ring_deinitialize(
               write - read, write, read);
 
   if (ring->base) {
-    IREE_IGNORE_ERROR(
-        iree_hsa_amd_memory_pool_free(IREE_LIBHSA(libhsa), ring->base));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_memory_pool_free_raw(libhsa, ring->base));
   }
   memset(ring, 0, sizeof(*ring));
 

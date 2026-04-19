@@ -353,8 +353,8 @@ static void iree_hal_amdgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
     buffer->release_callback.fn(buffer->release_callback.user_data,
                                 base_buffer);
   } else if (buffer->host_ptr) {
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(IREE_LIBHSA(buffer->libhsa),
-                                                    buffer->host_ptr));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_memory_pool_free_raw(buffer->libhsa, buffer->host_ptr));
   }
 
   buffer->libhsa = NULL;

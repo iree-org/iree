@@ -37,7 +37,7 @@ class BlitBenchmark : public benchmark::Fixture {
     iree_status_t status = iree_hal_amdgpu_driver_module_register(
         iree_hal_driver_registry_default());
     if (iree_status_is_already_exists(status)) {
-      iree_status_ignore(status);
+      (void)iree_status_consume_code(status);
       status = iree_ok_status();
     }
 
@@ -84,7 +84,7 @@ class BlitBenchmark : public benchmark::Fixture {
     }
 
     iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    iree_status_free(status);
     iree_hal_device_release(device_);
     iree_hal_driver_release(driver_);
     device_ = nullptr;
@@ -357,7 +357,7 @@ class BlitBenchmark : public benchmark::Fixture {
                     const char* message) {
     if (iree_status_is_ok(status)) return true;
     iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    iree_status_free(status);
     state.SkipWithError(message);
     return false;
   }

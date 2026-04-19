@@ -596,7 +596,7 @@ TEST(HsacoMetadataTest, TruncatedElfPrefixesNeverSucceed) {
       ADD_FAILURE() << "unexpected success for truncated ELF prefix " << length;
       return;
     }
-    iree_status_ignore(status);
+    iree_status_free(status);
   }
 }
 

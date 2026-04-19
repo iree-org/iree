@@ -110,9 +110,15 @@ static bool iree_hal_amdgpu_executable_cache_can_prepare_format(
   iree_hal_amdgpu_executable_cache_t* executable_cache =
       iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
   bool is_supported = false;
-  IREE_IGNORE_ERROR(iree_hal_amdgpu_executable_format_supported(
+  iree_status_t status = iree_hal_amdgpu_executable_format_supported(
       executable_cache->libhsa, executable_cache->topology->gpu_agents[0],
-      executable_format, &is_supported, /*out_isa=*/NULL));
+      executable_format, &is_supported, /*out_isa=*/NULL);
+  if (!iree_status_is_ok(status)) {
+    // The HAL cache predicate has no status channel; query failures mean the
+    // format cannot be prepared by this cache.
+    iree_status_free(status);
+    return false;
+  }
   return is_supported;
 }
 
