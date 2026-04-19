@@ -1,0 +1,83 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_python//python:defs.bzl", "py_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "iree-profile-render",
+    "render/__init__.py",
+    "render/backends.py",
+    "render/common.py",
+    "render/perfetto.py",
+])
+
+py_test(
+    name = "render_test",
+    srcs = [
+        "render/__init__.py",
+        "render/backends.py",
+        "render/common.py",
+        "render/perfetto.py",
+        "render_test.py",
+    ],
+    imports = ["."],
+    main = "render_test.py",
+)
+
+py_test(
+    name = "cli_test",
+    srcs = ["cli_test.py"],
+    data = [
+        ":test_fixture_generator",
+        "//tools:iree-profile",
+    ],
+    main = "cli_test.py",
+)
+
+iree_runtime_cc_binary(
+    name = "test_fixture_generator",
+    testonly = True,
+    srcs = ["test_fixture_generator.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:profile_file",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+iree_local_py_test(
+  NAME
+    render_test
+  SRC
+    "render_test.py"
+  PACKAGE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+iree_local_py_test(
+  NAME
+    cli_test
+  SRC
+    "cli_test.py"
+  ARGS
+    "--fixture-generator=$<TARGET_FILE:iree_tools_profile_test_fixture_generator>"
+    "--iree-profile=$<TARGET_FILE:iree-profile>"
+  PACKAGE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+""",
+    inline = True,
+)

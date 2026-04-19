@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Unit tests for iree-profile-render shared helpers."""
+"""Unit tests for profile renderer shared helpers."""
 
 from __future__ import annotations
 
 import unittest
 
-from iree_profile_render import backends
-from iree_profile_render import common
-from iree_profile_render import perfetto
+from render import backends
+from render import common
+from render import perfetto
 
 
 class _FakeRepeated(list):

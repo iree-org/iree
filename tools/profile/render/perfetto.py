@@ -38,7 +38,7 @@ Missing optional Perfetto Python dependency.
 
 Run this script in a one-shot environment:
 
-  uvx --with perfetto --with protobuf python tools/iree-profile-render \\
+  uvx --with perfetto --with protobuf python tools/profile/iree-profile-render \\
       --format=perfetto INPUT.ireeperf.jsonl -o OUTPUT.pftrace
 
 or install the optional packages into your active environment:

@@ -21,8 +21,8 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from iree_profile_render import backends
-from iree_profile_render import common
+from render import backends
+from render import common
 
 
 def format_descriptions() -> str:
@@ -43,13 +43,13 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
             f"{format_descriptions()}\n\n"
             "One-shot Perfetto dependency invocation:\n"
             "  uvx --with perfetto --with protobuf python "
-            "tools/iree-profile-render --format=perfetto "
+            "tools/profile/iree-profile-render --format=perfetto "
             "INPUT.ireeperf.jsonl -o OUTPUT.pftrace\n\n"
             "Pipeline:\n"
             "  bazel-bin/tools/iree-profile export --format=ireeperf-jsonl "
             "--output=- run.ireeprof | \\\n"
             "    uvx --with perfetto --with protobuf python "
-            "tools/iree-profile-render --format=perfetto - -o run.pftrace"
+            "tools/profile/iree-profile-render --format=perfetto - -o run.pftrace"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
