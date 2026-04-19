@@ -159,6 +159,30 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile
+  HDRS
+    "profile.h"
+  SRCS
+    "profile.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    profile_test
+  SRCS
+    "profile_test.cc"
+  DEPS
+    ::profile
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     local
   HDRS
     "executable_loader.h"
