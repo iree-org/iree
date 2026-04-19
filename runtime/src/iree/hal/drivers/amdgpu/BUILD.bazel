@@ -244,6 +244,30 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "host_queue_pending_test",
+    srcs = ["host_queue_pending_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/drivers/amdgpu/util",
+        "//runtime/src/iree/hal/memory:fixed_block_pool",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",
