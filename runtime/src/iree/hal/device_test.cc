@@ -228,6 +228,126 @@ TEST_F(DeviceProfilingTest, BeginUnsupportedBackendDoesNotTouchSink) {
   EXPECT_EQ(0, sink.end_count);
 }
 
+struct CountingStatisticsRows {
+  // Number of statistics rows observed.
+  int row_count = 0;
+};
+
+static iree_status_t CountingStatisticsRowCallback(
+    void* user_data, const iree_hal_statistics_snapshot_metadata_t* metadata,
+    iree_hal_statistics_row_type_t row_type, const void* row,
+    iree_host_size_t row_length) {
+  (void)metadata;
+  (void)row_type;
+  (void)row;
+  (void)row_length;
+  ++reinterpret_cast<CountingStatisticsRows*>(user_data)->row_count;
+  return iree_ok_status();
+}
+
+static iree_hal_statistics_row_callback_t CountingStatisticsRowsAsCallback(
+    CountingStatisticsRows* rows) {
+  iree_hal_statistics_row_callback_t callback = {
+      .fn = CountingStatisticsRowCallback,
+      .user_data = rows,
+  };
+  return callback;
+}
+
+class DeviceStatisticsTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    iree_hal_mock_device_options_t mock_options;
+    iree_hal_mock_device_options_initialize(&mock_options);
+    IREE_ASSERT_OK(iree_hal_mock_device_create(
+        &mock_options, iree_allocator_system(), &device_));
+  }
+
+  void TearDown() override { iree_hal_device_release(device_); }
+
+  iree_status_t Query(const iree_hal_statistics_query_options_t* options,
+                      iree_hal_statistics_row_callback_t callback) {
+    return iree_hal_device_query_statistics(device_, options, callback);
+  }
+
+  iree_hal_device_t* device_ = NULL;
+};
+
+TEST_F(DeviceStatisticsTest, QueryRequiresFamily) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
+TEST_F(DeviceStatisticsTest, QueryRequiresCallback) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = IREE_HAL_STATISTICS_FAMILY_DEVICE;
+  iree_hal_statistics_row_callback_t callback = {};
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        Query(&options, callback));
+}
+
+TEST_F(DeviceStatisticsTest, QueryRejectsUnknownFamilyBits) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = 1ull << 63;
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
+TEST_F(DeviceStatisticsTest, QueryRejectsUnknownFlags) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = IREE_HAL_STATISTICS_FAMILY_DEVICE;
+  options.flags = 1u << 31;
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
+TEST_F(DeviceStatisticsTest, QueryRejectsReservedFields) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = IREE_HAL_STATISTICS_FAMILY_DEVICE;
+  options.reserved0 = 1;
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
+TEST_F(DeviceStatisticsTest, QueryRejectsExportOrdinalWithoutExecutable) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = IREE_HAL_STATISTICS_FAMILY_EXECUTABLE_EXPORT;
+  options.export_ordinal = 0;
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
+TEST_F(DeviceStatisticsTest, QueryWithoutAvailableRowsSucceeds) {
+  iree_hal_statistics_query_options_t options =
+      iree_hal_statistics_query_options_default();
+  options.requested_families = IREE_HAL_STATISTICS_FAMILY_DEVICE;
+  CountingStatisticsRows rows = {};
+  IREE_EXPECT_OK(Query(&options, CountingStatisticsRowsAsCallback(&rows)));
+  EXPECT_EQ(0, rows.row_count);
+}
+
 TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   std::string executable_export_pattern = "scale_*";
   std::string counter_set_name = "set0";
@@ -296,7 +416,7 @@ TEST(DeviceExternalCaptureTest, BeginRequiresProvider) {
   iree_hal_device_release(device);
 }
 
-TEST(DeviceExternalCaptureTest, BeginWithoutBackendHookIsUnimplemented) {
+TEST(DeviceExternalCaptureTest, BeginUnsupportedBackendReturnsUnimplemented) {
   iree_hal_mock_device_options_t mock_options;
   iree_hal_mock_device_options_initialize(&mock_options);
 

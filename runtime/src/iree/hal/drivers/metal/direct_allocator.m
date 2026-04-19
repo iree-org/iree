@@ -121,6 +121,28 @@ static void iree_hal_metal_allocator_query_statistics(
   });
 }
 
+static iree_status_t iree_hal_metal_allocator_query_memory_heaps(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator, iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
+  (void)base_allocator;
+  const iree_host_size_t count = 1;
+  if (out_count) *out_count = count;
+  if (capacity < count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+
+  heaps[0] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH |
+                       IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = ~(iree_device_size_t)0,
+      .min_alignment = 4,
+  };
+  return iree_ok_status();
+}
+
 static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -430,9 +452,20 @@ static const iree_hal_allocator_vtable_t iree_hal_metal_allocator_vtable = {
     .host_allocator = iree_hal_metal_allocator_host_allocator,
     .trim = iree_hal_metal_allocator_trim,
     .query_statistics = iree_hal_metal_allocator_query_statistics,
+    .query_memory_heaps = iree_hal_metal_allocator_query_memory_heaps,
     .query_buffer_compatibility = iree_hal_metal_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_metal_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_metal_allocator_deallocate_buffer,
     .import_buffer = iree_hal_metal_allocator_import_buffer,
     .export_buffer = iree_hal_metal_allocator_export_buffer,
+    .supports_virtual_memory = iree_hal_allocator_no_virtual_memory_supports,
+    .virtual_memory_query_granularity = iree_hal_allocator_no_virtual_memory_query_granularity,
+    .virtual_memory_reserve = iree_hal_allocator_no_virtual_memory_reserve,
+    .virtual_memory_release = iree_hal_allocator_no_virtual_memory_release,
+    .physical_memory_allocate = iree_hal_allocator_no_physical_memory_allocate,
+    .physical_memory_free = iree_hal_allocator_no_physical_memory_free,
+    .virtual_memory_map = iree_hal_allocator_no_virtual_memory_map,
+    .virtual_memory_unmap = iree_hal_allocator_no_virtual_memory_unmap,
+    .virtual_memory_protect = iree_hal_allocator_no_virtual_memory_protect,
+    .virtual_memory_advise = iree_hal_allocator_no_virtual_memory_advise,
 };

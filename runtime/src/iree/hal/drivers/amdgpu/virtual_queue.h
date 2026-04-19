@@ -174,9 +174,6 @@ typedef struct iree_hal_amdgpu_virtual_queue_vtable_t {
       iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
       iree_device_size_t length, iree_hal_copy_flags_t flags);
 
-  // NULL if not implemented and emulation should be used.
-  // TODO(benvanik): when all queue implementations support native I/O we should
-  // drop the emulation (it's bad).
   iree_status_t(IREE_API_PTR* read)(
       iree_hal_amdgpu_virtual_queue_t* queue,
       const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -185,9 +182,6 @@ typedef struct iree_hal_amdgpu_virtual_queue_vtable_t {
       iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
       iree_device_size_t length, iree_hal_read_flags_t flags);
 
-  // NULL if not implemented and emulation should be used.
-  // TODO(benvanik): when all queue implementations support native I/O we should
-  // drop the emulation (it's bad).
   iree_status_t(IREE_API_PTR* write)(
       iree_hal_amdgpu_virtual_queue_t* queue,
       const iree_hal_semaphore_list_t wait_semaphore_list,

@@ -269,6 +269,12 @@ static void iree_hal_metal_replace_device_allocator(iree_hal_device_t* base_devi
   device->device_allocator = new_allocator;
 }
 
+static void iree_hal_metal_replace_channel_provider(iree_hal_device_t* base_device,
+                                                    iree_hal_channel_provider_t* new_provider) {
+  (void)base_device;
+  (void)new_provider;
+}
+
 static iree_status_t iree_hal_metal_device_trim(iree_hal_device_t* base_device) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   iree_arena_block_pool_trim(&device->block_pool);
@@ -768,12 +774,22 @@ static iree_status_t iree_hal_metal_device_external_capture_end(iree_hal_device_
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_metal_device_query_statistics(
+    iree_hal_device_t* base_device, const iree_hal_statistics_query_options_t* options,
+    iree_hal_statistics_row_callback_t callback) {
+  (void)base_device;
+  (void)options;
+  (void)callback;
+  return iree_ok_status();
+}
+
 static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .destroy = iree_hal_metal_device_destroy,
     .id = iree_hal_metal_device_id,
     .host_allocator = iree_hal_metal_device_host_allocator,
     .device_allocator = iree_hal_metal_device_allocator,
     .replace_device_allocator = iree_hal_metal_replace_device_allocator,
+    .replace_channel_provider = iree_hal_metal_replace_channel_provider,
     .trim = iree_hal_metal_device_trim,
     .query_i64 = iree_hal_metal_device_query_i64,
     .query_capabilities = iree_hal_metal_device_query_capabilities,
@@ -804,4 +820,5 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .profiling_end = iree_hal_metal_device_profiling_end,
     .external_capture_begin = iree_hal_metal_device_external_capture_begin,
     .external_capture_end = iree_hal_metal_device_external_capture_end,
+    .query_statistics = iree_hal_metal_device_query_statistics,
 };

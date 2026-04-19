@@ -34,6 +34,7 @@
 #include "iree/hal/queue.h"             // IWYU pragma: export
 #include "iree/hal/resource.h"          // IWYU pragma: export
 #include "iree/hal/semaphore.h"         // IWYU pragma: export
+#include "iree/hal/statistics.h"        // IWYU pragma: export
 #include "iree/hal/string_util.h"       // IWYU pragma: export
 #include "iree/hal/topology.h"          // IWYU pragma: export
 #include "iree/hal/topology_builder.h"  // IWYU pragma: export

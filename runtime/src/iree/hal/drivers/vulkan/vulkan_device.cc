@@ -2048,6 +2048,16 @@ static iree_status_t iree_hal_vulkan_device_external_capture_end(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_query_statistics(
+    iree_hal_device_t* base_device,
+    const iree_hal_statistics_query_options_t* options,
+    iree_hal_statistics_row_callback_t callback) {
+  (void)base_device;
+  (void)options;
+  (void)callback;
+  return iree_ok_status();
+}
+
 namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
@@ -2090,5 +2100,6 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.external_capture_begin=*/
     iree_hal_vulkan_device_external_capture_begin,
     /*.external_capture_end=*/iree_hal_vulkan_device_external_capture_end,
+    /*.query_statistics=*/iree_hal_vulkan_device_query_statistics,
 };
 }  // namespace

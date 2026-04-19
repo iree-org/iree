@@ -2954,6 +2954,32 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   return status;
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "AMDGPU external capture not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  (void)base_device;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "AMDGPU external capture not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_query_statistics(
+    iree_hal_device_t* base_device,
+    const iree_hal_statistics_query_options_t* options,
+    iree_hal_statistics_row_callback_t callback) {
+  (void)base_device;
+  (void)options;
+  (void)callback;
+  return iree_ok_status();
+}
+
 static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .destroy = iree_hal_amdgpu_logical_device_destroy,
     .id = iree_hal_amdgpu_logical_device_id,
@@ -2993,4 +3019,8 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .profiling_begin = iree_hal_amdgpu_logical_device_profiling_begin,
     .profiling_flush = iree_hal_amdgpu_logical_device_profiling_flush,
     .profiling_end = iree_hal_amdgpu_logical_device_profiling_end,
+    .external_capture_begin =
+        iree_hal_amdgpu_logical_device_external_capture_begin,
+    .external_capture_end = iree_hal_amdgpu_logical_device_external_capture_end,
+    .query_statistics = iree_hal_amdgpu_logical_device_query_statistics,
 };

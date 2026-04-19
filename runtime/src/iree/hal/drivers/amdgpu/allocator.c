@@ -788,4 +788,15 @@ static const iree_hal_allocator_vtable_t iree_hal_amdgpu_allocator_vtable = {
     .deallocate_buffer = iree_hal_amdgpu_allocator_deallocate_buffer,
     .import_buffer = iree_hal_amdgpu_allocator_import_buffer,
     .export_buffer = iree_hal_amdgpu_allocator_export_buffer,
+    .supports_virtual_memory = iree_hal_allocator_no_virtual_memory_supports,
+    .virtual_memory_query_granularity =
+        iree_hal_allocator_no_virtual_memory_query_granularity,
+    .virtual_memory_reserve = iree_hal_allocator_no_virtual_memory_reserve,
+    .virtual_memory_release = iree_hal_allocator_no_virtual_memory_release,
+    .physical_memory_allocate = iree_hal_allocator_no_physical_memory_allocate,
+    .physical_memory_free = iree_hal_allocator_no_physical_memory_free,
+    .virtual_memory_map = iree_hal_allocator_no_virtual_memory_map,
+    .virtual_memory_unmap = iree_hal_allocator_no_virtual_memory_unmap,
+    .virtual_memory_protect = iree_hal_allocator_no_virtual_memory_protect,
+    .virtual_memory_advise = iree_hal_allocator_no_virtual_memory_advise,
 };

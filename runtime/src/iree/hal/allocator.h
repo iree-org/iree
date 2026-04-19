@@ -468,7 +468,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
 //===----------------------------------------------------------------------===//
-// Virtual Memory Management (Optional)
+// Virtual Memory Management
 //===----------------------------------------------------------------------===//
 
 // Returns true if the allocator supports virtual memory management operations.
@@ -649,6 +649,130 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 // iree_hal_allocator_t implementation details
 //===----------------------------------------------------------------------===//
 
+// Default hook suite for allocators that report supports_virtual_memory=false.
+static inline bool iree_hal_allocator_no_virtual_memory_supports(
+    iree_hal_allocator_t* IREE_RESTRICT allocator) {
+  (void)allocator;
+  return false;
+}
+
+static inline iree_status_t
+iree_hal_allocator_no_virtual_memory_query_granularity(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
+  (void)allocator;
+  (void)params;
+  *out_minimum_page_size = 0;
+  *out_recommended_page_size = 0;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_reserve(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
+    iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
+  (void)allocator;
+  (void)queue_affinity;
+  (void)size;
+  *out_virtual_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_release(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
+  (void)allocator;
+  (void)virtual_buffer;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_physical_memory_allocate(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t size,
+    iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
+  (void)allocator;
+  (void)params;
+  (void)size;
+  (void)host_allocator;
+  *out_physical_memory = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_physical_memory_free(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
+  (void)allocator;
+  (void)physical_memory;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_map(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
+    iree_device_size_t physical_offset, iree_device_size_t size) {
+  (void)allocator;
+  (void)virtual_buffer;
+  (void)virtual_offset;
+  (void)physical_memory;
+  (void)physical_offset;
+  (void)size;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_unmap(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size) {
+  (void)allocator;
+  (void)virtual_buffer;
+  (void)virtual_offset;
+  (void)size;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_protect(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_protection_t protection) {
+  (void)allocator;
+  (void)virtual_buffer;
+  (void)virtual_offset;
+  (void)size;
+  (void)queue_affinity;
+  (void)protection;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
+static inline iree_status_t iree_hal_allocator_no_virtual_memory_advise(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
+  (void)allocator;
+  (void)virtual_buffer;
+  (void)virtual_offset;
+  (void)size;
+  (void)queue_affinity;
+  (void)advice;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "virtual memory is unavailable");
+}
+
 typedef struct iree_hal_allocator_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_allocator_t* IREE_RESTRICT allocator);
 
@@ -696,8 +820,7 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_external_buffer_flags_t requested_flags,
       iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
-  // Virtual memory management operations (optional).
-  // All entries may be NULL if virtual memory is not supported.
+  // Virtual memory management operations.
   bool(IREE_API_PTR* supports_virtual_memory)(
       iree_hal_allocator_t* IREE_RESTRICT allocator);
   iree_status_t(IREE_API_PTR* virtual_memory_query_granularity)(

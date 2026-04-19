@@ -25,6 +25,7 @@
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
+#include "iree/hal/statistics.h"
 #include "iree/hal/topology.h"
 
 #ifdef __cplusplus
@@ -911,6 +912,41 @@ iree_hal_device_profiling_flush(iree_hal_device_t* device);
 IREE_API_EXPORT iree_status_t
 iree_hal_device_profiling_end(iree_hal_device_t* device);
 
+// Queries aggregate runtime statistics from |device|.
+//
+// Statistics queries are cold snapshots intended for tools, serving systems,
+// benchmark summaries, and agents. They complement precise profile captures:
+// profile sinks answer what happened during a capture window, while statistics
+// rows answer what this device has accumulated so far.
+//
+// The device is the root because queues, physical-device replicas, completion
+// paths, clocks, and memory pressure are device-local. Querying executable or
+// command-buffer rows through the device makes cross-physical-device merges an
+// explicit cold operation instead of hidden traffic on hot paths.
+//
+// Implementations may omit rows they cannot produce, including entire requested
+// families, rows that cannot satisfy requested exact/drain/reset behavior, or
+// rows whose aggregate tracking is disabled. An empty successful query is a
+// valid response. This allows tools to query heterogeneous device groups and
+// harvest whatever each device can provide without capability preflight.
+// Unsupported or disabled aggregate tracking must remain a compile-time no-op
+// or a cheap predictable branch in recording/submission paths; query/reset work
+// may allocate, lock, and merge.
+//
+// Timing rows report distributions of producer-defined duration samples in the
+// row time domain. Sample totals may double-count overlapping work and should
+// not be interpreted as elapsed latency or hardware occupancy unless the row
+// field explicitly defines that meaning.
+//
+// Rows are streamed to |callback| and may stop early by returning an error.
+// The returned status is either query validation failure, a producer failure
+// while collecting available rows, or the first callback failure. Missing rows
+// are represented by not invoking |callback| for those rows.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_statistics(
+    iree_hal_device_t* device,
+    const iree_hal_statistics_query_options_t* options,
+    iree_hal_statistics_row_callback_t callback);
+
 // Begins an external profiler/tool capture range on |device|.
 //
 // External capture is for provider-specific artifacts and UI sessions outside
@@ -1128,6 +1164,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device,
       const iree_hal_device_external_capture_options_t* options);
   iree_status_t(IREE_API_PTR* external_capture_end)(iree_hal_device_t* device);
+
+  iree_status_t(IREE_API_PTR* query_statistics)(
+      iree_hal_device_t* device,
+      const iree_hal_statistics_query_options_t* options,
+      iree_hal_statistics_row_callback_t callback);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 
