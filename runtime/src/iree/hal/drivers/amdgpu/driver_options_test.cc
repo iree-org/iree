@@ -109,15 +109,6 @@ TEST(AmdgpuDriverOptionsTest, RejectsInvalidQueuePlacementBeforeLoadingHsa) {
                         CreateDriverWithDefaultDeviceOptions(&options));
 }
 
-TEST(AmdgpuDriverOptionsTest, RejectsTraceExecutionBeforeLoadingHsa) {
-  iree_hal_amdgpu_logical_device_options_t options;
-  iree_hal_amdgpu_logical_device_options_initialize(&options);
-  options.trace_execution = 1;
-
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
-                        CreateDriverWithDefaultDeviceOptions(&options));
-}
-
 TEST(AmdgpuDriverOptionsTest, RejectsExclusiveExecutionBeforeLoadingHsa) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);

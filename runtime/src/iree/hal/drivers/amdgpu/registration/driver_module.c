@@ -55,9 +55,6 @@ IREE_FLAG(bool, amdgpu_preallocate_pools, true,
           "Preallocates a reasonable number of resources in pools to reduce "
           "initial execution latency.");
 
-IREE_FLAG(bool, amdgpu_trace_execution, false,
-          "Reserved for device-side execution tracing; currently unsupported.");
-
 IREE_FLAG(
     bool, amdgpu_retain_executable_code_object_images, false,
     "Retains exact executable code-object images and loader load ranges in "
@@ -209,8 +206,6 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   }
 
   device_options->preallocate_pools = FLAG_amdgpu_preallocate_pools;
-
-  device_options->trace_execution = FLAG_amdgpu_trace_execution;
 
   device_options->profiling.retain_executable_code_object_images =
       FLAG_amdgpu_retain_executable_code_object_images;

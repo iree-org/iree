@@ -16,7 +16,6 @@ add_custom_command(OUTPUT bitcode_srcs.stamp
     "blit.c"
     "dispatch.c"
     "profiling.c"
-    "tracing.c"
 )
 
 add_custom_target(bitcode_srcs
@@ -35,7 +34,6 @@ add_custom_command(OUTPUT bitcode_hdrs.stamp
     "support/kernel.h"
     "support/queue.h"
     "support/signal.h"
-    "tracing.h"
 )
 
 add_custom_target(bitcode_hdrs
@@ -55,7 +53,6 @@ iree_cc_library(
     "support/kernel.h"
     "support/queue.h"
     "support/signal.h"
-    "tracing.h"
   DEPS
     iree::base
     iree::base::internal

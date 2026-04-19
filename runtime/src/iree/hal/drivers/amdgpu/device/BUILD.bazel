@@ -16,7 +16,6 @@ DEVICE_SRCS = [
     "blit.c",
     "dispatch.c",
     "profiling.c",
-    "tracing.c",
 ]
 
 DEVICE_HDRS = [
@@ -29,7 +28,6 @@ DEVICE_HDRS = [
     "support/kernel.h",
     "support/queue.h",
     "support/signal.h",
-    "tracing.h",
 ]
 
 filegroup(

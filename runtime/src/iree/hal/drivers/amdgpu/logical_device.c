@@ -175,12 +175,6 @@ iree_status_t iree_hal_amdgpu_logical_device_options_verify_supported_features(
                               "invalid AMDGPU queue placement value %u",
                               (uint32_t)options->queue_placement);
   }
-  if (options->trace_execution) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "AMDGPU trace_execution is not implemented; use HAL profiling "
-        "executable traces for supported trace capture");
-  }
   if (options->exclusive_execution) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "AMDGPU exclusive_execution is not implemented");
@@ -1486,7 +1480,6 @@ iree_hal_amdgpu_logical_device_initialize_system_and_allocator(
     const iree_hal_amdgpu_topology_t* topology,
     iree_allocator_t host_allocator) {
   iree_hal_amdgpu_system_options_t system_options = {
-      .trace_execution = options->trace_execution,
       .exclusive_execution = options->exclusive_execution,
   };
   IREE_RETURN_IF_ERROR(

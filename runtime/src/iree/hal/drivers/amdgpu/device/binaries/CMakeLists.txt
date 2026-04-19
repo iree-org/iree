@@ -67,7 +67,6 @@ set(_BITCODE_SRCS
   "../blit.c"
   "../dispatch.c"
   "../profiling.c"
-  "../tracing.c"
 )
 
 set(_ABI_HDRS
@@ -88,7 +87,6 @@ set(_BITCODE_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/../support/kernel.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../support/queue.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../support/signal.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../tracing.h"
   ${_ABI_HDRS}
 )
 

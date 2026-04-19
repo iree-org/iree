@@ -21,22 +21,6 @@
 #include "iree/schemas/amdgpu_executable_def_reader.h"
 #include "iree/schemas/amdgpu_executable_def_verifier.h"
 
-// TODO(benvanik): replace with include when device-side tracing imported.
-// #include "iree/hal/drivers/amdgpu/device/tracing.h"
-typedef uint32_t iree_hal_amdgpu_trace_color_t;
-typedef struct iree_hal_amdgpu_trace_src_loc_t {
-  // Trace label shown by device-side instrumentation.
-  const char* name;
-  // Source function name for the trace location.
-  const char* function;
-  // Source file path for the trace location.
-  const char* file;
-  // One-based source line for the trace location.
-  uint32_t line;
-  // Packed trace color used by the device-side tracing ABI.
-  iree_hal_amdgpu_trace_color_t color;
-} iree_hal_amdgpu_trace_src_loc_t;
-
 //===----------------------------------------------------------------------===//
 // ISA Support
 //===----------------------------------------------------------------------===//
@@ -617,42 +601,6 @@ static iree_status_t iree_hal_amdgpu_executable_load_module(
   return status;
 }
 
-static iree_status_t iree_hal_amdgpu_executable_add_trace_string_storage(
-    flatbuffers_string_t value, iree_host_size_t* inout_total_size) {
-  if (!value) return iree_ok_status();
-  const iree_host_size_t value_length = flatbuffers_string_len(value);
-  if (value_length == 0) return iree_ok_status();
-
-  iree_host_size_t storage_size = 0;
-  if (!iree_host_size_checked_add(value_length, 1, &storage_size) ||
-      !iree_host_size_checked_add(*inout_total_size, storage_size,
-                                  inout_total_size)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "AMDGPU executable trace source location storage size overflow");
-  }
-  return iree_ok_status();
-}
-
-static const char* iree_hal_amdgpu_executable_copy_trace_string(
-    flatbuffers_string_t value, char** inout_char_buffer) {
-  if (!value) return NULL;
-  const iree_host_size_t value_length = flatbuffers_string_len(value);
-  if (value_length == 0) return NULL;
-
-  char* storage = *inout_char_buffer;
-  memcpy(storage, value, value_length);
-  storage[value_length] = 0;
-  *inout_char_buffer = storage + value_length + 1;
-  return storage;
-}
-
-static bool iree_hal_amdgpu_trace_src_loc_has_data(
-    const iree_hal_amdgpu_trace_src_loc_t* trace_src_loc) {
-  return trace_src_loc && (trace_src_loc->function || trace_src_loc->file ||
-                           trace_src_loc->line != 0);
-}
-
 typedef struct iree_hal_amdgpu_executable_find_loaded_code_object_state_t {
   // Borrowed HSA API table used for loader extension queries.
   const iree_hal_amdgpu_libhsa_t* libhsa;
@@ -782,7 +730,7 @@ static iree_status_t iree_hal_amdgpu_executable_get_raw_hsaco_symbol_by_name(
 static iree_status_t iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_executable_symbol_t symbol,
     const uint32_t workgroup_size[3], uint16_t constant_count,
-    uint16_t binding_count, const iree_hal_amdgpu_trace_src_loc_t* export_loc,
+    uint16_t binding_count,
     iree_hal_amdgpu_device_kernel_args_t* out_kernel_args) {
   IREE_ASSERT_ARGUMENT(out_kernel_args);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -824,107 +772,6 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
   out_kernel_args->binding_count = binding_count;
   out_kernel_args->constant_count = constant_count;
 
-  // Interned debugging info for the lifetime of the process. This is required
-  // so tracing tools can access the values while flushing when the process
-  // exits. If no debugging info was available or it's not enabled in the build
-  // this will be 0/NULL.
-  out_kernel_args->trace_src_loc = (uint64_t)export_loc;
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-// Allocates (and leaks) a table of source locations for each of |export_defs|.
-// The returned table matches 1:1 and will persist for the lifetime of the
-// process.
-static iree_status_t iree_hal_amdgpu_executable_intern_trace_locs(
-    iree_hal_amdgpu_ExportDef_vec_t export_defs,
-    iree_hal_amdgpu_trace_src_loc_t** out_export_locs) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  const iree_host_size_t export_count =
-      iree_hal_amdgpu_ExportDef_vec_len(export_defs);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, export_count);
-
-  // Sum up the total storage required for all information.
-  iree_host_size_t total_size = 0;
-  if (!iree_host_size_checked_mul(
-          export_count, sizeof(iree_hal_amdgpu_trace_src_loc_t), &total_size)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(
-                IREE_STATUS_OUT_OF_RANGE,
-                "AMDGPU executable trace source location table size overflow"));
-  }
-  for (iree_host_size_t i = 0; i < export_count; ++i) {
-    iree_hal_amdgpu_ExportDef_table_t export_def =
-        iree_hal_amdgpu_ExportDef_vec_at(export_defs, i);
-    iree_hal_debug_ExportDef_table_t debug_def =
-        iree_hal_amdgpu_ExportDef_debug_info_get(export_def);
-    if (!debug_def) continue;
-
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_amdgpu_executable_add_trace_string_storage(
-                iree_hal_debug_ExportDef_name_get(debug_def), &total_size));
-    iree_hal_debug_FileLineLocDef_table_t loc_def =
-        iree_hal_debug_ExportDef_location_get(debug_def);
-    if (loc_def) {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_amdgpu_executable_add_trace_string_storage(
-                  iree_hal_debug_FileLineLocDef_filename_get(loc_def),
-                  &total_size));
-    }
-  }
-
-  if (total_size == 0) {
-    *out_export_locs = NULL;
-    IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
-  }
-
-  // Allocate persistent storage.
-  iree_hal_amdgpu_trace_src_loc_t* export_locs = NULL;
-  IREE_LEAK_CHECK_DISABLE_PUSH();
-  export_locs = (iree_hal_amdgpu_trace_src_loc_t*)malloc(total_size);
-  IREE_LEAK_CHECK_DISABLE_POP();
-  if (!export_locs) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_make_status(
-                IREE_STATUS_RESOURCE_EXHAUSTED,
-                "AMDGPU executable trace source location storage allocation "
-                "failed"));
-  }
-  memset(export_locs, 0, total_size);
-  char* char_buffer = (char*)&export_locs[export_count];
-
-  // Populate table and fill the buffer. The only pointers used are those
-  // pointing into the persistent allocation.
-  for (iree_host_size_t i = 0; i < export_count; ++i) {
-    iree_hal_amdgpu_trace_src_loc_t* export_loc = &export_locs[i];
-    export_loc->name = NULL;  // not needed
-
-    iree_hal_amdgpu_ExportDef_table_t export_def =
-        iree_hal_amdgpu_ExportDef_vec_at(export_defs, i);
-    iree_hal_debug_ExportDef_table_t debug_def =
-        iree_hal_amdgpu_ExportDef_debug_info_get(export_def);
-    if (!debug_def) continue;
-
-    export_loc->function = iree_hal_amdgpu_executable_copy_trace_string(
-        iree_hal_debug_ExportDef_name_get(debug_def), &char_buffer);
-
-    iree_hal_debug_FileLineLocDef_table_t loc_def =
-        iree_hal_debug_ExportDef_location_get(debug_def);
-    if (loc_def) {
-      export_loc->file = iree_hal_amdgpu_executable_copy_trace_string(
-          iree_hal_debug_FileLineLocDef_filename_get(loc_def), &char_buffer);
-      export_loc->line = iree_hal_debug_FileLineLocDef_line_get(loc_def);
-    }
-
-    // We could do something clever here to ensure consistent colors, like
-    // hashing based on name.
-    export_loc->color = 0;
-  }
-
-  *out_export_locs = export_locs;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -1751,9 +1598,7 @@ iree_hal_amdgpu_executable_initialize_raw_hsaco_export_infos(
 
 static iree_status_t iree_hal_amdgpu_executable_resolve_flatbuffer_kernel_args(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_executable_t executable,
-    iree_hal_amdgpu_ExportDef_vec_t export_defs,
-    const iree_hal_amdgpu_trace_src_loc_t* export_locs,
-    hsa_agent_t any_device_agent,
+    iree_hal_amdgpu_ExportDef_vec_t export_defs, hsa_agent_t any_device_agent,
     iree_hal_amdgpu_device_kernel_args_t* host_kernel_args) {
   const iree_host_size_t kernel_count =
       iree_hal_amdgpu_ExportDef_vec_len(export_defs);
@@ -1790,15 +1635,10 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_flatbuffer_kernel_args(
         iree_hal_amdgpu_ExportDef_binding_flags_get(export_def);
     const uint16_t binding_count =
         (uint16_t)iree_hal_amdgpu_BindingBits_vec_len(binding_bits);
-    const iree_hal_amdgpu_trace_src_loc_t* export_loc = NULL;
-    if (export_locs &&
-        iree_hal_amdgpu_trace_src_loc_has_data(&export_locs[kernel_ordinal])) {
-      export_loc = &export_locs[kernel_ordinal];
-    }
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
             libhsa, symbol, workgroup_size, constant_count, binding_count,
-            export_loc, &host_kernel_args[kernel_ordinal]),
+            &host_kernel_args[kernel_ordinal]),
         "resolving kernel args for `%.*s`", (int)symbol_name_view.size,
         symbol_name_view.data);
   }
@@ -1835,8 +1675,7 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_raw_hsaco_kernel_args(
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
             libhsa, symbol, workgroup_size, requirements.constant_count,
-            requirements.binding_count, /*export_loc=*/NULL,
-            &host_kernel_args[kernel_ordinal]),
+            requirements.binding_count, &host_kernel_args[kernel_ordinal]),
         "resolving kernel args for raw kernel `%.*s`", (int)symbol_name.size,
         symbol_name.data);
   }
@@ -1920,17 +1759,6 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
         iree_hal_amdgpu_ExecutableDef_source_files_get(executable_def));
   }
 
-  // Intern source locations for all exported functions. These will persist for
-  // the lifetime of the process and be passed to tooling as if they were in a
-  // rodata segment.
-  iree_hal_amdgpu_trace_src_loc_t* export_locs = NULL;
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_amdgpu_executable_intern_trace_locs(export_defs, &export_locs);
-  }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
-
   // Load executable and register it with selected GPU agents.
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_executable_load_module(
@@ -1944,7 +1772,7 @@ static iree_status_t iree_hal_amdgpu_executable_create_from_flatbuffer(
   // kernel_object pointer and we handle that per-device during table upload.
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_executable_resolve_flatbuffer_kernel_args(
-        libhsa, executable->handle, export_defs, export_locs, any_device_agent,
+        libhsa, executable->handle, export_defs, any_device_agent,
         executable->host_kernel_args);
   }
 

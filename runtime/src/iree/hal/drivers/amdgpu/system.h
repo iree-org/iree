@@ -23,8 +23,6 @@ extern "C" {
 
 // Options defining total system behavior.
 typedef struct iree_hal_amdgpu_system_options_t {
-  // Enable dispatch-level tracing (if device instrumentation is compiled in).
-  uint64_t trace_execution : 1;
   // Force queues to run one entry at a time instead of overlapping or
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;

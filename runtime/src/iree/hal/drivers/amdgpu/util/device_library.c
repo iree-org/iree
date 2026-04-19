@@ -581,14 +581,6 @@ static iree_status_t iree_hal_amdgpu_device_library_populate_kernel_args(
               HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_KERNARG_SEGMENT_ALIGNMENT,
               &out_kernel_args->kernarg_alignment));
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
-  // TODO(benvanik): intern an export_loc? We don't have a Tracy API for this
-  // yet and our option is to leak the value unconditionally.
-  out_kernel_args->trace_src_loc = 0;
-#else
-  out_kernel_args->trace_src_loc = 0;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
-
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

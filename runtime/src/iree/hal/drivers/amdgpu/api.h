@@ -115,10 +115,6 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // execution latency.
   uint64_t preallocate_pools : 1;
 
-  // Reserved for a future device-side execution trace stream. Unsupported
-  // today; enabling it fails option verification.
-  uint64_t trace_execution : 1;
-
   // Profiling metadata retention policy.
   struct {
     // Retains exact executable code-object image bytes and loader load ranges
