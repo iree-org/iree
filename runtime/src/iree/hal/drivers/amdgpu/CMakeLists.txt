@@ -12,6 +12,19 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    queue_affinity
+  HDRS
+    "queue_affinity.h"
+  SRCS
+    "queue_affinity.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     amdgpu
   HDRS
     "api.h"
@@ -87,6 +100,7 @@ iree_cc_library(
     "transient_buffer.h"
     "virtual_queue.h"
   DEPS
+    ::queue_affinity
     iree::async
     iree::async::util::proactor_pool
     iree::base
@@ -159,6 +173,7 @@ iree_cc_library(
     "transient_buffer.h"
     "virtual_queue.h"
   DEPS
+    ::queue_affinity
     iree::base
     iree::base::internal
     iree::base::internal::arena
@@ -174,6 +189,21 @@ iree_cc_library(
     iree::hal::memory::slab_provider
     iree::hal::memory::tracing
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    queue_affinity_test
+  SRCS
+    "queue_affinity_test.cc"
+  DEPS
+    ::queue_affinity
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(

@@ -8,6 +8,7 @@
 
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
@@ -111,23 +112,18 @@ static bool iree_hal_amdgpu_allocator_select_device_ordinal(
     const iree_hal_amdgpu_allocator_t* allocator,
     iree_hal_queue_affinity_t queue_affinity,
     iree_host_size_t* out_device_ordinal) {
-  iree_hal_queue_affinity_t effective_affinity = queue_affinity;
-  if (iree_hal_queue_affinity_is_any(effective_affinity)) {
-    effective_affinity = allocator->logical_device->queue_affinity_mask;
-  } else {
-    iree_hal_queue_affinity_and_into(
-        effective_affinity, allocator->logical_device->queue_affinity_mask);
+  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = allocator->logical_device->queue_affinity_mask,
+      .physical_device_count = allocator->topology->gpu_agent_count,
+      .queue_count_per_physical_device =
+          allocator->topology->gpu_agent_queue_count,
+  };
+  iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+  if (!iree_hal_amdgpu_queue_affinity_try_resolve(domain, queue_affinity,
+                                                  &resolved)) {
+    return false;
   }
-  if (iree_hal_queue_affinity_is_empty(effective_affinity)) return false;
-
-  const int queue_ordinal =
-      iree_hal_queue_affinity_find_first_set(effective_affinity);
-  const iree_host_size_t device_ordinal =
-      (iree_host_size_t)queue_ordinal /
-      allocator->topology->gpu_agent_queue_count;
-  if (device_ordinal >= allocator->topology->gpu_agent_count) return false;
-
-  *out_device_ordinal = device_ordinal;
+  *out_device_ordinal = resolved.physical_device_ordinal;
   return true;
 }
 

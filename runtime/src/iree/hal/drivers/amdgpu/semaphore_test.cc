@@ -115,6 +115,7 @@ TEST_F(SemaphoreTest, QueuePolicyUsesAgentScopeOnlyForSamePhysicalDevice) {
   iree_hal_amdgpu_logical_device_t logical_device;
   memset(&logical_device, 0, sizeof(logical_device));
   logical_device.system = &system;
+  logical_device.physical_device_count = 2;
   logical_device.queue_affinity_mask = 0xFull;
 
   iree_hal_amdgpu_host_queue_t queue;

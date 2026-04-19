@@ -7,6 +7,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 
 #include "iree/hal/drivers/amdgpu/logical_device.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 
@@ -19,19 +20,14 @@ static bool iree_hal_amdgpu_host_queue_affinity_is_same_agent(
     iree_hal_queue_affinity_t queue_affinity) {
   const iree_hal_amdgpu_logical_device_t* logical_device =
       (const iree_hal_amdgpu_logical_device_t*)queue->logical_device;
-
-  iree_hal_queue_affinity_and_into(queue_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) return false;
-
-  const iree_host_size_t per_device_queue_count =
-      logical_device->system->topology.gpu_agent_queue_count;
-  IREE_HAL_FOR_QUEUE_AFFINITY(queue_affinity) {
-    const iree_host_size_t device_ordinal =
-        (iree_host_size_t)queue_ordinal / per_device_queue_count;
-    if (device_ordinal != queue->device_ordinal) return false;
-  }
-  return true;
+  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = logical_device->queue_affinity_mask,
+      .physical_device_count = logical_device->physical_device_count,
+      .queue_count_per_physical_device =
+          logical_device->system->topology.gpu_agent_queue_count,
+  };
+  return iree_hal_amdgpu_queue_affinity_is_physical_device_local(
+      domain, queue_affinity, queue->device_ordinal);
 }
 
 // Returns true when a semaphore edge can be represented with HSA AGENT scope

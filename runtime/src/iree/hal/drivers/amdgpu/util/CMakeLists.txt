@@ -399,6 +399,7 @@ iree_cc_binary_benchmark(
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::headers
+    iree::hal::drivers::amdgpu::queue_affinity
     iree::hal::drivers::amdgpu::registration
     iree::io::file_handle
   TESTONLY

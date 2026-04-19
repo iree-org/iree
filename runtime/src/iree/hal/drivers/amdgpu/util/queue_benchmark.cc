@@ -23,6 +23,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_dispatch.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/benchmark_flags.h"
@@ -216,35 +217,25 @@ class QueueBenchmark : public benchmark::Fixture {
     *out_host_queue = nullptr;
     auto* logical_device =
         reinterpret_cast<iree_hal_amdgpu_logical_device_t*>(device_);
-    iree_hal_queue_affinity_and_into(queue_affinity,
-                                     logical_device->queue_affinity_mask);
-    if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "queue affinity is not available");
-    }
-
-    const iree_host_size_t queue_ordinal =
-        iree_hal_queue_affinity_find_first_set(queue_affinity);
-    const iree_host_size_t per_device_queue_count =
-        logical_device->system->topology.gpu_agent_queue_count;
-    const iree_host_size_t physical_device_ordinal =
-        queue_ordinal / per_device_queue_count;
-    if (IREE_UNLIKELY(physical_device_ordinal >=
-                      logical_device->physical_device_count)) {
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "queue ordinal has no physical device");
-    }
+    const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+        .supported_affinity = logical_device->queue_affinity_mask,
+        .physical_device_count = logical_device->physical_device_count,
+        .queue_count_per_physical_device =
+            logical_device->system->topology.gpu_agent_queue_count,
+    };
+    iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_resolve(
+        domain, queue_affinity, &resolved));
     iree_hal_amdgpu_physical_device_t* physical_device =
-        logical_device->physical_devices[physical_device_ordinal];
-    const iree_host_size_t physical_queue_ordinal =
-        queue_ordinal % per_device_queue_count;
-    if (IREE_UNLIKELY(physical_queue_ordinal >=
+        logical_device->physical_devices[resolved.physical_device_ordinal];
+    if (IREE_UNLIKELY(resolved.physical_queue_ordinal >=
                       physical_device->host_queue_count)) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "queue ordinal has no initialized host queue");
     }
 
-    *out_host_queue = &physical_device->host_queues[physical_queue_ordinal];
+    *out_host_queue =
+        &physical_device->host_queues[resolved.physical_queue_ordinal];
     return iree_ok_status();
   }
 

@@ -21,6 +21,7 @@
 #include "iree/hal/drivers/amdgpu/physical_device.h"
 #include "iree/hal/drivers/amdgpu/profile_counters.h"
 #include "iree/hal/drivers/amdgpu/profile_traces.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
@@ -34,6 +35,17 @@
 // Utilities
 //===----------------------------------------------------------------------===//
 
+static iree_hal_amdgpu_queue_affinity_domain_t
+iree_hal_amdgpu_logical_device_queue_affinity_domain(
+    const iree_hal_amdgpu_logical_device_t* logical_device) {
+  return (iree_hal_amdgpu_queue_affinity_domain_t){
+      .supported_affinity = logical_device->queue_affinity_mask,
+      .physical_device_count = logical_device->physical_device_count,
+      .queue_count_per_physical_device =
+          logical_device->system->topology.gpu_agent_queue_count,
+  };
+}
+
 // Returns the queue for a flattened logical queue ordinal.
 static iree_status_t iree_hal_amdgpu_logical_device_queue_from_ordinal(
     iree_hal_amdgpu_logical_device_t* logical_device,
@@ -43,33 +55,25 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_from_ordinal(
   IREE_ASSERT_ARGUMENT(out_queue);
   *out_queue = NULL;
 
-  const iree_host_size_t per_device_queue_count =
-      logical_device->system->topology.gpu_agent_queue_count;
-  const iree_host_size_t physical_device_ordinal =
-      queue_ordinal / per_device_queue_count;
-  const iree_host_size_t host_queue_ordinal =
-      queue_ordinal % per_device_queue_count;
-
-  if (IREE_UNLIKELY(physical_device_ordinal >=
-                    logical_device->physical_device_count)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "queue affinity ordinal %" PRIhsz
-                            " maps to invalid physical device ordinal %" PRIhsz,
-                            queue_ordinal, physical_device_ordinal);
-  }
+  iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_resolve_ordinal(
+      iree_hal_amdgpu_logical_device_queue_affinity_domain(logical_device),
+      queue_ordinal, &resolved));
 
   iree_hal_amdgpu_physical_device_t* physical_device =
-      logical_device->physical_devices[physical_device_ordinal];
-  if (IREE_UNLIKELY(host_queue_ordinal >= physical_device->host_queue_count)) {
+      logical_device->physical_devices[resolved.physical_device_ordinal];
+  if (IREE_UNLIKELY(resolved.physical_queue_ordinal >=
+                    physical_device->host_queue_count)) {
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "queue affinity ordinal %" PRIhsz
                             " maps to invalid host queue ordinal "
                             "%" PRIhsz " on physical device %" PRIhsz,
-                            queue_ordinal, host_queue_ordinal,
-                            physical_device_ordinal);
+                            queue_ordinal, resolved.physical_queue_ordinal,
+                            resolved.physical_device_ordinal);
   }
 
-  *out_queue = &physical_device->host_queues[host_queue_ordinal].base;
+  *out_queue =
+      &physical_device->host_queues[resolved.physical_queue_ordinal].base;
   return iree_ok_status();
 }
 
@@ -1219,17 +1223,12 @@ static iree_status_t iree_hal_amdgpu_logical_device_select_host_queue(
   IREE_ASSERT_ARGUMENT(out_queue);
   *out_queue = NULL;
 
-  iree_hal_queue_affinity_and_into(queue_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no valid queue affinity bits specified");
-  }
-
-  const iree_host_size_t queue_ordinal =
-      iree_hal_queue_affinity_find_first_set(queue_affinity);
+  iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_resolve(
+      iree_hal_amdgpu_logical_device_queue_affinity_domain(logical_device),
+      queue_affinity, &resolved));
   return iree_hal_amdgpu_logical_device_queue_from_ordinal(
-      logical_device, queue_ordinal, out_queue);
+      logical_device, resolved.queue_ordinal, out_queue);
 }
 
 // Selects the physical device backing |queue_affinity| for pool creation.
@@ -1248,21 +1247,12 @@ iree_hal_amdgpu_logical_device_select_queue_pool_physical_device(
   IREE_ASSERT_ARGUMENT(out_physical_device);
   *out_physical_device = NULL;
 
-  iree_hal_queue_affinity_and_into(queue_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no valid queue affinity bits specified");
-  }
-
-  const iree_host_size_t queue_ordinal =
-      iree_hal_queue_affinity_find_first_set(queue_affinity);
-  const iree_host_size_t per_device_queue_count =
-      logical_device->system->topology.gpu_agent_queue_count;
-  const iree_host_size_t physical_device_ordinal =
-      queue_ordinal / per_device_queue_count;
+  iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_resolve(
+      iree_hal_amdgpu_logical_device_queue_affinity_domain(logical_device),
+      queue_affinity, &resolved));
   *out_physical_device =
-      logical_device->physical_devices[physical_device_ordinal];
+      logical_device->physical_devices[resolved.physical_device_ordinal];
   return iree_ok_status();
 }
 
@@ -1278,50 +1268,9 @@ iree_hal_amdgpu_logical_device_normalize_command_buffer_affinity(
   *out_queue_affinity = 0;
   *out_device_ordinal = 0;
 
-  const bool is_any_affinity = iree_hal_queue_affinity_is_any(queue_affinity);
-  iree_hal_queue_affinity_t effective_affinity =
-      is_any_affinity ? logical_device->queue_affinity_mask : queue_affinity;
-  iree_hal_queue_affinity_and_into(effective_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(effective_affinity)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no valid queue affinity bits specified");
-  }
-
-  const iree_host_size_t queue_ordinal =
-      iree_hal_queue_affinity_find_first_set(effective_affinity);
-  const iree_host_size_t per_device_queue_count =
-      logical_device->system->topology.gpu_agent_queue_count;
-  const iree_host_size_t device_ordinal =
-      queue_ordinal / per_device_queue_count;
-  iree_hal_queue_affinity_t device_queue_affinity = 0;
-  for (iree_host_size_t queue_index = 0; queue_index < per_device_queue_count;
-       ++queue_index) {
-    const iree_host_size_t device_queue_ordinal =
-        device_ordinal * per_device_queue_count + queue_index;
-    iree_hal_queue_affinity_or_into(device_queue_affinity,
-                                    ((iree_hal_queue_affinity_t)1)
-                                        << device_queue_ordinal);
-  }
-  iree_hal_queue_affinity_and_into(device_queue_affinity,
-                                   logical_device->queue_affinity_mask);
-
-  if (!is_any_affinity &&
-      iree_any_bit_set(effective_affinity, ~device_queue_affinity)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "AMDGPU command buffers must target one physical device; queue "
-        "affinity 0x%" PRIx64 " spans multiple physical devices",
-        queue_affinity);
-  }
-
-  iree_hal_queue_affinity_t selected_affinity = device_queue_affinity;
-  if (!is_any_affinity) {
-    iree_hal_queue_affinity_and_into(selected_affinity, effective_affinity);
-  }
-  *out_queue_affinity = selected_affinity;
-  *out_device_ordinal = device_ordinal;
-  return iree_ok_status();
+  return iree_hal_amdgpu_queue_affinity_normalize_for_physical_device(
+      iree_hal_amdgpu_logical_device_queue_affinity_domain(logical_device),
+      queue_affinity, out_queue_affinity, out_device_ordinal);
 }
 
 static bool iree_hal_amdgpu_logical_device_query_pool_epoch(
@@ -1456,6 +1405,21 @@ static iree_status_t iree_hal_amdgpu_logical_device_allocate_storage(
           topology->gpu_agent_count, physical_device_size, uint8_t,
           iree_max_align_t, &physical_device_data_offset),
       IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset)));
+
+  const iree_hal_amdgpu_queue_affinity_domain_t queue_affinity_domain = {
+      .supported_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+      .physical_device_count = topology->gpu_agent_count,
+      .queue_count_per_physical_device = topology->gpu_agent_queue_count,
+  };
+  iree_hal_queue_affinity_t logical_queue_affinity_mask = 0;
+  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+    iree_hal_queue_affinity_t physical_device_affinity = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_for_physical_device(
+        queue_affinity_domain, i, &physical_device_affinity));
+    iree_hal_queue_affinity_or_into(logical_queue_affinity_mask,
+                                    physical_device_affinity);
+  }
+
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, total_size,
                                              (void**)&logical_device));
   memset(logical_device, 0, total_size);
@@ -1474,18 +1438,13 @@ static iree_status_t iree_hal_amdgpu_logical_device_allocate_storage(
 
   // Setup physical device table first so failure cleanup has a valid table.
   logical_device->physical_device_count = topology->gpu_agent_count;
+  logical_device->queue_affinity_mask = logical_queue_affinity_mask;
   uint8_t* physical_device_base =
       (uint8_t*)logical_device + physical_device_data_offset;
-  for (iree_host_size_t i = 0, queue_index = 0;
-       i < logical_device->physical_device_count; ++i) {
+  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
     logical_device->physical_devices[i] =
         (iree_hal_amdgpu_physical_device_t*)physical_device_base;
     physical_device_base += physical_device_size;
-    for (iree_host_size_t j = 0; j < topology->gpu_agent_queue_count;
-         ++j, ++queue_index) {
-      iree_hal_queue_affinity_or_into(logical_device->queue_affinity_mask,
-                                      1ull << queue_index);
-    }
   }
 
   *out_logical_device = logical_device;
@@ -2287,13 +2246,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_import_file(
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
 
-  // Mask the user-provided queue affinity to only those we have.
-  iree_hal_queue_affinity_and_into(queue_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no valid queue affinity bits specified");
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_normalize(
+      logical_device->queue_affinity_mask, queue_affinity, &queue_affinity));
 
   return iree_hal_file_from_handle(
       iree_hal_device_allocator(base_device), queue_affinity, access, handle,
@@ -2530,12 +2484,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_flush(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
-  iree_hal_queue_affinity_and_into(queue_affinity,
-                                   logical_device->queue_affinity_mask);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no valid queue affinity bits specified");
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_normalize(
+      logical_device->queue_affinity_mask, queue_affinity, &queue_affinity));
 
   IREE_HAL_FOR_QUEUE_AFFINITY(queue_affinity) {
     iree_hal_amdgpu_virtual_queue_t* queue = NULL;

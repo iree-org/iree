@@ -11,6 +11,7 @@
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/notification.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/slab_provider.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/epoch_signal_table.h"
@@ -563,21 +564,6 @@ static iree_status_t iree_hal_amdgpu_physical_device_preallocate_host_pool(
       options->host_block_pool_initial_capacity);
 }
 
-static iree_hal_queue_affinity_t
-iree_hal_amdgpu_physical_device_queue_affinity_mask(
-    const iree_hal_amdgpu_physical_device_options_t* options,
-    iree_host_size_t device_ordinal) {
-  iree_hal_queue_affinity_t queue_affinity_mask = 0;
-  for (iree_host_size_t queue_ordinal = 0;
-       queue_ordinal < options->host_queue_count; ++queue_ordinal) {
-    const iree_host_size_t logical_queue_ordinal =
-        device_ordinal * options->host_queue_count + queue_ordinal;
-    iree_hal_queue_affinity_or_into(queue_affinity_mask,
-                                    1ull << logical_queue_ordinal);
-  }
-  return queue_affinity_mask;
-}
-
 static iree_status_t
 iree_hal_amdgpu_physical_device_initialize_default_pool_resources(
     iree_hal_device_t* logical_device, iree_hal_amdgpu_system_t* system,
@@ -773,9 +759,16 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   // Create the default queue-allocation slab provider over the device
   // coarse-grained HSA pool and derive the TLSF policy used once topology
   // assignment provides an epoch query.
-  iree_hal_queue_affinity_t queue_affinity_mask =
-      iree_hal_amdgpu_physical_device_queue_affinity_mask(options,
-                                                          device_ordinal);
+  iree_hal_queue_affinity_t queue_affinity_mask = 0;
+  const iree_hal_amdgpu_queue_affinity_domain_t queue_affinity_domain = {
+      .supported_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+      .physical_device_count = system->topology.gpu_agent_count,
+      .queue_count_per_physical_device = options->host_queue_count,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_queue_affinity_for_physical_device(
+        queue_affinity_domain, device_ordinal, &queue_affinity_mask);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_physical_device_initialize_default_pool_resources(
         logical_device, system, options, proactor, device_ordinal,
@@ -838,6 +831,11 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
           .user_data = epoch_signal_table,
       },
       host_allocator, &physical_device->default_pool);
+  const iree_hal_amdgpu_queue_affinity_domain_t queue_affinity_domain = {
+      .supported_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+      .physical_device_count = system->topology.gpu_agent_count,
+      .queue_count_per_physical_device = physical_device->host_queue_capacity,
+  };
   for (iree_host_size_t queue_ordinal = 0;
        queue_ordinal < physical_device->host_queue_capacity &&
        iree_status_is_ok(status);
@@ -845,8 +843,10 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
     const iree_host_size_t logical_queue_ordinal =
         physical_device->device_ordinal * physical_device->host_queue_capacity +
         queue_ordinal;
-    const iree_hal_queue_affinity_t queue_affinity =
-        ((iree_hal_queue_affinity_t)1) << logical_queue_ordinal;
+    iree_hal_amdgpu_queue_affinity_resolved_t resolved;
+    status = iree_hal_amdgpu_queue_affinity_resolve_ordinal(
+        queue_affinity_domain, logical_queue_ordinal, &resolved);
+    if (!iree_status_is_ok(status)) break;
     iree_async_axis_t queue_axis = iree_async_axis_make_queue(
         session_epoch, machine_index, (uint8_t)physical_device->device_ordinal,
         (uint8_t)queue_ordinal);
@@ -856,7 +856,7 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
     status = iree_hal_amdgpu_host_queue_initialize(
         libhsa, logical_device, proactor, physical_device->device_agent,
         host_memory_pools->kernarg_pool, host_memory_pools->fine_pool,
-        frontier_tracker, queue_axis, queue_affinity,
+        frontier_tracker, queue_axis, resolved.queue_affinity,
         completion_thread_affinity, physical_device->wait_barrier_strategy,
         physical_device->vendor_packet_capabilities, epoch_signal_table,
         &physical_device->fine_host_block_pool,
