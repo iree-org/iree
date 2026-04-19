@@ -15,6 +15,63 @@
 namespace iree::hal::amdgpu {
 namespace {
 
+TEST(KFDStandaloneTest, ValidateClockCounters) {
+  iree_hal_amdgpu_clock_counters_t counters = {
+      /*.gpu_clock_counter=*/1,
+      /*.cpu_clock_counter=*/2,
+      /*.system_clock_counter=*/3,
+      /*.system_clock_freq=*/4,
+  };
+  IREE_EXPECT_OK(iree_hal_amdgpu_kfd_validate_clock_counters(1234, &counters));
+
+  counters.gpu_clock_counter = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_hal_amdgpu_kfd_validate_clock_counters(1234, &counters));
+  counters.gpu_clock_counter = 1;
+
+  counters.cpu_clock_counter = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_hal_amdgpu_kfd_validate_clock_counters(1234, &counters));
+  counters.cpu_clock_counter = 2;
+
+  counters.system_clock_counter = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_hal_amdgpu_kfd_validate_clock_counters(1234, &counters));
+  counters.system_clock_counter = 3;
+
+  counters.system_clock_freq = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_hal_amdgpu_kfd_validate_clock_counters(1234, &counters));
+}
+
+TEST(KFDStandaloneTest, GetClockCountersFailsForInvalidDescriptor) {
+  iree_hal_amdgpu_clock_counters_t counters = {
+      /*.gpu_clock_counter=*/1,
+      /*.cpu_clock_counter=*/2,
+      /*.system_clock_counter=*/3,
+      /*.system_clock_freq=*/4,
+  };
+
+#if defined(IREE_PLATFORM_LINUX)
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_amdgpu_kfd_get_clock_counters(-1, 1234, &counters));
+#else
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNIMPLEMENTED,
+      iree_hal_amdgpu_kfd_get_clock_counters(-1, 1234, &counters));
+#endif  // IREE_PLATFORM_LINUX
+
+  EXPECT_EQ(counters.gpu_clock_counter, 0);
+  EXPECT_EQ(counters.cpu_clock_counter, 0);
+  EXPECT_EQ(counters.system_clock_counter, 0);
+  EXPECT_EQ(counters.system_clock_freq, 0);
+}
+
 // NOTE: ROCR also opens the KFD - if it initializes then we're likely to
 // succeed as well. We need information we can only get from HSA to make the
 // ioctls so we have to setup a full topology here.

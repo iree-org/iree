@@ -40,11 +40,26 @@ int iree_hal_amdgpu_ioctl(int fd, unsigned long request, void* arg);
 // https://github.com/ROCm/ROCR-Runtime/issues/278
 
 typedef struct iree_hal_amdgpu_clock_counters_t {
+  // GPU clock counter sampled by KFD for the requested GPU.
   uint64_t gpu_clock_counter;
+
+  // Host CPU timestamp sampled by KFD near the GPU clock read.
   uint64_t cpu_clock_counter;
+
+  // Host system clock counter sampled by KFD near the GPU clock read.
   uint64_t system_clock_counter;
+
+  // Frequency in Hz for system_clock_counter.
   uint64_t system_clock_freq;
 } iree_hal_amdgpu_clock_counters_t;
+
+// Validates that |counters| contains a usable KFD clock-counter sample.
+//
+// AMDKFD_IOC_GET_CLOCK_COUNTERS can succeed while returning zeroed counters
+// for an invalid GPU UID. Callers must validate the sample before publishing
+// any clock-correlation flags derived from it.
+iree_status_t iree_hal_amdgpu_kfd_validate_clock_counters(
+    uint32_t gpu_uid, const iree_hal_amdgpu_clock_counters_t* counters);
 
 // Equivalent to `hsaKmtGetClockCounters` in the ROCR KMT.
 // |fd| must be an open /dev/kfd file handle.

@@ -655,6 +655,12 @@ iree_hal_amdgpu_logical_device_sample_profile_clock_correlation(
     out_record->host_system_frequency_hz = counters.system_clock_freq;
     out_record->host_time_begin_ns = host_time_begin_ns;
     out_record->host_time_end_ns = host_time_end_ns;
+  } else {
+    status = iree_status_annotate_f(
+        status,
+        "sampling profile clock correlation for physical_device_ordinal=%zu "
+        "gpu_uid=%" PRIu32,
+        physical_device->device_ordinal, physical_device->kfd_gpu_uid);
   }
   return status;
 }
