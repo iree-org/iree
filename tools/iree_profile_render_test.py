@@ -143,6 +143,19 @@ class CommonTest(unittest.TestCase):
             ),
         )
 
+    def test_device_event_without_time_mapping_has_no_host_range(self):
+        self.assertIsNone(
+            common.device_event_host_time_range(
+                {
+                    "valid": True,
+                    "physical_device_ordinal": 0,
+                    "start_tick": 120,
+                    "end_tick": 130,
+                },
+                {},
+            )
+        )
+
 
 class PerfettoTest(unittest.TestCase):
 
@@ -232,6 +245,53 @@ class PerfettoTest(unittest.TestCase):
         self.assertEqual(1, stats.queue_instants)
         self.assertEqual(2, stats.clock_instants)
         self.assertEqual(1, stats.relationship_flows)
+
+    def test_build_trace_skips_unmapped_device_ticks_but_keeps_host_spans(self):
+        trace_bytes, stats = perfetto.build_trace(
+            [
+                {"record_type": "device", "physical_device_ordinal": 0},
+                {
+                    "record_type": "queue",
+                    "physical_device_ordinal": 0,
+                    "queue_ordinal": 0,
+                    "stream_id": 0,
+                },
+                {
+                    "record_type": "dispatch_event",
+                    "event_id": 1,
+                    "submission_id": 1,
+                    "key": "dispatch_0",
+                    "valid": True,
+                    "physical_device_ordinal": 0,
+                    "queue_ordinal": 0,
+                    "stream_id": 0,
+                    "start_tick": 110,
+                    "end_tick": 120,
+                },
+                {
+                    "record_type": "host_execution_event",
+                    "event_id": 2,
+                    "submission_id": 1,
+                    "key": "host dispatch",
+                    "physical_device_ordinal": 0,
+                    "queue_ordinal": 0,
+                    "stream_id": 0,
+                    "start_host_time_ns": 1000,
+                    "end_host_time_ns": 1050,
+                },
+            ],
+            perfetto.PerfettoImports(
+                trace_proto_builder=_FakeTraceProtoBuilder,
+                track_descriptor=_FakeTrackDescriptor,
+                track_event=_FakeTrackEvent,
+            ),
+        )
+
+        self.assertTrue(trace_bytes.startswith(b"packets="))
+        self.assertEqual(0, stats.dispatch_slices)
+        self.assertEqual(1, stats.skipped_dispatches)
+        self.assertEqual(1, stats.host_execution_slices)
+        self.assertEqual(0, stats.skipped_host_execution_events)
 
 
 if __name__ == "__main__":
