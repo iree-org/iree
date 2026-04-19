@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/profile_schema.h"
 #include "iree/hal/profile_sink.h"
 #include "iree/io/file_handle.h"
 

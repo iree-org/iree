@@ -26,6 +26,7 @@
 #include "iree/hal/drivers/amdgpu/util/pm4_capabilities.h"
 #include "iree/hal/drivers/amdgpu/virtual_queue.h"
 #include "iree/hal/pool.h"
+#include "iree/hal/profile_schema.h"
 #include "iree/hal/profile_sink.h"
 
 #ifdef __cplusplus

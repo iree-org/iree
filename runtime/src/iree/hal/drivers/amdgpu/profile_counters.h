@@ -10,6 +10,7 @@
 #include "iree/hal/device.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/drivers/amdgpu/util/aql_ring.h"
+#include "iree/hal/profile_schema.h"
 #include "iree/hal/profile_sink.h"
 
 #ifdef __cplusplus

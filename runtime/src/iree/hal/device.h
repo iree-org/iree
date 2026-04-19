@@ -21,7 +21,7 @@
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
 #include "iree/hal/pool.h"
-#include "iree/hal/profile_sink.h"
+#include "iree/hal/profile_options.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
@@ -118,135 +118,6 @@ iree_hal_device_create_params_default(void) {
   iree_hal_device_create_params_t params;
   memset(&params, 0, sizeof(params));
   return params;
-}
-
-// Bitfield selecting HAL-native structured profiling data families.
-//
-// These bits are not mutually-exclusive modes. Each bit requests one family of
-// records or artifacts emitted through iree_hal_profile_sink_t. Not all
-// implementations support all families.
-typedef uint64_t iree_hal_device_profiling_data_families_t;
-enum iree_hal_device_profiling_data_family_bits_t {
-  IREE_HAL_DEVICE_PROFILING_DATA_NONE = 0u,
-
-  // Host-timestamped queue operation records such as submissions, dependency
-  // strategy, and encoded operation counts. Producers may retain these as an
-  // aggregate lossy stream and report dropped records with TRUNCATED chunks.
-  IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS = 1ull << 0,
-
-  // Host-timestamped execution spans for work performed by the host, such as
-  // CPU/local dispatch bodies or host-side command buffer replay.
-  IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS = 1ull << 1,
-
-  // Device-timestamped queue operation spans showing when queue-visible work
-  // started and completed in the device timestamp domain. These are precise
-  // execution timeline records: producers should fail the profiled operation or
-  // session when they cannot retain complete selected events.
-  IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS = 1ull << 2,
-
-  // Device-timestamped dispatch execution events. This does not request
-  // hardware/software counter samples by itself. These are precise execution
-  // timeline records: producers should fail the profiled operation or session
-  // when they cannot retain complete selected events.
-  IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS = 1ull << 3,
-
-  // Explicitly selected hardware/software counter samples. Requested counters
-  // are described by |counter_sets|.
-  IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES = 1ull << 4,
-
-  // Executable/code-object/export metadata needed for offline analysis. Some
-  // producers may emit this implicitly when another requested family references
-  // executable ids, but this bit lets callers request metadata by itself.
-  IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA = 1ull << 5,
-
-  // Heavyweight executable trace artifacts such as instruction/thread traces
-  // for selected dispatches or command-buffer ranges. This can allocate large
-  // device buffers and inject additional queue packets and should only be
-  // enabled with a narrow capture filter.
-  IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES = 1ull << 6,
-
-  // Memory allocation and reservation lifecycle records. Producers may retain
-  // these as an aggregate lossy stream and report dropped records with
-  // TRUNCATED chunks.
-  IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS = 1ull << 7,
-};
-
-// Controls profiling options.
-//
-// All pointer and string-view fields are borrowed and only need to remain valid
-// until iree_hal_device_profiling_begin returns. Implementations that need a
-// value after returning success must retain, copy, or resolve it into
-// implementation-owned session state before returning.
-typedef struct iree_hal_device_profiling_options_t {
-  // HAL-native structured data families requested by the caller.
-  iree_hal_device_profiling_data_families_t data_families;
-
-  // Programmatic sink receiving HAL-native profiling chunks.
-  // The caller retains ownership of the sink for the duration of the
-  // profiling_begin call. Implementations that keep the sink beyond the call
-  // must retain it and release it during profiling_end or teardown.
-  iree_hal_profile_sink_t* sink;
-
-  // Optional borrowed filter selecting operations that should emit heavy
-  // profile artifacts. A zero-initialized filter matches all operations.
-  // Implementations that retain the filter for session matching must copy any
-  // string views it contains before returning from profiling_begin.
-  iree_hal_profile_capture_filter_t capture_filter;
-
-  // Number of explicitly requested hardware/software counter sets.
-  // Must be nonzero when requesting
-  // IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES.
-  iree_host_size_t counter_set_count;
-
-  // Borrowed begin-call-only array of explicitly requested counter sets.
-  // Implementations must either capture every requested counter set exactly or
-  // fail profiling_begin; silently dropping counters would make the profile
-  // bundle misleading.
-  const iree_hal_profile_counter_set_selection_t* counter_sets;
-} iree_hal_device_profiling_options_t;
-
-// Opaque storage backing cloned profiling options.
-typedef struct iree_hal_device_profiling_options_storage_t
-    iree_hal_device_profiling_options_storage_t;
-
-// Clones |source_options| and all borrowed nested storage into
-// |host_allocator|.
-//
-// |out_options| receives a value type whose pointer/string fields reference
-// storage owned by |out_storage|. If |source_options->sink| is non-NULL it is
-// retained and will be released by
-// iree_hal_device_profiling_options_storage_free. Callers must not separately
-// release any pointers in |out_options|.
-IREE_API_EXPORT iree_status_t iree_hal_device_profiling_options_clone(
-    const iree_hal_device_profiling_options_t* source_options,
-    iree_allocator_t host_allocator,
-    iree_hal_device_profiling_options_t* out_options,
-    iree_hal_device_profiling_options_storage_t** out_storage);
-
-// Frees storage returned by iree_hal_device_profiling_options_clone.
-IREE_API_EXPORT void iree_hal_device_profiling_options_storage_free(
-    iree_hal_device_profiling_options_storage_t* storage,
-    iree_allocator_t host_allocator);
-
-// Returns true when |options| requests explicit hardware counter capture.
-static inline bool iree_hal_device_profiling_options_requests_data(
-    const iree_hal_device_profiling_options_t* options,
-    iree_hal_device_profiling_data_families_t data_families) {
-  return iree_any_bit_set(options->data_families, data_families);
-}
-
-// Returns true when |options| requests explicit hardware counter capture.
-static inline bool iree_hal_device_profiling_options_requests_counter_samples(
-    const iree_hal_device_profiling_options_t* options) {
-  return iree_hal_device_profiling_options_requests_data(
-      options, IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES);
-}
-
-// Returns true when |options| requests executable trace artifacts.
-static inline bool iree_hal_device_profiling_options_requests_executable_traces(
-    const iree_hal_device_profiling_options_t* options) {
-  return iree_hal_device_profiling_options_requests_data(
-      options, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
 }
 
 // Bitfield selecting external capture behavior.

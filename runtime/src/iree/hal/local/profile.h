@@ -13,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/device.h"
+#include "iree/hal/profile_schema.h"
 
 #ifdef __cplusplus
 extern "C" {
