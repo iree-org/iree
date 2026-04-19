@@ -1798,35 +1798,45 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_capabilities(
       iree_hal_amdgpu_logical_device_cast(base_device);
   memset(out_capabilities, 0, sizeof(*out_capabilities));
 
-  // For single-GPU logical devices, query the first physical device.
-  // TODO(multi-gpu): for multi-GPU logical devices, aggregate capabilities from
-  // all physical devices (take intersection of supported features, lowest
-  // common denominator for limits, etc.).
   if (logical_device->physical_device_count == 0) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
         "logical device has no physical devices (initialization incomplete)");
   }
 
+  // A multi-GPU logical device is a composite HAL device. Generic HAL topology
+  // has only one node for it, so do not expose a physical-device-0 identity as
+  // though it represented the entire composite. Exact internal physical device
+  // identity is reported through AMDGPU profile/device metadata and queue
+  // affinity records.
+  const bool is_composite_device = logical_device->physical_device_count > 1;
   iree_hal_amdgpu_physical_device_t* physical_device =
       logical_device->physical_devices[0];
-  hsa_agent_t gpu_agent = physical_device->device_agent;
-  const iree_hal_amdgpu_libhsa_t* libhsa = &logical_device->system->libhsa;
 
   memset(out_capabilities->physical_device_uuid, 0,
          sizeof(out_capabilities->physical_device_uuid));
-  if (physical_device->has_physical_device_uuid) {
+  if (!is_composite_device && physical_device->has_physical_device_uuid) {
     memcpy(out_capabilities->physical_device_uuid,
            physical_device->physical_device_uuid,
            sizeof(out_capabilities->physical_device_uuid));
     out_capabilities->has_physical_device_uuid = true;
   }
 
-  // Query NUMA node from HSA.
-  uint32_t numa_node;
-  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-      IREE_LIBHSA(libhsa), gpu_agent, HSA_AGENT_INFO_NODE, &numa_node));
-  out_capabilities->numa_node = (uint8_t)numa_node;
+  // Report a NUMA affinity only when the composite has a single nearest host
+  // node that fits the generic HAL uint8_t representation. Mixed-NUMA
+  // composites intentionally leave the default 0 because generic topology
+  // cannot express one logical device spanning multiple CPU NUMA nodes.
+  uint32_t host_numa_node = physical_device->host_numa_node;
+  bool has_representative_numa_node = host_numa_node <= UINT8_MAX;
+  for (iree_host_size_t i = 1; i < logical_device->physical_device_count &&
+                               has_representative_numa_node;
+       ++i) {
+    has_representative_numa_node =
+        logical_device->physical_devices[i]->host_numa_node == host_numa_node;
+  }
+  if (has_representative_numa_node) {
+    out_capabilities->numa_node = (uint8_t)host_numa_node;
+  }
 
   // External handle types (DMA-BUF support from system info).
   if (logical_device->system->info.dmabuf_supported) {
@@ -1869,8 +1879,13 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_capabilities(
     out_capabilities->flags |= IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT;
   }
 
-  // Driver handle (HSA agent handle for same-driver refinement).
-  out_capabilities->driver_device_handle = (uintptr_t)gpu_agent.handle;
+  // Driver handle (HSA agent handle for same-driver refinement). Composite
+  // devices intentionally leave this unset: a single HSA agent handle would
+  // make generic topology alias detection treat a composite as one GPU.
+  if (!is_composite_device) {
+    out_capabilities->driver_device_handle =
+        (uintptr_t)physical_device->device_agent.handle;
+  }
 
   return iree_ok_status();
 }
