@@ -1063,11 +1063,14 @@ static void iree_profile_queue_print_text_header(
   fprintf(file,
           "queues=%" PRIhsz " queue_events=%" PRIhsz
           " queue_device_events=%" PRIhsz " host_execution_events=%" PRIhsz
+          " truncated_chunks=%" PRIu64 " dropped_records=%" PRIu64
           " submissions=%" PRIhsz " matched_dispatches=%" PRIu64
           " valid=%" PRIu64 " invalid=%" PRIu64 "\n",
           context->model.queue_count, context->queue_query.queue_event_count,
           context->queue_query.queue_device_event_count,
           context->queue_query.host_execution_event_count,
+          context->queue_query.truncated_chunk_count,
+          context->queue_query.dropped_record_count,
           context->queue_aggregate_count, context->matched_dispatch_count,
           context->valid_dispatch_count, context->invalid_dispatch_count);
 }
@@ -1266,12 +1269,15 @@ static void iree_profile_queue_print_jsonl_summary(
   fprintf(file,
           ",\"queues\":%" PRIhsz ",\"queue_events\":%" PRIhsz
           ",\"queue_device_events\":%" PRIhsz
-          ",\"host_execution_events\":%" PRIhsz ",\"submissions\":%" PRIhsz
+          ",\"host_execution_events\":%" PRIhsz ",\"truncated_chunks\":%" PRIu64
+          ",\"dropped_records\":%" PRIu64 ",\"submissions\":%" PRIhsz
           ",\"matched_dispatches\":%" PRIu64 ",\"valid_dispatches\":%" PRIu64
           ",\"invalid_dispatches\":%" PRIu64 "}\n",
           context->model.queue_count, context->queue_query.queue_event_count,
           context->queue_query.queue_device_event_count,
           context->queue_query.host_execution_event_count,
+          context->queue_query.truncated_chunk_count,
+          context->queue_query.dropped_record_count,
           context->queue_aggregate_count, context->matched_dispatch_count,
           context->valid_dispatch_count, context->invalid_dispatch_count);
 }

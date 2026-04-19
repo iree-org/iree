@@ -209,6 +209,10 @@ typedef struct iree_profile_memory_context_t {
   uint64_t total_event_count;
   // Memory events matched by --id and --filter.
   uint64_t matched_event_count;
+  // MEMORY_EVENTS chunks with the truncated flag set.
+  uint64_t truncated_chunk_count;
+  // Producer-reported memory records omitted from truncated chunks.
+  uint64_t dropped_record_count;
   // Matched memory events from truncated chunks.
   uint64_t truncated_event_count;
 } iree_profile_memory_context_t;

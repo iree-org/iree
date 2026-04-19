@@ -192,6 +192,7 @@ iree_runtime_cc_test(
         ":counter",
         ":memory",
         ":model",
+        ":queue_query",
         ":reader",
         ":summary",
         "//runtime/src/iree/base",

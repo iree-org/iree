@@ -501,11 +501,26 @@ static iree_status_t CommandBufferProfileSinkWrite(
     return iree_make_status(test_sink->fail_write_status_code,
                             "injected profile sink write failure");
   }
-  if (iree_any_bit_set(metadata->flags,
-                       IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED)) {
+  const bool is_truncated =
+      iree_any_bit_set(metadata->flags, IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED);
+  if (is_truncated) {
     ++test_sink->truncated_chunk_count;
     test_sink->dropped_record_count += metadata->dropped_record_count;
-    EXPECT_NE(0u, metadata->dropped_record_count);
+  }
+  if (iovec_count == 0) {
+    if (iree_string_view_equal(metadata->content_type,
+                               IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
+      test_sink->queue_event_dropped_record_count +=
+          metadata->dropped_record_count;
+      ++test_sink->queue_event_count;
+    } else if (iree_string_view_equal(
+                   metadata->content_type,
+                   IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
+      test_sink->memory_event_dropped_record_count +=
+          metadata->dropped_record_count;
+      ++test_sink->memory_event_count;
+    }
+    return iree_ok_status();
   }
   if (iovec_count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

@@ -14,6 +14,7 @@
 #include "iree/tooling/profile/counter.h"
 #include "iree/tooling/profile/memory.h"
 #include "iree/tooling/profile/model.h"
+#include "iree/tooling/profile/queue_query.h"
 #include "iree/tooling/profile/reader.h"
 #include "iree/tooling/profile/summary.h"
 
@@ -44,6 +45,13 @@ static iree_hal_profile_file_record_t MakeMemoryChunk(
     const std::vector<uint8_t>& payload) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
   chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeQueueEventsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS;
   return chunk;
 }
 
@@ -396,6 +404,29 @@ TEST(ProfileSummaryTest, AccumulatesDroppedRecordsFromTruncatedChunks) {
   iree_profile_summary_deinitialize(&summary);
 }
 
+TEST(ProfileQueueQueryTest, RecordsZeroPayloadTruncatedChunks) {
+  std::vector<uint8_t> payload;
+  iree_hal_profile_file_record_t chunk = MakeQueueEventsChunk(payload);
+  chunk.header.chunk_flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  chunk.header.dropped_record_count = 5;
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  iree_profile_queue_event_query_t query;
+  iree_profile_queue_event_query_initialize(iree_allocator_system(), &query);
+  IREE_ASSERT_OK(iree_profile_queue_event_query_process_record(
+      &query, &model, &chunk, IREE_SV("*"), -1));
+
+  EXPECT_EQ(1u, query.truncated_chunk_count);
+  EXPECT_EQ(5u, query.dropped_record_count);
+  EXPECT_EQ(0u, query.total_queue_event_count);
+  EXPECT_EQ(0u, query.matched_queue_event_count);
+  EXPECT_EQ(0u, query.queue_event_count);
+
+  iree_profile_queue_event_query_deinitialize(&query);
+  iree_profile_model_deinitialize(&model);
+}
+
 TEST(ProfileSummaryTest, RecordsFirstNonOkSessionEndStatus) {
   iree_hal_profile_file_record_t first_session_end;
   memset(&first_session_end, 0, sizeof(first_session_end));
@@ -695,6 +726,27 @@ TEST(ProfileMemoryTest, InvokesEventCallbackForMatchedEvents) {
   EXPECT_EQ(1u, collector.event_count);
   EXPECT_EQ(1u, collector.first_event_id);
   EXPECT_TRUE(collector.saw_truncated_chunk);
+
+  iree_profile_memory_context_deinitialize(&context);
+}
+
+TEST(ProfileMemoryTest, RecordsZeroPayloadTruncatedChunks) {
+  std::vector<uint8_t> payload;
+  iree_hal_profile_file_record_t chunk = MakeMemoryChunk(payload);
+  chunk.header.chunk_flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  chunk.header.dropped_record_count = 7;
+
+  iree_profile_memory_context_t context;
+  iree_profile_memory_context_initialize(iree_allocator_system(), &context);
+  IREE_ASSERT_OK(iree_profile_memory_context_accumulate_record(
+      &context, &chunk, IREE_SV("*"), -1,
+      iree_profile_memory_event_callback_t{0}));
+
+  EXPECT_EQ(1u, context.truncated_chunk_count);
+  EXPECT_EQ(7u, context.dropped_record_count);
+  EXPECT_EQ(0u, context.total_event_count);
+  EXPECT_EQ(0u, context.matched_event_count);
+  EXPECT_EQ(0u, context.truncated_event_count);
 
   iree_profile_memory_context_deinitialize(&context);
 }

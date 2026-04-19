@@ -1592,7 +1592,9 @@ typedef struct iree_hal_profile_chunk_metadata_t {
   iree_hal_profile_chunk_flags_t flags;
   // Number of typed records omitted from this chunk stream, or 0 when unknown
   // or not truncated. Producers should set
-  // IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED when this is nonzero.
+  // IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED when this is nonzero. A truncated
+  // chunk may have zero payload records; in that case the metadata still
+  // reports that records were lost from the producer-side stream.
   uint64_t dropped_record_count;
 } iree_hal_profile_chunk_metadata_t;
 
@@ -1629,7 +1631,9 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_sink_begin_session(
 //
 // The sink must consume or copy the provided iovecs before returning. The
 // producer may reuse or release the storage immediately after this call
-// returns.
+// returns. |iovec_count| may be zero for metadata-only chunks, including
+// TRUNCATED chunks that report producer-side dropped records even when no typed
+// records survived.
 IREE_API_EXPORT iree_status_t iree_hal_profile_sink_write(
     iree_hal_profile_sink_t* sink,
     const iree_hal_profile_chunk_metadata_t* metadata,

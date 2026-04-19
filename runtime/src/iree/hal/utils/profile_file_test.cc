@@ -66,6 +66,18 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   chunk_metadata.dropped_record_count = 13;
   IREE_ASSERT_OK(iree_hal_profile_sink_write(sink, &chunk_metadata, 2, iovecs));
 
+  iree_hal_profile_chunk_metadata_t empty_chunk_metadata =
+      iree_hal_profile_chunk_metadata_default();
+  empty_chunk_metadata.content_type =
+      IREE_SV("application/vnd.iree.test.empty");
+  empty_chunk_metadata.name = IREE_SV("test-empty-chunk");
+  empty_chunk_metadata.session_id = 42;
+  empty_chunk_metadata.stream_id = 13;
+  empty_chunk_metadata.flags = IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+  empty_chunk_metadata.dropped_record_count = 21;
+  IREE_ASSERT_OK(
+      iree_hal_profile_sink_write(sink, &empty_chunk_metadata, 0, NULL));
+
   IREE_ASSERT_OK(iree_hal_profile_sink_end_session(sink, &session_metadata,
                                                    IREE_STATUS_CANCELLED));
   iree_hal_profile_sink_release(sink);
@@ -120,6 +132,22 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
                       sizeof(first_payload)));
   EXPECT_EQ(0, memcmp(chunk_record.payload.data + sizeof(first_payload),
                       &second_payload, sizeof(second_payload)));
+
+  iree_hal_profile_file_record_t empty_chunk_record;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_record(
+      iree_make_const_byte_span(storage.data(), storage.size()), offset,
+      &empty_chunk_record, &offset));
+  EXPECT_EQ(IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK,
+            empty_chunk_record.header.record_type);
+  EXPECT_EQ(42u, empty_chunk_record.header.session_id);
+  EXPECT_EQ(13u, empty_chunk_record.header.stream_id);
+  EXPECT_EQ(IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED,
+            empty_chunk_record.header.chunk_flags);
+  EXPECT_EQ(21u, empty_chunk_record.header.dropped_record_count);
+  EXPECT_TRUE(StringViewEqual(empty_chunk_record.content_type,
+                              "application/vnd.iree.test.empty"));
+  EXPECT_TRUE(StringViewEqual(empty_chunk_record.name, "test-empty-chunk"));
+  EXPECT_EQ(0u, empty_chunk_record.payload.data_length);
 
   iree_hal_profile_file_record_t end_record;
   IREE_ASSERT_OK(iree_hal_profile_file_parse_record(

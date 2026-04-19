@@ -203,6 +203,17 @@ static iree_status_t iree_profile_queue_event_query_process_host_executions(
   return status;
 }
 
+static void iree_profile_queue_event_query_accumulate_chunk_status(
+    iree_profile_queue_event_query_t* query,
+    const iree_hal_profile_file_record_t* record) {
+  if (!iree_any_bit_set(record->header.chunk_flags,
+                        IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED)) {
+    return;
+  }
+  ++query->truncated_chunk_count;
+  query->dropped_record_count += record->header.dropped_record_count;
+}
+
 iree_status_t iree_profile_queue_event_query_process_record(
     iree_profile_queue_event_query_t* query, const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -212,16 +223,19 @@ iree_status_t iree_profile_queue_event_query_process_record(
   }
   if (iree_string_view_equal(record->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
+    iree_profile_queue_event_query_accumulate_chunk_status(query, record);
     return iree_profile_queue_event_query_process_queue_events(
         query, model, record, filter, id_filter);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
+    iree_profile_queue_event_query_accumulate_chunk_status(query, record);
     return iree_profile_queue_event_query_process_device_events(
         query, model, record, filter, id_filter);
   } else if (iree_string_view_equal(
                  record->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
+    iree_profile_queue_event_query_accumulate_chunk_status(query, record);
     return iree_profile_queue_event_query_process_host_executions(
         query, model, record, filter, id_filter);
   }

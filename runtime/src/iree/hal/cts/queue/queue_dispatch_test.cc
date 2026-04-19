@@ -181,6 +181,9 @@ static iree_status_t TestProfileSinkWrite(
   EXPECT_EQ(0, test_sink->end_count);
   if (test_sink->end_count != 0) test_sink->write_after_end = true;
   EXPECT_EQ(test_sink->session_id, metadata->session_id);
+  if (iovec_count == 0) {
+    return iree_ok_status();
+  }
   if (iovec_count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "expected exactly one profile chunk iovec");

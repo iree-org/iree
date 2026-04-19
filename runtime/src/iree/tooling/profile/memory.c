@@ -1104,6 +1104,10 @@ iree_status_t iree_profile_memory_context_accumulate_record(
 
   const bool is_truncated = iree_any_bit_set(
       record->header.chunk_flags, IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED);
+  if (is_truncated) {
+    ++context->truncated_chunk_count;
+    context->dropped_record_count += record->header.dropped_record_count;
+  }
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_memory_event_t), &iterator);
@@ -1137,10 +1141,12 @@ static void iree_profile_memory_print_text_header(
   }
   fprintf(file,
           "events: total=%" PRIu64 " matched=%" PRIu64
+          " truncated_chunks=%" PRIu64 " dropped_records=%" PRIu64
           " truncated_matched=%" PRIu64 " devices=%" PRIhsz " pools=%" PRIhsz
           " allocation_lifecycles=%" PRIhsz " open_lifecycles=%" PRIu64
           " partial_closes=%" PRIu64 "\n",
           context->total_event_count, context->matched_event_count,
+          context->truncated_chunk_count, context->dropped_record_count,
           context->truncated_event_count, context->device_count,
           context->pool_count, context->allocation_count,
           overview->open_allocation_lifecycle_count,
@@ -1344,12 +1350,14 @@ static void iree_profile_memory_print_jsonl_header(
   iree_profile_fprint_json_string(file, filter);
   fprintf(file,
           ",\"id_filter\":%" PRId64 ",\"total_events\":%" PRIu64
-          ",\"matched_events\":%" PRIu64
+          ",\"matched_events\":%" PRIu64 ",\"truncated_chunks\":%" PRIu64
+          ",\"dropped_records\":%" PRIu64
           ",\"truncated_matched_events\":%" PRIu64 ",\"devices\":%" PRIhsz
           ",\"pools\":%" PRIhsz ",\"allocation_lifecycles\":%" PRIhsz
           ",\"open_allocation_lifecycles\":%" PRIu64
           ",\"partial_lifecycle_closes\":%" PRIu64 "}\n",
           id_filter, context->total_event_count, context->matched_event_count,
+          context->truncated_chunk_count, context->dropped_record_count,
           context->truncated_event_count, context->device_count,
           context->pool_count, context->allocation_count,
           overview->open_allocation_lifecycle_count,

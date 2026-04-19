@@ -237,6 +237,7 @@ iree_cc_test(
     ::counter
     ::memory
     ::model
+    ::queue_query
     ::reader
     ::summary
     iree::base

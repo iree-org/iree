@@ -65,6 +65,10 @@ typedef struct iree_profile_queue_event_query_t {
   uint64_t total_host_execution_event_count;
   // Host execution span records matched by the active filter.
   uint64_t matched_host_execution_event_count;
+  // Queue event-family chunks with the truncated flag set.
+  uint64_t truncated_chunk_count;
+  // Producer-reported records omitted from truncated queue event-family chunks.
+  uint64_t dropped_record_count;
 } iree_profile_queue_event_query_t;
 
 // Initializes |out_query| for filtered queue operation rows.
