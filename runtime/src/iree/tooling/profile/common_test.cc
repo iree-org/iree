@@ -544,6 +544,37 @@ TEST(ProfileQueueQueryTest, SeparatesHostAndDeviceTimedEventFamilies) {
   iree_profile_model_deinitialize(&model);
 }
 
+TEST(ProfileQueueQueryTest, RejectsMatchedEventWithoutQueueMetadata) {
+  std::vector<uint8_t> queue_event_payload;
+  iree_hal_profile_queue_event_t queue_event =
+      iree_hal_profile_queue_event_default();
+  queue_event.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+  queue_event.event_id = 10;
+  queue_event.submission_id = 20;
+  queue_event.physical_device_ordinal = 2;
+  queue_event.queue_ordinal = 3;
+  queue_event.stream_id = 4;
+  AppendPlainRecord(&queue_event_payload, queue_event);
+  iree_hal_profile_file_record_t queue_event_chunk =
+      MakeQueueEventsChunk(queue_event_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  iree_profile_queue_event_query_t query;
+  iree_profile_queue_event_query_initialize(iree_allocator_system(), &query);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_queue_event_query_process_record(
+          &query, &model, &queue_event_chunk, IREE_SV("*"), -1));
+
+  EXPECT_EQ(1u, query.total_queue_event_count);
+  EXPECT_EQ(1u, query.matched_queue_event_count);
+  EXPECT_EQ(0u, query.queue_event_count);
+
+  iree_profile_queue_event_query_deinitialize(&query);
+  iree_profile_model_deinitialize(&model);
+}
+
 TEST(ProfileSummaryTest, RecordsFirstNonOkSessionEndStatus) {
   iree_hal_profile_file_record_t first_session_end;
   memset(&first_session_end, 0, sizeof(first_session_end));
