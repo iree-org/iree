@@ -51,6 +51,9 @@ constexpr iree_device_size_t kPayloadLength = sizeof(uint32_t);
 constexpr iree_host_size_t kDispatchBindingBenchmarkMaxCount = 256;
 constexpr iree_host_size_t kDispatchBindingBenchmarkVariantCapacity =
     kDispatchBindingBenchmarkMaxCount + 1;
+constexpr int64_t kProfileGuardrailBindingCount = 1;
+constexpr int64_t kProfileGuardrailIterations = 200;
+constexpr int64_t kProfileGuardrailOperationCount = 20;
 constexpr iree_hal_queue_affinity_t kQueue0 = ((iree_hal_queue_affinity_t)1ull)
                                               << 0;
 constexpr iree_hal_queue_affinity_t kQueue1 = ((iree_hal_queue_affinity_t)1ull)
@@ -63,6 +66,105 @@ enum class PayloadKind {
   kNoopDispatch,
   kPreResolvedDispatch,
 };
+
+enum class ProfileGuardrailMode : int64_t {
+  kDisabled = 0,
+  kQueueDeviceEvents = 1,
+  kDispatchEvents = 2,
+  kQueueDeviceAndDispatchEvents = 3,
+};
+
+iree_hal_device_profiling_data_families_t ProfileGuardrailDataFamilies(
+    ProfileGuardrailMode mode) {
+  switch (mode) {
+    case ProfileGuardrailMode::kDisabled:
+      return IREE_HAL_DEVICE_PROFILING_DATA_NONE;
+    case ProfileGuardrailMode::kQueueDeviceEvents:
+      return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+             IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
+    case ProfileGuardrailMode::kDispatchEvents:
+      return IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+    case ProfileGuardrailMode::kQueueDeviceAndDispatchEvents:
+      return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+             IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+             IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  }
+  return IREE_HAL_DEVICE_PROFILING_DATA_NONE;
+}
+
+typedef struct QueueBenchmarkDiscardProfileSink {
+  // Resource header for iree_hal_profile_sink_t lifetime management.
+  iree_hal_resource_t resource;
+  // Host allocator used for sink lifetime.
+  iree_allocator_t host_allocator;
+  // Number of profile chunks observed by the sink.
+  uint64_t write_count;
+  // Total bytes observed across all profile chunk iovecs.
+  uint64_t payload_byte_count;
+} QueueBenchmarkDiscardProfileSink;
+
+static void QueueBenchmarkDiscardProfileSinkDestroy(
+    iree_hal_profile_sink_t* base_sink) {
+  QueueBenchmarkDiscardProfileSink* sink =
+      (QueueBenchmarkDiscardProfileSink*)base_sink;
+  iree_allocator_t host_allocator = sink->host_allocator;
+  iree_allocator_free(host_allocator, sink);
+}
+
+static iree_status_t QueueBenchmarkDiscardProfileSinkBeginSession(
+    iree_hal_profile_sink_t* base_sink,
+    const iree_hal_profile_chunk_metadata_t* metadata) {
+  (void)base_sink;
+  (void)metadata;
+  return iree_ok_status();
+}
+
+static iree_status_t QueueBenchmarkDiscardProfileSinkWrite(
+    iree_hal_profile_sink_t* base_sink,
+    const iree_hal_profile_chunk_metadata_t* metadata,
+    iree_host_size_t iovec_count, const iree_const_byte_span_t* iovecs) {
+  (void)metadata;
+  QueueBenchmarkDiscardProfileSink* sink =
+      (QueueBenchmarkDiscardProfileSink*)base_sink;
+  ++sink->write_count;
+  for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+    sink->payload_byte_count += iovecs[i].data_length;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t QueueBenchmarkDiscardProfileSinkEndSession(
+    iree_hal_profile_sink_t* base_sink,
+    const iree_hal_profile_chunk_metadata_t* metadata,
+    iree_status_code_t session_status_code) {
+  (void)base_sink;
+  (void)metadata;
+  (void)session_status_code;
+  return iree_ok_status();
+}
+
+static const iree_hal_profile_sink_vtable_t
+    kQueueBenchmarkDiscardProfileSinkVtable = {
+        .destroy = QueueBenchmarkDiscardProfileSinkDestroy,
+        .begin_session = QueueBenchmarkDiscardProfileSinkBeginSession,
+        .write = QueueBenchmarkDiscardProfileSinkWrite,
+        .end_session = QueueBenchmarkDiscardProfileSinkEndSession,
+};
+
+iree_status_t QueueBenchmarkDiscardProfileSinkCreate(
+    iree_allocator_t host_allocator, iree_hal_profile_sink_t** out_sink) {
+  *out_sink = nullptr;
+  QueueBenchmarkDiscardProfileSink* sink = nullptr;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, sizeof(*sink), (void**)&sink));
+  iree_hal_resource_initialize(&kQueueBenchmarkDiscardProfileSinkVtable,
+                               &sink->resource);
+  sink->host_allocator = host_allocator;
+  sink->write_count = 0;
+  sink->payload_byte_count = 0;
+  *out_sink = (iree_hal_profile_sink_t*)sink;
+  return iree_ok_status();
+}
 
 class QueueBenchmark : public benchmark::Fixture {
  public:
@@ -164,6 +266,12 @@ class QueueBenchmark : public benchmark::Fixture {
   }
 
   void TearDown(benchmark::State& state) override {
+    if (profile_session_active_) {
+      EndProfileSession(state,
+                        "profiling end failed during benchmark teardown");
+    }
+    iree_hal_profile_sink_release(profile_sink_);
+    profile_sink_ = nullptr;
     ReleasePreResolvedDispatch();
     for (iree_host_size_t i = 0; i < kDispatchBindingBenchmarkVariantCapacity;
          ++i) {
@@ -210,6 +318,102 @@ class QueueBenchmark : public benchmark::Fixture {
     return HandleStatus(state,
                         iree_hal_device_queue_flush(device_, queue_affinity),
                         "queue affinity not available");
+  }
+
+  bool BeginProfileSession(benchmark::State& state, ProfileGuardrailMode mode) {
+    const iree_hal_device_profiling_data_families_t data_families =
+        ProfileGuardrailDataFamilies(mode);
+    if (data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) return true;
+
+    if (!HandleStatus(state,
+                      QueueBenchmarkDiscardProfileSinkCreate(host_allocator_,
+                                                             &profile_sink_),
+                      "failed to create profile benchmark sink")) {
+      return false;
+    }
+    iree_hal_device_profiling_options_t options = {0};
+    options.data_families = data_families;
+    options.sink = profile_sink_;
+    if (!HandleStatus(state, iree_hal_device_profiling_begin(device_, &options),
+                      "failed to begin profile benchmark session")) {
+      iree_hal_profile_sink_release(profile_sink_);
+      profile_sink_ = nullptr;
+      return false;
+    }
+    profile_session_active_ = true;
+    return true;
+  }
+
+  void EndProfileSession(benchmark::State& state, const char* message) {
+    if (!profile_session_active_) return;
+    profile_session_active_ = false;
+    HandleStatus(state, iree_hal_device_profiling_end(device_), message);
+  }
+
+  bool FlushProfileSession(benchmark::State& state, const char* message) {
+    if (!profile_session_active_) return true;
+    return HandleStatus(state, iree_hal_device_profiling_flush(device_),
+                        message);
+  }
+
+  bool FlushProfileSessionWithTimingPaused(benchmark::State& state,
+                                           const char* message) {
+    if (!profile_session_active_) return true;
+    state.PauseTiming();
+    const bool result = FlushProfileSession(state, message);
+    state.ResumeTiming();
+    return result;
+  }
+
+  bool WaitAndFlushProfileSessionWithTimingPaused(
+      benchmark::State& state, const SubmittedCompletion& completion,
+      const char* wait_message, const char* flush_message) {
+    state.PauseTiming();
+    iree_status_t status = Wait(completion.semaphore, completion.payload_value);
+    bool result = HandleStatus(state, status, wait_message);
+    if (result) {
+      result = FlushProfileSession(state, flush_message);
+    }
+    state.ResumeTiming();
+    return result;
+  }
+
+  template <typename RunWaitFn>
+  void RunProfileGuardrailFinalWaitBenchmark(
+      benchmark::State& state, int64_t queue_submissions_per_sync,
+      int64_t profiled_operations_per_sync, const char* flush_message,
+      const char* end_message, RunWaitFn run_wait) {
+    const ProfileGuardrailMode profile_mode =
+        static_cast<ProfileGuardrailMode>(state.range(0));
+    if (!BeginProfileSession(state, profile_mode)) return;
+    for (auto _ : state) {
+      if (!run_wait()) break;
+      if (!FlushProfileSessionWithTimingPaused(state, flush_message)) break;
+    }
+    SetProfileGuardrailCounters(state, profile_mode, queue_submissions_per_sync,
+                                profiled_operations_per_sync);
+    EndProfileSession(state, end_message);
+  }
+
+  template <typename SubmitFn>
+  void RunProfileGuardrailSubmitOnlyBenchmark(
+      benchmark::State& state, int64_t queue_submissions_per_sync,
+      int64_t profiled_operations_per_sync, const char* wait_message,
+      const char* flush_message, const char* end_message, SubmitFn submit) {
+    const ProfileGuardrailMode profile_mode =
+        static_cast<ProfileGuardrailMode>(state.range(0));
+    if (!BeginProfileSession(state, profile_mode)) return;
+    for (auto _ : state) {
+      SubmittedCompletion completion;
+      if (!submit(&completion)) break;
+      if (!WaitAndFlushProfileSessionWithTimingPaused(
+              state, completion, wait_message, flush_message)) {
+        break;
+      }
+    }
+    SetProfileGuardrailCounters(state, profile_mode, queue_submissions_per_sync,
+                                profiled_operations_per_sync);
+    EndProfileSession(state, end_message);
   }
 
   iree_status_t LookupHostQueue(iree_hal_queue_affinity_t queue_affinity,
@@ -1020,6 +1224,34 @@ class QueueBenchmark : public benchmark::Fixture {
     SetQueueSubmissionsProcessed(state, operation_count);
   }
 
+  void SetProfileGuardrailCounters(benchmark::State& state,
+                                   ProfileGuardrailMode mode,
+                                   int64_t queue_submissions_per_sync,
+                                   int64_t profiled_operations_per_sync) {
+    const iree_hal_device_profiling_data_families_t data_families =
+        ProfileGuardrailDataFamilies(mode);
+    state.counters["profile_data_families"] =
+        static_cast<double>(data_families);
+    state.counters["profile_queue_events"] =
+        iree_any_bit_set(data_families,
+                         IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)
+            ? 1.0
+            : 0.0;
+    state.counters["profile_device_queue_events"] =
+        iree_any_bit_set(data_families,
+                         IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS)
+            ? 1.0
+            : 0.0;
+    state.counters["profile_dispatch_events"] =
+        iree_any_bit_set(data_families,
+                         IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)
+            ? 1.0
+            : 0.0;
+    state.counters["profiled_operations_per_sync"] =
+        static_cast<double>(profiled_operations_per_sync);
+    SetQueueSubmissionsProcessed(state, queue_submissions_per_sync);
+  }
+
   bool WaitWithTimingPaused(benchmark::State& state,
                             const SubmittedCompletion& completion,
                             const char* message) {
@@ -1753,6 +1985,10 @@ class QueueBenchmark : public benchmark::Fixture {
   iree_hal_semaphore_t* stream_semaphore_ = nullptr;
   // Private single-producer stream semaphore used by queue 0.
   iree_hal_semaphore_t* producer_semaphore_ = nullptr;
+  // Discard sink used by profiling overhead guardrail rows.
+  iree_hal_profile_sink_t* profile_sink_ = nullptr;
+  // True while the fixture owns an active HAL profiling session.
+  bool profile_session_active_ = false;
   // Next public completion payload value.
   uint64_t completion_payload_value_ = 0;
   // Next private queue 1 stream payload value.
@@ -2789,6 +3025,197 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
   iree_hal_command_buffer_release(command_buffer);
 }
 
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailBarrierBatch20FinalWait)(
+    benchmark::State& state) {
+  RunProfileGuardrailFinalWaitBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail barrier batch flush failed",
+      "profile guardrail barrier batch end failed", [&]() {
+        return HandleStatus(
+            state,
+            SameQueueBarrierBatchAndWait(kProfileGuardrailOperationCount),
+            "profile guardrail barrier batch failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailBarrierBatch20SubmitOnly)(
+    benchmark::State& state) {
+  RunProfileGuardrailSubmitOnlyBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail barrier batch wait failed",
+      "profile guardrail barrier batch flush failed",
+      "profile guardrail barrier batch end failed",
+      [&](SubmittedCompletion* completion) {
+        return HandleStatus(state,
+                            SameQueueBarrierBatchSubmit(
+                                kProfileGuardrailOperationCount, completion),
+                            "profile guardrail barrier batch submit failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailCopyBatch20FinalWait)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  RunProfileGuardrailFinalWaitBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail copy batch flush failed",
+      "profile guardrail copy batch end failed", [&]() {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadPublicFinalInlineAndWait(
+                PayloadKind::kCopy, kProfileGuardrailOperationCount),
+            "profile guardrail copy batch failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailCopyBatch20SubmitOnly)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  RunProfileGuardrailSubmitOnlyBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail copy batch wait failed",
+      "profile guardrail copy batch flush failed",
+      "profile guardrail copy batch end failed",
+      [&](SubmittedCompletion* completion) {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadSubmitPublicFinalInline(
+                PayloadKind::kCopy, kProfileGuardrailOperationCount,
+                completion),
+            "profile guardrail copy batch submit failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailFillBatch20FinalWait)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  RunProfileGuardrailFinalWaitBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail fill batch flush failed",
+      "profile guardrail fill batch end failed", [&]() {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadPublicFinalInlineAndWait(
+                PayloadKind::kFill, kProfileGuardrailOperationCount),
+            "profile guardrail fill batch failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailFillBatch20SubmitOnly)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  RunProfileGuardrailSubmitOnlyBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail fill batch wait failed",
+      "profile guardrail fill batch flush failed",
+      "profile guardrail fill batch end failed",
+      [&](SubmittedCompletion* completion) {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadSubmitPublicFinalInline(
+                PayloadKind::kFill, kProfileGuardrailOperationCount,
+                completion),
+            "profile guardrail fill batch submit failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailDispatchBatch20FinalWait)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  if (!EnsureDispatchExecutable(state)) return;
+  RunProfileGuardrailFinalWaitBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail dispatch batch flush failed",
+      "profile guardrail dispatch batch end failed", [&]() {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadPublicFinalInlineAndWait(
+                PayloadKind::kDispatch, kProfileGuardrailOperationCount),
+            "profile guardrail dispatch batch failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark, ProfileGuardrailDispatchBatch20SubmitOnly)(
+    benchmark::State& state) {
+  if (!EnsurePayloadBuffers(state)) return;
+  if (!EnsureDispatchExecutable(state)) return;
+  RunProfileGuardrailSubmitOnlyBenchmark(
+      state, kProfileGuardrailOperationCount, kProfileGuardrailOperationCount,
+      "profile guardrail dispatch batch wait failed",
+      "profile guardrail dispatch batch flush failed",
+      "profile guardrail dispatch batch end failed",
+      [&](SubmittedCompletion* completion) {
+        return HandleStatus(
+            state,
+            SameQueuePrivateStreamPayloadSubmitPublicFinalInline(
+                PayloadKind::kDispatch, kProfileGuardrailOperationCount,
+                completion),
+            "profile guardrail dispatch batch submit failed");
+      });
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   ProfileGuardrailCommandBufferDispatchChain20FinalWait)(
+    benchmark::State& state) {
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, kProfileGuardrailBindingCount)) return;
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  if (!HandleStatus(state,
+                    RecordBindingCountDispatchChainCommandBuffer(
+                        kProfileGuardrailOperationCount,
+                        kProfileGuardrailBindingCount, &command_buffer),
+                    "failed to record profile guardrail command buffer")) {
+    return;
+  }
+  RunProfileGuardrailFinalWaitBenchmark(
+      state, /*queue_submissions_per_sync=*/1, kProfileGuardrailOperationCount,
+      "profile guardrail command-buffer flush failed",
+      "profile guardrail command-buffer end failed", [&]() {
+        SubmittedCompletion completion;
+        if (!HandleStatus(
+                state,
+                BindingCountDispatchChainCommandBufferSubmitPublicFinalInline(
+                    command_buffer, &completion),
+                "profile guardrail command-buffer submit failed")) {
+          return false;
+        }
+        return HandleStatus(
+            state, Wait(completion.semaphore, completion.payload_value),
+            "profile guardrail command-buffer wait failed");
+      });
+  iree_hal_command_buffer_release(command_buffer);
+}
+
+BENCHMARK_DEFINE_F(QueueBenchmark,
+                   ProfileGuardrailCommandBufferDispatchChain20SubmitOnly)(
+    benchmark::State& state) {
+  if (!EnsureBindingCountExecutable(state)) return;
+  if (!EnsureBindingCountBuffers(state, kProfileGuardrailBindingCount)) return;
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  if (!HandleStatus(state,
+                    RecordBindingCountDispatchChainCommandBuffer(
+                        kProfileGuardrailOperationCount,
+                        kProfileGuardrailBindingCount, &command_buffer),
+                    "failed to record profile guardrail command buffer")) {
+    return;
+  }
+  RunProfileGuardrailSubmitOnlyBenchmark(
+      state, /*queue_submissions_per_sync=*/1, kProfileGuardrailOperationCount,
+      "profile guardrail command-buffer wait failed",
+      "profile guardrail command-buffer flush failed",
+      "profile guardrail command-buffer end failed",
+      [&](SubmittedCompletion* completion) {
+        return HandleStatus(
+            state,
+            BindingCountDispatchChainCommandBufferSubmitPublicFinalInline(
+                command_buffer, completion),
+            "profile guardrail command-buffer submit failed");
+      });
+  iree_hal_command_buffer_release(command_buffer);
+}
+
 BENCHMARK_DEFINE_F(
     QueueBenchmark,
     SameQueueCommandBufferDispatchChainStaticPublicFinalInlineSubmitOnly)(
@@ -2834,6 +3261,15 @@ BENCHMARK_DEFINE_F(QueueBenchmark,
     }
   }
   SetQueueSubmissionsProcessed(state, /*queue_submissions_per_sync=*/2);
+}
+
+void ApplyProfileGuardrailModes(benchmark::Benchmark* benchmark) {
+  benchmark->ArgName("profile_mode");
+  benchmark->Arg((int64_t)ProfileGuardrailMode::kDisabled);
+  benchmark->Arg((int64_t)ProfileGuardrailMode::kQueueDeviceEvents);
+  benchmark->Arg((int64_t)ProfileGuardrailMode::kDispatchEvents);
+  benchmark->Arg((int64_t)ProfileGuardrailMode::kQueueDeviceAndDispatchEvents);
+  benchmark->Iterations(kProfileGuardrailIterations);
 }
 
 BENCHMARK_REGISTER_F(QueueBenchmark, SameQueueBarrierWait)
@@ -3209,6 +3645,48 @@ BENCHMARK_REGISTER_F(QueueBenchmark,
                      SameQueueCommandBufferDispatchChainStaticPublicFinalInline)
     ->ArgsProduct({{1, 10, 100, 1000, 5000}, {0, 1, 4, 8, 16}})
     ->ArgNames({"operation_count", "binding_count"})
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailBarrierBatch20FinalWait)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailBarrierBatch20SubmitOnly)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailCopyBatch20FinalWait)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailCopyBatch20SubmitOnly)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailFillBatch20FinalWait)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailFillBatch20SubmitOnly)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailDispatchBatch20FinalWait)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark, ProfileGuardrailDispatchBatch20SubmitOnly)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark,
+                     ProfileGuardrailCommandBufferDispatchChain20FinalWait)
+    ->Apply(ApplyProfileGuardrailModes)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+BENCHMARK_REGISTER_F(QueueBenchmark,
+                     ProfileGuardrailCommandBufferDispatchChain20SubmitOnly)
+    ->Apply(ApplyProfileGuardrailModes)
     ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 BENCHMARK_REGISTER_F(
