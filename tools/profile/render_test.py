@@ -74,7 +74,7 @@ class _FakeTraceProtoBuilder:
 class CommonTest(unittest.TestCase):
 
     def test_validate_schema_rejects_old_version(self):
-        with self.assertRaisesRegex(SystemExit, "schema version 2; expected 7"):
+        with self.assertRaisesRegex(SystemExit, "schema version 2; expected 9"):
             common.validate_schema(
                 [
                     {
