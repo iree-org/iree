@@ -70,7 +70,7 @@ typedef struct iree_hal_amdgpu_system_t {
   // HSA API handle.
   iree_hal_amdgpu_libhsa_t libhsa;
 
-  // /dev/kfd handle, if needed on the platform.
+  // /dev/kfd handle, or -1 when unavailable on the platform.
   // TODO(benvanik): drop this when HSA supports all of the ioctls we need.
   int kfd_fd;
 

@@ -22,12 +22,15 @@ extern "C" {
 // platform).
 
 // Tries to open /dev/kfd for read/write access.
+//
+// Returns a non-negative file descriptor in |out_fd| on success and -1 on
+// failure or unsupported platforms.
 // It should be exceptionally rare that this fails: if HSA has already been
 // initialized successfully the only expected failure condition would be file
 // handle exhaustion.
 iree_status_t iree_hal_amdgpu_kfd_open(int* out_fd);
 
-// Closes an open /dev/kfd handle.
+// Closes an open /dev/kfd handle. Ignores the -1 invalid sentinel.
 void iree_hal_amdgpu_kfd_close(int fd);
 
 // Interrupt-tolerant ioctl.

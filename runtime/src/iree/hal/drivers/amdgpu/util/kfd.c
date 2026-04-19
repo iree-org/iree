@@ -29,19 +29,21 @@
 iree_status_t iree_hal_amdgpu_kfd_open(int* out_fd) {
   IREE_ASSERT_ARGUMENT(out_fd);
   IREE_TRACE_ZONE_BEGIN(z0);
-  *out_fd = 0;
+  *out_fd = -1;
 
   iree_status_t status = iree_ok_status();
   const int fd = open("/dev/kfd", O_RDWR | O_CLOEXEC);
   if (fd == -1) {
+    const int errsv = errno;
     status = iree_make_status(IREE_STATUS_INTERNAL,
                               "unable to open /dev/kfd channel; platform file "
-                              "handle limit may be reached");
+                              "handle limit may be reached; errno=%d (%s)",
+                              errsv, strerror(errsv));
   }
 
   if (iree_status_is_ok(status)) {
     *out_fd = fd;
-  } else if (fd > 0) {
+  } else if (fd >= 0) {
     close(fd);
   }
   IREE_TRACE_ZONE_END(z0);
@@ -50,7 +52,7 @@ iree_status_t iree_hal_amdgpu_kfd_open(int* out_fd) {
 
 void iree_hal_amdgpu_kfd_close(int fd) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (fd > 0) {
+  if (fd >= 0) {
     close(fd);
   }
   IREE_TRACE_ZONE_END(z0);
@@ -67,13 +69,17 @@ int iree_hal_amdgpu_ioctl(int fd, unsigned long request, void* arg) {
 #else
 
 iree_status_t iree_hal_amdgpu_kfd_open(int* out_fd) {
-  *out_fd = 0;
+  IREE_ASSERT_ARGUMENT(out_fd);
+  *out_fd = -1;
   return iree_ok_status();
 }
 
-void iree_hal_amdgpu_kfd_close(int fd) {}
+void iree_hal_amdgpu_kfd_close(int fd) { (void)fd; }
 
 int iree_hal_amdgpu_ioctl(int fd, unsigned long request, void* arg) {
+  (void)fd;
+  (void)request;
+  (void)arg;
   return -1;
 }
 
