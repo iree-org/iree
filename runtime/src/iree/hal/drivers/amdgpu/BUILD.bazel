@@ -297,6 +297,20 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "profile_metadata_test",
+    srcs = ["profile_metadata_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "semaphore_test",
     srcs = ["semaphore_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",

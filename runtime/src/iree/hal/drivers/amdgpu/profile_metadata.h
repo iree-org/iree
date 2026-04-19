@@ -105,18 +105,34 @@ void iree_hal_amdgpu_profile_metadata_deinitialize(
 void iree_hal_amdgpu_profile_metadata_hash_code_object(
     iree_const_byte_span_t code_object_data, uint64_t out_hash[2]);
 
-// Registers immutable executable metadata and assigns |out_executable_id|.
+// Registers immutable executable identity metadata and assigns
+// |out_executable_id|.
+//
+// This records the cheap executable/export metadata required to attribute
+// dispatch events and aggregate statistics. It does not retain code-object
+// image bytes or loader load ranges.
 iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_host_size_t export_count,
     const iree_hal_executable_export_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
-    iree_const_byte_span_t code_object_data, const uint64_t code_object_hash[2],
-    iree_host_size_t code_object_load_info_count,
-    const iree_hal_amdgpu_profile_code_object_load_info_t*
-        code_object_load_infos,
+    const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id);
+
+// Registers optional code-object image and load-range artifacts for an
+// executable previously registered with
+// iree_hal_amdgpu_profile_metadata_register_executable.
+//
+// These artifacts are needed by trace/disassembly workflows but are not
+// required for normal dispatch execution or aggregate timing attribution.
+iree_status_t iree_hal_amdgpu_profile_metadata_register_executable_artifacts(
+    iree_hal_amdgpu_profile_metadata_registry_t* registry,
+    uint64_t executable_id, iree_const_byte_span_t code_object_data,
+    const uint64_t code_object_hash[2],
+    iree_host_size_t code_object_load_info_count,
+    const iree_hal_amdgpu_profile_code_object_load_info_t*
+        code_object_load_infos);
 
 // Looks up the code-object load record for |executable_id| on a physical
 // device.

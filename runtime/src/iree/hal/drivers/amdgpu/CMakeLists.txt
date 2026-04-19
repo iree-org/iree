@@ -300,6 +300,22 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    profile_metadata_test
+  SRCS
+    "profile_metadata_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     semaphore_test
   SRCS
     "semaphore_test.cc"
