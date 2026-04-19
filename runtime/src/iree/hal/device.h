@@ -130,7 +130,8 @@ enum iree_hal_device_profiling_data_family_bits_t {
   IREE_HAL_DEVICE_PROFILING_DATA_NONE = 0u,
 
   // Host-timestamped queue operation records such as submissions, dependency
-  // strategy, and encoded operation counts.
+  // strategy, and encoded operation counts. Producers may retain these as an
+  // aggregate lossy stream and report dropped records with TRUNCATED chunks.
   IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS = 1ull << 0,
 
   // Host-timestamped execution spans for work performed by the host, such as
@@ -138,11 +139,15 @@ enum iree_hal_device_profiling_data_family_bits_t {
   IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS = 1ull << 1,
 
   // Device-timestamped queue operation spans showing when queue-visible work
-  // started and completed in the device timestamp domain.
+  // started and completed in the device timestamp domain. These are precise
+  // execution timeline records: producers should fail the profiled operation or
+  // session when they cannot retain complete selected events.
   IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS = 1ull << 2,
 
   // Device-timestamped dispatch execution events. This does not request
-  // hardware/software counter samples by itself.
+  // hardware/software counter samples by itself. These are precise execution
+  // timeline records: producers should fail the profiled operation or session
+  // when they cannot retain complete selected events.
   IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS = 1ull << 3,
 
   // Explicitly selected hardware/software counter samples. Requested counters
@@ -160,7 +165,9 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // enabled with a narrow capture filter.
   IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES = 1ull << 6,
 
-  // Memory allocation and reservation lifecycle records.
+  // Memory allocation and reservation lifecycle records. Producers may retain
+  // these as an aggregate lossy stream and report dropped records with
+  // TRUNCATED chunks.
   IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS = 1ull << 7,
 };
 

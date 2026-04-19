@@ -359,6 +359,9 @@ struct CommandBufferProfileSink {
   // Number of device queue event chunks observed.
   int queue_device_event_count = 0;
 
+  // Number of memory event chunks observed.
+  int memory_event_count = 0;
+
   // Number of event relationship chunks observed.
   int relationship_count = 0;
 
@@ -370,6 +373,18 @@ struct CommandBufferProfileSink {
 
   // Number of counter sample chunks observed.
   int counter_sample_count = 0;
+
+  // Number of chunks marked truncated by the producer.
+  int truncated_chunk_count = 0;
+
+  // Total dropped records reported by truncated chunks.
+  uint64_t dropped_record_count = 0;
+
+  // Dropped queue event records reported by QUEUE_EVENTS chunks.
+  uint64_t queue_event_dropped_record_count = 0;
+
+  // Dropped memory event records reported by MEMORY_EVENTS chunks.
+  uint64_t memory_event_dropped_record_count = 0;
 
   // Executable identifiers copied from EXECUTABLES chunks.
   std::vector<uint64_t> executable_ids;
@@ -391,6 +406,9 @@ struct CommandBufferProfileSink {
 
   // Device queue events copied from QUEUE_DEVICE_EVENTS chunks.
   std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;
+
+  // Memory events copied from MEMORY_EVENTS chunks.
+  std::vector<iree_hal_profile_memory_event_t> memory_events;
 
   // Event relationships copied from EVENT_RELATIONSHIPS chunks.
   std::vector<iree_hal_profile_event_relationship_record_t> event_relationships;
@@ -482,6 +500,12 @@ static iree_status_t CommandBufferProfileSinkWrite(
     --test_sink->fail_write_remaining;
     return iree_make_status(test_sink->fail_write_status_code,
                             "injected profile sink write failure");
+  }
+  if (iree_any_bit_set(metadata->flags,
+                       IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED)) {
+    ++test_sink->truncated_chunk_count;
+    test_sink->dropped_record_count += metadata->dropped_record_count;
+    EXPECT_NE(0u, metadata->dropped_record_count);
   }
   if (iovec_count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -720,6 +744,8 @@ static iree_status_t CommandBufferProfileSinkWrite(
     }
     test_sink->queue_events.insert(test_sink->queue_events.end(), records,
                                    records + record_count);
+    test_sink->queue_event_dropped_record_count +=
+        metadata->dropped_record_count;
     ++test_sink->queue_event_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
@@ -749,6 +775,30 @@ static iree_status_t CommandBufferProfileSinkWrite(
     test_sink->queue_device_events.insert(test_sink->queue_device_events.end(),
                                           records, records + record_count);
     ++test_sink->queue_device_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_memory_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_memory_event_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_memory_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_memory_event_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0, records[i].host_time_ns);
+      EXPECT_NE(0u, records[i].allocation_id);
+    }
+    test_sink->memory_events.insert(test_sink->memory_events.end(), records,
+                                    records + record_count);
+    test_sink->memory_event_dropped_record_count +=
+        metadata->dropped_record_count;
+    ++test_sink->memory_event_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS)) {
@@ -1897,6 +1947,87 @@ TEST_F(HostQueueCommandBufferTest,
 }
 
 TEST_F(HostQueueCommandBufferTest,
+       ProfiledQueueEventsReportDroppedRecordsWhenRingFull) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  const iree_host_size_t event_capacity =
+      test_device.logical_device()->profiling.queue_event_capacity;
+  ASSERT_GT(event_capacity, 0u);
+  for (iree_host_size_t i = 0; i <= event_capacity; ++i) {
+    iree_hal_profile_queue_event_t event =
+        iree_hal_profile_queue_event_default();
+    event.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL;
+    event.physical_device_ordinal = 0;
+    event.queue_ordinal = 0;
+    event.operation_count = 1;
+    iree_hal_amdgpu_logical_device_record_profile_queue_event(
+        test_device.base_device(), &event);
+  }
+
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.queue_event_count);
+  EXPECT_EQ(event_capacity, sink.queue_events.size());
+  EXPECT_EQ(1u, sink.queue_event_dropped_record_count);
+  EXPECT_EQ(1u, sink.dropped_record_count);
+  EXPECT_EQ(1, sink.truncated_chunk_count);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfiledMemoryEventsReportDroppedRecordsWhenRingFull) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  const iree_host_size_t event_capacity =
+      test_device.logical_device()->profiling.memory_event_capacity;
+  ASSERT_GT(event_capacity, 0u);
+  iree_host_size_t recorded_count = 0;
+  for (iree_host_size_t i = 0; i <= event_capacity; ++i) {
+    iree_hal_profile_memory_event_t event =
+        iree_hal_profile_memory_event_default();
+    event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE;
+    event.allocation_id = i + 1;
+    event.physical_device_ordinal = 0;
+    event.queue_ordinal = 0;
+    event.length = sizeof(uint32_t);
+    if (iree_hal_amdgpu_logical_device_record_profile_memory_event(
+            test_device.base_device(), &event)) {
+      ++recorded_count;
+    }
+  }
+
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(event_capacity, recorded_count);
+  EXPECT_EQ(1, sink.memory_event_count);
+  EXPECT_EQ(event_capacity, sink.memory_events.size());
+  EXPECT_EQ(1u, sink.memory_event_dropped_record_count);
+  EXPECT_EQ(1u, sink.dropped_record_count);
+  EXPECT_EQ(1, sink.truncated_chunk_count);
+}
+
+TEST_F(HostQueueCommandBufferTest,
        ProfilingFlushMetadataWriteFailurePreservesCursorForRetry) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
@@ -2162,7 +2293,7 @@ TEST_F(HostQueueCommandBufferTest,
                           IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
                           IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
                       CommandBufferProfileSinkAsBase(&sink));
-  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+  if (IsQueueDeviceProfilingUnavailable(profiling_status)) {
     iree_status_free(profiling_status);
     GTEST_SKIP() << "queue-device profiling data family unsupported by backend";
   }
@@ -2515,7 +2646,7 @@ TEST_F(HostQueueCommandBufferTest,
 }
 
 TEST_F(HostQueueCommandBufferTest,
-       ProfiledDispatchReservationFailsWhenCapacityExceeded) {
+       ProfiledDispatchReservationFailsWhenRingFull) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
   options.preallocate_pools = 0;
@@ -2539,15 +2670,71 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(profiling_status);
 
   iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation = {0};
+  iree_hal_amdgpu_profile_dispatch_event_reservation_t exhausted_reservation = {
+      0};
   const uint32_t dispatch_event_capacity =
       iree_hal_amdgpu_host_queue_profile_dispatch_event_capacity(queue);
   iree_slim_mutex_lock(&queue->submission_mutex);
   iree_status_t status =
       iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
-          queue, dispatch_event_capacity + 1, &reservation);
+          queue, dispatch_event_capacity, &reservation);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
+        queue, 1, &exhausted_reservation);
+  }
+  iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue, reservation);
   iree_slim_mutex_unlock(&queue->submission_mutex);
   IREE_ASSERT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
-  EXPECT_EQ(0u, reservation.event_count);
+  EXPECT_EQ(dispatch_event_capacity, reservation.event_count);
+  EXPECT_EQ(0u, exhausted_reservation.event_count);
+
+  IREE_ASSERT_OK(profiling.End());
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfiledQueueDeviceReservationFailsWhenRingFull) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(nullptr, queue);
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsQueueDeviceProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "queue-device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  iree_hal_amdgpu_profile_queue_device_event_reservation_t reservation = {0};
+  iree_hal_amdgpu_profile_queue_device_event_reservation_t
+      exhausted_reservation = {0};
+  const uint32_t queue_device_event_capacity =
+      queue->profiling.queue_device_event_capacity;
+  ASSERT_GT(queue_device_event_capacity, 0u);
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_status_t status =
+      iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
+          queue, queue_device_event_capacity, &reservation);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
+        queue, 1, &exhausted_reservation);
+  }
+  iree_hal_amdgpu_host_queue_cancel_profile_queue_device_events(queue,
+                                                                reservation);
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+  IREE_ASSERT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+  EXPECT_EQ(queue_device_event_capacity, reservation.event_count);
+  EXPECT_EQ(0u, exhausted_reservation.event_count);
 
   IREE_ASSERT_OK(profiling.End());
 }

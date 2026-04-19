@@ -236,7 +236,9 @@ uint64_t iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
 //
 // This never calls the sink directly. Events are buffered in host memory and
 // emitted by profiling_flush/end, making this safe for submission and pool
-// paths that must not block on file or tool I/O.
+// paths that must not block on file or tool I/O. The stream is an aggregate
+// lossy signal: when its fixed ring is full the event is dropped and the next
+// emitted chunk reports TRUNCATED with a dropped-record count.
 bool iree_hal_amdgpu_logical_device_record_profile_memory_event(
     iree_hal_device_t* base_device,
     const iree_hal_profile_memory_event_t* event);
@@ -250,7 +252,9 @@ bool iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
 //
 // This never calls the sink directly. Events are buffered in host memory and
 // emitted by profiling_flush/end, making this safe for submission paths that
-// must not block on file or tool I/O.
+// must not block on file or tool I/O. The stream is an aggregate lossy signal:
+// when its fixed ring is full the event is dropped and the next emitted chunk
+// reports TRUNCATED with a dropped-record count.
 void iree_hal_amdgpu_logical_device_record_profile_queue_event(
     iree_hal_device_t* base_device,
     const iree_hal_profile_queue_event_t* event);

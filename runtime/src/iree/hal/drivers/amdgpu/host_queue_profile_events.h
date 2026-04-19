@@ -84,9 +84,10 @@ iree_hal_amdgpu_host_queue_profiling_completion_signal(
 // Reserves queue-local dispatch profile event records.
 //
 // Caller must hold submission_mutex. If the ring cannot hold |event_count|
-// records the function fails with RESOURCE_EXHAUSTED. Callers that want to keep
-// long captures exact must drain with iree_hal_device_profiling_flush before
-// the ring fills.
+// records the function fails with RESOURCE_EXHAUSTED. Dispatch events are a
+// precise execution timeline, so AMDGPU does not drop them under pressure.
+// Callers that want to keep long captures exact must drain with
+// iree_hal_device_profiling_flush before the ring fills.
 iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
     iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t* out_reservation);
@@ -116,8 +117,10 @@ bool iree_hal_amdgpu_host_queue_should_profile_queue_device_events(
 // Reserves queue-local device-timestamped queue operation records.
 //
 // Caller must hold submission_mutex. If the ring cannot hold |event_count|
-// records the function fails with RESOURCE_EXHAUSTED. The returned records live
-// in device-visible memory so PM4 packets can write timestamp fields directly.
+// records the function fails with RESOURCE_EXHAUSTED. Queue-device events are a
+// precise execution timeline, so AMDGPU does not drop them under pressure. The
+// returned records live in device-visible memory so PM4 packets can write
+// timestamp fields directly.
 iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
     iree_hal_amdgpu_host_queue_t* queue, uint32_t event_count,
     iree_hal_amdgpu_profile_queue_device_event_reservation_t* out_reservation);
