@@ -27,35 +27,40 @@ iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
   return 1;
 }
 
-iree_status_t iree_hal_platform_query_numa_distance_impl(
-    uint8_t node_a, uint8_t node_b, uint8_t* out_distance) {
+bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
+                                                    uint8_t node_b,
+                                                    uint8_t* out_distance) {
   IREE_ASSERT_ARGUMENT(out_distance);
   *out_distance = 10;  // Default: same node.
 
-  // Validate node IDs.
   iree_host_size_t node_count = iree_hal_platform_query_numa_node_count_impl();
-  if (node_a >= node_count || node_b >= node_count) {
+  if (node_a >= node_count || node_b >= node_count) return false;
+
+  if (node_a == node_b) {
+    *out_distance = 10;
+    return true;
+  }
+
+  // Windows doesn't provide a direct NUMA distance query API like Linux SLIT.
+  // Use a fixed conservative cross-node distance.
+  *out_distance = 20;
+  return true;
+}
+
+iree_status_t iree_hal_platform_query_numa_distance_impl(
+    uint8_t node_a, uint8_t node_b, uint8_t* out_distance) {
+  IREE_ASSERT_ARGUMENT(out_distance);
+
+  if (!iree_hal_platform_try_query_numa_distance_impl(node_a, node_b,
+                                                      out_distance)) {
+    iree_host_size_t node_count =
+        iree_hal_platform_query_numa_node_count_impl();
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "NUMA node out of range (node_a=%u, node_b=%u, "
                             "node_count=%zu)",
                             node_a, node_b, node_count);
   }
 
-  // Same node: distance is 10.
-  if (node_a == node_b) {
-    *out_distance = 10;
-    return iree_ok_status();
-  }
-
-  // Query NUMA distance using GetNumaProximityNodeEx.
-  // This API returns proximity domain information, but Windows doesn't expose
-  // SLIT-style distance tables directly. We'll use a heuristic based on
-  // proximity domain equality.
-
-  // Windows doesn't provide a direct NUMA distance query API like Linux SLIT.
-  // We'll use a heuristic: nodes with the same proximity domain are closer.
-  // For simplicity, return a fixed cross-node distance.
-  *out_distance = 20;  // Default: one hop away.
   return iree_ok_status();
 }
 
