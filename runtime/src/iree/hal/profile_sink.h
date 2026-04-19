@@ -471,15 +471,24 @@ enum iree_hal_profile_command_operation_flag_bits_t {
 
   // Operation changes command-buffer control flow.
   IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW = 1u << 5,
+
+  // Producer-local block coordinates are populated. Producers with linear or
+  // opaque command encodings must clear this flag and leave all block ordinal
+  // fields as UINT32_MAX.
+  IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_BLOCK_STRUCTURE = 1u << 6,
 };
 
 // Session-level reusable command-buffer operation description.
 //
 // Producers should emit command-operation records after the command-buffer
 // record defining |command_buffer_id| and before dispatch event records that
-// reference |command_buffer_id| and |command_index|. The fields are intended to
-// be compact enough for one record per recorded command and generic enough for
-// non-AMDGPU producers to populate from their own command encodings.
+// reference |command_buffer_id| and |command_index|. |command_index| is the
+// portable operation identity within |command_buffer_id| and the join key used
+// by dispatch events. The optional block fields are producer-local detail for
+// command encodings with explicit blocks or control-flow regions, such as the
+// AMDGPU AQL command-buffer program and local-task block ISA. Producers with a
+// linear or opaque command encoding must leave the block fields absent instead
+// of fabricating block structure.
 typedef struct iree_hal_profile_command_operation_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
@@ -491,9 +500,9 @@ typedef struct iree_hal_profile_command_operation_record_t {
   uint32_t command_index;
   // Session-local command-buffer identifier.
   uint64_t command_buffer_id;
-  // Producer-local command block ordinal containing this operation.
+  // Producer-local command block ordinal, or UINT32_MAX when absent.
   uint32_t block_ordinal;
-  // Command ordinal within |block_ordinal|.
+  // Command ordinal within |block_ordinal|, or UINT32_MAX when absent.
   uint32_t block_command_ordinal;
   // Session-local executable identifier, or 0 when not applicable.
   uint64_t executable_id;
@@ -515,7 +524,7 @@ typedef struct iree_hal_profile_command_operation_record_t {
   uint32_t source_ordinal;
   // Producer-defined target binding ordinal, or UINT32_MAX when absent.
   uint32_t target_ordinal;
-  // Primary branch target block ordinal, or UINT32_MAX when not applicable.
+  // Primary branch target block ordinal, or UINT32_MAX when absent.
   uint32_t target_block_ordinal;
   // Alternate branch target block ordinal, or UINT32_MAX when absent.
   uint32_t alternate_block_ordinal;
@@ -538,6 +547,14 @@ iree_hal_profile_command_operation_record_default(void) {
   record.target_block_ordinal = UINT32_MAX;
   record.alternate_block_ordinal = UINT32_MAX;
   return record;
+}
+
+// Returns true if a command-operation record carries producer-local block
+// coordinates.
+static inline bool iree_hal_profile_command_operation_has_block_structure(
+    const iree_hal_profile_command_operation_record_t* record) {
+  return iree_all_bits_set(
+      record->flags, IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_BLOCK_STRUCTURE);
 }
 
 // Bitfield specifying which clock correlation fields are populated.

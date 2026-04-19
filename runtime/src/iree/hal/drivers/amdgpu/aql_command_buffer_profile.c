@@ -89,6 +89,7 @@ static void iree_hal_amdgpu_aql_command_buffer_initialize_profile_operation(
       command->opcode);
   record.command_buffer_id = command_buffer_id;
   record.command_index = command->command_index;
+  record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_BLOCK_STRUCTURE;
   record.block_ordinal = block->block_ordinal;
   record.block_command_ordinal = block_command_ordinal;
   if (iree_any_bit_set(

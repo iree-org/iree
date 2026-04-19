@@ -425,6 +425,32 @@ static iree_status_t iree_profile_model_append_command_operation(
   return iree_ok_status();
 }
 
+static iree_status_t iree_profile_model_validate_command_operation(
+    const iree_hal_profile_command_operation_record_t* record) {
+  const bool has_block_structure =
+      iree_hal_profile_command_operation_has_block_structure(record);
+  if (has_block_structure) {
+    if (record->block_ordinal == UINT32_MAX ||
+        record->block_command_ordinal == UINT32_MAX) {
+      return iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "command operation declares block structure without block "
+          "coordinates command_buffer=%" PRIu64 " command_index=%u",
+          record->command_buffer_id, record->command_index);
+    }
+  } else if (record->block_ordinal != UINT32_MAX ||
+             record->block_command_ordinal != UINT32_MAX ||
+             record->target_block_ordinal != UINT32_MAX ||
+             record->alternate_block_ordinal != UINT32_MAX) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "command operation carries block coordinates without the block "
+        "structure flag command_buffer=%" PRIu64 " command_index=%u",
+        record->command_buffer_id, record->command_index);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_profile_model_append_queue(
     iree_profile_model_t* model,
     const iree_hal_profile_queue_record_t* record) {
@@ -559,7 +585,9 @@ static iree_status_t iree_profile_model_process_command_operation_records(
 
     iree_hal_profile_command_operation_record_t record_value;
     memcpy(&record_value, typed_record.contents.data, sizeof(record_value));
-    if (!iree_profile_model_find_command_buffer(
+    status = iree_profile_model_validate_command_operation(&record_value);
+    if (iree_status_is_ok(status) &&
+        !iree_profile_model_find_command_buffer(
             model, record_value.command_buffer_id)) {
       status = iree_make_status(
           IREE_STATUS_DATA_LOSS,

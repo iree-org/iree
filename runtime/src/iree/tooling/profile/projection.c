@@ -224,9 +224,12 @@ static iree_status_t iree_profile_command_print_operation_text(
     return iree_ok_status();
   }
 
-  fprintf(file, "    command[%u]: op=%s block=%u local=%u flags=0x%x",
-          operation->command_index, operation_name, operation->block_ordinal,
-          operation->block_command_ordinal, operation->flags);
+  fprintf(file, "    command[%u]: op=%s flags=0x%x", operation->command_index,
+          operation_name, operation->flags);
+  if (iree_hal_profile_command_operation_has_block_structure(operation)) {
+    fprintf(file, " block=%u local=%u", operation->block_ordinal,
+            operation->block_command_ordinal);
+  }
   if (operation->type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
     fprintf(file,
             " executable=%" PRIu64
@@ -281,10 +284,14 @@ static iree_status_t iree_profile_command_print_operation_jsonl(
   fprintf(file,
           "{\"type\":\"command_operation\",\"command_buffer_id\":%" PRIu64
           ",\"command_index\":%u,\"op\":\"%s\",\"flags\":%u"
+          ",\"block_structure\":%s"
           ",\"block_ordinal\":%u,\"block_command_ordinal\":%u",
           operation->command_buffer_id, operation->command_index,
-          operation_name, operation->flags, operation->block_ordinal,
-          operation->block_command_ordinal);
+          operation_name, operation->flags,
+          iree_hal_profile_command_operation_has_block_structure(operation)
+              ? "true"
+              : "false",
+          operation->block_ordinal, operation->block_command_ordinal);
   fprintf(file, ",\"key\":");
   iree_profile_fprint_json_string(file, key);
   fprintf(file,

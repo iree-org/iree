@@ -364,6 +364,9 @@ static iree_status_t iree_profile_export_process_command_operation_records(
     status = iree_profile_model_resolve_command_operation_key(
         model, &operation_record, numeric_buffer, sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
+      const bool has_block_structure =
+          iree_hal_profile_command_operation_has_block_structure(
+              &operation_record);
       iree_profile_export_print_prefix(file, "command_operation", record_index);
       fprintf(file,
               ",\"command_buffer_id\":%" PRIu64
@@ -376,7 +379,8 @@ static iree_status_t iree_profile_export_process_command_operation_records(
       fprintf(file, ",\"key\":");
       iree_profile_fprint_json_string(file, key);
       fprintf(file,
-              ",\"flags\":%u,\"block_ordinal\":%u"
+              ",\"flags\":%u,\"block_structure\":%s"
+              ",\"block_ordinal\":%u"
               ",\"block_command_ordinal\":%u"
               ",\"executable_id\":%" PRIu64
               ",\"export_ordinal\":%u"
@@ -387,7 +391,8 @@ static iree_status_t iree_profile_export_process_command_operation_records(
               ",\"length\":%" PRIu64
               ",\"target_block_ordinal\":%u"
               ",\"alternate_block_ordinal\":%u}\n",
-              operation_record.flags, operation_record.block_ordinal,
+              operation_record.flags, has_block_structure ? "true" : "false",
+              operation_record.block_ordinal,
               operation_record.block_command_ordinal,
               operation_record.executable_id, operation_record.export_ordinal,
               operation_record.binding_count,

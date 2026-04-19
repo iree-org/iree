@@ -526,6 +526,8 @@ static iree_status_t CommandBufferProfileSinkWrite(
       EXPECT_NE(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE, records[i].type);
       EXPECT_NE(UINT32_MAX, records[i].command_index);
       EXPECT_NE(0u, records[i].command_buffer_id);
+      EXPECT_TRUE(
+          iree_hal_profile_command_operation_has_block_structure(&records[i]));
       EXPECT_NE(UINT32_MAX, records[i].block_ordinal);
       EXPECT_NE(UINT32_MAX, records[i].block_command_ordinal);
       if (records[i].type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
@@ -1801,6 +1803,8 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
     switch (operation.type) {
       case IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH:
+        EXPECT_TRUE(
+            iree_hal_profile_command_operation_has_block_structure(&operation));
         EXPECT_EQ(dispatch_operation_count, operation.command_index);
         EXPECT_NE(0u, operation.executable_id);
         EXPECT_NE(
@@ -1819,6 +1823,8 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
         ++dispatch_operation_count;
         break;
       case IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_RETURN:
+        EXPECT_TRUE(
+            iree_hal_profile_command_operation_has_block_structure(&operation));
         EXPECT_EQ(2u, operation.command_index);
         EXPECT_NE(0u, operation.flags &
                           IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW);

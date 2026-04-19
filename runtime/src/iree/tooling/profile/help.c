@@ -405,6 +405,8 @@ static void iree_profile_print_agent_markdown_cross_references(FILE* file) {
       "  join recorded command-buffer operations to dispatch events. "
       "`op` and\n"
       "  `key` can be filtered with `command --filter=<pattern>`.\n"
+      "  `block_structure` means producer-local block ordinals are present;\n"
+      "  linear or opaque producers leave those fields absent.\n"
       "- `dispatch_event.executable_id` plus `dispatch_event.export_ordinal` "
       "joins\n"
       "  to `executable_export`. The `key` field is the export name when "
