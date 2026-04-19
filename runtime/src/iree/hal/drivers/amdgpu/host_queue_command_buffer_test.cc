@@ -257,6 +257,31 @@ static iree_status_t CreateSemaphore(iree_hal_device_t* device,
       /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, out_semaphore);
 }
 
+static iree_status_t SubmitProfiledQueueFill(TestLogicalDevice* test_device) {
+  Ref<iree_hal_buffer_t> target_buffer;
+  IREE_RETURN_IF_ERROR(CreateHostVisibleTransferBuffer(
+      test_device->allocator(), sizeof(uint32_t), target_buffer.out()));
+
+  Ref<iree_hal_semaphore_t> signal;
+  IREE_RETURN_IF_ERROR(
+      CreateSemaphore(test_device->base_device(), signal.out()));
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_t* signal_ptr = signal.get();
+  const iree_hal_semaphore_list_t signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&signal_ptr,
+      /*payload_values=*/&signal_value,
+  };
+  const uint32_t pattern = 0xA11CA7E5u;
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_fill(
+      test_device->base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), signal_list, target_buffer,
+      /*target_offset=*/0, sizeof(pattern), &pattern, sizeof(pattern),
+      IREE_HAL_FILL_FLAG_NONE));
+  return iree_hal_semaphore_wait(signal, signal_value, iree_infinite_timeout(),
+                                 IREE_ASYNC_WAIT_FLAG_NONE);
+}
+
 class DeviceProfilingScope {
  public:
   explicit DeviceProfilingScope(iree_hal_device_t* device) : device_(device) {}
@@ -393,6 +418,27 @@ struct CommandBufferProfileSink {
 
   // True if the backend writes after ending the profiling session.
   bool write_after_end = false;
+
+  // Status code returned from begin_session, or OK for success.
+  iree_status_code_t fail_begin_session_status_code = IREE_STATUS_OK;
+
+  // Content type whose write callback should fail, or empty when disabled.
+  iree_string_view_t fail_write_content_type = {nullptr, 0};
+
+  // Number of matching write callbacks that should fail.
+  int fail_write_remaining = 0;
+
+  // Status code returned from matching write callbacks.
+  iree_status_code_t fail_write_status_code = IREE_STATUS_OK;
+
+  // Expected session status code passed to end_session.
+  iree_status_code_t expected_end_session_status_code = IREE_STATUS_OK;
+
+  // Status code observed by the most recent end_session callback.
+  iree_status_code_t observed_end_session_status_code = IREE_STATUS_OK;
+
+  // Status code returned from end_session, or OK for success.
+  iree_status_code_t fail_end_session_status_code = IREE_STATUS_OK;
 };
 
 static CommandBufferProfileSink* CommandBufferProfileSinkCast(
@@ -412,7 +458,11 @@ static iree_status_t CommandBufferProfileSinkBeginSession(
   EXPECT_EQ(0, test_sink->end_count);
   EXPECT_TRUE(iree_string_view_equal(metadata->content_type,
                                      IREE_HAL_PROFILE_CONTENT_TYPE_SESSION));
-  test_sink->begin_count = 1;
+  ++test_sink->begin_count;
+  if (test_sink->fail_begin_session_status_code != IREE_STATUS_OK) {
+    return iree_make_status(test_sink->fail_begin_session_status_code,
+                            "injected profile sink begin_session failure");
+  }
   test_sink->session_id = metadata->session_id;
   return iree_ok_status();
 }
@@ -426,6 +476,13 @@ static iree_status_t CommandBufferProfileSinkWrite(
   EXPECT_EQ(0, test_sink->end_count);
   if (test_sink->end_count != 0) test_sink->write_after_end = true;
   EXPECT_EQ(test_sink->session_id, metadata->session_id);
+  if (test_sink->fail_write_remaining != 0 &&
+      iree_string_view_equal(metadata->content_type,
+                             test_sink->fail_write_content_type)) {
+    --test_sink->fail_write_remaining;
+    return iree_make_status(test_sink->fail_write_status_code,
+                            "injected profile sink write failure");
+  }
   if (iovec_count != 1) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "expected exactly one profile chunk iovec");
@@ -771,8 +828,13 @@ static iree_status_t CommandBufferProfileSinkEndSession(
   EXPECT_TRUE(iree_string_view_equal(metadata->content_type,
                                      IREE_HAL_PROFILE_CONTENT_TYPE_SESSION));
   EXPECT_EQ(test_sink->session_id, metadata->session_id);
-  EXPECT_EQ(IREE_STATUS_OK, session_status_code);
+  EXPECT_EQ(test_sink->expected_end_session_status_code, session_status_code);
+  test_sink->observed_end_session_status_code = session_status_code;
   test_sink->end_count = 1;
+  if (test_sink->fail_end_session_status_code != IREE_STATUS_OK) {
+    return iree_make_status(test_sink->fail_end_session_status_code,
+                            "injected profile sink end_session failure");
+  }
   return iree_ok_status();
 }
 
@@ -791,6 +853,18 @@ static void CommandBufferProfileSinkInitialize(CommandBufferProfileSink* sink) {
 static iree_hal_profile_sink_t* CommandBufferProfileSinkAsBase(
     CommandBufferProfileSink* sink) {
   return reinterpret_cast<iree_hal_profile_sink_t*>(sink);
+}
+
+static void ExpectQueueEventProfilingCanBeginAndEnd(
+    TestLogicalDevice* test_device) {
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device->base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
 }
 
 static void ExpectDispatchEventsWithinClockCorrelationRange(
@@ -1737,6 +1811,200 @@ TEST_F(HostQueueCommandBufferTest, SinklessProfilingBeginFails) {
   IREE_EXPECT_OK(iree_hal_device_profiling_end(test_device.base_device()));
 }
 
+TEST_F(HostQueueCommandBufferTest, ProfilingBeginSinkBeginFailureAllowsRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  sink.fail_begin_session_status_code = IREE_STATUS_RESOURCE_EXHAUSTED;
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_RESOURCE_EXHAUSTED,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink)));
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(0, sink.end_count);
+
+  ExpectQueueEventProfilingCanBeginAndEnd(&test_device);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingBeginMetadataWriteFailureEndsSessionAndAllowsRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  sink.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES;
+  sink.fail_write_remaining = 1;
+  sink.fail_write_status_code = IREE_STATUS_DATA_LOSS;
+  sink.expected_end_session_status_code = IREE_STATUS_DATA_LOSS;
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink)));
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(IREE_STATUS_DATA_LOSS, sink.observed_end_session_status_code);
+  EXPECT_EQ(0, sink.device_metadata_count);
+
+  ExpectQueueEventProfilingCanBeginAndEnd(&test_device);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingFlushWriteFailurePreservesQueueEventsForRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  IREE_ASSERT_OK(SubmitProfiledQueueFill(&test_device));
+  sink.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS;
+  sink.fail_write_remaining = 1;
+  sink.fail_write_status_code = IREE_STATUS_UNAVAILABLE;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNAVAILABLE,
+      iree_hal_device_profiling_flush(test_device.base_device()));
+  EXPECT_EQ(0, sink.queue_event_count);
+  EXPECT_TRUE(sink.queue_events.empty());
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.queue_event_count);
+  ASSERT_EQ(1u, sink.queue_events.size());
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL, sink.queue_events[0].type);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingFlushMetadataWriteFailurePreservesCursorForRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  Ref<iree_hal_semaphore_t> signal;
+  IREE_ASSERT_OK(CreateSemaphore(test_device.base_device(), signal.out()));
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_t* signal_ptr = signal.get();
+  const iree_hal_semaphore_list_t signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&signal_ptr,
+      /*payload_values=*/&signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), signal_list, command_buffer,
+      iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal, signal_value,
+                                         iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  sink.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS;
+  sink.fail_write_remaining = 1;
+  sink.fail_write_status_code = IREE_STATUS_UNAVAILABLE;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNAVAILABLE,
+      iree_hal_device_profiling_flush(test_device.base_device()));
+  EXPECT_EQ(0, sink.command_buffer_metadata_count);
+  EXPECT_TRUE(sink.command_buffer_ids.empty());
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  ASSERT_EQ(1u, sink.command_buffer_ids.size());
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingEndWriteFailureReportsSessionStatusAndAllowsRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  IREE_ASSERT_OK(SubmitProfiledQueueFill(&test_device));
+  sink.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS;
+  sink.fail_write_remaining = 1;
+  sink.fail_write_status_code = IREE_STATUS_DATA_LOSS;
+  sink.expected_end_session_status_code = IREE_STATUS_DATA_LOSS;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS, profiling.End());
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(IREE_STATUS_DATA_LOSS, sink.observed_end_session_status_code);
+  EXPECT_EQ(0, sink.queue_event_count);
+
+  ExpectQueueEventProfilingCanBeginAndEnd(&test_device);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingEndSessionFailureClearsStateAndAllowsRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  sink.fail_end_session_status_code = IREE_STATUS_ABORTED;
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, profiling.End());
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(IREE_STATUS_OK, sink.observed_end_session_status_code);
+
+  ExpectQueueEventProfilingCanBeginAndEnd(&test_device);
+}
+
 TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
@@ -2067,6 +2335,66 @@ TEST_F(HostQueueCommandBufferTest,
             std::find_if(sink.counter_sample_values.begin(),
                          sink.counter_sample_values.end(),
                          [](uint64_t value) { return value != 0; }));
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingFlushCounterSampleWriteFailurePreservesSamplesForRetry) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status = BeginSqWavesProfiling(&profiling, &sink);
+  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "AMDGPU hardware counter profiling unavailable";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(&test_device, &fixture));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  sink.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES;
+  sink.fail_write_remaining = 1;
+  sink.fail_write_status_code = IREE_STATUS_UNAVAILABLE;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNAVAILABLE,
+      iree_hal_device_profiling_flush(test_device.base_device()));
+  EXPECT_EQ(0, sink.counter_sample_count);
+  EXPECT_TRUE(sink.counter_samples.empty());
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  ExpectTwoDispatchOutputs(fixture);
+  EXPECT_GE(sink.counter_sample_count, 1);
+  ASSERT_EQ(2u, sink.counter_samples.size());
+  EXPECT_GE(sink.dispatch_events.size(), sink.counter_samples.size());
 }
 
 TEST_F(HostQueueCommandBufferTest,
