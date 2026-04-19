@@ -38,6 +38,18 @@ iree_runtime_cc_library(
     ],
 )
 
+# Reusable profile sink helpers for CTS coverage of HAL profiling behavior.
+iree_runtime_cc_library(
+    name = "profile_test_util",
+    testonly = True,
+    srcs = ["profile_test_util.cc"],
+    hdrs = ["profile_test_util.h"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
 # CtsTestBase fixture and helper utilities.
 iree_runtime_cc_library(
     name = "test_base",

@@ -26,6 +26,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_test_util
+  HDRS
+    "profile_test_util.h"
+  SRCS
+    "profile_test_util.cc"
+  DEPS
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     test_base
   HDRS
     "test_base.h"

@@ -166,6 +166,7 @@ iree_cc_library(
     "profile.c"
   DEPS
     iree::base
+    iree::base::threading
     iree::hal
   PUBLIC
 )

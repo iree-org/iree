@@ -9,6 +9,8 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include "iree/base/threading/mutex.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_local_profile_recorder_t
 //===----------------------------------------------------------------------===//
@@ -18,6 +20,12 @@
 struct iree_hal_local_profile_recorder_t {
   // Host allocator used for recorder-owned storage.
   iree_allocator_t host_allocator;
+
+  // Guards buffered records while producers append and flush snapshots copy.
+  iree_slim_mutex_t mutex;
+
+  // Serializes flush operations while sink callbacks are being invoked.
+  iree_slim_mutex_t flush_mutex;
 
   // Copied human-readable producer name used on emitted chunks.
   iree_string_view_t name;
@@ -73,6 +81,26 @@ struct iree_hal_local_profile_recorder_t {
   // Next nonzero relationship id assigned by this stream.
   uint64_t next_event_relationship_id;
 };
+
+typedef struct iree_hal_local_profile_recorder_snapshot_t {
+  // Copied queue events waiting to be written.
+  iree_hal_profile_queue_event_t* queue_events;
+
+  // Number of entries in |queue_events|.
+  iree_host_size_t queue_event_count;
+
+  // Copied host execution events waiting to be written.
+  iree_hal_profile_host_execution_event_t* host_execution_events;
+
+  // Number of entries in |host_execution_events|.
+  iree_host_size_t host_execution_event_count;
+
+  // Copied relationship records waiting to be written.
+  iree_hal_profile_event_relationship_record_t* event_relationships;
+
+  // Number of entries in |event_relationships|.
+  iree_host_size_t event_relationship_count;
+} iree_hal_local_profile_recorder_snapshot_t;
 
 static iree_status_t iree_hal_local_profile_recorder_validate_records(
     const iree_hal_local_profile_recorder_options_t* recorder_options) {
@@ -297,8 +325,11 @@ iree_status_t iree_hal_local_profile_recorder_create(
   iree_hal_local_profile_recorder_t* recorder = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, sizeof(*recorder),
                                              (void**)&recorder));
+  memset(recorder, 0, sizeof(*recorder));
   recorder->host_allocator = host_allocator;
   recorder->session_id = recorder_options->session_id;
+  iree_slim_mutex_initialize(&recorder->mutex);
+  iree_slim_mutex_initialize(&recorder->flush_mutex);
 
   bool sink_session_begun = false;
   iree_status_t status = iree_hal_local_profile_recorder_copy_name(
@@ -354,6 +385,8 @@ void iree_hal_local_profile_recorder_destroy(
   iree_hal_device_profiling_options_storage_free(recorder->options_storage,
                                                  host_allocator);
   iree_allocator_free(host_allocator, recorder->name_storage);
+  iree_slim_mutex_deinitialize(&recorder->flush_mutex);
+  iree_slim_mutex_deinitialize(&recorder->mutex);
   iree_allocator_free(host_allocator, recorder);
 }
 
@@ -391,7 +424,10 @@ iree_status_t iree_hal_local_profile_recorder_append_queue_event(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "local profile queue event requires a type");
   }
+
+  iree_slim_mutex_lock(&recorder->mutex);
   if (recorder->queue_event_count >= recorder->queue_event_capacity) {
+    iree_slim_mutex_unlock(&recorder->mutex);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "local profile queue event buffer is full");
   }
@@ -417,10 +453,12 @@ iree_status_t iree_hal_local_profile_recorder_append_queue_event(
   event->operation_count = event_info->operation_count;
   event->payload_length = event_info->payload_length;
   if (out_event_id) *out_event_id = event->event_id;
+  iree_slim_mutex_unlock(&recorder->mutex);
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_local_profile_recorder_append_relationship(
+static iree_status_t
+iree_hal_local_profile_recorder_append_relationship_unlocked(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_queue_scope_t* scope, uint64_t queue_event_id,
     uint64_t host_execution_event_id) {
@@ -478,8 +516,10 @@ iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
         IREE_STATUS_INVALID_ARGUMENT,
         "local profile host execution event end time precedes start time");
   }
+  iree_slim_mutex_lock(&recorder->mutex);
   if (recorder->host_execution_event_count >=
       recorder->host_execution_event_capacity) {
+    iree_slim_mutex_unlock(&recorder->mutex);
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "local profile host execution event buffer is full");
@@ -488,6 +528,7 @@ iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
       event_info->related_queue_event_id != 0 &&
       recorder->event_relationship_count >=
           recorder->event_relationship_capacity) {
+    iree_slim_mutex_unlock(&recorder->mutex);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "local profile relationship buffer is full");
   }
@@ -518,36 +559,154 @@ iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
   event->operation_count = event_info->operation_count;
   if (out_event_id) *out_event_id = event->event_id;
 
-  return iree_hal_local_profile_recorder_append_relationship(
-      recorder, &event_info->scope, event_info->related_queue_event_id,
-      event->event_id);
+  iree_status_t status =
+      iree_hal_local_profile_recorder_append_relationship_unlocked(
+          recorder, &event_info->scope, event_info->related_queue_event_id,
+          event->event_id);
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return status;
+}
+
+static void iree_hal_local_profile_recorder_snapshot_deinitialize(
+    iree_allocator_t host_allocator,
+    iree_hal_local_profile_recorder_snapshot_t* snapshot) {
+  iree_allocator_free(host_allocator, snapshot->event_relationships);
+  iree_allocator_free(host_allocator, snapshot->host_execution_events);
+  iree_allocator_free(host_allocator, snapshot->queue_events);
+  memset(snapshot, 0, sizeof(*snapshot));
+}
+
+static iree_status_t iree_hal_local_profile_recorder_copy_records(
+    iree_allocator_t host_allocator, const void* records,
+    iree_host_size_t record_count, iree_host_size_t record_size,
+    void** out_records) {
+  *out_records = NULL;
+  if (record_count == 0) return iree_ok_status();
+  iree_host_size_t byte_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(record_count, record_size,
+                                                &byte_length))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "local profiling snapshot size overflow for %" PRIhsz " records",
+        record_count);
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, byte_length, out_records));
+  memcpy(*out_records, records, byte_length);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_local_profile_recorder_snapshot(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_recorder_snapshot_t* out_snapshot) {
+  memset(out_snapshot, 0, sizeof(*out_snapshot));
+
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_hal_local_profile_recorder_copy_records(
+      recorder->host_allocator, recorder->queue_events,
+      recorder->queue_event_count, sizeof(*recorder->queue_events),
+      (void**)&out_snapshot->queue_events);
+  if (iree_status_is_ok(status)) {
+    out_snapshot->queue_event_count = recorder->queue_event_count;
+    status = iree_hal_local_profile_recorder_copy_records(
+        recorder->host_allocator, recorder->host_execution_events,
+        recorder->host_execution_event_count,
+        sizeof(*recorder->host_execution_events),
+        (void**)&out_snapshot->host_execution_events);
+  }
+  if (iree_status_is_ok(status)) {
+    out_snapshot->host_execution_event_count =
+        recorder->host_execution_event_count;
+    status = iree_hal_local_profile_recorder_copy_records(
+        recorder->host_allocator, recorder->event_relationships,
+        recorder->event_relationship_count,
+        sizeof(*recorder->event_relationships),
+        (void**)&out_snapshot->event_relationships);
+  }
+  if (iree_status_is_ok(status)) {
+    out_snapshot->event_relationship_count = recorder->event_relationship_count;
+  }
+  iree_slim_mutex_unlock(&recorder->mutex);
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_local_profile_recorder_snapshot_deinitialize(
+        recorder->host_allocator, out_snapshot);
+  }
+  return status;
+}
+
+static void iree_hal_local_profile_recorder_drop_record_prefix(
+    void* records, iree_host_size_t record_size, iree_host_size_t drop_count,
+    iree_host_size_t* record_count) {
+  if (drop_count == 0) return;
+  IREE_ASSERT(*record_count >= drop_count);
+  const iree_host_size_t remaining_count = *record_count - drop_count;
+  if (remaining_count > 0) {
+    memmove(records, (uint8_t*)records + drop_count * record_size,
+            remaining_count * record_size);
+  }
+  *record_count = remaining_count;
+}
+
+static void iree_hal_local_profile_recorder_drop_flushed_records(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_host_size_t queue_event_count,
+    iree_host_size_t host_execution_event_count,
+    iree_host_size_t event_relationship_count) {
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_hal_local_profile_recorder_drop_record_prefix(
+      recorder->queue_events, sizeof(*recorder->queue_events),
+      queue_event_count, &recorder->queue_event_count);
+  iree_hal_local_profile_recorder_drop_record_prefix(
+      recorder->host_execution_events, sizeof(*recorder->host_execution_events),
+      host_execution_event_count, &recorder->host_execution_event_count);
+  iree_hal_local_profile_recorder_drop_record_prefix(
+      recorder->event_relationships, sizeof(*recorder->event_relationships),
+      event_relationship_count, &recorder->event_relationship_count);
+  iree_slim_mutex_unlock(&recorder->mutex);
 }
 
 iree_status_t iree_hal_local_profile_recorder_flush(
     iree_hal_local_profile_recorder_t* recorder) {
   if (!recorder || !recorder->active) return iree_ok_status();
 
-  iree_status_t status = iree_hal_local_profile_recorder_write_records(
-      recorder, IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
-      recorder->queue_events, recorder->queue_event_count,
-      sizeof(*recorder->queue_events));
+  iree_slim_mutex_lock(&recorder->flush_mutex);
+  iree_hal_local_profile_recorder_snapshot_t snapshot;
+  iree_status_t status =
+      iree_hal_local_profile_recorder_snapshot(recorder, &snapshot);
+
   if (iree_status_is_ok(status)) {
-    recorder->queue_event_count = 0;
+    status = iree_hal_local_profile_recorder_write_records(
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
+        snapshot.queue_events, snapshot.queue_event_count,
+        sizeof(*snapshot.queue_events));
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_local_profile_recorder_drop_flushed_records(
+        recorder, snapshot.queue_event_count, /*host_execution_event_count=*/0,
+        /*event_relationship_count=*/0);
     status = iree_hal_local_profile_recorder_write_records(
         recorder, IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
-        recorder->host_execution_events, recorder->host_execution_event_count,
-        sizeof(*recorder->host_execution_events));
+        snapshot.host_execution_events, snapshot.host_execution_event_count,
+        sizeof(*snapshot.host_execution_events));
   }
   if (iree_status_is_ok(status)) {
-    recorder->host_execution_event_count = 0;
+    iree_hal_local_profile_recorder_drop_flushed_records(
+        recorder, /*queue_event_count=*/0, snapshot.host_execution_event_count,
+        /*event_relationship_count=*/0);
     status = iree_hal_local_profile_recorder_write_records(
         recorder, IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS,
-        recorder->event_relationships, recorder->event_relationship_count,
-        sizeof(*recorder->event_relationships));
+        snapshot.event_relationships, snapshot.event_relationship_count,
+        sizeof(*snapshot.event_relationships));
   }
   if (iree_status_is_ok(status)) {
-    recorder->event_relationship_count = 0;
+    iree_hal_local_profile_recorder_drop_flushed_records(
+        recorder, /*queue_event_count=*/0, /*host_execution_event_count=*/0,
+        snapshot.event_relationship_count);
   }
+  iree_hal_local_profile_recorder_snapshot_deinitialize(
+      recorder->host_allocator, &snapshot);
+  iree_slim_mutex_unlock(&recorder->flush_mutex);
   return status;
 }
 

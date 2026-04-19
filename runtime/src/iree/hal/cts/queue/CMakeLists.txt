@@ -34,6 +34,7 @@ iree_cc_library(
     "queue_dispatch_test.cc"
   DEPS
     iree::hal
+    iree::hal::cts::util::profile_test_util
     iree::hal::cts::util::test_base
   TESTONLY
   ALWAYSLINK
@@ -60,6 +61,7 @@ iree_cc_library(
     "queue_transfer_test.cc"
   DEPS
     iree::hal
+    iree::hal::cts::util::profile_test_util
     iree::hal::cts::util::test_base
   TESTONLY
   ALWAYSLINK

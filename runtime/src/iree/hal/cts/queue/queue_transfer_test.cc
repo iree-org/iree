@@ -12,11 +12,13 @@
 // command buffer. The tests verify data correctness, offset handling, pattern
 // sizes, and semaphore ordering between chained operations.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <numeric>
 #include <vector>
 
+#include "iree/hal/cts/util/profile_test_util.h"
 #include "iree/hal/cts/util/test_base.h"
 
 namespace iree::hal::cts {
@@ -519,6 +521,98 @@ TEST_P(QueueTransferTest, BurstCopySubmit) {
   auto data = ReadBufferData<uint32_t>(target);
   uint32_t expected = 0xC0DE0000 | (kBurstSubmitIterations - 1);
   EXPECT_THAT(data, Each(expected));
+}
+
+// HAL-native CPU profiling should produce host queue and execution records for
+// non-dispatch queue operations.
+TEST_P(QueueTransferTest, FillAndCopyHostQueueEventProfiling) {
+  const iree_device_size_t buffer_size = 128;
+  Ref<iree_hal_buffer_t> source;
+  CreateZeroedDeviceBuffer(buffer_size, source.out());
+  Ref<iree_hal_buffer_t> target;
+  CreateZeroedDeviceBuffer(buffer_size, target.out());
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+
+  DeviceProfilingScope profiling(device_);
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+                          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS,
+                      TestProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "host queue profiling unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  SemaphoreList empty_wait;
+  SemaphoreList fill_signal(device_, {0}, {1});
+  uint32_t pattern = 0xA5A5A5A5u;
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, fill_signal, source, 0,
+      buffer_size, &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+
+  SemaphoreList copy_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_copy(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, fill_signal, copy_signal, source, 0,
+      target, 0, buffer_size, IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      copy_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto data = ReadBufferData<uint32_t>(target);
+  EXPECT_THAT(data, Each(pattern));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.queue_event_count, 1);
+  EXPECT_GE(sink.host_execution_event_count, 1);
+  EXPECT_GE(sink.event_relationship_count, 1);
+  EXPECT_EQ(0, sink.dispatch_event_count);
+  EXPECT_EQ(0, sink.queue_device_event_count);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+
+  auto find_queue_event = [&](iree_hal_profile_queue_event_type_t type) {
+    return std::find_if(sink.queue_events.begin(), sink.queue_events.end(),
+                        [type](const iree_hal_profile_queue_event_t& event) {
+                          return event.type == type;
+                        });
+  };
+  auto find_host_event = [&](iree_hal_profile_queue_event_type_t type) {
+    return std::find_if(
+        sink.host_execution_events.begin(), sink.host_execution_events.end(),
+        [type](const iree_hal_profile_host_execution_event_t& event) {
+          return event.type == type;
+        });
+  };
+
+  auto fill_queue_it = find_queue_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL);
+  ASSERT_NE(sink.queue_events.end(), fill_queue_it);
+  auto fill_host_it = find_host_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL);
+  ASSERT_NE(sink.host_execution_events.end(), fill_host_it);
+  EXPECT_EQ(buffer_size, fill_queue_it->payload_length);
+  EXPECT_EQ(buffer_size, fill_host_it->payload_length);
+  EXPECT_EQ(1u, fill_queue_it->operation_count);
+  EXPECT_EQ(1u, fill_host_it->operation_count);
+  EXPECT_EQ(fill_queue_it->submission_id, fill_host_it->submission_id);
+  EXPECT_EQ(IREE_STATUS_OK, fill_host_it->status_code);
+
+  auto copy_queue_it = find_queue_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY);
+  ASSERT_NE(sink.queue_events.end(), copy_queue_it);
+  auto copy_host_it = find_host_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY);
+  ASSERT_NE(sink.host_execution_events.end(), copy_host_it);
+  EXPECT_EQ(buffer_size, copy_queue_it->payload_length);
+  EXPECT_EQ(buffer_size, copy_host_it->payload_length);
+  EXPECT_EQ(1u, copy_queue_it->operation_count);
+  EXPECT_EQ(1u, copy_host_it->operation_count);
+  EXPECT_EQ(copy_queue_it->submission_id, copy_host_it->submission_id);
+  EXPECT_EQ(IREE_STATUS_OK, copy_host_it->status_code);
 }
 
 //===----------------------------------------------------------------------===//
