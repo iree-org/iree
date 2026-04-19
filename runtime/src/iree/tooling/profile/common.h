@@ -23,6 +23,9 @@ extern "C" {
 const char* iree_profile_record_type_name(
     iree_hal_profile_file_record_type_t record_type);
 
+// Returns the stable text name for a status code used in profile records.
+const char* iree_profile_status_code_name(uint32_t status_code);
+
 // Prints |value| as a JSON string literal with control-character escaping.
 void iree_profile_fprint_json_string(FILE* file, iree_string_view_t value);
 

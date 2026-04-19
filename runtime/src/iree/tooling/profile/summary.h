@@ -63,6 +63,16 @@ typedef struct iree_profile_summary_t {
   uint64_t session_begin_count;
   // Session-end records parsed.
   uint64_t session_end_count;
+  // Session-end records with a non-OK session status code.
+  uint64_t non_ok_session_end_count;
+  // Session id of the first non-OK session-end record, or 0 when absent.
+  uint64_t first_non_ok_session_id;
+  // Stream id of the first non-OK session-end record, or 0 when absent.
+  uint64_t first_non_ok_stream_id;
+  // Event id of the first non-OK session-end record, or 0 when absent.
+  uint64_t first_non_ok_event_id;
+  // Status code of the first non-OK session-end record, or OK when absent.
+  iree_status_code_t first_non_ok_session_status_code;
   // Chunk records parsed.
   uint64_t chunk_count;
   // Records with unknown file record types.

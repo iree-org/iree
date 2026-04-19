@@ -637,6 +637,23 @@ static iree_status_t iree_profile_summary_process_chunk_record(
 
 #undef IREE_PROFILE_SUMMARY_CHUNK_ROUTE
 
+static void iree_profile_summary_process_session_end_record(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  ++summary->session_end_count;
+  iree_status_code_t session_status_code =
+      (iree_status_code_t)record->header.session_status_code;
+  if (session_status_code == IREE_STATUS_OK) return;
+
+  ++summary->non_ok_session_end_count;
+  if (summary->non_ok_session_end_count == 1) {
+    summary->first_non_ok_session_id = record->header.session_id;
+    summary->first_non_ok_stream_id = record->header.stream_id;
+    summary->first_non_ok_event_id = record->header.event_id;
+    summary->first_non_ok_session_status_code = session_status_code;
+  }
+}
+
 iree_status_t iree_profile_summary_process_record(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -647,7 +664,7 @@ iree_status_t iree_profile_summary_process_record(
       ++summary->session_begin_count;
       return iree_ok_status();
     case IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END:
-      ++summary->session_end_count;
+      iree_profile_summary_process_session_end_record(summary, record);
       return iree_ok_status();
     case IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK:
       ++summary->chunk_count;
@@ -773,10 +790,22 @@ static void iree_profile_print_summary_text_records(
     const iree_profile_summary_t* summary, FILE* file) {
   fprintf(file,
           "records: file=%" PRIu64 " session_begin=%" PRIu64 " chunks=%" PRIu64
-          " session_end=%" PRIu64 " unknown=%" PRIu64 "\n",
+          " session_end=%" PRIu64 " non_ok_session_end=%" PRIu64
+          " unknown=%" PRIu64 "\n",
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
-          summary->unknown_record_count);
+          summary->non_ok_session_end_count, summary->unknown_record_count);
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            "session_status: first_non_ok_session_id=%" PRIu64
+            " first_non_ok_stream_id=%" PRIu64 " first_non_ok_event_id=%" PRIu64
+            " first_non_ok_status_code=%u first_non_ok_status=%s\n",
+            summary->first_non_ok_session_id, summary->first_non_ok_stream_id,
+            summary->first_non_ok_event_id,
+            (uint32_t)summary->first_non_ok_session_status_code,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code));
+  }
 }
 
 static void iree_profile_print_summary_text_chunks(
@@ -961,10 +990,24 @@ static void iree_profile_print_summary_jsonl_record_fields(
   fprintf(file,
           "{\"type\":\"summary\",\"file_records\":%" PRIu64
           ",\"session_begin_records\":%" PRIu64 ",\"chunk_records\":%" PRIu64
-          ",\"session_end_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64,
+          ",\"session_end_records\":%" PRIu64
+          ",\"non_ok_session_end_records\":%" PRIu64
+          ",\"unknown_records\":%" PRIu64,
           summary->file_record_count, summary->session_begin_count,
           summary->chunk_count, summary->session_end_count,
-          summary->unknown_record_count);
+          summary->non_ok_session_end_count, summary->unknown_record_count);
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            ",\"first_non_ok_session_id\":%" PRIu64
+            ",\"first_non_ok_stream_id\":%" PRIu64
+            ",\"first_non_ok_event_id\":%" PRIu64
+            ",\"first_non_ok_status_code\":%u,\"first_non_ok_status\":\"%s\"",
+            summary->first_non_ok_session_id, summary->first_non_ok_stream_id,
+            summary->first_non_ok_event_id,
+            (uint32_t)summary->first_non_ok_session_status_code,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code));
+  }
 }
 
 static void iree_profile_print_summary_jsonl_metadata_fields(

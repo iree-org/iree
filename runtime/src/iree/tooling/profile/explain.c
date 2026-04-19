@@ -502,6 +502,19 @@ static void iree_profile_explain_print_text_header(
           summary->file_record_count, summary->chunk_count,
           summary->unknown_record_count, summary->unknown_chunk_count,
           summary->truncated_chunk_count, summary->dropped_record_count);
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            "session_status: non_ok_session_end=%" PRIu64
+            " first_session_id=%" PRIu64 " first_stream_id=%" PRIu64
+            " first_event_id=%" PRIu64
+            " first_status_code=%u"
+            " first_status=%s\n",
+            summary->non_ok_session_end_count, summary->first_non_ok_session_id,
+            summary->first_non_ok_stream_id, summary->first_non_ok_event_id,
+            (uint32_t)summary->first_non_ok_session_status_code,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code));
+  }
   fprintf(file,
           "coverage: dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
           " queues=%" PRIhsz " queue_events=%" PRIhsz
@@ -739,6 +752,18 @@ static void iree_profile_explain_print_text_hints(
         "incomplete",
         file);
   }
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            "  [error] session: %" PRIu64
+            " profiling session end record(s) reported non-OK status; first "
+            "session_id=%" PRIu64 " stream_id=%" PRIu64 " event_id=%" PRIu64
+            " status=%s(%u)\n",
+            summary->non_ok_session_end_count, summary->first_non_ok_session_id,
+            summary->first_non_ok_stream_id, summary->first_non_ok_event_id,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code),
+            (uint32_t)summary->first_non_ok_session_status_code);
+  }
   if (dispatch_context->invalid_dispatch_count != 0) {
     iree_profile_explain_print_hint_text(
         "warning", "dispatch",
@@ -815,14 +840,16 @@ static void iree_profile_explain_print_jsonl_summary(
           "{\"type\":\"explain_summary\",\"file_records\":%" PRIu64
           ",\"chunk_records\":%" PRIu64 ",\"unknown_records\":%" PRIu64
           ",\"unknown_chunks\":%" PRIu64 ",\"truncated_chunks\":%" PRIu64
-          ",\"dropped_records\":%" PRIu64 ",\"dispatches\":%" PRIu64
+          ",\"dropped_records\":%" PRIu64
+          ",\"non_ok_session_end_records\":%" PRIu64 ",\"dispatches\":%" PRIu64
           ",\"valid_dispatches\":%" PRIu64 ",\"invalid_dispatches\":%" PRIu64
           ",\"queues\":%" PRIhsz ",\"queue_events\":%" PRIhsz
           ",\"command_buffers\":%" PRIhsz ",\"command_operations\":%" PRIhsz
-          ",\"memory_events\":%" PRIu64 "}\n",
+          ",\"memory_events\":%" PRIu64,
           summary->file_record_count, summary->chunk_count,
           summary->unknown_record_count, summary->unknown_chunk_count,
           summary->truncated_chunk_count, summary->dropped_record_count,
+          summary->non_ok_session_end_count,
           dispatch_context->matched_dispatch_count,
           dispatch_context->valid_dispatch_count,
           dispatch_context->invalid_dispatch_count,
@@ -831,6 +858,19 @@ static void iree_profile_explain_print_jsonl_summary(
           dispatch_context->model.command_buffer_count,
           dispatch_context->model.command_operation_count,
           memory_context->matched_event_count);
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            ",\"first_non_ok_session_id\":%" PRIu64
+            ",\"first_non_ok_stream_id\":%" PRIu64
+            ",\"first_non_ok_event_id\":%" PRIu64
+            ",\"first_non_ok_status_code\":%u,\"first_non_ok_status\":\"%s\"",
+            summary->first_non_ok_session_id, summary->first_non_ok_stream_id,
+            summary->first_non_ok_event_id,
+            (uint32_t)summary->first_non_ok_session_status_code,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code));
+  }
+  fputs("}\n", file);
 }
 
 static iree_status_t iree_profile_explain_print_jsonl_devices(
@@ -1069,6 +1109,23 @@ static void iree_profile_explain_print_jsonl_hints(
         "truncated chunks were present; timing and lifecycle totals may be "
         "incomplete",
         file);
+  }
+  if (summary->non_ok_session_end_count != 0) {
+    fprintf(file,
+            "{\"type\":\"explain_hint\",\"severity\":\"error\""
+            ",\"category\":\"session\",\"message\":\"profiling session end "
+            "records reported non-OK status\""
+            ",\"non_ok_session_end_records\":%" PRIu64
+            ",\"first_non_ok_session_id\":%" PRIu64
+            ",\"first_non_ok_stream_id\":%" PRIu64
+            ",\"first_non_ok_event_id\":%" PRIu64
+            ",\"first_non_ok_status_code\":%u,\"first_non_ok_status\":\"%s\""
+            "}\n",
+            summary->non_ok_session_end_count, summary->first_non_ok_session_id,
+            summary->first_non_ok_stream_id, summary->first_non_ok_event_id,
+            (uint32_t)summary->first_non_ok_session_status_code,
+            iree_profile_status_code_name(
+                (uint32_t)summary->first_non_ok_session_status_code));
   }
   if (dispatch_context->invalid_dispatch_count != 0) {
     iree_profile_explain_print_hint_jsonl(

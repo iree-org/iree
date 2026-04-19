@@ -20,6 +20,11 @@ const char* iree_profile_record_type_name(
   }
 }
 
+const char* iree_profile_status_code_name(uint32_t status_code) {
+  const char* name = iree_status_code_string((iree_status_code_t)status_code);
+  return name[0] != '\0' ? name : "UNKNOWN_STATUS";
+}
+
 void iree_profile_fprint_json_string(FILE* file, iree_string_view_t value) {
   fputc('"', file);
   for (iree_host_size_t i = 0; i < value.size; ++i) {

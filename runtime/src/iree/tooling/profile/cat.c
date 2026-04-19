@@ -38,8 +38,11 @@ static void iree_profile_dump_record_text(
           header->executable_id, header->command_buffer_id);
   fprintf(file, "  physical_device_ordinal=%u queue_ordinal=%u\n",
           header->physical_device_ordinal, header->queue_ordinal);
-  fprintf(file, "  chunk_flags=0x%016" PRIx64 " session_status_code=%u\n",
-          header->chunk_flags, header->session_status_code);
+  fprintf(file,
+          "  chunk_flags=0x%016" PRIx64
+          " session_status_code=%u session_status=%s\n",
+          header->chunk_flags, header->session_status_code,
+          iree_profile_status_code_name(header->session_status_code));
 }
 
 static void iree_profile_dump_header_jsonl(
@@ -78,6 +81,10 @@ static void iree_profile_dump_record_jsonl(
   fprintf(file, ",\"queue_ordinal\":%u", header->queue_ordinal);
   fprintf(file, ",\"chunk_flags\":%" PRIu64, header->chunk_flags);
   fprintf(file, ",\"session_status_code\":%u", header->session_status_code);
+  fprintf(file, ",\"session_status\":");
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(
+                iree_profile_status_code_name(header->session_status_code)));
   fputs("}\n", file);
 }
 

@@ -24,6 +24,12 @@ typedef struct test_profile_record_t {
   uint32_t value;
 } test_profile_record_t;
 
+TEST(ProfileCommonTest, NamesProfileStatusCodes) {
+  EXPECT_STREQ("CANCELLED",
+               iree_profile_status_code_name(IREE_STATUS_CANCELLED));
+  EXPECT_STREQ("UNKNOWN_STATUS", iree_profile_status_code_name(UINT32_MAX));
+}
+
 static iree_hal_profile_file_record_t MakeChunk(
     const std::vector<uint8_t>& payload) {
   iree_hal_profile_file_record_t chunk;
@@ -387,6 +393,37 @@ TEST(ProfileSummaryTest, AccumulatesDroppedRecordsFromTruncatedChunks) {
   IREE_ASSERT_OK(iree_profile_summary_process_record(&summary, &chunk));
   EXPECT_EQ(1u, summary.truncated_chunk_count);
   EXPECT_EQ(7u, summary.dropped_record_count);
+  iree_profile_summary_deinitialize(&summary);
+}
+
+TEST(ProfileSummaryTest, RecordsFirstNonOkSessionEndStatus) {
+  iree_hal_profile_file_record_t first_session_end;
+  memset(&first_session_end, 0, sizeof(first_session_end));
+  first_session_end.header.record_type =
+      IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END;
+  first_session_end.header.session_id = 42;
+  first_session_end.header.stream_id = 7;
+  first_session_end.header.event_id = 8;
+  first_session_end.header.session_status_code = IREE_STATUS_CANCELLED;
+
+  iree_hal_profile_file_record_t second_session_end = first_session_end;
+  second_session_end.header.session_id = 99;
+  second_session_end.header.session_status_code =
+      IREE_STATUS_RESOURCE_EXHAUSTED;
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  IREE_ASSERT_OK(
+      iree_profile_summary_process_record(&summary, &first_session_end));
+  IREE_ASSERT_OK(
+      iree_profile_summary_process_record(&summary, &second_session_end));
+
+  EXPECT_EQ(2u, summary.session_end_count);
+  EXPECT_EQ(2u, summary.non_ok_session_end_count);
+  EXPECT_EQ(42u, summary.first_non_ok_session_id);
+  EXPECT_EQ(7u, summary.first_non_ok_stream_id);
+  EXPECT_EQ(8u, summary.first_non_ok_event_id);
+  EXPECT_EQ(IREE_STATUS_CANCELLED, summary.first_non_ok_session_status_code);
   iree_profile_summary_deinitialize(&summary);
 }
 

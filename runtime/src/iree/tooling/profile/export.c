@@ -13,7 +13,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 8
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 9
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -123,9 +123,14 @@ static void iree_profile_export_print_session_record(
   iree_profile_export_print_prefix(file, "session", record_index);
   fprintf(file,
           ",\"event\":\"%s\",\"session_id\":%" PRIu64 ",\"stream_id\":%" PRIu64
-          ",\"event_id\":%" PRIu64 ",\"session_status_code\":%u}\n",
+          ",\"event_id\":%" PRIu64 ",\"session_status_code\":%u",
           event_name, record->header.session_id, record->header.stream_id,
           record->header.event_id, record->header.session_status_code);
+  fprintf(file, ",\"session_status\":");
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(iree_profile_status_code_name(
+                record->header.session_status_code)));
+  fputs("}\n", file);
 }
 
 static void iree_profile_export_print_diagnostic(
