@@ -33,7 +33,7 @@ static hsa_status_t iree_hal_amdgpu_iterate_hsa_memory_pool(
     hsa_amd_memory_pool_t memory_pool, void* user_data) {
   iree_hal_amdgpu_hsa_memory_pool_list_t* pool_list =
       (iree_hal_amdgpu_hsa_memory_pool_list_t*)user_data;
-  if (pool_list->count + 1 >= IREE_ARRAYSIZE(pool_list->values)) {
+  if (pool_list->count >= IREE_ARRAYSIZE(pool_list->values)) {
     return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
   }
   pool_list->values[pool_list->count++] = memory_pool;
@@ -146,12 +146,12 @@ typedef struct iree_hal_amdgpu_hsa_region_list_t {
 } iree_hal_amdgpu_hsa_region_list_t;
 static hsa_status_t iree_hal_amdgpu_iterate_hsa_region(hsa_region_t region,
                                                        void* user_data) {
-  iree_hal_amdgpu_hsa_region_list_t* pool_list =
+  iree_hal_amdgpu_hsa_region_list_t* region_list =
       (iree_hal_amdgpu_hsa_region_list_t*)user_data;
-  if (pool_list->count + 1 >= IREE_ARRAYSIZE(pool_list->values)) {
+  if (region_list->count >= IREE_ARRAYSIZE(region_list->values)) {
     return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
   }
-  pool_list->values[pool_list->count++] = region;
+  region_list->values[region_list->count++] = region;
   return HSA_STATUS_SUCCESS;
 }
 

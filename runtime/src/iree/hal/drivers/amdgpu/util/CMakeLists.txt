@@ -73,6 +73,7 @@ iree_cc_library(
   DEPS
     ::libhsa
     iree::base
+    iree::hal
   PUBLIC
 )
 
@@ -85,6 +86,7 @@ iree_cc_test(
     ::libhsa
     ::topology
     iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

@@ -87,6 +87,7 @@ iree_runtime_cc_library(
     deps = [
         ":libhsa",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -102,6 +103,7 @@ iree_runtime_cc_test(
         ":libhsa",
         ":topology",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
