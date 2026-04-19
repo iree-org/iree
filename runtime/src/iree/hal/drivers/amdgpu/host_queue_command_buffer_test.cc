@@ -19,6 +19,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
+#include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -112,6 +113,22 @@ class TestLogicalDevice {
   // Device group that owns the topology assigned to |base_device_|.
   iree_hal_device_group_t* device_group_ = NULL;
 };
+
+static iree_status_t QueueAffinityForPhysicalDevice(
+    const TestLogicalDevice& test_device,
+    iree_host_size_t physical_device_ordinal,
+    iree_hal_queue_affinity_t* out_queue_affinity) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      test_device.logical_device();
+  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = logical_device->queue_affinity_mask,
+      .physical_device_count = logical_device->physical_device_count,
+      .queue_count_per_physical_device =
+          logical_device->system->topology.gpu_agent_queue_count,
+  };
+  return iree_hal_amdgpu_queue_affinity_for_physical_device(
+      domain, physical_device_ordinal, out_queue_affinity);
+}
 
 static iree_status_t CreateHostVisibleTransferBuffer(
     iree_hal_allocator_t* allocator, iree_device_size_t buffer_size,
@@ -386,6 +403,12 @@ struct CommandBufferProfileSink {
   // Dropped memory event records reported by MEMORY_EVENTS chunks.
   uint64_t memory_event_dropped_record_count = 0;
 
+  // Device metadata records copied from DEVICES chunks.
+  std::vector<iree_hal_profile_device_record_t> device_records;
+
+  // Queue metadata records copied from QUEUES chunks.
+  std::vector<iree_hal_profile_queue_record_t> queue_records;
+
   // Executable identifiers copied from EXECUTABLES chunks.
   std::vector<uint64_t> executable_ids;
 
@@ -529,9 +552,41 @@ static iree_status_t CommandBufferProfileSinkWrite(
 
   if (iree_string_view_equal(metadata->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES)) {
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_device_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_device_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_device_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_device_record_t),
+                records[i].record_length);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_GT(records[i].queue_count, 0u);
+    }
+    test_sink->device_records.insert(test_sink->device_records.end(), records,
+                                     records + record_count);
     ++test_sink->device_metadata_count;
   } else if (iree_string_view_equal(metadata->content_type,
                                     IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_queue_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_queue_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_queue_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_queue_record_t),
+                records[i].record_length);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+    }
+    test_sink->queue_records.insert(test_sink->queue_records.end(), records,
+                                    records + record_count);
     ++test_sink->queue_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
@@ -1855,6 +1910,95 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
 
   iree_hal_executable_release(executable);
   iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       CommandBufferRejectsCrossPhysicalDeviceQueue) {
+  if (topology_.gpu_agent_count < 2) {
+    GTEST_SKIP() << "fewer than two compatible GPU agents";
+    return;
+  }
+
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  ASSERT_GE(test_device.logical_device()->physical_device_count, 2u);
+
+  iree_hal_queue_affinity_t device0_affinity = 0;
+  IREE_ASSERT_OK(
+      QueueAffinityForPhysicalDevice(test_device, 0, &device0_affinity));
+  iree_hal_queue_affinity_t device1_affinity = 0;
+  IREE_ASSERT_OK(
+      QueueAffinityForPhysicalDevice(test_device, 1, &device1_affinity));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, device0_affinity,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_device_queue_execute(
+          test_device.base_device(), device1_affinity,
+          iree_hal_semaphore_list_empty(), iree_hal_semaphore_list_empty(),
+          command_buffer, iree_hal_buffer_binding_table_empty(),
+          IREE_HAL_EXECUTE_FLAG_NONE));
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ProfilingMetadataCoversMultiplePhysicalDevices) {
+  if (topology_.gpu_agent_count < 2) {
+    GTEST_SKIP() << "fewer than two compatible GPU agents";
+    return;
+  }
+
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      test_device.logical_device();
+  ASSERT_GE(logical_device->physical_device_count, 2u);
+  ASSERT_GT(logical_device->system->topology.gpu_agent_queue_count, 0u);
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+  IREE_ASSERT_OK(profiling.End());
+
+  const iree_host_size_t physical_device_count =
+      logical_device->physical_device_count;
+  const iree_host_size_t queue_count_per_physical_device =
+      logical_device->system->topology.gpu_agent_queue_count;
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  ASSERT_EQ(physical_device_count, sink.device_records.size());
+  ASSERT_EQ(physical_device_count * queue_count_per_physical_device,
+            sink.queue_records.size());
+  EXPECT_GE(sink.clock_correlations.size(), 2 * physical_device_count);
+
+  for (const auto& device_record : sink.device_records) {
+    EXPECT_LT(device_record.physical_device_ordinal, physical_device_count);
+    EXPECT_EQ(queue_count_per_physical_device, device_record.queue_count);
+  }
+  for (const auto& queue_record : sink.queue_records) {
+    EXPECT_LT(queue_record.physical_device_ordinal, physical_device_count);
+    EXPECT_LT(queue_record.queue_ordinal, queue_count_per_physical_device);
+  }
+  for (const auto& clock_correlation : sink.clock_correlations) {
+    EXPECT_LT(clock_correlation.physical_device_ordinal, physical_device_count);
+  }
 }
 
 TEST_F(HostQueueCommandBufferTest, SinklessProfilingBeginFails) {

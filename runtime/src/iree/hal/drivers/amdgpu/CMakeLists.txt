@@ -279,6 +279,7 @@ iree_cc_test(
   DEPS
     ::amdgpu
     ::headers
+    ::queue_affinity
     iree::base
     iree::hal
     iree::hal::cts::util::test_base

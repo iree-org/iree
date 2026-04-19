@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
+#include <string>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
@@ -39,6 +41,29 @@ static iree_hal_amdgpu_topology_t MakeStructurallyValidTopology() {
   topology.all_agents[1] = topology.gpu_agents[0];
   topology.gpu_cpu_map[0] = 0;
   return topology;
+}
+
+static void ExpectTopologyHasTwoGpus(
+    const iree_hal_amdgpu_topology_t& topology) {
+  EXPECT_GE(topology.all_agent_count, 3);
+  EXPECT_GE(topology.cpu_agent_count, 1);
+  ASSERT_EQ(topology.gpu_agent_count, 2);
+  EXPECT_GE(topology.gpu_agent_queue_count, 1);
+  for (iree_host_size_t i = 0; i < topology.gpu_agent_count; ++i) {
+    EXPECT_LT(topology.gpu_cpu_map[i], topology.cpu_agent_count);
+  }
+}
+
+static iree_status_t AppendAgentUuidPathFragment(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    std::string* path) {
+  char agent_uuid[32] = {0};
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_UUID,
+      agent_uuid));
+  if (!path->empty()) path->append(",");
+  path->append(agent_uuid);
+  return iree_ok_status();
 }
 
 TEST(TopologyStructureTest, VerifyAcceptsStructurallyValidTopology) {
@@ -240,8 +265,6 @@ TEST_F(TopologyTest, InitializeFromPathOrdinal) {
   IREE_ASSERT_OK(iree_hal_amdgpu_topology_initialize_from_path(
       &libhsa, IREE_SV("0"), &topology));
   if (topology.gpu_agent_count == 0) {
-    // This could be ignoring an error, but it usually just indicates no agents
-    // on the machine.
     GTEST_SKIP() << "no GPU agents found";
     return;
   }
@@ -254,6 +277,48 @@ TEST_F(TopologyTest, InitializeFromPathOrdinal) {
   iree_hal_amdgpu_topology_deinitialize(&topology);
 }
 
+TEST_F(TopologyTest, InitializeFromPathTwoOrdinals) {
+  iree_hal_amdgpu_topology_t topology;
+  iree_status_t status = iree_hal_amdgpu_topology_initialize_from_path(
+      &libhsa, IREE_SV("0,1"), &topology);
+  if (!iree_status_is_ok(status)) {
+    iree_status_code_t status_code = iree_status_code(status);
+    if (status_code == IREE_STATUS_INVALID_ARGUMENT) {
+      iree_status_free(status);
+      GTEST_SKIP() << "fewer than two visible GPU agents";
+      return;
+    }
+    IREE_ASSERT_OK(status);
+  }
+  ExpectTopologyHasTwoGpus(topology);
+  iree_hal_amdgpu_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologyTest, InitializeFromPathTwoDefaultGpuUuidsVerifies) {
+  iree_hal_amdgpu_topology_t defaults;
+  IREE_ASSERT_OK(
+      iree_hal_amdgpu_topology_initialize_with_defaults(&libhsa, &defaults));
+  if (defaults.gpu_agent_count < 2) {
+    iree_hal_amdgpu_topology_deinitialize(&defaults);
+    GTEST_SKIP() << "fewer than two compatible GPU agents";
+    return;
+  }
+
+  std::string path;
+  IREE_ASSERT_OK(
+      AppendAgentUuidPathFragment(&libhsa, defaults.gpu_agents[0], &path));
+  IREE_ASSERT_OK(
+      AppendAgentUuidPathFragment(&libhsa, defaults.gpu_agents[1], &path));
+
+  iree_hal_amdgpu_topology_t topology;
+  IREE_ASSERT_OK(iree_hal_amdgpu_topology_initialize_from_path(
+      &libhsa, iree_make_cstring_view(path.c_str()), &topology));
+  ExpectTopologyHasTwoGpus(topology);
+  IREE_EXPECT_OK(iree_hal_amdgpu_topology_verify(&topology, &libhsa));
+  iree_hal_amdgpu_topology_deinitialize(&topology);
+  iree_hal_amdgpu_topology_deinitialize(&defaults);
+}
+
 // Tests that initialize_from_gpu_agent_mask with a 0 mask is the same as
 // initializing from defaults.
 TEST_F(TopologyTest, InitializeFromGPUAgentMask0) {
@@ -261,8 +326,6 @@ TEST_F(TopologyTest, InitializeFromGPUAgentMask0) {
   IREE_ASSERT_OK(iree_hal_amdgpu_topology_initialize_from_gpu_agent_mask(
       &libhsa, 0ull, &topology));
   if (topology.gpu_agent_count == 0) {
-    // This could be ignoring an error, but it usually just indicates no agents
-    // on the machine.
     GTEST_SKIP() << "no GPU agents found";
     return;
   }
@@ -279,8 +342,6 @@ TEST_F(TopologyTest, InitializeFromGPUAgentMask1) {
   IREE_ASSERT_OK(iree_hal_amdgpu_topology_initialize_from_gpu_agent_mask(
       &libhsa, 1ull << 0, &topology));
   if (topology.gpu_agent_count == 0) {
-    // This could be ignoring an error, but it usually just indicates no agents
-    // on the machine.
     GTEST_SKIP() << "no GPU agents found";
     return;
   }
@@ -290,6 +351,24 @@ TEST_F(TopologyTest, InitializeFromGPUAgentMask1) {
   EXPECT_EQ(topology.gpu_agent_queue_count,
             IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT);
   EXPECT_EQ(topology.gpu_cpu_map[0], 0);
+  iree_hal_amdgpu_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologyTest, InitializeFromGPUAgentMaskTwoDevices) {
+  iree_hal_amdgpu_topology_t topology;
+  iree_status_t status =
+      iree_hal_amdgpu_topology_initialize_from_gpu_agent_mask(&libhsa, 0x3ull,
+                                                              &topology);
+  if (!iree_status_is_ok(status)) {
+    iree_status_code_t status_code = iree_status_code(status);
+    if (status_code == IREE_STATUS_OUT_OF_RANGE) {
+      iree_status_free(status);
+      GTEST_SKIP() << "fewer than two visible GPU agents";
+      return;
+    }
+    IREE_ASSERT_OK(status);
+  }
+  ExpectTopologyHasTwoGpus(topology);
   iree_hal_amdgpu_topology_deinitialize(&topology);
 }
 
