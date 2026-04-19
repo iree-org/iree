@@ -22,6 +22,7 @@
 #include "iree/hal/drivers/local_task/block_command_buffer.h"
 #include "iree/hal/drivers/local_task/block_command_ops.h"
 #include "iree/hal/drivers/local_task/block_processor.h"
+#include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/transient_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -151,9 +152,6 @@ typedef struct iree_hal_task_queue_profile_operation_t {
   // Strategy used for wait dependencies on this operation.
   iree_hal_profile_queue_dependency_strategy_t dependency_strategy;
 
-  // Queue event id assigned by the recorder, or 0 when absent.
-  uint64_t queue_event_id;
-
   // Submission id assigned to this queue operation, or 0 when absent.
   uint64_t submission_id;
 
@@ -265,7 +263,11 @@ static void iree_hal_task_queue_profile_operation_initialize(
   profile_operation->signal_count =
       iree_hal_task_queue_profile_count(signal_semaphores->count);
   profile_operation->export_ordinal = UINT32_MAX;
-  profile_operation->submit_host_time_ns = iree_time_now();
+  if (iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    profile_operation->submit_host_time_ns = iree_time_now();
+  }
   iree_atomic_store(&profile_operation->start_host_time_ns, 0,
                     iree_memory_order_relaxed);
   if (queue->profile_submission_counter) {
@@ -315,6 +317,77 @@ static void iree_hal_task_queue_profile_set_payload(
   profile_operation->payload_length = payload_length;
 }
 
+static void iree_hal_task_queue_profile_set_transient_buffer(
+    iree_hal_task_queue_op_t* operation, iree_hal_buffer_t* transient_buffer) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->allocation_id =
+      iree_hal_local_transient_buffer_profile_id(transient_buffer);
+  profile_operation->payload_length =
+      iree_hal_buffer_byte_length(transient_buffer);
+}
+
+static void iree_hal_task_queue_profile_populate_memory_event_pool_stats(
+    iree_hal_pool_t* pool, iree_hal_profile_memory_event_t* event) {
+  if (!pool) return;
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool, &stats);
+  event->flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS;
+  event->pool_bytes_reserved = stats.bytes_reserved;
+  event->pool_bytes_free = stats.bytes_free;
+  event->pool_bytes_committed = stats.bytes_committed;
+  event->pool_budget_limit = stats.budget_limit;
+  event->pool_reservation_count = stats.reservation_count;
+  event->pool_slab_count = stats.slab_count;
+}
+
+static void iree_hal_task_queue_profile_record_memory_event(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_profile_memory_event_type_t type,
+    iree_hal_profile_memory_event_flags_t flags, uint32_t result,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
+    const iree_hal_pool_reservation_t* reservation,
+    uint64_t frontier_entry_count) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation || !iree_hal_local_profile_recorder_is_enabled(
+                                profile_operation->recorder,
+                                IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS)) {
+    return;
+  }
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = type;
+  event.flags = flags;
+  event.result = result;
+  event.allocation_id = profile_operation->allocation_id;
+  event.pool_id = (uint64_t)(uintptr_t)pool;
+  event.submission_id = profile_operation->submission_id;
+  event.physical_device_ordinal =
+      profile_operation->scope.physical_device_ordinal;
+  event.queue_ordinal = profile_operation->scope.queue_ordinal;
+  event.frontier_entry_count =
+      (uint32_t)iree_min(frontier_entry_count, (uint64_t)UINT32_MAX);
+  event.memory_type = params.type;
+  event.buffer_usage = params.usage;
+  event.length = profile_operation->payload_length;
+  event.alignment = params.min_alignment ? params.min_alignment : 1;
+  if (reservation) {
+    event.flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION;
+    event.backing_id = reservation->block_handle;
+    event.offset = reservation->offset;
+    if (type != IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA &&
+        type != IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA) {
+      event.length = reservation->length;
+    }
+  }
+  iree_hal_task_queue_profile_populate_memory_event_pool_stats(pool, &event);
+  iree_hal_local_profile_recorder_append_memory_event(
+      profile_operation->recorder, &event, /*out_event_id=*/NULL);
+}
+
 static void iree_hal_task_queue_profile_add_host_flags(
     iree_hal_task_queue_op_t* operation,
     iree_hal_profile_host_execution_event_flags_t host_flags) {
@@ -325,12 +398,16 @@ static void iree_hal_task_queue_profile_add_host_flags(
 }
 
 static void iree_hal_task_queue_profile_set_dispatch(
-    iree_hal_task_queue_op_t* operation,
+    iree_hal_task_queue_op_t* operation, iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
   if (!profile_operation) return;
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  profile_operation->executable_id =
+      iree_hal_local_executable_profile_id(local_executable);
   profile_operation->export_ordinal = export_ordinal;
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     profile_operation->host_flags |=
@@ -347,11 +424,26 @@ static void iree_hal_task_queue_profile_set_dispatch(
       config.workgroup_size[2] ? config.workgroup_size[2] : 1;
 }
 
+static void iree_hal_task_queue_profile_set_command_buffer(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_command_buffer_t* command_buffer) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->command_buffer_id =
+      command_buffer ? iree_hal_command_buffer_profile_id(command_buffer) : 0;
+}
+
 static void iree_hal_task_queue_profile_record_queue_event(
     iree_hal_task_queue_op_t* operation, iree_time_t ready_host_time_ns) {
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
   if (!profile_operation || profile_operation->queue_event_recorded) return;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    return;
+  }
   profile_operation->queue_event_recorded = true;
   profile_operation->ready_host_time_ns = ready_host_time_ns;
 
@@ -370,16 +462,20 @@ static void iree_hal_task_queue_profile_record_queue_event(
   event_info.signal_count = profile_operation->signal_count;
   event_info.operation_count = profile_operation->operation_count;
   event_info.payload_length = profile_operation->payload_length;
-  iree_hal_local_profile_recorder_consume_status(
-      profile_operation->recorder,
-      iree_hal_local_profile_recorder_append_queue_event(
-          profile_operation->recorder, &event_info,
-          &profile_operation->queue_event_id));
+  iree_hal_local_profile_recorder_append_queue_event(
+      profile_operation->recorder, &event_info, /*out_event_id=*/NULL);
 }
 
 static void iree_hal_task_queue_profile_record_ready(
     iree_hal_task_queue_op_t* operation) {
   if (operation->type == IREE_HAL_TASK_QUEUE_OP_ALLOCA) return;
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation || !iree_hal_local_profile_recorder_is_enabled(
+                                profile_operation->recorder,
+                                IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    return;
+  }
   iree_hal_task_queue_profile_record_queue_event(operation, iree_time_now());
 }
 
@@ -394,6 +490,11 @@ static void iree_hal_task_queue_profile_start_host_execution(
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
   if (!profile_operation) return;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    return;
+  }
   int64_t expected = 0;
   const iree_time_t start_host_time_ns = iree_time_now();
   iree_atomic_compare_exchange_strong(
@@ -406,6 +507,11 @@ static void iree_hal_task_queue_profile_finish_host_execution(
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
   if (!profile_operation) return;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    return;
+  }
   const iree_time_t start_host_time_ns = iree_atomic_load(
       &profile_operation->start_host_time_ns, iree_memory_order_acquire);
   if (start_host_time_ns == 0) return;
@@ -416,7 +522,6 @@ static void iree_hal_task_queue_profile_finish_host_execution(
   event_info.flags = profile_operation->host_flags;
   event_info.status_code = iree_status_code(operation_status);
   event_info.scope = profile_operation->scope;
-  event_info.related_queue_event_id = profile_operation->queue_event_id;
   event_info.submission_id = profile_operation->submission_id;
   event_info.command_buffer_id = profile_operation->command_buffer_id;
   event_info.executable_id = profile_operation->executable_id;
@@ -430,10 +535,8 @@ static void iree_hal_task_queue_profile_finish_host_execution(
   event_info.end_host_time_ns = iree_time_now();
   event_info.payload_length = profile_operation->payload_length;
   event_info.operation_count = profile_operation->operation_count;
-  iree_hal_local_profile_recorder_consume_status(
-      profile_operation->recorder,
-      iree_hal_local_profile_recorder_append_host_execution_event(
-          profile_operation->recorder, &event_info, /*out_event_id=*/NULL));
+  iree_hal_local_profile_recorder_append_host_execution_event(
+      profile_operation->recorder, &event_info, /*out_event_id=*/NULL);
 }
 
 //===----------------------------------------------------------------------===//
@@ -473,7 +576,7 @@ static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
         if (iree_status_is_ok(failure_status)) {
           failure_status = unmap_status;
         } else {
-          iree_status_ignore(unmap_status);
+          failure_status = iree_status_join(failure_status, unmap_status);
         }
       }
     }
@@ -945,6 +1048,12 @@ static iree_status_t iree_hal_task_queue_alloca_wait_for_frontier(
         &wait->frontier.waiter);
     if (iree_status_is_ok(status)) {
       iree_hal_task_queue_profile_force_software_defer(operation);
+      iree_hal_task_queue_profile_record_memory_event(
+          operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT,
+          IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION |
+              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_FRONTIER,
+          IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT, operation->alloca.pool,
+          operation->alloca.params, reservation, wait_frontier->entry_count);
     }
   }
   if (!iree_status_is_ok(status)) {
@@ -959,6 +1068,7 @@ static iree_status_t iree_hal_task_queue_alloca_wait_for_frontier(
 
 static iree_status_t iree_hal_task_queue_alloca_wait_for_pool_notification(
     iree_hal_task_queue_op_t* operation,
+    iree_hal_pool_acquire_result_t acquire_result,
     iree_async_notification_t* notification, uint32_t wait_token) {
   iree_hal_task_queue_alloca_memory_wait_t* wait = NULL;
   IREE_RETURN_IF_ERROR(
@@ -984,6 +1094,12 @@ static iree_status_t iree_hal_task_queue_alloca_wait_for_pool_notification(
     wait->kind = IREE_HAL_TASK_QUEUE_ALLOCA_MEMORY_WAIT_NONE;
   } else {
     iree_hal_task_queue_profile_force_software_defer(operation);
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_WAIT,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION |
+            IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_NOTIFICATION,
+        acquire_result, operation->alloca.pool, operation->alloca.params,
+        /*reservation=*/NULL, /*frontier_entry_count=*/0);
   }
   return status;
 }
@@ -1395,6 +1511,7 @@ static iree_status_t iree_hal_task_queue_drain_host_call(
 
 static iree_status_t iree_hal_task_queue_drain_alloca_submit_reservation(
     iree_hal_task_queue_op_t* operation,
+    iree_hal_pool_acquire_result_t acquire_result,
     const iree_hal_pool_reservation_t* reservation,
     const iree_async_frontier_t* reservation_failure_frontier) {
   iree_hal_task_queue_profile_record_queue_event(operation, iree_time_now());
@@ -1409,15 +1526,34 @@ static iree_status_t iree_hal_task_queue_drain_alloca_submit_reservation(
   if (iree_status_is_ok(status)) {
     iree_hal_local_transient_buffer_stage_backing(
         operation->alloca.transient_buffer, backing_buffer);
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_MATERIALIZE,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, acquire_result,
+        operation->alloca.pool, operation->alloca.params, reservation,
+        reservation_failure_frontier ? reservation_failure_frontier->entry_count
+                                     : 0);
   }
   iree_hal_buffer_release(backing_buffer);
 
   if (iree_status_is_ok(status)) {
     iree_hal_local_transient_buffer_commit(operation->alloca.transient_buffer);
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, acquire_result,
+        operation->alloca.pool, operation->alloca.params, reservation,
+        reservation_failure_frontier ? reservation_failure_frontier->entry_count
+                                     : 0);
     iree_hal_task_queue_op_complete(operation);
   } else {
     iree_hal_local_transient_buffer_release_reservation(
         operation->alloca.transient_buffer, reservation_failure_frontier);
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION,
+        iree_status_code(status), operation->alloca.pool,
+        operation->alloca.params, reservation,
+        reservation_failure_frontier ? reservation_failure_frontier->entry_count
+                                     : 0);
   }
   return status;
 }
@@ -1431,10 +1567,31 @@ static iree_status_t iree_hal_task_queue_drain_alloca_acquire(
       operation->alloca.params.min_alignment
           ? operation->alloca.params.min_alignment
           : 1;
-  return iree_hal_pool_acquire_reservation(
+  iree_status_t status = iree_hal_pool_acquire_reservation(
       operation->alloca.pool, operation->alloca.allocation_size, min_alignment,
       /*requester_frontier=*/NULL, operation->alloca.reserve_flags,
       out_reservation, out_acquire_info, out_acquire_result);
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_memory_event_flags_t flags =
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION;
+    if (*out_acquire_result == IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT) {
+      flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_FRONTIER;
+    } else if (*out_acquire_result == IREE_HAL_POOL_ACQUIRE_EXHAUSTED ||
+               *out_acquire_result == IREE_HAL_POOL_ACQUIRE_OVER_BUDGET) {
+      flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_WAIT_NOTIFICATION;
+    }
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RESERVE, flags,
+        *out_acquire_result, operation->alloca.pool, operation->alloca.params,
+        *out_acquire_result == IREE_HAL_POOL_ACQUIRE_EXHAUSTED ||
+                *out_acquire_result == IREE_HAL_POOL_ACQUIRE_OVER_BUDGET
+            ? NULL
+            : out_reservation,
+        out_acquire_info->wait_frontier
+            ? out_acquire_info->wait_frontier->entry_count
+            : 0);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_task_queue_drain_alloca_on_acquire_result(
@@ -1474,7 +1631,7 @@ iree_hal_task_queue_drain_alloca_wait_for_pool_notification(
       case IREE_HAL_POOL_ACQUIRE_EXHAUSTED:
       case IREE_HAL_POOL_ACQUIRE_OVER_BUDGET:
         status = iree_hal_task_queue_alloca_wait_for_pool_notification(
-            operation, notification, wait_token);
+            operation, acquire_result, notification, wait_token);
         break;
       default:
         status = iree_make_status(IREE_STATUS_INTERNAL,
@@ -1496,7 +1653,8 @@ static iree_status_t iree_hal_task_queue_drain_alloca_on_acquire_result(
     case IREE_HAL_POOL_ACQUIRE_OK:
     case IREE_HAL_POOL_ACQUIRE_OK_FRESH:
       return iree_hal_task_queue_drain_alloca_submit_reservation(
-          operation, reservation, /*reservation_failure_frontier=*/NULL);
+          operation, acquire_result, reservation,
+          /*reservation_failure_frontier=*/NULL);
     case IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT:
       if (!iree_all_bits_set(operation->alloca.flags,
                              IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER)) {
@@ -1531,7 +1689,7 @@ static iree_status_t iree_hal_task_queue_drain_alloca(
     const iree_async_frontier_t* wait_frontier = wait->frontier.wait_frontier;
     wait->kind = IREE_HAL_TASK_QUEUE_ALLOCA_MEMORY_WAIT_NONE;
     return iree_hal_task_queue_drain_alloca_submit_reservation(
-        operation, &reservation,
+        operation, IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT, &reservation,
         /*reservation_failure_frontier=*/wait_frontier);
   }
 
@@ -1549,6 +1707,19 @@ static iree_status_t iree_hal_task_queue_drain_alloca(
 // reservation with a queue frontier that gates future pool reuse.
 static void iree_hal_task_queue_drain_dealloca(
     iree_hal_task_queue_op_t* operation) {
+  iree_hal_pool_t* pool = NULL;
+  iree_hal_pool_reservation_t reservation;
+  const bool has_reservation =
+      iree_hal_local_transient_buffer_query_reservation(
+          operation->dealloca.transient_buffer, &pool, &reservation);
+  const iree_hal_buffer_params_t params = {
+      .type = iree_hal_buffer_memory_type(operation->dealloca.transient_buffer),
+      .access =
+          iree_hal_buffer_allowed_access(operation->dealloca.transient_buffer),
+      .usage =
+          iree_hal_buffer_allowed_usage(operation->dealloca.transient_buffer),
+  };
+
   iree_hal_local_transient_buffer_decommit(
       operation->dealloca.transient_buffer);
 
@@ -1560,6 +1731,17 @@ static void iree_hal_task_queue_drain_dealloca(
   iree_hal_local_transient_buffer_release_reservation(
       operation->dealloca.transient_buffer,
       iree_async_single_frontier_as_const_frontier(&death_frontier));
+  iree_hal_task_queue_profile_record_memory_event(
+      operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA,
+      IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX, pool,
+      params, has_reservation ? &reservation : NULL,
+      death_frontier.entry_count);
+  if (has_reservation) {
+    iree_hal_task_queue_profile_record_memory_event(
+        operation, IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_POOL_RELEASE,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX, pool,
+        params, &reservation, death_frontier.entry_count);
+  }
   iree_hal_task_queue_op_complete_with_epoch(operation, epoch);
 }
 
@@ -2922,6 +3104,8 @@ iree_status_t iree_hal_task_queue_submit_commands(
     operation->commands.binding_mappings = NULL;
     iree_hal_task_queue_profile_add_host_flags(
         operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER);
+    iree_hal_task_queue_profile_set_command_buffer(operation,
+                                                   batch->command_buffer);
 
     // Copy binding table entries into the arena if present.
     if (iree_status_is_ok(status) && batch->binding_table.count > 0) {
@@ -3019,7 +3203,7 @@ iree_status_t iree_hal_task_queue_submit_alloca(
   operation->alloca.reserve_flags = reserve_flags;
   operation->alloca.transient_buffer = transient_buffer;
   operation->alloca.memory_wait = NULL;
-  iree_hal_task_queue_profile_set_payload(operation, allocation_size);
+  iree_hal_task_queue_profile_set_transient_buffer(operation, transient_buffer);
 
   // Retain the transient buffer until the operation completes. The selected
   // pool is borrowed: pool lifetimes must outlive all allocations sourced from
@@ -3075,6 +3259,7 @@ iree_status_t iree_hal_task_queue_submit_dealloca(
 
   // Store the transient buffer for decommit in the drain handler.
   operation->dealloca.transient_buffer = transient_buffer;
+  iree_hal_task_queue_profile_set_transient_buffer(operation, transient_buffer);
 
   // Retain the transient buffer so it survives until the operation completes.
   status = iree_hal_resource_set_insert(
@@ -3301,8 +3486,8 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
   operation->dispatch.config = config;
   operation->dispatch.binding_count = binding_count;
   operation->dispatch.flags = flags;
-  iree_hal_task_queue_profile_set_dispatch(operation, export_ordinal, config,
-                                           flags);
+  iree_hal_task_queue_profile_set_dispatch(operation, executable,
+                                           export_ordinal, config, flags);
 
   // Arena-allocate copies of constants and bindings.
   iree_status_t status = iree_ok_status();

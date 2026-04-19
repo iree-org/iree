@@ -228,7 +228,8 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
                                iree_allocator_system(), &threads[i - 1]);
         if (!iree_status_is_ok(status)) {
           // Abort: discard any execution result and free.
-          iree_status_ignore(
+          status = iree_status_join(
+              status,
               iree_hal_cmd_block_processor_context_consume_result(context));
           iree_hal_cmd_block_processor_context_free(context,
                                                     iree_allocator_system());

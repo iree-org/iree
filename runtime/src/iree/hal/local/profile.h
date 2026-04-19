@@ -30,7 +30,8 @@ typedef struct iree_hal_local_profile_recorder_t
 static inline iree_hal_device_profiling_data_families_t
 iree_hal_local_profile_recorder_supported_data_families(void) {
   return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
-         IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS;
+         IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
 }
 
 // Metadata needed to begin a local CPU profiling session.
@@ -64,9 +65,8 @@ typedef struct iree_hal_local_profile_recorder_options_t {
   // default.
   iree_host_size_t host_execution_event_capacity;
 
-  // Maximum event relationships retained between flushes; 0 selects the
-  // default.
-  iree_host_size_t event_relationship_capacity;
+  // Maximum memory events retained between flushes; 0 selects the default.
+  iree_host_size_t memory_event_capacity;
 } iree_hal_local_profile_recorder_options_t;
 
 // Queue identity shared by local profiling records.
@@ -159,9 +159,6 @@ typedef struct iree_hal_local_profile_host_execution_event_info_t {
   // Queue metadata identity shared by the appended record.
   iree_hal_local_profile_queue_scope_t scope;
 
-  // Queue event identifier corresponding to this span, or 0 when absent.
-  uint64_t related_queue_event_id;
-
   // Queue submission epoch containing this span, or 0 when absent.
   uint64_t submission_id;
 
@@ -194,6 +191,13 @@ typedef struct iree_hal_local_profile_host_execution_event_info_t {
 
   // Type-specific payload byte length, or 0 when not applicable.
   uint64_t payload_length;
+
+  // Number of execution tiles represented by this span, or 0 when absent.
+  uint64_t tile_count;
+
+  // Sum of per-tile execution durations in nanoseconds. This may exceed the
+  // span duration when tiles execute concurrently.
+  int64_t tile_duration_sum_ns;
 
   // Number of encoded payload operations represented by this span.
   uint32_t operation_count;
@@ -238,31 +242,34 @@ bool iree_hal_local_profile_recorder_is_enabled(
 // Appends one host-timestamped queue event to |recorder|.
 //
 // |out_event_id| may be NULL. When provided it receives the assigned event id,
-// or 0 if queue events were not requested.
-iree_status_t iree_hal_local_profile_recorder_append_queue_event(
+// or 0 if queue events were not requested or the event ring was full. Ring
+// capacity pressure is reported later as truncated chunks during flush.
+void iree_hal_local_profile_recorder_append_queue_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_queue_event_info_t* event_info,
     uint64_t* out_event_id);
 
 // Appends one host execution span to |recorder|.
 //
-// When |event_info->related_queue_event_id| is nonzero and both queue and host
-// execution events are enabled, the recorder also appends an explicit
-// queue-event-to-host-execution relationship.
-iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
+// |out_event_id| may be NULL. When provided it receives the assigned event id,
+// or 0 if host execution events were not requested or the event ring was full.
+// Ring capacity pressure is reported later as truncated chunks during flush.
+void iree_hal_local_profile_recorder_append_host_execution_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_host_execution_event_info_t* event_info,
     uint64_t* out_event_id);
 
-// Consumes |status| and records it as a deferred recorder failure.
+// Appends one host-timestamped memory lifecycle event to |recorder|.
 //
-// This is for producer contexts that cannot return profiling failures to their
-// immediate caller, such as async completion callbacks. The first failure is
-// reported by later flush/end calls; additional failures are attached to that
-// first failure when status annotations are enabled. OK statuses are consumed
-// without touching the recorder.
-void iree_hal_local_profile_recorder_consume_status(
-    iree_hal_local_profile_recorder_t* recorder, iree_status_t status);
+// |event| is copied into the recorder. The recorder overwrites record_length
+// and event_id and samples host_time_ns when it is zero. Queue-operation memory
+// events must provide a valid physical device and queue ordinal. |out_event_id|
+// may be NULL. When provided it receives the assigned event id, or 0 if memory
+// events were not requested or the event ring was full. Ring capacity pressure
+// is reported later as truncated chunks during flush.
+void iree_hal_local_profile_recorder_append_memory_event(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_profile_memory_event_t* event, uint64_t* out_event_id);
 
 // Writes all buffered profile records to the session sink.
 iree_status_t iree_hal_local_profile_recorder_flush(

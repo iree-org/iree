@@ -225,7 +225,6 @@ TEST_P(QueueDispatchTest, DispatchHostQueueEventProfiling) {
   EXPECT_EQ(1, sink.queue_metadata_count);
   EXPECT_GE(sink.queue_event_count, 1);
   EXPECT_GE(sink.host_execution_event_count, 1);
-  EXPECT_GE(sink.event_relationship_count, 1);
   EXPECT_EQ(0, sink.dispatch_event_count);
   EXPECT_EQ(0, sink.queue_device_event_count);
   EXPECT_TRUE(sink.saw_device_metadata);

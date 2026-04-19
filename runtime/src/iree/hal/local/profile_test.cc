@@ -61,8 +61,17 @@ struct RecordingProfileSink {
   // Host execution event records copied from data chunks.
   std::vector<iree_hal_profile_host_execution_event_t> host_execution_events;
 
-  // Relationship records copied from data chunks.
-  std::vector<iree_hal_profile_event_relationship_record_t> event_relationships;
+  // Memory event records copied from data chunks.
+  std::vector<iree_hal_profile_memory_event_t> memory_events;
+
+  // Dropped queue event records reported by truncated chunks.
+  uint64_t dropped_queue_event_count = 0;
+
+  // Dropped host execution event records reported by truncated chunks.
+  uint64_t dropped_host_execution_event_count = 0;
+
+  // Dropped memory event records reported by truncated chunks.
+  uint64_t dropped_memory_event_count = 0;
 };
 
 static RecordingProfileSink* RecordingProfileSinkCast(
@@ -125,33 +134,59 @@ static iree_status_t RecordingProfileSinkWrite(
                             "injected profile sink write failure");
   }
 
-  if (iovec_count == 0) return iree_ok_status();
-  if (iovec_count != 1) {
+  if (metadata->dropped_record_count != 0) {
+    EXPECT_TRUE(iree_all_bits_set(metadata->flags,
+                                  IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED));
+  }
+  if (iovec_count > 2) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected one profile chunk iovec");
+                            "expected at most two profile chunk iovecs");
   }
 
   if (iree_string_view_equal(metadata->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICES)) {
-    return CopyProfileRecords(iovecs[0], &test_sink->device_records);
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->device_records));
+    }
+    return iree_ok_status();
   }
   if (iree_string_view_equal(metadata->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUES)) {
-    return CopyProfileRecords(iovecs[0], &test_sink->queue_records);
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->queue_records));
+    }
+    return iree_ok_status();
   }
   if (iree_string_view_equal(metadata->content_type,
                              IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
-    return CopyProfileRecords(iovecs[0], &test_sink->queue_events);
+    test_sink->dropped_queue_event_count += metadata->dropped_record_count;
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->queue_events));
+    }
+    return iree_ok_status();
   }
   if (iree_string_view_equal(
           metadata->content_type,
           IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS)) {
-    return CopyProfileRecords(iovecs[0], &test_sink->host_execution_events);
+    test_sink->dropped_host_execution_event_count +=
+        metadata->dropped_record_count;
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->host_execution_events));
+    }
+    return iree_ok_status();
   }
-  if (iree_string_view_equal(
-          metadata->content_type,
-          IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS)) {
-    return CopyProfileRecords(iovecs[0], &test_sink->event_relationships);
+  if (iree_string_view_equal(metadata->content_type,
+                             IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
+    test_sink->dropped_memory_event_count += metadata->dropped_record_count;
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->memory_events));
+    }
+    return iree_ok_status();
   }
   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                           "unexpected profile chunk content type");
@@ -221,7 +256,7 @@ class LocalProfileRecorderTest : public ::testing::Test {
     recorder_options_.queue_records = &queue_record_;
     recorder_options_.queue_event_capacity = 4;
     recorder_options_.host_execution_event_capacity = 4;
-    recorder_options_.event_relationship_capacity = 4;
+    recorder_options_.memory_event_capacity = 4;
   }
 
   void TearDown() override {
@@ -334,8 +369,8 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
   queue_info.signal_count = 1;
   queue_info.operation_count = 1;
   uint64_t queue_event_id = 0;
-  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_event(
-      recorder_, &queue_info, &queue_event_id));
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &queue_event_id);
   EXPECT_NE(0u, queue_event_id);
 
   iree_hal_local_profile_host_execution_event_info_t host_info =
@@ -343,7 +378,6 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
   host_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
   host_info.status_code = IREE_STATUS_OK;
   host_info.scope = QueueScope();
-  host_info.related_queue_event_id = queue_event_id;
   host_info.submission_id = queue_info.submission_id;
   host_info.executable_id = 5;
   host_info.export_ordinal = 3;
@@ -353,37 +387,59 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
   host_info.end_host_time_ns = 140;
   host_info.operation_count = 1;
   uint64_t host_event_id = 0;
-  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_host_execution_event(
-      recorder_, &host_info, &host_event_id));
+  iree_hal_local_profile_recorder_append_host_execution_event(
+      recorder_, &host_info, &host_event_id);
   EXPECT_NE(0u, host_event_id);
 
   IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
   ASSERT_EQ(1u, sink_.queue_events.size());
   ASSERT_EQ(1u, sink_.host_execution_events.size());
-  ASSERT_EQ(1u, sink_.event_relationships.size());
   EXPECT_EQ(queue_event_id, sink_.queue_events[0].event_id);
   EXPECT_EQ(100, sink_.queue_events[0].host_time_ns);
   EXPECT_EQ(105, sink_.queue_events[0].ready_host_time_ns);
   EXPECT_EQ(host_event_id, sink_.host_execution_events[0].event_id);
-  EXPECT_EQ(queue_event_id, sink_.event_relationships[0].source_id);
-  EXPECT_EQ(host_event_id, sink_.event_relationships[0].target_id);
 }
 
-TEST_F(LocalProfileRecorderTest, AppendRejectsInvalidHostSpan) {
-  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS));
-  iree_hal_local_profile_host_execution_event_info_t host_info =
-      iree_hal_local_profile_host_execution_event_info_default();
-  host_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
-  host_info.scope = QueueScope();
-  host_info.start_host_time_ns = 20;
-  host_info.end_host_time_ns = 10;
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_hal_local_profile_recorder_append_host_execution_event(
-          recorder_, &host_info, nullptr));
+TEST_F(LocalProfileRecorderTest, AppendsAndFlushesMemoryEvents) {
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS));
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA;
+  event.flags = IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION;
+  event.result = IREE_STATUS_OK;
+  event.host_time_ns = 100;
+  event.allocation_id = 5;
+  event.pool_id = 6;
+  event.backing_id = 7;
+  event.submission_id = 8;
+  event.physical_device_ordinal = QueueScope().physical_device_ordinal;
+  event.queue_ordinal = QueueScope().queue_ordinal;
+  event.memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  event.buffer_usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  event.offset = 64;
+  event.length = 256;
+  event.alignment = 16;
+
+  uint64_t event_id = 0;
+  iree_hal_local_profile_recorder_append_memory_event(recorder_, &event,
+                                                      &event_id);
+  EXPECT_NE(0u, event_id);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
+  ASSERT_EQ(1u, sink_.memory_events.size());
+  const iree_hal_profile_memory_event_t& recorded_event =
+      sink_.memory_events[0];
+  EXPECT_EQ(event_id, recorded_event.event_id);
+  EXPECT_EQ(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA,
+            recorded_event.type);
+  EXPECT_EQ(100, recorded_event.host_time_ns);
+  EXPECT_EQ(5u, recorded_event.allocation_id);
+  EXPECT_EQ(8u, recorded_event.submission_id);
+  EXPECT_EQ(256u, recorded_event.length);
 }
 
-TEST_F(LocalProfileRecorderTest, AppendFailsWhenBufferIsFull) {
+TEST_F(LocalProfileRecorderTest, FullQueueRingReportsTruncatedChunk) {
   recorder_options_.queue_event_capacity = 1;
   IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS));
 
@@ -391,37 +447,50 @@ TEST_F(LocalProfileRecorderTest, AppendFailsWhenBufferIsFull) {
       iree_hal_local_profile_queue_event_info_default();
   queue_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
   queue_info.scope = QueueScope();
-  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_event(
-      recorder_, &queue_info, nullptr));
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
-                        iree_hal_local_profile_recorder_append_queue_event(
-                            recorder_, &queue_info, nullptr));
+  uint64_t captured_event_id = 0;
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &captured_event_id);
+  EXPECT_NE(0u, captured_event_id);
+
+  uint64_t dropped_event_id = 0;
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &dropped_event_id);
+  EXPECT_EQ(0u, dropped_event_id);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
+  ASSERT_EQ(1u, sink_.queue_events.size());
+  EXPECT_EQ(captured_event_id, sink_.queue_events[0].event_id);
+  EXPECT_EQ(1u, sink_.dropped_queue_event_count);
 }
 
-TEST_F(LocalProfileRecorderTest, DeferredAppendFailureReportsOnFlushAndEnd) {
-  recorder_options_.queue_event_capacity = 1;
+TEST_F(LocalProfileRecorderTest, FlushesWrappedQueueRing) {
+  recorder_options_.queue_event_capacity = 2;
   IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS));
 
   iree_hal_local_profile_queue_event_info_t queue_info =
       iree_hal_local_profile_queue_event_info_default();
   queue_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
   queue_info.scope = QueueScope();
-  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_event(
-      recorder_, &queue_info, nullptr));
 
-  iree_hal_local_profile_recorder_consume_status(
-      recorder_, iree_hal_local_profile_recorder_append_queue_event(
-                     recorder_, &queue_info, nullptr));
+  uint64_t first_event_id = 0;
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &first_event_id);
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
+  ASSERT_EQ(1u, sink_.queue_events.size());
 
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
-                        iree_hal_local_profile_recorder_flush(recorder_));
-  EXPECT_EQ(1u, sink_.queue_events.size());
+  uint64_t second_event_id = 0;
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &second_event_id);
+  uint64_t third_event_id = 0;
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     &third_event_id);
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
 
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
-                        iree_hal_local_profile_recorder_end(recorder_));
-  EXPECT_EQ(1, sink_.end_count);
-  EXPECT_EQ(IREE_STATUS_RESOURCE_EXHAUSTED,
-            sink_.observed_end_session_status_code);
+  ASSERT_EQ(3u, sink_.queue_events.size());
+  EXPECT_EQ(first_event_id, sink_.queue_events[0].event_id);
+  EXPECT_EQ(second_event_id, sink_.queue_events[1].event_id);
+  EXPECT_EQ(third_event_id, sink_.queue_events[2].event_id);
+  EXPECT_EQ(0u, sink_.dropped_queue_event_count);
 }
 
 TEST_F(LocalProfileRecorderTest, FlushFailurePreservesPendingRecords) {
@@ -430,8 +499,8 @@ TEST_F(LocalProfileRecorderTest, FlushFailurePreservesPendingRecords) {
       iree_hal_local_profile_queue_event_info_default();
   queue_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
   queue_info.scope = QueueScope();
-  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_event(
-      recorder_, &queue_info, nullptr));
+  iree_hal_local_profile_recorder_append_queue_event(recorder_, &queue_info,
+                                                     nullptr);
 
   sink_.fail_write_content_type = IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS;
   sink_.fail_write_remaining = 1;

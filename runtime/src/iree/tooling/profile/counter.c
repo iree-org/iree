@@ -21,14 +21,130 @@ void iree_profile_counter_context_initialize(
 
 void iree_profile_counter_context_deinitialize(
     iree_profile_counter_context_t* context) {
+  iree_profile_index_deinitialize(&context->aggregate_index,
+                                  context->host_allocator);
+  iree_profile_index_deinitialize(&context->counter_index,
+                                  context->host_allocator);
+  iree_profile_index_deinitialize(&context->counter_set_index,
+                                  context->host_allocator);
   iree_allocator_free(context->host_allocator, context->aggregates);
   iree_allocator_free(context->host_allocator, context->counters);
   iree_allocator_free(context->host_allocator, context->counter_sets);
   memset(context, 0, sizeof(*context));
 }
+
+typedef struct iree_profile_counter_set_lookup_t {
+  // Counter context owning candidate counter-set rows.
+  const iree_profile_counter_context_t* context;
+  // Producer-local counter-set identifier.
+  uint64_t counter_set_id;
+} iree_profile_counter_set_lookup_t;
+
+typedef struct iree_profile_counter_lookup_t {
+  // Counter context owning candidate counter rows.
+  const iree_profile_counter_context_t* context;
+  // Producer-local counter-set identifier.
+  uint64_t counter_set_id;
+  // Counter ordinal within |counter_set_id|.
+  uint32_t counter_ordinal;
+} iree_profile_counter_lookup_t;
+
+typedef struct iree_profile_counter_aggregate_lookup_t {
+  // Counter context owning candidate aggregate rows.
+  const iree_profile_counter_context_t* context;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal.
+  uint32_t queue_ordinal;
+  // Producer-defined stream identifier.
+  uint64_t stream_id;
+  // Producer-local counter-set identifier.
+  uint64_t counter_set_id;
+  // Counter ordinal within |counter_set_id|.
+  uint32_t counter_ordinal;
+  // Producer-local executable identifier.
+  uint64_t executable_id;
+  // Export ordinal within |executable_id|.
+  uint32_t export_ordinal;
+  // Process-local command-buffer identifier.
+  uint64_t command_buffer_id;
+} iree_profile_counter_aggregate_lookup_t;
+
+static uint64_t iree_profile_counter_set_hash(uint64_t counter_set_id) {
+  return iree_profile_index_mix_u64(counter_set_id);
+}
+
+static uint64_t iree_profile_counter_hash(uint64_t counter_set_id,
+                                          uint32_t counter_ordinal) {
+  uint64_t hash = iree_profile_counter_set_hash(counter_set_id);
+  return iree_profile_index_combine_u64(hash, counter_ordinal);
+}
+
+static uint64_t iree_profile_counter_aggregate_hash(
+    uint32_t physical_device_ordinal, uint32_t queue_ordinal,
+    uint64_t stream_id, uint64_t counter_set_id, uint32_t counter_ordinal,
+    uint64_t executable_id, uint32_t export_ordinal,
+    uint64_t command_buffer_id) {
+  uint64_t hash = iree_profile_index_mix_u64(physical_device_ordinal);
+  hash = iree_profile_index_combine_u64(hash, queue_ordinal);
+  hash = iree_profile_index_combine_u64(hash, stream_id);
+  hash = iree_profile_index_combine_u64(hash, counter_set_id);
+  hash = iree_profile_index_combine_u64(hash, counter_ordinal);
+  hash = iree_profile_index_combine_u64(hash, executable_id);
+  hash = iree_profile_index_combine_u64(hash, export_ordinal);
+  return iree_profile_index_combine_u64(hash, command_buffer_id);
+}
+
+static bool iree_profile_counter_set_matches(const void* user_data,
+                                             iree_host_size_t value) {
+  const iree_profile_counter_set_lookup_t* lookup =
+      (const iree_profile_counter_set_lookup_t*)user_data;
+  return lookup->context->counter_sets[value].record.counter_set_id ==
+         lookup->counter_set_id;
+}
+
+static bool iree_profile_counter_matches(const void* user_data,
+                                         iree_host_size_t value) {
+  const iree_profile_counter_lookup_t* lookup =
+      (const iree_profile_counter_lookup_t*)user_data;
+  const iree_profile_counter_t* counter = &lookup->context->counters[value];
+  return counter->record.counter_set_id == lookup->counter_set_id &&
+         counter->record.counter_ordinal == lookup->counter_ordinal;
+}
+
+static bool iree_profile_counter_aggregate_matches(const void* user_data,
+                                                   iree_host_size_t value) {
+  const iree_profile_counter_aggregate_lookup_t* lookup =
+      (const iree_profile_counter_aggregate_lookup_t*)user_data;
+  const iree_profile_counter_aggregate_t* aggregate =
+      &lookup->context->aggregates[value];
+  return aggregate->physical_device_ordinal ==
+             lookup->physical_device_ordinal &&
+         aggregate->queue_ordinal == lookup->queue_ordinal &&
+         aggregate->stream_id == lookup->stream_id &&
+         aggregate->counter_set_id == lookup->counter_set_id &&
+         aggregate->counter_ordinal == lookup->counter_ordinal &&
+         aggregate->executable_id == lookup->executable_id &&
+         aggregate->export_ordinal == lookup->export_ordinal &&
+         aggregate->command_buffer_id == lookup->command_buffer_id;
+}
+
 static iree_status_t iree_profile_counter_append_counter_set(
     iree_profile_counter_context_t* context,
     const iree_profile_counter_set_t* counter_set) {
+  const iree_profile_counter_set_lookup_t lookup = {
+      .context = context,
+      .counter_set_id = counter_set->record.counter_set_id,
+  };
+  const uint64_t hash =
+      iree_profile_counter_set_hash(counter_set->record.counter_set_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->counter_set_index, hash,
+                              iree_profile_counter_set_matches, &lookup,
+                              &existing_index)) {
+    return iree_ok_status();
+  }
+
   if (context->counter_set_count + 1 > context->counter_set_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         context->host_allocator,
@@ -36,13 +152,56 @@ static iree_status_t iree_profile_counter_append_counter_set(
         sizeof(context->counter_sets[0]), &context->counter_set_capacity,
         (void**)&context->counter_sets));
   }
-  context->counter_sets[context->counter_set_count++] = *counter_set;
+  const iree_host_size_t counter_set_index = context->counter_set_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(&context->counter_set_index,
+                                                 context->host_allocator, hash,
+                                                 counter_set_index));
+  context->counter_sets[counter_set_index] = *counter_set;
+  context->counter_sets[counter_set_index].first_counter_index =
+      IREE_HOST_SIZE_MAX;
+  context->counter_sets[counter_set_index].last_counter_index =
+      IREE_HOST_SIZE_MAX;
+  context->counter_sets[counter_set_index].counter_count = 0;
+  ++context->counter_set_count;
   return iree_ok_status();
 }
 
 static iree_status_t iree_profile_counter_append_counter(
     iree_profile_counter_context_t* context,
     const iree_profile_counter_t* counter) {
+  const iree_profile_counter_lookup_t lookup = {
+      .context = context,
+      .counter_set_id = counter->record.counter_set_id,
+      .counter_ordinal = counter->record.counter_ordinal,
+  };
+  const uint64_t hash = iree_profile_counter_hash(
+      counter->record.counter_set_id, counter->record.counter_ordinal);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->counter_index, hash,
+                              iree_profile_counter_matches, &lookup,
+                              &existing_index)) {
+    return iree_ok_status();
+  }
+
+  iree_profile_counter_set_t* counter_set = NULL;
+  iree_host_size_t counter_set_index = 0;
+  const iree_profile_counter_set_lookup_t counter_set_lookup = {
+      .context = context,
+      .counter_set_id = counter->record.counter_set_id,
+  };
+  if (!iree_profile_index_find(
+          &context->counter_set_index,
+          iree_profile_counter_set_hash(counter->record.counter_set_id),
+          iree_profile_counter_set_matches, &counter_set_lookup,
+          &counter_set_index)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "counter references missing counter-set metadata "
+                            "counter_set=%" PRIu64 " counter_ordinal=%u",
+                            counter->record.counter_set_id,
+                            counter->record.counter_ordinal);
+  }
+  counter_set = &context->counter_sets[counter_set_index];
+
   if (context->counter_count + 1 > context->counter_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         context->host_allocator,
@@ -50,17 +209,36 @@ static iree_status_t iree_profile_counter_append_counter(
         sizeof(context->counters[0]), &context->counter_capacity,
         (void**)&context->counters));
   }
-  context->counters[context->counter_count++] = *counter;
+
+  const iree_host_size_t counter_index = context->counter_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &context->counter_index, context->host_allocator, hash, counter_index));
+  context->counters[counter_index] = *counter;
+  context->counters[counter_index].next_counter_index = IREE_HOST_SIZE_MAX;
+  if (counter_set->first_counter_index == IREE_HOST_SIZE_MAX) {
+    counter_set->first_counter_index = counter_index;
+  } else {
+    context->counters[counter_set->last_counter_index].next_counter_index =
+        counter_index;
+  }
+  counter_set->last_counter_index = counter_index;
+  ++counter_set->counter_count;
+  ++context->counter_count;
   return iree_ok_status();
 }
 
 static const iree_profile_counter_set_t* iree_profile_counter_find_counter_set(
     const iree_profile_counter_context_t* context, uint64_t counter_set_id) {
-  for (iree_host_size_t i = 0; i < context->counter_set_count; ++i) {
-    const iree_profile_counter_set_t* counter_set = &context->counter_sets[i];
-    if (counter_set->record.counter_set_id == counter_set_id) {
-      return counter_set;
-    }
+  const iree_profile_counter_set_lookup_t lookup = {
+      .context = context,
+      .counter_set_id = counter_set_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(&context->counter_set_index,
+                              iree_profile_counter_set_hash(counter_set_id),
+                              iree_profile_counter_set_matches, &lookup,
+                              &index)) {
+    return &context->counter_sets[index];
   }
   return NULL;
 }
@@ -68,12 +246,17 @@ static const iree_profile_counter_set_t* iree_profile_counter_find_counter_set(
 static const iree_profile_counter_t* iree_profile_counter_find_counter(
     const iree_profile_counter_context_t* context, uint64_t counter_set_id,
     uint32_t counter_ordinal) {
-  for (iree_host_size_t i = 0; i < context->counter_count; ++i) {
-    const iree_profile_counter_t* counter = &context->counters[i];
-    if (counter->record.counter_set_id == counter_set_id &&
-        counter->record.counter_ordinal == counter_ordinal) {
-      return counter;
-    }
+  const iree_profile_counter_lookup_t lookup = {
+      .context = context,
+      .counter_set_id = counter_set_id,
+      .counter_ordinal = counter_ordinal,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &context->counter_index,
+          iree_profile_counter_hash(counter_set_id, counter_ordinal),
+          iree_profile_counter_matches, &lookup, &index)) {
+    return &context->counters[index];
   }
   return NULL;
 }
@@ -86,19 +269,26 @@ static iree_status_t iree_profile_counter_get_aggregate(
     iree_profile_counter_aggregate_t** out_aggregate) {
   *out_aggregate = NULL;
 
-  for (iree_host_size_t i = 0; i < context->aggregate_count; ++i) {
-    iree_profile_counter_aggregate_t* aggregate = &context->aggregates[i];
-    if (aggregate->physical_device_ordinal == physical_device_ordinal &&
-        aggregate->queue_ordinal == queue_ordinal &&
-        aggregate->stream_id == stream_id &&
-        aggregate->counter_set_id == counter_set_id &&
-        aggregate->counter_ordinal == counter_ordinal &&
-        aggregate->executable_id == executable_id &&
-        aggregate->export_ordinal == export_ordinal &&
-        aggregate->command_buffer_id == command_buffer_id) {
-      *out_aggregate = aggregate;
-      return iree_ok_status();
-    }
+  const iree_profile_counter_aggregate_lookup_t lookup = {
+      .context = context,
+      .physical_device_ordinal = physical_device_ordinal,
+      .queue_ordinal = queue_ordinal,
+      .stream_id = stream_id,
+      .counter_set_id = counter_set_id,
+      .counter_ordinal = counter_ordinal,
+      .executable_id = executable_id,
+      .export_ordinal = export_ordinal,
+      .command_buffer_id = command_buffer_id,
+  };
+  const uint64_t hash = iree_profile_counter_aggregate_hash(
+      physical_device_ordinal, queue_ordinal, stream_id, counter_set_id,
+      counter_ordinal, executable_id, export_ordinal, command_buffer_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->aggregate_index, hash,
+                              iree_profile_counter_aggregate_matches, &lookup,
+                              &existing_index)) {
+    *out_aggregate = &context->aggregates[existing_index];
+    return iree_ok_status();
   }
 
   if (context->aggregate_count + 1 > context->aggregate_capacity) {
@@ -109,8 +299,12 @@ static iree_status_t iree_profile_counter_get_aggregate(
         (void**)&context->aggregates));
   }
 
+  const iree_host_size_t aggregate_index = context->aggregate_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(&context->aggregate_index,
+                                                 context->host_allocator, hash,
+                                                 aggregate_index));
   iree_profile_counter_aggregate_t* aggregate =
-      &context->aggregates[context->aggregate_count++];
+      &context->aggregates[aggregate_index];
   memset(aggregate, 0, sizeof(*aggregate));
   aggregate->physical_device_ordinal = physical_device_ordinal;
   aggregate->queue_ordinal = queue_ordinal;
@@ -121,6 +315,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
   aggregate->export_ordinal = export_ordinal;
   aggregate->command_buffer_id = command_buffer_id;
   aggregate->minimum_value = DBL_MAX;
+  ++context->aggregate_count;
   *out_aggregate = aggregate;
   return iree_ok_status();
 }
@@ -533,12 +728,10 @@ static iree_status_t iree_profile_counter_process_matching_sample(
 
   bool found_counter = false;
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0;
-       i < counter_context->counter_count && iree_status_is_ok(status); ++i) {
-    const iree_profile_counter_t* counter = &counter_context->counters[i];
-    if (counter->record.counter_set_id != state->sample.counter_set_id) {
-      continue;
-    }
+  iree_host_size_t counter_index = state->counter_set->first_counter_index;
+  while (counter_index != IREE_HOST_SIZE_MAX && iree_status_is_ok(status)) {
+    const iree_profile_counter_t* counter =
+        &counter_context->counters[counter_index];
     found_counter = true;
 
     bool matched_counter = false;
@@ -548,6 +741,7 @@ static iree_status_t iree_profile_counter_process_matching_sample(
     if (iree_status_is_ok(status) && matched_counter) {
       *out_matched_sample = true;
     }
+    counter_index = counter->next_counter_index;
   }
   if (iree_status_is_ok(status) && !found_counter) {
     status = iree_make_status(

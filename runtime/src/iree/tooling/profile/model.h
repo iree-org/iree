@@ -46,12 +46,21 @@ typedef struct iree_profile_model_executable_t {
 typedef struct iree_profile_model_command_buffer_t {
   // Immutable command-buffer metadata record borrowed from the profile bundle.
   iree_hal_profile_command_buffer_record_t record;
+  // First command-operation row for this command buffer, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t first_operation_index;
+  // Last command-operation row for this command buffer, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t last_operation_index;
+  // Number of command-operation rows linked to this command buffer.
+  iree_host_size_t operation_count;
 } iree_profile_model_command_buffer_t;
 
 // Command-operation metadata indexed by command-buffer id and command index.
 typedef struct iree_profile_model_command_operation_t {
   // Immutable command-operation metadata record copied from the profile bundle.
   iree_hal_profile_command_operation_record_t record;
+  // Next command-operation row in the owning command buffer, or
+  // IREE_HOST_SIZE_MAX.
+  iree_host_size_t next_operation_index;
 } iree_profile_model_command_operation_t;
 
 // Queue metadata indexed by physical device, queue ordinal, and stream id.
@@ -111,18 +120,25 @@ typedef struct iree_profile_model_t {
   iree_host_size_t executable_count;
   // Capacity of |executables| in entries.
   iree_host_size_t executable_capacity;
+  // Lookup index from executable id to |executables| entry index.
+  iree_profile_index_t executable_index;
   // Dynamic array of executable export side-table entries.
   iree_profile_model_export_t* exports;
   // Number of valid entries in |exports|.
   iree_host_size_t export_count;
   // Capacity of |exports| in entries.
   iree_host_size_t export_capacity;
+  // Lookup index from executable id and export ordinal to |exports| entry
+  // index.
+  iree_profile_index_t export_index;
   // Dynamic array of command-buffer side-table entries.
   iree_profile_model_command_buffer_t* command_buffers;
   // Number of valid entries in |command_buffers|.
   iree_host_size_t command_buffer_count;
   // Capacity of |command_buffers| in entries.
   iree_host_size_t command_buffer_capacity;
+  // Lookup index from command-buffer id to |command_buffers| entry index.
+  iree_profile_index_t command_buffer_index;
   // Dynamic array of command-operation side-table entries.
   iree_profile_model_command_operation_t* command_operations;
   // Number of valid entries in |command_operations|.
@@ -135,12 +151,16 @@ typedef struct iree_profile_model_t {
   iree_host_size_t queue_count;
   // Capacity of |queues| in entries.
   iree_host_size_t queue_capacity;
+  // Lookup index from physical queue stream to |queues| entry index.
+  iree_profile_index_t queue_index;
   // Dynamic array of per-physical-device clock-correlation state.
   iree_profile_model_device_t* devices;
   // Number of valid entries in |devices|.
   iree_host_size_t device_count;
   // Capacity of |devices| in entries.
   iree_host_size_t device_capacity;
+  // Lookup index from physical-device ordinal to |devices| entry index.
+  iree_profile_index_t device_index;
 } iree_profile_model_t;
 
 // Initializes |out_model| for profile metadata side tables.

@@ -933,6 +933,12 @@ typedef struct iree_hal_profile_host_execution_event_t {
   int64_t end_host_time_ns;
   // Type-specific payload byte length, or 0 when not applicable.
   uint64_t payload_length;
+  // Number of execution tiles represented by this span, or 0 when the
+  // producer did not provide tile attribution.
+  uint64_t tile_count;
+  // Sum of per-tile execution durations in nanoseconds. This may exceed the
+  // span duration when tiles execute concurrently.
+  int64_t tile_duration_sum_ns;
   // Number of encoded payload operations represented by this span.
   uint32_t operation_count;
   // Reserved for future host execution fields; must be zero.

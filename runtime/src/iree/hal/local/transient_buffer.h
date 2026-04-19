@@ -45,6 +45,12 @@ iree_status_t iree_hal_local_transient_buffer_create(
 // Returns true if |buffer| is a local transient buffer wrapper.
 bool iree_hal_local_transient_buffer_isa(const iree_hal_buffer_t* buffer);
 
+// Returns the stable profiling id assigned to this transient buffer wrapper.
+//
+// The id is process-global and nonzero. Producers use it as a session-local
+// allocation id whenever the wrapper participates in an active profile capture.
+uint64_t iree_hal_local_transient_buffer_profile_id(iree_hal_buffer_t* buffer);
+
 // Attaches a pool reservation to the transient buffer. The wrapper keeps only
 // a borrowed pointer to |pool| and takes ownership of |reservation| until
 // iree_hal_local_transient_buffer_release_reservation() or wrapper destroy.
@@ -66,6 +72,14 @@ void iree_hal_local_transient_buffer_commit(iree_hal_buffer_t* buffer);
 // state. Any staged-but-uncommitted backing view is also released. Safe to
 // call on an already-uncommitted wrapper.
 void iree_hal_local_transient_buffer_decommit(iree_hal_buffer_t* buffer);
+
+// Returns the attached pool reservation without transferring ownership.
+//
+// This is a cold diagnostic/profiling helper. Returns false when the wrapper
+// has no live reservation or the reservation has already been released.
+bool iree_hal_local_transient_buffer_query_reservation(
+    iree_hal_buffer_t* buffer, iree_hal_pool_t** out_pool,
+    iree_hal_pool_reservation_t* out_reservation);
 
 // Releases the attached reservation exactly once. If the wrapper has no
 // reservation or the reservation was already released, this is a no-op.

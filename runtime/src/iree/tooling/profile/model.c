@@ -17,6 +17,13 @@ void iree_profile_model_initialize(iree_allocator_t host_allocator,
 }
 
 void iree_profile_model_deinitialize(iree_profile_model_t* model) {
+  iree_profile_index_deinitialize(&model->device_index, model->host_allocator);
+  iree_profile_index_deinitialize(&model->queue_index, model->host_allocator);
+  iree_profile_index_deinitialize(&model->command_buffer_index,
+                                  model->host_allocator);
+  iree_profile_index_deinitialize(&model->export_index, model->host_allocator);
+  iree_profile_index_deinitialize(&model->executable_index,
+                                  model->host_allocator);
   iree_allocator_free(model->host_allocator, model->devices);
   iree_allocator_free(model->host_allocator, model->queues);
   iree_allocator_free(model->host_allocator, model->command_operations);
@@ -26,16 +33,136 @@ void iree_profile_model_deinitialize(iree_profile_model_t* model) {
   memset(model, 0, sizeof(*model));
 }
 
+typedef struct iree_profile_model_device_lookup_t {
+  // Model owning the candidate rows.
+  const iree_profile_model_t* model;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+} iree_profile_model_device_lookup_t;
+
+typedef struct iree_profile_model_queue_lookup_t {
+  // Model owning the candidate rows.
+  const iree_profile_model_t* model;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal.
+  uint32_t queue_ordinal;
+  // Producer-defined queue stream identifier.
+  uint64_t stream_id;
+} iree_profile_model_queue_lookup_t;
+
+typedef struct iree_profile_model_executable_lookup_t {
+  // Model owning the candidate rows.
+  const iree_profile_model_t* model;
+  // Producer-local executable identifier.
+  uint64_t executable_id;
+} iree_profile_model_executable_lookup_t;
+
+typedef struct iree_profile_model_export_lookup_t {
+  // Model owning the candidate rows.
+  const iree_profile_model_t* model;
+  // Producer-local executable identifier.
+  uint64_t executable_id;
+  // Export ordinal within |executable_id|.
+  uint32_t export_ordinal;
+} iree_profile_model_export_lookup_t;
+
+typedef struct iree_profile_model_command_buffer_lookup_t {
+  // Model owning the candidate rows.
+  const iree_profile_model_t* model;
+  // Producer-local command-buffer identifier.
+  uint64_t command_buffer_id;
+} iree_profile_model_command_buffer_lookup_t;
+
+static uint64_t iree_profile_model_device_hash(
+    uint32_t physical_device_ordinal) {
+  return iree_profile_index_mix_u64(physical_device_ordinal);
+}
+
+static uint64_t iree_profile_model_queue_hash(uint32_t physical_device_ordinal,
+                                              uint32_t queue_ordinal,
+                                              uint64_t stream_id) {
+  uint64_t hash = iree_profile_model_device_hash(physical_device_ordinal);
+  hash = iree_profile_index_combine_u64(hash, queue_ordinal);
+  return iree_profile_index_combine_u64(hash, stream_id);
+}
+
+static uint64_t iree_profile_model_executable_hash(uint64_t executable_id) {
+  return iree_profile_index_mix_u64(executable_id);
+}
+
+static uint64_t iree_profile_model_export_hash(uint64_t executable_id,
+                                               uint32_t export_ordinal) {
+  uint64_t hash = iree_profile_model_executable_hash(executable_id);
+  return iree_profile_index_combine_u64(hash, export_ordinal);
+}
+
+static uint64_t iree_profile_model_command_buffer_hash(
+    uint64_t command_buffer_id) {
+  return iree_profile_index_mix_u64(command_buffer_id);
+}
+
+static bool iree_profile_model_device_matches(const void* user_data,
+                                              iree_host_size_t value) {
+  const iree_profile_model_device_lookup_t* lookup =
+      (const iree_profile_model_device_lookup_t*)user_data;
+  return lookup->model->devices[value].physical_device_ordinal ==
+         lookup->physical_device_ordinal;
+}
+
+static bool iree_profile_model_queue_matches(const void* user_data,
+                                             iree_host_size_t value) {
+  const iree_profile_model_queue_lookup_t* lookup =
+      (const iree_profile_model_queue_lookup_t*)user_data;
+  const iree_hal_profile_queue_record_t* record =
+      &lookup->model->queues[value].record;
+  return record->physical_device_ordinal == lookup->physical_device_ordinal &&
+         record->queue_ordinal == lookup->queue_ordinal &&
+         record->stream_id == lookup->stream_id;
+}
+
+static bool iree_profile_model_executable_matches(const void* user_data,
+                                                  iree_host_size_t value) {
+  const iree_profile_model_executable_lookup_t* lookup =
+      (const iree_profile_model_executable_lookup_t*)user_data;
+  return lookup->model->executables[value].record.executable_id ==
+         lookup->executable_id;
+}
+
+static bool iree_profile_model_export_matches(const void* user_data,
+                                              iree_host_size_t value) {
+  const iree_profile_model_export_lookup_t* lookup =
+      (const iree_profile_model_export_lookup_t*)user_data;
+  const iree_profile_model_export_t* export_info =
+      &lookup->model->exports[value];
+  return export_info->executable_id == lookup->executable_id &&
+         export_info->export_ordinal == lookup->export_ordinal;
+}
+
+static bool iree_profile_model_command_buffer_matches(const void* user_data,
+                                                      iree_host_size_t value) {
+  const iree_profile_model_command_buffer_lookup_t* lookup =
+      (const iree_profile_model_command_buffer_lookup_t*)user_data;
+  return lookup->model->command_buffers[value].record.command_buffer_id ==
+         lookup->command_buffer_id;
+}
+
 iree_status_t iree_profile_model_ensure_device(
     iree_profile_model_t* model, uint32_t physical_device_ordinal,
     iree_profile_model_device_t** out_device) {
   *out_device = NULL;
 
-  for (iree_host_size_t i = 0; i < model->device_count; ++i) {
-    if (model->devices[i].physical_device_ordinal == physical_device_ordinal) {
-      *out_device = &model->devices[i];
-      return iree_ok_status();
-    }
+  const iree_profile_model_device_lookup_t lookup = {
+      .model = model,
+      .physical_device_ordinal = physical_device_ordinal,
+  };
+  const uint64_t hash = iree_profile_model_device_hash(physical_device_ordinal);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&model->device_index, hash,
+                              iree_profile_model_device_matches, &lookup,
+                              &existing_index)) {
+    *out_device = &model->devices[existing_index];
+    return iree_ok_status();
   }
 
   if (model->device_count + 1 > model->device_capacity) {
@@ -46,7 +173,12 @@ iree_status_t iree_profile_model_ensure_device(
         (void**)&model->devices));
   }
 
-  iree_profile_model_device_t* device = &model->devices[model->device_count++];
+  const iree_host_size_t device_index = model->device_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &model->device_index, model->host_allocator, hash, device_index));
+  ++model->device_count;
+
+  iree_profile_model_device_t* device = &model->devices[device_index];
   memset(device, 0, sizeof(*device));
   device->physical_device_ordinal = physical_device_ordinal;
   *out_device = device;
@@ -65,10 +197,17 @@ static void iree_profile_model_record_clock_sample(
 
 const iree_profile_model_device_t* iree_profile_model_find_device(
     const iree_profile_model_t* model, uint32_t physical_device_ordinal) {
-  for (iree_host_size_t i = 0; i < model->device_count; ++i) {
-    if (model->devices[i].physical_device_ordinal == physical_device_ordinal) {
-      return &model->devices[i];
-    }
+  if (!model) return NULL;
+  const iree_profile_model_device_lookup_t lookup = {
+      .model = model,
+      .physical_device_ordinal = physical_device_ordinal,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &model->device_index,
+          iree_profile_model_device_hash(physical_device_ordinal),
+          iree_profile_model_device_matches, &lookup, &index)) {
+    return &model->devices[index];
   }
   return NULL;
 }
@@ -76,25 +215,37 @@ const iree_profile_model_device_t* iree_profile_model_find_device(
 const iree_profile_model_queue_t* iree_profile_model_find_queue(
     const iree_profile_model_t* model, uint32_t physical_device_ordinal,
     uint32_t queue_ordinal, uint64_t stream_id) {
-  for (iree_host_size_t i = 0; i < model->queue_count; ++i) {
-    const iree_profile_model_queue_t* queue_info = &model->queues[i];
-    if (queue_info->record.physical_device_ordinal == physical_device_ordinal &&
-        queue_info->record.queue_ordinal == queue_ordinal &&
-        queue_info->record.stream_id == stream_id) {
-      return queue_info;
-    }
+  if (!model) return NULL;
+  const iree_profile_model_queue_lookup_t lookup = {
+      .model = model,
+      .physical_device_ordinal = physical_device_ordinal,
+      .queue_ordinal = queue_ordinal,
+      .stream_id = stream_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &model->queue_index,
+          iree_profile_model_queue_hash(physical_device_ordinal, queue_ordinal,
+                                        stream_id),
+          iree_profile_model_queue_matches, &lookup, &index)) {
+    return &model->queues[index];
   }
   return NULL;
 }
 
 const iree_profile_model_executable_t* iree_profile_model_find_executable(
     const iree_profile_model_t* model, uint64_t executable_id) {
-  for (iree_host_size_t i = 0; i < model->executable_count; ++i) {
-    const iree_profile_model_executable_t* executable_info =
-        &model->executables[i];
-    if (executable_info->record.executable_id == executable_id) {
-      return executable_info;
-    }
+  if (!model) return NULL;
+  const iree_profile_model_executable_lookup_t lookup = {
+      .model = model,
+      .executable_id = executable_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(&model->executable_index,
+                              iree_profile_model_executable_hash(executable_id),
+                              iree_profile_model_executable_matches, &lookup,
+                              &index)) {
+    return &model->executables[index];
   }
   return NULL;
 }
@@ -102,12 +253,18 @@ const iree_profile_model_executable_t* iree_profile_model_find_executable(
 const iree_profile_model_export_t* iree_profile_model_find_export(
     const iree_profile_model_t* model, uint64_t executable_id,
     uint32_t export_ordinal) {
-  for (iree_host_size_t i = 0; i < model->export_count; ++i) {
-    const iree_profile_model_export_t* export_info = &model->exports[i];
-    if (export_info->executable_id == executable_id &&
-        export_info->export_ordinal == export_ordinal) {
-      return export_info;
-    }
+  if (!model) return NULL;
+  const iree_profile_model_export_lookup_t lookup = {
+      .model = model,
+      .executable_id = executable_id,
+      .export_ordinal = export_ordinal,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &model->export_index,
+          iree_profile_model_export_hash(executable_id, export_ordinal),
+          iree_profile_model_export_matches, &lookup, &index)) {
+    return &model->exports[index];
   }
   return NULL;
 }
@@ -115,12 +272,35 @@ const iree_profile_model_export_t* iree_profile_model_find_export(
 const iree_profile_model_command_buffer_t*
 iree_profile_model_find_command_buffer(const iree_profile_model_t* model,
                                        uint64_t command_buffer_id) {
-  for (iree_host_size_t i = 0; i < model->command_buffer_count; ++i) {
-    const iree_profile_model_command_buffer_t* command_buffer_info =
-        &model->command_buffers[i];
-    if (command_buffer_info->record.command_buffer_id == command_buffer_id) {
-      return command_buffer_info;
-    }
+  if (!model) return NULL;
+  const iree_profile_model_command_buffer_lookup_t lookup = {
+      .model = model,
+      .command_buffer_id = command_buffer_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &model->command_buffer_index,
+          iree_profile_model_command_buffer_hash(command_buffer_id),
+          iree_profile_model_command_buffer_matches, &lookup, &index)) {
+    return &model->command_buffers[index];
+  }
+  return NULL;
+}
+
+static iree_profile_model_command_buffer_t*
+iree_profile_model_find_command_buffer_mutable(iree_profile_model_t* model,
+                                               uint64_t command_buffer_id) {
+  if (!model) return NULL;
+  const iree_profile_model_command_buffer_lookup_t lookup = {
+      .model = model,
+      .command_buffer_id = command_buffer_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &model->command_buffer_index,
+          iree_profile_model_command_buffer_hash(command_buffer_id),
+          iree_profile_model_command_buffer_matches, &lookup, &index)) {
+    return &model->command_buffers[index];
   }
   return NULL;
 }
@@ -365,6 +545,20 @@ iree_status_t iree_profile_model_resolve_dispatch_key(
 static iree_status_t iree_profile_model_append_export(
     iree_profile_model_t* model,
     const iree_profile_model_export_t* export_info) {
+  const iree_profile_model_export_lookup_t lookup = {
+      .model = model,
+      .executable_id = export_info->executable_id,
+      .export_ordinal = export_info->export_ordinal,
+  };
+  const uint64_t hash = iree_profile_model_export_hash(
+      export_info->executable_id, export_info->export_ordinal);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&model->export_index, hash,
+                              iree_profile_model_export_matches, &lookup,
+                              &existing_index)) {
+    return iree_ok_status();
+  }
+
   if (model->export_count + 1 > model->export_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         model->host_allocator,
@@ -372,13 +566,31 @@ static iree_status_t iree_profile_model_append_export(
         sizeof(model->exports[0]), &model->export_capacity,
         (void**)&model->exports));
   }
-  model->exports[model->export_count++] = *export_info;
+
+  const iree_host_size_t export_index = model->export_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &model->export_index, model->host_allocator, hash, export_index));
+  model->exports[export_index] = *export_info;
+  ++model->export_count;
   return iree_ok_status();
 }
 
 static iree_status_t iree_profile_model_append_executable(
     iree_profile_model_t* model,
     const iree_hal_profile_executable_record_t* record) {
+  const iree_profile_model_executable_lookup_t lookup = {
+      .model = model,
+      .executable_id = record->executable_id,
+  };
+  const uint64_t hash =
+      iree_profile_model_executable_hash(record->executable_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&model->executable_index, hash,
+                              iree_profile_model_executable_matches, &lookup,
+                              &existing_index)) {
+    return iree_ok_status();
+  }
+
   if (model->executable_count + 1 > model->executable_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         model->host_allocator,
@@ -386,15 +598,32 @@ static iree_status_t iree_profile_model_append_executable(
         sizeof(model->executables[0]), &model->executable_capacity,
         (void**)&model->executables));
   }
+  const iree_host_size_t executable_index = model->executable_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &model->executable_index, model->host_allocator, hash, executable_index));
   iree_profile_model_executable_t* executable_info =
-      &model->executables[model->executable_count++];
+      &model->executables[executable_index];
   executable_info->record = *record;
+  ++model->executable_count;
   return iree_ok_status();
 }
 
 static iree_status_t iree_profile_model_append_command_buffer(
     iree_profile_model_t* model,
     const iree_hal_profile_command_buffer_record_t* record) {
+  const iree_profile_model_command_buffer_lookup_t lookup = {
+      .model = model,
+      .command_buffer_id = record->command_buffer_id,
+  };
+  const uint64_t hash =
+      iree_profile_model_command_buffer_hash(record->command_buffer_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&model->command_buffer_index, hash,
+                              iree_profile_model_command_buffer_matches,
+                              &lookup, &existing_index)) {
+    return iree_ok_status();
+  }
+
   if (model->command_buffer_count + 1 > model->command_buffer_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         model->host_allocator,
@@ -402,15 +631,34 @@ static iree_status_t iree_profile_model_append_command_buffer(
         sizeof(model->command_buffers[0]), &model->command_buffer_capacity,
         (void**)&model->command_buffers));
   }
+  const iree_host_size_t command_buffer_index = model->command_buffer_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(&model->command_buffer_index,
+                                                 model->host_allocator, hash,
+                                                 command_buffer_index));
   iree_profile_model_command_buffer_t* command_buffer_info =
-      &model->command_buffers[model->command_buffer_count++];
+      &model->command_buffers[command_buffer_index];
   command_buffer_info->record = *record;
+  command_buffer_info->first_operation_index = IREE_HOST_SIZE_MAX;
+  command_buffer_info->last_operation_index = IREE_HOST_SIZE_MAX;
+  command_buffer_info->operation_count = 0;
+  ++model->command_buffer_count;
   return iree_ok_status();
 }
 
 static iree_status_t iree_profile_model_append_command_operation(
     iree_profile_model_t* model,
     const iree_hal_profile_command_operation_record_t* record) {
+  iree_profile_model_command_buffer_t* command_buffer =
+      iree_profile_model_find_command_buffer_mutable(model,
+                                                     record->command_buffer_id);
+  if (!command_buffer) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "command operation references missing command-buffer metadata "
+        "command_buffer=%" PRIu64 " command_index=%u",
+        record->command_buffer_id, record->command_index);
+  }
+
   if (model->command_operation_count + 1 > model->command_operation_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         model->host_allocator,
@@ -419,9 +667,21 @@ static iree_status_t iree_profile_model_append_command_operation(
         &model->command_operation_capacity,
         (void**)&model->command_operations));
   }
+
+  const iree_host_size_t operation_index = model->command_operation_count;
   iree_profile_model_command_operation_t* operation_info =
-      &model->command_operations[model->command_operation_count++];
+      &model->command_operations[operation_index];
   operation_info->record = *record;
+  operation_info->next_operation_index = IREE_HOST_SIZE_MAX;
+  if (command_buffer->first_operation_index == IREE_HOST_SIZE_MAX) {
+    command_buffer->first_operation_index = operation_index;
+  } else {
+    model->command_operations[command_buffer->last_operation_index]
+        .next_operation_index = operation_index;
+  }
+  command_buffer->last_operation_index = operation_index;
+  ++command_buffer->operation_count;
+  ++model->command_operation_count;
   return iree_ok_status();
 }
 
@@ -454,6 +714,22 @@ static iree_status_t iree_profile_model_validate_command_operation(
 static iree_status_t iree_profile_model_append_queue(
     iree_profile_model_t* model,
     const iree_hal_profile_queue_record_t* record) {
+  const iree_profile_model_queue_lookup_t lookup = {
+      .model = model,
+      .physical_device_ordinal = record->physical_device_ordinal,
+      .queue_ordinal = record->queue_ordinal,
+      .stream_id = record->stream_id,
+  };
+  const uint64_t hash =
+      iree_profile_model_queue_hash(record->physical_device_ordinal,
+                                    record->queue_ordinal, record->stream_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&model->queue_index, hash,
+                              iree_profile_model_queue_matches, &lookup,
+                              &existing_index)) {
+    return iree_ok_status();
+  }
+
   if (model->queue_count + 1 > model->queue_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         model->host_allocator,
@@ -461,8 +737,12 @@ static iree_status_t iree_profile_model_append_queue(
         sizeof(model->queues[0]), &model->queue_capacity,
         (void**)&model->queues));
   }
-  iree_profile_model_queue_t* queue_info = &model->queues[model->queue_count++];
+  const iree_host_size_t queue_index = model->queue_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &model->queue_index, model->host_allocator, hash, queue_index));
+  iree_profile_model_queue_t* queue_info = &model->queues[queue_index];
   queue_info->record = *record;
+  ++model->queue_count;
   return iree_ok_status();
 }
 
@@ -586,15 +866,6 @@ static iree_status_t iree_profile_model_process_command_operation_records(
     iree_hal_profile_command_operation_record_t record_value;
     memcpy(&record_value, typed_record.contents.data, sizeof(record_value));
     status = iree_profile_model_validate_command_operation(&record_value);
-    if (iree_status_is_ok(status) &&
-        !iree_profile_model_find_command_buffer(
-            model, record_value.command_buffer_id)) {
-      status = iree_make_status(
-          IREE_STATUS_DATA_LOSS,
-          "command operation references missing command-buffer metadata "
-          "command_buffer=%" PRIu64 " command_index=%u",
-          record_value.command_buffer_id, record_value.command_index);
-    }
     if (iree_status_is_ok(status)) {
       status =
           iree_profile_model_append_command_operation(model, &record_value);

@@ -215,6 +215,20 @@ static inline iree_status_t iree_hal_cmd_execute_dispatch_tile(
       workgroup_state, workgroup_state->processor_id);
 }
 
+static inline void iree_hal_cmd_dispatch_initialize_workgroup_state(
+    uint32_t tile, const uint32_t workgroup_count[3], uint32_t xy_count,
+    uint32_t worker_index, uint8_t* local_memory, uint32_t local_memory_size,
+    iree_hal_executable_workgroup_state_v0_t* out_workgroup_state) {
+  memset(out_workgroup_state, 0, sizeof(*out_workgroup_state));
+  out_workgroup_state->workgroup_id_x = tile % workgroup_count[0];
+  out_workgroup_state->workgroup_id_y =
+      (tile / workgroup_count[0]) % workgroup_count[1];
+  out_workgroup_state->workgroup_id_z = (uint16_t)(tile / xy_count);
+  out_workgroup_state->processor_id = worker_index;
+  out_workgroup_state->local_memory = local_memory;
+  out_workgroup_state->local_memory_size = local_memory_size;
+}
+
 // Executes tiles for a DISPATCH command. Claims tiles via epoch-tagged CAS
 // on the command's 64-bit tile_index entry, executes each tile by calling the
 // kernel function, and returns the total number of tiles completed.
@@ -270,18 +284,12 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
   }
 
   if (worker_count == 1) {
-    // Single-worker fast path: no atomics needed. Execute all tiles.
+    // Single-worker fast path: no tile claiming atomics needed.
     for (uint32_t tile = 0; tile < tile_count; ++tile) {
       iree_hal_executable_workgroup_state_v0_t workgroup_state;
-      memset(&workgroup_state, 0, sizeof(workgroup_state));
-      workgroup_state.workgroup_id_x = tile % workgroup_count[0];
-      workgroup_state.workgroup_id_y =
-          (tile / workgroup_count[0]) % workgroup_count[1];
-      workgroup_state.workgroup_id_z = (uint16_t)(tile / xy_count);
-      workgroup_state.processor_id = worker_index;
-      workgroup_state.local_memory = local_memory;
-      workgroup_state.local_memory_size = dispatch->local_memory_size;
-
+      iree_hal_cmd_dispatch_initialize_workgroup_state(
+          tile, workgroup_count, xy_count, worker_index, local_memory,
+          dispatch->local_memory_size, &workgroup_state);
       IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tile(
           dispatch, &dispatch_state, &workgroup_state));
     }
@@ -311,15 +319,9 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
         // CAS succeeded — execute claimed tiles [counter, new_counter).
         for (uint32_t tile = counter; tile < new_counter; ++tile) {
           iree_hal_executable_workgroup_state_v0_t workgroup_state;
-          memset(&workgroup_state, 0, sizeof(workgroup_state));
-          workgroup_state.workgroup_id_x = tile % workgroup_count[0];
-          workgroup_state.workgroup_id_y =
-              (tile / workgroup_count[0]) % workgroup_count[1];
-          workgroup_state.workgroup_id_z = (uint16_t)(tile / xy_count);
-          workgroup_state.processor_id = worker_index;
-          workgroup_state.local_memory = local_memory;
-          workgroup_state.local_memory_size = dispatch->local_memory_size;
-
+          iree_hal_cmd_dispatch_initialize_workgroup_state(
+              tile, workgroup_count, xy_count, worker_index, local_memory,
+              dispatch->local_memory_size, &workgroup_state);
           IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tile(
               dispatch, &dispatch_state, &workgroup_state));
           ++completed;

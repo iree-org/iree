@@ -30,6 +30,9 @@ typedef struct iree_hal_local_executable_t {
   // so execution has zero indirection.
   const iree_hal_executable_dispatch_v0_t* dispatch_ptrs;
 
+  // Process-local nonzero executable identifier used by profiling sessions.
+  uint64_t profile_id;
+
   // Execution environment.
   iree_hal_executable_environment_v0_t environment;
 } iree_hal_local_executable_t;
@@ -55,6 +58,10 @@ void iree_hal_local_executable_deinitialize(
 
 iree_hal_local_executable_t* iree_hal_local_executable_cast(
     iree_hal_executable_t* base_value);
+
+// Returns the process-local nonzero profiling identifier for |executable|.
+uint64_t iree_hal_local_executable_profile_id(
+    const iree_hal_local_executable_t* executable);
 
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,

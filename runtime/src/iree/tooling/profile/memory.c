@@ -168,10 +168,137 @@ void iree_profile_memory_context_initialize(
 
 void iree_profile_memory_context_deinitialize(
     iree_profile_memory_context_t* context) {
+  iree_profile_index_deinitialize(&context->latest_allocation_index,
+                                  context->host_allocator);
+  iree_profile_index_deinitialize(&context->allocation_index,
+                                  context->host_allocator);
+  iree_profile_index_deinitialize(&context->pool_index,
+                                  context->host_allocator);
+  iree_profile_index_deinitialize(&context->device_index,
+                                  context->host_allocator);
   iree_allocator_free(context->host_allocator, context->devices);
   iree_allocator_free(context->host_allocator, context->pools);
   iree_allocator_free(context->host_allocator, context->allocations);
   memset(context, 0, sizeof(*context));
+}
+
+typedef struct iree_profile_memory_device_lookup_t {
+  // Memory context owning candidate device rows.
+  const iree_profile_memory_context_t* context;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+} iree_profile_memory_device_lookup_t;
+
+typedef struct iree_profile_memory_pool_lookup_t {
+  // Memory context owning candidate pool rows.
+  const iree_profile_memory_context_t* context;
+  // Lifecycle kind for the pool/provider row.
+  iree_profile_memory_lifecycle_kind_t kind;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Producer-defined pool/provider identifier.
+  uint64_t pool_id;
+  // HAL memory type bits for the pool/provider row.
+  uint64_t memory_type;
+} iree_profile_memory_pool_lookup_t;
+
+typedef struct iree_profile_memory_allocation_lookup_t {
+  // Memory context owning candidate allocation rows.
+  const iree_profile_memory_context_t* context;
+  // Lifecycle kind for the allocation row.
+  iree_profile_memory_lifecycle_kind_t kind;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Producer-defined allocation identifier.
+  uint64_t allocation_id;
+  // Producer-defined pool/provider identifier.
+  uint64_t pool_id;
+} iree_profile_memory_allocation_lookup_t;
+
+typedef struct iree_profile_memory_latest_allocation_lookup_t {
+  // Memory context owning candidate allocation rows.
+  const iree_profile_memory_context_t* context;
+  // Lifecycle kind for the allocation row.
+  iree_profile_memory_lifecycle_kind_t kind;
+  // Session-local physical device ordinal.
+  uint32_t physical_device_ordinal;
+  // Producer-defined allocation identifier.
+  uint64_t allocation_id;
+} iree_profile_memory_latest_allocation_lookup_t;
+
+static uint64_t iree_profile_memory_device_hash(
+    uint32_t physical_device_ordinal) {
+  return iree_profile_index_mix_u64(physical_device_ordinal);
+}
+
+static uint64_t iree_profile_memory_pool_hash(
+    iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
+    uint64_t pool_id, uint64_t memory_type) {
+  uint64_t hash = iree_profile_index_mix_u64(kind);
+  hash = iree_profile_index_combine_u64(hash, physical_device_ordinal);
+  hash = iree_profile_index_combine_u64(hash, pool_id);
+  return iree_profile_index_combine_u64(hash, memory_type);
+}
+
+static uint64_t iree_profile_memory_allocation_hash(
+    iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
+    uint64_t allocation_id, uint64_t pool_id) {
+  uint64_t hash = iree_profile_index_mix_u64(kind);
+  hash = iree_profile_index_combine_u64(hash, physical_device_ordinal);
+  hash = iree_profile_index_combine_u64(hash, allocation_id);
+  return iree_profile_index_combine_u64(hash, pool_id);
+}
+
+static uint64_t iree_profile_memory_latest_allocation_hash(
+    iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
+    uint64_t allocation_id) {
+  uint64_t hash = iree_profile_index_mix_u64(kind);
+  hash = iree_profile_index_combine_u64(hash, physical_device_ordinal);
+  return iree_profile_index_combine_u64(hash, allocation_id);
+}
+
+static bool iree_profile_memory_device_matches(const void* user_data,
+                                               iree_host_size_t value) {
+  const iree_profile_memory_device_lookup_t* lookup =
+      (const iree_profile_memory_device_lookup_t*)user_data;
+  return lookup->context->devices[value].physical_device_ordinal ==
+         lookup->physical_device_ordinal;
+}
+
+static bool iree_profile_memory_pool_matches(const void* user_data,
+                                             iree_host_size_t value) {
+  const iree_profile_memory_pool_lookup_t* lookup =
+      (const iree_profile_memory_pool_lookup_t*)user_data;
+  const iree_profile_memory_pool_t* pool = &lookup->context->pools[value];
+  return pool->kind == lookup->kind &&
+         pool->physical_device_ordinal == lookup->physical_device_ordinal &&
+         pool->pool_id == lookup->pool_id &&
+         pool->memory_type == lookup->memory_type;
+}
+
+static bool iree_profile_memory_allocation_matches(const void* user_data,
+                                                   iree_host_size_t value) {
+  const iree_profile_memory_allocation_lookup_t* lookup =
+      (const iree_profile_memory_allocation_lookup_t*)user_data;
+  const iree_profile_memory_allocation_t* allocation =
+      &lookup->context->allocations[value];
+  return allocation->kind == lookup->kind &&
+         allocation->physical_device_ordinal ==
+             lookup->physical_device_ordinal &&
+         allocation->allocation_id == lookup->allocation_id &&
+         allocation->pool_id == lookup->pool_id;
+}
+
+static bool iree_profile_memory_latest_allocation_matches(
+    const void* user_data, iree_host_size_t value) {
+  const iree_profile_memory_latest_allocation_lookup_t* lookup =
+      (const iree_profile_memory_latest_allocation_lookup_t*)user_data;
+  const iree_profile_memory_allocation_t* allocation =
+      &lookup->context->allocations[value];
+  return allocation->kind == lookup->kind &&
+         allocation->physical_device_ordinal ==
+             lookup->physical_device_ordinal &&
+         allocation->allocation_id == lookup->allocation_id;
 }
 
 static iree_status_t iree_profile_memory_get_device(
@@ -179,12 +306,18 @@ static iree_status_t iree_profile_memory_get_device(
     iree_profile_memory_device_t** out_device) {
   *out_device = NULL;
 
-  for (iree_host_size_t i = 0; i < context->device_count; ++i) {
-    if (context->devices[i].physical_device_ordinal ==
-        physical_device_ordinal) {
-      *out_device = &context->devices[i];
-      return iree_ok_status();
-    }
+  const iree_profile_memory_device_lookup_t lookup = {
+      .context = context,
+      .physical_device_ordinal = physical_device_ordinal,
+  };
+  const uint64_t hash =
+      iree_profile_memory_device_hash(physical_device_ordinal);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->device_index, hash,
+                              iree_profile_memory_device_matches, &lookup,
+                              &existing_index)) {
+    *out_device = &context->devices[existing_index];
+    return iree_ok_status();
   }
 
   if (context->device_count + 1 > context->device_capacity) {
@@ -195,10 +328,13 @@ static iree_status_t iree_profile_memory_get_device(
         (void**)&context->devices));
   }
 
-  iree_profile_memory_device_t* device =
-      &context->devices[context->device_count++];
+  const iree_host_size_t device_index = context->device_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &context->device_index, context->host_allocator, hash, device_index));
+  iree_profile_memory_device_t* device = &context->devices[device_index];
   memset(device, 0, sizeof(*device));
   device->physical_device_ordinal = physical_device_ordinal;
+  ++context->device_count;
   *out_device = device;
   return iree_ok_status();
 }
@@ -210,14 +346,21 @@ static iree_status_t iree_profile_memory_get_pool(
     iree_profile_memory_pool_t** out_pool) {
   *out_pool = NULL;
 
-  for (iree_host_size_t i = context->pool_count; i > 0; --i) {
-    iree_profile_memory_pool_t* pool = &context->pools[i - 1];
-    if (pool->kind == kind &&
-        pool->physical_device_ordinal == physical_device_ordinal &&
-        pool->pool_id == pool_id && pool->memory_type == memory_type) {
-      *out_pool = pool;
-      return iree_ok_status();
-    }
+  const iree_profile_memory_pool_lookup_t lookup = {
+      .context = context,
+      .kind = kind,
+      .physical_device_ordinal = physical_device_ordinal,
+      .pool_id = pool_id,
+      .memory_type = memory_type,
+  };
+  const uint64_t hash = iree_profile_memory_pool_hash(
+      kind, physical_device_ordinal, pool_id, memory_type);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->pool_index, hash,
+                              iree_profile_memory_pool_matches, &lookup,
+                              &existing_index)) {
+    *out_pool = &context->pools[existing_index];
+    return iree_ok_status();
   }
 
   if (context->pool_count + 1 > context->pool_capacity) {
@@ -228,12 +371,16 @@ static iree_status_t iree_profile_memory_get_pool(
         (void**)&context->pools));
   }
 
-  iree_profile_memory_pool_t* pool = &context->pools[context->pool_count++];
+  const iree_host_size_t pool_index = context->pool_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(
+      &context->pool_index, context->host_allocator, hash, pool_index));
+  iree_profile_memory_pool_t* pool = &context->pools[pool_index];
   memset(pool, 0, sizeof(*pool));
   pool->kind = kind;
   pool->physical_device_ordinal = physical_device_ordinal;
   pool->pool_id = pool_id;
   pool->memory_type = memory_type;
+  ++context->pool_count;
   *out_pool = pool;
   return iree_ok_status();
 }
@@ -245,15 +392,21 @@ static iree_status_t iree_profile_memory_get_allocation(
     iree_profile_memory_allocation_t** out_allocation) {
   *out_allocation = NULL;
 
-  for (iree_host_size_t i = context->allocation_count; i > 0; --i) {
-    iree_profile_memory_allocation_t* allocation = &context->allocations[i - 1];
-    if (allocation->kind == kind &&
-        allocation->physical_device_ordinal == physical_device_ordinal &&
-        allocation->allocation_id == allocation_id &&
-        allocation->pool_id == pool_id) {
-      *out_allocation = allocation;
-      return iree_ok_status();
-    }
+  const iree_profile_memory_allocation_lookup_t lookup = {
+      .context = context,
+      .kind = kind,
+      .physical_device_ordinal = physical_device_ordinal,
+      .allocation_id = allocation_id,
+      .pool_id = pool_id,
+  };
+  const uint64_t hash = iree_profile_memory_allocation_hash(
+      kind, physical_device_ordinal, allocation_id, pool_id);
+  iree_host_size_t existing_index = 0;
+  if (iree_profile_index_find(&context->allocation_index, hash,
+                              iree_profile_memory_allocation_matches, &lookup,
+                              &existing_index)) {
+    *out_allocation = &context->allocations[existing_index];
+    return iree_ok_status();
   }
 
   if (context->allocation_count + 1 > context->allocation_capacity) {
@@ -264,8 +417,31 @@ static iree_status_t iree_profile_memory_get_allocation(
         (void**)&context->allocations));
   }
 
+  const iree_host_size_t allocation_index = context->allocation_count;
+  IREE_RETURN_IF_ERROR(iree_profile_index_reserve(
+      &context->allocation_index, context->host_allocator,
+      context->allocation_index.count + 1));
+  IREE_RETURN_IF_ERROR(iree_profile_index_reserve(
+      &context->latest_allocation_index, context->host_allocator,
+      context->latest_allocation_index.count + 1));
+  IREE_RETURN_IF_ERROR(iree_profile_index_insert(&context->allocation_index,
+                                                 context->host_allocator, hash,
+                                                 allocation_index));
+  const iree_profile_memory_latest_allocation_lookup_t latest_lookup = {
+      .context = context,
+      .kind = kind,
+      .physical_device_ordinal = physical_device_ordinal,
+      .allocation_id = allocation_id,
+  };
+  const uint64_t latest_hash = iree_profile_memory_latest_allocation_hash(
+      kind, physical_device_ordinal, allocation_id);
+  IREE_RETURN_IF_ERROR(iree_profile_index_replace(
+      &context->latest_allocation_index, context->host_allocator, latest_hash,
+      iree_profile_memory_latest_allocation_matches, &latest_lookup,
+      allocation_index));
+
   iree_profile_memory_allocation_t* allocation =
-      &context->allocations[context->allocation_count++];
+      &context->allocations[allocation_index];
   memset(allocation, 0, sizeof(*allocation));
   allocation->kind = kind;
   allocation->physical_device_ordinal = physical_device_ordinal;
@@ -273,6 +449,7 @@ static iree_status_t iree_profile_memory_get_allocation(
   allocation->pool_id = pool_id;
   allocation->first_queue_ordinal = UINT32_MAX;
   allocation->last_queue_ordinal = UINT32_MAX;
+  ++context->allocation_count;
   *out_allocation = allocation;
   return iree_ok_status();
 }
@@ -282,15 +459,20 @@ iree_profile_memory_find_allocation(
     const iree_profile_memory_context_t* context,
     iree_profile_memory_lifecycle_kind_t kind, uint32_t physical_device_ordinal,
     uint64_t allocation_id, uint64_t pool_id) {
-  for (iree_host_size_t i = context->allocation_count; i > 0; --i) {
-    const iree_profile_memory_allocation_t* allocation =
-        &context->allocations[i - 1];
-    if (allocation->kind == kind &&
-        allocation->physical_device_ordinal == physical_device_ordinal &&
-        allocation->allocation_id == allocation_id &&
-        allocation->pool_id == pool_id) {
-      return allocation;
-    }
+  const iree_profile_memory_allocation_lookup_t lookup = {
+      .context = context,
+      .kind = kind,
+      .physical_device_ordinal = physical_device_ordinal,
+      .allocation_id = allocation_id,
+      .pool_id = pool_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &context->allocation_index,
+          iree_profile_memory_allocation_hash(kind, physical_device_ordinal,
+                                              allocation_id, pool_id),
+          iree_profile_memory_allocation_matches, &lookup, &index)) {
+    return &context->allocations[index];
   }
   return NULL;
 }
@@ -304,14 +486,19 @@ static uint64_t iree_profile_memory_resolve_pool_id(
     return event->pool_id;
   }
 
-  for (iree_host_size_t i = context->allocation_count; i > 0; --i) {
-    const iree_profile_memory_allocation_t* allocation =
-        &context->allocations[i - 1];
-    if (allocation->kind == kind &&
-        allocation->physical_device_ordinal == event->physical_device_ordinal &&
-        allocation->allocation_id == event->allocation_id) {
-      return allocation->pool_id;
-    }
+  const iree_profile_memory_latest_allocation_lookup_t lookup = {
+      .context = context,
+      .kind = kind,
+      .physical_device_ordinal = event->physical_device_ordinal,
+      .allocation_id = event->allocation_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(
+          &context->latest_allocation_index,
+          iree_profile_memory_latest_allocation_hash(
+              kind, event->physical_device_ordinal, event->allocation_id),
+          iree_profile_memory_latest_allocation_matches, &lookup, &index)) {
+    return context->allocations[index].pool_id;
   }
   return event->pool_id;
 }

@@ -251,27 +251,42 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_profile_host_execution_event_t host_event =
-        iree_hal_profile_host_execution_event_default();
-    host_event.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE;
-    host_event.status_code = IREE_STATUS_OK;
-    host_event.event_id = 102;
-    host_event.submission_id = kSmokeSubmissionId;
-    host_event.command_buffer_id = kSmokeCommandBufferId;
-    host_event.executable_id = kSmokeExecutableId;
-    host_event.stream_id = kSmokeStreamId;
-    host_event.physical_device_ordinal = kSmokePhysicalDevice;
-    host_event.queue_ordinal = kSmokeQueueOrdinal;
-    host_event.command_index = kSmokeCommandIndex;
-    host_event.export_ordinal = kSmokeExportOrdinal;
-    host_event.start_host_time_ns = 3100;
-    host_event.end_host_time_ns = 3150;
-    host_event.payload_length = 4096;
-    host_event.operation_count = 1;
+    iree_hal_profile_host_execution_event_t host_events[2];
+    host_events[0] = iree_hal_profile_host_execution_event_default();
+    host_events[0].type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE;
+    host_events[0].status_code = IREE_STATUS_OK;
+    host_events[0].event_id = 102;
+    host_events[0].submission_id = kSmokeSubmissionId;
+    host_events[0].command_buffer_id = kSmokeCommandBufferId;
+    host_events[0].executable_id = kSmokeExecutableId;
+    host_events[0].stream_id = kSmokeStreamId;
+    host_events[0].physical_device_ordinal = kSmokePhysicalDevice;
+    host_events[0].queue_ordinal = kSmokeQueueOrdinal;
+    host_events[0].command_index = kSmokeCommandIndex;
+    host_events[0].export_ordinal = kSmokeExportOrdinal;
+    host_events[0].start_host_time_ns = 3100;
+    host_events[0].end_host_time_ns = 3150;
+    host_events[0].payload_length = 4096;
+    host_events[0].operation_count = 1;
+    host_events[1] = host_events[0];
+    host_events[1].type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+    host_events[1].flags =
+        IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER;
+    host_events[1].event_id = 103;
+    host_events[1].start_host_time_ns = 3110;
+    host_events[1].end_host_time_ns = 3140;
+    host_events[1].workgroup_count[0] = 4;
+    host_events[1].workgroup_count[1] = 5;
+    host_events[1].workgroup_count[2] = 6;
+    host_events[1].workgroup_size[0] = 7;
+    host_events[1].workgroup_size[1] = 8;
+    host_events[1].workgroup_size[2] = 9;
+    host_events[1].tile_count = 4;
+    host_events[1].tile_duration_sum_ns = 30;
     status = write_profile_chunk(
         sink, IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
         IREE_SV("host-execution-events"),
-        iree_make_const_byte_span(&host_event, sizeof(host_event)));
+        iree_make_const_byte_span(host_events, sizeof(host_events)));
   }
 
   if (iree_status_is_ok(status)) {

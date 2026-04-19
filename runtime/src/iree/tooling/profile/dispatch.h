@@ -109,6 +109,72 @@ typedef struct iree_profile_dispatch_queue_aggregate_t {
   uint64_t total_ticks;
 } iree_profile_dispatch_queue_aggregate_t;
 
+typedef struct iree_profile_host_dispatch_aggregate_t {
+  // Session-local physical device ordinal for this aggregate row.
+  uint32_t physical_device_ordinal;
+  // Producer-local executable identifier for this aggregate row.
+  uint64_t executable_id;
+  // Export ordinal for this aggregate row.
+  uint32_t export_ordinal;
+  // Total host execution dispatch records matched for this aggregate row.
+  uint64_t dispatch_count;
+  // Host execution dispatch records with valid start/end timestamps.
+  uint64_t valid_count;
+  // Host execution dispatch records with missing or reversed timestamps.
+  uint64_t invalid_count;
+  // Earliest valid dispatch start time in iree_host_time_ns.
+  int64_t earliest_start_host_time_ns;
+  // Latest valid dispatch end time in iree_host_time_ns.
+  int64_t latest_end_host_time_ns;
+  // Minimum valid dispatch duration in nanoseconds.
+  int64_t minimum_ns;
+  // Maximum valid dispatch duration in nanoseconds.
+  int64_t maximum_ns;
+  // Sum of valid dispatch durations in nanoseconds.
+  int64_t total_ns;
+  // Sum of tile counts reported by valid dispatch spans.
+  uint64_t total_tile_count;
+  // Sum of valid per-tile duration totals in nanoseconds.
+  int64_t total_tile_duration_sum_ns;
+  // Running mean of valid dispatch durations in nanoseconds.
+  double mean_ns;
+  // Running sum of squares of differences from |mean_ns|.
+  double m2_ns;
+  // Last observed workgroup count for this dispatch key.
+  uint32_t last_workgroup_count[3];
+  // Last observed workgroup size for this dispatch key.
+  uint32_t last_workgroup_size[3];
+} iree_profile_host_dispatch_aggregate_t;
+
+typedef struct iree_profile_host_dispatch_command_aggregate_t {
+  // Producer-local command-buffer identifier for this aggregate row.
+  uint64_t command_buffer_id;
+  // Queue submission epoch containing this command-buffer execution.
+  uint64_t submission_id;
+  // Session-local physical device ordinal for this aggregate row.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal for this aggregate row.
+  uint32_t queue_ordinal;
+  // Producer-defined stream identifier for this aggregate row.
+  uint64_t stream_id;
+  // Total host execution dispatch records matched for this aggregate row.
+  uint64_t dispatch_count;
+  // Host execution dispatch records with valid start/end timestamps.
+  uint64_t valid_count;
+  // Host execution dispatch records with missing or reversed timestamps.
+  uint64_t invalid_count;
+  // Earliest valid dispatch start time in iree_host_time_ns.
+  int64_t earliest_start_host_time_ns;
+  // Latest valid dispatch end time in iree_host_time_ns.
+  int64_t latest_end_host_time_ns;
+  // Sum of valid dispatch durations in nanoseconds.
+  int64_t total_ns;
+  // Sum of tile counts reported by valid dispatch spans.
+  uint64_t total_tile_count;
+  // Sum of valid per-tile duration totals in nanoseconds.
+  int64_t total_tile_duration_sum_ns;
+} iree_profile_host_dispatch_command_aggregate_t;
+
 typedef struct iree_profile_dispatch_top_event_t {
   // Session-local physical device ordinal for this dispatch event.
   uint32_t physical_device_ordinal;
@@ -135,13 +201,25 @@ typedef struct iree_profile_dispatch_event_row_t {
   bool has_clock_fit;
 } iree_profile_dispatch_event_row_t;
 
+typedef struct iree_profile_host_dispatch_event_row_t {
+  // Host dispatch event record valid only for the callback duration.
+  const iree_hal_profile_host_execution_event_t* event;
+  // Resolved executable/export key valid only for the callback duration.
+  iree_string_view_t key;
+} iree_profile_host_dispatch_event_row_t;
+
 typedef iree_status_t (*iree_profile_dispatch_event_callback_fn_t)(
     void* user_data, const iree_profile_dispatch_event_row_t* row);
+
+typedef iree_status_t (*iree_profile_host_dispatch_event_callback_fn_t)(
+    void* user_data, const iree_profile_host_dispatch_event_row_t* row);
 
 typedef struct iree_profile_dispatch_event_callback_t {
   // Optional callback invoked for each matched dispatch event row.
   iree_profile_dispatch_event_callback_fn_t fn;
-  // Opaque user data passed to |fn|.
+  // Optional callback invoked for each matched host dispatch span row.
+  iree_profile_host_dispatch_event_callback_fn_t host_fn;
+  // Opaque user data passed to callback functions.
   void* user_data;
 } iree_profile_dispatch_event_callback_t;
 
@@ -158,18 +236,41 @@ typedef struct iree_profile_dispatch_context_t {
   iree_host_size_t aggregate_count;
   // Capacity of |aggregates| in entries.
   iree_host_size_t aggregate_capacity;
+  // Lookup index from executable export key to |aggregates| entry index.
+  iree_profile_index_t aggregate_index;
   // Dynamic array of command-buffer execution aggregate rows.
   iree_profile_dispatch_command_aggregate_t* command_aggregates;
   // Number of valid entries in |command_aggregates|.
   iree_host_size_t command_aggregate_count;
   // Capacity of |command_aggregates| in entries.
   iree_host_size_t command_aggregate_capacity;
+  // Lookup index from command execution key to |command_aggregates| entry
+  // index.
+  iree_profile_index_t command_aggregate_index;
   // Dynamic array of queue submission aggregate rows.
   iree_profile_dispatch_queue_aggregate_t* queue_aggregates;
   // Number of valid entries in |queue_aggregates|.
   iree_host_size_t queue_aggregate_count;
   // Capacity of |queue_aggregates| in entries.
   iree_host_size_t queue_aggregate_capacity;
+  // Lookup index from queue submission key to |queue_aggregates| entry index.
+  iree_profile_index_t queue_aggregate_index;
+  // Dynamic array of aggregate host dispatch rows.
+  iree_profile_host_dispatch_aggregate_t* host_dispatch_aggregates;
+  // Number of valid entries in |host_dispatch_aggregates|.
+  iree_host_size_t host_dispatch_aggregate_count;
+  // Capacity of |host_dispatch_aggregates| in entries.
+  iree_host_size_t host_dispatch_aggregate_capacity;
+  // Lookup index from executable export key to |host_dispatch_aggregates|.
+  iree_profile_index_t host_dispatch_aggregate_index;
+  // Dynamic array of command-buffer host dispatch aggregate rows.
+  iree_profile_host_dispatch_command_aggregate_t* host_command_aggregates;
+  // Number of valid entries in |host_command_aggregates|.
+  iree_host_size_t host_command_aggregate_count;
+  // Capacity of |host_command_aggregates| in entries.
+  iree_host_size_t host_command_aggregate_capacity;
+  // Lookup index from command execution key to |host_command_aggregates|.
+  iree_profile_index_t host_command_aggregate_index;
   // Largest valid dispatch events observed while applying the active filter.
   iree_profile_dispatch_top_event_t
       top_dispatches[IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT];
@@ -183,6 +284,15 @@ typedef struct iree_profile_dispatch_context_t {
   uint64_t valid_dispatch_count;
   // Matched dispatch records with missing or reversed timestamps.
   uint64_t invalid_dispatch_count;
+  // Total host execution dispatch records parsed before filtering.
+  uint64_t total_host_dispatch_count;
+  // Host execution dispatch records matched by the active filter.
+  uint64_t matched_host_dispatch_count;
+  // Matched host execution dispatch records with valid timestamps.
+  uint64_t valid_host_dispatch_count;
+  // Matched host execution dispatch records with missing or reversed
+  // timestamps.
+  uint64_t invalid_host_dispatch_count;
 } iree_profile_dispatch_context_t;
 
 // Initializes |out_context| for dispatch, queue, and executable aggregation.
@@ -194,11 +304,12 @@ void iree_profile_dispatch_context_initialize(
 void iree_profile_dispatch_context_deinitialize(
     iree_profile_dispatch_context_t* context);
 
-// Processes dispatch/queue event records from one profile file record.
+// Processes dispatch, host execution, and queue event records from one profile
+// file record.
 //
 // When |aggregate_events| is true, matched dispatches update aggregate arrays
-// owned by |context|. When |event_callback.fn| is non-NULL, each matched
-// dispatch event is delivered to the callback before returning from this call.
+// owned by |context|. When a callback field is non-NULL, each matched event in
+// that timing domain is delivered before returning from this call.
 iree_status_t iree_profile_dispatch_process_events_record(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,

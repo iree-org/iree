@@ -193,18 +193,27 @@ typedef struct iree_profile_memory_context_t {
   iree_host_size_t device_count;
   // Capacity of |devices| in entries.
   iree_host_size_t device_capacity;
+  // Lookup index from physical-device ordinal to |devices| entry index.
+  iree_profile_index_t device_index;
   // Dynamic array of per-pool/provider memory summaries.
   iree_profile_memory_pool_t* pools;
   // Number of valid entries in |pools|.
   iree_host_size_t pool_count;
   // Capacity of |pools| in entries.
   iree_host_size_t pool_capacity;
+  // Lookup index from pool/provider identity to |pools| entry index.
+  iree_profile_index_t pool_index;
   // Dynamic array of per-allocation memory lifecycles.
   iree_profile_memory_allocation_t* allocations;
   // Number of valid entries in |allocations|.
   iree_host_size_t allocation_count;
   // Capacity of |allocations| in entries.
   iree_host_size_t allocation_capacity;
+  // Lookup index from complete allocation identity to |allocations| entry
+  // index.
+  iree_profile_index_t allocation_index;
+  // Lookup index from allocation id to the latest matching allocation row.
+  iree_profile_index_t latest_allocation_index;
   // Total memory events parsed before filtering.
   uint64_t total_event_count;
   // Memory events matched by --id and --filter.

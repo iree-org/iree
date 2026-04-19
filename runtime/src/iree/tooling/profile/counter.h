@@ -20,6 +20,12 @@ typedef struct iree_profile_counter_set_t {
   iree_hal_profile_counter_set_record_t record;
   // Borrowed counter set name from the mapped profile bundle.
   iree_string_view_t name;
+  // First counter row belonging to this set, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t first_counter_index;
+  // Last counter row belonging to this set, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t last_counter_index;
+  // Number of counter metadata rows observed for this set.
+  iree_host_size_t counter_count;
 } iree_profile_counter_set_t;
 
 typedef struct iree_profile_counter_t {
@@ -31,6 +37,8 @@ typedef struct iree_profile_counter_t {
   iree_string_view_t name;
   // Borrowed counter description from the mapped profile bundle.
   iree_string_view_t description;
+  // Next counter row in the owning counter set, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t next_counter_index;
 } iree_profile_counter_t;
 
 typedef struct iree_profile_counter_aggregate_t {
@@ -79,18 +87,24 @@ typedef struct iree_profile_counter_context_t {
   iree_host_size_t counter_set_count;
   // Capacity of |counter_sets| in entries.
   iree_host_size_t counter_set_capacity;
+  // Lookup index from counter-set id to |counter_sets| entry index.
+  iree_profile_index_t counter_set_index;
   // Dynamic array of counter metadata entries.
   iree_profile_counter_t* counters;
   // Number of valid entries in |counters|.
   iree_host_size_t counter_count;
   // Capacity of |counters| in entries.
   iree_host_size_t counter_capacity;
+  // Lookup index from counter identity to |counters| entry index.
+  iree_profile_index_t counter_index;
   // Dynamic array of aggregate counter rows.
   iree_profile_counter_aggregate_t* aggregates;
   // Number of valid entries in |aggregates|.
   iree_host_size_t aggregate_count;
   // Capacity of |aggregates| in entries.
   iree_host_size_t aggregate_capacity;
+  // Lookup index from aggregate identity to |aggregates| entry index.
+  iree_profile_index_t aggregate_index;
   // Total counter sample records parsed before filtering.
   uint64_t total_sample_count;
   // Counter sample records matched by --id and --filter.

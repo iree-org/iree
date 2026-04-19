@@ -6,6 +6,9 @@
 
 #include "iree/hal/local/transient_buffer.h"
 
+static iree_atomic_int64_t iree_hal_local_transient_buffer_next_profile_id =
+    IREE_ATOMIC_VAR_INIT(1);
+
 // Vtable dispatch for forwarding to the committed buffer's implementation.
 // Equivalent to IREE_HAL_VTABLE_DISPATCH from detail.h but accessible from
 // this HAL-local utility (detail.h is module-private to the HAL core).
@@ -16,8 +19,14 @@ iree_hal_local_transient_buffer_committed_vtable(iree_hal_buffer_t* buffer) {
 }
 
 struct iree_hal_local_transient_buffer_t {
+  // Base HAL buffer resource exposed to callers.
   iree_hal_buffer_t base;
+
+  // Host allocator used for wrapper storage and teardown.
   iree_allocator_t host_allocator;
+
+  // Stable nonzero id used to join profile rows for this wrapper lifetime.
+  uint64_t profile_id;
 
   // Materialized backing buffer staged for a future commit. Retained by the
   // wrapper while non-NULL.
@@ -30,14 +39,13 @@ struct iree_hal_local_transient_buffer_t {
   // keep concurrent host access to the wrapper's state data-race-free.
   iree_atomic_intptr_t committed;
 
-  // Optional queue-allocation reservation owned by this wrapper.
-  //
-  // |reservation_pool| is borrowed; pool owners must outlive every transient
-  // buffer sourced from them. |reservation_armed| tracks whether the wrapper
-  // still owns |reservation| so submit-time dealloca and destroy can race
-  // without double-releasing.
+  // Borrowed pool that owns |reservation| when armed.
   iree_hal_pool_t* reservation_pool;
+
+  // Optional queue-allocation reservation owned by this wrapper while armed.
   iree_hal_pool_reservation_t reservation;
+
+  // Nonzero while the wrapper still owns |reservation|.
   iree_atomic_int32_t reservation_armed;
 };
 
@@ -78,6 +86,9 @@ iree_status_t iree_hal_local_transient_buffer_create(
       /*byte_offset=*/0, byte_length, params.type, params.access, params.usage,
       &iree_hal_local_transient_buffer_vtable, &buffer->base);
   buffer->host_allocator = host_allocator;
+  buffer->profile_id = (uint64_t)iree_atomic_fetch_add(
+      &iree_hal_local_transient_buffer_next_profile_id, 1,
+      iree_memory_order_relaxed);
   buffer->staged_backing = NULL;
   iree_atomic_store(&buffer->committed, 0, iree_memory_order_relaxed);
   buffer->reservation_pool = NULL;
@@ -92,6 +103,13 @@ iree_status_t iree_hal_local_transient_buffer_create(
 bool iree_hal_local_transient_buffer_isa(const iree_hal_buffer_t* buffer) {
   return iree_hal_resource_is(&buffer->resource,
                               &iree_hal_local_transient_buffer_vtable);
+}
+
+uint64_t iree_hal_local_transient_buffer_profile_id(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_local_transient_buffer_t* buffer =
+      iree_hal_local_transient_buffer_cast(base_buffer);
+  return buffer->profile_id;
 }
 
 void iree_hal_local_transient_buffer_attach_reservation(
@@ -139,6 +157,21 @@ void iree_hal_local_transient_buffer_decommit(iree_hal_buffer_t* base_buffer) {
     iree_hal_buffer_release(buffer->staged_backing);
     buffer->staged_backing = NULL;
   }
+}
+
+bool iree_hal_local_transient_buffer_query_reservation(
+    iree_hal_buffer_t* base_buffer, iree_hal_pool_t** out_pool,
+    iree_hal_pool_reservation_t* out_reservation) {
+  iree_hal_local_transient_buffer_t* buffer =
+      iree_hal_local_transient_buffer_cast(base_buffer);
+  if (!buffer->reservation_pool) return false;
+  if (iree_atomic_load(&buffer->reservation_armed, iree_memory_order_acquire) ==
+      0) {
+    return false;
+  }
+  if (out_pool) *out_pool = buffer->reservation_pool;
+  if (out_reservation) *out_reservation = buffer->reservation;
+  return true;
 }
 
 void iree_hal_local_transient_buffer_release_reservation(

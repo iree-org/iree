@@ -112,6 +112,8 @@ class IreeProfileCliTest(unittest.TestCase):
             summary_rows = self._profile_jsonl(profile_path, "summary")
             queue_rows = self._profile_jsonl(profile_path, "queue")
             command_rows = self._profile_jsonl(profile_path, "command")
+            executable_rows = self._profile_jsonl(profile_path, "executable")
+            dispatch_rows = self._profile_jsonl(profile_path, "dispatch")
 
         self.assertIn("summary", _row_type_set(summary_rows))
         self.assertIn("device_summary", _row_type_set(summary_rows))
@@ -120,6 +122,11 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertIn("host_execution_event", _row_type_set(queue_rows))
         self.assertIn("command_operation", _row_type_set(command_rows))
         self.assertIn("command_execution", _row_type_set(command_rows))
+        self.assertIn("command_host_execution", _row_type_set(command_rows))
+        self.assertIn(
+            "executable_export_host_dispatch_group", _row_type_set(executable_rows)
+        )
+        self.assertIn("host_dispatch_group", _row_type_set(dispatch_rows))
 
     def test_queue_projection_separates_host_and_device_time(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -165,6 +172,19 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertEqual(dispatch_event["device_tick_domain"], "device_tick")
         self.assertEqual(
             dispatch_event["duration_time_domain"], "device_tick_duration_ns"
+        )
+
+        host_dispatch_event = _find_row(dispatch_rows, "host_dispatch_event")
+        self.assertEqual(
+            operation["command_buffer_id"], host_dispatch_event["command_buffer_id"]
+        )
+        self.assertEqual(
+            operation["command_index"], host_dispatch_event["command_index"]
+        )
+        self.assertEqual(host_dispatch_event["timing_source"], "host_execution_event")
+        self.assertEqual(host_dispatch_event["time_domain"], "iree_host_time_ns")
+        self.assertEqual(
+            host_dispatch_event["duration_time_domain"], "iree_host_duration_ns"
         )
 
     def test_export_ireeperf_jsonl_decodes_record_families(self):

@@ -21,6 +21,7 @@
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/inline_dispatch.h"
+#include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/profile.h"
 #include "iree/hal/local/transient_buffer.h"
@@ -494,14 +495,14 @@ typedef struct iree_hal_sync_device_profile_operation_t {
   // Queue scope shared by all records for this operation.
   iree_hal_local_profile_queue_scope_t scope;
 
-  // Queue event id linked to the host execution span, or 0 when absent.
-  uint64_t queue_event_id;
-
   // Queue submission id assigned to records for this operation, or 0.
   uint64_t submission_id;
 
   // Command-buffer id assigned to records for this operation, or 0.
   uint64_t command_buffer_id;
+
+  // Executable id assigned to records for this operation, or 0.
+  uint64_t executable_id;
 
   // Allocation id assigned to records for this operation, or 0.
   uint64_t allocation_id;
@@ -565,8 +566,13 @@ static void iree_hal_sync_device_profile_operation_initialize(
 
 static void iree_hal_sync_device_profile_operation_set_dispatch(
     iree_hal_sync_device_profile_operation_t* operation,
+    iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  operation->executable_id =
+      iree_hal_local_executable_profile_id(local_executable);
   operation->export_ordinal = export_ordinal;
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     operation->host_flags |=
@@ -583,16 +589,94 @@ static void iree_hal_sync_device_profile_operation_set_dispatch(
       config.workgroup_size[2] ? config.workgroup_size[2] : 1;
 }
 
-static iree_status_t iree_hal_sync_device_profile_operation_record_begin(
+static void iree_hal_sync_device_profile_operation_set_transient_buffer(
+    iree_hal_sync_device_profile_operation_t* operation,
+    iree_hal_buffer_t* transient_buffer) {
+  operation->allocation_id =
+      iree_hal_local_transient_buffer_profile_id(transient_buffer);
+  operation->payload_length = iree_hal_buffer_byte_length(transient_buffer);
+}
+
+static void iree_hal_sync_device_profile_populate_memory_event_pool_stats(
+    iree_hal_pool_t* pool, iree_hal_profile_memory_event_t* event) {
+  if (!pool) return;
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(pool, &stats);
+  event->flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_STATS;
+  event->pool_bytes_reserved = stats.bytes_reserved;
+  event->pool_bytes_free = stats.bytes_free;
+  event->pool_bytes_committed = stats.bytes_committed;
+  event->pool_budget_limit = stats.budget_limit;
+  event->pool_reservation_count = stats.reservation_count;
+  event->pool_slab_count = stats.slab_count;
+}
+
+static void iree_hal_sync_device_profile_record_memory_event(
+    iree_hal_sync_device_t* device,
+    const iree_hal_sync_device_profile_operation_t* operation,
+    iree_hal_profile_memory_event_type_t type,
+    iree_hal_profile_memory_event_flags_t flags, uint32_t result,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
+    const iree_hal_pool_reservation_t* reservation,
+    uint64_t frontier_entry_count) {
+  iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
+  if (IREE_UNLIKELY(!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS))) {
+    return;
+  }
+
+  iree_hal_profile_memory_event_t event =
+      iree_hal_profile_memory_event_default();
+  event.type = type;
+  event.flags = flags;
+  event.result = result;
+  event.allocation_id = operation->allocation_id;
+  event.pool_id = (uint64_t)(uintptr_t)pool;
+  event.submission_id = operation->submission_id;
+  event.physical_device_ordinal = operation->scope.physical_device_ordinal;
+  event.queue_ordinal = operation->scope.queue_ordinal;
+  event.frontier_entry_count =
+      (uint32_t)iree_min(frontier_entry_count, (uint64_t)UINT32_MAX);
+  event.memory_type = params.type;
+  event.buffer_usage = params.usage;
+  event.length = operation->payload_length;
+  event.alignment = params.min_alignment ? params.min_alignment : 1;
+  if (reservation) {
+    event.flags |= IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_POOL_RESERVATION;
+    event.backing_id = reservation->block_handle;
+    event.offset = reservation->offset;
+    if (type != IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA &&
+        type != IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA) {
+      event.length = reservation->length;
+    }
+  }
+  iree_hal_sync_device_profile_populate_memory_event_pool_stats(pool, &event);
+  iree_hal_local_profile_recorder_append_memory_event(recorder, &event,
+                                                      /*out_event_id=*/NULL);
+}
+
+static void iree_hal_sync_device_profile_set_command_buffer(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_sync_device_profile_operation_t* operation) {
+  operation->command_buffer_id =
+      command_buffer ? iree_hal_command_buffer_profile_id(command_buffer) : 0;
+}
+
+static void iree_hal_sync_device_profile_operation_record_begin(
     iree_hal_sync_device_t* device,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_sync_device_profile_operation_t* operation) {
   iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
-  if (IREE_UNLIKELY(!recorder)) return iree_ok_status();
+  if (IREE_UNLIKELY(!recorder)) return;
 
-  const iree_time_t host_time_ns = iree_time_now();
   operation->scope = iree_hal_sync_device_profile_queue_scope(device);
+  operation->submission_id = (uint64_t)iree_atomic_fetch_add(
+      &device->next_profile_submission_id, 1, iree_memory_order_relaxed);
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    return;
+  }
 
   iree_hal_local_profile_queue_event_info_t event_info =
       iree_hal_local_profile_queue_event_info_default();
@@ -600,6 +684,7 @@ static iree_status_t iree_hal_sync_device_profile_operation_record_begin(
   event_info.dependency_strategy =
       iree_hal_sync_device_profile_dependency_strategy(wait_semaphore_list);
   event_info.scope = operation->scope;
+  const iree_time_t host_time_ns = iree_time_now();
   event_info.host_time_ns = host_time_ns;
   event_info.ready_host_time_ns = host_time_ns;
   event_info.command_buffer_id = operation->command_buffer_id;
@@ -611,20 +696,22 @@ static iree_status_t iree_hal_sync_device_profile_operation_record_begin(
   event_info.operation_count = operation->operation_count;
   event_info.payload_length = operation->payload_length;
 
-  operation->submission_id = (uint64_t)iree_atomic_fetch_add(
-      &device->next_profile_submission_id, 1, iree_memory_order_relaxed);
   event_info.submission_id = operation->submission_id;
-  return iree_hal_local_profile_recorder_append_queue_event(
-      recorder, &event_info, &operation->queue_event_id);
+  iree_hal_local_profile_recorder_append_queue_event(recorder, &event_info,
+                                                     /*out_event_id=*/NULL);
 }
 
-static iree_status_t iree_hal_sync_device_profile_operation_record_end(
+static void iree_hal_sync_device_profile_operation_record_end(
     iree_hal_sync_device_t* device,
     const iree_hal_sync_device_profile_operation_t* operation,
     iree_status_t operation_status) {
   iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
   if (IREE_UNLIKELY(!recorder || operation->submission_id == 0)) {
-    return operation_status;
+    return;
+  }
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    return;
   }
 
   iree_hal_local_profile_host_execution_event_info_t event_info =
@@ -633,9 +720,9 @@ static iree_status_t iree_hal_sync_device_profile_operation_record_end(
   event_info.flags = operation->host_flags;
   event_info.status_code = iree_status_code(operation_status);
   event_info.scope = operation->scope;
-  event_info.related_queue_event_id = operation->queue_event_id;
   event_info.submission_id = operation->submission_id;
   event_info.command_buffer_id = operation->command_buffer_id;
+  event_info.executable_id = operation->executable_id;
   event_info.allocation_id = operation->allocation_id;
   event_info.export_ordinal = operation->export_ordinal;
   memcpy(event_info.workgroup_count, operation->workgroup_count,
@@ -647,10 +734,8 @@ static iree_status_t iree_hal_sync_device_profile_operation_record_end(
   event_info.payload_length = operation->payload_length;
   event_info.operation_count = operation->operation_count;
 
-  iree_status_t profile_status =
-      iree_hal_local_profile_recorder_append_host_execution_event(
-          recorder, &event_info, /*out_event_id=*/NULL);
-  return iree_status_join(operation_status, profile_status);
+  iree_hal_local_profile_recorder_append_host_execution_event(
+      recorder, &event_info, /*out_event_id=*/NULL);
 }
 
 // Waits for all semaphore dependencies before a queue operation body.
@@ -688,11 +773,15 @@ static iree_status_t iree_hal_sync_device_profiled_queue_op_begin(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_sync_device_profile_operation_t* operation) {
-  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profile_operation_record_begin(
-      device, wait_semaphore_list, signal_semaphore_list, operation));
+  iree_hal_sync_device_profile_operation_record_begin(
+      device, wait_semaphore_list, signal_semaphore_list, operation);
   IREE_RETURN_IF_ERROR(
       iree_hal_sync_device_queue_op_begin(device, wait_semaphore_list));
-  if (IREE_UNLIKELY(operation->submission_id != 0)) {
+  if (IREE_UNLIKELY(
+          operation->submission_id != 0 &&
+          iree_hal_local_profile_recorder_is_enabled(
+              device->profile_recorder,
+              IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS))) {
     operation->start_host_time_ns = iree_time_now();
   }
   return iree_ok_status();
@@ -703,8 +792,8 @@ static iree_status_t iree_hal_sync_device_profiled_queue_op_end(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     const iree_hal_sync_device_profile_operation_t* operation,
     iree_status_t operation_status) {
-  operation_status = iree_hal_sync_device_profile_operation_record_end(
-      device, operation, operation_status);
+  iree_hal_sync_device_profile_operation_record_end(device, operation,
+                                                    operation_status);
   return iree_hal_sync_device_queue_op_end(device, signal_semaphore_list,
                                            operation_status);
 }
@@ -721,34 +810,47 @@ static iree_status_t iree_hal_sync_device_queue_alloca_profiled(
   iree_hal_sync_device_profile_operation_initialize(
       IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA, allocation_size,
       /*operation_count=*/1, &profile_operation);
-  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
-      device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
 
   iree_hal_buffer_t* backing_buffer = NULL;
   iree_hal_buffer_t* transient_buffer = NULL;
-  iree_status_t status = iree_hal_pool_allocate_buffer(
-      allocation_pool, params, allocation_size,
-      /*requester_frontier=*/NULL, iree_infinite_timeout(), &backing_buffer);
+  bool queue_op_begun = false;
+  iree_hal_buffer_placement_t placement = {
+      .device = base_device,
+      .queue_affinity = queue_affinity,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
+  };
+  iree_status_t status = iree_hal_local_transient_buffer_create(
+      placement, params, allocation_size, allocation_size,
+      device->host_allocator, &transient_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_placement_t placement = {
-        .device = base_device,
-        .queue_affinity = queue_affinity,
-        .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
-    };
-    status = iree_hal_local_transient_buffer_create(
-        placement, params, iree_hal_buffer_allocation_size(backing_buffer),
-        iree_hal_buffer_byte_length(backing_buffer), device->host_allocator,
-        &transient_buffer);
+    iree_hal_sync_device_profile_operation_set_transient_buffer(
+        &profile_operation, transient_buffer);
+    status = iree_hal_sync_device_profiled_queue_op_begin(
+        device, wait_semaphore_list, signal_semaphore_list, &profile_operation);
+    queue_op_begun = iree_status_is_ok(status);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_pool_allocate_buffer(
+        allocation_pool, params, allocation_size,
+        /*requester_frontier=*/NULL, iree_infinite_timeout(), &backing_buffer);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_local_transient_buffer_stage_backing(transient_buffer,
                                                   backing_buffer);
     iree_hal_local_transient_buffer_commit(transient_buffer);
+    iree_hal_sync_device_profile_record_memory_event(
+        device, &profile_operation,
+        IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX,
+        allocation_pool, params, /*reservation=*/NULL,
+        /*frontier_entry_count=*/0);
   }
   iree_hal_buffer_release(backing_buffer);
 
-  status = iree_hal_sync_device_profiled_queue_op_end(
-      device, signal_semaphore_list, &profile_operation, status);
+  if (queue_op_begun) {
+    status = iree_hal_sync_device_profiled_queue_op_end(
+        device, signal_semaphore_list, &profile_operation, status);
+  }
   if (iree_status_is_ok(status)) {
     *out_buffer = transient_buffer;
   } else {
@@ -826,16 +928,33 @@ static iree_status_t iree_hal_sync_device_queue_dealloca_profiled(
       IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA,
       iree_hal_buffer_byte_length(buffer), /*operation_count=*/1,
       &profile_operation);
-  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
-      device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
   const iree_hal_buffer_placement_t placement =
       iree_hal_buffer_allocation_placement(buffer);
-  if (placement.device == base_device &&
-      iree_hal_local_transient_buffer_isa(buffer)) {
+  const bool is_native_transient = placement.device == base_device &&
+                                   iree_hal_local_transient_buffer_isa(buffer);
+  if (is_native_transient) {
+    iree_hal_sync_device_profile_operation_set_transient_buffer(
+        &profile_operation, buffer);
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
+      device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
+  iree_status_t status = iree_ok_status();
+  if (is_native_transient) {
+    iree_hal_buffer_params_t params = {
+        .type = iree_hal_buffer_memory_type(buffer),
+        .access = iree_hal_buffer_allowed_access(buffer),
+        .usage = iree_hal_buffer_allowed_usage(buffer),
+    };
     iree_hal_local_transient_buffer_decommit(buffer);
+    iree_hal_sync_device_profile_record_memory_event(
+        device, &profile_operation,
+        IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA,
+        IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION, UINT32_MAX,
+        /*pool=*/NULL, params, /*reservation=*/NULL,
+        /*frontier_entry_count=*/0);
   }
   return iree_hal_sync_device_profiled_queue_op_end(
-      device, signal_semaphore_list, &profile_operation, iree_ok_status());
+      device, signal_semaphore_list, &profile_operation, status);
 }
 
 static iree_status_t iree_hal_sync_device_queue_dealloca(
@@ -1140,7 +1259,7 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
       IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH, /*payload_length=*/0,
       /*operation_count=*/1, &profile_operation);
   iree_hal_sync_device_profile_operation_set_dispatch(
-      &profile_operation, export_ordinal, config, flags);
+      &profile_operation, executable, export_ordinal, config, flags);
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
       device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
   iree_status_t status = iree_hal_local_executable_dispatch_inline(
@@ -1185,13 +1304,17 @@ static iree_status_t iree_hal_sync_device_queue_host_call_profiled(
   iree_hal_sync_device_profile_operation_initialize(
       IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL, /*payload_length=*/0,
       /*operation_count=*/1, &profile_operation);
-  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profile_operation_record_begin(
-      device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
+  iree_hal_sync_device_profile_operation_record_begin(
+      device, wait_semaphore_list, signal_semaphore_list, &profile_operation);
 
   // Wait for all dependencies.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(
       wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-  if (IREE_UNLIKELY(profile_operation.submission_id != 0)) {
+  if (IREE_UNLIKELY(
+          profile_operation.submission_id != 0 &&
+          iree_hal_local_profile_recorder_is_enabled(
+              device->profile_recorder,
+              IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS))) {
     profile_operation.start_host_time_ns = iree_time_now();
   }
 
@@ -1230,7 +1353,7 @@ static iree_status_t iree_hal_sync_device_queue_host_call_profiled(
     return iree_hal_sync_device_profiled_queue_op_end(
         device, signal_semaphore_list, &profile_operation, call_status);
   } else {
-    call_status = iree_hal_sync_device_profile_operation_record_end(
+    iree_hal_sync_device_profile_operation_record_end(
         device, &profile_operation, call_status);
     iree_async_frontier_tracker_fail_axis(
         device->frontier_tracker, device->axis,
@@ -1371,6 +1494,8 @@ static iree_status_t iree_hal_sync_device_queue_execute_profiled(
   if (!is_barrier) {
     profile_operation.host_flags |=
         IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER;
+    iree_hal_sync_device_profile_set_command_buffer(command_buffer,
+                                                    &profile_operation);
   }
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
       device, wait_semaphore_list, signal_semaphore_list, &profile_operation));

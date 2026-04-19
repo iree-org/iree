@@ -82,6 +82,7 @@ class ConversionStats:
     dispatch_slices: int = 0
     queue_device_slices: int = 0
     host_execution_slices: int = 0
+    command_operation_instants: int = 0
     queue_instants: int = 0
     memory_instants: int = 0
     clock_instants: int = 0
@@ -281,6 +282,12 @@ class PerfettoTraceConverter:
         self.tracks = TrackRegistry(self.builder, perfetto.track_descriptor)
         self.stats = ConversionStats(records=len(records))
         self.clock_mappers = build_device_clock_mappers(records)
+        self.command_buffers_by_id: dict[int, dict[str, Any]] = {}
+        self.command_operations_by_command_buffer_id: dict[
+            int, list[dict[str, Any]]
+        ] = collections.defaultdict(list)
+        self.command_operations_by_key: dict[tuple[int, int], dict[str, Any]] = {}
+        self.executable_exports_by_key: dict[tuple[int, int], dict[str, Any]] = {}
         self.root_uuid = self.tracks.uuid("iree", "root")
         self.diagnostics_uuid = self.tracks.uuid("iree", "diagnostics")
         self.dispatch_lane_allocators: dict[tuple[int, int], LaneAllocator] = (
@@ -301,6 +308,7 @@ class PerfettoTraceConverter:
         self.flow_ids_by_submission: dict[tuple[int, int, int, int], list[int]] = (
             collections.defaultdict(list)
         )
+        self.index_metadata_records()
 
     def build(self) -> tuple[bytes, ConversionStats]:
         self.define_root_tracks()
@@ -312,6 +320,38 @@ class PerfettoTraceConverter:
         self.emit_queue_allocation_counters()
         self.emit_timeline_events()
         return self.builder.serialize(), self.stats
+
+    def index_metadata_records(self) -> None:
+        for record in self.records:
+            record_type = record.get("record_type")
+            if record_type == "command_buffer":
+                command_buffer_id = parse_integer(record.get("command_buffer_id", 0))
+                if command_buffer_id:
+                    self.command_buffers_by_id[command_buffer_id] = record
+            elif record_type == "command_operation":
+                command_buffer_id = parse_integer(record.get("command_buffer_id", 0))
+                if command_buffer_id:
+                    self.command_operations_by_command_buffer_id[
+                        command_buffer_id
+                    ].append(record)
+            elif record_type == "executable_export":
+                executable_id = parse_integer(record.get("executable_id", 0))
+                export_ordinal = parse_ordinal(record.get("export_ordinal"))
+                if executable_id and export_ordinal >= 0:
+                    self.executable_exports_by_key[(executable_id, export_ordinal)] = (
+                        record
+                    )
+
+        for operations in self.command_operations_by_command_buffer_id.values():
+            operations.sort(
+                key=lambda operation: parse_integer(operation.get("command_index", 0))
+            )
+            for operation in operations:
+                command_buffer_id = parse_integer(operation.get("command_buffer_id", 0))
+                command_index = parse_ordinal(operation.get("command_index"))
+                if command_buffer_id and command_index >= 0:
+                    operation_key = (command_buffer_id, command_index)
+                    self.command_operations_by_key[operation_key] = operation
 
     def define_root_tracks(self) -> None:
         self.tracks.define(
@@ -395,6 +435,17 @@ class PerfettoTraceConverter:
             sibling_order_rank=0,
         )
         self.tracks.define(
+            self.tracks.uuid(
+                "iree",
+                "command-operations",
+                physical_device_ordinal,
+                queue_ordinal,
+            ),
+            "command buffer operations",
+            parent_uuid=queue_uuid,
+            sibling_order_rank=100,
+        )
+        self.tracks.define(
             self.tracks.uuid("iree", "memory", physical_device_ordinal, queue_ordinal),
             "host memory events",
             parent_uuid=queue_uuid,
@@ -410,6 +461,17 @@ class PerfettoTraceConverter:
             is_counter=True,
         )
         return queue_uuid
+
+    def command_operation_track(
+        self, physical_device_ordinal: int, queue_ordinal: int
+    ) -> int:
+        self.ensure_queue_tracks(physical_device_ordinal, queue_ordinal)
+        return self.tracks.uuid(
+            "iree",
+            "command-operations",
+            physical_device_ordinal,
+            queue_ordinal,
+        )
 
     def collect_relationships(self) -> None:
         slice_endpoint_types = {
@@ -699,12 +761,25 @@ class PerfettoTraceConverter:
         self.ensure_queue_tracks(
             physical_device_ordinal, queue_ordinal, record.get("stream_id")
         )
-        name = f"host:{record.get('op', 'event')}"
-        if record.get("key"):
-            name = str(record["key"])
+        command_buffer_id = parse_integer(record.get("command_buffer_id", 0))
+        command_operations = self.command_operations_by_command_buffer_id.get(
+            command_buffer_id, []
+        )
+        name = self.host_execution_event_name(record, command_operations)
         annotations = event_annotations(record)
         annotations["iree_perfetto_time_domain"] = record.get(
             "host_time_domain", "iree_host_time_ns"
+        )
+        if record.get("op") == "execute":
+            self.add_command_buffer_annotations(
+                annotations, command_buffer_id, command_operations
+            )
+        self.collect_timed_command_operation_instant(
+            record,
+            start_time_ns,
+            physical_device_ordinal,
+            queue_ordinal,
+            command_buffer_id,
         )
         self.append_pending_slice(
             lane_family="host_execution",
@@ -718,6 +793,137 @@ class PerfettoTraceConverter:
             flow_ids=self.endpoint_flow_ids(record, "host_execution_event"),
         )
         self.stats.host_execution_slices += 1
+
+    def host_execution_event_name(
+        self,
+        record: dict[str, Any],
+        command_operations: list[dict[str, Any]],
+    ) -> str:
+        if record.get("key"):
+            return str(record["key"])
+        op = str(record.get("op", "event"))
+        command_buffer_id = parse_integer(record.get("command_buffer_id", 0))
+        if op != "execute" or not command_buffer_id or not command_operations:
+            return f"host:{op}"
+        dispatch_operations = self.dispatch_command_operations(command_operations)
+        if len(dispatch_operations) == 1:
+            dispatch_name = self.command_operation_display_name(
+                dispatch_operations[0],
+                include_command_index=False,
+            )
+            return f"execute cb#{command_buffer_id}: {dispatch_name}"
+        return (
+            f"execute cb#{command_buffer_id} "
+            f"({len(command_operations)} ops, {len(dispatch_operations)} dispatches)"
+        )
+
+    def add_command_buffer_annotations(
+        self,
+        annotations: dict[str, Any],
+        command_buffer_id: int,
+        command_operations: list[dict[str, Any]],
+    ) -> None:
+        if not command_buffer_id:
+            return
+        annotations["iree_command_buffer_id"] = command_buffer_id
+        command_buffer = self.command_buffers_by_id.get(command_buffer_id)
+        if command_buffer is not None:
+            annotations["iree_command_buffer_flags"] = command_buffer.get("flags")
+            annotations["iree_command_buffer_categories"] = command_buffer.get(
+                "command_categories"
+            )
+        if not command_operations:
+            return
+        dispatch_operations = self.dispatch_command_operations(command_operations)
+        annotations["iree_command_buffer_operation_count"] = len(command_operations)
+        annotations["iree_command_buffer_dispatch_count"] = len(dispatch_operations)
+
+    def collect_timed_command_operation_instant(
+        self,
+        record: dict[str, Any],
+        start_time_ns: int,
+        physical_device_ordinal: int,
+        queue_ordinal: int,
+        command_buffer_id: int,
+    ) -> None:
+        command_index = parse_ordinal(record.get("command_index"))
+        if not command_buffer_id or command_index < 0:
+            return
+        operation = self.command_operations_by_key.get(
+            (command_buffer_id, command_index)
+        )
+        if operation is None:
+            return
+        track_uuid = self.command_operation_track(
+            physical_device_ordinal, queue_ordinal
+        )
+        operation_annotations = event_annotations(operation)
+        operation_annotations["iree_host_execution_event_id"] = record.get("event_id")
+        operation_annotations["iree_host_submission_id"] = record.get("submission_id")
+        operation_annotations["iree_perfetto_time_domain"] = record.get(
+            "host_time_domain", "iree_host_time_ns"
+        )
+        operation_annotations["iree_perfetto_timing_source"] = "host_execution_event"
+        for field_name in ("duration_ns", "tile_count", "tile_duration_sum_ns"):
+            if field_name in record:
+                operation_annotations[f"iree_host_{field_name}"] = record[field_name]
+        operation_name = (
+            f"cb#{command_buffer_id} "
+            f"{self.command_operation_display_name(operation)}"
+        )
+        self.timeline_events.append(
+            TimelineEvent(
+                start_time_ns,
+                (
+                    2,
+                    "command-operation",
+                    physical_device_ordinal,
+                    queue_ordinal,
+                    start_time_ns,
+                    command_buffer_id,
+                    command_index,
+                ),
+                lambda timestamp_ns=start_time_ns, track_uuid=track_uuid, name=operation_name, annotations=operation_annotations: add_instant(
+                    self.builder,
+                    self.perfetto.track_event,
+                    timestamp_ns,
+                    track_uuid,
+                    name,
+                    annotations,
+                ),
+            )
+        )
+        self.all_timestamp_ns.append(start_time_ns)
+        self.stats.command_operation_instants += 1
+
+    def dispatch_command_operations(
+        self, command_operations: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        return [
+            operation
+            for operation in command_operations
+            if operation.get("op") == "dispatch"
+        ]
+
+    def command_operation_display_name(
+        self,
+        operation: dict[str, Any],
+        *,
+        include_command_index: bool = True,
+    ) -> str:
+        command_index = parse_integer(operation.get("command_index", 0))
+        op = str(operation.get("op", "op"))
+        display_name = str(operation.get("key") or op)
+        executable_id = parse_integer(operation.get("executable_id", 0))
+        export_ordinal = parse_ordinal(operation.get("export_ordinal"))
+        export_record = self.executable_exports_by_key.get(
+            (executable_id, export_ordinal)
+        )
+        if export_record is not None and export_record.get("name"):
+            display_name = str(export_record["name"])
+        if include_command_index:
+            return f"op{command_index} {op} {display_name}"
+        return display_name
 
     def collect_queue_event(self, record: dict[str, Any]) -> None:
         timestamp_ns = record.get("host_time_ns")
@@ -1026,6 +1232,7 @@ def summary_fields(stats: ConversionStats) -> list[tuple[str, Any]]:
         ("dispatch_slices", stats.dispatch_slices),
         ("queue_device_slices", stats.queue_device_slices),
         ("host_execution_slices", stats.host_execution_slices),
+        ("command_operation_instants", stats.command_operation_instants),
         ("queue_instants", stats.queue_instants),
         ("memory_instants", stats.memory_instants),
         ("clock_instants", stats.clock_instants),

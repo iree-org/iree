@@ -15,7 +15,6 @@
 #include "iree/hal/drivers/local_task/block_command_ops.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_executable.h"
 #include "iree/hal/utils/resource_set.h"
 
 //===----------------------------------------------------------------------===//

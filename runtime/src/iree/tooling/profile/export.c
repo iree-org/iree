@@ -13,7 +13,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 9
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 10
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -681,14 +681,16 @@ static iree_status_t iree_profile_export_process_host_execution_event_records(
               ",\"start_host_time_ns\":%" PRId64
               ",\"end_host_time_ns\":%" PRId64 ",\"duration_ns\":%" PRId64
               ",\"valid\":%s"
-              ",\"payload_length\":%" PRIu64 ",\"operation_count\":%u}\n",
+              ",\"payload_length\":%" PRIu64 ",\"tile_count\":%" PRIu64
+              ",\"tile_duration_sum_ns\":%" PRId64 ",\"operation_count\":%u}\n",
               host_event.type, host_event.flags, host_event.status_code,
               host_event.workgroup_count[0], host_event.workgroup_count[1],
               host_event.workgroup_count[2], host_event.workgroup_size[0],
               host_event.workgroup_size[1], host_event.workgroup_size[2],
               host_event.start_host_time_ns, host_event.end_host_time_ns,
               duration_ns, is_valid ? "true" : "false",
-              host_event.payload_length, host_event.operation_count);
+              host_event.payload_length, host_event.tile_count,
+              host_event.tile_duration_sum_ns, host_event.operation_count);
     }
   }
   return status;
