@@ -71,10 +71,19 @@ class TestLogicalDevice {
       const iree_hal_amdgpu_libhsa_t* libhsa,
       const iree_hal_amdgpu_topology_t* topology,
       iree_allocator_t host_allocator) {
+    iree_hal_amdgpu_logical_device_options_t test_options = *options;
+#if !defined(NDEBUG)
+    // Debug resource-set validation caps block pools at 64 KiB; keep the CTS
+    // fixture's command-buffer block pool under that cap.
+    test_options.host_block_pools.command_buffer.usable_block_size =
+        std::min<iree_host_size_t>(
+            test_options.host_block_pools.command_buffer.usable_block_size,
+            64 * 1024);
+#endif  // !defined(NDEBUG)
     IREE_RETURN_IF_ERROR(create_context_.Initialize(host_allocator));
     IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_create(
-        IREE_SV("amdgpu"), options, libhsa, topology, create_context_.params(),
-        host_allocator, &base_device_));
+        IREE_SV("amdgpu"), &test_options, libhsa, topology,
+        create_context_.params(), host_allocator, &base_device_));
     return iree_hal_device_group_create_from_device(
         base_device_, create_context_.frontier_tracker(), host_allocator,
         &device_group_);
@@ -657,6 +666,17 @@ TEST_F(HostQueueCommandBufferTest,
   EXPECT_FALSE(AqlHeaderHasBarrier(summary.first_packet_header));
   EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
 
+  resolution.inline_acquire_scope = IREE_HSA_FENCE_SCOPE_AGENT;
+  summary = iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t{};
+  IREE_ASSERT_OK(
+      iree_hal_amdgpu_host_queue_summarize_command_buffer_block_packets(
+          queue, &resolution, iree_hal_semaphore_list_empty(),
+          program->first_block, &summary));
+  EXPECT_EQ(summary.packet_count, 2u);
+  EXPECT_EQ(summary.barrier_packet_count, 2u);
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.first_packet_header));
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
+
   iree_hal_executable_release(executable);
   iree_hal_executable_cache_release(executable_cache);
 }
@@ -831,7 +851,7 @@ TEST_F(HostQueueCommandBufferTest,
           queue, &resolution, iree_hal_semaphore_list_empty(),
           program->first_block, &summary));
   EXPECT_EQ(summary.packet_count, 2u);
-  EXPECT_EQ(summary.barrier_packet_count, 1u);
+  EXPECT_EQ(summary.barrier_packet_count, 2u);
   EXPECT_EQ(summary.system_acquire_packet_count, 1u);
   EXPECT_EQ(summary.system_release_packet_count, 0u);
 
