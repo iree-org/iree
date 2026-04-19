@@ -34,7 +34,7 @@ IREE_API_EXPORT void iree_hal_amdgpu_driver_options_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_options_parse(
     iree_hal_amdgpu_driver_options_t* options, iree_string_pair_list_t params) {
   IREE_ASSERT_ARGUMENT(options);
-  if (!params.count) return iree_ok_status();  // no-op
+  if (!params.count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   const iree_string_pair_t* first_param = &params.pairs[0];
@@ -379,7 +379,7 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   if (topology.gpu_agent_count == 0) {
     iree_hal_amdgpu_topology_deinitialize(&topology);
     IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();  // no devices
+    return iree_ok_status();
   }
 
   // Run the string builder in size calculation mode.

@@ -207,7 +207,7 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_topology_insert_gpu_agent(
   // Ignore if the GPU agent has already been added.
   for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
     if (topology->gpu_agents[i].handle == gpu_agent.handle) {
-      return iree_ok_status();  // already present
+      return iree_ok_status();
     }
   }
 
