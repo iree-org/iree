@@ -322,8 +322,20 @@ struct CommandBufferProfileSink {
   // Number of command-buffer metadata chunks observed.
   int command_buffer_metadata_count = 0;
 
+  // Number of command-operation metadata chunks observed.
+  int command_operation_metadata_count = 0;
+
   // Number of clock correlation chunks observed.
   int clock_correlation_count = 0;
+
+  // Number of host queue event chunks observed.
+  int queue_event_count = 0;
+
+  // Number of device queue event chunks observed.
+  int queue_device_event_count = 0;
+
+  // Number of event relationship chunks observed.
+  int relationship_count = 0;
 
   // Number of counter set metadata chunks observed.
   int counter_set_metadata_count = 0;
@@ -343,8 +355,20 @@ struct CommandBufferProfileSink {
   // Command-buffer identifiers copied from COMMAND_BUFFERS chunks.
   std::vector<uint64_t> command_buffer_ids;
 
+  // Command operations copied from COMMAND_OPERATIONS chunks.
+  std::vector<iree_hal_profile_command_operation_record_t> command_operations;
+
   // Clock correlation records copied from CLOCK_CORRELATIONS chunks.
   std::vector<iree_hal_profile_clock_correlation_record_t> clock_correlations;
+
+  // Host queue events copied from QUEUE_EVENTS chunks.
+  std::vector<iree_hal_profile_queue_event_t> queue_events;
+
+  // Device queue events copied from QUEUE_DEVICE_EVENTS chunks.
+  std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;
+
+  // Event relationships copied from EVENT_RELATIONSHIPS chunks.
+  std::vector<iree_hal_profile_event_relationship_record_t> event_relationships;
 
   // Dispatch events copied from DISPATCH_EVENTS chunks.
   std::vector<iree_hal_profile_dispatch_event_t> dispatch_events;
@@ -486,6 +510,36 @@ static iree_status_t CommandBufferProfileSinkWrite(
     ++test_sink->command_buffer_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_operation_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_operation_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_operation_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_operation_record_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE, records[i].type);
+      EXPECT_NE(UINT32_MAX, records[i].command_index);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      EXPECT_NE(UINT32_MAX, records[i].block_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].block_command_ordinal);
+      if (records[i].type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
+        EXPECT_NE(0u, records[i].executable_id);
+        EXPECT_NE(UINT32_MAX, records[i].export_ordinal);
+        EXPECT_NE(0u, records[i].binding_count);
+        EXPECT_NE(0u, records[i].workgroup_size[0]);
+      }
+    }
+    test_sink->command_operations.insert(test_sink->command_operations.end(),
+                                         records, records + record_count);
+    ++test_sink->command_operation_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
     EXPECT_EQ(0u, iovecs[0].data_length %
                       sizeof(iree_hal_profile_clock_correlation_record_t));
@@ -588,6 +642,87 @@ static iree_status_t CommandBufferProfileSinkWrite(
         metadata->physical_device_ordinal);
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS)) {
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_queue_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_queue_event_t*>(iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_queue_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_queue_event_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0, records[i].host_time_ns);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+    }
+    test_sink->queue_events.insert(test_sink->queue_events.end(), records,
+                                   records + record_count);
+    ++test_sink->queue_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
+    EXPECT_NE(UINT32_MAX, metadata->physical_device_ordinal);
+    EXPECT_NE(UINT32_MAX, metadata->queue_ordinal);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_queue_device_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_queue_device_event_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_queue_device_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_queue_device_event_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0u, records[i].submission_id);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+      EXPECT_NE(0u, records[i].start_tick);
+      EXPECT_NE(0u, records[i].end_tick);
+      EXPECT_GE(records[i].end_tick, records[i].start_tick);
+    }
+    test_sink->queue_device_events.insert(test_sink->queue_device_events.end(),
+                                          records, records + record_count);
+    ++test_sink->queue_device_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS)) {
+    EXPECT_NE(UINT32_MAX, metadata->physical_device_ordinal);
+    EXPECT_NE(UINT32_MAX, metadata->queue_ordinal);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_event_relationship_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_event_relationship_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_event_relationship_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_event_relationship_record_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].relationship_id);
+      EXPECT_NE(IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_NONE,
+                records[i].source_type);
+      EXPECT_NE(IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_NONE,
+                records[i].target_type);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+      EXPECT_NE(0u, records[i].source_id);
+      EXPECT_NE(0u, records[i].target_id);
+    }
+    test_sink->event_relationships.insert(test_sink->event_relationships.end(),
+                                          records, records + record_count);
+    ++test_sink->relationship_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES)) {
     iree_host_size_t payload_offset = 0;
     while (payload_offset < iovecs[0].data_length) {
@@ -686,6 +821,70 @@ static void ExpectDispatchEventsWithinClockCorrelationRange(
   }
 }
 
+static const iree_hal_profile_command_operation_record_t* FindCommandOperation(
+    const CommandBufferProfileSink& sink, uint64_t command_buffer_id,
+    uint32_t command_index) {
+  for (const auto& operation : sink.command_operations) {
+    if (operation.command_buffer_id == command_buffer_id &&
+        operation.command_index == command_index) {
+      return &operation;
+    }
+  }
+  return nullptr;
+}
+
+static const iree_hal_profile_event_relationship_record_t*
+FindEventRelationship(const CommandBufferProfileSink& sink,
+                      iree_hal_profile_event_relationship_type_t type,
+                      iree_hal_profile_event_endpoint_type_t source_type,
+                      uint64_t source_id,
+                      iree_hal_profile_event_endpoint_type_t target_type,
+                      uint64_t target_id) {
+  for (const auto& relationship : sink.event_relationships) {
+    if (relationship.type == type && relationship.source_type == source_type &&
+        relationship.source_id == source_id &&
+        relationship.target_type == target_type &&
+        relationship.target_id == target_id) {
+      return &relationship;
+    }
+  }
+  return nullptr;
+}
+
+static const iree_hal_profile_queue_event_t* FindUniqueQueueEvent(
+    const CommandBufferProfileSink& sink,
+    iree_hal_profile_queue_event_type_t type) {
+  const iree_hal_profile_queue_event_t* result = nullptr;
+  for (const auto& event : sink.queue_events) {
+    if (event.type != type) continue;
+    EXPECT_EQ(nullptr, result);
+    result = &event;
+  }
+  return result;
+}
+
+static iree_host_size_t CountQueueEvents(
+    const CommandBufferProfileSink& sink,
+    iree_hal_profile_queue_event_type_t type) {
+  iree_host_size_t count = 0;
+  for (const auto& event : sink.queue_events) {
+    if (event.type == type) ++count;
+  }
+  return count;
+}
+
+static uint32_t SumQueueEventOperationCounts(
+    const CommandBufferProfileSink& sink,
+    iree_hal_profile_queue_event_type_t type) {
+  uint32_t operation_count = 0;
+  for (const auto& event : sink.queue_events) {
+    if (event.type == type) {
+      operation_count += event.operation_count;
+    }
+  }
+  return operation_count;
+}
+
 static bool IsProfilingUnsupported(iree_status_t status) {
   return iree_status_is_unimplemented(status) ||
          iree_status_is_invalid_argument(status);
@@ -693,6 +892,11 @@ static bool IsProfilingUnsupported(iree_status_t status) {
 
 static bool IsHardwareCounterProfilingUnavailable(iree_status_t status) {
   return IsProfilingUnsupported(status) || iree_status_is_not_found(status) ||
+         iree_status_is_failed_precondition(status);
+}
+
+static bool IsQueueDeviceProfilingUnavailable(iree_status_t status) {
+  return IsProfilingUnsupported(status) ||
          iree_status_is_failed_precondition(status);
 }
 
@@ -748,7 +952,7 @@ TEST_F(HostQueueCommandBufferTest,
   CommandBufferProfileSinkInitialize(&sink);
   DeviceProfilingScope profiling(test_device.base_device());
   iree_status_t profiling_status = BeginSqWavesProfiling(&profiling, &sink);
-  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+  if (IsQueueDeviceProfilingUnavailable(profiling_status)) {
     iree_status_free(profiling_status);
     GTEST_SKIP() << "AMDGPU hardware counter profiling unavailable";
   }
@@ -819,6 +1023,112 @@ static iree_status_t AppendConstantsBindingsDispatch(
       command_buffer, executable, /*entry_point=*/0,
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE);
+}
+
+struct TwoDispatchCommandBuffer {
+  ~TwoDispatchCommandBuffer() {
+    iree_hal_executable_release(executable);
+    iree_hal_executable_cache_release(executable_cache);
+  }
+
+  // Executable cache owning |executable|.
+  iree_hal_executable_cache_t* executable_cache = NULL;
+
+  // CTS executable containing the constants+bindings dispatch entry point.
+  iree_hal_executable_t* executable = NULL;
+
+  // Host-visible input buffer shared by both dispatches.
+  Ref<iree_hal_buffer_t> input_buffer;
+
+  // Host-visible output buffer written by command index 0.
+  Ref<iree_hal_buffer_t> output_buffer0;
+
+  // Host-visible output buffer written by command index 1.
+  Ref<iree_hal_buffer_t> output_buffer1;
+
+  // Command buffer containing two equivalent dispatch operations.
+  Ref<iree_hal_command_buffer_t> command_buffer;
+};
+
+static iree_status_t CreateTwoDispatchCommandBuffer(
+    TestLogicalDevice* test_device, TwoDispatchCommandBuffer* out_fixture) {
+  IREE_RETURN_IF_ERROR(LoadCtsExecutable(
+      test_device->base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &out_fixture->executable_cache, &out_fixture->executable));
+
+  IREE_RETURN_IF_ERROR(CreateHostVisibleDispatchBuffer(
+      test_device->allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      out_fixture->input_buffer.out()));
+  const uint32_t input_values[4] = {1, 2, 3, 4};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_map_write(out_fixture->input_buffer, /*target_offset=*/0,
+                                input_values, sizeof(input_values)));
+
+  IREE_RETURN_IF_ERROR(CreateHostVisibleDispatchBuffer(
+      test_device->allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      out_fixture->output_buffer0.out()));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_zero(
+      out_fixture->output_buffer0, /*offset=*/0, IREE_HAL_WHOLE_BUFFER));
+
+  IREE_RETURN_IF_ERROR(CreateHostVisibleDispatchBuffer(
+      test_device->allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      out_fixture->output_buffer1.out()));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_zero(
+      out_fixture->output_buffer1, /*offset=*/0, IREE_HAL_WHOLE_BUFFER));
+
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
+      test_device->base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, out_fixture->command_buffer.out()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_begin(out_fixture->command_buffer));
+  iree_hal_buffer_ref_t binding_refs0[2] = {
+      iree_hal_make_buffer_ref(
+          out_fixture->input_buffer, /*offset=*/0,
+          iree_hal_buffer_byte_length(out_fixture->input_buffer)),
+      iree_hal_make_buffer_ref(
+          out_fixture->output_buffer0, /*offset=*/0,
+          iree_hal_buffer_byte_length(out_fixture->output_buffer0)),
+  };
+  const iree_hal_buffer_ref_list_t bindings0 = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs0),
+      /*values=*/binding_refs0,
+  };
+  IREE_RETURN_IF_ERROR(AppendConstantsBindingsDispatch(
+      out_fixture->command_buffer, out_fixture->executable, bindings0));
+  iree_hal_buffer_ref_t binding_refs1[2] = {
+      iree_hal_make_buffer_ref(
+          out_fixture->input_buffer, /*offset=*/0,
+          iree_hal_buffer_byte_length(out_fixture->input_buffer)),
+      iree_hal_make_buffer_ref(
+          out_fixture->output_buffer1, /*offset=*/0,
+          iree_hal_buffer_byte_length(out_fixture->output_buffer1)),
+  };
+  const iree_hal_buffer_ref_list_t bindings1 = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs1),
+      /*values=*/binding_refs1,
+  };
+  IREE_RETURN_IF_ERROR(AppendConstantsBindingsDispatch(
+      out_fixture->command_buffer, out_fixture->executable, bindings1));
+  return iree_hal_command_buffer_end(out_fixture->command_buffer);
+}
+
+static void ExpectTwoDispatchOutputs(const TwoDispatchCommandBuffer& fixture) {
+  const uint32_t expected_values[4] = {13, 16, 19, 22};
+  uint32_t output_values0[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(fixture.output_buffer0, /*offset=*/0,
+                                          output_values0,
+                                          sizeof(output_values0)));
+  EXPECT_EQ(0,
+            memcmp(output_values0, expected_values, sizeof(expected_values)));
+  uint32_t output_values1[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(fixture.output_buffer1, /*offset=*/0,
+                                          output_values1,
+                                          sizeof(output_values1)));
+  EXPECT_EQ(0,
+            memcmp(output_values1, expected_values, sizeof(expected_values)));
 }
 
 #if !defined(NDEBUG)
@@ -1446,67 +1756,8 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   }
   IREE_ASSERT_OK(profiling_status);
 
-  iree_hal_executable_cache_t* executable_cache = NULL;
-  iree_hal_executable_t* executable = NULL;
-  IREE_ASSERT_OK(LoadCtsExecutable(
-      test_device.base_device(),
-      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
-                             "bin"),
-      &executable_cache, &executable));
-
-  Ref<iree_hal_buffer_t> input_buffer;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      input_buffer.out()));
-  const uint32_t input_values[4] = {1, 2, 3, 4};
-  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
-                                           input_values, sizeof(input_values)));
-
-  Ref<iree_hal_buffer_t> output_buffer0;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer0.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer0, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_buffer_t> output_buffer1;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer1.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer1, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  iree_hal_buffer_ref_t binding_refs0[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer0, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer0)),
-  };
-  const iree_hal_buffer_ref_list_t bindings0 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs0),
-      /*values=*/binding_refs0,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings0));
-  iree_hal_buffer_ref_t binding_refs1[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer1, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer1)),
-  };
-  const iree_hal_buffer_ref_list_t bindings1 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs1),
-      /*values=*/binding_refs1,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings1));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(&test_device, &fixture));
 
   Ref<iree_hal_semaphore_t> command_buffer_signal;
   IREE_ASSERT_OK(
@@ -1521,7 +1772,7 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
       test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       iree_hal_semaphore_list_empty(), command_buffer_signal_list,
-      command_buffer, iree_hal_buffer_binding_table_empty(),
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
       IREE_HAL_EXECUTE_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       command_buffer_signal, command_buffer_signal_value,
@@ -1531,17 +1782,7 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
   IREE_ASSERT_OK(profiling.End());
 
-  const uint32_t expected_values[4] = {13, 16, 19, 22};
-  uint32_t output_values0[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer0, /*offset=*/0, output_values0, sizeof(output_values0)));
-  EXPECT_EQ(0,
-            memcmp(output_values0, expected_values, sizeof(expected_values)));
-  uint32_t output_values1[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer1, /*offset=*/0, output_values1, sizeof(output_values1)));
-  EXPECT_EQ(0,
-            memcmp(output_values1, expected_values, sizeof(expected_values)));
+  ExpectTwoDispatchOutputs(fixture);
 
   EXPECT_EQ(1, sink.begin_count);
   EXPECT_EQ(1, sink.end_count);
@@ -1550,8 +1791,45 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   EXPECT_EQ(1, sink.executable_metadata_count);
   EXPECT_EQ(1, sink.executable_export_metadata_count);
   EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  EXPECT_EQ(1, sink.command_operation_metadata_count);
   EXPECT_GE(sink.clock_correlation_count, 2);
   EXPECT_FALSE(sink.write_after_end);
+  ASSERT_EQ(3u, sink.command_operations.size());
+  uint32_t dispatch_operation_count = 0;
+  uint32_t return_operation_count = 0;
+  for (const auto& operation : sink.command_operations) {
+    EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
+    switch (operation.type) {
+      case IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH:
+        EXPECT_EQ(dispatch_operation_count, operation.command_index);
+        EXPECT_NE(0u, operation.executable_id);
+        EXPECT_NE(
+            sink.executable_ids.end(),
+            std::find(sink.executable_ids.begin(), sink.executable_ids.end(),
+                      operation.executable_id));
+        EXPECT_EQ(0u, operation.export_ordinal);
+        EXPECT_EQ(2u, operation.binding_count);
+        EXPECT_EQ(1u, operation.workgroup_count[0]);
+        EXPECT_EQ(1u, operation.workgroup_count[1]);
+        EXPECT_EQ(1u, operation.workgroup_count[2]);
+        EXPECT_NE(0u, operation.workgroup_size[0]);
+        EXPECT_NE(0u,
+                  operation.flags &
+                      IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS);
+        ++dispatch_operation_count;
+        break;
+      case IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_RETURN:
+        EXPECT_EQ(2u, operation.command_index);
+        EXPECT_NE(0u, operation.flags &
+                          IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_CONTROL_FLOW);
+        ++return_operation_count;
+        break;
+      default:
+        FAIL() << "unexpected command operation type " << operation.type;
+    }
+  }
+  EXPECT_EQ(2u, dispatch_operation_count);
+  EXPECT_EQ(1u, return_operation_count);
   ASSERT_EQ(2u, sink.dispatch_events.size());
   for (iree_host_size_t i = 0; i < sink.dispatch_events.size(); ++i) {
     const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[i];
@@ -1572,6 +1850,14 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
               std::find(sink.executable_export_ids.begin(),
                         sink.executable_export_ids.end(), event.executable_id));
     EXPECT_EQ((uint32_t)i, event.command_index);
+    const iree_hal_profile_command_operation_record_t* operation =
+        FindCommandOperation(sink, event.command_buffer_id,
+                             event.command_index);
+    ASSERT_NE(nullptr, operation);
+    EXPECT_EQ(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH,
+              operation->type);
+    EXPECT_EQ(event.executable_id, operation->executable_id);
+    EXPECT_EQ(event.export_ordinal, operation->export_ordinal);
     EXPECT_EQ(0u, event.export_ordinal);
     EXPECT_EQ(1u, event.workgroup_count[0]);
     EXPECT_EQ(1u, event.workgroup_count[1]);
@@ -1582,9 +1868,120 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_GE(event.end_tick, event.start_tick);
   }
   ExpectDispatchEventsWithinClockCorrelationRange(sink);
+}
 
-  iree_hal_executable_release(executable);
-  iree_hal_executable_cache_release(executable_cache);
+TEST_F(HostQueueCommandBufferTest,
+       CommandBufferExecuteEmitsQueueDeviceSpansAndRelationships) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+                          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+                          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsHardwareCounterProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "queue-device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(&test_device, &fixture));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  ExpectTwoDispatchOutputs(fixture);
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_FALSE(sink.write_after_end);
+  EXPECT_EQ(1, sink.queue_event_count);
+  EXPECT_EQ(1, sink.queue_device_event_count);
+  EXPECT_EQ(1, sink.relationship_count);
+  ASSERT_EQ(1u, sink.queue_events.size());
+  ASSERT_EQ(1u, sink.queue_device_events.size());
+  ASSERT_EQ(2u, sink.dispatch_events.size());
+  ASSERT_EQ(3u, sink.event_relationships.size());
+
+  const iree_hal_profile_queue_event_t& queue_event = sink.queue_events[0];
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE, queue_event.type);
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE,
+            queue_event.dependency_strategy);
+  EXPECT_NE(0u, queue_event.submission_id);
+  EXPECT_NE(0u, queue_event.command_buffer_id);
+  EXPECT_EQ(0u, queue_event.wait_count);
+  EXPECT_EQ(1u, queue_event.signal_count);
+  EXPECT_EQ(0u, queue_event.barrier_count);
+  EXPECT_EQ(3u, queue_event.operation_count);
+  EXPECT_NE(
+      sink.command_buffer_ids.end(),
+      std::find(sink.command_buffer_ids.begin(), sink.command_buffer_ids.end(),
+                queue_event.command_buffer_id));
+
+  const iree_hal_profile_queue_device_event_t& device_event =
+      sink.queue_device_events[0];
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE, device_event.type);
+  EXPECT_EQ(queue_event.submission_id, device_event.submission_id);
+  EXPECT_EQ(queue_event.command_buffer_id, device_event.command_buffer_id);
+  EXPECT_EQ(queue_event.stream_id, device_event.stream_id);
+  EXPECT_EQ(queue_event.physical_device_ordinal,
+            device_event.physical_device_ordinal);
+  EXPECT_EQ(queue_event.queue_ordinal, device_event.queue_ordinal);
+  EXPECT_EQ(queue_event.operation_count, device_event.operation_count);
+
+  for (const auto& dispatch_event : sink.dispatch_events) {
+    EXPECT_EQ(queue_event.submission_id, dispatch_event.submission_id);
+    EXPECT_EQ(queue_event.command_buffer_id, dispatch_event.command_buffer_id);
+    EXPECT_NE(
+        nullptr,
+        FindEventRelationship(
+            sink,
+            IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_DISPATCH,
+            IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_SUBMISSION,
+            dispatch_event.submission_id,
+            IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_DISPATCH_EVENT,
+            dispatch_event.event_id));
+  }
+  EXPECT_NE(
+      nullptr,
+      FindEventRelationship(
+          sink,
+          IREE_HAL_PROFILE_EVENT_RELATIONSHIP_TYPE_QUEUE_SUBMISSION_QUEUE_DEVICE_EVENT,
+          IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_SUBMISSION,
+          device_event.submission_id,
+          IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_DEVICE_EVENT,
+          device_event.event_id));
+  ExpectDispatchEventsWithinClockCorrelationRange(sink);
 }
 
 TEST_F(HostQueueCommandBufferTest,
@@ -1607,67 +2004,8 @@ TEST_F(HostQueueCommandBufferTest,
   }
   IREE_ASSERT_OK(profiling_status);
 
-  iree_hal_executable_cache_t* executable_cache = NULL;
-  iree_hal_executable_t* executable = NULL;
-  IREE_ASSERT_OK(LoadCtsExecutable(
-      test_device.base_device(),
-      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
-                             "bin"),
-      &executable_cache, &executable));
-
-  Ref<iree_hal_buffer_t> input_buffer;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      input_buffer.out()));
-  const uint32_t input_values[4] = {1, 2, 3, 4};
-  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
-                                           input_values, sizeof(input_values)));
-
-  Ref<iree_hal_buffer_t> output_buffer0;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer0.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer0, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_buffer_t> output_buffer1;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer1.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer1, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  iree_hal_buffer_ref_t binding_refs0[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer0, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer0)),
-  };
-  const iree_hal_buffer_ref_list_t bindings0 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs0),
-      /*values=*/binding_refs0,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings0));
-  iree_hal_buffer_ref_t binding_refs1[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer1, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer1)),
-  };
-  const iree_hal_buffer_ref_list_t bindings1 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs1),
-      /*values=*/binding_refs1,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings1));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(&test_device, &fixture));
 
   Ref<iree_hal_semaphore_t> command_buffer_signal;
   IREE_ASSERT_OK(
@@ -1682,7 +2020,7 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
       test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       iree_hal_semaphore_list_empty(), command_buffer_signal_list,
-      command_buffer, iree_hal_buffer_binding_table_empty(),
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
       IREE_HAL_EXECUTE_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       command_buffer_signal, command_buffer_signal_value,
@@ -1692,17 +2030,7 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
   IREE_ASSERT_OK(profiling.End());
 
-  const uint32_t expected_values[4] = {13, 16, 19, 22};
-  uint32_t output_values0[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer0, /*offset=*/0, output_values0, sizeof(output_values0)));
-  EXPECT_EQ(0,
-            memcmp(output_values0, expected_values, sizeof(expected_values)));
-  uint32_t output_values1[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer1, /*offset=*/0, output_values1, sizeof(output_values1)));
-  EXPECT_EQ(0,
-            memcmp(output_values1, expected_values, sizeof(expected_values)));
+  ExpectTwoDispatchOutputs(fixture);
 
   EXPECT_EQ(1, sink.begin_count);
   EXPECT_EQ(1, sink.end_count);
@@ -1733,9 +2061,6 @@ TEST_F(HostQueueCommandBufferTest,
             std::find_if(sink.counter_sample_values.begin(),
                          sink.counter_sample_values.end(),
                          [](uint64_t value) { return value != 0; }));
-
-  iree_hal_executable_release(executable);
-  iree_hal_executable_cache_release(executable_cache);
 }
 
 TEST_F(HostQueueCommandBufferTest,
@@ -1765,67 +2090,8 @@ TEST_F(HostQueueCommandBufferTest,
   }
   IREE_ASSERT_OK(profiling_status);
 
-  iree_hal_executable_cache_t* executable_cache = NULL;
-  iree_hal_executable_t* executable = NULL;
-  IREE_ASSERT_OK(LoadCtsExecutable(
-      test_device.base_device(),
-      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
-                             "bin"),
-      &executable_cache, &executable));
-
-  Ref<iree_hal_buffer_t> input_buffer;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      input_buffer.out()));
-  const uint32_t input_values[4] = {1, 2, 3, 4};
-  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
-                                           input_values, sizeof(input_values)));
-
-  Ref<iree_hal_buffer_t> output_buffer0;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer0.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer0, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_buffer_t> output_buffer1;
-  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
-      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
-      output_buffer1.out()));
-  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer1, /*offset=*/0,
-                                          IREE_HAL_WHOLE_BUFFER));
-
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  iree_hal_buffer_ref_t binding_refs0[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer0, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer0)),
-  };
-  const iree_hal_buffer_ref_list_t bindings0 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs0),
-      /*values=*/binding_refs0,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings0));
-  iree_hal_buffer_ref_t binding_refs1[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer1, /*offset=*/0,
-                               iree_hal_buffer_byte_length(output_buffer1)),
-  };
-  const iree_hal_buffer_ref_list_t bindings1 = {
-      /*count=*/IREE_ARRAYSIZE(binding_refs1),
-      /*values=*/binding_refs1,
-  };
-  IREE_ASSERT_OK(
-      AppendConstantsBindingsDispatch(command_buffer, executable, bindings1));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(&test_device, &fixture));
 
   Ref<iree_hal_semaphore_t> command_buffer_signal;
   IREE_ASSERT_OK(
@@ -1840,7 +2106,7 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
       test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       iree_hal_semaphore_list_empty(), command_buffer_signal_list,
-      command_buffer, iree_hal_buffer_binding_table_empty(),
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
       IREE_HAL_EXECUTE_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_wait(
       command_buffer_signal, command_buffer_signal_value,
@@ -1849,17 +2115,7 @@ TEST_F(HostQueueCommandBufferTest,
   IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
   IREE_ASSERT_OK(profiling.End());
 
-  const uint32_t expected_values[4] = {13, 16, 19, 22};
-  uint32_t output_values0[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer0, /*offset=*/0, output_values0, sizeof(output_values0)));
-  EXPECT_EQ(0,
-            memcmp(output_values0, expected_values, sizeof(expected_values)));
-  uint32_t output_values1[4] = {0, 0, 0, 0};
-  IREE_ASSERT_OK(iree_hal_buffer_map_read(
-      output_buffer1, /*offset=*/0, output_values1, sizeof(output_values1)));
-  EXPECT_EQ(0,
-            memcmp(output_values1, expected_values, sizeof(expected_values)));
+  ExpectTwoDispatchOutputs(fixture);
 
   ASSERT_EQ(1u, sink.dispatch_events.size());
   const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[0];
@@ -1871,9 +2127,6 @@ TEST_F(HostQueueCommandBufferTest,
   EXPECT_NE(0u, event.start_tick);
   EXPECT_NE(0u, event.end_tick);
   EXPECT_GE(event.end_tick, event.start_tick);
-
-  iree_hal_executable_release(executable);
-  iree_hal_executable_cache_release(executable_cache);
 }
 
 TEST_F(HostQueueCommandBufferTest,
@@ -2228,6 +2481,12 @@ TEST_F(HostQueueCommandBufferTest,
   iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
   ASSERT_NE(queue, nullptr);
 
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
   Ref<iree_hal_buffer_t> pressure_buffer;
   IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
       test_device.allocator(), sizeof(uint32_t), pressure_buffer.out()));
@@ -2299,7 +2558,29 @@ TEST_F(HostQueueCommandBufferTest,
       iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), blocker_signal));
 
   IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
   EXPECT_TRUE(replay_parked);
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  EXPECT_EQ(1, sink.queue_event_count);
+  ASSERT_EQ(1u, sink.command_buffer_ids.size());
+  EXPECT_EQ(1u, CountQueueEvents(sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL));
+  EXPECT_EQ(1u,
+            CountQueueEvents(sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE));
+  const iree_hal_profile_queue_event_t* execute_event =
+      FindUniqueQueueEvent(sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE);
+  ASSERT_NE(nullptr, execute_event);
+  EXPECT_EQ(sink.command_buffer_ids[0], execute_event->command_buffer_id);
+  EXPECT_EQ(0u, execute_event->operation_count);
+  EXPECT_EQ(1u, execute_event->signal_count);
+  EXPECT_LE(sink.command_operations.size(), 1u);
+  for (const auto& operation : sink.command_operations) {
+    EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
+    EXPECT_EQ(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_RETURN, operation.type);
+  }
 }
 
 TEST_F(HostQueueCommandBufferTest,
@@ -2495,6 +2776,12 @@ TEST_F(HostQueueCommandBufferTest,
   iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
   ASSERT_NE(queue, nullptr);
 
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&sink)));
+
   Ref<iree_hal_buffer_t> pressure_buffer;
   IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
       test_device.allocator(), sizeof(uint32_t), pressure_buffer.out()));
@@ -2592,7 +2879,28 @@ TEST_F(HostQueueCommandBufferTest,
       iree_hsa_signal_destroy(IREE_LIBHSA(&libhsa_), blocker_signal));
 
   IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
   EXPECT_TRUE(replay_parked);
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  EXPECT_EQ(1, sink.queue_event_count);
+  ASSERT_EQ(1u, sink.command_buffer_ids.size());
+  EXPECT_EQ(1u, CountQueueEvents(sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL));
+  EXPECT_EQ(program->block_count,
+            CountQueueEvents(sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE));
+  EXPECT_EQ(program->command_count,
+            SumQueueEventOperationCounts(
+                sink, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE));
+  uint32_t execute_signal_count = 0;
+  for (const auto& event : sink.queue_events) {
+    if (event.type != IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE) continue;
+    EXPECT_EQ(sink.command_buffer_ids[0], event.command_buffer_id);
+    execute_signal_count += event.signal_count;
+  }
+  EXPECT_EQ(1u, execute_signal_count);
 
   std::vector<uint32_t> actual(kFillCount);
   IREE_ASSERT_OK(iree_hal_buffer_map_read(target_buffer, /*offset=*/0,
