@@ -289,6 +289,38 @@ TEST(PM4EmitterTest, EmitsCopyDataMemoryPackets) {
   EXPECT_EQ(slot.dwords[5], 0x0FEDCBA9u);
 }
 
+TEST(PM4EmitterTest, EmitsWaitRegMem64Packet) {
+  iree_amd_signal_t signal_abi = {};
+  iree_hsa_signal_t epoch_signal = {};
+  epoch_signal.handle = reinterpret_cast<uint64_t>(&signal_abi);
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+
+  const uint32_t dword_count = iree_hal_amdgpu_pm4_emit_wait_reg_mem64(
+      &slot, epoch_signal, /*compare_value=*/0x1122334455667788ll,
+      /*mask=*/0x7FFFFFFFFFFFFFFFll);
+  EXPECT_EQ(dword_count, 9u);
+  EXPECT_EQ(slot.dwords[0],
+            iree_hal_amdgpu_pm4_make_header(
+                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64,
+                /*dword_count=*/9));
+  EXPECT_EQ(slot.dwords[1],
+            iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
+                IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN,
+                IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY,
+                IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM));
+
+  const uintptr_t value_address =
+      reinterpret_cast<uintptr_t>(&signal_abi.value);
+  EXPECT_EQ(slot.dwords[2], iree_hal_amdgpu_pm4_addr_lo_8(value_address));
+  EXPECT_EQ(slot.dwords[3], iree_hal_amdgpu_pm4_addr_hi(value_address));
+  EXPECT_EQ(slot.dwords[4], 0x55667788u);
+  EXPECT_EQ(slot.dwords[5], 0x11223344u);
+  EXPECT_EQ(slot.dwords[6], 0xFFFFFFFFu);
+  EXPECT_EQ(slot.dwords[7], 0x7FFFFFFFu);
+  EXPECT_EQ(slot.dwords[8],
+            4u | IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPTIMIZE_ACE_OFFLOAD_MODE);
+}
+
 TEST(PM4EmitterTest, BuilderAppendsTimestampPackets) {
   iree_hal_amdgpu_pm4_ib_slot_t slot;
   iree_hal_amdgpu_pm4_ib_builder_t builder;

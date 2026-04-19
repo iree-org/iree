@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "iree/base/api.h"
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 

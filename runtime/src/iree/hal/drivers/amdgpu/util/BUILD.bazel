@@ -340,6 +340,21 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "aql_emitter_test",
+    srcs = ["aql_emitter_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":util",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "pm4_emitter_test",
     srcs = ["pm4_emitter_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",

@@ -337,6 +337,22 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    aql_emitter_test
+  SRCS
+    "aql_emitter_test.cc"
+  DEPS
+    ::util
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     pm4_emitter_test
   SRCS
     "pm4_emitter_test.cc"
