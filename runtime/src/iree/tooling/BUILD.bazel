@@ -101,7 +101,9 @@ iree_runtime_cc_library(
     hdrs = ["device_util.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",

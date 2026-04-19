@@ -6,7 +6,11 @@
 
 #include "iree/tooling/device_util.h"
 
+#include "iree/base/internal/atomics.h"
 #include "iree/base/threading/call_once.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/hal/utils/allocators.h"
@@ -478,6 +482,13 @@ IREE_FLAG_LIST(
     "be\n"
     "specified multiple times; the selected HAL driver decides which counter\n"
     "names and combinations are supported.");
+IREE_FLAG(
+    int64_t, device_profiling_flush_interval_ms, 0,
+    "Optional interval in milliseconds for a tooling-owned background thread\n"
+    "to call iree_hal_device_profiling_flush while HAL-native profiling is\n"
+    "active. 0 disables periodic flushing. The selected HAL backend must\n"
+    "support safe in-flight profiling snapshots for the requested data.\n"
+    "Sink failures are reported when profiling ends.");
 
 IREE_FLAG(
     string, device_capture_tool, "",
@@ -489,6 +500,41 @@ IREE_FLAG(string, device_capture_file, "",
           "template.");
 IREE_FLAG(string, device_capture_label, "",
           "Optional provider-specific external capture range label.");
+
+struct iree_hal_profiling_from_flags_t {
+  // Host allocator used for this session object.
+  iree_allocator_t host_allocator;
+
+  // Device retained while profiling/capture state is active.
+  iree_hal_device_t* device;
+
+  // True when a nonempty HAL-native profiling session is active.
+  bool native_profile_active;
+
+  // True when iree_hal_device_external_capture_begin succeeded.
+  bool external_capture_active;
+
+  // Periodic flush interval in milliseconds, or 0 when disabled.
+  iree_duration_t flush_interval_ms;
+
+  // Mutex serializing explicit and periodic flush calls.
+  iree_slim_mutex_t flush_mutex;
+
+  // Background flush thread owned by the session when periodic flush is active.
+  iree_thread_t* flush_thread;
+
+  // Notification used to wake the flush thread during shutdown.
+  iree_notification_t flush_notification;
+
+  // Nonzero when the flush thread should stop.
+  iree_atomic_int32_t flush_stop_requested;
+
+  // Mutex protecting |flush_status|.
+  iree_slim_mutex_t flush_status_mutex;
+
+  // First background flush failure, joined with any later failures.
+  iree_status_t flush_status;
+};
 
 static iree_status_t iree_hal_profile_capture_filter_set_u32_from_flag(
     int64_t flag_value, iree_hal_profile_capture_filter_flags_t flag,
@@ -627,7 +673,110 @@ static iree_status_t iree_hal_device_external_capture_begin_from_flags(
   return iree_hal_device_external_capture_begin(device, &options);
 }
 
-iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
+static bool iree_hal_profiling_from_flags_flush_should_stop(void* arg) {
+  iree_hal_profiling_from_flags_t* profiling =
+      (iree_hal_profiling_from_flags_t*)arg;
+  return iree_atomic_load(&profiling->flush_stop_requested,
+                          iree_memory_order_acquire) != 0;
+}
+
+static void iree_hal_profiling_from_flags_record_flush_status(
+    iree_hal_profiling_from_flags_t* profiling, iree_status_t status) {
+  if (iree_status_is_ok(status)) return;
+  iree_slim_mutex_lock(&profiling->flush_status_mutex);
+  profiling->flush_status = iree_status_join(profiling->flush_status, status);
+  iree_slim_mutex_unlock(&profiling->flush_status_mutex);
+}
+
+static iree_status_t iree_hal_profiling_from_flags_consume_flush_status(
+    iree_hal_profiling_from_flags_t* profiling) {
+  iree_slim_mutex_lock(&profiling->flush_status_mutex);
+  iree_status_t status = profiling->flush_status;
+  profiling->flush_status = iree_ok_status();
+  iree_slim_mutex_unlock(&profiling->flush_status_mutex);
+  return status;
+}
+
+iree_status_t iree_hal_flush_profiling_from_flags(
+    iree_hal_profiling_from_flags_t* profiling) {
+  if (!profiling || !profiling->native_profile_active) {
+    return iree_ok_status();
+  }
+  iree_slim_mutex_lock(&profiling->flush_mutex);
+  iree_status_t status = iree_hal_device_profiling_flush(profiling->device);
+  iree_slim_mutex_unlock(&profiling->flush_mutex);
+  return status;
+}
+
+static int iree_hal_profiling_from_flags_flush_thread_main(void* arg) {
+  iree_hal_profiling_from_flags_t* profiling =
+      (iree_hal_profiling_from_flags_t*)arg;
+
+  while (!iree_hal_profiling_from_flags_flush_should_stop(profiling)) {
+    const bool should_stop = iree_notification_await(
+        &profiling->flush_notification,
+        iree_hal_profiling_from_flags_flush_should_stop, profiling,
+        iree_make_timeout_ms(profiling->flush_interval_ms));
+    if (should_stop) break;
+
+    iree_status_t status = iree_hal_flush_profiling_from_flags(profiling);
+    if (!iree_status_is_ok(status)) {
+      iree_hal_profiling_from_flags_record_flush_status(profiling, status);
+      break;
+    }
+  }
+
+  return 0;
+}
+
+static iree_status_t iree_hal_profiling_from_flags_start_periodic_flush(
+    iree_hal_profiling_from_flags_t* profiling) {
+  if (!profiling->native_profile_active || profiling->flush_interval_ms == 0) {
+    return iree_ok_status();
+  }
+
+  iree_notification_initialize(&profiling->flush_notification);
+  iree_slim_mutex_initialize(&profiling->flush_status_mutex);
+  iree_atomic_store(&profiling->flush_stop_requested, 0,
+                    iree_memory_order_relaxed);
+
+  const iree_thread_create_params_t thread_params = {
+      .name = IREE_SV("iree-hal-profile-flush"),
+      .priority_class = IREE_THREAD_PRIORITY_CLASS_LOW,
+  };
+  iree_status_t status = iree_thread_create(
+      iree_hal_profiling_from_flags_flush_thread_main, profiling, thread_params,
+      profiling->host_allocator, &profiling->flush_thread);
+  if (!iree_status_is_ok(status)) {
+    iree_slim_mutex_deinitialize(&profiling->flush_status_mutex);
+    iree_notification_deinitialize(&profiling->flush_notification);
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_profiling_from_flags_stop_periodic_flush(
+    iree_hal_profiling_from_flags_t* profiling) {
+  if (!profiling || !profiling->flush_thread) return iree_ok_status();
+
+  iree_atomic_store(&profiling->flush_stop_requested, 1,
+                    iree_memory_order_release);
+  iree_notification_post(&profiling->flush_notification, IREE_ALL_WAITERS);
+  iree_thread_join(profiling->flush_thread);
+  iree_thread_release(profiling->flush_thread);
+  profiling->flush_thread = NULL;
+
+  iree_status_t status =
+      iree_hal_profiling_from_flags_consume_flush_status(profiling);
+  iree_slim_mutex_deinitialize(&profiling->flush_status_mutex);
+  iree_notification_deinitialize(&profiling->flush_notification);
+  return status;
+}
+
+iree_status_t iree_hal_begin_profiling_from_flags(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_profiling_from_flags_t** out_profiling) {
+  IREE_ASSERT_ARGUMENT(out_profiling);
+  *out_profiling = NULL;
   if (!device) return iree_ok_status();
 
   const iree_flag_string_list_t counter_names =
@@ -642,6 +791,11 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
                             "--device_capture_file and --device_capture_label "
                             "require --device_capture_tool");
   }
+  if (FLAG_device_profiling_flush_interval_ms < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--device_profiling_flush_interval_ms must be non-negative");
+  }
   if (options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
     if (counter_names.count != 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -655,9 +809,12 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
           "--device_profiling_output and --device_profiling_filter_* require "
           "--device_profiling_mode");
     }
-    return external_capture_requested
-               ? iree_hal_device_external_capture_begin_from_flags(device)
-               : iree_ok_status();
+    if (FLAG_device_profiling_flush_interval_ms != 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "--device_profiling_flush_interval_ms requires "
+                              "--device_profiling_mode");
+    }
+    if (!external_capture_requested) return iree_ok_status();
   }
   if (counter_names.count != 0 &&
       !iree_any_bit_set(options.data_families,
@@ -666,7 +823,8 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
         IREE_STATUS_INVALID_ARGUMENT,
         "--device_profiling_counter requires --device_profiling_mode=counters");
   }
-  if (strlen(FLAG_device_profiling_output) == 0) {
+  if (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
+      strlen(FLAG_device_profiling_output) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "--device_profiling_mode requires "
                             "--device_profiling_output");
@@ -682,33 +840,70 @@ iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
     options.counter_sets = &counter_set;
   }
 
+  iree_hal_profiling_from_flags_t* profiling = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, sizeof(*profiling),
+                                             (void**)&profiling));
+  memset(profiling, 0, sizeof(*profiling));
+  profiling->host_allocator = host_allocator;
+  profiling->device = device;
+  profiling->flush_interval_ms = FLAG_device_profiling_flush_interval_ms;
+  iree_slim_mutex_initialize(&profiling->flush_mutex);
+  iree_hal_device_retain(device);
+
   iree_hal_profile_sink_t* sink = NULL;
   iree_status_t status =
-      iree_hal_profile_sink_create_from_flags(iree_allocator_system(), &sink);
-  bool native_profile_active = false;
+      iree_hal_profile_sink_create_from_flags(host_allocator, &sink);
   if (iree_status_is_ok(status)) {
     options.sink = sink;
     status = iree_hal_device_profiling_begin(device, &options);
-    native_profile_active = iree_status_is_ok(status);
+    profiling->native_profile_active =
+        iree_status_is_ok(status) &&
+        options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE;
   }
   if (iree_status_is_ok(status) && external_capture_requested) {
     status = iree_hal_device_external_capture_begin_from_flags(device);
+    profiling->external_capture_active = iree_status_is_ok(status);
   }
-  if (!iree_status_is_ok(status) && native_profile_active) {
-    status = iree_status_join(status, iree_hal_device_profiling_end(device));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_profiling_from_flags_start_periodic_flush(profiling);
+  }
+  if (!iree_status_is_ok(status)) {
+    status = iree_status_join(
+        status, iree_hal_profiling_from_flags_stop_periodic_flush(profiling));
+    if (profiling->external_capture_active) {
+      status = iree_status_join(
+          status, iree_hal_device_external_capture_end(profiling->device));
+    }
+    if (profiling->native_profile_active) {
+      status = iree_status_join(
+          status, iree_hal_device_profiling_end(profiling->device));
+    }
+    iree_hal_device_release(profiling->device);
+    iree_slim_mutex_deinitialize(&profiling->flush_mutex);
+    iree_allocator_free(host_allocator, profiling);
+  } else {
+    *out_profiling = profiling;
   }
   iree_hal_profile_sink_release(sink);
   return status;
 }
 
-iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device) {
-  if (!device) return iree_ok_status();
-  iree_status_t status = iree_ok_status();
-  if (strlen(FLAG_device_capture_tool) != 0) {
-    status = iree_hal_device_external_capture_end(device);
+iree_status_t iree_hal_end_profiling_from_flags(
+    iree_hal_profiling_from_flags_t* profiling) {
+  if (!profiling) return iree_ok_status();
+
+  iree_status_t status =
+      iree_hal_profiling_from_flags_stop_periodic_flush(profiling);
+  if (profiling->external_capture_active) {
+    status = iree_status_join(
+        status, iree_hal_device_external_capture_end(profiling->device));
   }
-  if (strlen(FLAG_device_profiling_mode) != 0) {
-    status = iree_status_join(status, iree_hal_device_profiling_end(device));
+  if (profiling->native_profile_active) {
+    status = iree_status_join(status,
+                              iree_hal_device_profiling_end(profiling->device));
   }
+  iree_hal_device_release(profiling->device);
+  iree_slim_mutex_deinitialize(&profiling->flush_mutex);
+  iree_allocator_free(profiling->host_allocator, profiling);
   return status;
 }

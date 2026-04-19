@@ -178,6 +178,7 @@ iree_cc_test(
     "profile_test.cc"
   DEPS
     ::profile
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
 )

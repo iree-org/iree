@@ -52,16 +52,36 @@ iree_status_t iree_hal_create_devices_from_flags(
 iree_status_t iree_hal_device_set_default_channel_provider(
     iree_hal_device_t* device);
 
+// Owns any HAL-native profiling, external capture, and periodic flush state
+// requested by command line flags.
+typedef struct iree_hal_profiling_from_flags_t iree_hal_profiling_from_flags_t;
+
 // Begins any HAL-native profiling and external capture ranges requested by
 // command line flags. No-op if neither profiling nor external capture is
 // enabled.
-// Must be matched with a call to iree_hal_end_profiling_from_flags.
-iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device);
+//
+// |out_profiling| is set to NULL when no profiling or capture state was
+// created. Otherwise the returned state must be passed to
+// iree_hal_end_profiling_from_flags, even if the profiled operation fails, so
+// background flush failures and sink end-session failures can be observed.
+iree_status_t iree_hal_begin_profiling_from_flags(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_profiling_from_flags_t** out_profiling);
+
+// Flushes HAL-native profiling if |profiling| has an active native session.
+// No-op for NULL state and external-capture-only sessions.
+//
+// This serializes with the optional periodic flush thread owned by |profiling|.
+// Tools using iree_hal_begin_profiling_from_flags should prefer this helper
+// over calling iree_hal_device_profiling_flush directly.
+iree_status_t iree_hal_flush_profiling_from_flags(
+    iree_hal_profiling_from_flags_t* profiling);
 
 // Ends any HAL-native profiling and external capture ranges requested by
 // command line flags. No-op if neither profiling nor external capture is
 // enabled.
-iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device);
+iree_status_t iree_hal_end_profiling_from_flags(
+    iree_hal_profiling_from_flags_t* profiling);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

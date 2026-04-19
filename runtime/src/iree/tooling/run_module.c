@@ -242,9 +242,11 @@ static iree_status_t iree_tooling_run_function(
   }
 
   // Begin profiling immediate prior to invocation.
+  iree_hal_profiling_from_flags_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_status_annotate_f(iree_hal_begin_profiling_from_flags(device),
-                                    "beginning device profiling");
+    status = iree_status_annotate_f(
+        iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling),
+        "beginning device profiling");
   }
 
   // Invoke the function with the provided inputs.
@@ -259,7 +261,7 @@ static iree_status_t iree_tooling_run_function(
 
   // If the function is async we need to wait for it to complete.
   if (iree_status_is_ok(status) && finish_fence) {
-    IREE_RETURN_IF_ERROR(
+    status = iree_status_annotate_f(
         iree_hal_fence_wait(finish_fence, iree_infinite_timeout(),
                             IREE_ASYNC_WAIT_FLAG_NONE),
         "waiting on finish fence");
@@ -267,9 +269,11 @@ static iree_status_t iree_tooling_run_function(
   iree_hal_fence_release(finish_fence);
 
   // End profiling after waiting for the invocation to finish.
-  if (iree_status_is_ok(status)) {
-    status = iree_status_annotate_f(iree_hal_end_profiling_from_flags(device),
-                                    "ending device profiling");
+  if (profiling) {
+    status = iree_status_join(
+        status,
+        iree_status_annotate_f(iree_hal_end_profiling_from_flags(profiling),
+                               "ending device profiling"));
   }
 
   // Grab any instrumentation data present in the context and write it to disk.

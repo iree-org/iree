@@ -56,13 +56,15 @@ class CheckModuleTest : public ::testing::Test {
   }
 
   void TestBody() override {
-    IREE_ASSERT_OK(iree_hal_begin_profiling_from_flags(device_));
+    iree_hal_profiling_from_flags_t* profiling = nullptr;
+    IREE_ASSERT_OK(iree_hal_begin_profiling_from_flags(
+        device_, iree_allocator_system(), &profiling));
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_,
                                   IREE_VM_INVOCATION_FLAG_NONE,
                                   /*policy=*/nullptr,
                                   /*inputs=*/nullptr, /*outputs=*/nullptr,
                                   iree_vm_instance_allocator(instance_)));
-    IREE_ASSERT_OK(iree_hal_end_profiling_from_flags(device_));
+    IREE_ASSERT_OK(iree_hal_end_profiling_from_flags(profiling));
   }
 
  private:

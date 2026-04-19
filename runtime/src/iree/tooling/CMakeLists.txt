@@ -113,7 +113,9 @@ iree_cc_library(
     "device_util.c"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::threading
+    iree::base::threading::thread
     iree::base::tooling::flags
     iree::hal
     iree::hal::drivers
