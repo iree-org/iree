@@ -110,7 +110,9 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   // Borrowed logical-device profiling metadata registry.
   iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata;
   // Block pool used for durable command-buffer program blocks.
-  iree_arena_block_pool_t* block_pool;
+  iree_arena_block_pool_t* program_block_pool;
+  // Block pool used for retained HAL resource sets.
+  iree_arena_block_pool_t* resource_set_block_pool;
   // Producer-local profile command-buffer id assigned at creation.
   uint64_t profile_id;
   // Physical device ordinal selected from the command buffer's queue affinity.
@@ -195,8 +197,8 @@ static void iree_hal_amdgpu_aql_command_buffer_discard_recording(
     iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
   iree_hal_amdgpu_aql_program_release(&command_buffer->program);
   iree_hal_amdgpu_aql_program_builder_deinitialize(&command_buffer->builder);
-  iree_hal_amdgpu_aql_program_builder_initialize(command_buffer->block_pool,
-                                                 &command_buffer->builder);
+  iree_hal_amdgpu_aql_program_builder_initialize(
+      command_buffer->program_block_pool, &command_buffer->builder);
   iree_hal_amdgpu_aql_command_buffer_reset_resources(command_buffer);
 }
 
@@ -208,7 +210,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_resource_set_allocate(
-      command_buffer->block_pool, &command_buffer->resource_set);
+      command_buffer->resource_set_block_pool, &command_buffer->resource_set);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -603,7 +605,9 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_host_size_t device_ordinal,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    iree_arena_block_pool_t* program_block_pool,
+    iree_arena_block_pool_t* resource_set_block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -614,9 +618,14 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "ALLOW_INLINE_EXECUTION requires ONE_SHOT mode");
   }
-  if (IREE_UNLIKELY(!block_pool)) {
+  if (IREE_UNLIKELY(!program_block_pool)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command-buffer block pool is required");
+                            "command-buffer program block pool is required");
+  }
+  if (IREE_UNLIKELY(!resource_set_block_pool)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "command-buffer resource set block pool is "
+                            "required");
   }
   if (IREE_UNLIKELY(!profile_metadata)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -652,10 +661,11 @@ iree_status_t iree_hal_amdgpu_aql_command_buffer_create(
   command_buffer->host_allocator = host_allocator;
   command_buffer->device_allocator = device_allocator;
   command_buffer->profile_metadata = profile_metadata;
-  command_buffer->block_pool = block_pool;
+  command_buffer->program_block_pool = program_block_pool;
+  command_buffer->resource_set_block_pool = resource_set_block_pool;
   command_buffer->device_ordinal = (uint32_t)device_ordinal;
-  iree_arena_initialize(block_pool, &command_buffer->recording_arena);
-  iree_hal_amdgpu_aql_program_builder_initialize(block_pool,
+  iree_arena_initialize(program_block_pool, &command_buffer->recording_arena);
+  iree_hal_amdgpu_aql_program_builder_initialize(program_block_pool,
                                                  &command_buffer->builder);
 
   iree_status_t status =

@@ -2413,7 +2413,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_command_buffer(
       effective_queue_affinity, binding_capacity, device_ordinal,
       &logical_device->profile_metadata,
       &logical_device->host_block_pools.command_buffer,
-      logical_device->host_allocator, out_command_buffer);
+      &logical_device->host_block_pools.small, logical_device->host_allocator,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_create_event(

@@ -155,50 +155,153 @@ iree_cc_fuzz(
 
 iree_cc_library(
   NAME
-    util
+    affinity
   HDRS
     "affinity.h"
+  DEPS
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    packet
+  HDRS
     "aql_emitter.h"
-    "aql_ring.h"
-    "block_pool.h"
-    "device_library.h"
-    "epoch_signal_table.h"
-    "error_callback.h"
-    "info.h"
-    "kernarg_ring.h"
-    "kfd.h"
-    "notification_ring.h"
     "pm4_capabilities.h"
     "pm4_emitter.h"
-    "pm4_program.h"
-    "signal_pool.h"
-    "vmem.h"
+  DEPS
+    iree::base
+    iree::hal::drivers::amdgpu::abi
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    info
+  HDRS
+    "info.h"
   SRCS
-    "block_pool.c"
-    "device_library.c"
     "info.c"
-    "kernarg_ring.c"
-    "kfd.c"
-    "notification_ring.c"
-    "pm4_program.c"
-    "signal_pool.c"
-    "vmem.c"
   DEPS
     ::libhsa
-    ::topology
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    kfd
+  HDRS
+    "kfd.h"
+  SRCS
+    "kfd.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pm4_program
+  HDRS
+    "pm4_program.h"
+  SRCS
+    "pm4_program.c"
+  DEPS
+    ::libhsa
+    ::packet
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_primitives
+  HDRS
+    "aql_ring.h"
+    "epoch_signal_table.h"
+    "error_callback.h"
+    "kernarg_ring.h"
+    "notification_ring.h"
+    "signal_pool.h"
+  SRCS
+    "kernarg_ring.c"
+    "notification_ring.c"
+    "signal_pool.c"
+  DEPS
+    ::libhsa
     iree::async
     iree::base
     iree::base::internal
     iree::base::internal::arena
     iree::base::threading
-    iree::base::threading::thread
     iree::hal
-    iree::hal::drivers::amdgpu::abi
+    iree::hal::utils::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmem
+  HDRS
+    "vmem.h"
+  SRCS
+    "vmem.c"
+  DEPS
+    ::libhsa
+    ::topology
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    block_pool
+  HDRS
+    "block_pool.h"
+  SRCS
+    "block_pool.c"
+  DEPS
+    ::libhsa
+    iree::base
+    iree::base::threading
+    iree::hal::memory::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    device_library
+  HDRS
+    "device_library.h"
+  SRCS
+    "device_library.c"
+  DEPS
+    ::libhsa
+    ::topology
+    iree::base
+    iree::base::internal
     iree::hal::drivers::amdgpu::device::binaries::target_map
     iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::headers
-    iree::hal::memory::tracing
-    iree::hal::utils::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    util
+  DEPS
+    ::affinity
+    ::block_pool
+    ::device_library
+    ::info
+    ::kfd
+    ::packet
+    ::pm4_program
+    ::queue_primitives
+    ::vmem
   PUBLIC
 )
 
@@ -246,8 +349,9 @@ iree_cc_test(
   SRCS
     "block_pool_test.cc"
   DEPS
+    ::block_pool
     ::topology
-    ::util
+    ::vmem
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -264,8 +368,8 @@ iree_cc_test(
   SRCS
     "device_library_test.cc"
   DEPS
+    ::device_library
     ::topology
-    ::util
     iree::base
     iree::hal::drivers::amdgpu::device::headers
     iree::testing::gtest
@@ -283,7 +387,7 @@ iree_cc_test(
   SRCS
     "epoch_signal_table_test.cc"
   DEPS
-    ::util
+    ::queue_primitives
     iree::async
     iree::base
     iree::testing::gtest
@@ -301,9 +405,9 @@ iree_cc_test(
   SRCS
     "kfd_test.cc"
   DEPS
+    ::kfd
     ::libhsa
     ::topology
-    ::util
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -321,7 +425,7 @@ iree_cc_test(
     "notification_ring_test.cc"
   DEPS
     ::libhsa
-    ::util
+    ::queue_primitives
     iree::async
     iree::async::platform
     iree::base
@@ -341,7 +445,7 @@ iree_cc_test(
   SRCS
     "aql_emitter_test.cc"
   DEPS
-    ::util
+    ::packet
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
@@ -357,7 +461,7 @@ iree_cc_test(
   SRCS
     "pm4_emitter_test.cc"
   DEPS
-    ::util
+    ::packet
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
@@ -373,8 +477,10 @@ iree_cc_test(
   SRCS
     "pm4_program_test.cc"
   DEPS
+    ::packet
+    ::pm4_program
     ::topology
-    ::util
+    ::vmem
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -449,8 +555,8 @@ iree_cc_test(
     "signal_pool_test.cc"
   DEPS
     ::libhsa
+    ::queue_primitives
     ::topology
-    ::util
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -468,8 +574,8 @@ iree_cc_binary_benchmark(
     "signal_pool_benchmark.cc"
   DEPS
     ::libhsa
+    ::queue_primitives
     ::topology
-    ::util
     benchmark
     iree::base
   TESTONLY
@@ -487,7 +593,7 @@ iree_cc_test(
   DEPS
     ::libhsa
     ::topology
-    ::util
+    ::vmem
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

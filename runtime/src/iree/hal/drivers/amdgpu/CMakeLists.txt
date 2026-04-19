@@ -117,11 +117,17 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
     iree::hal::drivers::amdgpu::device::profiling
-    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::block_pool
+    iree::hal::drivers::amdgpu::util::device_library
     iree::hal::drivers::amdgpu::util::hsaco_metadata
+    iree::hal::drivers::amdgpu::util::info
+    iree::hal::drivers::amdgpu::util::kfd
     iree::hal::drivers::amdgpu::util::libaqlprofile
     iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::packet
+    iree::hal::drivers::amdgpu::util::queue_primitives
     iree::hal::drivers::amdgpu::util::topology
+    iree::hal::drivers::amdgpu::util::vmem
     iree::hal::memory::slab_provider
     iree::hal::memory::tlsf_pool
     iree::hal::memory::tracing
@@ -183,9 +189,14 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::dispatch
     iree::hal::drivers::amdgpu::device::headers
-    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::block_pool
+    iree::hal::drivers::amdgpu::util::device_library
+    iree::hal::drivers::amdgpu::util::info
     iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::packet
+    iree::hal::drivers::amdgpu::util::queue_primitives
     iree::hal::drivers::amdgpu::util::topology
+    iree::hal::drivers::amdgpu::util::vmem
     iree::hal::memory::slab_provider
     iree::hal::memory::tracing
   PUBLIC
@@ -272,7 +283,7 @@ iree_cc_test(
     iree::hal
     iree::hal::cts::util::test_base
     iree::hal::drivers::amdgpu::cts::testdata_amdgpu
-    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::packet
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
@@ -296,7 +307,7 @@ iree_cc_test(
     iree::base::threading
     iree::hal
     iree::hal::cts::util::test_base
-    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::packet
     iree::hal::memory::fixed_block_pool
     iree::testing::gtest
     iree::testing::gtest_main
@@ -318,7 +329,7 @@ iree_cc_test(
     iree::base
     iree::hal
     iree::hal::cts::util::test_base
-    iree::hal::drivers::amdgpu::util
+    iree::hal::drivers::amdgpu::util::packet
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

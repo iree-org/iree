@@ -165,52 +165,132 @@ iree_runtime_cc_fuzz(
 ##----------------------------------------------------------------------------##
 
 iree_runtime_cc_library(
-    name = "util",
-    srcs = [
-        "block_pool.c",
-        "device_library.c",
-        "info.c",
-        "kernarg_ring.c",
-        "kfd.c",
-        "notification_ring.c",
-        "pm4_program.c",
-        "signal_pool.c",
-        "vmem.c",
-    ],
+    name = "affinity",
+    hdrs = ["affinity.h"],
+    deps = ["//runtime/src/iree/base/internal"],
+)
+
+iree_runtime_cc_library(
+    name = "packet",
     hdrs = [
-        "affinity.h",
         "aql_emitter.h",
-        "aql_ring.h",
-        "block_pool.h",
-        "device_library.h",
-        "epoch_signal_table.h",
-        "error_callback.h",
-        "info.h",
-        "kernarg_ring.h",
-        "kfd.h",
-        "notification_ring.h",
         "pm4_capabilities.h",
         "pm4_emitter.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "info",
+    srcs = ["info.c"],
+    hdrs = ["info.h"],
+    deps = [
+        ":libhsa",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "kfd",
+    srcs = ["kfd.c"],
+    hdrs = ["kfd.h"],
+    deps = ["//runtime/src/iree/base"],
+)
+
+iree_runtime_cc_library(
+    name = "pm4_program",
+    srcs = ["pm4_program.c"],
+    hdrs = [
         "pm4_program.h",
-        "signal_pool.h",
-        "vmem.h",
     ],
     deps = [
         ":libhsa",
-        ":topology",
+        ":packet",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "queue_primitives",
+    srcs = [
+        "kernarg_ring.c",
+        "notification_ring.c",
+        "signal_pool.c",
+    ],
+    hdrs = [
+        "aql_ring.h",
+        "epoch_signal_table.h",
+        "error_callback.h",
+        "kernarg_ring.h",
+        "notification_ring.h",
+        "signal_pool.h",
+    ],
+    deps = [
+        ":libhsa",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/threading",
-        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/drivers/amdgpu/abi",
+        "//runtime/src/iree/hal/utils:resource_set",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vmem",
+    srcs = ["vmem.c"],
+    hdrs = ["vmem.h"],
+    deps = [
+        ":libhsa",
+        ":topology",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_pool",
+    srcs = ["block_pool.c"],
+    hdrs = ["block_pool.h"],
+    deps = [
+        ":libhsa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal/memory:tracing",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "device_library",
+    srcs = ["device_library.c"],
+    hdrs = ["device_library.h"],
+    deps = [
+        ":libhsa",
+        ":topology",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:target_map",
         "//runtime/src/iree/hal/drivers/amdgpu/device/binaries:toc",
-        "//runtime/src/iree/hal/memory:tracing",
-        "//runtime/src/iree/hal/utils:resource_set",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "util",
+    deps = [
+        ":affinity",
+        ":block_pool",
+        ":device_library",
+        ":info",
+        ":kfd",
+        ":packet",
+        ":pm4_program",
+        ":queue_primitives",
+        ":vmem",
     ],
 )
 
@@ -258,8 +338,9 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
+        ":block_pool",
         ":topology",
-        ":util",
+        ":vmem",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -275,8 +356,8 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
+        ":device_library",
         ":topology",
-        ":util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/testing:gtest",
@@ -293,7 +374,7 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
-        ":util",
+        ":queue_primitives",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
@@ -310,9 +391,9 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
+        ":kfd",
         ":libhsa",
         ":topology",
-        ":util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -329,7 +410,7 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":libhsa",
-        ":util",
+        ":queue_primitives",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
@@ -348,7 +429,7 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
-        ":util",
+        ":packet",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -363,7 +444,7 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
-        ":util",
+        ":packet",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -378,8 +459,10 @@ iree_runtime_cc_test(
         "nodocker",
     ],
     deps = [
+        ":packet",
+        ":pm4_program",
         ":topology",
-        ":util",
+        ":vmem",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -459,8 +542,8 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":libhsa",
+        ":queue_primitives",
         ":topology",
-        ":util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -477,8 +560,8 @@ cc_binary_benchmark(
     ],
     deps = [
         ":libhsa",
+        ":queue_primitives",
         ":topology",
-        ":util",
         "//runtime/src:runtime_defines",
         "//runtime/src/iree/base",
         "@com_google_benchmark//:benchmark",
@@ -496,7 +579,7 @@ iree_runtime_cc_test(
     deps = [
         ":libhsa",
         ":topology",
-        ":util",
+        ":vmem",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

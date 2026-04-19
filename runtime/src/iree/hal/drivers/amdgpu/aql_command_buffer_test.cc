@@ -46,7 +46,7 @@ class AqlCommandBufferTest : public ::testing::Test {
     IREE_EXPECT_OK(iree_hal_amdgpu_aql_command_buffer_create(
         /*device_allocator=*/nullptr, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
         IREE_HAL_QUEUE_AFFINITY_ANY, binding_capacity, /*device_ordinal=*/0,
-        &profile_metadata_, &block_pool_, iree_allocator_system(),
+        &profile_metadata_, &block_pool_, &block_pool_, iree_allocator_system(),
         &command_buffer));
     return CommandBufferPtr(command_buffer);
   }
