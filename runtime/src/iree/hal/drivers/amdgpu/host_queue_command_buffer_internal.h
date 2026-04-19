@@ -37,6 +37,10 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready);
 
+// Validates that a metadata-only command-buffer program can be replayed.
+iree_status_t iree_hal_amdgpu_host_queue_validate_metadata_commands(
+    const iree_hal_amdgpu_aql_program_t* program);
+
 // Starts multi-block command-buffer replay.
 iree_status_t iree_hal_amdgpu_command_buffer_replay_start_under_lock(
     iree_hal_amdgpu_host_queue_t* queue,

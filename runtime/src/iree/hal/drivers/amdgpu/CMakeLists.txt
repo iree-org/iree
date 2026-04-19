@@ -38,6 +38,7 @@ iree_cc_library(
     "host_queue_blit.h"
     "host_queue_command_buffer.c"
     "host_queue_command_buffer.h"
+    "host_queue_command_buffer_block.c"
     "host_queue_command_buffer_internal.h"
     "host_queue_command_buffer_profile.c"
     "host_queue_command_buffer_profile.h"
