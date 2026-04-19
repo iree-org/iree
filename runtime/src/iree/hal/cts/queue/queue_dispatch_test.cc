@@ -120,10 +120,14 @@ struct TestProfileSink {
   int clock_correlation_count = 0;
   // Number of dispatch event chunks observed.
   int dispatch_event_count = 0;
+  // Number of queue device event chunks observed.
+  int queue_device_event_count = 0;
   // Clock correlation records copied from CLOCK_CORRELATIONS chunks.
   std::vector<iree_hal_profile_clock_correlation_record_t> clock_correlations;
   // Dispatch event records copied from DISPATCH_EVENTS chunks.
   std::vector<iree_hal_profile_dispatch_event_t> dispatch_events;
+  // Queue device event records copied from QUEUE_DEVICE_EVENTS chunks.
+  std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;
   // Executable identifiers copied from EXECUTABLES chunks.
   std::vector<uint64_t> executable_ids;
   // Executable identifiers copied from EXECUTABLE_EXPORTS chunks.
@@ -352,6 +356,36 @@ static iree_status_t TestProfileSinkWrite(
         test_sink->dispatch_event_physical_device_ordinals.end(), record_count,
         metadata->physical_device_ordinal);
     ++test_sink->dispatch_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_TRUE(test_sink->saw_queue_metadata);
+    EXPECT_NE(UINT32_MAX, metadata->physical_device_ordinal);
+    EXPECT_NE(UINT32_MAX, metadata->queue_ordinal);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_queue_device_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_queue_device_event_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_queue_device_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_queue_device_event_t),
+                records[i].record_length);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0u, records[i].submission_id);
+      EXPECT_NE(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+      EXPECT_NE(0u, records[i].start_tick);
+      EXPECT_NE(0u, records[i].end_tick);
+      EXPECT_GE(records[i].end_tick, records[i].start_tick);
+    }
+    test_sink->queue_device_events.insert(test_sink->queue_device_events.end(),
+                                          records, records + record_count);
+    ++test_sink->queue_device_event_count;
   }
 
   return iree_ok_status();
@@ -414,6 +448,33 @@ static void ExpectDispatchEventsWithinClockCorrelationRange(
     ASSERT_LT(min_device_tick, max_device_tick);
     EXPECT_GE(sink.dispatch_events[event_index].start_tick, min_device_tick);
     EXPECT_LE(sink.dispatch_events[event_index].end_tick, max_device_tick);
+  }
+}
+
+static void ExpectQueueDeviceEventsWithinClockCorrelationRange(
+    const TestProfileSink& sink) {
+  ASSERT_GE(sink.clock_correlations.size(), 2u);
+  for (const iree_hal_profile_queue_device_event_t& event :
+       sink.queue_device_events) {
+    uint64_t min_device_tick = UINT64_MAX;
+    uint64_t max_device_tick = 0;
+    for (const iree_hal_profile_clock_correlation_record_t& correlation :
+         sink.clock_correlations) {
+      if (correlation.physical_device_ordinal !=
+              event.physical_device_ordinal ||
+          !iree_any_bit_set(
+              correlation.flags,
+              IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
+        continue;
+      }
+      min_device_tick = std::min(min_device_tick, correlation.device_tick);
+      max_device_tick = std::max(max_device_tick, correlation.device_tick);
+    }
+    ASSERT_NE(UINT64_MAX, min_device_tick);
+    ASSERT_NE(0u, max_device_tick);
+    ASSERT_LT(min_device_tick, max_device_tick);
+    EXPECT_GE(event.start_tick, min_device_tick);
+    EXPECT_LE(event.end_tick, max_device_tick);
   }
 }
 
@@ -523,6 +584,77 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
   EXPECT_TRUE(sink.saw_queue_metadata);
   EXPECT_FALSE(sink.write_after_end);
   ExpectDispatchEventsWithinClockCorrelationRange(sink);
+}
+
+// Device queue event profiling should produce one device-domain span for the
+// direct dispatch submission without also requiring dispatch-event capture.
+TEST_P(QueueDispatchTest, DispatchDeviceQueueEventProfiling) {
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  {
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    CreateDeviceBufferWithData(input_data.data(),
+                               input_data.size() * sizeof(input_data[0]),
+                               input_buffer.out());
+  }
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  const uint32_t constant_data[] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_data, sizeof(constant_data));
+
+  DeviceProfilingScope profiling(device_);
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS,
+                      TestProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device queue profiling unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  SemaphoreList empty_wait;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+      executable_, /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+  EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.clock_correlation_count, 3);
+  EXPECT_EQ(0, sink.dispatch_event_count);
+  EXPECT_TRUE(sink.dispatch_events.empty());
+  EXPECT_GE(sink.queue_device_event_count, 1);
+  ASSERT_EQ(1u, sink.queue_device_events.size());
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH,
+            sink.queue_device_events[0].type);
+  EXPECT_EQ(1u, sink.queue_device_events[0].operation_count);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+  ExpectQueueDeviceEventsWithinClockCorrelationRange(sink);
 }
 
 // Capture filters must not perturb direct queue dispatch semantics or
@@ -837,7 +969,8 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
 
     DeviceProfilingScope profiling(device_);
     iree_status_t profiling_status =
-        profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+        profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+                            IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS,
                         TestProfileSinkAsBase(&sink));
     if (IsProfilingUnsupported(profiling_status)) {
       iree_status_free(profiling_status);
@@ -854,10 +987,18 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
     EXPECT_EQ(1, sink.queue_metadata_count);
     EXPECT_GE(sink.clock_correlation_count, 2);
     EXPECT_GE(sink.dispatch_event_count, 1);
+    EXPECT_GE(sink.queue_device_event_count, 1);
+    const iree_host_size_t dispatch_queue_device_event_count = std::count_if(
+        sink.queue_device_events.begin(), sink.queue_device_events.end(),
+        [](const iree_hal_profile_queue_device_event_t& event) {
+          return event.type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+        });
+    EXPECT_GE(dispatch_queue_device_event_count, 1u);
     EXPECT_TRUE(sink.saw_device_metadata);
     EXPECT_TRUE(sink.saw_queue_metadata);
     EXPECT_FALSE(sink.write_after_end);
     ExpectDispatchEventsWithinClockCorrelationRange(sink);
+    ExpectQueueDeviceEventsWithinClockCorrelationRange(sink);
   }
 
   iree_hal_executable_cache_t* executable_cache_ = nullptr;

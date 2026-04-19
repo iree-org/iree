@@ -238,6 +238,22 @@ void iree_hal_amdgpu_host_queue_emit_kernel_submission_prefix(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_amdgpu_host_queue_kernel_submission_t* submission);
 
+// Commits a non-final queue-device start timestamp packet. The packet must be
+// reserved in |submission| and precede the queue operation payload.
+void iree_hal_amdgpu_host_queue_commit_queue_device_start_packet(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution, uint64_t packet_id,
+    iree_hal_amdgpu_profile_queue_device_event_t* queue_device_event);
+
+// Commits the final queue-device end timestamp packet and queue completion.
+// The packet must be reserved in |submission| and follow the queue operation
+// payload.
+void iree_hal_amdgpu_host_queue_commit_queue_device_end_packet(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list, uint64_t packet_id,
+    iree_hal_amdgpu_profile_queue_device_event_t* queue_device_event);
+
 // Attempts to begin one kernel-dispatch submission without waiting for ring
 // capacity. Caller must hold submission_mutex.
 iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(

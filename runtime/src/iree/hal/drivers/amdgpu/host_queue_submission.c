@@ -249,7 +249,7 @@ iree_hal_amdgpu_host_queue_payload_pm4_ib_packet_control(
       IREE_HSA_FENCE_SCOPE_NONE);
 }
 
-static void iree_hal_amdgpu_host_queue_commit_queue_device_start_packet(
+void iree_hal_amdgpu_host_queue_commit_queue_device_start_packet(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution, uint64_t packet_id,
     iree_hal_amdgpu_profile_queue_device_event_t* queue_device_event) {
@@ -273,7 +273,7 @@ static void iree_hal_amdgpu_host_queue_commit_queue_device_start_packet(
   iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
 }
 
-static void iree_hal_amdgpu_host_queue_commit_queue_device_end_packet(
+void iree_hal_amdgpu_host_queue_commit_queue_device_end_packet(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list, uint64_t packet_id,

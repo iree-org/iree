@@ -779,9 +779,9 @@ iree_hal_profile_queue_event_default(void) {
 //
 // Queue device events describe when queue work became visible to the physical
 // device, in the device's raw timestamp domain. They complement, but do not
-// replace, host-timestamped queue events: consumers should join records by
-// explicit relationship records or by queue submission id when relationships
-// are absent.
+// replace, host-timestamped queue events: a producer may emit them without
+// QUEUE_EVENTS being requested. Consumers should join records by explicit
+// relationship records or by queue submission id when relationships are absent.
 typedef struct iree_hal_profile_queue_device_event_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
