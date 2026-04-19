@@ -728,6 +728,7 @@ static iree_status_t iree_profile_export_process_queue_event_records(
             ",\"allocation_id\":%" PRIu64
             ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
             ",\"stream_id\":%" PRIu64 ",\"host_time_ns\":%" PRId64
+            ",\"ready_host_time_ns\":%" PRId64
             ",\"host_time_domain\":\"iree_host_time_ns\""
             ",\"wait_count\":%u,\"signal_count\":%u"
             ",\"barrier_count\":%u,\"operation_count\":%u"
@@ -735,9 +736,10 @@ static iree_status_t iree_profile_export_process_queue_event_records(
             queue_event.submission_id, queue_event.command_buffer_id,
             queue_event.allocation_id, queue_event.physical_device_ordinal,
             queue_event.queue_ordinal, queue_event.stream_id,
-            queue_event.host_time_ns, queue_event.wait_count,
-            queue_event.signal_count, queue_event.barrier_count,
-            queue_event.operation_count, queue_event.payload_length);
+            queue_event.host_time_ns, queue_event.ready_host_time_ns,
+            queue_event.wait_count, queue_event.signal_count,
+            queue_event.barrier_count, queue_event.operation_count,
+            queue_event.payload_length);
   }
   return status;
 }

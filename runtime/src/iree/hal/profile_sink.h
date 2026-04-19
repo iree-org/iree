@@ -762,8 +762,8 @@ enum iree_hal_profile_queue_dependency_strategy_e {
 //
 // Queue events describe submission-time behavior: which queue accepted an
 // operation, how dependency edges were represented, what user-visible
-// submission id was assigned, and how much payload the operation covered. The
-// timestamp is in IREE host monotonic time, not a device clock domain.
+// submission id was assigned, and how much payload the operation covered.
+// Timestamps are in IREE host monotonic time, not a device clock domain.
 typedef struct iree_hal_profile_queue_event_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
@@ -775,7 +775,7 @@ typedef struct iree_hal_profile_queue_event_t {
   iree_hal_profile_queue_dependency_strategy_t dependency_strategy;
   // Producer-defined event identifier unique within the queue event stream.
   uint64_t event_id;
-  // IREE monotonic host timestamp in nanoseconds.
+  // IREE monotonic host timestamp when the operation was submitted.
   int64_t host_time_ns;
   // Queue submission epoch associated with this operation, or 0 when absent.
   uint64_t submission_id;
@@ -799,8 +799,10 @@ typedef struct iree_hal_profile_queue_event_t {
   uint32_t operation_count;
   // Type-specific payload byte length, or 0 when not applicable.
   uint64_t payload_length;
-  // Reserved for future queue event fields; must be zero.
-  uint64_t reserved0;
+  // IREE monotonic host timestamp when the operation became ready to execute.
+  // May be 0 when readiness is not producer-observable or the operation failed
+  // before it became ready.
+  int64_t ready_host_time_ns;
 } iree_hal_profile_queue_event_t;
 
 // Returns a default queue operation event record.

@@ -270,6 +270,9 @@ static iree_status_t TestProfileSinkWrite(
       EXPECT_NE(0u, records[i].submission_id);
       EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
       EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+      if (records[i].ready_host_time_ns != 0) {
+        EXPECT_GE(records[i].ready_host_time_ns, records[i].host_time_ns);
+      }
     }
     test_sink->queue_events.insert(test_sink->queue_events.end(), records,
                                    records + record_count);

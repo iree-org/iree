@@ -743,24 +743,51 @@ class PerfettoTraceConverter:
             else []
         )
         flow_ids.extend(self.endpoint_flow_ids(record, "queue_event"))
-        self.timeline_events.append(
-            TimelineEvent(
-                event_time_ns,
-                (2, "queue", physical_device_ordinal, queue_ordinal, event_time_ns),
-                lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, name=name, annotations=annotations, flow_ids=tuple(
-                    flow_ids
-                ): add_instant(
-                    self.builder,
-                    self.perfetto.track_event,
-                    timestamp_ns,
-                    track_uuid,
-                    name,
-                    annotations,
-                    flow_ids,
-                ),
+
+        def append_queue_instant(
+            instant_time_ns: int, sort_label: str, instant_name: str
+        ) -> None:
+            instant_annotations = dict(annotations)
+            instant_flow_ids = tuple(flow_ids)
+            self.timeline_events.append(
+                TimelineEvent(
+                    instant_time_ns,
+                    (
+                        2,
+                        sort_label,
+                        physical_device_ordinal,
+                        queue_ordinal,
+                        instant_time_ns,
+                    ),
+                    lambda timestamp_ns=instant_time_ns: add_instant(
+                        self.builder,
+                        self.perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        instant_name,
+                        instant_annotations,
+                        instant_flow_ids,
+                    ),
+                )
             )
-        )
+
+        append_queue_instant(event_time_ns, "queue", name)
         self.all_timestamp_ns.append(event_time_ns)
+        self.stats.queue_instants += 1
+
+        ready_time_ns = record.get("ready_host_time_ns")
+        if ready_time_ns is None:
+            return
+        ready_event_time_ns = parse_integer(ready_time_ns)
+        if ready_event_time_ns <= 0 or ready_event_time_ns == event_time_ns:
+            return
+        ready_name = f"queue_ready:{record.get('op', 'event')}"
+        append_queue_instant(
+            ready_event_time_ns,
+            "queue-ready",
+            ready_name,
+        )
+        self.all_timestamp_ns.append(ready_event_time_ns)
         self.stats.queue_instants += 1
 
     def collect_memory_event(self, record: dict[str, Any]) -> None:

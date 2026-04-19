@@ -162,6 +162,7 @@ iree_cc_library(
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
+    iree::hal::local::profile
     iree::hal::local::transient_buffer
     iree::hal::memory::cpu_slab_provider
     iree::hal::memory::tlsf_pool

@@ -213,6 +213,7 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
         IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_DEVICE_BARRIER;
     queue_event.event_id = 100;
     queue_event.host_time_ns = 3000;
+    queue_event.ready_host_time_ns = 3050;
     queue_event.submission_id = kSmokeSubmissionId;
     queue_event.command_buffer_id = kSmokeCommandBufferId;
     queue_event.stream_id = kSmokeStreamId;

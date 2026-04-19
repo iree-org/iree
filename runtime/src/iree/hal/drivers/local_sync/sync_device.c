@@ -601,6 +601,7 @@ static iree_status_t iree_hal_sync_device_profile_operation_record_begin(
       iree_hal_sync_device_profile_dependency_strategy(wait_semaphore_list);
   event_info.scope = operation->scope;
   event_info.host_time_ns = host_time_ns;
+  event_info.ready_host_time_ns = host_time_ns;
   event_info.command_buffer_id = operation->command_buffer_id;
   event_info.allocation_id = operation->allocation_id;
   event_info.wait_count =

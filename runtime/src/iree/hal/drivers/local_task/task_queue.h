@@ -31,6 +31,7 @@
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/local_task/block_processor.h"
+#include "iree/hal/local/profile.h"
 #include "iree/task/executor.h"
 #include "iree/task/process.h"
 #include "iree/task/scope.h"
@@ -420,6 +421,15 @@ struct iree_hal_task_queue_t {
   // Device allocator used for transient allocations/tracking.
   iree_hal_allocator_t* device_allocator;
 
+  // Active local CPU profile recorder, or NULL when profiling is disabled.
+  iree_hal_local_profile_recorder_t* profile_recorder;
+
+  // Queue metadata identity used by records during the active profile session.
+  iree_hal_local_profile_queue_scope_t profile_scope;
+
+  // Device-owned submission id counter shared by all queues in the session.
+  iree_atomic_int64_t* profile_submission_counter;
+
   // Scope used for all operations in the queue.
   // This allows for easy waits on all outstanding queue operations as well as
   // differentiation of operations within the executor.
@@ -537,6 +547,18 @@ void iree_hal_task_queue_retire_frontier(iree_hal_task_queue_t* queue);
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue);
 
 void iree_hal_task_queue_trim(iree_hal_task_queue_t* queue);
+
+// Sets the active profile recorder snapshot used by future queue submissions.
+//
+// The owning device must call this only under the HAL profiling scope contract:
+// no concurrent submissions and no in-flight queue work while profiling is
+// enabled or disabled. Existing operations therefore never observe the recorder
+// pointer changing underneath them.
+void iree_hal_task_queue_set_profile_recorder(
+    iree_hal_task_queue_t* queue,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t profile_scope,
+    iree_atomic_int64_t* submission_counter);
 
 iree_status_t iree_hal_task_queue_submit_barrier(
     iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,

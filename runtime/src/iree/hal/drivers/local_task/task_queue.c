@@ -126,6 +126,317 @@ static void iree_hal_task_queue_debug_record_destroy(
 //  +--------------------+    end scope, free arena.
 
 //===----------------------------------------------------------------------===//
+// Profiling helpers
+//===----------------------------------------------------------------------===//
+
+// Optional trailing profiling state for one queue operation. This is allocated
+// from the operation arena only while a local CPU profile session is active so
+// the disabled path does not grow task_queue_op_t or its memset footprint.
+typedef struct iree_hal_task_queue_profile_operation_t {
+  // Recorder captured at operation allocation time.
+  iree_hal_local_profile_recorder_t* recorder;
+
+  // Queue identity captured at operation allocation time.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Queue operation type shared by emitted records.
+  iree_hal_profile_queue_event_type_t type;
+
+  // Queue event flags captured for emitted queue records.
+  iree_hal_profile_queue_event_flags_t queue_flags;
+
+  // Host execution flags captured for emitted execution records.
+  iree_hal_profile_host_execution_event_flags_t host_flags;
+
+  // Strategy used for wait dependencies on this operation.
+  iree_hal_profile_queue_dependency_strategy_t dependency_strategy;
+
+  // Queue event id assigned by the recorder, or 0 when absent.
+  uint64_t queue_event_id;
+
+  // Submission id assigned to this queue operation, or 0 when absent.
+  uint64_t submission_id;
+
+  // Command-buffer id assigned to this queue operation, or 0 when absent.
+  uint64_t command_buffer_id;
+
+  // Executable id assigned to this operation, or 0 when absent.
+  uint64_t executable_id;
+
+  // Allocation id assigned to this operation, or 0 when absent.
+  uint64_t allocation_id;
+
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+
+  // Number of encoded payload operations represented by this queue operation.
+  uint32_t operation_count;
+
+  // Number of wait semaphores supplied to the queue operation.
+  uint32_t wait_count;
+
+  // Number of signal semaphores supplied to the queue operation.
+  uint32_t signal_count;
+
+  // Executable export ordinal for dispatch-like spans, or UINT32_MAX.
+  uint32_t export_ordinal;
+
+  // Workgroup counts submitted for dispatch-like spans.
+  uint32_t workgroup_count[3];
+
+  // Workgroup sizes submitted for dispatch-like spans.
+  uint32_t workgroup_size[3];
+
+  // Host timestamp captured at queue submission.
+  iree_time_t submit_host_time_ns;
+
+  // Host timestamp captured when the operation became ready to execute.
+  iree_time_t ready_host_time_ns;
+
+  // First host execution start timestamp, or 0 when no span began.
+  iree_atomic_int64_t start_host_time_ns;
+
+  // True after the queue event append has been attempted.
+  bool queue_event_recorded;
+} iree_hal_task_queue_profile_operation_t;
+
+static iree_host_size_t iree_hal_task_queue_profile_operation_offset(void) {
+  return iree_host_align(sizeof(iree_hal_task_queue_op_t),
+                         iree_alignof(iree_hal_task_queue_profile_operation_t));
+}
+
+static uint32_t iree_hal_task_queue_profile_count(iree_host_size_t count) {
+  return count > UINT32_MAX ? UINT32_MAX : (uint32_t)count;
+}
+
+static iree_hal_profile_queue_event_type_t iree_hal_task_queue_profile_type(
+    iree_hal_task_queue_op_type_t type) {
+  switch (type) {
+    case IREE_HAL_TASK_QUEUE_OP_COMMANDS:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE;
+    case IREE_HAL_TASK_QUEUE_OP_BARRIER:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
+    case IREE_HAL_TASK_QUEUE_OP_HOST_CALL:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL;
+    case IREE_HAL_TASK_QUEUE_OP_ALLOCA:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA;
+    case IREE_HAL_TASK_QUEUE_OP_DEALLOCA:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA;
+    case IREE_HAL_TASK_QUEUE_OP_READ:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ;
+    case IREE_HAL_TASK_QUEUE_OP_WRITE:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE;
+    case IREE_HAL_TASK_QUEUE_OP_FILL:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL;
+    case IREE_HAL_TASK_QUEUE_OP_COPY:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY;
+    case IREE_HAL_TASK_QUEUE_OP_UPDATE:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_UPDATE;
+    case IREE_HAL_TASK_QUEUE_OP_DISPATCH:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+  }
+  return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE;
+}
+
+static uint32_t iree_hal_task_queue_profile_operation_count(
+    iree_hal_task_queue_op_type_t type) {
+  return type == IREE_HAL_TASK_QUEUE_OP_BARRIER ? 0u : 1u;
+}
+
+static iree_hal_task_queue_profile_operation_t*
+iree_hal_task_queue_profile_operation(iree_hal_task_queue_op_t* operation) {
+  if (IREE_LIKELY(!operation->queue->profile_recorder)) return NULL;
+  const iree_host_size_t profile_operation_offset =
+      iree_hal_task_queue_profile_operation_offset();
+  return (iree_hal_task_queue_profile_operation_t*)((uint8_t*)operation +
+                                                    profile_operation_offset);
+}
+
+static void iree_hal_task_queue_profile_operation_initialize(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_op_type_t type,
+    const iree_hal_semaphore_list_t* signal_semaphores,
+    iree_hal_task_queue_profile_operation_t* profile_operation) {
+  memset(profile_operation, 0, sizeof(*profile_operation));
+  profile_operation->recorder = queue->profile_recorder;
+  profile_operation->scope = queue->profile_scope;
+  profile_operation->type = iree_hal_task_queue_profile_type(type);
+  profile_operation->operation_count =
+      iree_hal_task_queue_profile_operation_count(type);
+  profile_operation->signal_count =
+      iree_hal_task_queue_profile_count(signal_semaphores->count);
+  profile_operation->export_ordinal = UINT32_MAX;
+  profile_operation->submit_host_time_ns = iree_time_now();
+  iree_atomic_store(&profile_operation->start_host_time_ns, 0,
+                    iree_memory_order_relaxed);
+  if (queue->profile_submission_counter) {
+    profile_operation->submission_id = (uint64_t)iree_atomic_fetch_add(
+        queue->profile_submission_counter, 1, iree_memory_order_relaxed);
+  }
+}
+
+static void iree_hal_task_queue_profile_set_waits(
+    iree_hal_task_queue_op_t* operation, iree_host_size_t original_wait_count,
+    iree_host_size_t unsatisfied_wait_count) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->wait_count =
+      iree_hal_task_queue_profile_count(original_wait_count);
+  if (original_wait_count == 0) {
+    profile_operation->dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE;
+  } else if (unsatisfied_wait_count == 0) {
+    profile_operation->dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE;
+  } else {
+    profile_operation->dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER;
+    profile_operation->queue_flags |=
+        IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
+  }
+}
+
+static void iree_hal_task_queue_profile_force_software_defer(
+    iree_hal_task_queue_op_t* operation) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->dependency_strategy =
+      IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER;
+  profile_operation->queue_flags |=
+      IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
+}
+
+static void iree_hal_task_queue_profile_set_payload(
+    iree_hal_task_queue_op_t* operation, uint64_t payload_length) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->payload_length = payload_length;
+}
+
+static void iree_hal_task_queue_profile_add_host_flags(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_profile_host_execution_event_flags_t host_flags) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->host_flags |= host_flags;
+}
+
+static void iree_hal_task_queue_profile_set_dispatch(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  profile_operation->export_ordinal = export_ordinal;
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    profile_operation->host_flags |=
+        IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
+  } else {
+    memcpy(profile_operation->workgroup_count, config.workgroup_count,
+           sizeof(profile_operation->workgroup_count));
+  }
+  profile_operation->workgroup_size[0] =
+      config.workgroup_size[0] ? config.workgroup_size[0] : 1;
+  profile_operation->workgroup_size[1] =
+      config.workgroup_size[1] ? config.workgroup_size[1] : 1;
+  profile_operation->workgroup_size[2] =
+      config.workgroup_size[2] ? config.workgroup_size[2] : 1;
+}
+
+static void iree_hal_task_queue_profile_record_queue_event(
+    iree_hal_task_queue_op_t* operation, iree_time_t ready_host_time_ns) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation || profile_operation->queue_event_recorded) return;
+  profile_operation->queue_event_recorded = true;
+  profile_operation->ready_host_time_ns = ready_host_time_ns;
+
+  iree_hal_local_profile_queue_event_info_t event_info =
+      iree_hal_local_profile_queue_event_info_default();
+  event_info.type = profile_operation->type;
+  event_info.flags = profile_operation->queue_flags;
+  event_info.dependency_strategy = profile_operation->dependency_strategy;
+  event_info.scope = profile_operation->scope;
+  event_info.host_time_ns = profile_operation->submit_host_time_ns;
+  event_info.ready_host_time_ns = profile_operation->ready_host_time_ns;
+  event_info.submission_id = profile_operation->submission_id;
+  event_info.command_buffer_id = profile_operation->command_buffer_id;
+  event_info.allocation_id = profile_operation->allocation_id;
+  event_info.wait_count = profile_operation->wait_count;
+  event_info.signal_count = profile_operation->signal_count;
+  event_info.operation_count = profile_operation->operation_count;
+  event_info.payload_length = profile_operation->payload_length;
+  iree_hal_local_profile_recorder_consume_status(
+      profile_operation->recorder,
+      iree_hal_local_profile_recorder_append_queue_event(
+          profile_operation->recorder, &event_info,
+          &profile_operation->queue_event_id));
+}
+
+static void iree_hal_task_queue_profile_record_ready(
+    iree_hal_task_queue_op_t* operation) {
+  if (operation->type == IREE_HAL_TASK_QUEUE_OP_ALLOCA) return;
+  iree_hal_task_queue_profile_record_queue_event(operation, iree_time_now());
+}
+
+static void iree_hal_task_queue_profile_record_failed_before_ready(
+    iree_hal_task_queue_op_t* operation) {
+  iree_hal_task_queue_profile_record_queue_event(operation,
+                                                 /*ready_host_time_ns=*/0);
+}
+
+static void iree_hal_task_queue_profile_start_host_execution(
+    iree_hal_task_queue_op_t* operation) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  int64_t expected = 0;
+  const iree_time_t start_host_time_ns = iree_time_now();
+  iree_atomic_compare_exchange_strong(
+      &profile_operation->start_host_time_ns, &expected, start_host_time_ns,
+      iree_memory_order_acq_rel, iree_memory_order_acquire);
+}
+
+static void iree_hal_task_queue_profile_finish_host_execution(
+    iree_hal_task_queue_op_t* operation, iree_status_t operation_status) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return;
+  const iree_time_t start_host_time_ns = iree_atomic_load(
+      &profile_operation->start_host_time_ns, iree_memory_order_acquire);
+  if (start_host_time_ns == 0) return;
+
+  iree_hal_local_profile_host_execution_event_info_t event_info =
+      iree_hal_local_profile_host_execution_event_info_default();
+  event_info.type = profile_operation->type;
+  event_info.flags = profile_operation->host_flags;
+  event_info.status_code = iree_status_code(operation_status);
+  event_info.scope = profile_operation->scope;
+  event_info.related_queue_event_id = profile_operation->queue_event_id;
+  event_info.submission_id = profile_operation->submission_id;
+  event_info.command_buffer_id = profile_operation->command_buffer_id;
+  event_info.executable_id = profile_operation->executable_id;
+  event_info.allocation_id = profile_operation->allocation_id;
+  event_info.export_ordinal = profile_operation->export_ordinal;
+  memcpy(event_info.workgroup_count, profile_operation->workgroup_count,
+         sizeof(event_info.workgroup_count));
+  memcpy(event_info.workgroup_size, profile_operation->workgroup_size,
+         sizeof(event_info.workgroup_size));
+  event_info.start_host_time_ns = start_host_time_ns;
+  event_info.end_host_time_ns = iree_time_now();
+  event_info.payload_length = profile_operation->payload_length;
+  event_info.operation_count = profile_operation->operation_count;
+  iree_hal_local_profile_recorder_consume_status(
+      profile_operation->recorder,
+      iree_hal_local_profile_recorder_append_host_execution_event(
+          profile_operation->recorder, &event_info, /*out_event_id=*/NULL));
+}
+
+//===----------------------------------------------------------------------===//
 // Operation lifecycle
 //===----------------------------------------------------------------------===//
 
@@ -139,6 +450,7 @@ static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
                                            iree_status_t failure_status) {
   iree_hal_task_queue_debug_record_destroy(operation->queue, operation,
                                            failure_status);
+  iree_hal_task_queue_profile_finish_host_execution(operation, failure_status);
 
   // Unmap SCOPED binding table mappings before signaling semaphores: the
   // unmap may flush non-coherent memory, so waiters must not observe the
@@ -270,8 +582,15 @@ static iree_status_t iree_hal_task_queue_op_allocate(
 
   // Allocate the operation from the arena.
   iree_hal_task_queue_op_t* operation = NULL;
+  const bool has_profile_operation =
+      IREE_UNLIKELY(queue->profile_recorder != NULL);
+  const iree_host_size_t operation_size =
+      has_profile_operation
+          ? iree_hal_task_queue_profile_operation_offset() +
+                sizeof(iree_hal_task_queue_profile_operation_t)
+          : sizeof(*operation);
   iree_status_t status =
-      iree_arena_allocate(&arena, sizeof(*operation), (void**)&operation);
+      iree_arena_allocate(&arena, operation_size, (void**)&operation);
   if (!iree_status_is_ok(status)) {
     iree_arena_deinitialize(&arena);
     return status;
@@ -286,6 +605,12 @@ static iree_status_t iree_hal_task_queue_op_allocate(
   operation->epoch_counter = &queue->epoch;
   operation->queue = queue;
   iree_hal_task_queue_debug_record_submit(queue, operation);
+  if (has_profile_operation) {
+    iree_hal_task_queue_profile_operation_t* profile_operation =
+        iree_hal_task_queue_profile_operation(operation);
+    iree_hal_task_queue_profile_operation_initialize(
+        queue, type, signal_semaphores, profile_operation);
+  }
 
   // Clone signal semaphores into the arena.
   status = iree_hal_semaphore_list_clone(
@@ -359,9 +684,11 @@ static void iree_hal_task_queue_wait_resolved(
         &operation->error_status, 0, iree_memory_order_acquire);
     if (!iree_status_is_ok(error)) {
       // At least one wait failed. Fail signals and destroy.
+      iree_hal_task_queue_profile_record_failed_before_ready(operation);
       iree_hal_task_queue_op_destroy(operation, error);
     } else {
       // All waits satisfied. Push to ready list and wake queue.
+      iree_hal_task_queue_profile_record_ready(operation);
       iree_hal_task_queue_op_slist_push(&operation->queue->ready_list,
                                         operation);
       iree_task_executor_schedule_process(operation->queue->executor,
@@ -411,6 +738,7 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
     iree_hal_semaphore_list_t wait_semaphores) {
   if (wait_semaphores.count == 0) {
     // All waits already satisfied — push directly.
+    iree_hal_task_queue_profile_record_ready(operation);
     iree_hal_task_queue_op_slist_push(&operation->queue->ready_list, operation);
     iree_task_executor_schedule_process(operation->queue->executor,
                                         &operation->queue->process);
@@ -468,6 +796,7 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
         // decrement — destroy the operation with the recorded error.
         iree_status_t error = (iree_status_t)iree_atomic_exchange(
             &operation->error_status, 0, iree_memory_order_acquire);
+        iree_hal_task_queue_profile_record_failed_before_ready(operation);
         iree_hal_task_queue_op_destroy(operation, error);
       }
       // Return OK: the operation is owned by the timepoint callbacks (or
@@ -562,6 +891,7 @@ static void iree_hal_task_queue_op_release_alloca_memory_wait(
 static void iree_hal_task_queue_alloca_memory_wait_resolved(
     iree_hal_task_queue_op_t* operation, iree_status_t status) {
   if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_fail(operation, status);
     return;
   }
@@ -613,6 +943,9 @@ static iree_status_t iree_hal_task_queue_alloca_wait_for_frontier(
         operation->frontier_tracker, wait_frontier,
         iree_hal_task_queue_alloca_frontier_wait_resolved, operation,
         &wait->frontier.waiter);
+    if (iree_status_is_ok(status)) {
+      iree_hal_task_queue_profile_force_software_defer(operation);
+    }
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_pool_release_reservation(operation->alloca.pool, reservation,
@@ -649,6 +982,8 @@ static iree_status_t iree_hal_task_queue_alloca_wait_for_pool_notification(
       operation->queue->proactor, &wait_op->base);
   if (!iree_status_is_ok(status)) {
     wait->kind = IREE_HAL_TASK_QUEUE_ALLOCA_MEMORY_WAIT_NONE;
+  } else {
+    iree_hal_task_queue_profile_force_software_defer(operation);
   }
   return status;
 }
@@ -863,6 +1198,8 @@ static iree_status_t iree_hal_task_queue_drain_recording(
     iree_hal_cmd_block_recording_t* owned_recording,
     const iree_hal_cmd_binding_entry_t* binding_table,
     iree_host_size_t binding_table_length) {
+  iree_hal_task_queue_profile_add_host_flags(
+      operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_DEFERRED);
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(queue->device_allocator);
 
@@ -1060,6 +1397,8 @@ static iree_status_t iree_hal_task_queue_drain_alloca_submit_reservation(
     iree_hal_task_queue_op_t* operation,
     const iree_hal_pool_reservation_t* reservation,
     const iree_async_frontier_t* reservation_failure_frontier) {
+  iree_hal_task_queue_profile_record_queue_event(operation, iree_time_now());
+  iree_hal_task_queue_profile_start_host_execution(operation);
   iree_hal_local_transient_buffer_attach_reservation(
       operation->alloca.transient_buffer, operation->alloca.pool, reservation);
 
@@ -1694,6 +2033,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     }
 
     // Drain the block processor.
+    if (IREE_UNLIKELY(queue->profile_recorder)) {
+      iree_hal_task_queue_profile_start_host_execution(item->operation);
+    }
     iree_hal_cmd_block_processor_worker_state_t* worker_state =
         &item->worker_states[worker_index % item->worker_count];
     iree_hal_cmd_block_processor_drain_result_t processor_result;
@@ -2024,6 +2366,8 @@ static iree_status_t iree_hal_task_queue_drain_read(
   if (!operation->read.async_file) {
     return iree_hal_task_queue_drain_read_sync(queue, operation);
   }
+  iree_hal_task_queue_profile_add_host_flags(
+      operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_DEFERRED);
 
   // Map the target buffer for writing.
   iree_hal_task_queue_io_context_t* io_context = NULL;
@@ -2085,6 +2429,8 @@ static iree_status_t iree_hal_task_queue_drain_write(
   if (!operation->write.async_file) {
     return iree_hal_task_queue_drain_write_sync(queue, operation);
   }
+  iree_hal_task_queue_profile_add_host_flags(
+      operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_DEFERRED);
 
   // Map the source buffer for reading.
   iree_hal_task_queue_io_context_t* io_context = NULL;
@@ -2194,22 +2540,27 @@ static iree_status_t iree_hal_task_queue_process_drain(
       break;
     case IREE_HAL_TASK_QUEUE_OP_BARRIER:
       // Barriers just signal and clean up — no CB to execute.
+      iree_hal_task_queue_profile_start_host_execution(operation);
       iree_hal_task_queue_op_complete(operation);
       break;
     case IREE_HAL_TASK_QUEUE_OP_HOST_CALL:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_host_call(queue, operation);
       break;
     case IREE_HAL_TASK_QUEUE_OP_ALLOCA:
       status = iree_hal_task_queue_drain_alloca(operation);
       if (!iree_status_is_ok(status)) {
+        iree_hal_task_queue_profile_record_failed_before_ready(operation);
         iree_hal_task_queue_op_destroy(operation, status);
         status = iree_ok_status();
       }
       break;
     case IREE_HAL_TASK_QUEUE_OP_DEALLOCA:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       iree_hal_task_queue_drain_dealloca(operation);
       break;
     case IREE_HAL_TASK_QUEUE_OP_READ:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_read(queue, operation);
       if (!iree_status_is_ok(status)) {
         iree_hal_task_queue_op_destroy(operation, status);
@@ -2217,6 +2568,7 @@ static iree_status_t iree_hal_task_queue_process_drain(
       }
       break;
     case IREE_HAL_TASK_QUEUE_OP_WRITE:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_write(queue, operation);
       if (!iree_status_is_ok(status)) {
         iree_hal_task_queue_op_destroy(operation, status);
@@ -2224,6 +2576,7 @@ static iree_status_t iree_hal_task_queue_process_drain(
       }
       break;
     case IREE_HAL_TASK_QUEUE_OP_FILL:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_fill(queue, operation);
       if (!iree_status_is_ok(status)) {
         iree_hal_task_queue_op_destroy(operation, status);
@@ -2231,6 +2584,7 @@ static iree_status_t iree_hal_task_queue_process_drain(
       }
       break;
     case IREE_HAL_TASK_QUEUE_OP_COPY:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_copy(queue, operation);
       if (!iree_status_is_ok(status)) {
         iree_hal_task_queue_op_destroy(operation, status);
@@ -2238,6 +2592,7 @@ static iree_status_t iree_hal_task_queue_process_drain(
       }
       break;
     case IREE_HAL_TASK_QUEUE_OP_UPDATE:
+      iree_hal_task_queue_profile_start_host_execution(operation);
       status = iree_hal_task_queue_drain_update(queue, operation);
       if (!iree_status_is_ok(status)) {
         iree_hal_task_queue_op_destroy(operation, status);
@@ -2284,6 +2639,7 @@ static iree_status_t iree_hal_task_queue_submit_op_finish(
     iree_hal_semaphore_list_t wait_semaphores, iree_host_size_t resource_count,
     iree_hal_resource_t* const* resources) {
   iree_status_t status = iree_ok_status();
+  const iree_host_size_t original_wait_count = wait_semaphores.count;
   if (resource_count > 0) {
     status = iree_hal_resource_set_insert(operation->resource_set,
                                           resource_count, resources);
@@ -2292,9 +2648,12 @@ static iree_status_t iree_hal_task_queue_submit_op_finish(
     status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
   }
   if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_profile_set_waits(operation, original_wait_count,
+                                          wait_semaphores.count);
     status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
   }
   if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
   }
   return status;
@@ -2496,6 +2855,22 @@ void iree_hal_task_queue_trim(iree_hal_task_queue_t* queue) {
   iree_task_executor_trim(queue->executor);
 }
 
+void iree_hal_task_queue_set_profile_recorder(
+    iree_hal_task_queue_t* queue,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t profile_scope,
+    iree_atomic_int64_t* submission_counter) {
+  if (profile_recorder) {
+    queue->profile_scope = profile_scope;
+    queue->profile_submission_counter = submission_counter;
+    queue->profile_recorder = profile_recorder;
+  } else {
+    queue->profile_recorder = NULL;
+    queue->profile_scope = profile_scope;
+    queue->profile_submission_counter = NULL;
+  }
+}
+
 iree_status_t iree_hal_task_queue_submit_barrier(
     iree_hal_task_queue_t* queue, iree_hal_semaphore_list_t wait_semaphores,
     iree_hal_semaphore_list_t signal_semaphores) {
@@ -2545,6 +2920,8 @@ iree_status_t iree_hal_task_queue_submit_commands(
     operation->commands.command_buffer = batch->command_buffer;
     operation->commands.binding_table = iree_hal_buffer_binding_table_empty();
     operation->commands.binding_mappings = NULL;
+    iree_hal_task_queue_profile_add_host_flags(
+        operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER);
 
     // Copy binding table entries into the arena if present.
     if (iree_status_is_ok(status) && batch->binding_table.count > 0) {
@@ -2566,19 +2943,15 @@ iree_status_t iree_hal_task_queue_submit_commands(
       }
     }
 
-    // Fast path: check if all wait semaphores are already satisfied.
-    iree_hal_semaphore_list_t wait_semaphores = batch->wait_semaphores;
-    if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
-      status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
-    }
-
-    // Register timepoints for unsatisfied waits.
     if (iree_status_is_ok(status)) {
-      status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
-    }
-
-    if (!iree_status_is_ok(status)) {
+      status = iree_hal_task_queue_submit_op_finish(
+          operation, batch->wait_semaphores, /*resource_count=*/0,
+          /*resources=*/NULL);
+    } else {
+      iree_hal_task_queue_profile_record_failed_before_ready(operation);
       iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
+    }
+    if (!iree_status_is_ok(status)) {
       break;
     }
   }
@@ -2613,19 +2986,8 @@ iree_status_t iree_hal_task_queue_submit_host_call(
   memcpy(operation->host_call.args, args, sizeof(operation->host_call.args));
   operation->host_call.flags = flags;
 
-  // Fast path: check if all wait semaphores are already satisfied.
-  if (wait_semaphores.count > 0) {
-    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
-  }
-
-  // Register timepoints for unsatisfied waits.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
-  }
-
-  if (!iree_status_is_ok(status)) {
-    iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
-  }
+  status = iree_hal_task_queue_submit_op_finish(
+      operation, wait_semaphores, /*resource_count=*/0, /*resources=*/NULL);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -2657,6 +3019,7 @@ iree_status_t iree_hal_task_queue_submit_alloca(
   operation->alloca.reserve_flags = reserve_flags;
   operation->alloca.transient_buffer = transient_buffer;
   operation->alloca.memory_wait = NULL;
+  iree_hal_task_queue_profile_set_payload(operation, allocation_size);
 
   // Retain the transient buffer until the operation completes. The selected
   // pool is borrowed: pool lifetimes must outlive all allocations sourced from
@@ -2664,6 +3027,8 @@ iree_status_t iree_hal_task_queue_submit_alloca(
   status = iree_hal_resource_set_insert(
       operation->resource_set, 1,
       (iree_hal_resource_t* const*)&transient_buffer);
+
+  const iree_host_size_t original_wait_count = wait_semaphores.count;
 
   // Fast path: check if all wait semaphores are already satisfied.
   if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
@@ -2674,12 +3039,17 @@ iree_status_t iree_hal_task_queue_submit_alloca(
   // reservation before returning so pool state changes are causally part of the
   // queue_alloca submission.
   if (iree_status_is_ok(status) && wait_semaphores.count == 0) {
+    iree_hal_task_queue_profile_set_waits(operation, original_wait_count,
+                                          wait_semaphores.count);
     status = iree_hal_task_queue_drain_alloca(operation);
   } else if (iree_status_is_ok(status)) {
+    iree_hal_task_queue_profile_set_waits(operation, original_wait_count,
+                                          wait_semaphores.count);
     status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
   }
 
   if (!iree_status_is_ok(status)) {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
   }
 
@@ -2711,24 +3081,16 @@ iree_status_t iree_hal_task_queue_submit_dealloca(
       operation->resource_set, 1,
       (iree_hal_resource_t* const*)&transient_buffer);
 
-  // Fast path: check if all wait semaphores are already satisfied.
-  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
-    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
-  }
-
-  // Register timepoints for unsatisfied waits.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
-  }
-
-  if (!iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_submit_op_finish(
+        operation, wait_semaphores, /*resource_count=*/0, /*resources=*/NULL);
+  } else {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
-    IREE_TRACE_ZONE_END(z0);
-    return status;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 iree_status_t iree_hal_task_queue_submit_read(
@@ -2755,6 +3117,7 @@ iree_status_t iree_hal_task_queue_submit_read(
   operation->read.buffer = target_buffer;
   operation->read.buffer_offset = target_offset;
   operation->read.length = length;
+  iree_hal_task_queue_profile_set_payload(operation, length);
 
   // Retain the HAL file and buffer through the operation lifetime.
   iree_hal_resource_t* resources[2] = {
@@ -2763,24 +3126,16 @@ iree_status_t iree_hal_task_queue_submit_read(
   };
   status = iree_hal_resource_set_insert(operation->resource_set, 2, resources);
 
-  // Fast path: check if all wait semaphores are already satisfied.
-  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
-    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
-  }
-
-  // Register timepoints for unsatisfied waits.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
-  }
-
-  if (!iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_submit_op_finish(
+        operation, wait_semaphores, /*resource_count=*/0, /*resources=*/NULL);
+  } else {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
-    IREE_TRACE_ZONE_END(z0);
-    return status;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 iree_status_t iree_hal_task_queue_submit_write(
@@ -2807,6 +3162,7 @@ iree_status_t iree_hal_task_queue_submit_write(
   operation->write.buffer = source_buffer;
   operation->write.buffer_offset = source_offset;
   operation->write.length = length;
+  iree_hal_task_queue_profile_set_payload(operation, length);
 
   // Retain the HAL file and buffer through the operation lifetime.
   iree_hal_resource_t* resources[2] = {
@@ -2815,24 +3171,16 @@ iree_status_t iree_hal_task_queue_submit_write(
   };
   status = iree_hal_resource_set_insert(operation->resource_set, 2, resources);
 
-  // Fast path: check if all wait semaphores are already satisfied.
-  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
-    status = iree_hal_task_queue_try_satisfy_waits(&wait_semaphores);
-  }
-
-  // Register timepoints for unsatisfied waits.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_queue_enqueue_waits(operation, wait_semaphores);
-  }
-
-  if (!iree_status_is_ok(status)) {
+    status = iree_hal_task_queue_submit_op_finish(
+        operation, wait_semaphores, /*resource_count=*/0, /*resources=*/NULL);
+  } else {
+    iree_hal_task_queue_profile_record_failed_before_ready(operation);
     iree_hal_task_queue_op_destroy(operation, iree_status_clone(status));
-    IREE_TRACE_ZONE_END(z0);
-    return status;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2853,6 +3201,7 @@ iree_status_t iree_hal_task_queue_submit_fill(
   operation->fill.length = length;
   operation->fill.pattern_length = (uint8_t)pattern_length;
   memcpy(operation->fill.pattern, pattern, pattern_length);
+  iree_hal_task_queue_profile_set_payload(operation, length);
   return iree_hal_task_queue_submit_op_finish(
       operation, wait_semaphores, 1,
       (iree_hal_resource_t* const*)&target_buffer);
@@ -2872,6 +3221,7 @@ iree_status_t iree_hal_task_queue_submit_copy(
   operation->copy.target_buffer = target_buffer;
   operation->copy.target_offset = target_offset;
   operation->copy.length = length;
+  iree_hal_task_queue_profile_set_payload(operation, length);
   iree_hal_resource_t* copy_resources[2] = {
       (iree_hal_resource_t*)source_buffer,
       (iree_hal_resource_t*)target_buffer,
@@ -2904,6 +3254,7 @@ iree_status_t iree_hal_task_queue_submit_update(
   operation->update.target_offset = target_offset;
   operation->update.length = length;
   operation->update.source_data = source_data_copy;
+  iree_hal_task_queue_profile_set_payload(operation, length);
 
   return iree_hal_task_queue_submit_op_finish(
       operation, wait_semaphores, 1,
@@ -2950,6 +3301,8 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
   operation->dispatch.config = config;
   operation->dispatch.binding_count = binding_count;
   operation->dispatch.flags = flags;
+  iree_hal_task_queue_profile_set_dispatch(operation, export_ordinal, config,
+                                           flags);
 
   // Arena-allocate copies of constants and bindings.
   iree_status_t status = iree_ok_status();
@@ -3009,6 +3362,9 @@ static iree_status_t iree_hal_task_queue_drain_dispatch(
     iree_hal_task_queue_t* queue, iree_hal_task_queue_op_t* operation) {
   const bool allow_inline = iree_any_bit_set(
       operation->dispatch.flags, IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION);
+  if (allow_inline) {
+    iree_hal_task_queue_profile_start_host_execution(operation);
+  }
   const bool uses_indirect_parameters =
       iree_hal_dispatch_uses_indirect_parameters(operation->dispatch.flags);
   const iree_host_size_t binding_count = operation->dispatch.binding_count;

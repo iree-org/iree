@@ -1144,12 +1144,14 @@ static void iree_profile_queue_print_text_event(
   fprintf(
       file,
       "  event=%" PRIu64 " type=%s submission=%" PRIu64
-      " strategy=%s waits=%u signals=%u barriers=%u ops=%u bytes=%" PRIu64 "\n",
+      " strategy=%s submit=%" PRId64 " ready=%" PRId64
+      " waits=%u signals=%u barriers=%u ops=%u bytes=%" PRIu64 "\n",
       event->event_id, iree_profile_queue_event_type_name(event->type),
       event->submission_id,
       iree_profile_queue_dependency_strategy_name(event->dependency_strategy),
-      event->wait_count, event->signal_count, event->barrier_count,
-      event->operation_count, event->payload_length);
+      event->host_time_ns, event->ready_host_time_ns, event->wait_count,
+      event->signal_count, event->barrier_count, event->operation_count,
+      event->payload_length);
 }
 
 static void iree_profile_queue_print_text_submissions_for_queue(
@@ -1429,6 +1431,7 @@ static void iree_profile_queue_print_jsonl_events(
         ",\"allocation_id\":%" PRIu64
         ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
         ",\"stream_id\":%" PRIu64 ",\"host_time_ns\":%" PRId64
+        ",\"ready_host_time_ns\":%" PRId64
         ",\"host_time_domain\":\"iree_host_time_ns\""
         ",\"wait_count\":%u,\"signal_count\":%u,\"barrier_count\":%u"
         ",\"operation_count\":%u,\"payload_length\":%" PRIu64 "}\n",
@@ -1437,8 +1440,9 @@ static void iree_profile_queue_print_jsonl_events(
         iree_profile_queue_dependency_strategy_name(event->dependency_strategy),
         event->submission_id, event->command_buffer_id, event->allocation_id,
         event->physical_device_ordinal, event->queue_ordinal, event->stream_id,
-        event->host_time_ns, event->wait_count, event->signal_count,
-        event->barrier_count, event->operation_count, event->payload_length);
+        event->host_time_ns, event->ready_host_time_ns, event->wait_count,
+        event->signal_count, event->barrier_count, event->operation_count,
+        event->payload_length);
   }
 }
 

@@ -105,8 +105,11 @@ typedef struct iree_hal_local_profile_queue_event_info_t {
   // Queue metadata identity shared by the appended record.
   iree_hal_local_profile_queue_scope_t scope;
 
-  // IREE monotonic host timestamp in nanoseconds, or 0 to sample now.
+  // IREE monotonic host timestamp when submitted, or 0 to sample now.
   iree_time_t host_time_ns;
+
+  // IREE monotonic host timestamp when ready to execute, or 0 when unknown.
+  iree_time_t ready_host_time_ns;
 
   // Queue submission epoch associated with this operation, or 0 when absent.
   uint64_t submission_id;
@@ -250,6 +253,16 @@ iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_host_execution_event_info_t* event_info,
     uint64_t* out_event_id);
+
+// Consumes |status| and records it as a deferred recorder failure.
+//
+// This is for producer contexts that cannot return profiling failures to their
+// immediate caller, such as async completion callbacks. The first failure is
+// reported by later flush/end calls; additional failures are attached to that
+// first failure when status annotations are enabled. OK statuses are consumed
+// without touching the recorder.
+void iree_hal_local_profile_recorder_consume_status(
+    iree_hal_local_profile_recorder_t* recorder, iree_status_t status);
 
 // Writes all buffered profile records to the session sink.
 iree_status_t iree_hal_local_profile_recorder_flush(

@@ -80,6 +80,9 @@ struct iree_hal_local_profile_recorder_t {
 
   // Next nonzero relationship id assigned by this stream.
   uint64_t next_event_relationship_id;
+
+  // First deferred append failure reported by async producers.
+  iree_status_t deferred_status;
 };
 
 typedef struct iree_hal_local_profile_recorder_snapshot_t {
@@ -379,6 +382,10 @@ void iree_hal_local_profile_recorder_destroy(
   IREE_ASSERT(!recorder->active,
               "active local profile recorders must be ended before destroy");
   iree_allocator_t host_allocator = recorder->host_allocator;
+  IREE_ASSERT(iree_status_is_ok(recorder->deferred_status),
+              "local profile recorders must report deferred failures before "
+              "destroy");
+  iree_status_free(recorder->deferred_status);
   iree_allocator_free(host_allocator, recorder->event_relationships);
   iree_allocator_free(host_allocator, recorder->host_execution_events);
   iree_allocator_free(host_allocator, recorder->queue_events);
@@ -441,6 +448,7 @@ iree_status_t iree_hal_local_profile_recorder_append_queue_event(
   event->event_id = recorder->next_queue_event_id++;
   event->host_time_ns = event_info->host_time_ns != 0 ? event_info->host_time_ns
                                                       : iree_time_now();
+  event->ready_host_time_ns = event_info->ready_host_time_ns;
   event->submission_id = event_info->submission_id;
   event->command_buffer_id = event_info->command_buffer_id;
   event->allocation_id = event_info->allocation_id;
@@ -567,6 +575,17 @@ iree_status_t iree_hal_local_profile_recorder_append_host_execution_event(
   return status;
 }
 
+void iree_hal_local_profile_recorder_consume_status(
+    iree_hal_local_profile_recorder_t* recorder, iree_status_t status) {
+  if (iree_status_is_ok(status)) return;
+  IREE_ASSERT_ARGUMENT(recorder);
+
+  iree_slim_mutex_lock(&recorder->mutex);
+  recorder->deferred_status =
+      iree_status_join(recorder->deferred_status, status);
+  iree_slim_mutex_unlock(&recorder->mutex);
+}
+
 static void iree_hal_local_profile_recorder_snapshot_deinitialize(
     iree_allocator_t host_allocator,
     iree_hal_local_profile_recorder_snapshot_t* snapshot) {
@@ -666,10 +685,25 @@ static void iree_hal_local_profile_recorder_drop_flushed_records(
   iree_slim_mutex_unlock(&recorder->mutex);
 }
 
-iree_status_t iree_hal_local_profile_recorder_flush(
+static iree_status_t iree_hal_local_profile_recorder_clone_deferred_status(
     iree_hal_local_profile_recorder_t* recorder) {
-  if (!recorder || !recorder->active) return iree_ok_status();
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_status_clone(recorder->deferred_status);
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return status;
+}
 
+static iree_status_t iree_hal_local_profile_recorder_take_deferred_status(
+    iree_hal_local_profile_recorder_t* recorder) {
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = recorder->deferred_status;
+  recorder->deferred_status = iree_ok_status();
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return status;
+}
+
+static iree_status_t iree_hal_local_profile_recorder_flush_records(
+    iree_hal_local_profile_recorder_t* recorder) {
   iree_slim_mutex_lock(&recorder->flush_mutex);
   iree_hal_local_profile_recorder_snapshot_t snapshot;
   iree_status_t status =
@@ -710,11 +744,24 @@ iree_status_t iree_hal_local_profile_recorder_flush(
   return status;
 }
 
+iree_status_t iree_hal_local_profile_recorder_flush(
+    iree_hal_local_profile_recorder_t* recorder) {
+  if (!recorder || !recorder->active) return iree_ok_status();
+
+  iree_status_t status =
+      iree_hal_local_profile_recorder_flush_records(recorder);
+  return iree_status_join(
+      iree_hal_local_profile_recorder_clone_deferred_status(recorder), status);
+}
+
 iree_status_t iree_hal_local_profile_recorder_end(
     iree_hal_local_profile_recorder_t* recorder) {
   if (!recorder || !recorder->active) return iree_ok_status();
 
-  iree_status_t status = iree_hal_local_profile_recorder_flush(recorder);
+  iree_status_t status =
+      iree_hal_local_profile_recorder_flush_records(recorder);
+  status = iree_status_join(
+      iree_hal_local_profile_recorder_take_deferred_status(recorder), status);
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_local_profile_recorder_metadata(
           recorder, IREE_HAL_PROFILE_CONTENT_TYPE_SESSION);

@@ -328,6 +328,7 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
       IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE;
   queue_info.scope = QueueScope();
   queue_info.host_time_ns = 100;
+  queue_info.ready_host_time_ns = 105;
   queue_info.submission_id = 7;
   queue_info.wait_count = 1;
   queue_info.signal_count = 1;
@@ -361,6 +362,8 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
   ASSERT_EQ(1u, sink_.host_execution_events.size());
   ASSERT_EQ(1u, sink_.event_relationships.size());
   EXPECT_EQ(queue_event_id, sink_.queue_events[0].event_id);
+  EXPECT_EQ(100, sink_.queue_events[0].host_time_ns);
+  EXPECT_EQ(105, sink_.queue_events[0].ready_host_time_ns);
   EXPECT_EQ(host_event_id, sink_.host_execution_events[0].event_id);
   EXPECT_EQ(queue_event_id, sink_.event_relationships[0].source_id);
   EXPECT_EQ(host_event_id, sink_.event_relationships[0].target_id);
@@ -393,6 +396,32 @@ TEST_F(LocalProfileRecorderTest, AppendFailsWhenBufferIsFull) {
   IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
                         iree_hal_local_profile_recorder_append_queue_event(
                             recorder_, &queue_info, nullptr));
+}
+
+TEST_F(LocalProfileRecorderTest, DeferredAppendFailureReportsOnFlushAndEnd) {
+  recorder_options_.queue_event_capacity = 1;
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS));
+
+  iree_hal_local_profile_queue_event_info_t queue_info =
+      iree_hal_local_profile_queue_event_info_default();
+  queue_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
+  queue_info.scope = QueueScope();
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_event(
+      recorder_, &queue_info, nullptr));
+
+  iree_hal_local_profile_recorder_consume_status(
+      recorder_, iree_hal_local_profile_recorder_append_queue_event(
+                     recorder_, &queue_info, nullptr));
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_hal_local_profile_recorder_flush(recorder_));
+  EXPECT_EQ(1u, sink_.queue_events.size());
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_hal_local_profile_recorder_end(recorder_));
+  EXPECT_EQ(1, sink_.end_count);
+  EXPECT_EQ(IREE_STATUS_RESOURCE_EXHAUSTED,
+            sink_.observed_end_session_status_code);
 }
 
 TEST_F(LocalProfileRecorderTest, FlushFailurePreservesPendingRecords) {

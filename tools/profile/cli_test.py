@@ -127,6 +127,9 @@ class IreeProfileCliTest(unittest.TestCase):
 
         queue_event = _find_row(rows, "queue_event")
         self.assertEqual(queue_event["host_time_domain"], "iree_host_time_ns")
+        self.assertLessEqual(
+            queue_event["host_time_ns"], queue_event["ready_host_time_ns"]
+        )
 
         device_event = _find_row(rows, "queue_device_event")
         self.assertIn("start_tick", device_event)
@@ -186,6 +189,9 @@ class IreeProfileCliTest(unittest.TestCase):
 
         queue_event = _find_row(rows, "queue_event")
         self.assertEqual(queue_event["host_time_domain"], "iree_host_time_ns")
+        self.assertLessEqual(
+            queue_event["host_time_ns"], queue_event["ready_host_time_ns"]
+        )
 
         device_event = _find_row(rows, "queue_device_event")
         self.assertIn("derived_time_available", device_event)
