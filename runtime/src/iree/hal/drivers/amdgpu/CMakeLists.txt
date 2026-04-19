@@ -20,6 +20,8 @@ iree_cc_library(
     "allocator.h"
     "aql_command_buffer.c"
     "aql_command_buffer.h"
+    "aql_command_buffer_profile.c"
+    "aql_command_buffer_profile.h"
     "aql_program_builder.c"
     "aql_program_builder.h"
     "buffer.c"
@@ -36,6 +38,8 @@ iree_cc_library(
     "host_queue_blit.h"
     "host_queue_command_buffer.c"
     "host_queue_command_buffer.h"
+    "host_queue_command_buffer_profile.c"
+    "host_queue_command_buffer_profile.h"
     "host_queue_dispatch.c"
     "host_queue_dispatch.h"
     "host_queue_file.c"
@@ -119,6 +123,7 @@ iree_cc_library(
     headers
   HDRS
     "aql_command_buffer.h"
+    "aql_command_buffer_profile.h"
     "aql_program_builder.h"
     "buffer.h"
     "driver.h"
@@ -127,6 +132,7 @@ iree_cc_library(
     "host_queue.h"
     "host_queue_blit.h"
     "host_queue_command_buffer.h"
+    "host_queue_command_buffer_profile.h"
     "host_queue_dispatch.h"
     "host_queue_file.h"
     "host_queue_host_call.h"
