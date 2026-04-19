@@ -41,6 +41,21 @@ typedef struct iree_hal_amdgpu_queue_affinity_resolved_t {
   iree_host_size_t physical_queue_ordinal;
 } iree_hal_amdgpu_queue_affinity_resolved_t;
 
+// Physical GPU devices selected by a HAL queue-affinity mask.
+typedef struct iree_hal_amdgpu_queue_affinity_physical_device_set_t {
+  // Queue bits remaining after applying the supported affinity mask.
+  iree_hal_queue_affinity_t queue_affinity;
+
+  // Bitmask of selected physical GPU device ordinals.
+  uint64_t physical_device_mask;
+
+  // First selected physical GPU device ordinal.
+  iree_host_size_t first_physical_device_ordinal;
+
+  // Total selected physical GPU device count.
+  iree_host_size_t physical_device_count;
+} iree_hal_amdgpu_queue_affinity_physical_device_set_t;
+
 // Normalizes |requested_affinity| against |supported_affinity|.
 //
 // IREE_HAL_QUEUE_AFFINITY_ANY expands to |supported_affinity|. Explicit masks
@@ -77,6 +92,14 @@ iree_status_t iree_hal_amdgpu_queue_affinity_for_physical_device(
     iree_hal_amdgpu_queue_affinity_domain_t domain,
     iree_host_size_t physical_device_ordinal,
     iree_hal_queue_affinity_t* out_queue_affinity);
+
+// Selects every physical GPU device with at least one queue in
+// |requested_affinity|.
+iree_status_t iree_hal_amdgpu_queue_affinity_select_physical_devices(
+    iree_hal_amdgpu_queue_affinity_domain_t domain,
+    iree_hal_queue_affinity_t requested_affinity,
+    iree_hal_amdgpu_queue_affinity_physical_device_set_t*
+        out_physical_device_set);
 
 // Normalizes |requested_affinity| to queues owned by a single physical device.
 //

@@ -130,7 +130,9 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
 // Returns metadata about an exported kernel function in device memory.
 // Kernel arguments are specific to the physical device specified by
 // |device_ordinal| in the topology and cannot be used on any other device. The
-// returned pointers will remain valid for the lifetime of the executable.
+// lookup fails if the executable queue affinity did not include
+// |device_ordinal| at load time. The returned pointers will remain valid for
+// the lifetime of the executable.
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
     iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
@@ -141,8 +143,9 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
 // physical device.
 //
 // The returned descriptor is specific to |device_ordinal| because the kernel
-// object embedded in the dispatch packet is per device. The pointer remains
-// valid for the lifetime of the executable.
+// object embedded in the dispatch packet is per device. The lookup fails if the
+// executable queue affinity did not include |device_ordinal| at load time. The
+// pointer remains valid for the lifetime of the executable.
 iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
     iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,

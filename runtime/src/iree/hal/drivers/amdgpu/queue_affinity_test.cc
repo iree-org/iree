@@ -81,6 +81,79 @@ TEST(QueueAffinityTest, PhysicalDeviceAffinityBuildsQueueRange) {
   EXPECT_EQ(queue_affinity, 0xCull);
 }
 
+TEST(QueueAffinityTest, SelectPhysicalDevicesForAnySelectsAllDevices) {
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_ASSERT_OK(iree_hal_amdgpu_queue_affinity_select_physical_devices(
+      TwoDeviceDomain(), IREE_HAL_QUEUE_AFFINITY_ANY, &physical_devices));
+  EXPECT_EQ(physical_devices.queue_affinity, 0xFull);
+  EXPECT_EQ(physical_devices.physical_device_mask, 0x3ull);
+  EXPECT_EQ(physical_devices.first_physical_device_ordinal, 0);
+  EXPECT_EQ(physical_devices.physical_device_count, 2);
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesForExplicitDeviceMask) {
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_ASSERT_OK(iree_hal_amdgpu_queue_affinity_select_physical_devices(
+      TwoDeviceDomain(), 0x8ull, &physical_devices));
+  EXPECT_EQ(physical_devices.queue_affinity, 0x8ull);
+  EXPECT_EQ(physical_devices.physical_device_mask, 0x2ull);
+  EXPECT_EQ(physical_devices.first_physical_device_ordinal, 1);
+  EXPECT_EQ(physical_devices.physical_device_count, 1);
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesForCrossDeviceMask) {
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_ASSERT_OK(iree_hal_amdgpu_queue_affinity_select_physical_devices(
+      TwoDeviceDomain(), 0x5ull, &physical_devices));
+  EXPECT_EQ(physical_devices.queue_affinity, 0x5ull);
+  EXPECT_EQ(physical_devices.physical_device_mask, 0x3ull);
+  EXPECT_EQ(physical_devices.first_physical_device_ordinal, 0);
+  EXPECT_EQ(physical_devices.physical_device_count, 2);
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesIntersectsUnsupportedBits) {
+  iree_hal_amdgpu_queue_affinity_domain_t domain = TwoDeviceDomain();
+  domain.supported_affinity = 0xDull;
+
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_ASSERT_OK(iree_hal_amdgpu_queue_affinity_select_physical_devices(
+      domain, 0xAull, &physical_devices));
+  EXPECT_EQ(physical_devices.queue_affinity, 0x8ull);
+  EXPECT_EQ(physical_devices.physical_device_mask, 0x2ull);
+  EXPECT_EQ(physical_devices.first_physical_device_ordinal, 1);
+  EXPECT_EQ(physical_devices.physical_device_count, 1);
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesRejectsEmptyIntersection) {
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_hal_amdgpu_queue_affinity_select_physical_devices(
+                            TwoDeviceDomain(), 0x10ull, &physical_devices));
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesRejectsUnmappedAffinity) {
+  iree_hal_amdgpu_queue_affinity_domain_t domain = TwoDeviceDomain();
+  domain.supported_affinity = 0x10ull;
+
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_hal_amdgpu_queue_affinity_select_physical_devices(
+                            domain, 0x10ull, &physical_devices));
+}
+
+TEST(QueueAffinityTest, SelectPhysicalDevicesRejectsUnrepresentableMask) {
+  iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = 1ull,
+      .physical_device_count = 65,
+      .queue_count_per_physical_device = 1,
+  };
+
+  iree_hal_amdgpu_queue_affinity_physical_device_set_t physical_devices;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_OUT_OF_RANGE,
+                        iree_hal_amdgpu_queue_affinity_select_physical_devices(
+                            domain, 1ull, &physical_devices));
+}
+
 TEST(QueueAffinityTest, NormalizeAnyForPhysicalDeviceSelectsFirstDevice) {
   iree_hal_queue_affinity_t queue_affinity = 0;
   iree_host_size_t physical_device_ordinal = 0;

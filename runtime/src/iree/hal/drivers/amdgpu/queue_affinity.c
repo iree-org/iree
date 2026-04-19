@@ -206,6 +206,58 @@ iree_status_t iree_hal_amdgpu_queue_affinity_for_physical_device(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_amdgpu_queue_affinity_select_physical_devices(
+    iree_hal_amdgpu_queue_affinity_domain_t domain,
+    iree_hal_queue_affinity_t requested_affinity,
+    iree_hal_amdgpu_queue_affinity_physical_device_set_t*
+        out_physical_device_set) {
+  memset(out_physical_device_set, 0, sizeof(*out_physical_device_set));
+
+  if (IREE_UNLIKELY(domain.physical_device_count > IREE_HAL_MAX_QUEUES)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "AMDGPU physical device count %" PRIhsz
+                            " exceeds physical device mask capacity %" PRIhsz,
+                            domain.physical_device_count,
+                            (iree_host_size_t)IREE_HAL_MAX_QUEUES);
+  }
+
+  iree_hal_queue_affinity_t normalized_affinity = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_normalize(
+      domain.supported_affinity, requested_affinity, &normalized_affinity));
+
+  out_physical_device_set->queue_affinity = normalized_affinity;
+  for (iree_host_size_t physical_device_ordinal = 0;
+       physical_device_ordinal < domain.physical_device_count;
+       ++physical_device_ordinal) {
+    iree_hal_queue_affinity_t physical_device_affinity = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_queue_affinity_for_physical_device(
+        domain, physical_device_ordinal, &physical_device_affinity));
+    iree_hal_queue_affinity_and_into(physical_device_affinity,
+                                     domain.supported_affinity);
+
+    iree_hal_queue_affinity_t selected_affinity = normalized_affinity;
+    iree_hal_queue_affinity_and_into(selected_affinity,
+                                     physical_device_affinity);
+    if (iree_hal_queue_affinity_is_empty(selected_affinity)) continue;
+
+    if (out_physical_device_set->physical_device_count == 0) {
+      out_physical_device_set->first_physical_device_ordinal =
+          physical_device_ordinal;
+    }
+    out_physical_device_set->physical_device_mask |= ((uint64_t)1)
+                                                     << physical_device_ordinal;
+    ++out_physical_device_set->physical_device_count;
+  }
+
+  if (IREE_UNLIKELY(out_physical_device_set->physical_device_count == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "queue affinity 0x%" PRIx64
+                            " selects no physical devices",
+                            requested_affinity);
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_amdgpu_queue_affinity_normalize_for_physical_device(
     iree_hal_amdgpu_queue_affinity_domain_t domain,
     iree_hal_queue_affinity_t requested_affinity,
