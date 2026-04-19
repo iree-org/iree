@@ -108,6 +108,7 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
   EXPECT_EQ(IREE_HAL_PROFILE_FILE_VERSION_MINOR, file_header.version_minor);
   EXPECT_EQ(sizeof(file_header), file_header.header_length);
   EXPECT_EQ(0u, file_header.flags);
+  ASSERT_NE(0u, file_header.file_length);
 
   iree_hal_profile_file_record_t begin_record;
   IREE_ASSERT_OK(iree_hal_profile_file_parse_record(
@@ -180,6 +181,7 @@ TEST(ProfileFileSinkTest, WritesProfileBundleRecords) {
                               "application/vnd.iree.hal.profile.session"));
   EXPECT_TRUE(StringViewEqual(end_record.name, "test-session"));
   EXPECT_EQ(0u, end_record.payload.data_length);
+  EXPECT_EQ(file_header.file_length, offset);
 }
 
 TEST(ProfileFileParseTest, RejectsBadMagic) {
@@ -198,6 +200,36 @@ TEST(ProfileFileParseTest, RejectsNonZeroFileFlags) {
   auto* file_header =
       reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
   file_header->flags = 1;
+
+  iree_hal_profile_file_header_t parsed_header;
+  iree_host_size_t offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_hal_profile_file_parse_header(
+          iree_make_const_byte_span(storage.data(), storage.size()),
+          &parsed_header, &offset));
+}
+
+TEST(ProfileFileParseTest, RejectsFileLengthBeforeFirstRecord) {
+  std::vector<uint8_t> storage = MakeProfileFileHeaderStorage();
+  auto* file_header =
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
+  file_header->file_length = file_header->header_length - 1;
+
+  iree_hal_profile_file_header_t parsed_header;
+  iree_host_size_t offset = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_hal_profile_file_parse_header(
+          iree_make_const_byte_span(storage.data(), storage.size()),
+          &parsed_header, &offset));
+}
+
+TEST(ProfileFileParseTest, RejectsFileLengthPastContents) {
+  std::vector<uint8_t> storage = MakeProfileFileHeaderStorage();
+  auto* file_header =
+      reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data());
+  file_header->file_length = storage.size() + 1;
 
   iree_hal_profile_file_header_t parsed_header;
   iree_host_size_t offset = 0;

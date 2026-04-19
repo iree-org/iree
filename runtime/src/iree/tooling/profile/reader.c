@@ -76,6 +76,40 @@ iree_status_t iree_profile_typed_record_parse(
   return iree_ok_status();
 }
 
+iree_status_t iree_profile_executable_trace_record_parse(
+    const iree_hal_profile_file_record_t* chunk,
+    iree_hal_profile_executable_trace_record_t* out_record,
+    iree_const_byte_span_t* out_trace_data) {
+  memset(out_record, 0, sizeof(*out_record));
+  if (out_trace_data) {
+    *out_trace_data = iree_const_byte_span_empty();
+  }
+
+  iree_profile_typed_record_t typed_record;
+  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
+      chunk, 0, sizeof(*out_record), 0, &typed_record));
+  if (typed_record.record_length != sizeof(*out_record)) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk record length must exclude raw trace "
+        "bytes");
+  }
+
+  memcpy(out_record, typed_record.contents.data, sizeof(*out_record));
+  if ((iree_host_size_t)out_record->data_length !=
+      typed_record.following_payload.data_length) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "profile executable trace chunk data length is inconsistent with "
+        "payload length");
+  }
+
+  if (out_trace_data) {
+    *out_trace_data = typed_record.following_payload;
+  }
+  return iree_ok_status();
+}
+
 void iree_profile_typed_record_iterator_initialize(
     const iree_hal_profile_file_record_t* chunk,
     iree_host_size_t minimum_record_length,
@@ -117,6 +151,18 @@ iree_status_t iree_profile_file_open(iree_string_view_t path,
         out_profile_file->contents->const_buffer, &out_profile_file->header,
         &out_profile_file->first_record_offset);
   }
+  if (iree_status_is_ok(status)) {
+    uint64_t file_length = out_profile_file->header.file_length;
+    if (file_length == 0) {
+      file_length = out_profile_file->contents->const_buffer.data_length;
+    }
+    if (IREE_UNLIKELY(file_length > IREE_HOST_SIZE_MAX)) {
+      status = iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "profile file length exceeds host size");
+    } else {
+      out_profile_file->file_length = (iree_host_size_t)file_length;
+    }
+  }
 
   if (!iree_status_is_ok(status)) {
     iree_profile_file_close(out_profile_file);
@@ -138,14 +184,19 @@ iree_status_t iree_profile_file_for_each_record(
         "profile file record callback must have a function");
   }
 
+  iree_host_size_t file_length = profile_file->file_length;
+  if (file_length == 0) {
+    file_length = profile_file->contents->const_buffer.data_length;
+  }
   iree_host_size_t record_offset = profile_file->first_record_offset;
   iree_host_size_t record_index = 0;
-  while (record_offset < profile_file->contents->const_buffer.data_length) {
+  iree_const_byte_span_t file_contents = iree_make_const_byte_span(
+      profile_file->contents->const_buffer.data, file_length);
+  while (record_offset < file_length) {
     iree_hal_profile_file_record_t record;
     iree_host_size_t next_record_offset = 0;
     IREE_RETURN_IF_ERROR(iree_hal_profile_file_parse_record(
-        profile_file->contents->const_buffer, record_offset, &record,
-        &next_record_offset));
+        file_contents, record_offset, &record, &next_record_offset));
     IREE_RETURN_IF_ERROR(
         callback.fn(callback.user_data, &record, record_index));
     record_offset = next_record_offset;

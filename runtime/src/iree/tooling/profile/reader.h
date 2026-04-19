@@ -21,6 +21,8 @@ typedef struct iree_profile_file_t {
   iree_hal_profile_file_header_t header;
   // Byte offset of the first record after the file header.
   iree_host_size_t first_record_offset;
+  // Logical byte length to parse, excluding any stale trailing storage.
+  iree_host_size_t file_length;
 } iree_profile_file_t;
 
 // Function signature invoked once per parsed profile file record.
@@ -70,6 +72,17 @@ iree_status_t iree_profile_typed_record_parse(
     const iree_hal_profile_file_record_t* chunk,
     iree_host_size_t payload_offset, iree_host_size_t minimum_record_length,
     iree_host_size_t record_index, iree_profile_typed_record_t* out_record);
+
+// Parses the single executable trace artifact carried by |chunk|.
+//
+// Executable trace chunks are intentionally not generic packed typed-record
+// streams: the fixed trace record has record_length == sizeof(record), and all
+// bytes after that fixed record are the raw trace artifact. |out_trace_data|
+// may be NULL when the caller only needs metadata validation.
+iree_status_t iree_profile_executable_trace_record_parse(
+    const iree_hal_profile_file_record_t* chunk,
+    iree_hal_profile_executable_trace_record_t* out_record,
+    iree_const_byte_span_t* out_trace_data);
 
 // Initializes an iterator over packed typed records in |chunk->payload|.
 void iree_profile_typed_record_iterator_initialize(

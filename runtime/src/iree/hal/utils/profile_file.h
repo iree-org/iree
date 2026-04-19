@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_UTILS_PROFILE_FILE_H_
 #define IREE_HAL_UTILS_PROFILE_FILE_H_
 
+#include <stddef.h>
+
 #include "iree/base/api.h"
 #include "iree/hal/profile_sink.h"
 #include "iree/io/file_handle.h"
@@ -22,7 +24,7 @@ extern "C" {
 #define IREE_HAL_PROFILE_FILE_VERSION_MAJOR 1u
 
 // Minor version of the IREE HAL profile bundle file format.
-#define IREE_HAL_PROFILE_FILE_VERSION_MINOR 5u
+#define IREE_HAL_PROFILE_FILE_VERSION_MINOR 6u
 
 // File header stored at byte 0 of every IREE HAL profile bundle.
 typedef struct iree_hal_profile_file_header_t {
@@ -36,6 +38,9 @@ typedef struct iree_hal_profile_file_header_t {
   uint32_t header_length;
   // Reserved for future file-level flags; must be zero.
   uint32_t flags;
+  // Logical byte length of the completed profile bundle, or zero if the bundle
+  // has not been finalized with a session end record.
+  uint64_t file_length;
 } iree_hal_profile_file_header_t;
 
 // Type of one record in an IREE HAL profile bundle file.
@@ -94,6 +99,22 @@ typedef struct iree_hal_profile_file_record_header_t {
   uint16_t flags;
 } iree_hal_profile_file_record_header_t;
 
+static_assert(sizeof(iree_hal_profile_file_header_t) == 24,
+              "profile file header layout must remain explicit");
+static_assert(offsetof(iree_hal_profile_file_header_t, file_length) == 16,
+              "profile file header file_length offset must remain explicit");
+static_assert(sizeof(iree_hal_profile_file_record_header_t) == 104,
+              "profile file record header layout must remain explicit");
+static_assert(offsetof(iree_hal_profile_file_record_header_t, payload_length) ==
+                  8,
+              "profile file record payload_length offset must remain explicit");
+static_assert(offsetof(iree_hal_profile_file_record_header_t, header_length) ==
+                  56,
+              "profile file record header_length offset must remain explicit");
+static_assert(offsetof(iree_hal_profile_file_record_header_t, record_type) ==
+                  100,
+              "profile file record_type offset must remain explicit");
+
 // Borrowed view of a parsed profile bundle record.
 //
 // All pointers reference the original file contents passed to
@@ -114,8 +135,12 @@ typedef struct iree_hal_profile_file_record_t {
 //
 // The caller supplies the target file handle so embedders can choose normal
 // files, host allocations, temporary files, or platform-specific handles. The
-// sink opens a writable stream at offset zero, writes a file header during
-// creation, then appends session begin/chunk/end records as callbacks arrive.
+// sink opens a writable stream at offset zero, writes a provisional file header
+// during creation, then appends session begin/chunk/end records as callbacks
+// arrive. A successful end_session patches the header with the logical file
+// length. Consumers must ignore bytes after that logical length; this lets
+// embedders write to fixed-size host allocations or existing file handles
+// without stale trailing storage becoming parseable records.
 //
 // The returned sink is not internally synchronized. Callers must serialize
 // callbacks for a single sink instance, which matches the HAL profiling API.
@@ -126,14 +151,19 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_sink_create(
 // Parses and validates the file header in |file_contents|.
 //
 // On success |out_header| contains the parsed header and |out_record_offset|
-// points at the first record. Forward-compatible header extensions are skipped
-// according to |header_length|.
+// points at the first record. If |out_header| has a nonzero |file_length|,
+// callers should parse records only within that logical byte extent.
+// Forward-compatible header extensions are skipped according to
+// |header_length|.
 IREE_API_EXPORT iree_status_t
 iree_hal_profile_file_parse_header(iree_const_byte_span_t file_contents,
                                    iree_hal_profile_file_header_t* out_header,
                                    iree_host_size_t* out_record_offset);
 
 // Parses one record beginning at |record_offset| in |file_contents|.
+// |file_contents| should be capped to iree_hal_profile_file_header_t::
+// file_length when nonzero so stale storage after the logical bundle end is
+// not visible to low-level record parsing.
 //
 // On success |out_record| contains borrowed views into |file_contents| and
 // |out_next_record_offset| points at the next record, or file end when the

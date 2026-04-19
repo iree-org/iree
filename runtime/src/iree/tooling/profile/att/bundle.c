@@ -228,21 +228,13 @@ static iree_status_t iree_profile_att_parse_dispatches(
 static iree_status_t iree_profile_att_parse_trace(
     iree_profile_att_profile_t* profile,
     const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_t typed_record;
-  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
-      record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
-      &typed_record));
   iree_hal_profile_executable_trace_record_t trace_record;
-  memcpy(&trace_record, typed_record.contents.data, sizeof(trace_record));
-  if ((iree_host_size_t)trace_record.data_length !=
-      typed_record.following_payload.data_length) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk has invalid trace record length");
-  }
+  iree_const_byte_span_t trace_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_profile_executable_trace_record_parse(
+      record, &trace_record, &trace_data));
   iree_profile_att_trace_t trace = {
       .record = trace_record,
-      .data = typed_record.following_payload,
+      .data = trace_data,
   };
   return iree_profile_att_append_trace(profile, trace);
 }

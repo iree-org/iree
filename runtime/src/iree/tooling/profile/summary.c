@@ -431,19 +431,9 @@ static iree_status_t iree_profile_summary_process_counter_sample_records(
 static iree_status_t iree_profile_summary_process_executable_trace_record(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
-  iree_profile_typed_record_t typed_record;
-  IREE_RETURN_IF_ERROR(iree_profile_typed_record_parse(
-      record, 0, sizeof(iree_hal_profile_executable_trace_record_t), 0,
-      &typed_record));
   iree_hal_profile_executable_trace_record_t trace_record;
-  memcpy(&trace_record, typed_record.contents.data, sizeof(trace_record));
-  if ((iree_host_size_t)trace_record.data_length !=
-      typed_record.following_payload.data_length) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "profile executable trace chunk data length is inconsistent with "
-        "payload length");
-  }
+  IREE_RETURN_IF_ERROR(iree_profile_executable_trace_record_parse(
+      record, &trace_record, /*out_trace_data=*/NULL));
 
   if (trace_record.data_length >
       UINT64_MAX - summary->executable_trace_data_bytes) {

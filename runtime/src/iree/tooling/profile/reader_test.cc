@@ -31,6 +31,27 @@ static iree_hal_profile_file_record_t MakeChunk(
   return chunk;
 }
 
+static std::vector<uint8_t> MakeExecutableTracePayload(
+    uint32_t record_length, uint64_t data_length,
+    std::initializer_list<uint8_t> trace_data) {
+  iree_hal_profile_executable_trace_record_t record =
+      iree_hal_profile_executable_trace_record_default();
+  record.record_length = record_length;
+  record.data_length = data_length;
+
+  std::vector<uint8_t> payload(sizeof(record), 0);
+  memcpy(payload.data(), &record, sizeof(record));
+  if (record_length > payload.size()) {
+    payload.resize(record_length, 0xCC);
+  }
+  const iree_host_size_t offset = payload.size();
+  payload.resize(offset + trace_data.size());
+  if (trace_data.size() != 0) {
+    memcpy(payload.data() + offset, trace_data.begin(), trace_data.size());
+  }
+  return payload;
+}
+
 static void AppendRecord(std::vector<uint8_t>* payload, uint32_t value,
                          std::initializer_list<uint8_t> inline_payload) {
   test_profile_record_t record;
@@ -45,6 +66,50 @@ static void AppendRecord(std::vector<uint8_t>* payload, uint32_t value,
     memcpy(payload->data() + offset + sizeof(record), inline_payload.begin(),
            inline_payload.size());
   }
+}
+
+static void AppendProfileFileHeader(std::vector<uint8_t>* storage,
+                                    uint64_t file_length) {
+  iree_hal_profile_file_header_t header;
+  memset(&header, 0, sizeof(header));
+  header.magic = IREE_HAL_PROFILE_FILE_MAGIC;
+  header.version_major = IREE_HAL_PROFILE_FILE_VERSION_MAJOR;
+  header.version_minor = IREE_HAL_PROFILE_FILE_VERSION_MINOR;
+  header.header_length = sizeof(header);
+  header.file_length = file_length;
+
+  const iree_host_size_t offset = storage->size();
+  storage->resize(offset + sizeof(header));
+  memcpy(storage->data() + offset, &header, sizeof(header));
+}
+
+static void AppendProfileFileRecord(
+    std::vector<uint8_t>* storage,
+    iree_hal_profile_file_record_type_t record_type) {
+  iree_hal_profile_file_record_header_t header;
+  memset(&header, 0, sizeof(header));
+  header.record_length = sizeof(header);
+  header.header_length = sizeof(header);
+  header.record_type = record_type;
+
+  const iree_host_size_t offset = storage->size();
+  storage->resize(offset + sizeof(header));
+  memcpy(storage->data() + offset, &header, sizeof(header));
+}
+
+typedef struct RecordCounter {
+  // Number of records observed by the iterator callback.
+  iree_host_size_t count;
+} RecordCounter;
+
+static iree_status_t CountProfileFileRecord(
+    void* user_data, const iree_hal_profile_file_record_t* record,
+    iree_host_size_t record_index) {
+  (void)record;
+  RecordCounter* counter = static_cast<RecordCounter*>(user_data);
+  EXPECT_EQ(counter->count, record_index);
+  ++counter->count;
+  return iree_ok_status();
 }
 
 TEST(ProfileTypedRecordTest, IteratesTypedRecords) {
@@ -113,6 +178,60 @@ TEST(ProfileTypedRecordTest, ParseExposesFollowingPayload) {
   EXPECT_EQ(0xBB, record.following_payload.data[1]);
 }
 
+TEST(ProfileExecutableTraceRecordTest, ParsesFollowingTracePayload) {
+  std::vector<uint8_t> payload = MakeExecutableTracePayload(
+      sizeof(iree_hal_profile_executable_trace_record_t), 3,
+      {0xAA, 0xBB, 0xCC});
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+
+  iree_hal_profile_executable_trace_record_t record;
+  iree_const_byte_span_t trace_data = iree_const_byte_span_empty();
+  IREE_ASSERT_OK(
+      iree_profile_executable_trace_record_parse(&chunk, &record, &trace_data));
+  EXPECT_EQ(sizeof(record), record.record_length);
+  EXPECT_EQ(3u, record.data_length);
+  ASSERT_EQ(3u, trace_data.data_length);
+  EXPECT_EQ(0xAA, trace_data.data[0]);
+  EXPECT_EQ(0xBB, trace_data.data[1]);
+  EXPECT_EQ(0xCC, trace_data.data[2]);
+}
+
+TEST(ProfileExecutableTraceRecordTest, RejectsInlineTracePayload) {
+  std::vector<uint8_t> payload = MakeExecutableTracePayload(
+      sizeof(iree_hal_profile_executable_trace_record_t) + 1, 3,
+      {0xAA, 0xBB, 0xCC});
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+
+  iree_hal_profile_executable_trace_record_t record;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_executable_trace_record_parse(
+                            &chunk, &record, /*out_trace_data=*/NULL));
+}
+
+TEST(ProfileExecutableTraceRecordTest, RejectsExtraTracePayload) {
+  std::vector<uint8_t> payload = MakeExecutableTracePayload(
+      sizeof(iree_hal_profile_executable_trace_record_t), 2,
+      {0xAA, 0xBB, 0xCC});
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+
+  iree_hal_profile_executable_trace_record_t record;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_executable_trace_record_parse(
+                            &chunk, &record, /*out_trace_data=*/NULL));
+}
+
+TEST(ProfileExecutableTraceRecordTest, RejectsTruncatedTracePayload) {
+  std::vector<uint8_t> payload = MakeExecutableTracePayload(
+      sizeof(iree_hal_profile_executable_trace_record_t), 4,
+      {0xAA, 0xBB, 0xCC});
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+
+  iree_hal_profile_executable_trace_record_t record;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_profile_executable_trace_record_parse(
+                            &chunk, &record, /*out_trace_data=*/NULL));
+}
+
 TEST(ProfileTypedRecordTest, RejectsTruncatedRecord) {
   std::vector<uint8_t> payload(sizeof(uint32_t), 0);
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
@@ -148,6 +267,42 @@ TEST(ProfileTypedRecordTest, RejectsOversizedRecordLength) {
       IREE_STATUS_DATA_LOSS,
       iree_profile_typed_record_parse(&chunk, 0, sizeof(test_profile_record_t),
                                       0, &record));
+}
+
+TEST(ProfileFileReaderTest, IteratesOnlyLogicalFileLength) {
+  std::vector<uint8_t> storage;
+  AppendProfileFileHeader(&storage, /*file_length=*/0);
+  AppendProfileFileRecord(&storage,
+                          IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_BEGIN);
+  AppendProfileFileRecord(&storage, IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK);
+  AppendProfileFileRecord(&storage,
+                          IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END);
+  const uint64_t file_length = storage.size();
+  reinterpret_cast<iree_hal_profile_file_header_t*>(storage.data())
+      ->file_length = file_length;
+
+  AppendProfileFileRecord(&storage, IREE_HAL_PROFILE_FILE_RECORD_TYPE_CHUNK);
+
+  iree_io_file_contents_t contents;
+  memset(&contents, 0, sizeof(contents));
+  contents.const_buffer =
+      iree_make_const_byte_span(storage.data(), storage.size());
+
+  iree_profile_file_t profile_file;
+  memset(&profile_file, 0, sizeof(profile_file));
+  profile_file.contents = &contents;
+  IREE_ASSERT_OK(iree_hal_profile_file_parse_header(
+      contents.const_buffer, &profile_file.header,
+      &profile_file.first_record_offset));
+  profile_file.file_length = (iree_host_size_t)profile_file.header.file_length;
+
+  RecordCounter counter = {};
+  iree_profile_file_record_callback_t callback = {
+      .fn = CountProfileFileRecord,
+      .user_data = &counter,
+  };
+  IREE_ASSERT_OK(iree_profile_file_for_each_record(&profile_file, callback));
+  EXPECT_EQ(3u, counter.count);
 }
 
 }  // namespace

@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_PROFILE_SINK_H_
 #define IREE_HAL_PROFILE_SINK_H_
 
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -1590,6 +1591,64 @@ iree_hal_profile_executable_trace_record_default(void) {
   record.queue_ordinal = UINT32_MAX;
   return record;
 }
+
+#define IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(record_type, byte_length)     \
+  static_assert(sizeof(record_type) == (byte_length),                       \
+                #record_type " size is part of the profile binary format"); \
+  static_assert(offsetof(record_type, record_length) == 0,                  \
+                #record_type " record_length must remain the first field")
+
+#define IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(record_type, field, byte_offset) \
+  static_assert(offsetof(record_type, field) == (byte_offset), #record_type   \
+                "." #field " offset is part of the profile binary format")
+
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_device_record_t, 32);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_queue_record_t, 24);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_executable_record_t, 40);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_executable_code_object_record_t, 48);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_executable_code_object_load_record_t, 40);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_executable_export_record_t, 64);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_command_buffer_record_t,
+                                      48);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_command_operation_record_t, 120);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_clock_correlation_record_t, 72);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_dispatch_event_t, 88);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_queue_event_t, 104);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_queue_device_event_t,
+                                      96);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_host_execution_event_t,
+                                      152);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_memory_event_t, 160);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_event_relationship_record_t, 72);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_set_record_t,
+                                      32);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_record_t, 48);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_sample_record_t,
+                                      88);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_executable_trace_record_t, 88);
+
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
+    iree_hal_profile_executable_code_object_record_t, data_length, 24);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
+    iree_hal_profile_executable_export_record_t, name_length, 44);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_set_record_t,
+                                     name_length, 28);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_record_t,
+                                     block_name_length, 36);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_sample_record_t,
+                                     sample_value_count, 80);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_executable_trace_record_t,
+                                     data_length, 80);
+
+#undef IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET
+#undef IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT
 
 // Metadata describing one profiling chunk.
 typedef struct iree_hal_profile_chunk_metadata_t {

@@ -33,15 +33,35 @@ static iree_hal_profile_file_sink_t* iree_hal_profile_file_sink_cast(
 }
 
 static iree_status_t iree_hal_profile_file_sink_write_file_header(
-    iree_io_stream_t* stream) {
+    iree_io_stream_t* stream, uint64_t file_length) {
   iree_hal_profile_file_header_t header = {
       .magic = IREE_HAL_PROFILE_FILE_MAGIC,
       .version_major = IREE_HAL_PROFILE_FILE_VERSION_MAJOR,
       .version_minor = IREE_HAL_PROFILE_FILE_VERSION_MINOR,
       .header_length = sizeof(header),
       .flags = 0,
+      .file_length = file_length,
   };
   return iree_io_stream_write(stream, sizeof(header), &header);
+}
+
+static iree_status_t iree_hal_profile_file_sink_update_file_length(
+    iree_hal_profile_file_sink_t* sink) {
+  iree_io_stream_pos_t file_length = iree_io_stream_offset(sink->stream);
+  if (IREE_UNLIKELY(file_length < 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile sink stream offset is invalid");
+  }
+
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_seek(sink->stream, IREE_IO_STREAM_SEEK_SET, 0));
+  iree_status_t status = iree_hal_profile_file_sink_write_file_header(
+      sink->stream, (uint64_t)file_length);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_io_stream_seek(sink->stream, IREE_IO_STREAM_SEEK_SET, file_length);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_profile_file_calculate_record_layout(
@@ -161,7 +181,8 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_sink_create(
       z0, iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, file_handle,
                               /*file_offset=*/0, host_allocator, &stream));
 
-  iree_status_t status = iree_hal_profile_file_sink_write_file_header(stream);
+  iree_status_t status =
+      iree_hal_profile_file_sink_write_file_header(stream, /*file_length=*/0);
 
   iree_hal_profile_file_sink_t* sink = NULL;
   if (iree_status_is_ok(status)) {
@@ -224,6 +245,15 @@ iree_hal_profile_file_parse_header(iree_const_byte_span_t file_contents,
   if (IREE_UNLIKELY(header.flags != 0)) {
     return iree_make_status(IREE_STATUS_DATA_LOSS,
                             "profile file reserved flags must be zero");
+  }
+  if (IREE_UNLIKELY(header.file_length != 0 &&
+                    header.file_length < header.header_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file length is before the first record");
+  }
+  if (IREE_UNLIKELY(header.file_length > file_contents.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "profile file length extends past file contents");
   }
 
   *out_header = header;
@@ -353,9 +383,10 @@ static iree_status_t iree_hal_profile_file_sink_end_session(
     iree_status_code_t session_status_code) {
   iree_hal_profile_file_sink_t* sink =
       iree_hal_profile_file_sink_cast(base_sink);
-  return iree_hal_profile_file_sink_write_record(
+  IREE_RETURN_IF_ERROR(iree_hal_profile_file_sink_write_record(
       sink, IREE_HAL_PROFILE_FILE_RECORD_TYPE_SESSION_END, metadata,
-      session_status_code, /*iovec_count=*/0, /*iovecs=*/NULL);
+      session_status_code, /*iovec_count=*/0, /*iovecs=*/NULL));
+  return iree_hal_profile_file_sink_update_file_length(sink);
 }
 
 static const iree_hal_profile_sink_vtable_t iree_hal_profile_file_sink_vtable =
