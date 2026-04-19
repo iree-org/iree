@@ -1876,6 +1876,38 @@ TEST_F(HostQueueCommandBufferTest, SinklessProfilingBeginFails) {
   IREE_EXPECT_OK(iree_hal_device_profiling_end(test_device.base_device()));
 }
 
+TEST_F(HostQueueCommandBufferTest, NestedProfilingBeginFails) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink first_sink = {};
+  CommandBufferProfileSinkInitialize(&first_sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  IREE_ASSERT_OK(profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                                 CommandBufferProfileSinkAsBase(&first_sink)));
+
+  CommandBufferProfileSink nested_sink = {};
+  CommandBufferProfileSinkInitialize(&nested_sink);
+  iree_hal_device_profiling_options_t nested_options = {0};
+  nested_options.data_families = IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS;
+  nested_options.sink = CommandBufferProfileSinkAsBase(&nested_sink);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_hal_device_profiling_begin(
+                            test_device.base_device(), &nested_options));
+  EXPECT_EQ(0, nested_sink.begin_count);
+  EXPECT_EQ(0, nested_sink.end_count);
+
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, first_sink.begin_count);
+  EXPECT_EQ(1, first_sink.end_count);
+  ExpectQueueEventProfilingCanBeginAndEnd(&test_device);
+}
+
 TEST_F(HostQueueCommandBufferTest, ProfilingBeginSinkBeginFailureAllowsRetry) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
