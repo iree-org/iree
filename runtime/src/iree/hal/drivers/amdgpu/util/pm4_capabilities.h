@@ -50,8 +50,34 @@ enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK = 1u << 9,
   // PM4 COPY_DATA can write immediate values into registers/perfcounters.
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE = 1u << 10,
+  // PM4 WRITE_DATA can write immediate values into memory through TC_L2.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY = 1u << 11,
+  // PM4 COPY_DATA can copy memory through TC_L2 into memory through TC_L2.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY = 1u << 12,
 };
 typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
+
+// Returns true if the device can emit queue-private PM4 WRITE_DATA memory
+// writes.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_write_data(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY);
+}
+
+// Returns true if the device can emit queue-private PM4 COPY_DATA memory
+// copies.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY);
+}
 
 // Returns true if the device can emit queue-private PM4 timestamp ranges using
 // a COPY_DATA start timestamp and RELEASE_MEM end timestamp.

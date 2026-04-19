@@ -215,11 +215,16 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
                     IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE;
   }
   // WAIT_REG_MEM64 is present in the gfx10+ PM4 packet tables. Gfx9 has only
-  // the 32-bit WAIT_REG_MEM variant, and non-CDNA gfx9 therefore defers.
+  // the 32-bit WAIT_REG_MEM variant, and non-CDNA gfx9 therefore defers. The
+  // gfx10+ memory WRITE_DATA/COPY_DATA and profiling families here have local
+  // gfx1100 evidence; CDNA/gfx9 stays on the narrower AQL_PM4_IB-only path
+  // until each packet family has hardware validation.
   if (version.major >= 10) {
     capabilities |=
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY |
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP |
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP |
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |

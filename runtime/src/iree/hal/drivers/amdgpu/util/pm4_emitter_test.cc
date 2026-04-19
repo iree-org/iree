@@ -13,6 +13,32 @@
 
 namespace {
 
+TEST(PM4CapabilitiesTest, MemoryWriteDataRequiresPM4IBAndPacketFamily) {
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_write_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_write_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_write_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY));
+}
+
+TEST(PM4CapabilitiesTest, MemoryCopyDataRequiresPM4IBAndPacketFamily) {
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY));
+}
+
 TEST(PM4CapabilitiesTest, TimestampRangeRequiresAllPacketFamilies) {
   EXPECT_TRUE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
@@ -190,6 +216,77 @@ TEST(PM4EmitterTest, BuilderRejectsInvalidRegisterPackets) {
       /*register_address=*/0x3456, unaligned_target,
       IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_NONE));
   EXPECT_EQ(iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder), 0u);
+}
+
+TEST(PM4EmitterTest, EmitsWriteDataMemoryPackets) {
+  void* target =
+      reinterpret_cast<void*>(static_cast<uintptr_t>(0x123456789ABCDEF0ull));
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+
+  uint32_t dword_count = iree_hal_amdgpu_pm4_emit_write_data32(
+      &slot, target, /*value=*/0xAABBCCDDu);
+  EXPECT_EQ(dword_count, 5u);
+  EXPECT_EQ(slot.dwords[0], iree_hal_amdgpu_pm4_make_header(
+                                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA,
+                                /*dword_count=*/5));
+  EXPECT_EQ(slot.dwords[1],
+            IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION);
+  EXPECT_EQ(slot.dwords[2], 0x9ABCDEF0u);
+  EXPECT_EQ(slot.dwords[3], 0x12345678u);
+  EXPECT_EQ(slot.dwords[4], 0xAABBCCDDu);
+
+  dword_count = iree_hal_amdgpu_pm4_emit_write_data64(
+      &slot, target, /*value=*/0x1122334455667788ull);
+  EXPECT_EQ(dword_count, 6u);
+  EXPECT_EQ(slot.dwords[0], iree_hal_amdgpu_pm4_make_header(
+                                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA,
+                                /*dword_count=*/6));
+  EXPECT_EQ(slot.dwords[1],
+            IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION);
+  EXPECT_EQ(slot.dwords[2], 0x9ABCDEF0u);
+  EXPECT_EQ(slot.dwords[3], 0x12345678u);
+  EXPECT_EQ(slot.dwords[4], 0x55667788u);
+  EXPECT_EQ(slot.dwords[5], 0x11223344u);
+}
+
+TEST(PM4EmitterTest, EmitsCopyDataMemoryPackets) {
+  const void* source = reinterpret_cast<const void*>(
+      static_cast<uintptr_t>(0x123456789ABCDEF0ull));
+  void* target =
+      reinterpret_cast<void*>(static_cast<uintptr_t>(0x0FEDCBA987654320ull));
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+
+  uint32_t dword_count =
+      iree_hal_amdgpu_pm4_emit_copy_data32(&slot, source, target);
+  EXPECT_EQ(dword_count, 6u);
+  EXPECT_EQ(slot.dwords[0], iree_hal_amdgpu_pm4_make_header(
+                                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
+                                /*dword_count=*/6));
+  EXPECT_EQ(slot.dwords[1],
+            IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION);
+  EXPECT_EQ(slot.dwords[2], 0x9ABCDEF0u);
+  EXPECT_EQ(slot.dwords[3], 0x12345678u);
+  EXPECT_EQ(slot.dwords[4], 0x87654320u);
+  EXPECT_EQ(slot.dwords[5], 0x0FEDCBA9u);
+
+  dword_count = iree_hal_amdgpu_pm4_emit_copy_data64(&slot, source, target);
+  EXPECT_EQ(dword_count, 6u);
+  EXPECT_EQ(slot.dwords[0], iree_hal_amdgpu_pm4_make_header(
+                                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
+                                /*dword_count=*/6));
+  EXPECT_EQ(slot.dwords[1],
+            IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+                IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
+                IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION);
+  EXPECT_EQ(slot.dwords[2], 0x9ABCDEF0u);
+  EXPECT_EQ(slot.dwords[3], 0x12345678u);
+  EXPECT_EQ(slot.dwords[4], 0x87654320u);
+  EXPECT_EQ(slot.dwords[5], 0x0FEDCBA9u);
 }
 
 TEST(PM4EmitterTest, BuilderAppendsTimestampPackets) {

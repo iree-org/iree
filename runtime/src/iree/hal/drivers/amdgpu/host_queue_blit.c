@@ -130,7 +130,10 @@ static uint64_t iree_hal_amdgpu_host_queue_extend_fill_pattern_x8(
 static bool iree_hal_amdgpu_host_queue_can_use_pm4_write_data(
     const iree_hal_amdgpu_host_queue_t* queue, const void* target_device_ptr,
     iree_host_size_t length) {
-  return queue->pm4_ib_slots && (length == 4 || length == 8) &&
+  return queue->pm4_ib_slots &&
+         iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_write_data(
+             queue->vendor_packet_capabilities) &&
+         (length == 4 || length == 8) &&
          iree_host_ptr_has_alignment(target_device_ptr, sizeof(uint32_t));
 }
 
@@ -218,7 +221,9 @@ static bool iree_hal_amdgpu_host_queue_prepare_pm4_copy_data(
     const iree_hal_amdgpu_host_queue_t* queue, const void* source_device_ptr,
     void* target_device_ptr, iree_device_size_t length,
     iree_hal_amdgpu_host_queue_pm4_copy_data_t* out_copy_data) {
-  if (!queue->pm4_ib_slots) {
+  if (!queue->pm4_ib_slots ||
+      !iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
+          queue->vendor_packet_capabilities)) {
     return false;
   }
   switch (length) {
