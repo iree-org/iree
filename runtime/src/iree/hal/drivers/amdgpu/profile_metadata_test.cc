@@ -49,6 +49,21 @@ class ProfileMetadataTest : public ::testing::Test {
   iree_hal_amdgpu_profile_metadata_registry_t registry_;
 };
 
+TEST_F(ProfileMetadataTest, HashCodeObjectGolden) {
+  const uint8_t code_object_data[] = {
+      0x7f, 'E', 'L', 'F', 0x02, 0x01, 0x01, 0x00,
+      'I',  'R', 'E', 'E', 0x00, 0x10, 0x80, 0xff,
+  };
+
+  uint64_t code_object_hash[2] = {};
+  iree_hal_amdgpu_profile_metadata_hash_code_object(
+      iree_make_const_byte_span(code_object_data, sizeof(code_object_data)),
+      code_object_hash);
+
+  EXPECT_EQ(code_object_hash[0], 0xc928aa6b62b629a9ull);
+  EXPECT_EQ(code_object_hash[1], 0xd1a52f9c3082fba5ull);
+}
+
 TEST_F(ProfileMetadataTest, RegisterExecutableRecordsOnlyIdentity) {
   iree_hal_executable_export_info_t export_info = MakeExportInfo();
   iree_host_size_t export_parameter_offsets[] = {0, 0};
@@ -67,6 +82,38 @@ TEST_F(ProfileMetadataTest, RegisterExecutableRecordsOnlyIdentity) {
   EXPECT_NE(registry_.executable_export_record_data_length, 0u);
   EXPECT_EQ(registry_.executable_code_object_record_data_length, 0u);
   EXPECT_EQ(registry_.executable_code_object_load_record_count, 0u);
+}
+
+TEST_F(ProfileMetadataTest, RegisterExecutableComputesStablePipelineHash) {
+  iree_hal_executable_export_info_t export_info = MakeExportInfo();
+  iree_host_size_t export_parameter_offsets[] = {0, 3};
+  iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
+  uint64_t code_object_hash[2] = {0x0706050403020100ull, 0x1716151413121110ull};
+
+  uint64_t executable_id = 0;
+  IREE_ASSERT_OK(iree_hal_amdgpu_profile_metadata_register_executable(
+      &registry_, /*export_count=*/1, &export_info, export_parameter_offsets,
+      code_object_hash, &kernel_args, &executable_id));
+
+  ASSERT_EQ(registry_.executable_export_record_data_length,
+            sizeof(iree_hal_profile_executable_export_record_t) +
+                export_info.name.size);
+  const auto* export_record =
+      reinterpret_cast<const iree_hal_profile_executable_export_record_t*>(
+          registry_.executable_export_record_data);
+  ASSERT_NE(export_record, nullptr);
+  EXPECT_EQ(export_record->flags,
+            IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+  EXPECT_EQ(export_record->executable_id, executable_id);
+  EXPECT_EQ(export_record->export_ordinal, 0u);
+  EXPECT_EQ(export_record->constant_count, 3u);
+  EXPECT_EQ(export_record->binding_count, 2u);
+  EXPECT_EQ(export_record->parameter_count, 3u);
+  EXPECT_EQ(export_record->workgroup_size[0], 8u);
+  EXPECT_EQ(export_record->workgroup_size[1], 4u);
+  EXPECT_EQ(export_record->workgroup_size[2], 1u);
+  EXPECT_EQ(export_record->pipeline_hash[0], 0x12dbd8b44277f553ull);
+  EXPECT_EQ(export_record->pipeline_hash[1], 0x873c5d1c5596dce4ull);
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableArtifactsAttachToIdentity) {

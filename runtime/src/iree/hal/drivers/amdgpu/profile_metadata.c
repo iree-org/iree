@@ -171,6 +171,27 @@ static void iree_hal_amdgpu_profile_hash128_append(
   iree_hal_amdgpu_profile_hash64_append(&states[1], data, data_length);
 }
 
+static void iree_hal_amdgpu_profile_hash128_append_u16(
+    iree_hal_amdgpu_profile_hash64_state_t states[2], uint16_t value) {
+  uint16_t storage = 0;
+  iree_unaligned_store_le_u16(&storage, value);
+  iree_hal_amdgpu_profile_hash128_append(states, &storage, sizeof(storage));
+}
+
+static void iree_hal_amdgpu_profile_hash128_append_u32(
+    iree_hal_amdgpu_profile_hash64_state_t states[2], uint32_t value) {
+  uint32_t storage = 0;
+  iree_unaligned_store_le_u32(&storage, value);
+  iree_hal_amdgpu_profile_hash128_append(states, &storage, sizeof(storage));
+}
+
+static void iree_hal_amdgpu_profile_hash128_append_u64(
+    iree_hal_amdgpu_profile_hash64_state_t states[2], uint64_t value) {
+  uint64_t storage = 0;
+  iree_unaligned_store_le_u64(&storage, value);
+  iree_hal_amdgpu_profile_hash128_append(states, &storage, sizeof(storage));
+}
+
 static void iree_hal_amdgpu_profile_hash128_finalize(
     iree_hal_amdgpu_profile_hash64_state_t states[2], uint64_t out_hash[2]) {
   out_hash[0] = iree_hal_amdgpu_profile_hash64_finalize(&states[0]);
@@ -217,22 +238,21 @@ static void iree_hal_amdgpu_profile_metadata_hash_pipeline(
     iree_string_view_t export_name, uint64_t out_hash[2]) {
   iree_hal_amdgpu_profile_hash64_state_t states[2];
   iree_hal_amdgpu_profile_hash128_initialize(states);
-  iree_hal_amdgpu_profile_hash128_append(states, code_object_hash,
-                                         2 * sizeof(code_object_hash[0]));
-  iree_hal_amdgpu_profile_hash128_append(states, &export_ordinal,
-                                         sizeof(export_ordinal));
-  iree_hal_amdgpu_profile_hash128_append(
-      states, &host_kernel_args->constant_count,
-      sizeof(host_kernel_args->constant_count));
-  iree_hal_amdgpu_profile_hash128_append(
-      states, &host_kernel_args->binding_count,
-      sizeof(host_kernel_args->binding_count));
-  iree_hal_amdgpu_profile_hash128_append(
-      states, host_kernel_args->workgroup_size,
-      sizeof(host_kernel_args->workgroup_size));
+  iree_hal_amdgpu_profile_hash128_append_u64(states, code_object_hash[0]);
+  iree_hal_amdgpu_profile_hash128_append_u64(states, code_object_hash[1]);
+  iree_hal_amdgpu_profile_hash128_append_u32(states, export_ordinal);
+  iree_hal_amdgpu_profile_hash128_append_u16(states,
+                                             host_kernel_args->constant_count);
+  iree_hal_amdgpu_profile_hash128_append_u16(states,
+                                             host_kernel_args->binding_count);
+  iree_hal_amdgpu_profile_hash128_append_u32(
+      states, host_kernel_args->workgroup_size[0]);
+  iree_hal_amdgpu_profile_hash128_append_u32(
+      states, host_kernel_args->workgroup_size[1]);
+  iree_hal_amdgpu_profile_hash128_append_u32(
+      states, host_kernel_args->workgroup_size[2]);
   const uint64_t export_name_length = export_name.size;
-  iree_hal_amdgpu_profile_hash128_append(states, &export_name_length,
-                                         sizeof(export_name_length));
+  iree_hal_amdgpu_profile_hash128_append_u64(states, export_name_length);
   iree_hal_amdgpu_profile_hash128_append(states, export_name.data,
                                          export_name.size);
   iree_hal_amdgpu_profile_hash128_finalize(states, out_hash);

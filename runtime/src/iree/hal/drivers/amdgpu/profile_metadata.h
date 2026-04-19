@@ -100,8 +100,12 @@ void iree_hal_amdgpu_profile_metadata_initialize(
 void iree_hal_amdgpu_profile_metadata_deinitialize(
     iree_hal_amdgpu_profile_metadata_registry_t* registry);
 
-// Computes the stable 128-bit SipHash-derived profile hash for exact
-// code-object bytes.
+// Computes the stable AMDGPU 128-bit code-object content hash.
+//
+// The hash is an IREE-defined identity value, not a security boundary:
+// consumers should use it only for equality/correlation. It is the pair of two
+// SipHash-2-4 outputs with fixed IREE keys over the exact loaded code-object
+// byte sequence.
 void iree_hal_amdgpu_profile_metadata_hash_code_object(
     iree_const_byte_span_t code_object_data, uint64_t out_hash[2]);
 
@@ -111,6 +115,18 @@ void iree_hal_amdgpu_profile_metadata_hash_code_object(
 // This records the cheap executable/export metadata required to attribute
 // dispatch events and aggregate statistics. It does not retain code-object
 // image bytes or loader load ranges.
+//
+// When |code_object_hash| is provided, each export receives an AMDGPU pipeline
+// hash. Inputs are appended in this order: code_object_hash[0] and
+// code_object_hash[1] as little-endian u64 values, export ordinal as a
+// little-endian u32 value, HAL ABI constant count and binding count as
+// little-endian u16 values, static workgroup size x/y/z as little-endian u32
+// values, and export name byte length as a little-endian u64 value followed by
+// the exact export name bytes.
+//
+// Loader-derived kernel-object, kernarg, private-segment, group-segment, ISA,
+// and code-generation facts are intentionally covered by the exact
+// code-object hash rather than duplicated in the pipeline hash.
 iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_host_size_t export_count,

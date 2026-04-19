@@ -234,7 +234,8 @@ iree_hal_profile_queue_record_default(void) {
 typedef uint32_t iree_hal_profile_executable_flags_t;
 enum iree_hal_profile_executable_flag_bits_t {
   IREE_HAL_PROFILE_EXECUTABLE_FLAG_NONE = 0u,
-  // The |code_object_hash| field contains a deterministic content hash.
+  // The |code_object_hash| field contains a producer-defined deterministic
+  // content hash.
   IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH = 1u << 0,
 };
 
@@ -255,7 +256,9 @@ typedef struct iree_hal_profile_executable_record_t {
   uint32_t export_count;
   // Reserved for future executable record fields; must be zero.
   uint32_t reserved0;
-  // Deterministic code-object content hash words when present in |flags|.
+  // Producer-defined deterministic code-object content hash words when present
+  // in |flags|. Consumers should treat the hash as an opaque equality key
+  // unless the producer documents its algorithm and inputs.
   uint64_t code_object_hash[2];
 } iree_hal_profile_executable_record_t;
 
@@ -272,7 +275,8 @@ iree_hal_profile_executable_record_default(void) {
 typedef uint32_t iree_hal_profile_executable_code_object_flags_t;
 enum iree_hal_profile_executable_code_object_flag_bits_t {
   IREE_HAL_PROFILE_EXECUTABLE_CODE_OBJECT_FLAG_NONE = 0u,
-  // The |code_object_hash| field contains a deterministic content hash.
+  // The |code_object_hash| field contains a producer-defined deterministic
+  // content hash.
   IREE_HAL_PROFILE_EXECUTABLE_CODE_OBJECT_FLAG_CODE_OBJECT_HASH = 1u << 0,
 };
 
@@ -294,7 +298,9 @@ typedef struct iree_hal_profile_executable_code_object_record_t {
   uint64_t code_object_id;
   // Byte length of the trailing code-object image.
   uint64_t data_length;
-  // Deterministic code-object content hash words when present in |flags|.
+  // Producer-defined deterministic code-object content hash words when present
+  // in |flags|. Consumers should treat the hash as an opaque equality key
+  // unless the producer documents its algorithm and inputs.
   uint64_t code_object_hash[2];
 } iree_hal_profile_executable_code_object_record_t;
 
@@ -342,7 +348,8 @@ iree_hal_profile_executable_code_object_load_record_default(void) {
 typedef uint32_t iree_hal_profile_executable_export_flags_t;
 enum iree_hal_profile_executable_export_flag_bits_t {
   IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_NONE = 0u,
-  // The |pipeline_hash| field contains a deterministic export identity hash.
+  // The |pipeline_hash| field contains a producer-defined deterministic export
+  // identity hash.
   IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH = 1u << 0,
 };
 
@@ -370,8 +377,9 @@ typedef struct iree_hal_profile_executable_export_record_t {
   uint32_t workgroup_size[3];
   // Byte length of the trailing export name.
   uint32_t name_length;
-  // Deterministic executable-export identity hash words when present in
-  // |flags|.
+  // Producer-defined deterministic executable-export identity hash words when
+  // present in |flags|. Consumers should treat the hash as an opaque equality
+  // key unless the producer documents its algorithm and inputs.
   uint64_t pipeline_hash[2];
 } iree_hal_profile_executable_export_record_t;
 
