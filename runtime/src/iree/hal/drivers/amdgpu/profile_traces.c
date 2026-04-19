@@ -238,12 +238,11 @@ iree_status_t iree_hal_amdgpu_profile_trace_session_create(
   iree_status_t status = iree_hal_amdgpu_libaqlprofile_initialize(
       session->libhsa, iree_string_view_list_empty(), host_allocator,
       &session->libaqlprofile);
-  if (iree_status_is_ok(status) &&
-      !iree_hal_amdgpu_libaqlprofile_has_att_support(&session->libaqlprofile)) {
-    status = iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "loaded AMDGPU aqlprofile library does not export ATT/SQTT packet "
-        "generation and data iteration symbols");
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_libaqlprofile_require_att_support(
+        &session->libaqlprofile,
+        "AMDGPU executable trace profiling requires ATT/SQTT packet generation "
+        "and trace data iteration symbols");
   }
 
   if (iree_status_is_ok(status)) {

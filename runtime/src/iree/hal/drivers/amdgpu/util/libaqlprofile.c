@@ -93,6 +93,10 @@ IREE_AMDGPU_STATIC_ASSERT(
         (uint32_t)AQLPROFILE_ATT_PARAMETER_NAME_RT_TIMESTAMP,
     "ATT runtime-timestamp parameter id must match the v2 SDK");
 
+enum {
+  IREE_HAL_AMDGPU_AQLPROFILE_SUPPORTED_MAJOR_VERSION = AQLPROFILE_VERSION_MAJOR,
+};
+
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -155,6 +159,38 @@ static iree_status_t iree_hal_amdgpu_libaqlprofile_load_symbols(
 
 #undef IREE_HAL_AMDGPU_LIBAQLPROFILE_LOOKUP
 
+  return iree_ok_status();
+}
+
+static bool iree_hal_amdgpu_libaqlprofile_version_is_supported(
+    iree_hal_amdgpu_aqlprofile_version_t version) {
+  return version.major == IREE_HAL_AMDGPU_AQLPROFILE_SUPPORTED_MAJOR_VERSION;
+}
+
+static bool iree_hal_amdgpu_libaqlprofile_has_queried_version(
+    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile) {
+  return libaqlprofile &&
+         (libaqlprofile->version.major || libaqlprofile->version.minor ||
+          libaqlprofile->version.patch);
+}
+
+static iree_status_t iree_hal_amdgpu_libaqlprofile_query_version(
+    iree_hal_amdgpu_libaqlprofile_t* libaqlprofile) {
+  iree_hal_amdgpu_aqlprofile_version_t version = {0};
+  hsa_status_t hsa_status = libaqlprofile->aqlprofile_get_version(&version);
+  IREE_RETURN_IF_ERROR(iree_status_from_aqlprofile_status(
+      libaqlprofile, __FILE__, __LINE__, hsa_status, "aqlprofile_get_version",
+      "querying AMDGPU aqlprofile runtime version"));
+
+  libaqlprofile->version = version;
+  if (!iree_hal_amdgpu_libaqlprofile_version_is_supported(version)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "unsupported AMDGPU aqlprofile runtime version %u.%u.%u; expected "
+        "major version %u matching the SDK headers used to build IREE",
+        version.major, version.minor, version.patch,
+        IREE_HAL_AMDGPU_AQLPROFILE_SUPPORTED_MAJOR_VERSION);
+  }
   return iree_ok_status();
 }
 
@@ -315,9 +351,13 @@ iree_status_t iree_hal_amdgpu_libaqlprofile_initialize(
         iree_hal_amdgpu_libaqlprofile_load_symbols(library, out_libaqlprofile);
   }
   if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_libaqlprofile_query_version(out_libaqlprofile);
+  }
+  if (iree_status_is_ok(status)) {
     out_libaqlprofile->library = library;
   } else {
     iree_dynamic_library_release(library);
+    memset(out_libaqlprofile, 0, sizeof(*out_libaqlprofile));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -339,6 +379,62 @@ bool iree_hal_amdgpu_libaqlprofile_has_att_support(
          libaqlprofile->aqlprofile_att_codeobj_marker;
 }
 
+static void iree_hal_amdgpu_libaqlprofile_append_missing_symbol(
+    const char* symbol_name, bool is_missing, char* buffer,
+    iree_host_size_t buffer_capacity, iree_host_size_t* inout_length) {
+  if (!is_missing || *inout_length >= buffer_capacity) return;
+
+  const char* separator = *inout_length ? ", " : "";
+  const int written =
+      iree_snprintf(buffer + *inout_length, buffer_capacity - *inout_length,
+                    "%s%s", separator, symbol_name);
+  if (written <= 0) return;
+
+  const iree_host_size_t available = buffer_capacity - *inout_length;
+  if ((iree_host_size_t)written >= available) {
+    *inout_length = buffer_capacity - 1;
+  } else {
+    *inout_length += (iree_host_size_t)written;
+  }
+}
+
+iree_status_t iree_hal_amdgpu_libaqlprofile_require_att_support(
+    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
+    const char* context_message) {
+  if (iree_hal_amdgpu_libaqlprofile_has_att_support(libaqlprofile)) {
+    return iree_ok_status();
+  }
+
+  char missing_symbols[256] = {0};
+  iree_host_size_t missing_symbols_length = 0;
+  iree_hal_amdgpu_libaqlprofile_append_missing_symbol(
+      "aqlprofile_att_create_packets",
+      !libaqlprofile || !libaqlprofile->aqlprofile_att_create_packets,
+      missing_symbols, sizeof(missing_symbols), &missing_symbols_length);
+  iree_hal_amdgpu_libaqlprofile_append_missing_symbol(
+      "aqlprofile_att_delete_packets",
+      !libaqlprofile || !libaqlprofile->aqlprofile_att_delete_packets,
+      missing_symbols, sizeof(missing_symbols), &missing_symbols_length);
+  iree_hal_amdgpu_libaqlprofile_append_missing_symbol(
+      "aqlprofile_att_iterate_data",
+      !libaqlprofile || !libaqlprofile->aqlprofile_att_iterate_data,
+      missing_symbols, sizeof(missing_symbols), &missing_symbols_length);
+  iree_hal_amdgpu_libaqlprofile_append_missing_symbol(
+      "aqlprofile_att_codeobj_marker",
+      !libaqlprofile || !libaqlprofile->aqlprofile_att_codeobj_marker,
+      missing_symbols, sizeof(missing_symbols), &missing_symbols_length);
+
+  const iree_hal_amdgpu_aqlprofile_version_t version =
+      libaqlprofile ? libaqlprofile->version
+                    : (iree_hal_amdgpu_aqlprofile_version_t){0};
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "loaded AMDGPU aqlprofile library version %u.%u.%u does not export "
+      "required ATT/SQTT symbol(s): %s%s%s",
+      version.major, version.minor, version.patch, missing_symbols,
+      context_message ? ": " : "", context_message ? context_message : "");
+}
+
 iree_status_t iree_status_from_aqlprofile_status(
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile, const char* file,
     uint32_t line, hsa_status_t hsa_status, const char* symbol,
@@ -357,6 +453,16 @@ iree_status_t iree_status_from_aqlprofile_status(
     error_string = "unknown aqlprofile error";
   }
 
+  if (iree_hal_amdgpu_libaqlprofile_has_queried_version(libaqlprofile)) {
+    return iree_make_status_with_location(
+        file, line, IREE_STATUS_INTERNAL,
+        "%s failed with hsa_status=0x%08X (%s) from AMDGPU aqlprofile runtime "
+        "version %u.%u.%u%s%s",
+        symbol, (uint32_t)hsa_status, error_string,
+        libaqlprofile->version.major, libaqlprofile->version.minor,
+        libaqlprofile->version.patch, message ? ": " : "",
+        message ? message : "");
+  }
   return iree_make_status_with_location(
       file, line, IREE_STATUS_INTERNAL,
       "%s failed with hsa_status=0x%08X (%s)%s%s", symbol, (uint32_t)hsa_status,

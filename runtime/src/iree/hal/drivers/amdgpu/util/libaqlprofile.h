@@ -25,6 +25,9 @@ typedef struct iree_hal_amdgpu_aqlprofile_handle_t {
   uint64_t handle;
 } iree_hal_amdgpu_aqlprofile_handle_t;
 
+// Mirrors aqlprofile_version_t from the ROCm aqlprofile SDK v2 ABI. The
+// runtime wrapper validates the loaded library against this ABI before exposing
+// packet generation entry points.
 typedef struct iree_hal_amdgpu_aqlprofile_version_t {
   // Major aqlprofile runtime version.
   uint32_t major;
@@ -239,6 +242,9 @@ typedef struct iree_hal_amdgpu_libaqlprofile_t {
   // Loaded aqlprofile dynamic library.
   iree_dynamic_library_t* library;
 
+  // Loaded aqlprofile runtime version returned by aqlprofile_get_version.
+  iree_hal_amdgpu_aqlprofile_version_t version;
+
   // Returns the aqlprofile runtime version.
   hsa_status_t(HSA_API* aqlprofile_get_version)(
       iree_hal_amdgpu_aqlprofile_version_t* version);
@@ -326,6 +332,12 @@ void iree_hal_amdgpu_libaqlprofile_deinitialize(
 // packet generation and data iteration ABI.
 bool iree_hal_amdgpu_libaqlprofile_has_att_support(
     const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile);
+
+// Returns OK if |libaqlprofile| exports the ATT/SQTT packet generation and data
+// iteration ABI, or a detailed UNIMPLEMENTED status naming missing symbols.
+iree_status_t iree_hal_amdgpu_libaqlprofile_require_att_support(
+    const iree_hal_amdgpu_libaqlprofile_t* libaqlprofile,
+    const char* context_message);
 
 // Returns an IREE status with the aqlprofile error string when available.
 iree_status_t iree_status_from_aqlprofile_status(

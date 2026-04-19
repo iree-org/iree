@@ -63,6 +63,23 @@ iree_cc_test(
     "iree-hal-drivers-amdgpu-tests"
 )
 
+iree_cc_test(
+  NAME
+    libaqlprofile_test
+  SRCS
+    "libaqlprofile_test.cc"
+  DEPS
+    ::libaqlprofile
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
 iree_cc_library(
   NAME
     topology
