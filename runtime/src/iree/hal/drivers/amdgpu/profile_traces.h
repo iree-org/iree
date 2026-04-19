@@ -46,11 +46,17 @@ bool iree_hal_amdgpu_profile_trace_session_is_active(
     const iree_hal_amdgpu_profile_trace_session_t* session);
 
 // Enables queue-local executable trace storage for |queue|.
+//
+// Allocates one host-side slot per dispatch event ring entry. Slots hold only
+// small control metadata until selected dispatches prepare them; a prepared
+// slot owns one aqlprofile ATT packet handle and its trace output buffer until
+// the corresponding dispatch event is successfully flushed and released.
 iree_status_t iree_hal_amdgpu_host_queue_enable_profile_traces(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_trace_session_t* session);
 
-// Disables queue-local executable trace storage and deletes all slot handles.
+// Disables queue-local executable trace storage and deletes all remaining slot
+// handles.
 void iree_hal_amdgpu_host_queue_disable_profile_traces(
     iree_hal_amdgpu_host_queue_t* queue);
 
@@ -69,7 +75,10 @@ uint32_t iree_hal_amdgpu_host_queue_profile_trace_start_packet_count(
 // Caller must hold queue->submission_mutex and must call this only after the
 // dispatch profile events have been reserved. Start/stop handles are created
 // lazily per event-ring slot and then reused only after the dispatch event
-// cursor has advanced past the slot.
+// cursor has advanced past the slot. Because ATT output buffers are large, the
+// event flush path releases the slot handle after all sink writes for the
+// corresponding dispatch event have succeeded instead of retaining it for the
+// full profiling session.
 iree_status_t iree_hal_amdgpu_host_queue_prepare_profile_traces(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t reservation);
@@ -124,12 +133,24 @@ void iree_hal_amdgpu_host_queue_commit_profile_trace_stop_packet(
 // Writes executable trace chunks for retired dispatch events in |events|.
 //
 // The caller must not advance the dispatch event read cursor until this returns
-// successfully; queue slot reuse is what makes the aqlprofile handles safe.
+// successfully. This only writes trace payloads; the caller must release the
+// flushed slots after all sink writes associated with the same event positions
+// have succeeded.
 iree_status_t iree_hal_amdgpu_host_queue_write_profile_traces(
     iree_hal_amdgpu_host_queue_t* queue, iree_hal_profile_sink_t* sink,
     uint64_t session_id, uint64_t event_read_position,
     iree_host_size_t event_count,
     const iree_hal_profile_dispatch_event_t* events);
+
+// Releases ATT handles for flushed dispatch event positions.
+//
+// The event flush path must call this only after every sink write associated
+// with the event positions has succeeded and before advancing the dispatch
+// event read cursor so those ring slots cannot be reused while they are being
+// reset.
+void iree_hal_amdgpu_host_queue_release_profile_trace_slots(
+    iree_hal_amdgpu_host_queue_t* queue, uint64_t event_read_position,
+    iree_host_size_t event_count);
 
 #ifdef __cplusplus
 }  // extern "C"

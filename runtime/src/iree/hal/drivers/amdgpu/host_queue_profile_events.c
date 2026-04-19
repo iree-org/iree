@@ -687,6 +687,8 @@ iree_status_t iree_hal_amdgpu_host_queue_write_profile_events(
   }
 
   if (iree_status_is_ok(status) && has_events) {
+    iree_hal_amdgpu_host_queue_release_profile_trace_slots(
+        queue, dispatch_read_position, dispatch_event_count);
     iree_slim_mutex_lock(&queue->profiling.event_mutex);
     queue->profiling.dispatch_event_read_position =
         dispatch_read_position + dispatch_event_count;

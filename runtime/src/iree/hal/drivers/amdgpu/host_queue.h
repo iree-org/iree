@@ -348,7 +348,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     uint64_t next_queue_device_event_id;
     // Borrowed hardware counter session active for this queue, or NULL.
     iree_hal_amdgpu_profile_counter_session_t* counter_session;
-    // Host-side slot table pairing dispatch event ring slots with per-use
+    // Host-side slot table pairing dispatch event ring slots with reusable
     // aqlprofile handles. One logical dispatch event owns |counter_set_count|
     // contiguous slots until its event ring position is flushed.
     iree_hal_amdgpu_profile_counter_sample_slot_t* counter_sample_slots;
@@ -357,7 +357,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     // Borrowed executable trace session active for this queue, or NULL.
     iree_hal_amdgpu_profile_trace_session_t* trace_session;
     // Host-side slot table pairing dispatch event ring slots with per-use
-    // aqlprofile ATT handles.
+    // aqlprofile ATT handles retained only until each trace is flushed.
     iree_hal_amdgpu_profile_trace_slot_t* trace_slots;
   } profiling;
 

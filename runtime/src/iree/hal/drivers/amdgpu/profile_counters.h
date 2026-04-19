@@ -52,6 +52,11 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_write_metadata(
     iree_string_view_t stream_name);
 
 // Enables queue-local counter sample storage for |queue|.
+//
+// Allocates one host-side slot for each dispatch event ring entry and selected
+// counter set. Slots create aqlprofile handles lazily and retain them until
+// profiling is disabled so steady counter captures reuse packet/output storage
+// after the dispatch event cursor advances past each slot.
 iree_status_t iree_hal_amdgpu_host_queue_enable_profile_counters(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_counter_session_t* session);
