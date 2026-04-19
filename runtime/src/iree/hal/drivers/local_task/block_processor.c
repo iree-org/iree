@@ -190,6 +190,25 @@ static uint32_t iree_hal_cmd_region_tile_count(
   return tile_count;
 }
 
+static void iree_hal_cmd_block_processor_profile_reset_dispatches(
+    iree_hal_cmd_block_processor_context_t* context) {
+  if (!context->profile.dispatches) return;
+  for (iree_host_size_t i = 0; i < context->profile.dispatch_capacity; ++i) {
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatch_profile =
+        &context->profile.dispatches[i];
+    iree_atomic_store(&dispatch_profile->start_host_time_ns, 0,
+                      iree_memory_order_relaxed);
+    iree_atomic_store(&dispatch_profile->end_host_time_ns, 0,
+                      iree_memory_order_relaxed);
+    iree_atomic_store(&dispatch_profile->tile_count, 0,
+                      iree_memory_order_relaxed);
+    iree_atomic_store(&dispatch_profile->tile_duration_sum_ns, 0,
+                      iree_memory_order_relaxed);
+    iree_atomic_store(&dispatch_profile->status_code, IREE_STATUS_OK,
+                      iree_memory_order_relaxed);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Per-command tile execution
 //===----------------------------------------------------------------------===//
@@ -337,6 +356,192 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
   return iree_ok_status();
 }
 
+static void iree_hal_cmd_block_processor_profile_atomic_min_i64(
+    iree_atomic_int64_t* target, int64_t value) {
+  int64_t current = iree_atomic_load(target, iree_memory_order_relaxed);
+  while ((current == 0 || value < current) &&
+         !iree_atomic_compare_exchange_weak(target, &current, value,
+                                            iree_memory_order_relaxed,
+                                            iree_memory_order_relaxed)) {
+  }
+}
+
+static void iree_hal_cmd_block_processor_profile_atomic_max_i64(
+    iree_atomic_int64_t* target, int64_t value) {
+  int64_t current = iree_atomic_load(target, iree_memory_order_relaxed);
+  while (value > current &&
+         !iree_atomic_compare_exchange_weak(target, &current, value,
+                                            iree_memory_order_relaxed,
+                                            iree_memory_order_relaxed)) {
+  }
+}
+
+static void iree_hal_cmd_block_processor_profile_accumulate_dispatch(
+    iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_dispatch_t* dispatch, iree_status_t status,
+    iree_time_t start_host_time_ns, iree_time_t end_host_time_ns,
+    uint32_t tile_count) {
+  iree_hal_cmd_block_processor_profile_dispatch_t* dispatch_profile =
+      &context->profile.dispatches[dispatch->header.dispatch_index];
+  iree_hal_cmd_block_processor_profile_atomic_min_i64(
+      &dispatch_profile->start_host_time_ns, start_host_time_ns);
+  iree_hal_cmd_block_processor_profile_atomic_max_i64(
+      &dispatch_profile->end_host_time_ns, end_host_time_ns);
+  iree_atomic_fetch_add(&dispatch_profile->tile_count, (int64_t)tile_count,
+                        iree_memory_order_relaxed);
+  iree_atomic_fetch_add(&dispatch_profile->tile_duration_sum_ns,
+                        (int64_t)(end_host_time_ns - start_host_time_ns),
+                        iree_memory_order_relaxed);
+  const iree_status_code_t status_code = iree_status_code(status);
+  if (status_code != IREE_STATUS_OK) {
+    int32_t expected_status_code = IREE_STATUS_OK;
+    iree_atomic_compare_exchange_strong(
+        &dispatch_profile->status_code, &expected_status_code,
+        (int32_t)status_code, iree_memory_order_relaxed,
+        iree_memory_order_relaxed);
+  }
+}
+
+static void iree_hal_cmd_block_processor_profile_append_dispatch_event(
+    iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs,
+    uint64_t tile_count, int64_t tile_duration_sum_ns,
+    iree_status_code_t status_code, iree_time_t start_host_time_ns,
+    iree_time_t end_host_time_ns) {
+  uint32_t workgroup_count[3];
+  iree_hal_cmd_dispatch_read_workgroup_count(dispatch, binding_ptrs,
+                                             workgroup_count);
+
+  iree_hal_local_profile_host_execution_event_info_t event_info =
+      iree_hal_local_profile_host_execution_event_info_default();
+  event_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+  event_info.flags = IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER |
+                     IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_DEFERRED;
+  if (iree_any_bit_set(dispatch->header.flags, IREE_HAL_CMD_FLAG_INDIRECT)) {
+    event_info.flags |=
+        IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
+  }
+  event_info.status_code = status_code;
+  event_info.scope = context->profile.scope;
+  event_info.submission_id = context->profile.submission_id;
+  event_info.command_buffer_id = context->profile.command_buffer_id;
+  event_info.executable_id =
+      iree_hal_local_executable_profile_id(dispatch->executable);
+  event_info.export_ordinal = dispatch->export_ordinal;
+  memcpy(event_info.workgroup_count, workgroup_count,
+         sizeof(event_info.workgroup_count));
+  event_info.workgroup_size[0] =
+      dispatch->workgroup_size[0] ? dispatch->workgroup_size[0] : 1;
+  event_info.workgroup_size[1] =
+      dispatch->workgroup_size[1] ? dispatch->workgroup_size[1] : 1;
+  event_info.workgroup_size[2] =
+      dispatch->workgroup_size[2] ? dispatch->workgroup_size[2] : 1;
+  event_info.start_host_time_ns = start_host_time_ns;
+  event_info.end_host_time_ns = end_host_time_ns;
+  event_info.tile_count = tile_count;
+  event_info.tile_duration_sum_ns = tile_duration_sum_ns;
+  event_info.operation_count = 1;
+  iree_hal_local_profile_recorder_append_host_execution_event(
+      context->profile.recorder, &event_info, /*out_event_id=*/NULL);
+}
+
+static iree_status_t iree_hal_cmd_execute_dispatch_tiles_profiled(
+    iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_dispatch_t* dispatch, void** binding_ptrs,
+    size_t* binding_lengths, iree_atomic_int64_t* tile_index,
+    int32_t region_epoch, uint32_t worker_index, uint32_t worker_count,
+    uint32_t* out_tiles_completed) {
+  *out_tiles_completed = 0;
+
+  iree_hal_local_profile_recorder_t* recorder = context->profile.recorder;
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+      recorder, (iree_hal_executable_t*)dispatch->executable));
+
+  const bool profile_host_execution =
+      iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS);
+  const bool aggregate_host_execution = profile_host_execution &&
+                                        context->worker_count > 1 &&
+                                        context->profile.dispatches != NULL;
+  if (IREE_UNLIKELY(aggregate_host_execution &&
+                    dispatch->header.dispatch_index >=
+                        context->profile.dispatch_capacity)) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "dispatch index %u exceeds profile dispatch capacity %zu",
+        dispatch->header.dispatch_index,
+        (size_t)context->profile.dispatch_capacity);
+  }
+
+  const iree_time_t start_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
+  iree_status_t status = iree_hal_cmd_execute_dispatch_tiles(
+      dispatch, binding_ptrs, binding_lengths, tile_index, region_epoch,
+      worker_index, worker_count, out_tiles_completed);
+  const iree_time_t end_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
+
+  if (IREE_UNLIKELY(profile_host_execution && (*out_tiles_completed != 0 ||
+                                               !iree_status_is_ok(status)))) {
+    if (aggregate_host_execution) {
+      iree_hal_cmd_block_processor_profile_accumulate_dispatch(
+          context, dispatch, status, start_host_time_ns, end_host_time_ns,
+          *out_tiles_completed);
+    } else {
+      iree_hal_cmd_block_processor_profile_append_dispatch_event(
+          context, dispatch, binding_ptrs, *out_tiles_completed,
+          (int64_t)(end_host_time_ns - start_host_time_ns),
+          iree_status_code(status), start_host_time_ns, end_host_time_ns);
+    }
+  }
+
+  return status;
+}
+
+static void iree_hal_cmd_block_processor_profile_emit_region(
+    iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_barrier_t* barrier, void** binding_ptrs) {
+  if (!context->profile.dispatches ||
+      !iree_hal_local_profile_recorder_is_enabled(
+          context->profile.recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    return;
+  }
+
+  const iree_hal_cmd_header_t* cmd = iree_hal_cmd_next(&barrier->header);
+  for (uint8_t d = 0; d < barrier->dispatch_count; ++d) {
+    if (cmd->opcode == IREE_HAL_CMD_DISPATCH) {
+      const iree_hal_cmd_dispatch_t* dispatch =
+          (const iree_hal_cmd_dispatch_t*)cmd;
+      IREE_ASSERT(dispatch->header.dispatch_index <
+                  context->profile.dispatch_capacity);
+      if (IREE_LIKELY(dispatch->header.dispatch_index <
+                      context->profile.dispatch_capacity)) {
+        iree_hal_cmd_block_processor_profile_dispatch_t* dispatch_profile =
+            &context->profile.dispatches[dispatch->header.dispatch_index];
+        const int64_t tile_count = iree_atomic_load(
+            &dispatch_profile->tile_count, iree_memory_order_relaxed);
+        const int32_t status_code = iree_atomic_load(
+            &dispatch_profile->status_code, iree_memory_order_relaxed);
+        if (tile_count != 0 || status_code != IREE_STATUS_OK) {
+          const iree_time_t start_host_time_ns = iree_atomic_load(
+              &dispatch_profile->start_host_time_ns, iree_memory_order_relaxed);
+          const iree_time_t end_host_time_ns = iree_atomic_load(
+              &dispatch_profile->end_host_time_ns, iree_memory_order_relaxed);
+          const int64_t tile_duration_sum_ns =
+              iree_atomic_load(&dispatch_profile->tile_duration_sum_ns,
+                               iree_memory_order_relaxed);
+          iree_hal_cmd_block_processor_profile_append_dispatch_event(
+              context, dispatch, binding_ptrs, (uint64_t)tile_count,
+              tile_duration_sum_ns, (iree_status_code_t)status_code,
+              start_host_time_ns, end_host_time_ns);
+        }
+      }
+    }
+    cmd = iree_hal_cmd_next(cmd);
+  }
+}
+
 // Executes a FILL command. For multi-worker: claims the single tile via
 // epoch-tagged CAS; exactly one worker performs the fill. Returns 1 if this
 // worker performed the fill, 0 otherwise.
@@ -476,10 +681,18 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
     switch (cmd->opcode) {
       case IREE_HAL_CMD_DISPATCH: {
         uint32_t dispatch_tiles = 0;
-        iree_status_t status = iree_hal_cmd_execute_dispatch_tiles(
-            (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs, binding_lengths,
-            tile_idx, region_epoch, worker_index, context->worker_count,
-            &dispatch_tiles);
+        iree_status_t status = iree_ok_status();
+        if (IREE_UNLIKELY(context->profile.recorder != NULL)) {
+          status = iree_hal_cmd_execute_dispatch_tiles_profiled(
+              context, (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
+              binding_lengths, tile_idx, region_epoch, worker_index,
+              context->worker_count, &dispatch_tiles);
+        } else {
+          status = iree_hal_cmd_execute_dispatch_tiles(
+              (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
+              binding_lengths, tile_idx, region_epoch, worker_index,
+              context->worker_count, &dispatch_tiles);
+        }
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
           iree_hal_cmd_block_processor_report_error(context, status);
           for (uint8_t remaining = d + 1; remaining < barrier->dispatch_count;
@@ -564,6 +777,8 @@ static const iree_hal_cmd_header_t* iree_hal_cmd_find_terminator(
 static void iree_hal_cmd_block_processor_init_block(
     const iree_hal_cmd_block_header_t* block,
     iree_hal_cmd_block_processor_context_t* context) {
+  iree_hal_cmd_block_processor_profile_reset_dispatches(context);
+
   // Assign a unique global epoch for this block's first active region.
   // The epoch monotonically increases across block and region transitions,
   // ensuring that stale workers from a previous block CAS-fail immediately
@@ -695,9 +910,15 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
       switch (cmd->opcode) {
         case IREE_HAL_CMD_DISPATCH: {
           uint32_t tiles = 0;
-          IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles(
-              (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
-              binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
+          if (IREE_UNLIKELY(context->profile.recorder != NULL)) {
+            IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles_profiled(
+                context, (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
+                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
+          } else {
+            IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles(
+                (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
+                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
+          }
           break;
         }
         case IREE_HAL_CMD_FILL: {
@@ -867,6 +1088,9 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
   iree_hal_cmd_block_state_t* state = context->state;
   void** binding_ptrs = iree_hal_cmd_block_state_binding_ptrs(
       state, context->max_region_dispatch_count);
+  iree_hal_cmd_block_processor_profile_emit_region(context, completed_barrier,
+                                                   binding_ptrs);
+  iree_hal_cmd_block_processor_profile_reset_dispatches(context);
 
   // Find next non-empty region, walking the command stream in parallel to
   // locate its barrier. Indirect dispatch regions read their parameter buffers
@@ -1220,6 +1444,23 @@ void iree_hal_cmd_block_processor_context_initialize(
                       (intptr_t)recording->first_block,
                       iree_memory_order_relaxed);
   }
+}
+
+void iree_hal_cmd_block_processor_context_set_profile_recorder(
+    iree_hal_cmd_block_processor_context_t* context,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id,
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatches,
+    iree_host_size_t dispatch_capacity) {
+  if (!context) return;
+  context->profile.recorder = recorder;
+  context->profile.scope = scope;
+  context->profile.submission_id = submission_id;
+  context->profile.command_buffer_id = command_buffer_id;
+  context->profile.dispatches = dispatches;
+  context->profile.dispatch_capacity = dispatch_capacity;
+  iree_hal_cmd_block_processor_profile_reset_dispatches(context);
 }
 
 iree_status_t iree_hal_cmd_block_processor_context_allocate(

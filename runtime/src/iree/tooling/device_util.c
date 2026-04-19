@@ -6,6 +6,9 @@
 
 #include "iree/tooling/device_util.h"
 
+#include <stdio.h>
+#include <string.h>
+
 #include "iree/base/internal/atomics.h"
 #include "iree/base/threading/call_once.h"
 #include "iree/base/threading/mutex.h"
@@ -16,6 +19,7 @@
 #include "iree/hal/utils/allocators.h"
 #include "iree/hal/utils/mpi_channel_provider.h"
 #include "iree/hal/utils/profile_file.h"
+#include "iree/hal/utils/statistics_sink.h"
 #include "iree/io/file_handle.h"
 
 //===----------------------------------------------------------------------===//
@@ -489,6 +493,13 @@ IREE_FLAG(
     "active. 0 disables periodic flushing. The selected HAL backend must\n"
     "support safe in-flight profiling snapshots for the requested data.\n"
     "Sink failures are reported when profiling ends.");
+IREE_FLAG(
+    bool, print_device_statistics, false,
+    "Enables a lightweight HAL profiling session and prints aggregate device\n"
+    "statistics at shutdown. This is a command-line convenience path: it does\n"
+    "not write a profiling bundle and cannot be combined with\n"
+    "--device_profiling_output. When --device_profiling_mode is empty,\n"
+    "tooling requests the producer's lightweight execution-statistics mode.");
 
 IREE_FLAG(
     string, device_capture_tool, "",
@@ -522,6 +533,9 @@ struct iree_hal_profiling_from_flags_t {
 
   // Background flush thread owned by the session when periodic flush is active.
   iree_thread_t* flush_thread;
+
+  // In-memory aggregate sink used by --print_device_statistics.
+  iree_hal_profile_statistics_sink_t* statistics_sink;
 
   // Notification used to wake the flush thread during shutdown.
   iree_notification_t flush_notification;
@@ -785,11 +799,17 @@ iree_status_t iree_hal_begin_profiling_from_flags(
   IREE_RETURN_IF_ERROR(iree_hal_device_profiling_data_families_from_flags(
       &options.data_families));
   const bool external_capture_requested = strlen(FLAG_device_capture_tool) != 0;
+  const bool statistics_requested = FLAG_print_device_statistics;
   if (!external_capture_requested &&
       iree_hal_device_external_capture_flags_present()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "--device_capture_file and --device_capture_label "
                             "require --device_capture_tool");
+  }
+  if (statistics_requested && strlen(FLAG_device_profiling_output) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--print_device_statistics cannot be combined with "
+                            "--device_profiling_output");
   }
   if (FLAG_device_profiling_flush_interval_ms < 0) {
     return iree_make_status(
@@ -802,19 +822,29 @@ iree_status_t iree_hal_begin_profiling_from_flags(
                               "--device_profiling_counter requires "
                               "--device_profiling_mode=counters");
     }
-    if (strlen(FLAG_device_profiling_output) != 0 ||
-        iree_hal_device_profiling_filter_flags_present()) {
+    if (strlen(FLAG_device_profiling_output) != 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "--device_profiling_output and --device_profiling_filter_* require "
-          "--device_profiling_mode");
+          "--device_profiling_output requires --device_profiling_mode");
     }
-    if (FLAG_device_profiling_flush_interval_ms != 0) {
+    if (iree_hal_device_profiling_filter_flags_present() &&
+        !statistics_requested) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "--device_profiling_filter_* requires --device_profiling_mode or "
+          "--print_device_statistics");
+    }
+    if (FLAG_device_profiling_flush_interval_ms != 0 && !statistics_requested) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "--device_profiling_flush_interval_ms requires "
-                              "--device_profiling_mode");
+                              "--device_profiling_mode or "
+                              "--print_device_statistics");
     }
-    if (!external_capture_requested) return iree_ok_status();
+    if (statistics_requested) {
+      options.flags |= IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+    } else if (!external_capture_requested) {
+      return iree_ok_status();
+    }
   }
   if (counter_names.count != 0 &&
       !iree_any_bit_set(options.data_families,
@@ -824,7 +854,7 @@ iree_status_t iree_hal_begin_profiling_from_flags(
         "--device_profiling_counter requires --device_profiling_mode=counters");
   }
   if (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
-      strlen(FLAG_device_profiling_output) == 0) {
+      strlen(FLAG_device_profiling_output) == 0 && !statistics_requested) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "--device_profiling_mode requires "
                             "--device_profiling_output");
@@ -851,14 +881,25 @@ iree_status_t iree_hal_begin_profiling_from_flags(
   iree_hal_device_retain(device);
 
   iree_hal_profile_sink_t* sink = NULL;
-  iree_status_t status =
-      iree_hal_profile_sink_create_from_flags(host_allocator, &sink);
+  iree_hal_profile_statistics_sink_t* statistics_sink = NULL;
+  iree_status_t status = iree_ok_status();
+  if (statistics_requested) {
+    status = iree_hal_profile_statistics_sink_create(host_allocator,
+                                                     &statistics_sink);
+    if (iree_status_is_ok(status)) {
+      sink = iree_hal_profile_statistics_sink_base(statistics_sink);
+    }
+  } else {
+    status = iree_hal_profile_sink_create_from_flags(host_allocator, &sink);
+  }
   if (iree_status_is_ok(status)) {
     options.sink = sink;
     status = iree_hal_device_profiling_begin(device, &options);
     profiling->native_profile_active =
         iree_status_is_ok(status) &&
-        options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE;
+        (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
+         iree_hal_device_profiling_options_requests_lightweight_statistics(
+             &options));
   }
   if (iree_status_is_ok(status) && external_capture_requested) {
     status = iree_hal_device_external_capture_begin_from_flags(device);
@@ -882,9 +923,15 @@ iree_status_t iree_hal_begin_profiling_from_flags(
     iree_slim_mutex_deinitialize(&profiling->flush_mutex);
     iree_allocator_free(host_allocator, profiling);
   } else {
+    profiling->statistics_sink = statistics_sink;
+    statistics_sink = NULL;
     *out_profiling = profiling;
   }
-  iree_hal_profile_sink_release(sink);
+  if (statistics_sink) {
+    iree_hal_profile_statistics_sink_release(statistics_sink);
+  } else if (!statistics_requested) {
+    iree_hal_profile_sink_release(sink);
+  }
   return status;
 }
 
@@ -901,6 +948,11 @@ iree_status_t iree_hal_end_profiling_from_flags(
   if (profiling->native_profile_active) {
     status = iree_status_join(status,
                               iree_hal_device_profiling_end(profiling->device));
+  }
+  if (profiling->statistics_sink) {
+    status = iree_status_join(status, iree_hal_profile_statistics_sink_fprint(
+                                          stderr, profiling->statistics_sink));
+    iree_hal_profile_statistics_sink_release(profiling->statistics_sink);
   }
   iree_hal_device_release(profiling->device);
   iree_slim_mutex_deinitialize(&profiling->flush_mutex);

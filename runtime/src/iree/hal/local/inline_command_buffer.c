@@ -16,6 +16,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/profile.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_inline_command_buffer_t
@@ -41,6 +42,20 @@ typedef struct iree_hal_inline_command_buffer_t {
     // Guess at the current processor ID.
     iree_cpu_processor_id_t processor_id;
   } state;
+
+  struct {
+    // Optional recorder used for command-buffer replay profiling.
+    iree_hal_local_profile_recorder_t* recorder;
+
+    // Queue identity attached to emitted replay records.
+    iree_hal_local_profile_queue_scope_t scope;
+
+    // Queue submission id shared by replayed dispatch records.
+    uint64_t submission_id;
+
+    // Session-local command buffer id for replayed dispatch records.
+    uint64_t command_buffer_id;
+  } profile;
 } iree_hal_inline_command_buffer_t;
 
 static const iree_hal_command_buffer_vtable_t
@@ -126,6 +141,19 @@ void iree_hal_inline_command_buffer_deinitialize(
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
   iree_hal_inline_command_buffer_reset(command_buffer);
+}
+
+void iree_hal_inline_command_buffer_set_profile_recorder(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id) {
+  iree_hal_inline_command_buffer_t* command_buffer =
+      iree_hal_inline_command_buffer_cast(base_command_buffer);
+  command_buffer->profile.recorder = recorder;
+  command_buffer->profile.scope = scope;
+  command_buffer->profile.submission_id = submission_id;
+  command_buffer->profile.command_buffer_id = command_buffer_id;
 }
 
 iree_status_t iree_hal_inline_command_buffer_create(
@@ -467,6 +495,15 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         buffer_mapping.contents.data_length;
   }
 
+  const bool profile_host_execution =
+      IREE_UNLIKELY(iree_hal_local_profile_recorder_is_enabled(
+          command_buffer->profile.recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS));
+  if (IREE_UNLIKELY(command_buffer->profile.recorder)) {
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+        command_buffer->profile.recorder, executable));
+  }
+
   // TODO(benvanik): plumb through an arena or fixed-size reservation to use.
   // For now when deploying to devices where you want something like the
   // inline command buffer you probably don't want 256KB of transient memory
@@ -483,12 +520,51 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   // Since we are running on a borrowed thread, we know nothing about the
   // floating point state. Reset it.
+  const iree_time_t start_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
       local_executable, export_ordinal, dispatch_state,
       command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
+  const iree_time_t end_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
+
+  if (IREE_UNLIKELY(profile_host_execution)) {
+    iree_hal_local_profile_host_execution_event_info_t event_info =
+        iree_hal_local_profile_host_execution_event_info_default();
+    event_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+    event_info.flags =
+        IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER;
+    if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+      event_info.flags |=
+          IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
+    }
+    event_info.status_code = iree_status_code(status);
+    event_info.scope = command_buffer->profile.scope;
+    event_info.submission_id = command_buffer->profile.submission_id;
+    event_info.command_buffer_id = command_buffer->profile.command_buffer_id;
+    event_info.executable_id =
+        iree_hal_local_executable_profile_id(local_executable);
+    event_info.export_ordinal = export_ordinal;
+    event_info.workgroup_count[0] = dispatch_state->workgroup_count_x;
+    event_info.workgroup_count[1] = dispatch_state->workgroup_count_y;
+    event_info.workgroup_count[2] = dispatch_state->workgroup_count_z;
+    event_info.workgroup_size[0] = dispatch_state->workgroup_size_x;
+    event_info.workgroup_size[1] = dispatch_state->workgroup_size_y;
+    event_info.workgroup_size[2] = dispatch_state->workgroup_size_z;
+    event_info.start_host_time_ns = start_host_time_ns;
+    event_info.end_host_time_ns = end_host_time_ns;
+    event_info.tile_count = (uint64_t)event_info.workgroup_count[0] *
+                            (uint64_t)event_info.workgroup_count[1] *
+                            (uint64_t)event_info.workgroup_count[2];
+    event_info.tile_duration_sum_ns =
+        (int64_t)(end_host_time_ns - start_host_time_ns);
+    event_info.operation_count = 1;
+    iree_hal_local_profile_recorder_append_host_execution_event(
+        command_buffer->profile.recorder, &event_info, /*out_event_id=*/NULL);
+  }
 
   if (local_memory.data) {
     iree_allocator_free(command_buffer->host_allocator, local_memory.data);

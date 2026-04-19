@@ -112,6 +112,21 @@ TEST_F(DeviceProfilingTest, BeginDataRequiresSink) {
                         Begin(&profiling_options));
 }
 
+TEST_F(DeviceProfilingTest, BeginLightweightStatisticsRequiresSink) {
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.flags =
+      IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        Begin(&profiling_options));
+}
+
+TEST_F(DeviceProfilingTest, BeginRejectsUnsupportedProfileFlags) {
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.flags = 1u << 31;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        Begin(&profiling_options));
+}
+
 TEST_F(DeviceProfilingTest, BeginRejectsUnsupportedCaptureFilterFlags) {
   iree_hal_device_profiling_options_t profiling_options = {0};
   profiling_options.capture_filter.flags = 1u << 31;
@@ -228,6 +243,20 @@ TEST_F(DeviceProfilingTest, BeginUnsupportedBackendDoesNotTouchSink) {
   EXPECT_EQ(0, sink.end_count);
 }
 
+TEST_F(DeviceProfilingTest, BeginLightweightStatisticsReachesBackend) {
+  CountingProfileSink sink = {};
+  CountingProfileSinkInitialize(&sink);
+
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.flags =
+      IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  profiling_options.sink = CountingProfileSinkAsBase(&sink);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED, Begin(&profiling_options));
+  EXPECT_EQ(0, sink.begin_count);
+  EXPECT_EQ(0, sink.write_count);
+  EXPECT_EQ(0, sink.end_count);
+}
+
 TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   std::string executable_export_pattern = "scale_*";
   std::string counter_set_name = "set0";
@@ -245,6 +274,7 @@ TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   counter_set.counter_names = counter_names;
 
   iree_hal_device_profiling_options_t source_options = {0};
+  source_options.flags = IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
   source_options.capture_filter.flags =
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
   source_options.capture_filter.executable_export_pattern =
@@ -264,6 +294,8 @@ TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   counter_name0.assign("changed0");
   counter_name1.assign("changed1");
 
+  EXPECT_EQ(cloned_options.flags,
+            IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS);
   EXPECT_TRUE(iree_string_view_equal(
       cloned_options.capture_filter.executable_export_pattern,
       IREE_SV("scale_*")));

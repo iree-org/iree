@@ -70,6 +70,19 @@ enum iree_hal_device_profiling_data_family_bits_t {
   IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS = 1ull << 7,
 };
 
+// Bitfield selecting producer-side profiling behavior that is not itself a
+// durable profile record family.
+typedef uint32_t iree_hal_device_profiling_flags_t;
+enum iree_hal_device_profiling_flag_bits_t {
+  IREE_HAL_DEVICE_PROFILING_FLAG_NONE = 0u,
+
+  // Requests the producer's cheapest useful execution-statistics record set.
+  // Producers expand this into ordinary profile chunks such as queue, dispatch,
+  // host-execution, and executable metadata records. No statistics-specific
+  // profile chunks are emitted.
+  IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS = 1u << 0,
+};
+
 // Bitfield specifying profile capture filter predicates.
 typedef uint32_t iree_hal_profile_capture_filter_flags_t;
 enum iree_hal_profile_capture_filter_flag_bits_t {
@@ -202,6 +215,9 @@ typedef struct iree_hal_profile_counter_set_selection_t {
 // value after returning success must retain, copy, or resolve it into
 // implementation-owned session state before returning.
 typedef struct iree_hal_device_profiling_options_t {
+  // Flags selecting producer-side profiling behavior.
+  iree_hal_device_profiling_flags_t flags;
+
   // HAL-native structured data families requested by the caller.
   iree_hal_device_profiling_data_families_t data_families;
 
@@ -257,6 +273,14 @@ static inline bool iree_hal_device_profiling_options_requests_data(
     const iree_hal_device_profiling_options_t* options,
     iree_hal_device_profiling_data_families_t data_families) {
   return iree_any_bit_set(options->data_families, data_families);
+}
+
+// Returns true when producers should select their lightweight statistics mode.
+static inline bool
+iree_hal_device_profiling_options_requests_lightweight_statistics(
+    const iree_hal_device_profiling_options_t* options) {
+  return iree_all_bits_set(
+      options->flags, IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS);
 }
 
 // Returns true when |options| requests explicit hardware counter capture.

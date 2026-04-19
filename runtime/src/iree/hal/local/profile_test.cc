@@ -7,9 +7,11 @@
 #include "iree/hal/local/profile.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "iree/hal/api.h"
+#include "iree/hal/local/local_executable.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -55,6 +57,16 @@ struct RecordingProfileSink {
 
   // Queue records copied from metadata chunks.
   std::vector<iree_hal_profile_queue_record_t> queue_records;
+
+  // Executable records copied from metadata chunks.
+  std::vector<iree_hal_profile_executable_record_t> executable_records;
+
+  // Executable export records copied from metadata chunks.
+  std::vector<iree_hal_profile_executable_export_record_t>
+      executable_export_records;
+
+  // Executable export names copied from trailing packed record data.
+  std::vector<std::string> executable_export_names;
 
   // Queue event records copied from data chunks.
   std::vector<iree_hal_profile_queue_event_t> queue_events;
@@ -117,6 +129,39 @@ static iree_status_t CopyProfileRecords(iree_const_byte_span_t iovec,
   return iree_ok_status();
 }
 
+static iree_status_t CopyExecutableExportProfileRecords(
+    iree_const_byte_span_t iovec,
+    std::vector<iree_hal_profile_executable_export_record_t>* out_records,
+    std::vector<std::string>* out_names) {
+  iree_host_size_t offset = 0;
+  while (offset < iovec.data_length) {
+    const iree_host_size_t remaining_length = iovec.data_length - offset;
+    if (remaining_length <
+        sizeof(iree_hal_profile_executable_export_record_t)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "truncated executable export record");
+    }
+    const auto* record =
+        reinterpret_cast<const iree_hal_profile_executable_export_record_t*>(
+            iovec.data + offset);
+    if (record->record_length < sizeof(*record) ||
+        record->record_length > remaining_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid executable export record length");
+    }
+    if (record->name_length > record->record_length - sizeof(*record)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid executable export name length");
+    }
+    out_records->push_back(*record);
+    out_names->emplace_back(
+        reinterpret_cast<const char*>(iovec.data + offset + sizeof(*record)),
+        record->name_length);
+    offset += record->record_length;
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t RecordingProfileSinkWrite(
     iree_hal_profile_sink_t* sink,
     const iree_hal_profile_chunk_metadata_t* metadata,
@@ -157,6 +202,24 @@ static iree_status_t RecordingProfileSinkWrite(
     for (iree_host_size_t i = 0; i < iovec_count; ++i) {
       IREE_RETURN_IF_ERROR(
           CopyProfileRecords(iovecs[i], &test_sink->queue_records));
+    }
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(metadata->content_type,
+                             IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES)) {
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->executable_records));
+    }
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(
+          metadata->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(CopyExecutableExportProfileRecords(
+          iovecs[i], &test_sink->executable_export_records,
+          &test_sink->executable_export_names));
     }
     return iree_ok_status();
   }
@@ -242,6 +305,99 @@ static iree_hal_profile_queue_record_t MakeQueueRecord(uint32_t queue_ordinal) {
   record.stream_id = queue_ordinal + 1;
   return record;
 }
+
+typedef struct FakeLocalExecutable {
+  iree_hal_local_executable_t base;
+} FakeLocalExecutable;
+
+static void FakeLocalExecutableDestroy(iree_hal_executable_t* executable) {
+  (void)executable;
+}
+
+static iree_host_size_t FakeLocalExecutableExportCount(
+    iree_hal_executable_t* executable) {
+  (void)executable;
+  return 2;
+}
+
+static iree_status_t FakeLocalExecutableExportInfo(
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  (void)executable;
+  memset(out_info, 0, sizeof(*out_info));
+  switch (export_ordinal) {
+    case 0:
+      out_info->name = IREE_SV("dispatch_a");
+      out_info->constant_count = 1;
+      out_info->binding_count = 2;
+      out_info->parameter_count = 3;
+      out_info->workgroup_size[0] = 4;
+      out_info->workgroup_size[1] = 5;
+      out_info->workgroup_size[2] = 6;
+      return iree_ok_status();
+    case 1:
+      out_info->name = IREE_SV("dispatch_b");
+      out_info->workgroup_size[0] = 1;
+      out_info->workgroup_size[1] = 1;
+      out_info->workgroup_size[2] = 1;
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "export ordinal out of range");
+  }
+}
+
+static iree_status_t FakeLocalExecutableExportParameters(
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  (void)executable;
+  (void)export_ordinal;
+  (void)capacity;
+  (void)out_parameters;
+  return iree_ok_status();
+}
+
+static iree_status_t FakeLocalExecutableLookupExportByName(
+    iree_hal_executable_t* executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  (void)executable;
+  if (iree_string_view_equal(name, IREE_SV("dispatch_a"))) {
+    *out_export_ordinal = 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(name, IREE_SV("dispatch_b"))) {
+    *out_export_ordinal = 1;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_NOT_FOUND, "export not found");
+}
+
+static iree_status_t FakeLocalExecutableIssueCall(
+    iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
+    const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+    uint32_t worker_id) {
+  (void)executable;
+  (void)ordinal;
+  (void)dispatch_state;
+  (void)workgroup_state;
+  (void)worker_id;
+  return iree_ok_status();
+}
+
+static const iree_hal_local_executable_vtable_t kFakeLocalExecutableVTable = {
+    {
+        FakeLocalExecutableDestroy,
+        FakeLocalExecutableExportCount,
+        FakeLocalExecutableExportInfo,
+        FakeLocalExecutableExportParameters,
+        FakeLocalExecutableLookupExportByName,
+    },
+    FakeLocalExecutableIssueCall,
+};
 
 class LocalProfileRecorderTest : public ::testing::Test {
  protected:
@@ -332,6 +488,31 @@ TEST_F(LocalProfileRecorderTest, RejectsCaptureFilter) {
       IREE_STATUS_UNIMPLEMENTED,
       iree_hal_local_profile_recorder_create(
           &recorder_options_, &options, iree_allocator_system(), &recorder_));
+}
+
+TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataOnce) {
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA));
+
+  FakeLocalExecutable executable;
+  iree_hal_local_executable_initialize(
+      &kFakeLocalExecutableVTable, iree_allocator_system(), &executable.base);
+  iree_hal_executable_t* base_executable =
+      reinterpret_cast<iree_hal_executable_t*>(&executable.base);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_record_executable(
+      recorder_, base_executable));
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_record_executable(
+      recorder_, base_executable));
+
+  ASSERT_EQ(1u, sink_.executable_records.size());
+  ASSERT_EQ(2u, sink_.executable_export_records.size());
+  EXPECT_EQ(2u, sink_.executable_records[0].export_count);
+  EXPECT_EQ(sink_.executable_records[0].executable_id,
+            sink_.executable_export_records[0].executable_id);
+  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+
+  iree_hal_local_executable_deinitialize(&executable.base);
 }
 
 TEST_F(LocalProfileRecorderTest, SinkBeginFailurePropagates) {

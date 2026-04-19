@@ -472,6 +472,13 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(options);
 
+  const iree_hal_device_profiling_flags_t supported_flags =
+      IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  if (iree_any_bit_set(options->flags, ~supported_flags)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported profile option flags 0x%x",
+                            options->flags & ~supported_flags);
+  }
   const iree_hal_profile_capture_filter_flags_t supported_filter_flags =
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN |
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID |
@@ -549,14 +556,16 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
         "selection");
   }
 
-  if (options->data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
-      !options->sink) {
+  const bool data_requested =
+      options->data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
+      iree_hal_device_profiling_options_requests_lightweight_statistics(
+          options);
+  if (data_requested && !options->sink) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "HAL-native profiling with requested data families requires a profile "
-        "sink");
+        "HAL-native profiling with requested data requires a profile sink");
   }
-  if (options->data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
+  if (!data_requested) {
     return iree_ok_status();
   }
 

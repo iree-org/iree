@@ -397,13 +397,15 @@ static void iree_hal_task_queue_profile_add_host_flags(
   profile_operation->host_flags |= host_flags;
 }
 
-static void iree_hal_task_queue_profile_set_dispatch(
+static iree_status_t iree_hal_task_queue_profile_set_dispatch(
     iree_hal_task_queue_op_t* operation, iree_hal_executable_t* executable,
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
-  if (!profile_operation) return;
+  if (!profile_operation) return iree_ok_status();
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+      profile_operation->recorder, executable));
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
   profile_operation->executable_id =
@@ -422,6 +424,7 @@ static void iree_hal_task_queue_profile_set_dispatch(
       config.workgroup_size[1] ? config.workgroup_size[1] : 1;
   profile_operation->workgroup_size[2] =
       config.workgroup_size[2] ? config.workgroup_size[2] : 1;
+  return iree_ok_status();
 }
 
 static void iree_hal_task_queue_profile_set_command_buffer(
@@ -1319,6 +1322,38 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(queue->device_allocator);
 
+  uint32_t worker_count =
+      (uint32_t)iree_task_executor_worker_count(queue->executor);
+  if (worker_count == 0) worker_count = 1;
+
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  iree_hal_cmd_block_processor_profile_dispatch_t* profile_dispatches = NULL;
+  iree_host_size_t profile_dispatch_capacity = 0;
+  iree_status_t status = iree_ok_status();
+  if (worker_count > 1 && profile_operation &&
+      recording->max_region_dispatch_count > 0 &&
+      iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    profile_dispatch_capacity = recording->max_region_dispatch_count;
+    iree_host_size_t dispatch_profile_bytes = 0;
+    if (IREE_LIKELY(iree_host_size_checked_mul(profile_dispatch_capacity,
+                                               sizeof(*profile_dispatches),
+                                               &dispatch_profile_bytes))) {
+      status = iree_arena_allocate(&operation->arena, dispatch_profile_bytes,
+                                   (void**)&profile_dispatches);
+    } else {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "local-task profile dispatch aggregation storage is too large");
+    }
+    if (iree_status_is_ok(status)) {
+      memset(profile_dispatches, 0, dispatch_profile_bytes);
+    }
+  }
+  IREE_RETURN_IF_ERROR(status);
+
   // Acquire a recording item from the free pool, growing the pool if empty.
   iree_hal_task_queue_compute_item_t* item =
       iree_hal_task_queue_compute_item_slist_pop(&queue->compute_free_pool);
@@ -1328,11 +1363,8 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   }
 
   // Allocate the block processor execution context.
-  uint32_t worker_count =
-      (uint32_t)iree_task_executor_worker_count(queue->executor);
-  if (worker_count == 0) worker_count = 1;
   iree_hal_cmd_block_processor_context_t* processor_context = NULL;
-  iree_status_t status = iree_hal_cmd_block_processor_context_allocate(
+  status = iree_hal_cmd_block_processor_context_allocate(
       recording, binding_table, binding_table_length, worker_count,
       host_allocator, &processor_context);
   if (!iree_status_is_ok(status)) {
@@ -1350,6 +1382,13 @@ static iree_status_t iree_hal_task_queue_drain_recording(
         &queue->compute_process.worker_budget;
     processor_context->desired_wake_ptr =
         iree_task_executor_desired_wake_ptr(queue->executor);
+    if (profile_operation) {
+      iree_hal_cmd_block_processor_context_set_profile_recorder(
+          processor_context, profile_operation->recorder,
+          profile_operation->scope, profile_operation->submission_id,
+          profile_operation->command_buffer_id, profile_dispatches,
+          profile_dispatch_capacity);
+    }
   }
 
   // Fill the recording item.
@@ -3486,11 +3525,10 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
   operation->dispatch.config = config;
   operation->dispatch.binding_count = binding_count;
   operation->dispatch.flags = flags;
-  iree_hal_task_queue_profile_set_dispatch(operation, executable,
-                                           export_ordinal, config, flags);
 
   // Arena-allocate copies of constants and bindings.
-  iree_status_t status = iree_ok_status();
+  iree_status_t status = iree_hal_task_queue_profile_set_dispatch(
+      operation, executable, export_ordinal, config, flags);
   if (iree_status_is_ok(status) && constants.data_length > 0) {
     uint32_t* constants_copy = NULL;
     status = iree_arena_allocate(&operation->arena, constants.data_length,

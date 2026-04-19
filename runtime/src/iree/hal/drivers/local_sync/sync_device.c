@@ -526,6 +526,20 @@ typedef struct iree_hal_sync_device_profile_operation_t {
   iree_time_t start_host_time_ns;
 } iree_hal_sync_device_profile_operation_t;
 
+typedef struct iree_hal_sync_device_command_buffer_profile_t {
+  // Recorder receiving replayed command-buffer dispatch records.
+  iree_hal_local_profile_recorder_t* recorder;
+
+  // Queue identity attached to emitted replay records.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Queue submission id shared by replayed dispatch records.
+  uint64_t submission_id;
+
+  // Session-local command-buffer identifier for replayed dispatch records.
+  uint64_t command_buffer_id;
+} iree_hal_sync_device_command_buffer_profile_t;
+
 static uint32_t iree_hal_sync_device_profile_semaphore_count(
     const iree_hal_semaphore_list_t semaphore_list) {
   return semaphore_list.count > UINT32_MAX ? UINT32_MAX
@@ -1258,6 +1272,8 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
   iree_hal_sync_device_profile_operation_initialize(
       IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH, /*payload_length=*/0,
       /*operation_count=*/1, &profile_operation);
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+      device->profile_recorder, executable));
   iree_hal_sync_device_profile_operation_set_dispatch(
       &profile_operation, executable, export_ordinal, config, flags);
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
@@ -1429,7 +1445,8 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
 
 static iree_status_t iree_hal_sync_device_apply_deferred_command_buffer(
     iree_hal_sync_device_t* device, iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table) {
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_sync_device_command_buffer_profile_t* profile) {
   // If there were no deferred command buffers no-op this call - they've already
   // been issued.
   if (!command_buffer ||
@@ -1470,6 +1487,11 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffer(
       IREE_HAL_QUEUE_AFFINITY_ANY,
       /*binding_capacity=*/0, device->host_allocator, storage,
       &inline_command_buffer));
+  if (profile && profile->recorder) {
+    iree_hal_inline_command_buffer_set_profile_recorder(
+        inline_command_buffer, profile->recorder, profile->scope,
+        profile->submission_id, profile->command_buffer_id);
+  }
 
   iree_status_t status = iree_hal_deferred_command_buffer_apply(
       command_buffer, inline_command_buffer, binding_table);
@@ -1499,8 +1521,14 @@ static iree_status_t iree_hal_sync_device_queue_execute_profiled(
   }
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
       device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
+  const iree_hal_sync_device_command_buffer_profile_t command_buffer_profile = {
+      .recorder = device->profile_recorder,
+      .scope = profile_operation.scope,
+      .submission_id = profile_operation.submission_id,
+      .command_buffer_id = profile_operation.command_buffer_id,
+  };
   iree_status_t status = iree_hal_sync_device_apply_deferred_command_buffer(
-      device, command_buffer, binding_table);
+      device, command_buffer, binding_table, &command_buffer_profile);
   return iree_hal_sync_device_profiled_queue_op_end(
       device, signal_semaphore_list, &profile_operation, status);
 }
@@ -1521,7 +1549,7 @@ static iree_status_t iree_hal_sync_device_queue_execute(
   IREE_RETURN_IF_ERROR(
       iree_hal_sync_device_queue_op_begin(device, wait_semaphore_list));
   iree_status_t status = iree_hal_sync_device_apply_deferred_command_buffer(
-      device, command_buffer, binding_table);
+      device, command_buffer, binding_table, /*profile=*/NULL);
   return iree_hal_sync_device_queue_op_end(device, signal_semaphore_list,
                                            status);
 }

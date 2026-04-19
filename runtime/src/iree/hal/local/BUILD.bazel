@@ -143,6 +143,7 @@ iree_runtime_cc_library(
     srcs = ["profile.c"],
     hdrs = ["profile.h"],
     deps = [
+        ":executable_loader",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
@@ -153,6 +154,7 @@ iree_runtime_cc_test(
     name = "profile_test",
     srcs = ["profile_test.cc"],
     deps = [
+        ":executable_loader",
         ":profile",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
@@ -175,6 +177,7 @@ iree_runtime_cc_library(
     deps = [
         ":executable_environment",
         ":executable_library",
+        ":profile",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:cpu",

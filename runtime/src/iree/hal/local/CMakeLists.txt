@@ -165,6 +165,7 @@ iree_cc_library(
   SRCS
     "profile.c"
   DEPS
+    ::executable_loader
     iree::base
     iree::base::threading
     iree::hal
@@ -177,6 +178,7 @@ iree_cc_test(
   SRCS
     "profile_test.cc"
   DEPS
+    ::executable_loader
     ::profile
     iree::hal
     iree::testing::gtest
@@ -197,6 +199,7 @@ iree_cc_library(
   DEPS
     ::executable_environment
     ::executable_library
+    ::profile
     iree::base
     iree::base::internal
     iree::base::internal::cpu

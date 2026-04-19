@@ -122,6 +122,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal/local:executable_loader",
+        "//runtime/src/iree/hal/local:profile",
     ],
 )
 

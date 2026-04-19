@@ -31,6 +31,7 @@ static inline iree_hal_device_profiling_data_families_t
 iree_hal_local_profile_recorder_supported_data_families(void) {
   return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
          IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
 }
 
@@ -238,6 +239,15 @@ void iree_hal_local_profile_recorder_destroy(
 bool iree_hal_local_profile_recorder_is_enabled(
     const iree_hal_local_profile_recorder_t* recorder,
     iree_hal_device_profiling_data_families_t data_families);
+
+// Emits executable/export metadata for |executable| once per recorder session.
+//
+// Returns OK without work when executable metadata is not enabled. This is a
+// cold-path helper for queue submission/replay sites that produce events with
+// executable ids and need offline tools to resolve those ids into export names.
+iree_status_t iree_hal_local_profile_recorder_record_executable(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_executable_t* executable);
 
 // Appends one host-timestamped queue event to |recorder|.
 //

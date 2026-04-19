@@ -315,6 +315,28 @@ static bool iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
                               IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
 }
 
+static iree_hal_device_profiling_data_families_t
+iree_hal_amdgpu_logical_device_lightweight_statistics_data_families(void) {
+  return IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
+         IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+}
+
+static iree_hal_device_profiling_options_t
+iree_hal_amdgpu_logical_device_resolve_profiling_options(
+    const iree_hal_device_profiling_options_t* options) {
+  iree_hal_device_profiling_options_t resolved_options = *options;
+  if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
+      iree_hal_device_profiling_options_requests_lightweight_statistics(
+          options)) {
+    resolved_options.data_families =
+        iree_hal_amdgpu_logical_device_lightweight_statistics_data_families();
+  }
+  resolved_options.flags &=
+      ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  return resolved_options;
+}
+
 // Power-of-two capacity for logical-device memory lifecycle event buffering.
 #define IREE_HAL_AMDGPU_LOGICAL_DEVICE_PROFILE_MEMORY_EVENT_CAPACITY (64 * 1024)
 
@@ -2717,14 +2739,17 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
+  iree_hal_device_profiling_options_t resolved_options =
+      iree_hal_amdgpu_logical_device_resolve_profiling_options(options);
 
   if (iree_hal_device_profiling_options_requests_data(
-          options, IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "AMDGPU profiling does not produce host execution events");
   }
-  if (options->data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
+  if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
     return iree_ok_status();
   }
   if (!logical_device->frontier_tracker) {
@@ -2738,7 +2763,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
                             "cannot nest AMDGPU profile captures");
   }
   if (iree_hal_device_profiling_options_requests_data(
-          options, IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS)) {
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS)) {
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_logical_device_verify_queue_device_profiling_supported(
             logical_device));
@@ -2753,7 +2779,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   iree_hal_amdgpu_profile_counter_session_t* counter_session = NULL;
   iree_hal_amdgpu_profile_trace_session_t* trace_session = NULL;
   iree_status_t status = iree_hal_device_profiling_options_clone(
-      options, logical_device->host_allocator, &session_options,
+      &resolved_options, logical_device->host_allocator, &session_options,
       &options_storage);
   iree_hal_profile_sink_t* sink = session_options.sink;
   uint64_t session_id = 0;

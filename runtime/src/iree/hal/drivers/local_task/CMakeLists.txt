@@ -111,6 +111,7 @@ iree_cc_library(
     iree::async
     iree::base
     iree::hal::local::executable_loader
+    iree::hal::local::profile
   PUBLIC
 )
 

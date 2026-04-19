@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/threading/mutex.h"
+#include "iree/hal/local/local_executable.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_local_profile_recorder_t
@@ -106,6 +107,15 @@ struct iree_hal_local_profile_recorder_t {
 
   // Ring of memory lifecycle event records.
   iree_hal_local_profile_event_ring_t memory_event_ring;
+
+  // Open-addressed set of executable ids whose metadata was emitted.
+  uint64_t* emitted_executable_ids;
+
+  // Power-of-two slot count in |emitted_executable_ids|.
+  iree_host_size_t emitted_executable_id_capacity;
+
+  // Number of occupied executable id slots.
+  iree_host_size_t emitted_executable_id_count;
 };
 
 static bool iree_hal_local_profile_recorder_requests_data(
@@ -113,6 +123,28 @@ static bool iree_hal_local_profile_recorder_requests_data(
     iree_hal_device_profiling_data_families_t data_families) {
   return iree_hal_device_profiling_options_requests_data(&recorder->options,
                                                          data_families);
+}
+
+static iree_hal_device_profiling_data_families_t
+iree_hal_local_profile_recorder_lightweight_statistics_data_families(void) {
+  return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
+}
+
+static iree_hal_device_profiling_options_t
+iree_hal_local_profile_recorder_resolve_profiling_options(
+    const iree_hal_device_profiling_options_t* profiling_options) {
+  iree_hal_device_profiling_options_t resolved_options = *profiling_options;
+  if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
+      iree_hal_device_profiling_options_requests_lightweight_statistics(
+          profiling_options)) {
+    resolved_options.data_families =
+        iree_hal_local_profile_recorder_lightweight_statistics_data_families();
+  }
+  resolved_options.flags &=
+      ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  return resolved_options;
 }
 
 static iree_status_t iree_hal_local_profile_recorder_validate_records(
@@ -168,6 +200,11 @@ static iree_status_t iree_hal_local_profile_recorder_validate_records(
 
 static iree_status_t iree_hal_local_profile_recorder_validate_profiling_options(
     const iree_hal_device_profiling_options_t* profiling_options) {
+  if (profiling_options->flags != IREE_HAL_DEVICE_PROFILING_FLAG_NONE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported local profiling flags 0x%x",
+                            profiling_options->flags);
+  }
   const iree_hal_device_profiling_data_families_t supported_data_families =
       iree_hal_local_profile_recorder_supported_data_families();
   const iree_hal_device_profiling_data_families_t unsupported_data_families =
@@ -270,6 +307,7 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
                                 iree_hal_profile_memory_event_t,
                                 iree_alignof(iree_hal_profile_memory_event_t),
                                 &memory_events_offset)));
+  if (total_size == 0) return iree_ok_status();
 
   void* event_storage = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(recorder->host_allocator,
@@ -367,13 +405,23 @@ iree_status_t iree_hal_local_profile_recorder_create(
   IREE_ASSERT_ARGUMENT(out_recorder);
   *out_recorder = NULL;
 
-  if (profiling_options->data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
+  const iree_hal_device_profiling_flags_t supported_flags =
+      IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  if (iree_any_bit_set(profiling_options->flags, ~supported_flags)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported local profiling flags 0x%x",
+                            profiling_options->flags & ~supported_flags);
+  }
+  iree_hal_device_profiling_options_t resolved_options =
+      iree_hal_local_profile_recorder_resolve_profiling_options(
+          profiling_options);
+  if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
     return iree_ok_status();
   }
 
   IREE_RETURN_IF_ERROR(
       iree_hal_local_profile_recorder_validate_profiling_options(
-          profiling_options));
+          &resolved_options));
   IREE_RETURN_IF_ERROR(
       iree_hal_local_profile_recorder_validate_records(recorder_options));
 
@@ -391,7 +439,7 @@ iree_status_t iree_hal_local_profile_recorder_create(
       recorder, recorder_options->name);
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_profiling_options_clone(
-        profiling_options, host_allocator, &recorder->options,
+        &resolved_options, host_allocator, &recorder->options,
         &recorder->options_storage);
   }
   if (iree_status_is_ok(status)) {
@@ -435,6 +483,7 @@ void iree_hal_local_profile_recorder_destroy(
               "active local profile recorders must be ended before destroy");
   iree_allocator_t host_allocator = recorder->host_allocator;
   iree_allocator_free(host_allocator, recorder->event_storage);
+  iree_allocator_free(host_allocator, recorder->emitted_executable_ids);
   iree_hal_device_profiling_options_storage_free(recorder->options_storage,
                                                  host_allocator);
   iree_allocator_free(host_allocator, recorder->name_storage);
@@ -449,6 +498,275 @@ bool iree_hal_local_profile_recorder_is_enabled(
   return recorder && recorder->active &&
          iree_hal_device_profiling_options_requests_data(&recorder->options,
                                                          data_families);
+}
+
+static iree_host_size_t iree_hal_local_profile_hash_executable_id(
+    uint64_t executable_id, iree_host_size_t capacity) {
+  executable_id ^= executable_id >> 33;
+  executable_id *= 0xff51afd7ed558ccdull;
+  executable_id ^= executable_id >> 33;
+  executable_id *= 0xc4ceb9fe1a85ec53ull;
+  executable_id ^= executable_id >> 33;
+  return (iree_host_size_t)executable_id & (capacity - 1);
+}
+
+static bool iree_hal_local_profile_find_executable_id_slot(
+    const uint64_t* executable_ids, iree_host_size_t capacity,
+    uint64_t executable_id, iree_host_size_t* out_slot) {
+  IREE_ASSERT(capacity != 0);
+  iree_host_size_t slot =
+      iree_hal_local_profile_hash_executable_id(executable_id, capacity);
+  while (executable_ids[slot] != 0) {
+    if (executable_ids[slot] == executable_id) {
+      *out_slot = slot;
+      return true;
+    }
+    slot = (slot + 1) & (capacity - 1);
+  }
+  *out_slot = slot;
+  return false;
+}
+
+static iree_status_t iree_hal_local_profile_recorder_reserve_executable_ids(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_host_size_t minimum_capacity) {
+  if (IREE_UNLIKELY(minimum_capacity > IREE_HOST_SIZE_MAX / 2)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "local profiling executable metadata set is too large");
+  }
+  const iree_host_size_t required_capacity = minimum_capacity * 2;
+  iree_host_size_t capacity = recorder->emitted_executable_id_capacity;
+  if (required_capacity <= capacity) return iree_ok_status();
+  capacity = capacity != 0 ? capacity : 16;
+  while (required_capacity > capacity) {
+    if (IREE_UNLIKELY(capacity > IREE_HOST_SIZE_MAX / 2)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "local profiling executable metadata set is too large");
+    }
+    capacity *= 2;
+  }
+
+  iree_host_size_t byte_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+          capacity, sizeof(*recorder->emitted_executable_ids), &byte_length))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "local profiling executable metadata set size overflow");
+  }
+  uint64_t* executable_ids = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      recorder->host_allocator, byte_length, (void**)&executable_ids));
+  memset(executable_ids, 0, byte_length);
+  for (iree_host_size_t i = 0; i < recorder->emitted_executable_id_capacity;
+       ++i) {
+    const uint64_t executable_id = recorder->emitted_executable_ids[i];
+    if (executable_id == 0) continue;
+    iree_host_size_t slot = 0;
+    iree_hal_local_profile_find_executable_id_slot(executable_ids, capacity,
+                                                   executable_id, &slot);
+    executable_ids[slot] = executable_id;
+  }
+
+  iree_allocator_free(recorder->host_allocator,
+                      recorder->emitted_executable_ids);
+  recorder->emitted_executable_ids = executable_ids;
+  recorder->emitted_executable_id_capacity = capacity;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_local_profile_recorder_mark_executable_emitted(
+    iree_hal_local_profile_recorder_t* recorder, uint64_t executable_id,
+    bool* out_should_emit) {
+  *out_should_emit = false;
+
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_hal_local_profile_recorder_reserve_executable_ids(
+      recorder, recorder->emitted_executable_id_count + 1);
+  if (iree_status_is_ok(status)) {
+    iree_host_size_t slot = 0;
+    const bool already_emitted = iree_hal_local_profile_find_executable_id_slot(
+        recorder->emitted_executable_ids,
+        recorder->emitted_executable_id_capacity, executable_id, &slot);
+    if (!already_emitted) {
+      recorder->emitted_executable_ids[slot] = executable_id;
+      ++recorder->emitted_executable_id_count;
+      *out_should_emit = true;
+    }
+  }
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return status;
+}
+
+static bool iree_hal_local_profile_recorder_has_emitted_executable(
+    iree_hal_local_profile_recorder_t* recorder, uint64_t executable_id) {
+  iree_slim_mutex_lock(&recorder->mutex);
+  bool has_emitted = false;
+  if (recorder->emitted_executable_id_capacity != 0) {
+    iree_host_size_t slot = 0;
+    has_emitted = iree_hal_local_profile_find_executable_id_slot(
+        recorder->emitted_executable_ids,
+        recorder->emitted_executable_id_capacity, executable_id, &slot);
+  }
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return has_emitted;
+}
+
+static iree_status_t iree_hal_local_profile_executable_export_record_length(
+    iree_string_view_t name, iree_host_size_t* out_record_length) {
+  *out_record_length = 0;
+  if (IREE_UNLIKELY(name.size > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profile executable export name is too long");
+  }
+  iree_host_size_t record_length = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_profile_executable_export_record_t), &record_length,
+      IREE_STRUCT_FIELD(name.size, uint8_t, NULL)));
+  if (IREE_UNLIKELY(record_length > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable export record length exceeds uint32_t");
+  }
+  *out_record_length = record_length;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_local_profile_executable_export_data_length(
+    iree_hal_executable_t* executable, iree_host_size_t export_count,
+    iree_host_size_t* out_data_length) {
+  *out_data_length = 0;
+  iree_host_size_t data_length = 0;
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_executable_export_info_t export_info = {0};
+    status = iree_hal_executable_export_info(
+        executable, (iree_hal_executable_export_ordinal_t)i, &export_info);
+    iree_host_size_t record_length = 0;
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_local_profile_executable_export_record_length(
+          export_info.name, &record_length);
+    }
+    if (iree_status_is_ok(status) &&
+        IREE_UNLIKELY(!iree_host_size_checked_add(data_length, record_length,
+                                                  &data_length))) {
+      status = iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "profile executable export metadata length overflow");
+    }
+  }
+  if (iree_status_is_ok(status)) *out_data_length = data_length;
+  return status;
+}
+
+static iree_status_t iree_hal_local_profile_append_executable_export_records(
+    uint64_t executable_id, iree_hal_executable_t* executable,
+    iree_host_size_t export_count, uint8_t* target_data) {
+  uint8_t* cursor = target_data;
+  for (iree_host_size_t i = 0; i < export_count; ++i) {
+    iree_hal_executable_export_info_t export_info = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+        executable, (iree_hal_executable_export_ordinal_t)i, &export_info));
+
+    iree_host_size_t record_length = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_export_record_length(
+        export_info.name, &record_length));
+
+    iree_hal_profile_executable_export_record_t record =
+        iree_hal_profile_executable_export_record_default();
+    record.record_length = (uint32_t)record_length;
+    record.executable_id = executable_id;
+    record.export_ordinal = (uint32_t)i;
+    record.constant_count = export_info.constant_count;
+    record.binding_count = export_info.binding_count;
+    record.parameter_count = export_info.parameter_count;
+    memcpy(record.workgroup_size, export_info.workgroup_size,
+           sizeof(record.workgroup_size));
+    record.name_length = (uint32_t)export_info.name.size;
+
+    memcpy(cursor, &record, sizeof(record));
+    if (export_info.name.size > 0) {
+      memcpy(cursor + sizeof(record), export_info.name.data,
+             export_info.name.size);
+    }
+    cursor += record_length;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_local_profile_recorder_write_span(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_string_view_t content_type, iree_const_byte_span_t span) {
+  if (span.data_length == 0) return iree_ok_status();
+  iree_hal_profile_chunk_metadata_t metadata =
+      iree_hal_local_profile_recorder_metadata(recorder, content_type);
+  return iree_hal_profile_sink_write(recorder->options.sink, &metadata, 1,
+                                     &span);
+}
+
+iree_status_t iree_hal_local_profile_recorder_record_executable(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_executable_t* executable) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  const uint64_t executable_id =
+      iree_hal_local_executable_profile_id(local_executable);
+  if (iree_hal_local_profile_recorder_has_emitted_executable(recorder,
+                                                             executable_id)) {
+    return iree_ok_status();
+  }
+
+  const iree_host_size_t export_count =
+      iree_hal_executable_export_count(executable);
+  if (IREE_UNLIKELY(export_count > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profile executable export count exceeds uint32_t");
+  }
+
+  iree_hal_profile_executable_record_t executable_record =
+      iree_hal_profile_executable_record_default();
+  executable_record.executable_id = executable_id;
+  executable_record.export_count = (uint32_t)export_count;
+
+  iree_host_size_t export_data_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_export_data_length(
+      executable, export_count, &export_data_length));
+  uint8_t* export_data = NULL;
+  iree_status_t status = iree_ok_status();
+  if (export_data_length != 0) {
+    status = iree_allocator_malloc(recorder->host_allocator, export_data_length,
+                                   (void**)&export_data);
+  }
+  if (iree_status_is_ok(status) && export_data_length != 0) {
+    status = iree_hal_local_profile_append_executable_export_records(
+        executable_id, executable, export_count, export_data);
+  }
+
+  bool should_emit = false;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_profile_recorder_mark_executable_emitted(
+        recorder, executable_id, &should_emit);
+  }
+  if (iree_status_is_ok(status) && should_emit) {
+    status = iree_hal_local_profile_recorder_write_records(
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES, &executable_record,
+        /*record_count=*/1, sizeof(executable_record));
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_profile_recorder_write_span(
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
+        should_emit ? iree_make_const_byte_span(export_data, export_data_length)
+                    : iree_const_byte_span_empty());
+  }
+  iree_allocator_free(recorder->host_allocator, export_data);
+  return status;
 }
 
 static bool iree_hal_local_profile_queue_scope_is_valid(

@@ -38,6 +38,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
+#include "iree/hal/local/profile.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,23 @@ extern "C" {
 // For single-worker execution, declare on the stack and use
 // context_initialize. For multi-worker, use context_allocate (which
 // allocates the context + .data together with proper alignment).
+typedef struct iree_hal_cmd_block_processor_profile_dispatch_t {
+  // Earliest host timestamp observed for this dispatch in the active region.
+  iree_atomic_int64_t start_host_time_ns;
+
+  // Latest host timestamp observed for this dispatch in the active region.
+  iree_atomic_int64_t end_host_time_ns;
+
+  // Total tiles completed for this dispatch in the active region.
+  iree_atomic_int64_t tile_count;
+
+  // Sum of worker execution span durations for this dispatch.
+  iree_atomic_int64_t tile_duration_sum_ns;
+
+  // First non-OK worker status code observed, or OK when absent.
+  iree_atomic_int32_t status_code;
+} iree_hal_cmd_block_processor_profile_dispatch_t;
+
 typedef struct iree_hal_cmd_block_processor_context_t {
   // The recording being executed (immutable .text).
   const iree_hal_cmd_block_recording_t* recording;
@@ -110,6 +128,26 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // claim wake credits via relay_wake on their next pump iteration.
   iree_atomic_int32_t* worker_budget_ptr;
   iree_atomic_int32_t* desired_wake_ptr;
+
+  struct {
+    // Optional recorder receiving command-buffer dispatch execution records.
+    iree_hal_local_profile_recorder_t* recorder;
+
+    // Queue identity attached to emitted dispatch records.
+    iree_hal_local_profile_queue_scope_t scope;
+
+    // Queue submission id shared by command-buffer dispatch records.
+    uint64_t submission_id;
+
+    // Session-local command-buffer identifier for replayed dispatch records.
+    uint64_t command_buffer_id;
+
+    // Aggregation state for dispatches in the active region, or NULL.
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatches;
+
+    // Number of entries in |dispatches|.
+    iree_host_size_t dispatch_capacity;
+  } profile;
 } iree_hal_cmd_block_processor_context_t;
 
 // Per-worker state maintained by the caller across drain() calls. Each worker
@@ -147,6 +185,19 @@ void iree_hal_cmd_block_processor_context_initialize(
     const iree_hal_cmd_binding_entry_t* binding_table,
     iree_host_size_t binding_table_length, iree_hal_cmd_block_state_t* state,
     iree_host_size_t state_size);
+
+// Attaches an optional local profiling recorder to a processor context.
+//
+// Callers should only set this for command-buffer replay operations that need
+// per-dispatch host execution spans; direct queue dispatches already have a
+// queue-operation-level profiling record.
+void iree_hal_cmd_block_processor_context_set_profile_recorder(
+    iree_hal_cmd_block_processor_context_t* context,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id,
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatches,
+    iree_host_size_t dispatch_capacity);
 
 // Allocates an execution context for processing a block recording.
 //
