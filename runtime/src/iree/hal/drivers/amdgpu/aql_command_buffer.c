@@ -37,6 +37,13 @@ typedef enum iree_hal_amdgpu_aql_command_buffer_rodata_segment_flag_bits_e {
       1u << 0,
 } iree_hal_amdgpu_aql_command_buffer_rodata_segment_flag_bits_t;
 
+typedef enum iree_hal_amdgpu_aql_command_buffer_recording_state_e {
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_INITIAL = 0,
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_RECORDING = 1,
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FINALIZED = 2,
+  IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FAILED = 3,
+} iree_hal_amdgpu_aql_command_buffer_recording_state_t;
+
 typedef struct iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t {
   // Next page in ordinal order.
   struct iree_hal_amdgpu_aql_command_buffer_static_buffer_page_t* next;
@@ -107,8 +114,8 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_t {
   uint64_t profile_id;
   // Physical device ordinal selected from the command buffer's queue affinity.
   uint32_t device_ordinal;
-  // Reserved bytes for stable layout.
-  uint32_t reserved0;
+  // One-shot lifecycle state enforced even when generic HAL validation is off.
+  iree_hal_amdgpu_aql_command_buffer_recording_state_t recording_state;
   // Arena owning recording-lifetime static buffer pages, rodata pages, and
   // rodata payload bytes referenced by finalized program command records.
   iree_arena_allocator_t recording_arena;
@@ -181,6 +188,15 @@ static void iree_hal_amdgpu_aql_command_buffer_reset_resources(
   command_buffer->rodata.first_page = NULL;
   command_buffer->rodata.current_page = NULL;
   command_buffer->rodata.segment_count = 0;
+}
+
+static void iree_hal_amdgpu_aql_command_buffer_discard_recording(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
+  iree_hal_amdgpu_aql_program_release(&command_buffer->program);
+  iree_hal_amdgpu_aql_program_builder_deinitialize(&command_buffer->builder);
+  iree_hal_amdgpu_aql_program_builder_initialize(command_buffer->block_pool,
+                                                 &command_buffer->builder);
+  iree_hal_amdgpu_aql_command_buffer_reset_resources(command_buffer);
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_ensure_resource_set(
@@ -996,15 +1012,42 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
-  iree_hal_amdgpu_aql_program_release(&command_buffer->program);
-  iree_hal_amdgpu_aql_command_buffer_reset_resources(command_buffer);
-  return iree_hal_amdgpu_aql_program_builder_begin(&command_buffer->builder);
+  switch (command_buffer->recording_state) {
+    case IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_INITIAL:
+      break;
+    case IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_RECORDING:
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "command buffer is already in a recording state");
+    case IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FINALIZED:
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "command buffer has already been recorded; "
+                              "re-recording command buffers is not allowed");
+    case IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FAILED:
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "command buffer recording failed and cannot be reused");
+    default:
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "invalid command-buffer recording state %d",
+                              (int)command_buffer->recording_state);
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_aql_program_builder_begin(&command_buffer->builder));
+  command_buffer->recording_state =
+      IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_RECORDING;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =
       iree_hal_amdgpu_aql_command_buffer_cast(base_command_buffer);
+  if (IREE_UNLIKELY(
+          command_buffer->recording_state !=
+          IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_RECORDING)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer is not in a recording state");
+  }
   iree_status_t status = iree_hal_amdgpu_aql_program_builder_end(
       &command_buffer->builder, &command_buffer->program);
   if (iree_status_is_ok(status)) {
@@ -1018,9 +1061,12 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_end(
   }
   if (iree_status_is_ok(status)) {
     iree_hal_resource_set_freeze(command_buffer->resource_set);
-  } else if (command_buffer->program.first_block) {
-    iree_hal_amdgpu_aql_program_release(&command_buffer->program);
-    iree_hal_amdgpu_aql_command_buffer_reset_resources(command_buffer);
+    command_buffer->recording_state =
+        IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FINALIZED;
+  } else {
+    iree_hal_amdgpu_aql_command_buffer_discard_recording(command_buffer);
+    command_buffer->recording_state =
+        IREE_HAL_AMDGPU_AQL_COMMAND_BUFFER_RECORDING_STATE_FAILED;
   }
   return status;
 }
