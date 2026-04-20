@@ -746,6 +746,40 @@ TEST(ReplayExecuteTest, ExecutesCapturedFdBackedQueueReadWithoutSourceFile) {
         // IREE_PLATFORM_LINUX)
 }
 
+TEST(ReplayExecuteTest,
+     ExecutesRangeCapturedFdBackedQueueReadWithoutSourceFile) {
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+  const uint8_t file_contents[32] = {
+      0x00, 0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+      0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21,
+      0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B,
+  };
+  ScopedTempFile source_file(
+      iree_make_const_byte_span(file_contents, sizeof(file_contents)));
+
+  std::vector<uint8_t> storage(65536, 0);
+  iree_hal_replay_recorder_options_t recorder_options =
+      iree_hal_replay_recorder_options_default();
+  recorder_options.external_file_policy =
+      IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_RANGES;
+  CaptureFdBackedQueueRead(source_file.path_view(), &recorder_options,
+                           &storage);
+
+  source_file.RenameToUniquePath();
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+#else
+  GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
+}
+
 TEST(ReplayExecuteTest, ExecutesRemappedFdBackedQueueRead) {
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))

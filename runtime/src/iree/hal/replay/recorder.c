@@ -414,6 +414,8 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
           options->external_file_policy !=
               IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE &&
           options->external_file_policy !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_RANGES &&
+          options->external_file_policy !=
               IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_ALL &&
           options->external_file_policy !=
               IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL)) {
@@ -923,7 +925,7 @@ static iree_status_t iree_hal_replay_device_import_file(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_recorder_file_create_proxy(
-        device->recorder, device->device_id, file_id, base_file,
+        device->recorder, device->device_id, file_id, handle, base_file,
         device->host_allocator, &replay_file);
   }
   status = iree_hal_replay_recorder_end_creation_operation(
@@ -1422,6 +1424,7 @@ static iree_status_t iree_hal_replay_device_queue_read(
   iree_host_size_t wait_payloads_size = 0;
   iree_hal_replay_semaphore_timepoint_payload_t* signal_payloads = NULL;
   iree_host_size_t signal_payloads_size = 0;
+  iree_byte_span_t captured_data_storage = iree_byte_span_empty();
   iree_status_t status = iree_hal_replay_recorder_allocate_semaphore_payloads(
       device->recorder, wait_semaphore_list, device->host_allocator,
       &wait_payloads, &wait_payloads_size);
@@ -1430,10 +1433,20 @@ static iree_status_t iree_hal_replay_device_queue_read(
         device->recorder, signal_semaphore_list, device->host_allocator,
         &signal_payloads, &signal_payloads_size);
   }
-  iree_const_byte_span_t iovecs[3] = {
+  if (iree_status_is_ok(status) &&
+      device->recorder->options.external_file_policy ==
+          IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_RANGES) {
+    status = iree_hal_replay_recorder_file_capture_read_data(
+        source_file, source_offset, length, device->host_allocator,
+        &captured_data_storage);
+    payload.captured_data_length = captured_data_storage.data_length;
+  }
+  iree_const_byte_span_t iovecs[4] = {
       iree_make_const_byte_span(&payload, sizeof(payload)),
       iree_make_const_byte_span(wait_payloads, wait_payloads_size),
       iree_make_const_byte_span(signal_payloads, signal_payloads_size),
+      iree_make_const_byte_span(captured_data_storage.data,
+                                captured_data_storage.data_length),
   };
 
   iree_hal_replay_pending_record_t pending_record = {0};
@@ -1466,6 +1479,7 @@ static iree_status_t iree_hal_replay_device_queue_read(
     status = iree_hal_replay_recorder_end_operation_with_payload(
         &pending_record, status, IREE_ARRAYSIZE(iovecs), iovecs);
   }
+  iree_allocator_free(device->host_allocator, captured_data_storage.data);
   iree_allocator_free(device->host_allocator, signal_payloads);
   iree_allocator_free(device->host_allocator, wait_payloads);
   return status;

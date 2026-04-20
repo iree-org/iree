@@ -1288,6 +1288,7 @@ static iree_status_t iree_hal_replay_executor_import_file(
   char* resolved_path_storage = NULL;
   iree_string_view_t captured_external_path = iree_string_view_empty();
   iree_string_view_t resolved_external_path = iree_string_view_empty();
+  bool import_file_handle = true;
   iree_status_t status = iree_ok_status();
   switch (payload.reference_type) {
     case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH: {
@@ -1324,6 +1325,11 @@ static iree_status_t iree_hal_replay_executor_import_file(
       status = iree_hal_replay_executor_wrap_inline_file(executor, &payload,
                                                          reference, &handle);
       break;
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_CAPTURED_RANGES:
+      captured_external_path = iree_make_string_view(
+          (const char*)reference.data, reference.data_length);
+      import_file_handle = false;
+      break;
     default:
       status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                 "replay file reference type %" PRIu32
@@ -1333,7 +1339,7 @@ static iree_status_t iree_hal_replay_executor_import_file(
   }
 
   iree_hal_file_t* file = NULL;
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && import_file_handle) {
     status =
         iree_hal_file_import(device_entry->value.device, payload.queue_affinity,
                              payload.access, handle, payload.flags, &file);
@@ -1702,7 +1708,7 @@ static iree_status_t iree_hal_replay_executor_queue_read(
   iree_const_byte_span_t trailing_payload;
   iree_status_t status = iree_hal_replay_executor_make_queue_semaphore_lists(
       executor, record, sizeof(payload), payload.wait_semaphore_count,
-      payload.signal_semaphore_count, /*trailing_payload_length=*/0,
+      payload.signal_semaphore_count, payload.captured_data_length,
       &wait_storage, &signal_storage, &trailing_payload);
   iree_hal_replay_object_entry_t* file_entry = NULL;
   if (iree_status_is_ok(status)) {
@@ -1720,7 +1726,26 @@ static iree_status_t iree_hal_replay_executor_queue_read(
         IREE_STATUS_DATA_LOSS,
         "replay queue read requires a direct target buffer reference");
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && payload.captured_data_length != 0 &&
+      payload.captured_data_length != target_ref.length) {
+    status = iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "replay queue read captured data length does not match target length");
+  }
+  if (iree_status_is_ok(status) && payload.captured_data_length != 0) {
+    status = iree_hal_device_queue_update(
+        device_entry->value.device, payload.queue_affinity, wait_storage.list,
+        signal_storage.list, trailing_payload.data, /*source_offset=*/0,
+        target_ref.buffer, target_ref.offset, target_ref.length,
+        IREE_HAL_UPDATE_FLAG_NONE);
+  } else if (iree_status_is_ok(status)) {
+    if (!file_entry->value.file) {
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "replay queue read requires an imported file or captured data");
+    }
+  }
+  if (iree_status_is_ok(status) && payload.captured_data_length == 0) {
     status = iree_hal_device_queue_read(
         device_entry->value.device, payload.queue_affinity, wait_storage.list,
         signal_storage.list, file_entry->value.file, payload.source_offset,
@@ -1773,6 +1798,11 @@ static iree_status_t iree_hal_replay_executor_queue_write(
     status = iree_make_status(
         IREE_STATUS_DATA_LOSS,
         "replay queue write requires a direct source buffer reference");
+  }
+  if (iree_status_is_ok(status) && !file_entry->value.file) {
+    status =
+        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                         "replay queue write requires an imported target file");
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_queue_write(

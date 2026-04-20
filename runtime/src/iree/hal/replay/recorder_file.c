@@ -108,9 +108,10 @@ static iree_string_view_t iree_hal_replay_recorder_file_capture_fd_path(
         // IREE_PLATFORM_LINUX)
 }
 
-static iree_status_t iree_hal_replay_recorder_file_capture_fd_contents(
-    int fd, uint64_t file_length, iree_allocator_t host_allocator,
-    iree_byte_span_t* out_storage, iree_string_view_t* out_reference) {
+static iree_status_t iree_hal_replay_recorder_file_capture_fd_range_contents(
+    int fd, uint64_t source_offset, uint64_t data_length,
+    iree_allocator_t host_allocator, iree_byte_span_t* out_storage,
+    iree_string_view_t* out_reference) {
   IREE_ASSERT_ARGUMENT(out_storage);
   IREE_ASSERT_ARGUMENT(out_reference);
   *out_storage = iree_byte_span_empty();
@@ -118,27 +119,34 @@ static iree_status_t iree_hal_replay_recorder_file_capture_fd_contents(
 
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
-  if (IREE_UNLIKELY(file_length > IREE_HOST_SIZE_MAX)) {
-    return iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "HAL replay recorder cannot inline fd-backed file with length %" PRIu64,
-        file_length);
+  if (IREE_UNLIKELY(source_offset > UINT64_MAX - data_length)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "HAL replay recorder cannot inline fd-backed file "
+                            "range at offset %" PRIu64 " with length %" PRIu64,
+                            source_offset, data_length);
+  }
+  if (IREE_UNLIKELY(data_length > IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "HAL replay recorder cannot inline fd-backed file "
+                            "range with length %" PRIu64,
+                            data_length);
   }
 
   uint8_t* file_bytes = NULL;
-  iree_host_size_t host_file_length = (iree_host_size_t)file_length;
-  if (host_file_length != 0) {
+  iree_host_size_t host_data_length = (iree_host_size_t)data_length;
+  if (host_data_length != 0) {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc_uninitialized(
-        host_allocator, host_file_length, (void**)&file_bytes));
+        host_allocator, host_data_length, (void**)&file_bytes));
   }
 
   uint64_t offset = 0;
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) && offset < file_length) {
-    uint64_t chunk_length = file_length - offset;
+  while (iree_status_is_ok(status) && offset < data_length) {
+    uint64_t chunk_length = data_length - offset;
     if (chunk_length > 64 * 1024) chunk_length = 64 * 1024;
+    uint64_t absolute_offset = source_offset + offset;
     ssize_t read_length = pread(fd, file_bytes + (iree_host_size_t)offset,
-                                (size_t)chunk_length, (off_t)offset);
+                                (size_t)chunk_length, (off_t)absolute_offset);
     if (read_length < 0 && errno == EINTR) continue;
     if (read_length <= 0) {
       status = iree_make_status(
@@ -150,22 +158,31 @@ static iree_status_t iree_hal_replay_recorder_file_capture_fd_contents(
     }
   }
   if (iree_status_is_ok(status)) {
-    *out_storage = iree_make_byte_span(file_bytes, host_file_length);
+    *out_storage = iree_make_byte_span(file_bytes, host_data_length);
     *out_reference =
-        iree_make_string_view((const char*)file_bytes, host_file_length);
+        iree_make_string_view((const char*)file_bytes, host_data_length);
   } else {
     iree_allocator_free(host_allocator, file_bytes);
   }
   return status;
 #else
   (void)fd;
-  (void)file_length;
+  (void)source_offset;
+  (void)data_length;
   (void)host_allocator;
   return iree_make_status(
       IREE_STATUS_UNAVAILABLE,
       "HAL replay recorder inline file capture requires POSIX file IO");
 #endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
         // IREE_PLATFORM_LINUX)
+}
+
+static iree_status_t iree_hal_replay_recorder_file_capture_fd_contents(
+    int fd, uint64_t file_length, iree_allocator_t host_allocator,
+    iree_byte_span_t* out_storage, iree_string_view_t* out_reference) {
+  return iree_hal_replay_recorder_file_capture_fd_range_contents(
+      fd, /*source_offset=*/0, file_length, host_allocator, out_storage,
+      out_reference);
 }
 
 iree_status_t iree_hal_replay_recorder_file_make_object_payload(
@@ -220,6 +237,18 @@ iree_status_t iree_hal_replay_recorder_file_make_object_payload(
             out_allocated_reference_storage, out_reference));
         out_payload->reference_type =
             IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES;
+        out_payload->reference_length = out_reference->size;
+        out_payload->validation_type =
+            IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE;
+        out_payload->digest_type = IREE_HAL_REPLAY_DIGEST_TYPE_NONE;
+      } else if (external_file_policy ==
+                 IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_RANGES) {
+        iree_hal_replay_recorder_file_capture_fd_identity(primitive.value.fd,
+                                                          out_payload);
+        *out_reference = iree_hal_replay_recorder_file_capture_fd_path(
+            primitive.value.fd, path_reference_storage);
+        out_payload->reference_type =
+            IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_CAPTURED_RANGES;
         out_payload->reference_length = out_reference->size;
         out_payload->validation_type =
             IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE;
@@ -289,6 +318,10 @@ typedef struct iree_hal_replay_recorder_file_t {
   iree_hal_replay_recorder_t* recorder;
   // Underlying file receiving forwarded HAL calls.
   iree_hal_file_t* base_file;
+  // Primitive handle type captured at import time.
+  iree_io_file_handle_type_t primitive_type;
+  // POSIX fd backing fd-backed file capture, or -1 when unavailable.
+  int fd;
   // Session-local device object id associated with this file.
   iree_hal_replay_object_id_t device_id;
   // Session-local object id assigned to this file.
@@ -309,9 +342,11 @@ static iree_hal_replay_recorder_file_t* iree_hal_replay_recorder_file_cast(
 
 iree_status_t iree_hal_replay_recorder_file_create_proxy(
     iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
-    iree_hal_replay_object_id_t file_id, iree_hal_file_t* base_file,
-    iree_allocator_t host_allocator, iree_hal_file_t** out_file) {
+    iree_hal_replay_object_id_t file_id, iree_io_file_handle_t* source_handle,
+    iree_hal_file_t* base_file, iree_allocator_t host_allocator,
+    iree_hal_file_t** out_file) {
   IREE_ASSERT_ARGUMENT(recorder);
+  IREE_ASSERT_ARGUMENT(source_handle);
   IREE_ASSERT_ARGUMENT(base_file);
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
@@ -334,6 +369,13 @@ iree_status_t iree_hal_replay_recorder_file_create_proxy(
   iree_hal_replay_recorder_retain(file->recorder);
   file->base_file = base_file;
   iree_hal_file_retain(file->base_file);
+  iree_io_file_handle_primitive_t primitive =
+      iree_io_file_handle_primitive(source_handle);
+  file->primitive_type = primitive.type;
+  file->fd = -1;
+  if (primitive.type == IREE_IO_FILE_HANDLE_TYPE_FD) {
+    file->fd = primitive.value.fd;
+  }
   file->device_id = device_id;
   file->file_id = file_id;
 
@@ -346,6 +388,26 @@ iree_hal_file_t* iree_hal_replay_recorder_file_base_or_self(
   return iree_hal_replay_recorder_file_isa(file)
              ? iree_hal_replay_recorder_file_cast(file)->base_file
              : file;
+}
+
+iree_status_t iree_hal_replay_recorder_file_capture_read_data(
+    iree_hal_file_t* file, uint64_t source_offset, iree_device_size_t length,
+    iree_allocator_t host_allocator, iree_byte_span_t* out_storage) {
+  IREE_ASSERT_ARGUMENT(file);
+  IREE_ASSERT_ARGUMENT(out_storage);
+  iree_hal_replay_recorder_file_t* recorder_file =
+      iree_hal_replay_recorder_file_cast(file);
+  if (recorder_file->primitive_type != IREE_IO_FILE_HANDLE_TYPE_FD ||
+      recorder_file->fd < 0) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "HAL replay recorder can only capture read ranges from fd-backed "
+        "files");
+  }
+  iree_string_view_t ignored_reference = iree_string_view_empty();
+  return iree_hal_replay_recorder_file_capture_fd_range_contents(
+      recorder_file->fd, source_offset, length, host_allocator, out_storage,
+      &ignored_reference);
 }
 
 iree_hal_replay_object_id_t iree_hal_replay_recorder_file_id_or_none(

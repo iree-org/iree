@@ -667,7 +667,12 @@ TEST(ReplayDumpTest, EmitsFilePayloads) {
   EXPECT_THAT(text_output, HasSubstr("payload=file_object"));
   EXPECT_THAT(text_output, HasSubstr("hermetic: no"));
   EXPECT_THAT(text_output, HasSubstr("environment_referenced: yes"));
-  EXPECT_THAT(text_output, HasSubstr("files: total=1 external=1 inline=0"));
+  EXPECT_THAT(text_output,
+              HasSubstr("files: total=1 external=1 inline=0 ranges=0"));
+  EXPECT_THAT(
+      text_output,
+      HasSubstr(
+          "file_bytes: external=4096 inline=0 ranges=0 captured_reads=0"));
   EXPECT_THAT(text_output, HasSubstr("file_validation: identity=1"));
   EXPECT_THAT(text_output, HasSubstr("reference_type=external_path(1)"));
   EXPECT_THAT(text_output, HasSubstr("validation_type=identity(1)"));
@@ -689,6 +694,8 @@ TEST(ReplayDumpTest, EmitsFilePayloads) {
   EXPECT_THAT(json_output, HasSubstr("\"hermetic\":false"));
   EXPECT_THAT(json_output, HasSubstr("\"environment_referenced\":true"));
   EXPECT_THAT(json_output, HasSubstr("\"external_file_count\":1"));
+  EXPECT_THAT(json_output, HasSubstr("\"range_file_count\":0"));
+  EXPECT_THAT(json_output, HasSubstr("\"captured_read_total_length\":0"));
   EXPECT_THAT(json_output, HasSubstr("\"identity\":1"));
   EXPECT_THAT(json_output,
               HasSubstr("\"reference_type_name\":\"external_path\""));

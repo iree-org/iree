@@ -190,8 +190,12 @@ enum iree_hal_replay_payload_type_e {
 typedef uint32_t iree_hal_replay_file_reference_type_t;
 enum iree_hal_replay_file_reference_type_e {
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_NONE = 0u,
+  // File contents are read from an external path during replay.
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH = 1u,
+  // The whole file is embedded inline in the file object record.
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES = 2u,
+  // Read ranges are embedded inline in queue_read operation records.
+  IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_CAPTURED_RANGES = 3u,
 };
 
 // Validation method captured for a replay file reference.
@@ -655,6 +659,8 @@ typedef struct iree_hal_replay_device_queue_read_payload_t {
   uint64_t queue_affinity;
   // Read flags.
   uint64_t flags;
+  // Byte length of captured source data following the semaphore lists.
+  uint64_t captured_data_length;
   // Number of wait semaphore timepoints following this header.
   uint64_t wait_semaphore_count;
   // Number of signal semaphore timepoints following the wait timepoints.

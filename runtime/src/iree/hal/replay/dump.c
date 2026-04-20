@@ -37,6 +37,8 @@ typedef struct iree_hal_replay_dump_file_summary_t {
   uint64_t external_file_count;
   // Number of file objects embedded inline in the replay file.
   uint64_t inline_file_count;
+  // Number of file objects represented by captured queue_read ranges.
+  uint64_t range_file_count;
   // Number of file objects using unknown future reference types.
   uint64_t unknown_file_reference_count;
   // Number of external file references validated by platform identity.
@@ -51,6 +53,10 @@ typedef struct iree_hal_replay_dump_file_summary_t {
   uint64_t external_file_total_length;
   // Total embedded inline file bytes.
   uint64_t inline_file_total_length;
+  // Total length of files represented by captured queue_read ranges.
+  uint64_t range_file_total_length;
+  // Total bytes embedded on captured queue_read operation records.
+  uint64_t captured_read_total_length;
 } iree_hal_replay_dump_file_summary_t;
 
 static iree_status_t iree_hal_replay_dump_emit(
@@ -178,6 +184,10 @@ static iree_status_t iree_hal_replay_dump_summary_scan_file_object(
       ++summary->inline_file_count;
       summary->inline_file_total_length += payload.reference_length;
       break;
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_CAPTURED_RANGES:
+      ++summary->range_file_count;
+      summary->range_file_total_length += payload.file_length;
+      break;
     default:
       ++summary->unknown_file_reference_count;
       break;
@@ -194,6 +204,27 @@ static iree_status_t iree_hal_replay_dump_summary_scan_file_object(
       break;
     default:
       ++summary->unknown_file_validation_count;
+      break;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_replay_dump_summary_scan_operation(
+    const iree_hal_replay_file_record_t* record,
+    iree_hal_replay_dump_file_summary_t* summary) {
+  switch (record->header.payload_type) {
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ: {
+      if (record->payload.data_length <
+          sizeof(iree_hal_replay_device_queue_read_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay queue read payload is short");
+      }
+      iree_hal_replay_device_queue_read_payload_t payload;
+      memcpy(&payload, record->payload.data, sizeof(payload));
+      summary->captured_read_total_length += payload.captured_data_length;
+      break;
+    }
+    default:
       break;
   }
   return iree_ok_status();
@@ -225,6 +256,8 @@ static iree_status_t iree_hal_replay_dump_scan_summary(
         break;
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION:
         ++out_summary->operation_count;
+        IREE_RETURN_IF_ERROR(
+            iree_hal_replay_dump_summary_scan_operation(&record, out_summary));
         break;
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
         ++out_summary->unsupported_count;
@@ -245,6 +278,8 @@ static const char* iree_hal_replay_dump_file_reference_type_string(
       return "external_path";
     case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES:
       return "inline_bytes";
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_CAPTURED_RANGES:
+      return "captured_ranges";
     default:
       return "unknown";
   }
@@ -1229,20 +1264,23 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
       iree_host_size_t trailing_size = 0;
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_queue_payload_layout(
           record, sizeof(payload), payload.wait_semaphore_count,
-          payload.signal_semaphore_count, /*trailing_payload_length=*/0,
+          payload.signal_semaphore_count, payload.captured_data_length,
           &wait_offset, &wait_size, &signal_offset, &signal_size,
           &trailing_offset, &trailing_size));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           builder,
           " source_file_id=%" PRIu64 " source_offset=%" PRIu64
           " queue_affinity=%" PRIu64 " flags=0x%016" PRIx64
-          " wait_count=%" PRIu64 " signal_count=%" PRIu64
-          " wait_range=[%" PRIu64 ", +%" PRIhsz "] signal_range=[%" PRIu64
-          ", +%" PRIhsz "]",
+          " captured_data_length=%" PRIu64 " wait_count=%" PRIu64
+          " signal_count=%" PRIu64 " wait_range=[%" PRIu64 ", +%" PRIhsz
+          "] signal_range=[%" PRIu64 ", +%" PRIhsz
+          "] captured_data_range=[%" PRIu64 ", +%" PRIhsz "]",
           payload.source_file_id, payload.source_offset, payload.queue_affinity,
-          payload.flags, payload.wait_semaphore_count,
-          payload.signal_semaphore_count, payload_range->offset + wait_offset,
-          wait_size, payload_range->offset + signal_offset, signal_size));
+          payload.flags, payload.captured_data_length,
+          payload.wait_semaphore_count, payload.signal_semaphore_count,
+          payload_range->offset + wait_offset, wait_size,
+          payload_range->offset + signal_offset, signal_size,
+          payload_range->offset + trailing_offset, trailing_size));
       return iree_hal_replay_dump_append_text_buffer_ref(builder, "target_ref",
                                                          &payload.target_ref);
     }
@@ -2005,18 +2043,19 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
       iree_host_size_t trailing_size = 0;
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_queue_payload_layout(
           record, sizeof(payload), payload.wait_semaphore_count,
-          payload.signal_semaphore_count, /*trailing_payload_length=*/0,
+          payload.signal_semaphore_count, payload.captured_data_length,
           &wait_offset, &wait_size, &signal_offset, &signal_size,
           &trailing_offset, &trailing_size));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           builder,
           ",\"payload\":{\"source_file_id\":%" PRIu64
           ",\"source_offset\":%" PRIu64 ",\"queue_affinity\":%" PRIu64
-          ",\"flags\":%" PRIu64 ",\"wait_semaphore_count\":%" PRIu64
+          ",\"flags\":%" PRIu64 ",\"captured_data_length\":%" PRIu64
+          ",\"wait_semaphore_count\":%" PRIu64
           ",\"signal_semaphore_count\":%" PRIu64,
           payload.source_file_id, payload.source_offset, payload.queue_affinity,
-          payload.flags, payload.wait_semaphore_count,
-          payload.signal_semaphore_count));
+          payload.flags, payload.captured_data_length,
+          payload.wait_semaphore_count, payload.signal_semaphore_count));
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_buffer_ref(
           builder, "target_ref", &payload.target_ref));
       iree_hal_replay_file_range_t wait_range =
@@ -2029,6 +2068,11 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
           builder, "wait_semaphores_range", &wait_range));
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
           builder, "signal_semaphores_range", &signal_range));
+      iree_hal_replay_file_range_t captured_data_range =
+          iree_hal_replay_dump_payload_subrange(payload_range, trailing_offset,
+                                                trailing_size);
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
+          builder, "captured_data_range", &captured_data_range));
       return iree_string_builder_append_cstring(builder, "}");
     }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE: {
@@ -2354,9 +2398,10 @@ static iree_status_t iree_hal_replay_dump_emit_text_file(
       " unsupported=%" PRIu64
       "\n"
       "  files: total=%" PRIu64 " external=%" PRIu64 " inline=%" PRIu64
-      " unknown=%" PRIu64
+      " ranges=%" PRIu64 " unknown=%" PRIu64
       "\n"
-      "  file_bytes: external=%" PRIu64 " inline=%" PRIu64
+      "  file_bytes: external=%" PRIu64 " inline=%" PRIu64 " ranges=%" PRIu64
+      " captured_reads=%" PRIu64
       "\n"
       "  file_validation: identity=%" PRIu64 " digest=%" PRIu64 " none=%" PRIu64
       " unknown=%" PRIu64 "\nrecords:\n",
@@ -2367,8 +2412,9 @@ static iree_status_t iree_hal_replay_dump_emit_text_file(
       summary->object_count, summary->operation_count,
       summary->unsupported_count, summary->file_object_count,
       summary->external_file_count, summary->inline_file_count,
-      summary->unknown_file_reference_count,
+      summary->range_file_count, summary->unknown_file_reference_count,
       summary->external_file_total_length, summary->inline_file_total_length,
+      summary->range_file_total_length, summary->captured_read_total_length,
       summary->identity_file_validation_count,
       summary->digest_file_validation_count, summary->no_file_validation_count,
       summary->unknown_file_validation_count));
@@ -2404,10 +2450,12 @@ static iree_status_t iree_hal_replay_dump_emit_json_summary(
       ",\"record_count\":%" PRIu64 ",\"object_count\":%" PRIu64
       ",\"operation_count\":%" PRIu64 ",\"unsupported_count\":%" PRIu64
       ",\"file_object_count\":%" PRIu64 ",\"external_file_count\":%" PRIu64
-      ",\"inline_file_count\":%" PRIu64
+      ",\"inline_file_count\":%" PRIu64 ",\"range_file_count\":%" PRIu64
       ",\"unknown_file_reference_count\":%" PRIu64
       ",\"external_file_total_length\":%" PRIu64
       ",\"inline_file_total_length\":%" PRIu64
+      ",\"range_file_total_length\":%" PRIu64
+      ",\"captured_read_total_length\":%" PRIu64
       ",\"file_validation\":{\"identity\":%" PRIu64 ",\"digest\":%" PRIu64
       ",\"none\":%" PRIu64 ",\"unknown\":%" PRIu64 "}}\n",
       hermetic ? "true" : "false", environment_referenced ? "true" : "false",
@@ -2415,8 +2463,9 @@ static iree_status_t iree_hal_replay_dump_emit_json_summary(
       summary->object_count, summary->operation_count,
       summary->unsupported_count, summary->file_object_count,
       summary->external_file_count, summary->inline_file_count,
-      summary->unknown_file_reference_count,
+      summary->range_file_count, summary->unknown_file_reference_count,
       summary->external_file_total_length, summary->inline_file_total_length,
+      summary->range_file_total_length, summary->captured_read_total_length,
       summary->identity_file_validation_count,
       summary->digest_file_validation_count, summary->no_file_validation_count,
       summary->unknown_file_validation_count));
