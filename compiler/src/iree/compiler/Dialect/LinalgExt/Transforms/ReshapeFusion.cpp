@@ -1243,8 +1243,9 @@ getCollapsedOpIndexingMap(AffineMap indexingMap,
                         resultExprs, context);
 }
 
-/// Returns a copy of `attentionOp` with collapsed iteration dimensions.
-static Operation *createCollapsedOp(AttentionOp origOp,
+/// Returns a copy of `origOp` with collapsed iteration dimensions.
+template <typename AttentionOpTy>
+static Operation *createCollapsedOp(AttentionOpTy origOp,
                                     const CollapsingInfo &collapsingInfo,
                                     RewriterBase &rewriter) {
   SmallVector<Value> inputOperands, outputOperands;
@@ -1256,7 +1257,7 @@ static Operation *createCollapsedOp(AttentionOp origOp,
         return getCollapsedOpIndexingMap(map, collapsingInfo);
       }));
 
-  auto collapsedOp = AttentionOp::create(
+  auto collapsedOp = AttentionOpTy::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
       rewriter.getAffineMapArrayAttr(indexingMaps));
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
@@ -1264,10 +1265,11 @@ static Operation *createCollapsedOp(AttentionOp origOp,
   return collapsedOp;
 }
 
-FailureOr<CollapseResult>
-collapseOpIterationDims(AttentionOp op,
-                        ArrayRef<ReassociationIndices> foldedIterationDims,
-                        RewriterBase &rewriter) {
+template <typename AttentionOpTy>
+static FailureOr<CollapseResult>
+collapseAttentionLikeOpIterationDims(
+    AttentionOpTy op, ArrayRef<ReassociationIndices> foldedIterationDims,
+    RewriterBase &rewriter) {
   if (op.getNumLoops() <= 1 || foldedIterationDims.empty() ||
       llvm::all_of(foldedIterationDims, [](ReassociationIndicesRef foldedDims) {
         return foldedDims.size() <= 1;
@@ -1316,84 +1318,20 @@ collapseOpIterationDims(AttentionOp op,
   return CollapseResult{results, collapsedOp};
 }
 
-/// Returns a copy of `onlineAttentionOp` with collapsed iteration dimensions.
-static Operation *createCollapsedOp(OnlineAttentionOp origOp,
-                                    const CollapsingInfo &collapsingInfo,
-                                    RewriterBase &rewriter) {
-  SmallVector<Value> inputOperands, outputOperands;
-  SmallVector<Type> resultTypes;
-  collapseOperandsAndResults(origOp, collapsingInfo, rewriter, inputOperands,
-                             outputOperands, resultTypes);
-  SmallVector<AffineMap> indexingMaps(
-      llvm::map_range(origOp.getIndexingMapsArray(), [&](AffineMap map) {
-        return getCollapsedOpIndexingMap(map, collapsingInfo);
-      }));
-
-  std::optional<Value> maskOperand;
-  if (inputOperands.size() > 4) {
-    maskOperand = inputOperands[4];
-  }
-
-  auto collapsedOp = OnlineAttentionOp::create(
-      rewriter, origOp.getLoc(), resultTypes, inputOperands[0],
-      inputOperands[1], inputOperands[2], inputOperands[3], outputOperands[0],
-      outputOperands[1], outputOperands[2],
-      rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
-  rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
-                              collapsedOp.getRegion().begin());
-  return collapsedOp;
+FailureOr<CollapseResult>
+collapseOpIterationDims(AttentionOp op,
+                        ArrayRef<ReassociationIndices> foldedIterationDims,
+                        RewriterBase &rewriter) {
+  return collapseAttentionLikeOpIterationDims(op, foldedIterationDims,
+                                              rewriter);
 }
 
 FailureOr<CollapseResult>
 collapseOpIterationDims(OnlineAttentionOp op,
                         ArrayRef<ReassociationIndices> foldedIterationDims,
                         RewriterBase &rewriter) {
-  if (op.getNumLoops() <= 1 || foldedIterationDims.empty() ||
-      llvm::all_of(foldedIterationDims, [](ReassociationIndicesRef foldedDims) {
-        return foldedDims.size() <= 1;
-      })) {
-    return failure();
-  }
-
-  CollapsingInfo collapsingInfo;
-  if (failed(
-          collapsingInfo.initialize(op.getNumLoops(), foldedIterationDims))) {
-    return rewriter.notifyMatchFailure(
-        op, "illegal to collapse specified dimensions");
-  }
-
-  Operation *collapsedOp = createCollapsedOp(op, collapsingInfo, rewriter);
-
-  auto loc = op.getLoc();
-  SmallVector<Value> results;
-  for (const auto &originalResult : llvm::enumerate(op->getResults())) {
-    Value collapsedOpResult = collapsedOp->getResult(originalResult.index());
-    auto originalResultType =
-        cast<ShapedType>(originalResult.value().getType());
-    auto collapsedOpResultType = cast<ShapedType>(collapsedOpResult.getType());
-    if (collapsedOpResultType.getRank() != originalResultType.getRank()) {
-      AffineMap indexingMap =
-          op.getIndexingMapMatchingResult(originalResult.value());
-      SmallVector<ReassociationIndices> reassociation =
-          getOperandReassociation(indexingMap, collapsingInfo);
-      Value result;
-      if (isa<MemRefType>(collapsedOpResult.getType())) {
-        MemRefType expandShapeResultType = MemRefType::get(
-            originalResultType.getShape(), originalResultType.getElementType());
-        result =
-            memref::ExpandShapeOp::create(rewriter, loc, expandShapeResultType,
-                                          collapsedOpResult, reassociation);
-      } else {
-        result =
-            tensor::ExpandShapeOp::create(rewriter, loc, originalResultType,
-                                          collapsedOpResult, reassociation);
-      }
-      results.push_back(result);
-    } else {
-      results.push_back(collapsedOpResult);
-    }
-  }
-  return CollapseResult{results, collapsedOp};
+  return collapseAttentionLikeOpIterationDims(op, foldedIterationDims,
+                                              rewriter);
 }
 
 void populateFoldReshapeOpsByExpansionPatterns(
