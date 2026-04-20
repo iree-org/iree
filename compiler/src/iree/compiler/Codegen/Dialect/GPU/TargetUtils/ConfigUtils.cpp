@@ -557,6 +557,42 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+/// Returns true if direct load DMA should be rejected, and fall back to stream
+/// copies.
+///
+/// Rejection cases:
+///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
+///   2. Not a GEMM. TODO(#23907): support convolution.
+///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
+///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
+                                      Type lhsElemType, Type rhsElemType,
+                                      bool transposedLhs, bool transposedRhs) {
+  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+
+  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
+  if (!targetSupportsGlobalLoadDMA(target)) {
+    return true;
+  }
+
+  // Case 2: Only GEMM are supported currently.
+  if (!isGemm) {
+    return true;
+  }
+
+  // Case 3: Only f16/bf16 are supported currently.
+  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+    return true;
+  }
+
+  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
+  if (transposedLhs && !transposedRhs) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -750,16 +786,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // Only enable direct load (global load DMA) for f16/bf16 GEMMs on gfx950+.
-  // TODO: Add support for scaled matmul (#22119) and convolution (#23907).
-  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
   Location loc = operands[0].getLoc();
   if (useDirectLoad &&
-      !(isGemm && isF16OrBF16(lhsElemType) && isF16OrBF16(rhsElemType) &&
-        targetSupportsGlobalLoadDMA(target))) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is currently only "
-                              "supported for f16/bf16 GEMMs on gfx950+, "
-                              "falling back to stream copies";
+      shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
+                                transposedLhs, transposedRhs)) {
+    mlir::emitWarning(loc) << "overriding direct load DMA, falling back to "
+                              "stream copies";
     useDirectLoad = false;
   }
 
