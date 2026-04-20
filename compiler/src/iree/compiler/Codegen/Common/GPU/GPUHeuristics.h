@@ -223,7 +223,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
-// checks if the given intrinsic can be used for the given problem.
+/// Checks if the given intrinsic can be used for the given problem.
 LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
                                  const GPUMatmulShapeType &intrinsic,
                                  int64_t preferredSubgroupSize,

@@ -90,9 +90,8 @@ SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
       continue;
     }
 
-    Attribute mmaAttr = Attribute(mma);
-    if (!llvm::is_contained(mmaAttrs, mmaAttr)) {
-      mmaAttrs.push_back(mmaAttr);
+    if (!llvm::is_contained(mmaAttrs, mma)) {
+      mmaAttrs.push_back(mma);
     }
   }
   return mmaAttrs;
@@ -120,7 +119,6 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
         convolutionDims->inputChannel.empty()) {
       return failure();
     }
-    // Maps outputImage→M, outputChannel→N, inputChannel→K.
     return ContractionLikeDims{llvm::to_vector(convolutionDims->outputImage),
                                llvm::to_vector(convolutionDims->outputChannel),
                                llvm::to_vector(convolutionDims->inputChannel)};
@@ -150,7 +148,7 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
                                           makeIntAttr(ctx, 0));
   for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
     for (unsigned d : dimSet) {
-      workgroupEntries[d] = makeIntKnob(ctx, "wg_" + std::to_string(d));
+      workgroupEntries[d] = makeIntKnob(ctx, ("wg_" + Twine(d)).str());
     }
   }
   knobsEntries.emplace_back("workgroup", ArrayAttr::get(ctx, workgroupEntries));
@@ -159,7 +157,7 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
                                           makeIntAttr(ctx, 0));
   for (unsigned d : dims.k) {
-    reductionEntries[d] = IntKnobAttr::get(ctx, "red_" + std::to_string(d));
+    reductionEntries[d] = IntKnobAttr::get(ctx, ("red_" + Twine(d)).str());
   }
   knobsEntries.emplace_back("reduction", ArrayAttr::get(ctx, reductionEntries));
 
@@ -179,7 +177,7 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   subgroupBasisEntries.emplace_back("counts",
                                     ArrayAttr::get(ctx, subgroupCounts));
   SmallVector<Attribute> subgroupMapping;
-  for (size_t i = 0; i < loopInfo.numLoops; ++i) {
+  for (unsigned i = 0; i < loopInfo.numLoops; ++i) {
     subgroupMapping.push_back(makeIntAttr(ctx, i));
   }
   subgroupBasisEntries.emplace_back("mapping",
@@ -188,10 +186,9 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
                             DictionaryAttr::get(ctx, subgroupBasisEntries));
 
   // Add workgroup size and subgroup size at the top level.
-  SmallVector<Attribute> wgSizeKnobs;
-  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_x"));
-  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_y"));
-  wgSizeKnobs.push_back(makeIntKnob(ctx, "wg_z"));
+  SmallVector<Attribute> wgSizeKnobs = {makeIntKnob(ctx, "wg_x"),
+                                        makeIntKnob(ctx, "wg_y"),
+                                        makeIntKnob(ctx, "wg_z")};
   knobsEntries.emplace_back("workgroup_size", ArrayAttr::get(ctx, wgSizeKnobs));
   knobsEntries.emplace_back("subgroup_size", makeIntKnob(ctx, "sg_size"));
 
@@ -210,14 +207,14 @@ emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
   // Problem size must be divisible by tiling size.
   for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
     for (unsigned d : dimSet) {
-      Value wgKnob = mkKnob(builder, loc, "wg_" + std::to_string(d));
+      Value wgKnob = mkKnob(builder, loc, ("wg_" + Twine(d)).str());
       assertDivisible(
           builder, loc, smtDimArgs[d], wgKnob,
           ("dim_" + Twine(d) + " must be divisible by wg_" + Twine(d)).str());
     }
   }
   for (unsigned d : dims.k) {
-    Value redKnob = mkKnob(builder, loc, "red_" + std::to_string(d));
+    Value redKnob = mkKnob(builder, loc, ("red_" + Twine(d)).str());
     assertDivisible(
         builder, loc, smtDimArgs[d], redKnob,
         ("dim_" + Twine(d) + " must be divisible by red_" + Twine(d)).str());
@@ -272,6 +269,10 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp,
 
 LogicalResult emitLLVMGPUConstraints(Attribute attr,
                                      ArrayRef<Operation *> rootOps) {
+  if (rootOps.empty()) {
+    return success();
+  }
+
   auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
   // Only VectorDistribute has constraint generation today.
