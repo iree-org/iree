@@ -64,6 +64,18 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "execute",
+    srcs = ["execute.c"],
+    hdrs = ["execute.h"],
+    deps = [
+        ":file_reader",
+        ":format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "recorder",
     srcs = [
         "recorder.c",
@@ -97,6 +109,23 @@ iree_runtime_cc_test(
         ":file_writer",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "execute_test",
+    srcs = ["execute_test.cc"],
+    deps = [
+        ":execute",
+        ":file_reader",
+        ":recorder",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

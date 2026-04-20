@@ -77,6 +77,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    execute
+  HDRS
+    "execute.h"
+  SRCS
+    "execute.c"
+  DEPS
+    ::file_reader
+    ::format
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     recorder
   HDRS
     "recorder.h"
@@ -112,6 +127,24 @@ iree_cc_test(
     ::file_writer
     iree::base
     iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    execute_test
+  SRCS
+    "execute_test.cc"
+  DEPS
+    ::execute
+    ::file_reader
+    ::recorder
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::hal
+    iree::hal::drivers::local_sync::sync_driver
     iree::testing::gtest
     iree::testing::gtest_main
 )

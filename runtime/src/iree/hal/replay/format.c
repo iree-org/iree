@@ -231,6 +231,8 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "semaphore_object";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER:
       return "command_buffer_copy_buffer";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA:
+      return "device_queue_alloca";
     default:
       return "unknown";
   }

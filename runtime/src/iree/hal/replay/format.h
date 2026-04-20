@@ -170,6 +170,7 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_EXECUTE = 9u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_SEMAPHORE_OBJECT = 10u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER = 11u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA = 12u,
 };
 
 // Payload describing a captured buffer object.
@@ -370,6 +371,20 @@ typedef struct iree_hal_replay_device_queue_execute_payload_t {
   // Number of serialized binding table entries following the semaphore lists.
   uint64_t binding_count;
 } iree_hal_replay_device_queue_execute_payload_t;
+
+// Payload describing a device queue alloca request followed by semaphore lists.
+typedef struct iree_hal_replay_device_queue_alloca_payload_t {
+  // Buffer allocation request submitted to the device queue.
+  iree_hal_replay_allocator_allocate_buffer_payload_t allocation;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Alloca flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_alloca_payload_t;
 
 // Payload describing a command buffer copy operation.
 typedef struct iree_hal_replay_command_buffer_copy_buffer_payload_t {

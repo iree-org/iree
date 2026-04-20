@@ -241,6 +241,43 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-run-replay
+  SRCS
+    "iree-run-replay-main.c"
+  DEPS
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::replay::execute
+    iree::io::file_handle
+    iree::tooling::device_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
+    iree-benchmark-replay
+  SRCS
+    "iree-benchmark-replay-main.cc"
+  DEPS
+    benchmark
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::replay::execute
+    iree::io::file_handle
+    iree::tooling::device_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-encode-parameters
   SRCS
     "iree-encode-parameters-main.c"
