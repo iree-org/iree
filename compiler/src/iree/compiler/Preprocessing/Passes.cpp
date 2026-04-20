@@ -128,6 +128,16 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
   passManager.addPass(createCSEPass());
 }
 
+static void buildBackwardDataConvPassPipeline(OpPassManager &passManager,
+                                              const TransformOptions &options) {
+  passManager.addPass(createSwapStridedInsertSliceWithContractionPass());
+  passManager.addPass(createConvertStridedInsertSliceToGenericPass());
+  FunctionLikeNest(passManager)
+      .addPass(createConvertConvFilterToChannelsLastPass);
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+}
+
 /// Pass pipeline to make the computation within a function a single dispatch.
 /// Note that this expects a `OpPassManager` nested on `FunctionOpInterface`
 /// ops.
@@ -182,6 +192,17 @@ void registerPreprocessingPasses() {
              const TransformOptions &transformOptions) {
             buildTransposeConvolutionPassPipeline(passManager,
                                                   transformOptions);
+          });
+
+  PassPipelineRegistration<TransformOptions>
+      preprocessingBackwardDataConvPassPipeline(
+          "iree-preprocessing-backward-data-conv-pipeline",
+          "Runs passes for backward-data convolutions (swap scatter with "
+          "contraction, convert strided insert_slice to generic, convert "
+          "conv filter to channels-last)",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildBackwardDataConvPassPipeline(passManager, transformOptions);
           });
 
   PassPipelineRegistration<TransformOptions>

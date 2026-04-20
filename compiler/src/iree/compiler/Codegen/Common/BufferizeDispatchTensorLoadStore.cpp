@@ -98,12 +98,16 @@ struct BufferizeDispatchTensorLoadStorePass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
-    SmallVector<IREE::TensorExt::DispatchTensorLoadOp> loadOps(
-        funcOp.getFunctionBody()
-            .getOps<IREE::TensorExt::DispatchTensorLoadOp>());
-    SmallVector<IREE::TensorExt::DispatchTensorStoreOp> storeOps(
-        funcOp.getFunctionBody()
-            .getOps<IREE::TensorExt::DispatchTensorStoreOp>());
+    SmallVector<IREE::TensorExt::DispatchTensorLoadOp> loadOps;
+    SmallVector<IREE::TensorExt::DispatchTensorStoreOp> storeOps;
+    funcOp->walk([&](Operation *op) {
+      if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
+        loadOps.push_back(loadOp);
+      } else if (auto storeOp =
+                     dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
+        storeOps.push_back(storeOp);
+      }
+    });
 
     IRRewriter rewriter(context);
     for (IREE::TensorExt::DispatchTensorLoadOp loadOp : loadOps) {

@@ -18,8 +18,10 @@ iree_lit_test_suite(
         # keep sorted
         [
             "sparse_interface_methods.mlir",
+            "sparse_interface_methods_distribution_info.mlir",
             "sparse_interface_methods_estimated_loop_range_fail.mlir",
             "sparse_interface_methods_lower_loop_range_fail.mlir",
+            "sparse_interface_methods_resolve_range.mlir",
         ],
         include = ["*.mlir"],
     ),

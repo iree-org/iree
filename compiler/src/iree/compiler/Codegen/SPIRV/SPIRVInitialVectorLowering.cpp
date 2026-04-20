@@ -41,60 +41,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Folds vector.extract from vector.insert when the extract position is a
-/// prefix of the insert position and the remaining (un-indexed) dimensions
-/// of the extracted sub-vector are all size 1. In that case the extracted
-/// value is fully determined by the inserted value.
-///
-/// Example:
-///   %ins = vector.insert %s, %v [3, 0] : f32 into vector<16x1xf32>
-///   %ext = vector.extract %ins [3] : vector<1xf32> from vector<16x1xf32>
-/// folds to:
-///   %ext = vector.broadcast %s : f32 to vector<1xf32>
-struct FoldExtractFromInsertUnitDim final
-    : OpRewritePattern<vector::ExtractOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
-                                PatternRewriter &rewriter) const override {
-    if (extractOp.hasDynamicPosition()) {
-      return failure();
-    }
-
-    auto insertOp = extractOp.getSource().getDefiningOp<vector::InsertOp>();
-    if (!insertOp || insertOp.hasDynamicPosition()) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> extractPos = extractOp.getStaticPosition();
-    ArrayRef<int64_t> insertPos = insertOp.getStaticPosition();
-
-    // The extract position must be a strict prefix of the insert position.
-    if (extractPos.size() >= insertPos.size()) {
-      return failure();
-    }
-    if (extractPos != insertPos.take_front(extractPos.size())) {
-      return failure();
-    }
-
-    // The remaining dimensions (those not indexed by the extract) must all
-    // be size 1 in the source vector type. This guarantees that the inserted
-    // value fully determines the extracted sub-vector.
-    auto srcVecType = extractOp.getSourceVectorType();
-    for (int64_t i = extractPos.size(), e = srcVecType.getRank(); i < e; ++i) {
-      if (srcVecType.getDimSize(i) != 1) {
-        return failure();
-      }
-    }
-
-    // The inserted value fully determines the extracted sub-vector; broadcast
-    // it to the extracted type.
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        extractOp, extractOp.getResult().getType(), insertOp.getValueToStore());
-    return success();
-  }
-};
-
 void debugPrint(Operation *op, const char *message) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- " << message << " ---//\n";
@@ -557,15 +503,6 @@ public:
       vector::populateVectorInsertExtractStridedSliceDecompositionPatterns(
           patterns);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
-
-      // Fold extract-from-insert when trailing dims are all unit size. This
-      // handles the case where unrolling produced vector<Nx1xT> insert chains
-      // that the built-in extract fold cannot simplify (it bails on partial
-      // position overlap with sentinels). This must run after vector unrolling,
-      // which produces these patterns.
-      // TODO: Fix upstream ExtractFromInsertTransposeChainState (Case 4) to
-      // handle the unit-dim trailing suffix case, then remove this pattern.
-      patterns.add<FoldExtractFromInsertUnitDim>(context);
 
       // Trimming leading unit dims may generate broadcast/shape_cast ops. Clean
       // them up.

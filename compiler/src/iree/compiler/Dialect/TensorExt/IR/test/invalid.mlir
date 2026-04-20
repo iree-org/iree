@@ -363,3 +363,78 @@ util.func public @extraSourceDynamicDims(%source : tensor<2x?x5xf32>,
       : (tensor<2x?x5xf32>{%d0, %d1}, tensor<4xindex>) -> tensor<2x3x?x5xf32, #iree_tensor_ext.ragged_shape<1>>
   util.return %0 : tensor<2x3x?x5xf32, #iree_tensor_ext.ragged_shape<1>>
 }
+
+// -----
+
+// Error if source does not have ragged tensor encoding
+
+util.func public @noRaggedEncoding(%source : tensor<10x3x8x30xf32>)
+    -> tensor<10x240xf32> {
+  // expected-error @+1 {{expected source type to have a ragged tensor encoding}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x8x30xf32> -> tensor<10x240xf32>
+  util.return %0 : tensor<10x240xf32>
+}
+
+// -----
+
+// Error if result has encoding
+
+util.func public @resultHasEncoding(%source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>)
+    -> tensor<10x30xf32, #iree_tensor_ext.ragged_shape<0>> {
+  // expected-error @+1 {{expected result type to have no encoding or identity layout}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<10x30xf32, #iree_tensor_ext.ragged_shape<0>>
+  util.return %0 : tensor<10x30xf32, #iree_tensor_ext.ragged_shape<0>>
+}
+
+// -----
+
+// Error if result rank is incorrect
+
+util.func public @wrongResultRank(%source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>, %d0 : index) -> tensor<?xf32> {
+  // expected-error @+1 {{expected result rank to be 3 (source rank - number of sparse dimensions + 1), but got 1}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<?xf32>{%d0}
+  util.return %0 : tensor<?xf32>
+}
+
+// -----
+
+// Error if result rank is too high
+
+util.func public @resultRankTooHigh(%source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>) -> tensor<10x3x?x30xf32> {
+  // expected-error @+1 {{expected result rank to be 3 (source rank - number of sparse dimensions + 1), but got 4}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<10x3x?x30xf32>
+  util.return %0 : tensor<10x3x?x30xf32>
+}
+
+// -----
+
+// Error if non-ragged dimensions are not preserved
+
+util.func public @dimensionNotPreserved(%source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>) -> tensor<5x?x30xf32> {
+  // expected-error @+1 {{expected source dimension 0 with size 10 to be preserved in result dimension 0 but got size 5}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<5x?x30xf32>
+  util.return %0 : tensor<5x?x30xf32>
+}
+
+// -----
+
+// Error if incorrect number of dynamic dimensions provided
+
+util.func public @wrongDynamicDimCount(%source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>,
+    %d0 : index, %d1 : index, %d2 : index, %d3 : index)
+    -> tensor<?x?x?xf32> {
+  // expected-error @+1 {{value set has 3 dynamic dimensions but only 4 dimension values are attached}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<?x?x?xf32>{%d0, %d1, %d2, %d3}
+  util.return %0 : tensor<?x?x?xf32>
+}
+
+// -----
+
+// Error if missing dynamic dimensions
+
+util.func public @missingDynamicDims(%source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>)
+    -> tensor<?x?x?xf32> {
+  // expected-error @+1 {{value set has 3 dynamic dimensions but only 0 dimension values are attached}}
+  %0 = iree_tensor_ext.linearize_ragged_dims %source : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> -> tensor<?x?x?xf32>
+  util.return %0 : tensor<?x?x?xf32>
+}

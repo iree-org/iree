@@ -78,7 +78,7 @@ jobs:
           IREE_CONFIGURE_ONLY=1 ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
       - name: Run clang-tidy
-        uses: cpp-linter/cpp-linter-action@89288efe7a9b377406dcea651d756aa1ade3e4a3 # v1.11.4
+        uses: cpp-linter/cpp-linter-action@77c390c5ba9c947ebc185a3e49cc754f1558abb5 # v1.11.4
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

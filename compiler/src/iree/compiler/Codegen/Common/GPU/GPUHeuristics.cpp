@@ -280,6 +280,16 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
     }
   }
 
+  // Block intrinsics require the problem to have batch dimensions, and the
+  // innermost problem batch dimension must be perfectly divisible by the
+  // intrinsic batch size for simplicity and avoid overpadding.
+  if (!intrinsic.batchSizes.empty()) {
+    if (problem.batchSizes.empty() ||
+        problem.batchSizes.back() % intrinsic.batchSizes.back() != 0) {
+      return failure();
+    }
+  }
+
   if (mustBeAligned) {
     if ((problem.mSizes.back() % intrinsic.mSizes[0] != 0 ||
          problem.nSizes.back() % intrinsic.nSizes[0] != 0 ||
@@ -302,8 +312,19 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // remove this todo.
   const int64_t mSize = llvm::product_of(problem.mSizes);
   const int64_t nSize = llvm::product_of(problem.nSizes);
-  if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
-      (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
+  // For block intrinsics, tighten the skinny threshold per dimension to the
+  // minimum of the default threshold and half the intrinsic size in that
+  // dimension, since smaller block intrinsics are themselves skinny.
+  const int64_t mSkinnyThreshold =
+      intrinsic.batchSizes.empty()
+          ? kVerySkinnyDimThreshold
+          : std::min(kVerySkinnyDimThreshold, intrinsic.mSizes[0] / 2);
+  const int64_t nSkinnyThreshold =
+      intrinsic.batchSizes.empty()
+          ? kVerySkinnyDimThreshold
+          : std::min(kVerySkinnyDimThreshold, intrinsic.nSizes[0] / 2);
+  if ((mSize <= mSkinnyThreshold && (nSize > preferredSubgroupSize)) ||
+      (nSize <= nSkinnyThreshold && (mSize > preferredSubgroupSize))) {
     return failure();
   }
   return success();
@@ -676,7 +697,8 @@ static double computeMNUtilization(const GPUMatmulShapeType &problem,
 /// returns true if the lhs is ordered before rhs.
 static bool compareIntrinsics(const GPUMatmulShapeType &problem,
                               const GPUIntrinsicType &lhs,
-                              const GPUIntrinsicType &rhs) {
+                              const GPUIntrinsicType &rhs,
+                              bool preferHighComputeIntrinsic = false) {
   // When both M and N need padding, prefer the intrinsic with better M*N
   // utilization. This targets grouped convolutions where per-group channels
   // are small (e.g., 8x8 problem: 16x16 at 25% util >> 32x32 at 6.25%).
@@ -754,7 +776,7 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
   // (compute=8192, area=512) because throughput matters more. Among
   // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
   // for less operand staging pressure.
-  if (problem.gemmSize == GemmSizeKind::VeryLargeGemm) {
+  if (preferHighComputeIntrinsic) {
     int64_t lhsCompute = intrinsicCompute(lhs);
     int64_t rhsCompute = intrinsicCompute(rhs);
     if (lhsCompute != rhsCompute) {
@@ -785,11 +807,12 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
 
 static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
-                  ArrayRef<GPUIntrinsicType> intrinsics) {
+                  ArrayRef<GPUIntrinsicType> intrinsics,
+                  bool preferHighComputeIntrinsic = false) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
   llvm::stable_sort(sortedIntrinsics, [&](const GPUIntrinsicType &lhs,
                                           const GPUIntrinsicType &rhs) {
-    return compareIntrinsics(problem, lhs, rhs);
+    return compareIntrinsics(problem, lhs, rhs, preferHighComputeIntrinsic);
   });
   return sortedIntrinsics;
 }
@@ -813,7 +836,7 @@ static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
 }
 
 /// Adjust M*N tile-count (bestMNTileCountPerSubgroup) seeds based on target
-/// hardware and problem characteristics. Three independent adjustments, applied
+/// hardware and problem characteristics. Four independent adjustments, applied
 /// in order:
 /// 1. Baseline (all targets): reduces bestMNTileCountPerSubgroup until the
 ///    estimated workgroup count fills all CUs.
@@ -821,6 +844,8 @@ static int64_t computeEstimatedWorkgroupCount(const GPUMMAHeuristicSeeds &seeds,
 ///    with balanced K, boosts tile count to the architecture-specific target.
 /// 3. Utilization guard (when minUtilizationThreshold is set): halves tile
 ///    count until GPU utilization meets the threshold.
+/// 4. VGPR pressure cap: limits MN tile count based on per-thread output
+///    register pressure from the selected intrinsic, preventing spilling.
 static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
                                  const GPUMatmulShapeType &problem,
                                  const GPUIntrinsicType &intrinsic,
@@ -877,6 +902,12 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
           std::max(seeds.bestMNTileCountPerSubgroup, boostMNT);
       LDBG() << "Boosting MNT to " << seeds.bestMNTileCountPerSubgroup
              << " for balanced large gemm";
+      // Halve subgroup count to offset the MNT boost, keeping the total
+      // workgroup resource footprint (threads, LDS) in check for occupancy.
+      seeds.bestSubgroupCountPerWorkgroup =
+          std::max<int64_t>(1, seeds.bestSubgroupCountPerWorkgroup / 2);
+      LDBG() << "Halving subgroup count to "
+             << seeds.bestSubgroupCountPerWorkgroup << " to offset MNT boost";
     }
   }
 
@@ -907,6 +938,27 @@ static void adjustSeedsForTarget(GPUMMAHeuristicSeeds &seeds,
              << seeds.bestMNTileCountPerSubgroup;
     }
   }
+
+  // Cap per-subgroup MN tile count based on output VGPR pressure from the
+  // selected intrinsic. Only applies when the MNT boost (step 2) is
+  // configured, since the boost can push MN tile counts high enough to
+  // cause spilling with large-output intrinsics (32x32). Capping at 128
+  // output VGPRs per thread (8 MN tiles for 32x32, 32 for 16x16) prevents
+  // spilling while preserving the boost for intrinsics that can handle
+  // higher tile counts.
+  if (seeds.maxOutputVGPRsPerThread) {
+    int64_t subgroupSize = target.getPreferredSubgroupSize();
+    int64_t outputVGPRsPerTile =
+        (intrinsic.mSizes[0] * intrinsic.nSizes[0]) / subgroupSize;
+    int64_t maxMNTiles = *seeds.maxOutputVGPRsPerThread / outputVGPRsPerTile;
+    if (seeds.bestMNTileCountPerSubgroup > maxMNTiles) {
+      LDBG() << "VGPR cap: reducing bestMNTileCountPerSubgroup from "
+             << seeds.bestMNTileCountPerSubgroup << " to " << maxMNTiles
+             << " (intrinsic " << intrinsic.mSizes[0] << "x"
+             << intrinsic.nSizes[0] << ")";
+      seeds.bestMNTileCountPerSubgroup = maxMNTiles;
+    }
+  }
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
@@ -917,10 +969,34 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned,
     bool doCPromotion, int64_t splitReductionTripCnt) {
 
+  // Prefer higher-compute intrinsics (e.g., 32x32x16 over 16x16x32) for:
+  //  - VeryLargeGemm: always compute-bound, higher throughput wins.
+  //  - LargeGemm on architectures with MNT boost (e.g., CDNA4): the boost
+  //    indicates the target benefits from larger output tiles. Gated by
+  //    !doCPromotion to avoid regressing addmm shapes that need accumulator
+  //    promotion to shared memory.
+  bool isLargeGemmWithBoost = problem.gemmSize == GemmSizeKind::LargeGemm &&
+                              seeds.boostMNTileCountPerSubgroup.has_value() &&
+                              !doCPromotion;
+  bool preferHighComputeIntrinsic =
+      problem.gemmSize == GemmSizeKind::VeryLargeGemm || isLargeGemmWithBoost;
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
-      sortMMAIntrinsics(problem, intrinsics);
+      sortMMAIntrinsics(problem, intrinsics, preferHighComputeIntrinsic);
+
+  // Compute product of M and N problem sizes to decide if block intrinsics
+  // should be considered. If both M and N products exceed the threshold, skip
+  // block intrinsics as they are unlikely to be beneficial.
+  bool allowBlockIntrinsics =
+      llvm::product_of(problem.mSizes) <= 2 * kVerySkinnyDimThreshold ||
+      llvm::product_of(problem.nSizes) <= 2 * kVerySkinnyDimThreshold;
 
   for (const GPUIntrinsicType &intrinsic : sortedIntrinsics) {
+    // Skip block intrinsics if both M and N products are a fit for regular
+    // intrinsics.
+    bool isBlockIntrinsic = !intrinsic.batchSizes.empty();
+    if (isBlockIntrinsic && !allowBlockIntrinsics) {
+      continue;
+    }
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
@@ -935,16 +1011,24 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
-    // Compute batch tile sizes. When both M and N need padding (problem size
-    // < intrinsic size), tile the static innermost batch dim up to 4 to give
-    // each workgroup more useful work and amortize dispatch overhead.
+    // Compute batch tile sizes. For block intrinsics the intrinsic itself
+    // defines the batch tile size. Otherwise, when both M and N need padding
+    // (problem size < intrinsic size), tile the static innermost batch dim up
+    // to 4 to give each workgroup more useful work and amortize dispatch
+    // overhead.
     SmallVector<int64_t, 2> wgBatchSizes(problem.batchSizes.size(), 1);
     if (!problem.batchSizes.empty()) {
-      int64_t innerBatch = problem.batchSizes.back();
-      bool needsMNPadding = problem.mSizes.back() < schedule.getTotalMSize() &&
-                            problem.nSizes.back() < schedule.getTotalNSize();
-      if (needsMNPadding && innerBatch % 2 == 0) {
-        wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
+      if (!intrinsic.batchSizes.empty()) {
+        wgBatchSizes.back() = intrinsic.batchSizes.back();
+        schedule.batchSizes.push_back(intrinsic.batchSizes.back());
+      } else {
+        int64_t innerBatch = problem.batchSizes.back();
+        bool needsMNPadding =
+            problem.mSizes.back() < schedule.getTotalMSize() &&
+            problem.nSizes.back() < schedule.getTotalNSize();
+        if (needsMNPadding && innerBatch % 2 == 0) {
+          wgBatchSizes.back() = (innerBatch % 4 == 0) ? 4 : 2;
+        }
       }
     }
     schedule.workgroupBatchSizes = wgBatchSizes;

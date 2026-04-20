@@ -408,6 +408,93 @@ def MatchAttentionOp : Op<Transform_Dialect, "iree.match.attention",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchOnlineAttentionOp : Op<Transform_Dialect, "iree.match.online_attention",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims",
+                    "k1_dims", "k2_dims"]>
+     ]> {
+  let summary = [{Check whether the op is an online_attention operation.}];
+  let description = [{
+    Matches operations from the IREELinalgExt dialect that implement
+    online attention without a mask: iree_linalg_ext.online_attention.
+
+    ### Example
+
+    ```mlir
+    #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+    #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+    #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+    #map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+    #map_max = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+    #map_sum = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+
+    %batch_dims, %m_dims, %n_dims, %k1_dims, %k2_dims =
+      transform.iree.match.online_attention %attn_op,
+        query_type = f16, key_type = f16, value_type = f16, scale_type = f16,
+        output_type = f32, max_type = f32, sum_type = f32,
+        indexing_maps = [#map_query, #map_key, #map_value, #map_scale,
+                         #map_output, #map_max, #map_sum] :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%attn_op` is an unmasked online_attention operation
+    with the specified element types and indexing maps.
+
+    #### Return modes
+
+    Succeeds if the operation is an unmasked online_attention operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes extracted from the iteration domain:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of query sequence length dimension sizes.
+    - n_dims: Array of number of heads dimension sizes.
+    - k1_dims: Array of key/value sequence length dimension sizes.
+    - k2_dims: Array of key embedding dimension sizes.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$query_type,
+    TypeAttr:$key_type,
+    TypeAttr:$value_type,
+    TypeAttr:$scale_type,
+    TypeAttr:$output_type,
+    TypeAttr:$max_type,
+    TypeAttr:$sum_type,
+    AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k1_dims,
+    TransformParamTypeInterface:$k2_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle `,`
+    `query_type` `=` $query_type
+    `,` `key_type` `=` $key_type
+    `,` `value_type` `=` $value_type
+    `,` `scale_type` `=` $scale_type
+    `,` `output_type` `=` $output_type
+    `,` `max_type` `=` $max_type
+    `,` `sum_type` `=` $sum_type
+    `,` `indexing_maps` `=` $indexing_maps
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MatchOpInterface,

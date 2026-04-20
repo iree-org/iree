@@ -77,6 +77,15 @@ static int64_t getRank(Value v) {
   return 0;
 }
 
+static Value normalizeMaskValue(OpBuilder &builder, Location loc, Value mask) {
+  auto intType = dyn_cast<IntegerType>(mask.getType());
+  assert(intType && "expected integer mask type");
+  if (intType.getWidth() == 1) {
+    return mask;
+  }
+  return arith::TruncIOp::create(builder, loc, builder.getI1Type(), mask);
+}
+
 /// Method similar to `LinalgOp`s that concatenates shapes of all operands.
 static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
@@ -166,6 +175,22 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Value tiledIndices = indicesSlice->getResult(0);
   slices.push_back(indicesSlice);
 
+  Value tiledMask;
+  if (Value mask = getMask()) {
+    std::optional<ShapedType> maskType = getMaskType();
+    if (maskType->getRank() == 0) {
+      tiledMask = mask;
+    } else {
+      SmallVector<OpFoldResult> maskOffsets(offsets.take_front(getBatchRank()));
+      SmallVector<OpFoldResult> maskSizes(sizes.take_front(getBatchRank()));
+      SmallVector<OpFoldResult> maskStrides(maskType->getRank(), oneAttr);
+      Operation *maskSlice =
+          getSlice(builder, loc, mask, maskOffsets, maskSizes, maskStrides);
+      tiledMask = maskSlice->getResult(0);
+      slices.push_back(maskSlice);
+    }
+  }
+
   // Slice of the original.
   SmallVector<OpFoldResult> originalOffsets, originalSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, originalOffsets,
@@ -184,9 +209,13 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   if (getNumResults()) {
     resultTypes.push_back(tiledOriginal.getType());
   }
+  SmallVector<Value> tiledOperands = {tiledUpdate, tiledIndices};
+  if (tiledMask) {
+    tiledOperands.push_back(tiledMask);
+  }
+  tiledOperands.push_back(tiledOriginal);
   Operation *tiledScatterOp =
-      mlir::clone(builder, getOperation(), resultTypes,
-                  ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return TilingResult{{tiledScatterOp},
                       SmallVector<Value>(tiledScatterOp->getResults()),
                       slices};
@@ -298,20 +327,37 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     starts[dim] = ret;
   }
 
-  Value init = memref::LoadOp::create(b, loc, getOriginal(), starts);
+  auto emitScatterUpdate = [&](OpBuilder &builder, Location nestedLoc) {
+    Value init =
+        memref::LoadOp::create(builder, nestedLoc, getOriginal(), starts);
 
-  IRMapping bvm;
-  Block &block = getRegion().front();
-  bvm.map(block.getArgument(0), update);
-  bvm.map(block.getArgument(1), init);
-  for (auto &blockOp : block.without_terminator()) {
-    b.clone(blockOp, bvm);
+    IRMapping bvm;
+    Block &block = getRegion().front();
+    bvm.map(block.getArgument(0), update);
+    bvm.map(block.getArgument(1), init);
+    for (auto &blockOp : block.without_terminator()) {
+      builder.clone(blockOp, bvm);
+    }
+    // The last op is linalg_ext.yield op. Store the operand to destination.
+    memref::StoreOp::create(
+        builder, nestedLoc,
+        bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
+        getOriginal(), starts);
+  };
+
+  if (Value mask = getMask()) {
+    SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
+    Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
+    maskValue = normalizeMaskValue(b, loc, maskValue);
+    scf::IfOp::create(b, loc, maskValue,
+                      [&](OpBuilder &thenBuilder, Location thenLoc) {
+                        emitScatterUpdate(thenBuilder, thenLoc);
+                        scf::YieldOp::create(thenBuilder, thenLoc);
+                      });
+    return success();
   }
-  // The last op is linalg_ext.yield op. Store the operand to
-  // destination.
-  memref::StoreOp::create(
-      b, loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
-      getOriginal(), starts);
+
+  emitScatterUpdate(b, loc);
   return success();
 }
 
@@ -367,6 +413,22 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
                                      indicesSizes, indicesStrides);
   Value tiledIndices = indicesSlice->getResult(0);
 
+  Value tiledMask;
+  if (Value mask = getMask()) {
+    std::optional<ShapedType> maskType = getMaskType();
+    if (maskType->getRank() == 0) {
+      tiledMask = mask;
+    } else {
+      SmallVector<OpFoldResult> maskOffsets(offsets.take_front(getBatchRank()));
+      SmallVector<OpFoldResult> maskSizes(sizes.take_front(getBatchRank()));
+      SmallVector<OpFoldResult> maskStrides(maskType->getRank(), oneAttr);
+      Operation *maskSlice =
+          getSlice(builder, loc, mask, maskOffsets, maskSizes, maskStrides);
+      tiledMask = maskSlice->getResult(0);
+      slices.push_back(maskSlice);
+    }
+  }
+
   // Slice of the source.
   auto sourceRank = getSourceType().getRank();
   auto indexDepth = getIndexDepth();
@@ -394,9 +456,13 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
   if (getNumResults()) {
     resultTypes.push_back(tiledResult.getType());
   }
+  SmallVector<Value> tiledOperands = {tiledSource, tiledIndices};
+  if (tiledMask) {
+    tiledOperands.push_back(tiledMask);
+  }
+  tiledOperands.push_back(tiledResult);
   Operation *tiledGatherOp =
-      mlir::clone(builder, getOperation(), resultTypes,
-                  ValueRange{tiledSource, tiledIndices, tiledResult});
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
   return TilingResult{
       {tiledGatherOp}, SmallVector<Value>(tiledGatherOp->getResults()), slices};
 }
@@ -449,11 +515,26 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
     starts[dim] = ret;
   }
 
-  Value init = memref::LoadOp::create(b, loc, getSource(), starts);
+  auto emitGatherStore = [&](OpBuilder &builder, Location nestedLoc) {
+    Value init =
+        memref::LoadOp::create(builder, nestedLoc, getSource(), starts);
+    // The last op is linalg_ext.yield op. Store the operand to destination.
+    memref::StoreOp::create(builder, nestedLoc, init, getOutput(), ivs);
+  };
 
-  // The last op is linalg_ext.yield op. Store the operand to
-  // destination.
-  memref::StoreOp::create(b, loc, init, getOutput(), ivs);
+  if (Value mask = getMask()) {
+    SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
+    Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
+    maskValue = normalizeMaskValue(b, loc, maskValue);
+    scf::IfOp::create(b, loc, maskValue,
+                      [&](OpBuilder &thenBuilder, Location thenLoc) {
+                        emitGatherStore(thenBuilder, thenLoc);
+                        scf::YieldOp::create(thenBuilder, thenLoc);
+                      });
+    return success();
+  }
+
+  emitGatherStore(b, loc);
   return success();
 }
 

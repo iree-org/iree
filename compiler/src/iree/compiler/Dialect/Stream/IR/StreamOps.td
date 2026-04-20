@@ -5212,7 +5212,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     "IREE::Stream::CmdConcurrentOp",
   ]>,
   Pure,
-  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>,
+  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, ["getMutableSuccessorOperands"]>,
   Terminator,
   SameVariadicOperandSize,
   DeclareOpInterfaceMethods<Util_ClosureYieldOpInterface, [

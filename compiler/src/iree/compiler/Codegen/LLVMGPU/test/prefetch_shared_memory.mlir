@@ -519,6 +519,58 @@ func.func @gather_to_lds_inside_if_not_multibuffered(
 
 // -----
 
+// Test: gather_to_lds with two operands where one is inside scf.if.
+// The scf.if blocks pipelining in async copy mode. The pre-flight guard
+// should skip both multi-buffering and pipelining, leaving the IR untouched.
+// CHECK-LABEL: @gather_to_lds_two_operands_one_predicated
+func.func @gather_to_lds_two_operands_one_predicated(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %output: memref<128xf32>,
+    %bound: index) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  // No multi-buffering: both allocs stay as memref<1xf32, ...>.
+  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-NOT: memref<2x1xf32
+  %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // CHECK: scf.for
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // First DMA is unconditional.
+    // CHECK: amdgpu.gather_to_lds
+    amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+
+    // Second DMA is predicated — blocks pipelining.
+    %in_bounds = arith.cmpi slt, %k, %bound : index
+    // CHECK: scf.if
+    // CHECK: amdgpu.gather_to_lds
+    scf.if %in_bounds {
+      amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    }
+
+    // CHECK-NOT: rocdl.asyncmark
+    // CHECK-NOT: rocdl.wait.asyncmark
+    %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %prod = arith.mulf %a_val, %b_val : vector<1xf32>
+    %sum = arith.addf %prod, %acc : vector<1xf32>
+    // CHECK: scf.yield
+    scf.yield %sum : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
 // CHECK-ALL-LABEL: @gather_to_lds_mixed_with_stream_copy
 // CHECK-ALL-SAME: (%[[GLOBAL:.*]]: memref<128x128xf32>, %[[OUTPUT:.*]]: memref<128xf32>)
 func.func @gather_to_lds_mixed_with_stream_copy(
@@ -697,5 +749,31 @@ func.func @gather_to_lds_nested_loop_async(
     // CHECK: vector.transfer_read
     vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   }
+  return
+}
+
+// -----
+
+// Verify that the iree_codegen.swizzle attribute on memref.alloc is preserved
+// through multi-buffering.
+
+// CHECK-LABEL: @gather_to_lds_with_swizzle_attr
+// CHECK: memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>} : memref<2x1xf32, #gpu.address_space<workgroup>>
+func.func @gather_to_lds_with_swizzle_attr(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %lds = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>} : memref<1xf32, #gpu.address_space<workgroup>>
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %sum = arith.addf %val, %acc : vector<1xf32>
+    scf.yield %sum : vector<1xf32>
+  }
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }

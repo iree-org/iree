@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -807,6 +808,13 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       }
     }
 
+    // A public function with no translation info of its own and no existing
+    // dispatch_config is a non-entry-point helper.
+    if (!getTranslationInfo(rootFuncOp) &&
+        !configMap.contains(rootFuncOp.getName())) {
+      continue;
+    }
+
     // Reconcile workgroup sizes.
     FailureOr<SmallVector<int64_t>> reconciledWorkgroupSize =
         reconcileWorkgroupSize(translationInfos);
@@ -852,20 +860,29 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       configOp = configMap[rootFuncOp.getName()];
     }
 
-    // TODO(hanchung): We should signal a failure if it happens. Currently,
-    // there are some pipeline tests relying on this. It will be fixed once we
-    // have fully migrated the pipeline tests on modules.
+    // If no DispatchConfigOp exists, create one with a body holding a
+    // `workgroup_count_from_slice` placeholder.
     if (!configOp) {
-      // No dispatch_config exists. Create one with a stub body so that
-      // workgroup_size/subgroup_size can be propagated to the export.
-      Location loc = rootFuncOp.getLoc();
+      int64_t numWorkloads = 0;
+      rootFuncOp.walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ord) {
+        numWorkloads =
+            std::max(numWorkloads, ord.getOrdinal().getSExtValue() + 1);
+      });
+      OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPointAfter(rootFuncOp);
+      Location loc = rootFuncOp.getLoc();
       configOp = IREE::Codegen::DispatchConfigOp::create(
           rewriter, loc, FlatSymbolRefAttr::get(rootFuncOp.getNameAttr()));
-      Block *block = rewriter.createBlock(&configOp.getBody());
+      IndexType indexType = rewriter.getIndexType();
+      SmallVector<Type> argTypes(numWorkloads, indexType);
+      SmallVector<Location> argLocs(numWorkloads, loc);
+      Block *block = rewriter.createBlock(&configOp.getBody(), /*insertPt=*/{},
+                                          argTypes, argLocs);
       rewriter.setInsertionPointToStart(block);
-      auto c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
-      IREE::Codegen::YieldOp::create(rewriter, loc, ValueRange{c1, c1, c1});
+      auto fromSlice =
+          IREE::TensorExt::DispatchWorkgroupCountFromSliceOp::create(
+              rewriter, loc, block->getArguments());
+      IREE::Codegen::YieldOp::create(rewriter, loc, fromSlice.getResults());
     }
     configOp.setWorkgroupSizeAttr(rewriter.getDenseI64ArrayAttr(workgroupSize));
     if (subgroupSizeAttr) {

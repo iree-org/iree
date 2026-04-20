@@ -153,3 +153,40 @@ func.func @rank_reducing_slices() {
 // CHECK-SAME:        : memref<12xf32, strided<[1], offset: 2>, #hal.descriptor_type<storage_buffer>> -> tensor<12xf32>
 // CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT_SUBVIEW]]
 // CHECK-SAME:        : tensor<12xf32> into memref<12xf32, strided<[1], offset: 4>, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+// Verifies that dispatch.tensor.load ops nested inside scf.forall (e.g. from
+// split reduction) are bufferized correctly with memref.subview.
+
+#pipeline_layout_nested = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @nested_dispatch_tensor_load_in_forall() {
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_nested) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<24576x512xbf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_nested) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3072x512x8xbf16>>
+  %empty = tensor.empty() : tensor<3072x512x8xbf16>
+  %result = scf.forall (%iv) = (0) to (24576) step (3072) shared_outs(%out = %empty) -> (tensor<3072x512x8xbf16>) {
+    %load = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%iv, 0], sizes = [3072, 512], strides = [1, 1]
+        : !iree_tensor_ext.dispatch.tensor<readonly:tensor<24576x512xbf16>> -> tensor<3072x512xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %load into %out[0, 0, 0] [3072, 512, 1] [1, 1, 1] : tensor<3072x512xbf16> into tensor<3072x512x8xbf16>
+    }
+  }
+  iree_tensor_ext.dispatch.tensor.store %result, %1, offsets = [0, 0, 0], sizes = [3072, 512, 8], strides = [1, 1, 1]
+      : tensor<3072x512x8xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3072x512x8xbf16>>
+  return
+}
+
+// CHECK-LABEL: func.func @nested_dispatch_tensor_load_in_forall()
+// CHECK-DAG:     %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(0) : memref<24576x512xbf16, #hal.descriptor_type<storage_buffer>>
+// CHECK-DAG:     %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(1) : memref<3072x512x8xbf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:         scf.forall (%[[IV:.+]]) =
+// CHECK:           %[[SUBVIEW:.+]] = memref.subview %[[INPUT]][%[[IV]], 0] [3072, 512] [1, 1]
+// CHECK-SAME:          : memref<24576x512xbf16, #hal.descriptor_type<storage_buffer>> to
+// CHECK-SAME:            memref<3072x512xbf16, strided<[512, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+// CHECK:           iree_codegen.load_from_buffer %[[SUBVIEW]]
+// CHECK-SAME:          : memref<3072x512xbf16, strided<[512, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> -> tensor<3072x512xbf16>
+// CHECK:         iree_codegen.store_to_buffer %{{.+}}, %[[OUTPUT]]

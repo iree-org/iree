@@ -19,6 +19,11 @@ def AddFastMathFlagsPass
                 "given a floating-point mode.";
 }
 
+def AbsorbSwizzleHintToAllocPass :
+    InterfacePass<"iree-codegen-absorb-swizzle-hint-to-alloc", "mlir::FunctionOpInterface"> {
+  let summary = "Absorbs swizzle_hint ops into attributes on the defining alloc";
+}
+
 def BlockDynamicDimensionsPass
     : Pass<"iree-codegen-block-dynamic-dimensions"> {
   let summary = "Expand dynamic dimensions that are known to be multiples of "
@@ -361,6 +366,10 @@ def ReconcileTranslationInfoPass
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
       "`TranslationInfo` set on each function in the dispatch and merge them";
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
@@ -1003,12 +1012,6 @@ def PropagateDispatchSizeBoundsPass :
     InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
   let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
   let dependentDialects = ["::mlir::arith::ArithDialect"];
-  let options = [
-    Option<"useDispatchConfig", "use-dispatch-config", "bool",
-           /*default=*/"false",
-           "Read workgroup size/count from dispatch_config op instead of "
-           "hal.executable.export.">,
-  ];
 }
 
 def PropagateReshapesByExpansionPass :
@@ -1018,6 +1021,15 @@ def PropagateReshapesByExpansionPass :
     Pass to propagate reshapes by expansion through all ops without explicit
     lowering configurations.
   }];
+}
+
+def ReinsertSwizzleHintsPass :
+    InterfacePass<"iree-codegen-reinsert-swizzle-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Re-inserts swizzle_hint ops from alloc attributes at vector.load/store sites";
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "memref::MemRefDialect",
+  ];
 }
 
 def RematerializeParallelOpsPass :

@@ -58,6 +58,10 @@ struct GatherOpVectorizationModel
                       ArrayRef<bool> scalableDims,
                       DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    // TODO: Support operand masks by plumbing them through transfer_gather.
+    if (gatherOp.getMask()) {
+      return false;
+    }
     // TODO: Support indexDepth > 1 by splitting the innermost dim of
     // `indices` into `indexDepth` vectors so that each independent index can
     // be passed to the transfer_gather op.
@@ -72,6 +76,10 @@ struct GatherOpVectorizationModel
                                           ArrayRef<bool> scalableDims,
                                           DictionaryAttr options) const {
     auto gatherOp = cast<IREE::LinalgExt::GatherOp>(op);
+    // TODO: Support operand masks by plumbing them through transfer_gather.
+    if (gatherOp.getMask()) {
+      return failure();
+    }
     int64_t batchRank = gatherOp.getBatchRank();
     Location loc = gatherOp.getLoc();
     RewriterBase::InsertionGuard g(rewriter);
@@ -1146,39 +1154,13 @@ struct InnerTiledOpVectorizationModel
         tiledOp.getKind(), tiledOp.getSemantics());
 
     // Write results back to tensor, with masking if needed.
-    // TODO: Use createWriteOrMaskedWrite once it is promoted to a public
-    // utility in mlir/Dialect/Vector/Utils/VectorUtils.h.
-    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> results;
-    unsigned numInputs = tiledOp.getNumInputs();
-    for (auto [i, result, dest] :
-         llvm::enumerate(newTiledOp.getResults(), tiledOp.getOutputs())) {
-      auto destType = cast<ShapedType>(dest.getType());
-      int64_t rank = destType.getRank();
-      SmallVector<Value> indices(rank, zero);
-
-      ArrayRef<int64_t> writeShape = readShapes[numInputs + i];
-      SmallVector<bool> inBounds(rank);
-      for (int64_t d = 0; d < rank; ++d) {
-        inBounds[d] =
-            destType.isStaticDim(d) && destType.getDimSize(d) >= writeShape[d];
-      }
-
-      auto write = vector::TransferWriteOp::create(rewriter, loc, result, dest,
-                                                   indices, inBounds);
-      if (!needsMasking) {
-        results.push_back(write.getResults().front());
-        continue;
-      }
-      auto vecType = cast<VectorType>(result.getType());
-      auto maskType =
-          vecType.cloneWith(/*shape=*/std::nullopt, rewriter.getI1Type());
-      SmallVector<OpFoldResult> mixedSizes =
-          tensor::getMixedSizes(rewriter, loc, dest);
-      Value mask =
-          vector::CreateMaskOp::create(rewriter, loc, maskType, mixedSizes);
-      results.push_back(
-          mlir::vector::maskOperation(rewriter, write, mask)->getResult(0));
+    for (auto [result, dest] :
+         llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
+      Operation *write = vector::createWriteOrMaskedWrite(
+          rewriter, loc, result, dest, /*writeIndices=*/{},
+          /*useInBoundsInsteadOfMasking=*/!needsMasking);
+      results.push_back(write->getResult(0));
     }
     return results;
   }

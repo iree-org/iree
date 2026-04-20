@@ -290,6 +290,10 @@ static void populateReassocAndMaps(
       llvm::to_vector(llvm::seq<int64_t>(0, emptyOp.getType().getRank())))};
   resultMaps = {AffineMap::getMultiDimIdentityMap(emptyOp.getType().getRank(),
                                                   emptyOp.getContext())};
+  operandMaps.assign(emptyOp.getNumOperands(),
+                     AffineMap::get(emptyOp.getType().getRank(), 0,
+                                    ArrayRef<AffineExpr>{},
+                                    emptyOp.getContext()));
 }
 
 static void

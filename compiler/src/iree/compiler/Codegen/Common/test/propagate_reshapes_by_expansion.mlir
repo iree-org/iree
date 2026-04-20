@@ -162,6 +162,86 @@ func.func @expand_dest_forall_store_to_buffer(%0: memref<?x64x32xf32>, %index: i
 
 // -----
 
+// Verify that ExpandDestinationForallOp fires even when the forall result
+// has non-store users. The pattern's collapse_shape preserves the original
+// result type, so non-store users always see the same type. This is needed
+// for dynamic shapes where tensor.dim or other metadata ops appear as
+// users of the forall result.
+func.func @expand_dest_forall_with_non_store_user(
+    %buffer: memref<?x64x32xf32>, %index: index) {
+  %c0 = arith.constant 0 : index
+  %1 = tensor.empty(%index) : tensor<?x64x32xf32>
+  %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
+    shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
+    %extracted_slice = tensor.extract_slice %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+         : tensor<?x64x32xf32> to tensor<1x16x16xf32>
+    %expanded = tensor.expand_shape %extracted_slice [[0], [1], [2, 3, 4]]
+              output_shape [1, 16, 2, 4, 2] : tensor<1x16x16xf32> into tensor<1x16x2x4x2xf32>
+    %expanded_barrier = util.optimization_barrier %expanded : tensor<1x16x2x4x2xf32>
+    %collapsed = tensor.collapse_shape %expanded_barrier [[0], [1], [2, 3, 4]]
+              : tensor<1x16x2x4x2xf32> into tensor<1x16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %collapsed into %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+        : tensor<1x16x16xf32> into tensor<?x64x32xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  // Non-store user: previously blocked ExpandDestinationForallOp.
+  %barrier = util.optimization_barrier %2 : tensor<?x64x32xf32>
+  iree_codegen.store_to_buffer %2, %buffer
+    : tensor<?x64x32xf32> into memref<?x64x32xf32>
+  return
+}
+
+// The forall output should be expanded despite the non-store user.
+// CHECK-LABEL: func @expand_dest_forall_with_non_store_user(
+// CHECK-SAME:     %[[BUF:[a-zA-Z0-9]+]]: memref<?x64x32xf32>
+// CHECK-SAME:     %[[INDEX:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[INDEX]]) : tensor<?x64x4x4x2xf32>
+//       CHECK:   %[[FORALL:.+]] = scf.forall
+//  CHECK-SAME:       shared_outs(%{{.+}} = %[[EMPTY]]) -> (tensor<?x64x4x4x2xf32>)
+//       CHECK:     tensor.extract_slice
+//  CHECK-SAME:         tensor<?x64x4x4x2xf32> to tensor<1x16x2x4x2xf32>
+//       CHECK:     tensor.parallel_insert_slice
+//  CHECK-SAME:         tensor<1x16x2x4x2xf32> into tensor<?x64x4x4x2xf32>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FORALL]]
+//  CHECK-SAME:     tensor<?x64x4x4x2xf32> into tensor<?x64x32xf32>
+//       CHECK:   util.optimization_barrier %[[COLLAPSE]] : tensor<?x64x32xf32>
+//       CHECK:   %[[EXPAND_BUF:.+]] = memref.expand_shape %[[BUF]]
+//  CHECK-SAME:     memref<?x64x32xf32> into memref<?x64x4x4x2xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[FORALL]], %[[EXPAND_BUF]]
+//  CHECK-SAME:     tensor<?x64x4x4x2xf32> into memref<?x64x4x4x2xf32>
+
+// -----
+
+// Negative test: the pattern should NOT fire when there are only non-store
+// users (no expandable store to fold the collapse into).
+func.func @noexpand_dest_forall_no_store_user(%index: index) {
+  %c0 = arith.constant 0 : index
+  %1 = tensor.empty(%index) : tensor<?x64x32xf32>
+  %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
+    shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
+    %extracted_slice = tensor.extract_slice %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+         : tensor<?x64x32xf32> to tensor<1x16x16xf32>
+    %expanded = tensor.expand_shape %extracted_slice [[0], [1], [2, 3, 4]]
+              output_shape [1, 16, 2, 4, 2] : tensor<1x16x16xf32> into tensor<1x16x2x4x2xf32>
+    %expanded_barrier = util.optimization_barrier %expanded : tensor<1x16x2x4x2xf32>
+    %collapsed = tensor.collapse_shape %expanded_barrier [[0], [1], [2, 3, 4]]
+              : tensor<1x16x2x4x2xf32> into tensor<1x16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %collapsed into %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+        : tensor<1x16x16xf32> into tensor<?x64x32xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  %barrier = util.optimization_barrier %2 : tensor<?x64x32xf32>
+  return
+}
+
+// The forall output should NOT be expanded (no store to benefit from it).
+// CHECK-LABEL: func @noexpand_dest_forall_no_store_user
+//       CHECK:   scf.forall{{.*}}-> (tensor<?x64x32xf32>)
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @noexpand_dest_forall_dynamicpacked() {

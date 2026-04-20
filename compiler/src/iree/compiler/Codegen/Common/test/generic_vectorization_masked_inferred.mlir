@@ -913,7 +913,7 @@ func.func @masked_tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 //  CHECK-SAME:     : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
 //       CHECK:   %[[WRITE_MASK:.+]] = vector.create_mask {{.*}} : vector<2x5x4xi1>
-//       CHECK:   vector.transfer_write %[[MMA]], %arg2{{.*}}, %[[WRITE_MASK]] {in_bounds = [false, false, true]}
+//       CHECK:   vector.transfer_write %[[MMA]], %arg2{{.*}}, %[[WRITE_MASK]] {in_bounds = [true, true, true]}
 //  CHECK-SAME:     : vector<2x5x4xf32>, tensor<?x?x4xf32>
 
 // -----

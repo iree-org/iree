@@ -196,7 +196,9 @@ func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %
 
 // -----
 
-func.func @swizzle_gather_to_lds(%src: memref<?xf32>, %offset: index) {
+// Gather_to_lds source-side swizzle is handled by
+// AMDGPULowerCoalescedDMAToGatherLDS. ResolveSwizzleHints just drops the hint.
+func.func @gather_to_lds_passthrough(%src: memref<?xf32>, %offset: index) {
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %lds = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
@@ -204,46 +206,12 @@ func.func @swizzle_gather_to_lds(%src: memref<?xf32>, %offset: index) {
   return
 }
 
-// CHECK-LABEL: func @swizzle_gather_to_lds
+// CHECK-LABEL: func @gather_to_lds_passthrough
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
 //  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
-//   CHECK-DAG:   %[[ROW_WIDTH:.+]] = arith.constant 64 : index
-//   CHECK-DAG:   %[[GROUP_COUNT:.+]] = arith.constant 16 : index
-//   CHECK-DAG:   %[[GROUP_WIDTH:.+]] = arith.constant 4 : index
 //   CHECK-DAG:   %[[DSTOFFSET:.+]] = arith.constant 0 : index
 //       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[I:.+]] = arith.divui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[JELEM:.+]] = arith.remui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[J:.+]] = arith.divui %[[JELEM]], %[[GROUP_WIDTH]] : index
-//       CHECK:   %[[ADD:.+]] = arith.addi %[[I]], %[[J]] : index
-//       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[ADD]], %[[GROUP_COUNT]] : index
-//       CHECK:  %[[ROTATEJELEM:.+]] = arith.muli %[[ROTATEJ]], %[[GROUP_WIDTH]] : index
-//       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
-//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
-
-// -----
-func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 1>] : memref<?xf32>
-  %lds = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
-  %c0 = arith.constant 0 : index
-  amdgpu.gather_to_lds %0[%offset], %lds[%c0] : f32, memref<?xf32>, memref<256xf32, #gpu.address_space<workgroup>>
-  return
-}
-
-// CHECK-LABEL: func @swizzle_gather_to_lds_scalar
-//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
-//  CHECK-SAME:   %[[OFFSET:[A-Za-z0-9]+]]: index
-//   CHECK-DAG:   %[[ROW_WIDTH:.+]] = arith.constant 64 : index
-//   CHECK-DAG:   %[[DSTOFFSET:.+]] = arith.constant 0 : index
-//       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[I:.+]] = arith.divui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[JELEM:.+]] = arith.remui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[J:.+]] = arith.addi %[[I]], %[[JELEM]] : index
-//       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[J]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJ]], %[[IELEM]] : index
-//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
+//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[OFFSET]]], %[[LDS]][%[[DSTOFFSET]]]
 
 // -----
 
@@ -281,9 +249,11 @@ func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
 // -----
 
 
-func.func @swizzle_raw_buffer_to_lds(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
+// Gather_to_lds source-side swizzle is handled by
+// AMDGPULowerCoalescedDMAToGatherLDS. ResolveSwizzleHints just drops the hint
+// without modifying source indices.
+func.func @gather_to_lds_src_passthrough(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
   %c0 = arith.constant 0 : index
-  //1 row, 3rd tile : 1*8192+2*128 = 8448 -> (0 XOR 1)*16+8448 = 8464
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
   %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
@@ -293,19 +263,18 @@ func.func @swizzle_raw_buffer_to_lds(%global : memref<32768xi8, #amdgpu.address_
   func.return
 }
 
-// CHECK-LABEL: func @swizzle_raw_buffer_to_lds
+// CHECK-LABEL: func @gather_to_lds_src_passthrough
 //  CHECK-SAME:   %[[SRC:.+]]: memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
-//   CHECK:   %[[SWOFF:.+]] = arith.constant 8464 : index
-//   CHECK:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[OFFSET:.+]] = arith.constant 8448 : index
+//   CHECK-DAG:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
 //       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
-//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[LDSOFFSET]]]
+//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[OFFSET]]], %[[LDS]][%[[LDSOFFSET]]]
 
 // -----
 
-
-func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
+// Dst-side swizzle hint on gather_to_lds is treated as transparent.
+func.func @gather_to_lds_dst_passthrough(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
   %c0 = arith.constant 0 : index
-  //1 row, 3rd tile : 1*8192+2*128 = 8448 -> (0 XOR 1)*16+8448 = 8464
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
   %ldsSwizzle = iree_codegen.swizzle_hint %lds[#iree_codegen.xor_shuffle<128, 16>] : memref<32768xi8, #gpu.address_space<workgroup>>
@@ -316,12 +285,29 @@ func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #a
   func.return
 }
 
-// CHECK-LABEL: func @swizzle_raw_buffer_to_lds_ignore_dst_op
+// CHECK-LABEL: func @gather_to_lds_dst_passthrough
 //  CHECK-SAME:   %[[SRC:.+]]: memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
-//   CHECK:   %[[SWOFF:.+]] = arith.constant 8464 : index
-//   CHECK:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[OFFSET:.+]] = arith.constant 8448 : index
+//   CHECK-DAG:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
 //       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
-//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[LDSOFFSET]]]
+//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[OFFSET]]], %[[LDS]][%[[LDSOFFSET]]]
+
+// -----
+
+// Verify that rank-1 contiguous memref with dynamic offset is accepted.
+func.func @swizzle_strided_rank1_after_multibuffer(%src: memref<4096xi8, strided<[1], offset: ?>>) -> vector<16xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<4096xi8, strided<[1], offset: ?>>
+  // row 15, tile 2: 15*128+2*16 = 1952 -> (7 XOR 2)*16+15*128 = 2000
+  %index = arith.constant 1952 : index
+  %1 = vector.load %0[%index] : memref<4096xi8, strided<[1], offset: ?>>, vector<16xi8>
+  return %1: vector<16xi8>
+}
+
+// CHECK-LABEL: func @swizzle_strided_rank1_after_multibuffer
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<4096xi8, strided<[1], offset: ?>>
+//       CHECK:   %[[SWIZZLED_INDEX:.+]] = arith.constant 2000 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWIZZLED_INDEX]]]
+//       CHECK:   return %[[VECTOR]]
 
 // -----
 

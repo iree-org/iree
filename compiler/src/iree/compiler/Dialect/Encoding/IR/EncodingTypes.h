@@ -18,6 +18,10 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.h.inc" // IWYU pragma: export
+// clang-format on
+
 namespace mlir::iree_compiler::IREE::Encoding {
 
 static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
@@ -32,9 +36,14 @@ const int64_t SCALED_MATMUL_RHS = 1;
 const int64_t SCALED_MATMUL_LHS_SCALES = 2;
 const int64_t SCALED_MATMUL_RHS_SCALES = 3;
 const int64_t SCALED_MATMUL_RESULT = 4;
+/// Convolutions
+const int64_t CONV_IN = 0;
+const int64_t CONV_FILTER = 1;
+const int64_t CONV_OUT = 2;
 
 /// Convert operand index to strings for printing
-std::string stringifyOperandIndex(IntegerAttr);
+std::string stringifyOperandIndex(EncodingOpType opType,
+                                  IntegerAttr operandIndex);
 
 /// Designates a dimension in a matmul (either the M or the N dimension) as
 /// being "narrow", i.e. small enough that we bother lowering the amount of
@@ -129,7 +138,6 @@ struct BitcastEncodingInfo {
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 // clang-format off
-#include "iree/compiler/Dialect/Encoding/IR/EncodingEnums.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.h.inc" // IWYU pragma: export
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.h.inc" // IWYU pragma: export

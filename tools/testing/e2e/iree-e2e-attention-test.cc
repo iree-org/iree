@@ -52,7 +52,7 @@ static void reference_attention_f32_f32_f32_f32(
     iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2, iree_hal_dim_t N,
     iree_hal_dim_t B, const float* query_data, const float* key_data,
     const float* value_data, float* result_data, iree_hal_dim_t b,
-    float* Attention) {
+    float* Attention, const uint8_t* mask_data) {
   // Compute Q * K^T
   for (int m = 0; m < M; ++m) {
     for (int k2 = 0; k2 < K2; ++k2) {
@@ -65,6 +65,20 @@ static void reference_attention_f32_f32_f32_f32(
       }
       int att_idx = index_3d(0, m, k2, M, K2);
       Attention[att_idx] = sum / sqrt(K1);  // Scale by sqrt(K1)
+    }
+  }
+
+  // Apply mask before softmax if provided.
+  // mask_data is a boolean mask where 1 = attend, 0 = mask out (-inf)
+  if (mask_data != nullptr) {
+    for (int m = 0; m < M; ++m) {
+      for (int k2 = 0; k2 < K2; ++k2) {
+        int mask_idx = index_3d(b, m, k2, M, K2);
+        int att_idx = index_3d(0, m, k2, M, K2);
+        if (mask_data[mask_idx] == 0) {
+          Attention[att_idx] = -INFINITY;
+        }
+      }
     }
   }
 
@@ -112,13 +126,13 @@ static iree_status_t reference_attention_element(
     iree_hal_element_type_t key_elem_type,
     iree_hal_element_type_t value_elem_type, void* query_data, void* key_data,
     void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b,
-    float* Attention) {
+    float* Attention, const uint8_t* mask_data) {
   if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_attention_f32_f32_f32_f32(
         M, K1, K2, N, B, (const float*)query_data, (const float*)key_data,
-        (const float*)value_data, (float*)result_data, b, Attention);
+        (const float*)value_data, (float*)result_data, b, Attention, mask_data);
 
   } else {
     return iree_make_status(
@@ -137,7 +151,7 @@ static iree_status_t reference_attention(
     iree_hal_element_type_t value_elem_type, iree_byte_span_t query_contents,
     iree_byte_span_t key_contents, iree_byte_span_t value_contents,
     iree_byte_span_t actual_contents, iree_byte_span_t result_contents,
-    int compute_every) {
+    iree_byte_span_t mask_contents, int compute_every) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, B);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, M);
@@ -147,15 +161,19 @@ static iree_status_t reference_attention(
 
   iree_host_size_t count = 0;
   float* Attention = allocate_tensor(1, M, K2);
+  // mask_data is nullptr if no mask is provided.
+  const uint8_t* mask_data = mask_contents.data_length > 0
+                                 ? (const uint8_t*)mask_contents.data
+                                 : nullptr;
   for (iree_hal_dim_t b = 0; b < B; ++b) {
     if (++count < compute_every) continue;
     count = 0;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        reference_attention_element(
-            M, K1, K2, N, B, query_elem_type, key_elem_type, value_elem_type,
-            query_contents.data, key_contents.data, value_contents.data,
-            actual_contents.data, result_contents.data, b, Attention));
+        z0, reference_attention_element(
+                M, K1, K2, N, B, query_elem_type, key_elem_type,
+                value_elem_type, query_contents.data, key_contents.data,
+                value_contents.data, actual_contents.data, result_contents.data,
+                b, Attention, mask_data));
   }
   free_tensor(Attention);
 
@@ -182,6 +200,7 @@ typedef struct {
   iree_byte_span_t value_contents;
   iree_byte_span_t actual_contents;
   iree_byte_span_t expected_contents;
+  iree_byte_span_t mask_contents;  // Optional: empty if no mask.
 } attention_results_t;
 
 static void attention_results_deinitialize(attention_results_t* results);
@@ -191,6 +210,7 @@ static iree_status_t attention_results_initialize(
     iree_hal_dim_t k1_size, iree_hal_dim_t k2_size, iree_hal_dim_t n_size,
     iree_hal_buffer_view_t* query, iree_hal_buffer_view_t* key,
     iree_hal_buffer_view_t* value, iree_hal_buffer_view_t* result,
+    iree_hal_buffer_view_t* mask,  // Optional: can be nullptr.
     iree_allocator_t host_allocator, attention_results_t* out_results) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -212,6 +232,8 @@ static iree_status_t attention_results_initialize(
   iree_hal_buffer_t* key_buffer = iree_hal_buffer_view_buffer(key);
   iree_hal_buffer_t* value_buffer = iree_hal_buffer_view_buffer(value);
   iree_hal_buffer_t* result_buffer = iree_hal_buffer_view_buffer(result);
+  iree_hal_buffer_t* mask_buffer =
+      mask ? iree_hal_buffer_view_buffer(mask) : nullptr;
 
   iree_status_t status = iree_ok_status();
 
@@ -275,6 +297,20 @@ static iree_status_t attention_results_initialize(
         host_allocator, out_results->expected_contents.data_length,
         (void**)&out_results->expected_contents.data);
   }
+  // Transfer mask data if mask is provided.
+  if (iree_status_is_ok(status) && mask_buffer != nullptr) {
+    out_results->mask_contents.data_length =
+        iree_hal_buffer_byte_length(mask_buffer);
+    status = iree_allocator_malloc(host_allocator,
+                                   out_results->mask_contents.data_length,
+                                   (void**)&out_results->mask_contents.data);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_d2h(
+          device, mask_buffer, 0, out_results->mask_contents.data,
+          out_results->mask_contents.data_length,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    }
+  }
   if (!iree_status_is_ok(status)) {
     attention_results_deinitialize(out_results);
   }
@@ -289,6 +325,7 @@ static void attention_results_deinitialize(attention_results_t* results) {
   iree_allocator_free(results->host_allocator, results->value_contents.data);
   iree_allocator_free(results->host_allocator, results->actual_contents.data);
   iree_allocator_free(results->host_allocator, results->expected_contents.data);
+  iree_allocator_free(results->host_allocator, results->mask_contents.data);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -306,7 +343,8 @@ static iree_status_t check_attention_results_impl(
                               results->key_elem_type, results->value_elem_type,
                               results->query_contents, results->key_contents,
                               results->value_contents, results->actual_contents,
-                              results->expected_contents, check_every));
+                              results->expected_contents,
+                              results->mask_contents, check_every));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -415,7 +453,25 @@ class AttentionTestModuleState final {
     IREE_RETURN_IF_ERROR(attention_results_initialize(
         device, (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
         (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query, key, value, actual_result,
+        nullptr,  // No mask
         host_allocator_, &results));
+    iree_status_t status = check_attention_results(stderr, &results);
+    attention_results_deinitialize(&results);
+    return status;
+  }
+
+  Status CheckAttentionResultsWithMask(iree_hal_device_t* device, int64_t b,
+                                       int64_t m, int64_t k1, int64_t k2,
+                                       int64_t n, iree_hal_buffer_view_t* query,
+                                       iree_hal_buffer_view_t* key,
+                                       iree_hal_buffer_view_t* value,
+                                       iree_hal_buffer_view_t* mask,
+                                       iree_hal_buffer_view_t* actual_result) {
+    attention_results_t results = {};
+    IREE_RETURN_IF_ERROR(attention_results_initialize(
+        device, (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
+        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query, key, value, actual_result,
+        mask, host_allocator_, &results));
     iree_status_t status = check_attention_results(stderr, &results);
     attention_results_deinitialize(&results);
     return status;
@@ -433,6 +489,9 @@ static const vm::NativeFunction<AttentionTestModuleState>
         vm::MakeNativeFunction(
             "check_attention_results",
             &AttentionTestModuleState::CheckAttentionResults),
+        vm::MakeNativeFunction(
+            "check_attention_results_with_mask",
+            &AttentionTestModuleState::CheckAttentionResultsWithMask),
 };
 
 struct AttentionTestModule final

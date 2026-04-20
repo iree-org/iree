@@ -284,6 +284,48 @@ util.func public @fuse_attention_with_broadcast(%arg0: tensor<4x8x128x?xf16>, %a
 //  CHECK-SAME:       ins(%[[ARG1]], %[[ARG2]], %[[ARG0]], %[[ARG3]], %[[ARG4]] :
 //       CHECK:   util.return %[[ATTENTION]]
 
+// -----
+
+util.func public @dont_fuse_attention_with_broadcasted_away_n_dim(
+    %q: tensor<4x32x64x16xf16>,
+    %k: tensor<4x32x64x16xf16>,
+    %v: tensor<4x32x64xf16>,
+    %scale: f16) -> tensor<4x32x64x128xf16> {
+  %empty_v = tensor.empty() : tensor<4x32x64x128xf16>
+  %v_broadcast = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%v : tensor<4x32x64xf16>) outs(%empty_v : tensor<4x32x64x128xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<4x32x64x128xf16>
+  %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
+  %attention = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+      ins(%q, %k, %v_broadcast, %scale :
+          tensor<4x32x64x16xf16>, tensor<4x32x64x16xf16>,
+          tensor<4x32x64x128xf16>, f16)
+      outs(%empty_out : tensor<4x32x64x128xf16>) {
+  ^bb0(%score: f16):
+    iree_linalg_ext.yield %score : f16
+  } -> tensor<4x32x64x128xf16>
+  util.return %attention : tensor<4x32x64x128xf16>
+}
+// CHECK-LABEL: func public @dont_fuse_attention_with_broadcasted_away_n_dim
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[V_BCAST:.+]] = linalg.generic
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     ins(%[[Q]], %[[K]], %[[V_BCAST]], %[[SCALE]] :
+//       CHECK:   util.return %[[ATTENTION]]
+
 
 // -----
 
@@ -313,6 +355,63 @@ util.func public @fuse_attention_with_broadcast_transpose(%arg0: tensor<4x?x8x12
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>
 //  CHECK-SAME:       ins(%[[ARG1]], %[[ARG2]], %[[ARG0]], %[[ARG3]], %[[ARG4]] :
 //       CHECK:   util.return %[[ATTENTION]]
+
+// -----
+
+// Verify that when Q's producer has a non-projected-permutation input map
+// (constant 0), the pattern skips it and fuses K's transpose instead.
+util.func public @skip_non_projected_permutation_producer(
+    %q: tensor<1x32x64x128xf16>,
+    %k: tensor<4x64x32x128xf16>,
+    %v: tensor<4x32x64x128xf16>,
+    %scale: f16) -> tensor<4x32x64x128xf16> {
+  %empty_q = tensor.empty() : tensor<4x32x64x128xf16>
+  %q_prod = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%q : tensor<1x32x64x128xf16>) outs(%empty_q : tensor<4x32x64x128xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<4x32x64x128xf16>
+  %empty_k = tensor.empty() : tensor<4x32x64x128xf16>
+  %k_transposed = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%k : tensor<4x64x32x128xf16>) outs(%empty_k : tensor<4x32x64x128xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<4x32x64x128xf16>
+  %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
+  %attention = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+      ins(%q_prod, %k_transposed, %v, %scale :
+          tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>,
+          tensor<4x32x64x128xf16>, f16)
+      outs(%empty_out : tensor<4x32x64x128xf16>) {
+  ^bb0(%score: f16):
+    iree_linalg_ext.yield %score : f16
+  } -> tensor<4x32x64x128xf16>
+  util.return %attention : tensor<4x32x64x128xf16>
+}
+// CHECK-LABEL: util.func public @skip_non_projected_permutation_producer
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[Q_PROD:.+]] = linalg.generic
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d3)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:     ins(%[[Q_PROD]], %[[K]], %[[V]], %[[SCALE]] :
 
 // -----
 

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -122,12 +123,14 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildVMVXConfigurationPassPipeline(passManager.nest<ModuleOp>());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
+    IREE::VMVX::buildVMVXTransformPassPipeline(passManager.nest<ModuleOp>());
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
@@ -246,12 +249,14 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildVMVXConfigurationPassPipeline(passManager.nest<ModuleOp>());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
+    IREE::VMVX::buildVMVXTransformPassPipeline(passManager.nest<ModuleOp>());
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
 private:

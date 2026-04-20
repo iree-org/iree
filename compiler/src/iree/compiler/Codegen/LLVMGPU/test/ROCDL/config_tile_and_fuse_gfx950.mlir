@@ -412,13 +412,13 @@ func.func @matmul_large_symmetric_f16(
 
 // MI355X-LABEL: func.func @matmul_large_symmetric_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 1]
-//  MI355X-SAME:     subgroup = [4, 8, 0]
-//  MI355X-SAME:     workgroup = [128, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 2]
+//  MI355X-SAME:     subgroup = [2, 4, 0]
+//  MI355X-SAME:     workgroup = [256, 256, 0]
 
 // -----
 
@@ -437,13 +437,13 @@ func.func @matmul_large_tall_m_f16(
 
 // MI355X-LABEL: func.func @matmul_large_tall_m_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 1]
-//  MI355X-SAME:     subgroup = [4, 8, 0]
-//  MI355X-SAME:     workgroup = [128, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 2]
+//  MI355X-SAME:     subgroup = [2, 4, 0]
+//  MI355X-SAME:     workgroup = [256, 256, 0]
 
 // -----
 
@@ -462,13 +462,13 @@ func.func @matmul_large_wide_n_f16(
 
 // MI355X-LABEL: func.func @matmul_large_wide_n_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 1]
-//  MI355X-SAME:     subgroup = [4, 8, 0]
-//  MI355X-SAME:     workgroup = [128, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 2]
+//  MI355X-SAME:     subgroup = [2, 4, 0]
+//  MI355X-SAME:     workgroup = [256, 256, 0]
 
 // -----
 
@@ -490,11 +490,11 @@ func.func @matmul_large_very_tall_m_f16(
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 //  MI355X-SAME:     padding = [128, 256, 32]
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 1]
-//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     reduction = [0, 0, 2]
+//  MI355X-SAME:     subgroup = [2, 4, 0]
 //  MI355X-SAME:     workgroup = [128, 256, 0]
 
 // -----
@@ -516,9 +516,8 @@ func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %
 // -----
 
 // Small-channel grouped convolution (weight backward): 32 groups, 8 in/out channels per group.
-// With old heuristics, this picks MFMA_F32_32x32x8_F16 with workgroup = [1, 16, 1, 1, 16, 0].
-// Now it picks MFMA_F32_16x16x16_F16 (less wasted compute per instruction for 8x8 per-group channels),
-// distributes the N=3 filter dim, and increases batch tile from 1 to 4.
+// M product (8) <= 2*kVerySkinnyDimThreshold so block intrinsics are allowed and preferred.
+// Picks MFMA_F32_4x4x4x16B_F16 (block intrinsic) for small M/N channels.
 #map_gc = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d2 + d6, d3 + d7, d0, d4)>
 #map_gc1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d1)>
 #map_gc2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
@@ -535,9 +534,52 @@ func.func @group_conv_small_channels(%arg0: tensor<32x102x102x32x8xf16>, %arg1: 
 }
 // IGEMM-LABEL: func.func @group_conv_small_channels
 // IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// IGEMM-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>
+// IGEMM-SAME:      promote_operands = [0, 1]
+// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 32]
+// IGEMM-SAME:      subgroup = [1, 1, 1, 1, 1, 0]
+// IGEMM-SAME:      workgroup = [16, 8, 1, 1, 8, 0]
+
+// -----
+
+// Grouped convolution with 10 channels per group: M product (10) > 2*kVerySkinnyDimThreshold
+// so block intrinsics are skipped. Falls back to MFMA_F32_16x16x16_F16 with a larger
+// batch tile (workgroup[0]=4) to distribute the batch=32 dimension across workgroups.
+#map_gc_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d2 + d6, d3 + d7, d0, d4)>
+#map_gc1_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d1)>
+#map_gc2_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+func.func @group_conv_10_channels(%arg0: tensor<32x102x102x32x10xf16>, %arg1: tensor<32x100x100x32x10xf16>, %arg2: tensor<32x10x3x3x10xf32>) -> tensor<32x10x3x3x10xf32> {
+  %0 = linalg.generic {indexing_maps = [#map_gc_10ch, #map_gc1_10ch, #map_gc2_10ch], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<32x102x102x32x10xf16>, tensor<32x100x100x32x10xf16>) outs(%arg2 : tensor<32x10x3x3x10xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<32x10x3x3x10xf32>
+  return %0 : tensor<32x10x3x3x10xf32>
+}
+// IGEMM-LABEL: func.func @group_conv_10_channels
+// IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // IGEMM-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // IGEMM-SAME:      padding = [4, 16, 1, 3, 16, 128]
 // IGEMM-SAME:      promote_operands = [0, 1]
 // IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 8]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
 // IGEMM-SAME:      workgroup = [4, 16, 1, 3, 16, 0]
+
+// -----
+
+// BF16 matmul with DMA. Both LHS and RHS are not transposed, so only LHS gets XOR swizzle.
+func.func @matmul_bf16(
+    %arg0: tensor<4096x4096xbf16>,
+    %arg1: tensor<4096x4096xbf16>,
+    %arg2: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<4096x4096xbf16>, tensor<4096x4096xbf16>)
+                      outs(%arg2 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %0 : tensor<4096x4096xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<64, 8>>, #iree_gpu.use_global_load_dma]

@@ -223,14 +223,26 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
-      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
-      // https://github.com/iree-org/iree/issues/23941.
       // Introduced in CDNA2, still present in CDNA4
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA4
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const ScaledMMAIntrinsic cdna4ScaledMMAOps[] = {
       // Introduced in CDNA4
@@ -277,14 +289,26 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
-      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
-      // https://github.com/iree-org/iree/issues/23941.
       // Introduced in CDNA2, still present in CDNA3
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const int64_t cdna3DMASizes[] = {32};
   static const WgpDetails cdna3Wgp = {
@@ -315,12 +339,29 @@ const WgpDetails *getCDNA2WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x8_BF16,
       MMAIntrinsic::MFMA_F32_32x32x4_BF16,
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
+      // Block intrinsics introduced in CDNA2 (we use the finalized name from
+      // CDNA3 for uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
       // Introduced in CDNA1
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
+      // Block intrinsics introduced in CDNA1 (we use the finalized name from
+      // CDNA3 for uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const WgpDetails cdna2Wgp = {allComputeBits,
                                       allStorageBits,
@@ -345,9 +386,22 @@ const WgpDetails *getCDNA2WgpDetails() {
 
 const WgpDetails *getCDNA1WgpDetails() {
   static const MMAIntrinsic cdna1MMAOps[] = {
-      MMAIntrinsic::MFMA_F32_16x16x4_F32, MMAIntrinsic::MFMA_F32_16x16x16_F16,
-      MMAIntrinsic::MFMA_F32_32x32x8_F16, MMAIntrinsic::MFMA_I32_16x16x16_I8,
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
+      // Block intrinsics: (we use the finalized name from CDNA3 for
+      // uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const WgpDetails cdna1Wgp = {allComputeBits,
                                       allStorageBits,
@@ -1297,9 +1351,10 @@ static constexpr ArchSeedSet kCDNA4Seeds = {
     /*gemm=*/{
         /*SmallGemm=*/     {2, 2,  4, 2 * kCacheLineSizeBits},
         /*MediumGemm=*/    {4, 8,  4, 2 * kCacheLineSizeBits},
-        /*LargeGemm=*/     {4, 16, 2, kCacheLineSizeBits / 2,
+        /*LargeGemm=*/     {8, 16, 2, kCacheLineSizeBits / 2,
                             /*minUtilizationThreshold=*/0.50,
-                            /*boostMNTileCountPerSubgroup=*/32},
+                            /*boostMNTileCountPerSubgroup=*/32,
+                            /*maxOutputVGPRsPerThread=*/128},
         /*VeryLargeGemm=*/ {4, 16, 2, kCacheLineSizeBits / 2},
     },
     /*scaledGemm=*/{
