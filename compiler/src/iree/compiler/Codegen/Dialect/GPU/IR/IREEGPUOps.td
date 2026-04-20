@@ -192,22 +192,29 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
 
 def IREEGPU_SubgroupScanOp : Op<IREEGPU_Dialect, "subgroup_scan", [
     SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">,
-    AllTypesMatch<["value", "result"]>]> {
-  let summary = "Inclusive prefix scan across subgroup lanes.";
+    AllTypesMatch<["value", "identity", "result", "total"]>]> {
+  let summary = "Exclusive prefix scan across subgroup lanes with total.";
   let description = [{
-    Performs an inclusive prefix scan of a scalar value across lanes within
-    a subgroup cluster. The combiner is specified by the region body, which
-    takes two arguments of the value type and yields one result.
+    Performs an exclusive prefix scan of a scalar value across lanes within
+    a subgroup cluster, and returns the cluster total as a second result.
+    The combiner is specified by the region body, which takes two arguments
+    of the value type and yields one result.
 
     The subgroup is divided into clusters of `size` lanes starting at lane 0
     with inter-lane `stride`. Within each cluster, lane at logical position
-    `p` receives `val_0 op val_1 op ... op val_p`, where `op` is the combiner.
+    `p` receives `identity op val_0 op ... op val_{p-1}` (exclusive), where
+    `op` is the combiner. Lane 0 receives the identity.
 
+    The second result `total` is the reduction of all values in the cluster:
+    `val_0 op val_1 op ... op val_{size-1}`.
+
+    The caller must supply `identity`, the identity element of the combiner.
     The combiner must be associative. It does not need to be commutative.
 
     Example:
     ```mlir
-    %scan = iree_gpu.subgroup_scan(%x) cluster(size = 4, stride = 2) {
+    %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero)
+        cluster(size = 4, stride = 2) {
     ^bb0(%lhs: f32, %rhs: f32):
       %add = arith.addf %lhs, %rhs : f32
       iree_gpu.yield %add : f32
@@ -217,14 +224,18 @@ def IREEGPU_SubgroupScanOp : Op<IREEGPU_Dialect, "subgroup_scan", [
 
   let arguments = (ins
     AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$value,
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$identity,
     OptionalAttr<I32Attr>:$cluster_size,
     DefaultValuedAttr<I32Attr, "1">:$cluster_stride
   );
-  let results = (outs AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$result);
+  let results = (outs
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$result,
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$total
+  );
   let regions = (region SizedRegion<1>:$combiner);
 
   let assemblyFormat = [{
-    `(` $value `)`
+    `(` $value `,` `identity` `=` $identity `)`
     (`cluster` `(` `size` `=` $cluster_size^
       (`,` `stride` `=` $cluster_stride^)? `)`)?
     $combiner attr-dict `:` type($value)

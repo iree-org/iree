@@ -44,15 +44,10 @@ static Value inlineCombiner(RewriterBase &rewriter, Location loc,
 
 /// Lower `iree_gpu.subgroup_scan` to a Hillis-Steele scan using
 /// `gpu.shuffle idx`.
-/// For an inclusive scan over N elements, Hillis-Steele has an outer serial
-/// loop with log(N) steps and an inner parallel loop over N.
-/// The inner parallel loop can be distributed across the lanes, so we end up
-/// with the following pseudo-code:
-/// j = lane_id
-/// for i from 0 to log(N)
-///   x[i+1][j] = (j < 2^i) ?
-///                   x[i][j] :
-///                   x[i+1][j] = x[i][j] op x[i][j - 2^i]
+/// First computes an inclusive scan, then derives the exclusive result by
+/// shifting right by one cluster position and inserting the identity at
+/// position 0. Also computes the cluster total by shuffling from the last
+/// lane in each cluster.
 ///
 struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
   LowerSubgroupScan(MLIRContext *ctx, unsigned subgroupSize,
@@ -63,6 +58,7 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value val = op.getValue();
+    Value identity = op.getIdentity();
     uint32_t clusterSize = op.getClusterSize().value_or(subgroupSize);
     uint32_t clusterStride = op.getClusterStride();
     Type valTy = val.getType();
@@ -124,6 +120,11 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
                                   rewriter.getI32IntegerAttr(subgroupSize));
 
     // Hillis-Steele inclusive scan.
+    // j = lane_id
+    // for i from 0 to log(N)
+    //   x[i+1][j] = (j < 2^i) ?
+    //                   x[i][j] :
+    //                   x[i][j] op x[i][j - 2^i]
     unsigned numSteps = llvm::Log2_32(clusterSize);
     // Serial loop over log(N) steps.
     for (unsigned step = 0; step < numSteps; ++step) {
@@ -155,17 +156,52 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
       Value threshold =
           arith::ConstantOp::create(rewriter, loc, rewriter.getI32Type(),
                                     rewriter.getI32IntegerAttr(1 << step));
-      // j < 2^i
+      // j >= 2^i
       Value predicate = arith::CmpIOp::create(
           rewriter, loc, arith::CmpIPredicate::uge, lanePos, threshold);
 
-      // x[i+1][j] = (j < 2^i) ?
-      //                   x[i][j] :
-      //                   x[i+1][j] = x[i][j] op x[i][j - 2^i]
+      // x[i+1][j] = (j < 2^i) ? x[i][j] : x[i][j] op x[i][j - 2^i]
       val = arith::SelectOp::create(rewriter, loc, predicate, combined, val);
     }
+    // val now holds the inclusive scan result.
 
-    rewriter.replaceOp(op, val);
+    // Compute total: shuffle from the last lane in each cluster.
+    //   baseLane = laneIdI32 - lanePos * clusterStride
+    //   lastLane = baseLane + (clusterSize - 1) * clusterStride
+    Value lastOffset = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getI32Type(),
+        rewriter.getI32IntegerAttr((clusterSize - 1) * clusterStride));
+    Value posTimesStride =
+        arith::MulIOp::create(rewriter, loc, lanePos, strideCst);
+    Value baseLane =
+        arith::SubIOp::create(rewriter, loc, laneIdI32, posTimesStride);
+    Value lastLane = arith::AddIOp::create(rewriter, loc, baseLane, lastOffset);
+    Value packedForTotal = packFn(val);
+    auto totalShuffle =
+        gpu::ShuffleOp::create(rewriter, loc, packedForTotal, lastLane,
+                               subgroupSizeCst, gpu::ShuffleMode::IDX);
+    Value total = unpackFn(totalShuffle.getShuffleResult());
+
+    // Derive exclusive result: shift inclusive result right by one cluster
+    // position, insert identity at position 0.
+    //   predLane = laneIdI32 - clusterStride
+    //   shifted = shuffle idx val, predLane
+    //   scanResult = (lanePos == 0) ? identity : shifted
+    Value predLane = arith::SubIOp::create(rewriter, loc, laneIdI32, strideCst);
+    Value packedForShift = packFn(val);
+    auto shiftShuffle =
+        gpu::ShuffleOp::create(rewriter, loc, packedForShift, predLane,
+                               subgroupSizeCst, gpu::ShuffleMode::IDX);
+    Value shifted = unpackFn(shiftShuffle.getShuffleResult());
+
+    Value zero = arith::ConstantOp::create(rewriter, loc, rewriter.getI32Type(),
+                                           rewriter.getI32IntegerAttr(0));
+    Value isFirstLane = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, lanePos, zero);
+    Value scanResult =
+        arith::SelectOp::create(rewriter, loc, isFirstLane, identity, shifted);
+
+    rewriter.replaceOp(op, {scanResult, total});
     return success();
   }
 
