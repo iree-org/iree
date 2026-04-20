@@ -21,6 +21,9 @@ static const uint32_t kSmokeCommandIndex = 2;
 static const uint64_t kSmokeExecutableId = 13;
 static const uint32_t kSmokeExportOrdinal = 1;
 static const uint64_t kSmokeAllocationId = 31;
+static const uint64_t kSmokeMetricSourceId = 41;
+static const uint64_t kSmokeSourceSpecificMetricId =
+    IREE_HAL_PROFILE_METRIC_ID_PRODUCER_BASE + 1;
 static const uint64_t kSmokeSubmissionId = 77;
 
 static iree_status_t write_profile_chunk_iovecs(
@@ -311,6 +314,129 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
         sink, IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
         IREE_SV("memory-events"),
         iree_make_const_byte_span(memory_events, sizeof(memory_events)));
+  }
+
+  if (iree_status_is_ok(status)) {
+    const char source_name[] = "smoke.metrics";
+    iree_hal_profile_device_metric_source_record_t source_record =
+        iree_hal_profile_device_metric_source_record_default();
+    source_record.source_id = kSmokeMetricSourceId;
+    source_record.physical_device_ordinal = kSmokePhysicalDevice;
+    source_record.device_class = IREE_HAL_PROFILE_DEVICE_CLASS_GPU;
+    source_record.source_kind = 1;
+    source_record.source_revision = 1;
+    source_record.metric_count = 2;
+    source_record.name_length = sizeof(source_name) - 1;
+    source_record.record_length =
+        sizeof(source_record) + source_record.name_length;
+    iree_const_byte_span_t iovecs[2] = {
+        iree_make_const_byte_span(&source_record, sizeof(source_record)),
+        iree_make_const_byte_span(source_name, source_record.name_length),
+    };
+    status = write_profile_chunk_iovecs(
+        sink, IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES,
+        IREE_SV("device-metric-sources"), IREE_ARRAYSIZE(iovecs), iovecs);
+  }
+
+  if (iree_status_is_ok(status)) {
+    const iree_hal_profile_metric_descriptor_t* builtin_metric =
+        iree_hal_profile_builtin_metric_descriptor_lookup(
+            IREE_HAL_PROFILE_BUILTIN_METRIC_ID_ACTIVITY_COMPUTE);
+    if (!builtin_metric) {
+      status = iree_make_status(IREE_STATUS_INTERNAL,
+                                "missing built-in metric descriptor");
+    } else {
+      const char source_specific_name[] = "smoke.source_specific";
+      const char source_specific_description[] =
+          "Smoke fixture source-specific metric.";
+      iree_hal_profile_device_metric_descriptor_record_t builtin_record =
+          iree_hal_profile_device_metric_descriptor_record_default();
+      builtin_record.source_id = kSmokeMetricSourceId;
+      builtin_record.metric_id = builtin_metric->metric_id;
+      builtin_record.unit = builtin_metric->unit;
+      builtin_record.value_kind = builtin_metric->value_kind;
+      builtin_record.semantic = builtin_metric->semantic;
+      builtin_record.plot_hint = builtin_metric->plot_hint;
+      builtin_record.name_length = builtin_metric->name.size;
+      builtin_record.description_length = builtin_metric->description.size;
+      builtin_record.record_length = sizeof(builtin_record) +
+                                     builtin_record.name_length +
+                                     builtin_record.description_length;
+
+      iree_hal_profile_device_metric_descriptor_record_t
+          source_specific_record =
+              iree_hal_profile_device_metric_descriptor_record_default();
+      source_specific_record.source_id = kSmokeMetricSourceId;
+      source_specific_record.metric_id = kSmokeSourceSpecificMetricId;
+      source_specific_record.unit = IREE_HAL_PROFILE_METRIC_UNIT_COUNT;
+      source_specific_record.value_kind =
+          IREE_HAL_PROFILE_METRIC_VALUE_KIND_U64;
+      source_specific_record.semantic =
+          IREE_HAL_PROFILE_METRIC_SEMANTIC_INSTANT;
+      source_specific_record.plot_hint =
+          IREE_HAL_PROFILE_METRIC_PLOT_HINT_NUMBER;
+      source_specific_record.name_length = sizeof(source_specific_name) - 1;
+      source_specific_record.description_length =
+          sizeof(source_specific_description) - 1;
+      source_specific_record.record_length =
+          sizeof(source_specific_record) + source_specific_record.name_length +
+          source_specific_record.description_length;
+
+      iree_const_byte_span_t iovecs[6] = {
+          iree_make_const_byte_span(&builtin_record, sizeof(builtin_record)),
+          iree_make_const_byte_span(builtin_metric->name.data,
+                                    builtin_metric->name.size),
+          iree_make_const_byte_span(builtin_metric->description.data,
+                                    builtin_metric->description.size),
+          iree_make_const_byte_span(&source_specific_record,
+                                    sizeof(source_specific_record)),
+          iree_make_const_byte_span(source_specific_name,
+                                    source_specific_record.name_length),
+          iree_make_const_byte_span(source_specific_description,
+                                    source_specific_record.description_length),
+      };
+      status = write_profile_chunk_iovecs(
+          sink, IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS,
+          IREE_SV("device-metric-descriptors"), IREE_ARRAYSIZE(iovecs), iovecs);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_device_metric_sample_record_t sample_record =
+        iree_hal_profile_device_metric_sample_record_default();
+    sample_record.flags =
+        IREE_HAL_PROFILE_DEVICE_METRIC_SAMPLE_FLAG_SOURCE_TIMESTAMP;
+    sample_record.sample_id = 1;
+    sample_record.source_id = kSmokeMetricSourceId;
+    sample_record.host_time_begin_ns = 3400;
+    sample_record.host_time_end_ns = 3410;
+    sample_record.source_timestamp = 500;
+    sample_record.source_timestamp_frequency_hz = 1000000;
+    sample_record.physical_device_ordinal = kSmokePhysicalDevice;
+    sample_record.value_count = 2;
+    sample_record.record_length =
+        sizeof(sample_record) +
+        sample_record.value_count *
+            sizeof(iree_hal_profile_device_metric_value_t);
+    iree_hal_profile_device_metric_value_t values[2] = {
+        {
+            .metric_id = IREE_HAL_PROFILE_BUILTIN_METRIC_ID_ACTIVITY_COMPUTE,
+            .value_bits = 87500,
+            .flags = IREE_HAL_PROFILE_DEVICE_METRIC_VALUE_FLAG_NONE,
+        },
+        {
+            .metric_id = kSmokeSourceSpecificMetricId,
+            .value_bits = 12345,
+            .flags = IREE_HAL_PROFILE_DEVICE_METRIC_VALUE_FLAG_NONE,
+        },
+    };
+    iree_const_byte_span_t iovecs[2] = {
+        iree_make_const_byte_span(&sample_record, sizeof(sample_record)),
+        iree_make_const_byte_span(values, sizeof(values)),
+    };
+    status = write_profile_chunk_iovecs(
+        sink, IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SAMPLES,
+        IREE_SV("device-metric-samples"), IREE_ARRAYSIZE(iovecs), iovecs);
   }
 
   if (iree_status_is_ok(status)) {

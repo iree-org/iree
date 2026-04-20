@@ -9,11 +9,12 @@
 #include <errno.h>
 #include <string.h>
 
+#include "iree/hal/api.h"
 #include "iree/tooling/profile/memory.h"
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 10
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 11
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -42,6 +43,46 @@ static void iree_profile_export_fprint_nullable_hash(FILE* file, bool has_hash,
     fputc('"', file);
   } else {
     fprintf(file, "null");
+  }
+}
+
+static const char* iree_profile_export_device_class_name(
+    iree_hal_profile_device_class_t device_class) {
+  switch (device_class) {
+    case IREE_HAL_PROFILE_DEVICE_CLASS_NONE:
+      return "none";
+    case IREE_HAL_PROFILE_DEVICE_CLASS_CPU:
+      return "cpu";
+    case IREE_HAL_PROFILE_DEVICE_CLASS_GPU:
+      return "gpu";
+    case IREE_HAL_PROFILE_DEVICE_CLASS_NPU:
+      return "npu";
+    case IREE_HAL_PROFILE_DEVICE_CLASS_OTHER:
+      return "other";
+    default:
+      return "unknown";
+  }
+}
+
+static void iree_profile_export_print_device_metric_value(
+    FILE* file, iree_hal_profile_metric_value_kind_t value_kind,
+    uint64_t value_bits) {
+  switch (value_kind) {
+    case IREE_HAL_PROFILE_METRIC_VALUE_KIND_I64:
+      fprintf(file, "%" PRId64, (int64_t)value_bits);
+      break;
+    case IREE_HAL_PROFILE_METRIC_VALUE_KIND_U64:
+      fprintf(file, "%" PRIu64, value_bits);
+      break;
+    case IREE_HAL_PROFILE_METRIC_VALUE_KIND_F64: {
+      double value = 0.0;
+      memcpy(&value, &value_bits, sizeof(value));
+      fprintf(file, "%.17g", value);
+      break;
+    }
+    default:
+      fprintf(file, "null");
+      break;
   }
 }
 
@@ -1023,6 +1064,246 @@ static iree_status_t iree_profile_export_process_counter_sample_records(
   return status;
 }
 
+static iree_status_t iree_profile_export_process_device_metric_source_records(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  (void)model;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_source_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_source_record_t source_record;
+    memcpy(&source_record, typed_record.contents.data, sizeof(source_record));
+    if ((iree_host_size_t)source_record.name_length !=
+        typed_record.inline_payload.data_length) {
+      status = iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "device metric source name length is "
+                                "inconsistent with record length");
+    }
+    if (iree_status_is_ok(status)) {
+      iree_string_view_t name =
+          iree_make_string_view((const char*)typed_record.inline_payload.data,
+                                typed_record.inline_payload.data_length);
+      iree_profile_export_print_prefix(file, "device_metric_source",
+                                       record_index);
+      fprintf(file,
+              ",\"source_id\":%" PRIu64
+              ",\"physical_device_ordinal\":%u"
+              ",\"device_class\":",
+              source_record.source_id, source_record.physical_device_ordinal);
+      iree_profile_fprint_json_string(
+          file, iree_make_cstring_view(iree_profile_export_device_class_name(
+                    source_record.device_class)));
+      fprintf(file,
+              ",\"device_class_value\":%u,\"flags\":%u"
+              ",\"source_kind\":%u,\"source_revision\":%u"
+              ",\"metric_count\":%u,\"name\":",
+              source_record.device_class, source_record.flags,
+              source_record.source_kind, source_record.source_revision,
+              source_record.metric_count);
+      iree_profile_fprint_json_string(file, name);
+      fputs("}\n", file);
+    }
+  }
+  return status;
+}
+
+static iree_status_t
+iree_profile_export_process_device_metric_descriptor_records(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  (void)model;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_descriptor_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_descriptor_record_t descriptor_record;
+    memcpy(&descriptor_record, typed_record.contents.data,
+           sizeof(descriptor_record));
+    iree_host_size_t trailing_length = 0;
+    if (!iree_host_size_checked_add(descriptor_record.name_length,
+                                    descriptor_record.description_length,
+                                    &trailing_length) ||
+        trailing_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "device metric descriptor string lengths are inconsistent with "
+          "record length");
+    }
+    if (iree_status_is_ok(status)) {
+      const char* string_base = (const char*)typed_record.inline_payload.data;
+      iree_string_view_t name =
+          iree_make_string_view(string_base, descriptor_record.name_length);
+      iree_string_view_t description =
+          iree_make_string_view(string_base + descriptor_record.name_length,
+                                descriptor_record.description_length);
+      iree_profile_export_print_prefix(file, "device_metric_descriptor",
+                                       record_index);
+      fprintf(file,
+              ",\"source_id\":%" PRIu64 ",\"metric_id\":%" PRIu64
+              ",\"builtin\":%s,\"producer_specific\":%s"
+              ",\"flags\":%u,\"unit\":",
+              descriptor_record.source_id, descriptor_record.metric_id,
+              iree_hal_profile_metric_id_is_builtin(descriptor_record.metric_id)
+                  ? "true"
+                  : "false",
+              iree_hal_profile_metric_id_is_producer_specific(
+                  descriptor_record.metric_id)
+                  ? "true"
+                  : "false",
+              descriptor_record.flags);
+      iree_profile_fprint_json_string(
+          file, iree_hal_profile_metric_unit_string(descriptor_record.unit));
+      fprintf(file,
+              ",\"unit_value\":%u,\"value_kind\":", descriptor_record.unit);
+      iree_profile_fprint_json_string(file,
+                                      iree_hal_profile_metric_value_kind_string(
+                                          descriptor_record.value_kind));
+      fprintf(file, ",\"value_kind_value\":%u,\"semantic\":",
+              descriptor_record.value_kind);
+      iree_profile_fprint_json_string(
+          file,
+          iree_hal_profile_metric_semantic_string(descriptor_record.semantic));
+      fprintf(file, ",\"semantic_value\":%u,\"plot_hint\":",
+              descriptor_record.semantic);
+      iree_profile_fprint_json_string(file,
+                                      iree_hal_profile_metric_plot_hint_string(
+                                          descriptor_record.plot_hint));
+      fprintf(file,
+              ",\"plot_hint_value\":%u,\"name\":", descriptor_record.plot_hint);
+      iree_profile_fprint_json_string(file, name);
+      fprintf(file, ",\"description\":");
+      iree_profile_fprint_json_string(file, description);
+      fputs("}\n", file);
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_export_process_device_metric_sample_records(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_sample_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_sample_record_t sample_record;
+    memcpy(&sample_record, typed_record.contents.data, sizeof(sample_record));
+    iree_host_size_t values_length = 0;
+    if (!iree_host_size_checked_mul(
+            sample_record.value_count,
+            sizeof(iree_hal_profile_device_metric_value_t), &values_length) ||
+        values_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "device metric sample value count is "
+                                "inconsistent with record length");
+    }
+    if (iree_status_is_ok(status)) {
+      const iree_hal_profile_device_metric_value_t* values =
+          (const iree_hal_profile_device_metric_value_t*)
+              typed_record.inline_payload.data;
+      for (uint32_t i = 0;
+           i < sample_record.value_count && iree_status_is_ok(status); ++i) {
+        const iree_profile_model_metric_descriptor_t* descriptor = NULL;
+        status = iree_profile_model_resolve_metric_descriptor(
+            model, sample_record.source_id, values[i].metric_id, &descriptor);
+      }
+    }
+    if (iree_status_is_ok(status)) {
+      const iree_hal_profile_device_metric_value_t* values =
+          (const iree_hal_profile_device_metric_value_t*)
+              typed_record.inline_payload.data;
+      const int64_t host_time_uncertainty_ns =
+          sample_record.host_time_end_ns >= sample_record.host_time_begin_ns
+              ? sample_record.host_time_end_ns -
+                    sample_record.host_time_begin_ns
+              : 0;
+      const bool has_source_timestamp = iree_all_bits_set(
+          sample_record.flags,
+          IREE_HAL_PROFILE_DEVICE_METRIC_SAMPLE_FLAG_SOURCE_TIMESTAMP);
+      iree_profile_export_print_prefix(file, "device_metric_sample",
+                                       record_index);
+      fprintf(file,
+              ",\"sample_id\":%" PRIu64 ",\"source_id\":%" PRIu64
+              ",\"flags\":%u"
+              ",\"physical_device_ordinal\":%u"
+              ",\"host_time_domain\":\"iree_host_time_ns\""
+              ",\"host_time_begin_ns\":%" PRId64
+              ",\"host_time_end_ns\":%" PRId64
+              ",\"host_time_uncertainty_ns\":%" PRId64
+              ",\"source_timestamp_present\":%s"
+              ",\"source_timestamp\":%" PRIu64
+              ",\"source_timestamp_frequency_hz\":%" PRIu64 ",\"values\":[",
+              sample_record.sample_id, sample_record.source_id,
+              sample_record.flags, sample_record.physical_device_ordinal,
+              sample_record.host_time_begin_ns, sample_record.host_time_end_ns,
+              host_time_uncertainty_ns, has_source_timestamp ? "true" : "false",
+              sample_record.source_timestamp,
+              sample_record.source_timestamp_frequency_hz);
+      for (uint32_t i = 0; i < sample_record.value_count; ++i) {
+        if (i != 0) fputc(',', file);
+        const iree_profile_model_metric_descriptor_t* descriptor =
+            iree_profile_model_find_metric_descriptor(
+                model, sample_record.source_id, values[i].metric_id);
+        fprintf(file,
+                "{\"metric_id\":%" PRIu64 ",\"name\":", values[i].metric_id);
+        iree_profile_fprint_json_string(file, descriptor->name);
+        fprintf(file, ",\"unit\":");
+        iree_profile_fprint_json_string(
+            file, iree_hal_profile_metric_unit_string(descriptor->record.unit));
+        fprintf(file, ",\"value_kind\":");
+        iree_profile_fprint_json_string(
+            file, iree_hal_profile_metric_value_kind_string(
+                      descriptor->record.value_kind));
+        fprintf(file, ",\"semantic\":");
+        iree_profile_fprint_json_string(file,
+                                        iree_hal_profile_metric_semantic_string(
+                                            descriptor->record.semantic));
+        fprintf(file, ",\"plot_hint\":");
+        iree_profile_fprint_json_string(
+            file, iree_hal_profile_metric_plot_hint_string(
+                      descriptor->record.plot_hint));
+        fprintf(file,
+                ",\"flags\":%u"
+                ",\"value\":",
+                values[i].flags);
+        iree_profile_export_print_device_metric_value(
+            file, descriptor->record.value_kind, values[i].value_bits);
+        fprintf(file, ",\"value_bits\":%" PRIu64 "}", values[i].value_bits);
+      }
+      fputs("]}\n", file);
+    }
+  }
+  return status;
+}
+
 static const char* iree_profile_executable_trace_format_name(
     iree_hal_profile_executable_trace_format_t format) {
   switch (format) {
@@ -1119,6 +1400,12 @@ static iree_status_t iree_profile_export_process_chunk_record(
        iree_profile_export_process_counter_records},
       {IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES,
        iree_profile_export_process_counter_sample_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES,
+       iree_profile_export_process_device_metric_source_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS,
+       iree_profile_export_process_device_metric_descriptor_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SAMPLES,
+       iree_profile_export_process_device_metric_sample_records},
       {IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES,
        iree_profile_export_process_executable_trace_record},
   };

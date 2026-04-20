@@ -69,6 +69,24 @@ typedef struct iree_profile_model_queue_t {
   iree_hal_profile_queue_record_t record;
 } iree_profile_model_queue_t;
 
+// Device metric source metadata indexed by source id.
+typedef struct iree_profile_model_metric_source_t {
+  // Immutable metric source metadata copied from the profile bundle.
+  iree_hal_profile_device_metric_source_record_t record;
+  // Borrowed source name from the mapped profile bundle.
+  iree_string_view_t name;
+} iree_profile_model_metric_source_t;
+
+// Device metric descriptor metadata indexed by source id and metric id.
+typedef struct iree_profile_model_metric_descriptor_t {
+  // Immutable metric descriptor metadata copied from the profile bundle.
+  iree_hal_profile_device_metric_descriptor_record_t record;
+  // Borrowed metric name from the mapped profile bundle.
+  iree_string_view_t name;
+  // Borrowed metric description from the mapped profile bundle.
+  iree_string_view_t description;
+} iree_profile_model_metric_descriptor_t;
+
 // Per-physical-device clock-correlation state.
 typedef struct iree_profile_model_device_t {
   // Session-local physical device ordinal.
@@ -153,6 +171,23 @@ typedef struct iree_profile_model_t {
   iree_host_size_t queue_capacity;
   // Lookup index from physical queue stream to |queues| entry index.
   iree_profile_index_t queue_index;
+  // Dynamic array of metric source side-table entries.
+  iree_profile_model_metric_source_t* metric_sources;
+  // Number of valid entries in |metric_sources|.
+  iree_host_size_t metric_source_count;
+  // Capacity of |metric_sources| in entries.
+  iree_host_size_t metric_source_capacity;
+  // Lookup index from metric source id to |metric_sources| entry index.
+  iree_profile_index_t metric_source_index;
+  // Dynamic array of metric descriptor side-table entries.
+  iree_profile_model_metric_descriptor_t* metric_descriptors;
+  // Number of valid entries in |metric_descriptors|.
+  iree_host_size_t metric_descriptor_count;
+  // Capacity of |metric_descriptors| in entries.
+  iree_host_size_t metric_descriptor_capacity;
+  // Lookup index from source id and metric id to |metric_descriptors| entry
+  // index.
+  iree_profile_index_t metric_descriptor_index;
   // Dynamic array of per-physical-device clock-correlation state.
   iree_profile_model_device_t* devices;
   // Number of valid entries in |devices|.
@@ -199,6 +234,21 @@ const iree_profile_model_export_t* iree_profile_model_find_export(
 const iree_profile_model_command_buffer_t*
 iree_profile_model_find_command_buffer(const iree_profile_model_t* model,
                                        uint64_t command_buffer_id);
+
+// Returns the metric source metadata row for |source_id|.
+const iree_profile_model_metric_source_t* iree_profile_model_find_metric_source(
+    const iree_profile_model_t* model, uint64_t source_id);
+
+// Returns the metric descriptor metadata row for |source_id| and |metric_id|.
+const iree_profile_model_metric_descriptor_t*
+iree_profile_model_find_metric_descriptor(const iree_profile_model_t* model,
+                                          uint64_t source_id,
+                                          uint64_t metric_id);
+
+// Resolves a metric descriptor reference or fails if metadata is missing.
+iree_status_t iree_profile_model_resolve_metric_descriptor(
+    const iree_profile_model_t* model, uint64_t source_id, uint64_t metric_id,
+    const iree_profile_model_metric_descriptor_t** out_descriptor);
 
 // Fits a linear device-tick to nanosecond conversion for |device|.
 //

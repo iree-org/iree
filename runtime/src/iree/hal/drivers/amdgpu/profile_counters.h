@@ -27,19 +27,19 @@ typedef struct iree_hal_amdgpu_profile_counter_session_t
 typedef struct iree_hal_amdgpu_profile_dispatch_event_reservation_t
     iree_hal_amdgpu_profile_dispatch_event_reservation_t;
 
-// Creates a hardware counter profiling session from |options|.
+// Allocates a hardware counter profiling session from |options|.
 //
 // The returned session is immutable after creation except for its monotonically
 // assigned sample identifiers. The logical-device profiling begin path owns the
 // session and publishes a borrowed pointer to queues while profiling is active.
-iree_status_t iree_hal_amdgpu_profile_counter_session_create(
+iree_status_t iree_hal_amdgpu_profile_counter_session_allocate(
     iree_hal_amdgpu_logical_device_t* logical_device,
     const iree_hal_device_profiling_options_t* options,
     iree_allocator_t host_allocator,
     iree_hal_amdgpu_profile_counter_session_t** out_session);
 
-// Destroys |session| and releases its aqlprofile library reference.
-void iree_hal_amdgpu_profile_counter_session_destroy(
+// Frees |session| and releases its aqlprofile library reference.
+void iree_hal_amdgpu_profile_counter_session_free(
     iree_hal_amdgpu_profile_counter_session_t* session);
 
 // Returns true when |session| contains counter sets to capture.

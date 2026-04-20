@@ -203,6 +203,26 @@ static iree_status_t iree_hal_amdgpu_query_agent_uuid(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_amdgpu_query_agent_pci_identity(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    iree_hal_amdgpu_physical_device_t* out_physical_device) {
+  uint32_t pci_domain = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_DOMAIN,
+      &pci_domain));
+  uint32_t bdfid = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_BDFID,
+      &bdfid));
+
+  out_physical_device->pci_domain = pci_domain;
+  out_physical_device->pci_bus = (bdfid >> 8) & 0xFFu;
+  out_physical_device->pci_device = (bdfid >> 3) & 0x1Fu;
+  out_physical_device->pci_function = bdfid & 0x7u;
+  out_physical_device->has_pci_identity = 1u;
+  return iree_ok_status();
+}
+
 static iree_hal_amdgpu_vendor_packet_capability_flags_t
 iree_hal_amdgpu_select_vendor_packet_capabilities(
     iree_hal_amdgpu_gfxip_version_t version) {
@@ -461,6 +481,8 @@ static iree_status_t iree_hal_amdgpu_physical_device_initialize_identity(
       iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
                               (hsa_agent_info_t)HSA_AMD_AGENT_INFO_DRIVER_UID,
                               &out_physical_device->kfd_gpu_uid));
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_query_agent_pci_identity(
+      libhsa, device_agent, out_physical_device));
   bool has_physical_device_uuid = false;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_query_agent_uuid(
       libhsa, device_agent, out_physical_device->physical_device_uuid,

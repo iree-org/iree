@@ -96,6 +96,21 @@ extern "C" {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES \
   IREE_SV("application/vnd.iree.hal.profile.counter-samples")
 
+// Content type for packed iree_hal_profile_device_metric_source_record_t
+// records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES \
+  IREE_SV("application/vnd.iree.hal.profile.device-metric-sources")
+
+// Content type for packed iree_hal_profile_device_metric_descriptor_record_t
+// records followed by metric name and description strings.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS \
+  IREE_SV("application/vnd.iree.hal.profile.device-metric-descriptors")
+
+// Content type for packed iree_hal_profile_device_metric_sample_record_t
+// records followed by iree_hal_profile_device_metric_value_t values.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SAMPLES \
+  IREE_SV("application/vnd.iree.hal.profile.device-metric-samples")
+
 // Content type for one iree_hal_profile_executable_trace_record_t followed by
 // raw trace bytes.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES \
@@ -1359,6 +1374,292 @@ iree_hal_profile_counter_sample_record_default(void) {
   return record;
 }
 
+//===----------------------------------------------------------------------===//
+// Device metrics
+//===----------------------------------------------------------------------===//
+
+// Broad physical device class associated with a metric source.
+typedef uint32_t iree_hal_profile_device_class_t;
+enum iree_hal_profile_device_class_e {
+  IREE_HAL_PROFILE_DEVICE_CLASS_NONE = 0u,
+
+  // Host CPU package, core, or scheduler domain.
+  IREE_HAL_PROFILE_DEVICE_CLASS_CPU = 1u,
+
+  // GPU package, partition, or accelerator tile.
+  IREE_HAL_PROFILE_DEVICE_CLASS_GPU = 2u,
+
+  // NPU, TPU, DSP, or other neural accelerator.
+  IREE_HAL_PROFILE_DEVICE_CLASS_NPU = 3u,
+
+  // Other producer-defined device class.
+  IREE_HAL_PROFILE_DEVICE_CLASS_OTHER = 0x7FFFFFFFu,
+};
+
+// Bitfield specifying properties of one device metric source.
+typedef uint32_t iree_hal_profile_device_metric_source_flags_t;
+enum iree_hal_profile_device_metric_source_flag_bits_t {
+  IREE_HAL_PROFILE_DEVICE_METRIC_SOURCE_FLAG_NONE = 0u,
+};
+
+// Session-level source for one family of device metrics followed by
+// |name_length| bytes. The trailing source name is not NUL-terminated.
+//
+// A source is the unit of sampling and identity for device metrics. Producers
+// should emit one source record for each physical-device sampler or synthetic
+// aggregate that can produce samples. Descriptor and sample records reference
+// the same |source_id| so consumers can interpret producer-specific metrics
+// without consulting the runtime that recorded the profile.
+typedef struct iree_hal_profile_device_metric_source_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing source properties.
+  iree_hal_profile_device_metric_source_flags_t flags;
+  // Producer-defined source identifier unique within the profiling session.
+  uint64_t source_id;
+  // Session-local physical device ordinal associated with this source.
+  uint32_t physical_device_ordinal;
+  // Broad class of device that this source samples.
+  iree_hal_profile_device_class_t device_class;
+  // Producer-defined source kind, or 0 when not applicable.
+  uint32_t source_kind;
+  // Producer-defined source revision, or 0 when not applicable.
+  uint32_t source_revision;
+  // Number of descriptor records associated with this source.
+  uint32_t metric_count;
+  // Byte length of the trailing source name.
+  uint32_t name_length;
+} iree_hal_profile_device_metric_source_record_t;
+
+// Returns a default device metric source record.
+static inline iree_hal_profile_device_metric_source_record_t
+iree_hal_profile_device_metric_source_record_default(void) {
+  iree_hal_profile_device_metric_source_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
+// Bitfield specifying properties of one device metric descriptor.
+typedef uint32_t iree_hal_profile_metric_flags_t;
+enum iree_hal_profile_metric_flag_bits_t {
+  IREE_HAL_PROFILE_METRIC_FLAG_NONE = 0u,
+};
+
+// Display and scaling unit for a device metric value.
+typedef uint32_t iree_hal_profile_metric_unit_t;
+enum iree_hal_profile_metric_unit_e {
+  IREE_HAL_PROFILE_METRIC_UNIT_NONE = 0u,
+
+  // Dimensionless count.
+  IREE_HAL_PROFILE_METRIC_UNIT_COUNT = 1u,
+
+  // Frequency in hertz.
+  IREE_HAL_PROFILE_METRIC_UNIT_HERTZ = 2u,
+
+  // Size in bytes.
+  IREE_HAL_PROFILE_METRIC_UNIT_BYTES = 3u,
+
+  // Rate in bytes per second.
+  IREE_HAL_PROFILE_METRIC_UNIT_BYTES_PER_SECOND = 4u,
+
+  // Percentage scaled by 1000, where 100000 represents 100%.
+  IREE_HAL_PROFILE_METRIC_UNIT_MILLIPERCENT = 5u,
+
+  // Temperature in millidegrees Celsius.
+  IREE_HAL_PROFILE_METRIC_UNIT_MILLIDEGREES_CELSIUS = 6u,
+
+  // Power in microwatts.
+  IREE_HAL_PROFILE_METRIC_UNIT_MICROWATTS = 7u,
+
+  // Energy in microjoules.
+  IREE_HAL_PROFILE_METRIC_UNIT_MICROJOULES = 8u,
+
+  // Opaque bitfield value.
+  IREE_HAL_PROFILE_METRIC_UNIT_BITFIELD = 9u,
+
+  // Opaque enumerant value.
+  IREE_HAL_PROFILE_METRIC_UNIT_ENUM = 10u,
+};
+
+// Storage interpretation for a device metric value.
+typedef uint32_t iree_hal_profile_metric_value_kind_t;
+enum iree_hal_profile_metric_value_kind_e {
+  IREE_HAL_PROFILE_METRIC_VALUE_KIND_NONE = 0u,
+
+  // Signed 64-bit integer stored directly in value_bits.
+  IREE_HAL_PROFILE_METRIC_VALUE_KIND_I64 = 1u,
+
+  // Unsigned 64-bit integer stored directly in value_bits.
+  IREE_HAL_PROFILE_METRIC_VALUE_KIND_U64 = 2u,
+
+  // IEEE-754 double stored as raw bits in value_bits.
+  IREE_HAL_PROFILE_METRIC_VALUE_KIND_F64 = 3u,
+};
+
+// Sampling semantic for a device metric value.
+typedef uint32_t iree_hal_profile_metric_semantic_t;
+enum iree_hal_profile_metric_semantic_e {
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_NONE = 0u,
+
+  // Point-in-time value sampled within the enclosing sample bracket.
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_INSTANT = 1u,
+
+  // Average over the enclosing sample bracket or producer-defined window.
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_AVERAGE = 2u,
+
+  // Monotonic cumulative counter value.
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_CUMULATIVE = 3u,
+
+  // Delta since the previous sample from the same source.
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_DELTA = 4u,
+
+  // Opaque state value such as an enum or bitfield.
+  IREE_HAL_PROFILE_METRIC_SEMANTIC_STATE = 5u,
+};
+
+// Preferred visualization shape for a device metric.
+typedef uint32_t iree_hal_profile_metric_plot_hint_t;
+enum iree_hal_profile_metric_plot_hint_e {
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_NONE = 0u,
+
+  // Generic scalar timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_NUMBER = 1u,
+
+  // Memory capacity or occupancy timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_MEMORY = 2u,
+
+  // Percentage timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_PERCENTAGE = 3u,
+
+  // Clock or frequency timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_FREQUENCY = 4u,
+
+  // Temperature timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_TEMPERATURE = 5u,
+
+  // Power timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_POWER = 6u,
+
+  // Energy timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_ENERGY = 7u,
+
+  // Bandwidth timeline.
+  IREE_HAL_PROFILE_METRIC_PLOT_HINT_BANDWIDTH = 8u,
+};
+
+// Session-level device metric descriptor followed by |name_length| and
+// |description_length| bytes. Trailing strings are stored in that order and are
+// not NUL-terminated.
+//
+// Descriptors define the value-vector layout used by metric samples from the
+// same |source_id|. Built-in metric ids have stable semantics in HAL core;
+// producer-specific ids are interpreted entirely from the descriptor record
+// carried in the profile bundle.
+typedef struct iree_hal_profile_device_metric_descriptor_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing metric properties.
+  iree_hal_profile_metric_flags_t flags;
+  // Producer-defined metric source identifier owning this descriptor.
+  uint64_t source_id;
+  // Source-scoped metric identifier used by sample values.
+  uint64_t metric_id;
+  // Display and scaling unit for this metric.
+  iree_hal_profile_metric_unit_t unit;
+  // Storage interpretation for sample value_bits.
+  iree_hal_profile_metric_value_kind_t value_kind;
+  // Sampling semantic for this metric.
+  iree_hal_profile_metric_semantic_t semantic;
+  // Preferred visualization shape for this metric.
+  iree_hal_profile_metric_plot_hint_t plot_hint;
+  // Byte length of the trailing metric name.
+  uint32_t name_length;
+  // Byte length of the trailing metric description.
+  uint32_t description_length;
+} iree_hal_profile_device_metric_descriptor_record_t;
+
+// Returns a default device metric descriptor record.
+static inline iree_hal_profile_device_metric_descriptor_record_t
+iree_hal_profile_device_metric_descriptor_record_default(void) {
+  iree_hal_profile_device_metric_descriptor_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  return record;
+}
+
+// Bitfield specifying properties of one sampled device metric value.
+typedef uint32_t iree_hal_profile_device_metric_value_flags_t;
+enum iree_hal_profile_device_metric_value_flag_bits_t {
+  IREE_HAL_PROFILE_DEVICE_METRIC_VALUE_FLAG_NONE = 0u,
+};
+
+// Sampled value for one metric descriptor.
+typedef struct iree_hal_profile_device_metric_value_t {
+  // Source-scoped metric identifier matching a descriptor record.
+  uint64_t metric_id;
+  // Raw value bits interpreted using the descriptor's value_kind.
+  uint64_t value_bits;
+  // Flags describing value properties.
+  iree_hal_profile_device_metric_value_flags_t flags;
+  // Reserved for future value fields; must be zero.
+  uint32_t reserved0;
+} iree_hal_profile_device_metric_value_t;
+
+// Bitfield specifying properties of one device metric sample.
+typedef uint32_t iree_hal_profile_device_metric_sample_flags_t;
+enum iree_hal_profile_device_metric_sample_flag_bits_t {
+  IREE_HAL_PROFILE_DEVICE_METRIC_SAMPLE_FLAG_NONE = 0u,
+
+  // |source_timestamp| and |source_timestamp_frequency_hz| are populated with
+  // a producer-native timestamp from the sampled source.
+  IREE_HAL_PROFILE_DEVICE_METRIC_SAMPLE_FLAG_SOURCE_TIMESTAMP = 1u << 0,
+
+  // One or more requested metric sources were temporarily unavailable while
+  // producing this sample. Values that were readable may still be present.
+  IREE_HAL_PROFILE_DEVICE_METRIC_SAMPLE_FLAG_PARTIAL = 1u << 1,
+};
+
+// Device metric sample followed by |value_count| device metric values.
+//
+// |host_time_begin_ns| and |host_time_end_ns| bracket the producer's sampling
+// work in IREE host monotonic time. Producers sampling several files, syscalls,
+// or MMIO windows should use the bracket around the complete sample group
+// instead of assigning unrelated timestamps to individual values.
+typedef struct iree_hal_profile_device_metric_sample_record_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing sample properties.
+  iree_hal_profile_device_metric_sample_flags_t flags;
+  // Producer-defined sample identifier unique within the metric source stream.
+  uint64_t sample_id;
+  // Producer-defined metric source identifier defining the trailing values.
+  uint64_t source_id;
+  // IREE monotonic host timestamp immediately before sampling began.
+  int64_t host_time_begin_ns;
+  // IREE monotonic host timestamp immediately after sampling completed.
+  int64_t host_time_end_ns;
+  // Producer-native source timestamp in |source_timestamp_frequency_hz| units.
+  uint64_t source_timestamp;
+  // Frequency in Hz for |source_timestamp|.
+  uint64_t source_timestamp_frequency_hz;
+  // Session-local physical device ordinal associated with this sample.
+  uint32_t physical_device_ordinal;
+  // Number of trailing iree_hal_profile_device_metric_value_t values.
+  uint32_t value_count;
+} iree_hal_profile_device_metric_sample_record_t;
+
+// Returns a default device metric sample record.
+static inline iree_hal_profile_device_metric_sample_record_t
+iree_hal_profile_device_metric_sample_record_default(void) {
+  iree_hal_profile_device_metric_sample_record_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.physical_device_ordinal = UINT32_MAX;
+  return record;
+}
+
 // Bitfield specifying properties of one executable trace record.
 typedef uint32_t iree_hal_profile_executable_trace_flags_t;
 enum iree_hal_profile_executable_trace_flag_bits_t {
@@ -1474,6 +1775,16 @@ IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_record_t, 48);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_sample_record_t,
                                       88);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_device_metric_source_record_t, 40);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_device_metric_descriptor_record_t, 48);
+static_assert(
+    sizeof(iree_hal_profile_device_metric_value_t) == 24,
+    "iree_hal_profile_device_metric_value_t size is part of the profile binary "
+    "format");
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
+    iree_hal_profile_device_metric_sample_record_t, 64);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
     iree_hal_profile_executable_trace_record_t, 88);
 
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
@@ -1486,6 +1797,12 @@ IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_record_t,
                                      block_name_length, 36);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_sample_record_t,
                                      sample_value_count, 80);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
+    iree_hal_profile_device_metric_source_record_t, name_length, 36);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
+    iree_hal_profile_device_metric_descriptor_record_t, name_length, 40);
+IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
+    iree_hal_profile_device_metric_sample_record_t, value_count, 60);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_executable_trace_record_t,
                                      data_length, 80);
 

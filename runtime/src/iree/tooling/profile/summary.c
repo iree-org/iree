@@ -84,6 +84,13 @@ static bool iree_profile_summary_accumulate_ticks(uint64_t* total_ticks,
   return true;
 }
 
+static bool iree_profile_summary_accumulate_u64(uint64_t* total,
+                                                uint64_t value) {
+  if (value > UINT64_MAX - *total) return false;
+  *total += value;
+  return true;
+}
+
 static bool iree_profile_summary_record_dispatch_event(
     iree_profile_device_summary_t* device,
     const iree_hal_profile_dispatch_event_t* record) {
@@ -428,6 +435,128 @@ static iree_status_t iree_profile_summary_process_counter_sample_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_device_metric_source_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_source_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_source_record_t source_record;
+    memcpy(&source_record, typed_record.contents.data, sizeof(source_record));
+    if ((iree_host_size_t)source_record.name_length !=
+        typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "device metric source name length is inconsistent with record "
+          "length");
+    }
+    if (iree_status_is_ok(status)) {
+      ++summary->device_metric.source_record_count;
+    }
+  }
+  return status;
+}
+
+static iree_status_t
+iree_profile_summary_process_device_metric_descriptor_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_descriptor_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_descriptor_record_t descriptor_record;
+    memcpy(&descriptor_record, typed_record.contents.data,
+           sizeof(descriptor_record));
+    iree_host_size_t trailing_length = 0;
+    if (!iree_host_size_checked_add(descriptor_record.name_length,
+                                    descriptor_record.description_length,
+                                    &trailing_length) ||
+        trailing_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "device metric descriptor string lengths are inconsistent with "
+          "record length");
+    }
+    if (iree_status_is_ok(status)) {
+      ++summary->device_metric.descriptor_record_count;
+    }
+  }
+  return status;
+}
+
+static iree_status_t iree_profile_summary_process_device_metric_sample_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_device_metric_sample_record_t),
+      &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_device_metric_sample_record_t sample_record;
+    memcpy(&sample_record, typed_record.contents.data, sizeof(sample_record));
+    iree_host_size_t values_length = 0;
+    if (!iree_host_size_checked_mul(
+            sample_record.value_count,
+            sizeof(iree_hal_profile_device_metric_value_t), &values_length) ||
+        values_length != typed_record.inline_payload.data_length) {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "device metric sample value count is inconsistent with record "
+          "length");
+    }
+
+    iree_profile_device_summary_t* device = NULL;
+    if (iree_status_is_ok(status)) {
+      status = iree_profile_summary_get_device(
+          summary, sample_record.physical_device_ordinal, &device);
+    }
+    if (iree_status_is_ok(status)) {
+      ++summary->device_metric.sample_record_count;
+      ++device->device_metric.sample_count;
+      if (!iree_profile_summary_accumulate_u64(
+              &summary->device_metric.value_count, sample_record.value_count) ||
+          !iree_profile_summary_accumulate_u64(
+              &device->device_metric.value_count, sample_record.value_count)) {
+        status =
+            iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "profile device metric value counter overflowed");
+      }
+    }
+    if (iree_status_is_ok(status) &&
+        (sample_record.host_time_begin_ns < 0 ||
+         sample_record.host_time_end_ns < sample_record.host_time_begin_ns)) {
+      ++summary->device_metric.invalid_sample_record_count;
+      ++device->device_metric.invalid_sample_count;
+    }
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_executable_trace_record(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -604,6 +733,18 @@ static iree_status_t iree_profile_summary_process_chunk_record(
               IREE_HAL_PROFILE_CONTENT_TYPE_COUNTER_SAMPLES,
               counter_sample_chunk_count,
               iree_profile_summary_process_counter_sample_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES,
+              device_metric.source_chunk_count,
+              iree_profile_summary_process_device_metric_source_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS,
+              device_metric.descriptor_chunk_count,
+              iree_profile_summary_process_device_metric_descriptor_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SAMPLES,
+              device_metric.sample_chunk_count,
+              iree_profile_summary_process_device_metric_sample_records),
           IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
               IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_TRACES,
               executable_trace_chunk_count,
@@ -811,8 +952,10 @@ static void iree_profile_print_summary_text_chunks(
       " host_execution_events=%" PRIu64 " memory_events=%" PRIu64
       " event_relationships=%" PRIu64 " counter_sets=%" PRIu64
       " counters=%" PRIu64 " counter_samples=%" PRIu64
-      " executable_traces=%" PRIu64 " unknown=%" PRIu64 " truncated=%" PRIu64
-      " dropped_records=%" PRIu64 "\n",
+      " device_metric_sources=%" PRIu64 " device_metric_descriptors=%" PRIu64
+      " device_metric_samples=%" PRIu64 " executable_traces=%" PRIu64
+      " unknown=%" PRIu64 " truncated=%" PRIu64 " dropped_records=%" PRIu64
+      "\n",
       summary->device_chunk_count, summary->queue_chunk_count,
       summary->executable_chunk_count,
       summary->executable_code_object_chunk_count,
@@ -827,6 +970,9 @@ static void iree_profile_print_summary_text_chunks(
       summary->memory_event_chunk_count,
       summary->event_relationship_chunk_count, summary->counter_set_chunk_count,
       summary->counter_chunk_count, summary->counter_sample_chunk_count,
+      summary->device_metric.source_chunk_count,
+      summary->device_metric.descriptor_chunk_count,
+      summary->device_metric.sample_chunk_count,
       summary->executable_trace_chunk_count, summary->unknown_chunk_count,
       summary->truncated_chunk_count, summary->dropped_record_count);
 }
@@ -881,6 +1027,19 @@ static void iree_profile_print_summary_text_counter_records(
   fprintf(file,
           "counter_records: counter_sets=%" PRIu64 " counters=%" PRIu64 "\n",
           summary->counter_set_record_count, summary->counter_record_count);
+}
+
+static void iree_profile_print_summary_text_device_metric_records(
+    const iree_profile_summary_t* summary, FILE* file) {
+  fprintf(file,
+          "device_metric_records: sources=%" PRIu64 " descriptors=%" PRIu64
+          " samples=%" PRIu64 " values=%" PRIu64 " invalid_samples=%" PRIu64
+          "\n",
+          summary->device_metric.source_record_count,
+          summary->device_metric.descriptor_record_count,
+          summary->device_metric.sample_record_count,
+          summary->device_metric.value_count,
+          summary->device_metric.invalid_sample_record_count);
 }
 
 static void iree_profile_print_summary_text_device_clock(
@@ -944,6 +1103,15 @@ static void iree_profile_print_summary_text_device_dispatches(
   }
 }
 
+static void iree_profile_print_summary_text_device_metrics(
+    const iree_profile_device_summary_t* device, FILE* file) {
+  fprintf(file,
+          "    device_metrics: samples=%" PRIu64 " values=%" PRIu64
+          " invalid_samples=%" PRIu64 "\n",
+          device->device_metric.sample_count, device->device_metric.value_count,
+          device->device_metric.invalid_sample_count);
+}
+
 static void iree_profile_print_summary_text_device(
     const iree_profile_device_summary_t* device, FILE* file) {
   const iree_profile_summary_device_timing_t timing =
@@ -953,6 +1121,7 @@ static void iree_profile_print_summary_text_device(
           device->queue_record_count, device->queue_count);
   iree_profile_print_summary_text_device_clock(device, &timing, file);
   iree_profile_print_summary_text_device_dispatches(device, &timing, file);
+  iree_profile_print_summary_text_device_metrics(device, file);
 }
 
 static void iree_profile_print_summary_text_devices(
@@ -972,6 +1141,7 @@ static void iree_profile_print_summary_text(
   iree_profile_print_summary_text_event_records(summary, file);
   iree_profile_print_summary_text_trace_data(summary, file);
   iree_profile_print_summary_text_counter_records(summary, file);
+  iree_profile_print_summary_text_device_metric_records(summary, file);
   iree_profile_print_summary_text_devices(summary, file);
 }
 
@@ -1069,6 +1239,14 @@ static void iree_profile_print_summary_jsonl_counter_trace_fields(
       ",\"counter_chunks\":%" PRIu64 ",\"counter_records\":%" PRIu64
       ",\"counter_sample_chunks\":%" PRIu64
       ",\"counter_sample_records\":%" PRIu64
+      ",\"device_metric_source_chunks\":%" PRIu64
+      ",\"device_metric_source_records\":%" PRIu64
+      ",\"device_metric_descriptor_chunks\":%" PRIu64
+      ",\"device_metric_descriptor_records\":%" PRIu64
+      ",\"device_metric_sample_chunks\":%" PRIu64
+      ",\"device_metric_sample_records\":%" PRIu64
+      ",\"device_metric_values\":%" PRIu64
+      ",\"invalid_device_metric_sample_records\":%" PRIu64
       ",\"executable_trace_chunks\":%" PRIu64
       ",\"executable_trace_records\":%" PRIu64
       ",\"executable_trace_data_bytes\":%" PRIu64 ",\"unknown_chunks\":%" PRIu64
@@ -1076,6 +1254,14 @@ static void iree_profile_print_summary_jsonl_counter_trace_fields(
       summary->counter_set_chunk_count, summary->counter_set_record_count,
       summary->counter_chunk_count, summary->counter_record_count,
       summary->counter_sample_chunk_count, summary->counter_sample_record_count,
+      summary->device_metric.source_chunk_count,
+      summary->device_metric.source_record_count,
+      summary->device_metric.descriptor_chunk_count,
+      summary->device_metric.descriptor_record_count,
+      summary->device_metric.sample_chunk_count,
+      summary->device_metric.sample_record_count,
+      summary->device_metric.value_count,
+      summary->device_metric.invalid_sample_record_count,
       summary->executable_trace_chunk_count,
       summary->executable_trace_record_count,
       summary->executable_trace_data_bytes, summary->unknown_chunk_count,
@@ -1113,7 +1299,9 @@ static void iree_profile_print_summary_jsonl_device(
       ",\"dispatch_time_available\":%s"
       ",\"min_dispatch_ns\":%" PRId64
       ",\"avg_dispatch_ns\":%.3f"
-      ",\"max_dispatch_ns\":%" PRId64 ",\"total_dispatch_ns\":%" PRId64 "}\n",
+      ",\"max_dispatch_ns\":%" PRId64 ",\"total_dispatch_ns\":%" PRId64
+      ",\"device_metric_samples\":%" PRIu64 ",\"device_metric_values\":%" PRIu64
+      ",\"invalid_device_metric_samples\":%" PRIu64 "}\n",
       device->physical_device_ordinal, device->device_record_count,
       device->queue_record_count, device->queue_count,
       device->clock_sample_count, timing.has_clock_fit ? "true" : "false",
@@ -1134,7 +1322,9 @@ static void iree_profile_print_summary_jsonl_device(
           ? timing.average_dispatch_ticks * timing.ns_per_tick
           : 0.0,
       timing.has_dispatch_ns ? timing.maximum_dispatch_ns : 0,
-      timing.has_dispatch_ns ? timing.total_dispatch_ns : 0);
+      timing.has_dispatch_ns ? timing.total_dispatch_ns : 0,
+      device->device_metric.sample_count, device->device_metric.value_count,
+      device->device_metric.invalid_sample_count);
 }
 
 static void iree_profile_print_summary_jsonl_devices(

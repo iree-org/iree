@@ -8,6 +8,7 @@ import decimal
 import hashlib
 import heapq
 import json
+import struct
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -30,6 +31,7 @@ from .common import (
 
 
 TRUSTED_PACKET_SEQUENCE_ID = 1001
+DEVICE_METRIC_SAMPLE_FLAG_PARTIAL = 1 << 1
 FORMAT_NAME = "perfetto"
 FORMAT_DESCRIPTION = "Native Perfetto TrackEvent .pftrace."
 
@@ -88,6 +90,9 @@ class ConversionStats:
     clock_instants: int = 0
     diagnostic_instants: int = 0
     counter_samples: int = 0
+    device_metric_counter_values: int = 0
+    device_metric_partial_samples: int = 0
+    skipped_device_metric_samples: int = 0
     relationship_flows: int = 0
     skipped_dispatches: int = 0
     skipped_queue_device_events: int = 0
@@ -261,7 +266,8 @@ def add_counter(
     track_event_type: type,
     timestamp_ns: int,
     track_uuid: int,
-    value: int,
+    value: int | float,
+    annotations: dict[str, Any] | None = None,
 ) -> None:
     packet = builder.add_packet()
     packet.timestamp = timestamp_ns
@@ -269,7 +275,13 @@ def add_counter(
     event = packet.track_event
     event.type = track_event_type.TYPE_COUNTER
     event.track_uuid = track_uuid
-    event.counter_value = value
+    if isinstance(value, float):
+        event.double_counter_value = value
+    elif INT64_MIN <= value <= INT64_MAX:
+        event.counter_value = value
+    else:
+        event.double_counter_value = float(value)
+    add_debug_annotations(event, annotations or {})
 
 
 class PerfettoTraceConverter:
@@ -288,6 +300,10 @@ class PerfettoTraceConverter:
         ] = collections.defaultdict(list)
         self.command_operations_by_key: dict[tuple[int, int], dict[str, Any]] = {}
         self.executable_exports_by_key: dict[tuple[int, int], dict[str, Any]] = {}
+        self.device_metric_sources_by_id: dict[int, dict[str, Any]] = {}
+        self.device_metric_descriptors_by_key: dict[tuple[int, int], dict[str, Any]] = (
+            {}
+        )
         self.root_uuid = self.tracks.uuid("iree", "root")
         self.diagnostics_uuid = self.tracks.uuid("iree", "diagnostics")
         self.dispatch_lane_allocators: dict[tuple[int, int], LaneAllocator] = (
@@ -339,6 +355,17 @@ class PerfettoTraceConverter:
                 export_ordinal = parse_ordinal(record.get("export_ordinal"))
                 if executable_id and export_ordinal >= 0:
                     self.executable_exports_by_key[(executable_id, export_ordinal)] = (
+                        record
+                    )
+            elif record_type == "device_metric_source":
+                source_id = parse_integer(record.get("source_id", 0))
+                if source_id:
+                    self.device_metric_sources_by_id[source_id] = record
+            elif record_type == "device_metric_descriptor":
+                source_id = parse_integer(record.get("source_id", 0))
+                metric_id = parse_integer(record.get("metric_id", 0))
+                if source_id and metric_id:
+                    self.device_metric_descriptors_by_key[(source_id, metric_id)] = (
                         record
                     )
 
@@ -680,6 +707,8 @@ class PerfettoTraceConverter:
             self.collect_memory_event(record)
         elif record_type == "clock_correlation":
             self.collect_clock_correlation(record)
+        elif record_type == "device_metric_sample":
+            self.collect_device_metric_sample(record)
         elif record_type == "diagnostic":
             self.collect_diagnostic(record)
 
@@ -1061,6 +1090,239 @@ class PerfettoTraceConverter:
         self.all_timestamp_ns.append(event_time_ns)
         self.stats.clock_instants += 1
 
+    def collect_device_metric_sample(self, record: dict[str, Any]) -> None:
+        event_time_ns = timestamp_midpoint(record)
+        values = record.get("values", [])
+        if event_time_ns is None or not isinstance(values, list):
+            self.stats.skipped_device_metric_samples += 1
+            return
+        source_id = parse_integer(record.get("source_id", 0))
+        physical_device_ordinal = parse_ordinal(
+            record.get("physical_device_ordinal"), 0
+        )
+        self.ensure_device_metric_group_track(physical_device_ordinal)
+        sample_flags = parse_integer(record.get("flags", 0))
+        if sample_flags & DEVICE_METRIC_SAMPLE_FLAG_PARTIAL:
+            self.collect_partial_device_metric_sample(
+                record, event_time_ns, physical_device_ordinal
+            )
+        for value_record in values:
+            if not isinstance(value_record, dict):
+                self.stats.skipped_device_metric_samples += 1
+                continue
+            metric_id = parse_integer(value_record.get("metric_id", 0))
+            descriptor = self.device_metric_descriptor(
+                source_id, metric_id, value_record
+            )
+            if descriptor is None:
+                self.stats.skipped_device_metric_samples += 1
+                continue
+            counter_value = self.device_metric_counter_value(value_record, descriptor)
+            if counter_value is None:
+                self.stats.skipped_device_metric_samples += 1
+                continue
+            track_uuid = self.define_device_metric_counter_track(
+                physical_device_ordinal, source_id, metric_id, descriptor
+            )
+            annotations = self.device_metric_counter_annotations(
+                record, value_record, descriptor
+            )
+            self.timeline_events.append(
+                TimelineEvent(
+                    event_time_ns,
+                    (
+                        2,
+                        "device-metric-counter",
+                        physical_device_ordinal,
+                        source_id,
+                        metric_id,
+                        event_time_ns,
+                    ),
+                    lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, value=counter_value, annotations=annotations: add_counter(
+                        self.builder,
+                        self.perfetto.track_event,
+                        timestamp_ns,
+                        track_uuid,
+                        value,
+                        annotations,
+                    ),
+                )
+            )
+            self.all_timestamp_ns.append(event_time_ns)
+            self.stats.counter_samples += 1
+            self.stats.device_metric_counter_values += 1
+
+    def collect_partial_device_metric_sample(
+        self,
+        record: dict[str, Any],
+        event_time_ns: int,
+        physical_device_ordinal: int,
+    ) -> None:
+        track_uuid = self.ensure_device_metric_group_track(physical_device_ordinal)
+        source_id = parse_integer(record.get("source_id", 0))
+        source_record = self.device_metric_sources_by_id.get(source_id)
+        annotations = {
+            "iree_metric_source_id": record.get("source_id"),
+            "iree_metric_source_name": (
+                source_record.get("name") if source_record else None
+            ),
+            "iree_metric_sample_id": record.get("sample_id"),
+            "iree_metric_sample_flags": record.get("flags"),
+            "iree_metric_host_time_uncertainty_ns": record.get(
+                "host_time_uncertainty_ns"
+            ),
+        }
+        self.timeline_events.append(
+            TimelineEvent(
+                event_time_ns,
+                (
+                    2,
+                    "device-metric-partial-sample",
+                    physical_device_ordinal,
+                    source_id,
+                    event_time_ns,
+                ),
+                lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, annotations=annotations: add_instant(
+                    self.builder,
+                    self.perfetto.track_event,
+                    timestamp_ns,
+                    track_uuid,
+                    "device metrics partial sample",
+                    annotations,
+                ),
+            )
+        )
+        self.all_timestamp_ns.append(event_time_ns)
+        self.stats.device_metric_partial_samples += 1
+        self.stats.diagnostic_instants += 1
+
+    def device_metric_descriptor(
+        self,
+        source_id: int,
+        metric_id: int,
+        value_record: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        descriptor = self.device_metric_descriptors_by_key.get((source_id, metric_id))
+        if descriptor is not None:
+            return descriptor
+        if value_record.get("name") and value_record.get("value_kind"):
+            return value_record
+        return None
+
+    def device_metric_counter_value(
+        self,
+        value_record: dict[str, Any],
+        descriptor: dict[str, Any],
+    ) -> int | float | None:
+        value_kind = str(descriptor.get("value_kind", value_record.get("value_kind")))
+        if "value" in value_record:
+            value = value_record["value"]
+            if value is None:
+                return None
+            if value_kind == "f64":
+                return float(value)
+            return parse_integer(value)
+        if "value_bits" not in value_record:
+            return None
+        value_bits = parse_integer(value_record["value_bits"])
+        if value_kind == "i64":
+            return value_bits - (1 << 64) if value_bits & (1 << 63) else value_bits
+        if value_kind == "u64":
+            return value_bits
+        if value_kind == "f64":
+            return struct.unpack("<d", value_bits.to_bytes(8, "little"))[0]
+        return None
+
+    def device_metric_counter_annotations(
+        self,
+        sample_record: dict[str, Any],
+        value_record: dict[str, Any],
+        descriptor: dict[str, Any],
+    ) -> dict[str, Any]:
+        source_id = parse_integer(sample_record.get("source_id", 0))
+        source_record = self.device_metric_sources_by_id.get(source_id)
+        return {
+            "iree_metric_source_id": sample_record.get("source_id"),
+            "iree_metric_source_name": (
+                source_record.get("name") if source_record else None
+            ),
+            "iree_metric_sample_id": sample_record.get("sample_id"),
+            "iree_metric_id": value_record.get("metric_id"),
+            "iree_metric_name": descriptor.get("name"),
+            "iree_metric_unit": descriptor.get("unit"),
+            "iree_metric_value_kind": descriptor.get("value_kind"),
+            "iree_metric_semantic": descriptor.get("semantic"),
+            "iree_metric_plot_hint": descriptor.get("plot_hint"),
+            "iree_metric_value_flags": value_record.get("flags"),
+            "iree_metric_sample_flags": sample_record.get("flags"),
+            "iree_metric_host_time_uncertainty_ns": sample_record.get(
+                "host_time_uncertainty_ns"
+            ),
+            "iree_perfetto_time_domain": sample_record.get(
+                "host_time_domain", "iree_host_time_ns"
+            ),
+            "iree_perfetto_timing_source": "device_metric_sample_midpoint",
+        }
+
+    def ensure_device_metric_group_track(self, physical_device_ordinal: int) -> int:
+        device_uuid = self.ensure_device_track(physical_device_ordinal)
+        track_uuid = self.tracks.uuid("iree", "device-metrics", physical_device_ordinal)
+        self.tracks.define(
+            track_uuid,
+            "device metrics",
+            parent_uuid=device_uuid,
+            sibling_order_rank=9000,
+            explicit_child_order=True,
+        )
+        return track_uuid
+
+    def define_device_metric_counter_track(
+        self,
+        physical_device_ordinal: int,
+        source_id: int,
+        metric_id: int,
+        descriptor: dict[str, Any],
+    ) -> int:
+        group_uuid = self.ensure_device_metric_group_track(physical_device_ordinal)
+        track_uuid = self.tracks.uuid(
+            "iree",
+            "device-metric",
+            physical_device_ordinal,
+            source_id,
+            metric_id,
+        )
+        metric_name = str(descriptor.get("name") or f"metric[{metric_id}]")
+        self.tracks.define(
+            track_uuid,
+            metric_name,
+            parent_uuid=group_uuid,
+            sibling_order_rank=self.device_metric_sibling_order_rank(
+                metric_name, metric_id
+            ),
+            is_counter=True,
+        )
+        return track_uuid
+
+    def device_metric_sibling_order_rank(self, metric_name: str, metric_id: int) -> int:
+        metric_order = {
+            "clock.compute.current": 100,
+            "clock.memory.current": 110,
+            "activity.compute": 200,
+            "activity.memory": 210,
+            "memory.local.used": 300,
+            "memory.local.total": 310,
+            "memory.traffic.read": 320,
+            "memory.traffic.write": 330,
+            "temperature.edge": 400,
+            "temperature.hotspot": 410,
+            "temperature.memory": 420,
+            "power.socket": 500,
+            "energy.socket": 510,
+            "throttle.status": 900,
+            "performance.tier": 910,
+        }
+        return metric_order.get(metric_name, 10000 + min(metric_id, 999999))
+
     def collect_diagnostic(self, record: dict[str, Any]) -> None:
         annotations = event_annotations(record)
         self.timeline_events.append(
@@ -1237,6 +1499,9 @@ def summary_fields(stats: ConversionStats) -> list[tuple[str, Any]]:
         ("memory_instants", stats.memory_instants),
         ("clock_instants", stats.clock_instants),
         ("counter_samples", stats.counter_samples),
+        ("device_metric_counter_values", stats.device_metric_counter_values),
+        ("device_metric_partial_samples", stats.device_metric_partial_samples),
+        ("skipped_device_metric_samples", stats.skipped_device_metric_samples),
         ("relationship_flows", stats.relationship_flows),
         ("skipped_dispatches", stats.skipped_dispatches),
         ("skipped_queue_device_events", stats.skipped_queue_device_events),

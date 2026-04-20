@@ -28,6 +28,7 @@
 #include "iree/hal/file.h"              // IWYU pragma: export
 #include "iree/hal/pool.h"              // IWYU pragma: export
 #include "iree/hal/pool_set.h"          // IWYU pragma: export
+#include "iree/hal/profile_metrics.h"   // IWYU pragma: export
 #include "iree/hal/profile_options.h"   // IWYU pragma: export
 #include "iree/hal/profile_schema.h"    // IWYU pragma: export
 #include "iree/hal/profile_sink.h"      // IWYU pragma: export

@@ -13,6 +13,16 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Per-device counters for device metric sample records.
+typedef struct iree_profile_device_metric_counts_t {
+  // Number of device metric sample records seen for this physical device.
+  uint64_t sample_count;
+  // Number of device metric samples with unusable or reversed host brackets.
+  uint64_t invalid_sample_count;
+  // Number of sampled device metric values seen for this physical device.
+  uint64_t value_count;
+} iree_profile_device_metric_counts_t;
+
 typedef struct iree_profile_device_summary_t {
   // Session-local physical device ordinal.
   uint32_t physical_device_ordinal;
@@ -36,6 +46,8 @@ typedef struct iree_profile_device_summary_t {
   uint64_t dispatch_event_count;
   // Number of dispatch records with unusable or reversed timestamps.
   uint64_t invalid_dispatch_event_count;
+  // Device metric sample summary for this physical device.
+  iree_profile_device_metric_counts_t device_metric;
   // Sum of valid dispatch durations in raw device ticks.
   uint64_t total_dispatch_ticks;
   // Earliest valid dispatch start tick seen for this physical device.
@@ -47,6 +59,26 @@ typedef struct iree_profile_device_summary_t {
   // Maximum valid dispatch duration in raw device ticks.
   uint64_t maximum_dispatch_ticks;
 } iree_profile_device_summary_t;
+
+// Bundle-level counters for device metric metadata and sample records.
+typedef struct iree_profile_device_metric_summary_t {
+  // Device metric source metadata chunks parsed.
+  uint64_t source_chunk_count;
+  // Device metric source metadata records parsed.
+  uint64_t source_record_count;
+  // Device metric descriptor metadata chunks parsed.
+  uint64_t descriptor_chunk_count;
+  // Device metric descriptor metadata records parsed.
+  uint64_t descriptor_record_count;
+  // Device metric sample chunks parsed.
+  uint64_t sample_chunk_count;
+  // Device metric sample records parsed.
+  uint64_t sample_record_count;
+  // Device metric sample value records parsed.
+  uint64_t value_count;
+  // Device metric sample records with unusable or reversed host brackets.
+  uint64_t invalid_sample_record_count;
+} iree_profile_device_metric_summary_t;
 
 typedef struct iree_profile_summary_t {
   // Host allocator used for dynamic summary arrays.
@@ -151,6 +183,8 @@ typedef struct iree_profile_summary_t {
   uint64_t counter_sample_chunk_count;
   // Hardware counter sample records parsed.
   uint64_t counter_sample_record_count;
+  // Device metric source, descriptor, and sample summary.
+  iree_profile_device_metric_summary_t device_metric;
   // Executable trace chunks parsed.
   uint64_t executable_trace_chunk_count;
   // Executable trace records parsed.

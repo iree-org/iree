@@ -139,6 +139,7 @@ iree_runtime_cc_library(
         ":memory",
         ":model",
         ":reader",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -250,6 +251,7 @@ iree_runtime_cc_test(
     deps = [
         ":summary",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

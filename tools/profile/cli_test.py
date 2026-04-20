@@ -118,6 +118,8 @@ class IreeProfileCliTest(unittest.TestCase):
 
         self.assertIn("summary", _row_type_set(summary_rows))
         self.assertIn("device_summary", _row_type_set(summary_rows))
+        summary = _find_row(summary_rows, "summary")
+        self.assertGreater(summary["device_metric_sample_records"], 0)
         self.assertIn("queue_event", _row_type_set(queue_rows))
         self.assertIn("queue_device_event", _row_type_set(queue_rows))
         self.assertIn("host_execution_event", _row_type_set(queue_rows))
@@ -250,6 +252,21 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertEqual(relationship["kind"], "queue_event_host_execution_event")
         self.assertEqual(relationship["source_type"], "queue_event")
         self.assertEqual(relationship["target_type"], "host_execution_event")
+
+        metric_source = _find_row(rows, "device_metric_source")
+        self.assertEqual(metric_source["device_class"], "gpu")
+        self.assertEqual(metric_source["name"], "smoke.metrics")
+
+        metric_descriptor = _find_row(rows, "device_metric_descriptor")
+        self.assertIn(metric_descriptor["unit"], {"count", "millipercent"})
+
+        metric_sample = _find_row(rows, "device_metric_sample")
+        self.assertEqual(metric_sample["host_time_domain"], "iree_host_time_ns")
+        self.assertEqual(len(metric_sample["values"]), 2)
+        value_names = {value["name"] for value in metric_sample["values"]}
+        self.assertIn("activity.compute", value_names)
+        self.assertIn("smoke.source_specific", value_names)
+        self.assertTrue(all("value" in value for value in metric_sample["values"]))
 
 
 if __name__ == "__main__":

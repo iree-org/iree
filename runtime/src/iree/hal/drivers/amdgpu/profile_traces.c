@@ -192,7 +192,7 @@ static void iree_hal_amdgpu_profile_trace_slot_reset(
   memset(slot, 0, sizeof(*slot));
 }
 
-iree_status_t iree_hal_amdgpu_profile_trace_session_create(
+iree_status_t iree_hal_amdgpu_profile_trace_session_allocate(
     iree_hal_amdgpu_logical_device_t* logical_device,
     const iree_hal_device_profiling_options_t* options,
     iree_allocator_t host_allocator,
@@ -256,7 +256,7 @@ iree_status_t iree_hal_amdgpu_profile_trace_session_create(
   return status;
 }
 
-void iree_hal_amdgpu_profile_trace_session_destroy(
+void iree_hal_amdgpu_profile_trace_session_free(
     iree_hal_amdgpu_profile_trace_session_t* session) {
   if (!session) return;
   IREE_TRACE_ZONE_BEGIN(z0);

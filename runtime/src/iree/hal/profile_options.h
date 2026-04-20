@@ -68,6 +68,11 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // these as an aggregate lossy stream and report dropped records with
   // TRUNCATED chunks.
   IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS = 1ull << 7,
+
+  // Periodic physical-device metric samples such as clocks, temperature,
+  // power, memory occupancy, utilization, and bandwidth. Producers should emit
+  // source and descriptor metadata so profile bundles remain self-describing.
+  IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_METRICS = 1ull << 8,
 };
 
 // Bitfield selecting producer-side profiling behavior that is not itself a
@@ -295,6 +300,13 @@ static inline bool iree_hal_device_profiling_options_requests_executable_traces(
     const iree_hal_device_profiling_options_t* options) {
   return iree_hal_device_profiling_options_requests_data(
       options, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
+}
+
+// Returns true when |options| requests periodic device metrics.
+static inline bool iree_hal_device_profiling_options_requests_device_metrics(
+    const iree_hal_device_profiling_options_t* options) {
+  return iree_hal_device_profiling_options_requests_data(
+      options, IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_METRICS);
 }
 
 #ifdef __cplusplus

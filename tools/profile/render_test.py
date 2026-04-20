@@ -74,7 +74,7 @@ class _FakeTraceProtoBuilder:
 class CommonTest(unittest.TestCase):
 
     def test_validate_schema_rejects_old_version(self):
-        with self.assertRaisesRegex(SystemExit, "schema version 2; expected 10"):
+        with self.assertRaisesRegex(SystemExit, "schema version 2"):
             common.validate_schema(
                 [
                     {
@@ -245,6 +245,106 @@ class PerfettoTest(unittest.TestCase):
         self.assertEqual(1, stats.queue_instants)
         self.assertEqual(2, stats.clock_instants)
         self.assertEqual(1, stats.relationship_flows)
+
+    def test_build_trace_projects_device_metrics_as_counter_tracks(self):
+        builder = _FakeTraceProtoBuilder()
+        source_specific_metric_id = (1 << 63) + 1
+        trace_bytes, stats = perfetto.build_trace(
+            [
+                {"record_type": "device", "physical_device_ordinal": 0},
+                {
+                    "record_type": "device_metric_source",
+                    "source_id": 41,
+                    "physical_device_ordinal": 0,
+                    "device_class": "gpu",
+                    "name": "smoke.metrics",
+                },
+                {
+                    "record_type": "device_metric_descriptor",
+                    "source_id": 41,
+                    "metric_id": 8,
+                    "name": "activity.compute",
+                    "unit": "millipercent",
+                    "value_kind": "u64",
+                    "semantic": "average",
+                    "plot_hint": "percentage",
+                },
+                {
+                    "record_type": "device_metric_descriptor",
+                    "source_id": 41,
+                    "metric_id": source_specific_metric_id,
+                    "name": "smoke.source_specific",
+                    "unit": "count",
+                    "value_kind": "u64",
+                    "semantic": "instant",
+                    "plot_hint": "number",
+                },
+                {
+                    "record_type": "device_metric_sample",
+                    "source_id": 41,
+                    "sample_id": 1,
+                    "flags": perfetto.DEVICE_METRIC_SAMPLE_FLAG_PARTIAL,
+                    "physical_device_ordinal": 0,
+                    "host_time_domain": "iree_host_time_ns",
+                    "host_time_begin_ns": 1000,
+                    "host_time_end_ns": 1020,
+                    "host_time_uncertainty_ns": 20,
+                    "values": [
+                        {
+                            "metric_id": 8,
+                            "value": 87500,
+                            "value_bits": 87500,
+                            "flags": 0,
+                        },
+                        {
+                            "metric_id": source_specific_metric_id,
+                            "value": 12345,
+                            "value_bits": 12345,
+                            "flags": 0,
+                        },
+                    ],
+                },
+            ],
+            perfetto.PerfettoImports(
+                trace_proto_builder=lambda: builder,
+                track_descriptor=_FakeTrackDescriptor,
+                track_event=_FakeTrackEvent,
+            ),
+        )
+
+        counter_packets = [
+            packet
+            for packet in builder.packets
+            if getattr(packet.track_event, "type", None) == _FakeTrackEvent.TYPE_COUNTER
+        ]
+        track_names = [
+            getattr(packet.track_descriptor, "name", "")
+            for packet in builder.packets
+            if hasattr(packet.track_descriptor, "name")
+        ]
+        event_names = [
+            getattr(packet.track_event, "name", "")
+            for packet in builder.packets
+            if hasattr(packet.track_event, "name")
+        ]
+        annotation_names = [
+            annotation.name
+            for packet in builder.packets
+            for annotation in packet.track_event.debug_annotations
+            if hasattr(annotation, "name")
+        ]
+
+        self.assertTrue(trace_bytes.startswith(b"packets="))
+        self.assertEqual(2, stats.device_metric_counter_values)
+        self.assertEqual(1, stats.device_metric_partial_samples)
+        self.assertEqual(0, stats.skipped_device_metric_samples)
+        self.assertEqual(2, len(counter_packets))
+        self.assertIn("device metrics", track_names)
+        self.assertIn("activity.compute", track_names)
+        self.assertIn("smoke.source_specific", track_names)
+        self.assertIn("device metrics partial sample", event_names)
+        self.assertIn("iree_metric_source_name", annotation_names)
+        self.assertIn("iree_perfetto_timing_source", annotation_names)
 
     def test_build_trace_skips_unmapped_device_ticks_but_keeps_host_spans(self):
         trace_bytes, stats = perfetto.build_trace(

@@ -10,6 +10,7 @@
 #include <cstring>
 #include <vector>
 
+#include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -39,11 +40,42 @@ static iree_hal_profile_file_record_t MakeHostExecutionEventsChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeDeviceMetricSourcesChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeDeviceMetricDescriptorsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeDeviceMetricSamplesChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SAMPLES;
+  return chunk;
+}
+
 template <typename T>
 static void AppendPlainRecord(std::vector<uint8_t>* payload, const T& record) {
   const iree_host_size_t offset = payload->size();
   payload->resize(offset + sizeof(record));
   memcpy(payload->data() + offset, &record, sizeof(record));
+}
+
+template <typename T>
+static void AppendInlineRecord(std::vector<uint8_t>* payload, const T& record,
+                               iree_const_byte_span_t inline_payload) {
+  const iree_host_size_t offset = payload->size();
+  payload->resize(offset + sizeof(record) + inline_payload.data_length);
+  memcpy(payload->data() + offset, &record, sizeof(record));
+  memcpy(payload->data() + offset + sizeof(record), inline_payload.data,
+         inline_payload.data_length);
 }
 
 TEST(ProfileSummaryTest, AccumulatesDroppedRecordsFromTruncatedChunks) {
@@ -107,6 +139,91 @@ TEST(ProfileSummaryTest, RecordsFirstNonOkSessionEndStatus) {
   EXPECT_EQ(7u, summary.first_non_ok_stream_id);
   EXPECT_EQ(8u, summary.first_non_ok_event_id);
   EXPECT_EQ(IREE_STATUS_CANCELLED, summary.first_non_ok_session_status_code);
+  iree_profile_summary_deinitialize(&summary);
+}
+
+TEST(ProfileSummaryTest, RecordsDeviceMetricMetadataAndSamples) {
+  const char source_name[] = "summary.metrics";
+  iree_hal_profile_device_metric_source_record_t source_record =
+      iree_hal_profile_device_metric_source_record_default();
+  source_record.source_id = 1;
+  source_record.physical_device_ordinal = 2;
+  source_record.device_class = IREE_HAL_PROFILE_DEVICE_CLASS_GPU;
+  source_record.metric_count = 1;
+  source_record.name_length = sizeof(source_name) - 1;
+  source_record.record_length =
+      sizeof(source_record) + source_record.name_length;
+  std::vector<uint8_t> source_payload;
+  AppendInlineRecord(
+      &source_payload, source_record,
+      iree_make_const_byte_span(source_name, source_record.name_length));
+
+  const char metric_name[] = "summary.metric";
+  const char metric_description[] = "Summary metric.";
+  iree_hal_profile_device_metric_descriptor_record_t descriptor_record =
+      iree_hal_profile_device_metric_descriptor_record_default();
+  descriptor_record.source_id = source_record.source_id;
+  descriptor_record.metric_id = IREE_HAL_PROFILE_METRIC_ID_PRODUCER_BASE + 7;
+  descriptor_record.unit = IREE_HAL_PROFILE_METRIC_UNIT_COUNT;
+  descriptor_record.value_kind = IREE_HAL_PROFILE_METRIC_VALUE_KIND_U64;
+  descriptor_record.semantic = IREE_HAL_PROFILE_METRIC_SEMANTIC_INSTANT;
+  descriptor_record.plot_hint = IREE_HAL_PROFILE_METRIC_PLOT_HINT_NUMBER;
+  descriptor_record.name_length = sizeof(metric_name) - 1;
+  descriptor_record.description_length = sizeof(metric_description) - 1;
+  descriptor_record.record_length = sizeof(descriptor_record) +
+                                    descriptor_record.name_length +
+                                    descriptor_record.description_length;
+  std::vector<uint8_t> descriptor_payload;
+  AppendInlineRecord(
+      &descriptor_payload, descriptor_record,
+      iree_make_const_byte_span(metric_name, descriptor_record.name_length));
+  descriptor_payload.insert(
+      descriptor_payload.end(), metric_description,
+      metric_description + descriptor_record.description_length);
+
+  iree_hal_profile_device_metric_sample_record_t sample_record =
+      iree_hal_profile_device_metric_sample_record_default();
+  sample_record.sample_id = 1;
+  sample_record.source_id = source_record.source_id;
+  sample_record.physical_device_ordinal = source_record.physical_device_ordinal;
+  sample_record.host_time_begin_ns = 100;
+  sample_record.host_time_end_ns = 110;
+  sample_record.value_count = 1;
+  sample_record.record_length =
+      sizeof(sample_record) + sizeof(iree_hal_profile_device_metric_value_t);
+  iree_hal_profile_device_metric_value_t sample_value = {
+      .metric_id = descriptor_record.metric_id,
+      .value_bits = 42,
+      .flags = IREE_HAL_PROFILE_DEVICE_METRIC_VALUE_FLAG_NONE,
+  };
+  std::vector<uint8_t> sample_payload;
+  AppendInlineRecord(
+      &sample_payload, sample_record,
+      iree_make_const_byte_span(&sample_value, sizeof(sample_value)));
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  iree_hal_profile_file_record_t source_chunk =
+      MakeDeviceMetricSourcesChunk(source_payload);
+  iree_hal_profile_file_record_t descriptor_chunk =
+      MakeDeviceMetricDescriptorsChunk(descriptor_payload);
+  iree_hal_profile_file_record_t sample_chunk =
+      MakeDeviceMetricSamplesChunk(sample_payload);
+  IREE_ASSERT_OK(iree_profile_summary_process_record(&summary, &source_chunk));
+  IREE_ASSERT_OK(
+      iree_profile_summary_process_record(&summary, &descriptor_chunk));
+  IREE_ASSERT_OK(iree_profile_summary_process_record(&summary, &sample_chunk));
+
+  EXPECT_EQ(1u, summary.device_metric.source_record_count);
+  EXPECT_EQ(1u, summary.device_metric.descriptor_record_count);
+  EXPECT_EQ(1u, summary.device_metric.sample_record_count);
+  EXPECT_EQ(1u, summary.device_metric.value_count);
+  ASSERT_EQ(1u, summary.device_count);
+  EXPECT_EQ(2u, summary.devices[0].physical_device_ordinal);
+  EXPECT_EQ(1u, summary.devices[0].device_metric.sample_count);
+  EXPECT_EQ(1u, summary.devices[0].device_metric.value_count);
+  EXPECT_EQ(0u, summary.devices[0].device_metric.invalid_sample_count);
+
   iree_profile_summary_deinitialize(&summary);
 }
 

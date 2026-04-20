@@ -24,6 +24,8 @@ typedef struct iree_hal_amdgpu_epoch_signal_table_t
     iree_hal_amdgpu_epoch_signal_table_t;
 typedef struct iree_hal_amdgpu_profile_counter_session_t
     iree_hal_amdgpu_profile_counter_session_t;
+typedef struct iree_hal_amdgpu_profile_device_metrics_session_t
+    iree_hal_amdgpu_profile_device_metrics_session_t;
 typedef struct iree_hal_amdgpu_profile_trace_session_t
     iree_hal_amdgpu_profile_trace_session_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
@@ -137,6 +139,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     iree_hal_amdgpu_profile_counter_session_t* counter_session;
     // Executable trace session active for selected dispatches, or NULL.
     iree_hal_amdgpu_profile_trace_session_t* trace_session;
+    // Device metrics session sampled on profiling flush/end, or NULL.
+    iree_hal_amdgpu_profile_device_metrics_session_t* device_metrics_session;
     // Host-side memory lifecycle event stream protected by
     // |memory_event_mutex|.
     iree_hal_profile_memory_event_t* memory_events;

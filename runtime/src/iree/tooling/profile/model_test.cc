@@ -39,11 +39,36 @@ static iree_hal_profile_file_record_t MakeCommandOperationsChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeMetricSourcesChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_SOURCES;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeMetricDescriptorsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_DEVICE_METRIC_DESCRIPTORS;
+  return chunk;
+}
+
 template <typename T>
 static void AppendPlainRecord(std::vector<uint8_t>* payload, const T& record) {
   const iree_host_size_t offset = payload->size();
   payload->resize(offset + sizeof(record));
   memcpy(payload->data() + offset, &record, sizeof(record));
+}
+
+template <typename T>
+static void AppendRecordWithPayload(std::vector<uint8_t>* payload,
+                                    const T& record,
+                                    iree_string_view_t trailing_payload) {
+  AppendPlainRecord(payload, record);
+  const iree_host_size_t offset = payload->size();
+  payload->resize(offset + trailing_payload.size);
+  memcpy(payload->data() + offset, trailing_payload.data,
+         trailing_payload.size);
 }
 
 static void AppendCommandBuffer(std::vector<uint8_t>* payload,
@@ -59,6 +84,42 @@ static void AppendCommandOperation(
     std::vector<uint8_t>* payload,
     const iree_hal_profile_command_operation_record_t& record) {
   AppendPlainRecord(payload, record);
+}
+
+static void AppendMetricSource(std::vector<uint8_t>* payload,
+                               uint64_t source_id, iree_string_view_t name) {
+  iree_hal_profile_device_metric_source_record_t record =
+      iree_hal_profile_device_metric_source_record_default();
+  record.source_id = source_id;
+  record.physical_device_ordinal = 0;
+  record.device_class = IREE_HAL_PROFILE_DEVICE_CLASS_GPU;
+  record.metric_count = 1;
+  record.name_length = name.size;
+  record.record_length = sizeof(record) + record.name_length;
+  AppendRecordWithPayload(payload, record, name);
+}
+
+static void AppendMetricDescriptor(std::vector<uint8_t>* payload,
+                                   uint64_t source_id, uint64_t metric_id,
+                                   iree_string_view_t name,
+                                   iree_string_view_t description) {
+  iree_hal_profile_device_metric_descriptor_record_t record =
+      iree_hal_profile_device_metric_descriptor_record_default();
+  record.source_id = source_id;
+  record.metric_id = metric_id;
+  record.unit = IREE_HAL_PROFILE_METRIC_UNIT_HERTZ;
+  record.value_kind = IREE_HAL_PROFILE_METRIC_VALUE_KIND_U64;
+  record.semantic = IREE_HAL_PROFILE_METRIC_SEMANTIC_INSTANT;
+  record.plot_hint = IREE_HAL_PROFILE_METRIC_PLOT_HINT_FREQUENCY;
+  record.name_length = name.size;
+  record.description_length = description.size;
+  record.record_length = sizeof(record) + name.size + description.size;
+  AppendPlainRecord(payload, record);
+  const iree_host_size_t name_offset = payload->size();
+  payload->resize(name_offset + name.size + description.size);
+  memcpy(payload->data() + name_offset, name.data, name.size);
+  memcpy(payload->data() + name_offset + name.size, description.data,
+         description.size);
 }
 
 static iree_hal_profile_clock_correlation_record_t MakeClockSample(
@@ -217,6 +278,52 @@ TEST(ProfileModelTest, RejectsBlockStructureWithoutBlockCoordinates) {
   IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
                         iree_profile_model_process_metadata_record(
                             &model, &command_operation_chunk));
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, IndexesDeviceMetricDescriptors) {
+  std::vector<uint8_t> source_payload;
+  AppendMetricSource(&source_payload, 1, IREE_SV("test.metrics"));
+  iree_hal_profile_file_record_t source_chunk =
+      MakeMetricSourcesChunk(source_payload);
+
+  std::vector<uint8_t> descriptor_payload;
+  AppendMetricDescriptor(&descriptor_payload, 1, 2, IREE_SV("test.clock"),
+                         IREE_SV("Test clock."));
+  iree_hal_profile_file_record_t descriptor_chunk =
+      MakeMetricDescriptorsChunk(descriptor_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_ASSERT_OK(
+      iree_profile_model_process_metadata_record(&model, &source_chunk));
+  IREE_ASSERT_OK(
+      iree_profile_model_process_metadata_record(&model, &descriptor_chunk));
+
+  const iree_profile_model_metric_source_t* source =
+      iree_profile_model_find_metric_source(&model, 1);
+  ASSERT_NE(source, nullptr);
+  EXPECT_TRUE(iree_string_view_equal(source->name, IREE_SV("test.metrics")));
+
+  const iree_profile_model_metric_descriptor_t* descriptor = NULL;
+  IREE_ASSERT_OK(
+      iree_profile_model_resolve_metric_descriptor(&model, 1, 2, &descriptor));
+  ASSERT_NE(descriptor, nullptr);
+  EXPECT_TRUE(iree_string_view_equal(descriptor->name, IREE_SV("test.clock")));
+  EXPECT_TRUE(
+      iree_string_view_equal(descriptor->description, IREE_SV("Test clock.")));
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, RejectsMissingDeviceMetricDescriptorReference) {
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+
+  const iree_profile_model_metric_descriptor_t* descriptor = NULL;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_model_resolve_metric_descriptor(&model, 1, 2, &descriptor));
+  EXPECT_EQ(nullptr, descriptor);
   iree_profile_model_deinitialize(&model);
 }
 

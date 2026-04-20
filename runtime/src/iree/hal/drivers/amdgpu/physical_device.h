@@ -176,6 +176,16 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_host_size_t device_ordinal;
   // KFD GPU identifier used when querying per-device clock counters.
   uint32_t kfd_gpu_uid;
+  // PCI domain from HSA_AMD_AGENT_INFO_DOMAIN.
+  uint32_t pci_domain;
+  // PCI bus decoded from HSA_AMD_AGENT_INFO_BDFID.
+  uint32_t pci_bus;
+  // PCI device decoded from HSA_AMD_AGENT_INFO_BDFID.
+  uint32_t pci_device;
+  // PCI function decoded from HSA_AMD_AGENT_INFO_BDFID.
+  uint32_t pci_function;
+  // True when the PCI identity fields contain HSA-provided values.
+  uint32_t has_pci_identity : 1;
   // Parsed gfx ISA version reported by the HSA agent.
   iree_hal_amdgpu_gfxip_version_t gfxip_version;
   // Stable physical device UUID bytes reported by HSA when available.

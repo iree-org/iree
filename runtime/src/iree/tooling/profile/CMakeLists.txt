@@ -173,6 +173,7 @@ iree_cc_library(
     ::memory
     ::model
     ::reader
+    iree::hal
   PUBLIC
 )
 
@@ -302,6 +303,7 @@ iree_cc_test(
   DEPS
     ::summary
     iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
 )
