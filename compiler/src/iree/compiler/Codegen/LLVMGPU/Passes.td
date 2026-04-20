@@ -65,6 +65,14 @@ def LLVMGPULegalizeNDVectorsPass :
   ];
 }
 
+def LLVMGPUVectorFlatteningPass :
+    InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
+  let summary = "Flatten n-D vectors.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";
