@@ -64,6 +64,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
@@ -482,6 +483,7 @@ class IREEBenchmark {
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
     context_.reset();
+    IREE_CHECK_OK(CloseReplayCapture());
     iree_tooling_module_list_reset(&module_list_);
     instance_.reset();
 
@@ -495,6 +497,14 @@ class IREEBenchmark {
   };
 
   iree_hal_device_t* device() const { return device_.get(); }
+
+  iree_status_t CloseReplayCapture() {
+    if (!replay_recorder_) return iree_ok_status();
+    iree_status_t status = iree_hal_replay_recorder_close(replay_recorder_);
+    iree_hal_replay_recorder_release(replay_recorder_);
+    replay_recorder_ = nullptr;
+    return status;
+  }
 
   iree_status_t Register() {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Register");
@@ -527,7 +537,7 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
         instance_.get(), module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context_, &device_, &device_allocator_));
+        &context_, &device_, &device_allocator_, &replay_recorder_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree_ok_status();
@@ -644,6 +654,7 @@ class IREEBenchmark {
   iree::vm::ref<iree_vm_context_t> context_;
   iree::vm::ref<iree_hal_device_t> device_;
   iree::vm::ref<iree_hal_allocator_t> device_allocator_;
+  iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
   iree_tooling_module_list_t module_list_;
   iree::vm::ref<iree_vm_list_t> inputs_;
 };
@@ -669,6 +680,7 @@ static int runMain(int argc, char** argv) {
   iree::IREEBenchmark iree_benchmark;
   iree_status_t status = iree_benchmark.Register();
   if (!iree_status_is_ok(status)) {
+    status = iree_status_join(status, iree_benchmark.CloseReplayCapture());
     int exit_code = static_cast<int>(iree_status_code(status));
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     IREE_TRACE_ZONE_END(z0);
@@ -679,6 +691,7 @@ static int runMain(int argc, char** argv) {
   ::benchmark::RunSpecifiedBenchmarks();
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(g_profiling));
   g_profiling = nullptr;
+  IREE_CHECK_OK(iree_benchmark.CloseReplayCapture());
 
   IREE_TRACE_ZONE_END(z0);
   return EXIT_SUCCESS;

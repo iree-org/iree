@@ -17,6 +17,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
@@ -565,11 +566,12 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
   // Create the context with our support module and all --module= flags.
   iree_vm_context_t* context = NULL;
   iree_hal_device_t* device = NULL;
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_tooling_create_context_from_flags(
         instance, module_list.count, module_list.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context, &device, /*out_device_allocator=*/NULL);
+        &context, &device, /*out_device_allocator=*/NULL, &replay_recorder);
   }
 
   // Ensure the test module is possible to run.
@@ -597,8 +599,15 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
         iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
   }
 
-  iree_hal_device_release(device);
   iree_vm_context_release(context);
+  if (replay_recorder) {
+    status = iree_status_join(
+        status,
+        iree_status_annotate_f(iree_hal_replay_recorder_close(replay_recorder),
+                               "closing HAL replay capture"));
+    iree_hal_replay_recorder_release(replay_recorder);
+  }
+  iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 
   IREE_TRACE_ZONE_END(z0);

@@ -16,7 +16,9 @@
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/io/file_contents.h"
+#include "iree/io/file_handle.h"
 #include "iree/modules/hal/inline/module.h"
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
@@ -193,25 +195,97 @@ static iree_status_t iree_hal_module_device_allocator_select_specific(
   return iree_ok_status();
 }
 
-static iree_hal_module_device_policy_t iree_hal_module_device_policy_from_flags(
-    const iree_hal_device_list_t* device_list) {
-  iree_hal_module_device_policy_t policy =
-      iree_hal_module_device_policy_default();
-  policy.allocator_select.fn = iree_hal_module_device_allocator_select_specific;
-  policy.allocator_select.user_data =
-      device_list->devices[FLAG_device_lead_allocator];
-  return policy;
+static iree_status_t iree_tooling_device_lead_allocator_index_from_flags(
+    iree_hal_device_group_t* device_group, iree_host_size_t* out_index) {
+  IREE_ASSERT_ARGUMENT(device_group);
+  IREE_ASSERT_ARGUMENT(out_index);
+
+  const iree_host_size_t device_count =
+      iree_hal_device_group_device_count(device_group);
+  if (FLAG_device_lead_allocator < 0 ||
+      (iree_host_size_t)FLAG_device_lead_allocator >= device_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "--device_lead_allocator=%d outside the device group range [0, %" PRIhsz
+        ")",
+        FLAG_device_lead_allocator, device_count);
+  }
+
+  *out_index = (iree_host_size_t)FLAG_device_lead_allocator;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_module_device_policy_from_flags(
+    iree_hal_device_group_t* device_group,
+    iree_hal_module_device_policy_t* out_policy) {
+  IREE_ASSERT_ARGUMENT(out_policy);
+
+  iree_host_size_t lead_index = 0;
+  IREE_RETURN_IF_ERROR(iree_tooling_device_lead_allocator_index_from_flags(
+      device_group, &lead_index));
+
+  *out_policy = iree_hal_module_device_policy_default();
+  out_policy->allocator_select.fn =
+      iree_hal_module_device_allocator_select_specific;
+  out_policy->allocator_select.user_data =
+      iree_hal_device_group_device_at(device_group, lead_index);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
 // HAL execution model management
 //===----------------------------------------------------------------------===//
 
+IREE_FLAG(string, hal_replay_output, "",
+          "Writes a HAL replay capture stream to the specified .ireereplay "
+          "file. The HAL module device group is wrapped so operations across "
+          "all devices are emitted into one ordered replay.");
+
+static bool iree_tooling_hal_replay_capture_requested(void) {
+  return strlen(FLAG_hal_replay_output) != 0;
+}
+
+static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
+    iree_allocator_t host_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
+  IREE_ASSERT_ARGUMENT(out_replay_recorder);
+  *out_replay_recorder = NULL;
+
+  if (!iree_tooling_hal_replay_capture_requested()) return iree_ok_status();
+
+  iree_io_file_handle_t* file_handle = NULL;
+  iree_status_t status = iree_io_file_handle_create(
+      IREE_IO_FILE_MODE_WRITE | IREE_IO_FILE_MODE_SEQUENTIAL_SCAN |
+          IREE_IO_FILE_MODE_SHARE_READ,
+      iree_make_cstring_view(FLAG_hal_replay_output),
+      /*initial_size=*/0, host_allocator, &file_handle);
+  if (iree_status_is_ok(status)) {
+    iree_hal_replay_recorder_options_t options =
+        iree_hal_replay_recorder_options_default();
+    status = iree_hal_replay_recorder_create(
+        file_handle, &options, host_allocator, out_replay_recorder);
+  }
+  iree_io_file_handle_release(file_handle);
+  return status;
+}
+
+static iree_status_t iree_tooling_close_hal_replay_recorder(
+    iree_status_t base_status, iree_hal_replay_recorder_t* replay_recorder) {
+  if (replay_recorder) {
+    base_status = iree_status_join(
+        base_status,
+        iree_status_annotate_f(iree_hal_replay_recorder_close(replay_recorder),
+                               "closing HAL replay capture"));
+    iree_hal_replay_recorder_release(replay_recorder);
+  }
+  return base_status;
+}
+
 static iree_status_t iree_tooling_load_hal_async_module(
     iree_vm_instance_t* instance, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_vm_module_t** out_module,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator) {
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_module);
   IREE_ASSERT_ARGUMENT(out_device);
@@ -224,7 +298,15 @@ static iree_status_t iree_tooling_load_hal_async_module(
   *out_module = NULL;
   *out_device = NULL;
   *out_device_allocator = NULL;
+  if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--hal_replay_output requires a caller-owned replay recorder output");
+  }
 
   // Register required types before creating the module.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -263,15 +345,6 @@ static iree_status_t iree_tooling_load_hal_async_module(
     return status;
   }
 
-  // Pick a lead device we'll use for bookkeeping.
-  iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
-  IREE_ASSERT(device, "require at least one device");
-  iree_hal_device_retain(device);
-
-  // Fetch the allocator from the device to pass back to the caller.
-  iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
-  iree_hal_allocator_retain(device_allocator);
-
   // Build a device group from all enumerated devices.
   iree_hal_device_group_builder_t group_builder;
   iree_hal_device_group_builder_initialize(&group_builder, frontier_tracker);
@@ -289,15 +362,57 @@ static iree_status_t iree_tooling_load_hal_async_module(
     iree_hal_device_group_builder_deinitialize(&group_builder);
   }
 
+  // Optionally replace each group device with a replay-recording wrapper. The
+  // module and convenience outputs must all observe the same effective group.
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
+  iree_hal_device_group_t* replay_device_group = NULL;
+  if (iree_status_is_ok(status) &&
+      iree_tooling_hal_replay_capture_requested()) {
+    status = iree_tooling_create_hal_replay_recorder_from_flags(
+        host_allocator, &replay_recorder);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_replay_wrap_device_group(
+          replay_recorder, device_group, host_allocator, &replay_device_group);
+    }
+  }
+
+  iree_hal_device_group_t* module_device_group =
+      replay_device_group ? replay_device_group : device_group;
+
+  // Pick the lead device we'll use for bookkeeping.
+  iree_hal_device_t* device = NULL;
+  iree_hal_allocator_t* device_allocator = NULL;
+  iree_host_size_t lead_index = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_tooling_device_lead_allocator_index_from_flags(
+        module_device_group, &lead_index);
+  }
+  if (iree_status_is_ok(status)) {
+    device = iree_hal_device_group_device_at(module_device_group, lead_index);
+    iree_hal_device_retain(device);
+    device_allocator = iree_hal_device_allocator(device);
+    iree_hal_allocator_retain(device_allocator);
+  }
+
   // Create HAL module wrapping the device group.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_module_create(
-        instance, iree_hal_module_device_policy_from_flags(device_list),
-        device_group, flags, iree_hal_module_debug_sink_stdio(stderr),
-        host_allocator, &module);
+    iree_hal_module_device_policy_t device_policy;
+    status = iree_hal_module_device_policy_from_flags(module_device_group,
+                                                      &device_policy);
+    if (!iree_status_is_ok(status)) {
+      iree_hal_allocator_release(device_allocator);
+      device_allocator = NULL;
+      iree_hal_device_release(device);
+      device = NULL;
+    } else {
+      status = iree_hal_module_create(
+          instance, device_policy, module_device_group, flags,
+          iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
+    }
   }
+  iree_hal_device_group_release(replay_device_group);
   iree_hal_device_group_release(device_group);
 
   iree_hal_device_list_free(device_list);
@@ -306,7 +421,12 @@ static iree_status_t iree_tooling_load_hal_async_module(
     *out_module = module;
     *out_device = device;
     *out_device_allocator = device_allocator;
+    if (out_replay_recorder) {
+      *out_replay_recorder = replay_recorder;
+      replay_recorder = NULL;
+    }
   } else {
+    status = iree_tooling_close_hal_replay_recorder(status, replay_recorder);
     iree_hal_allocator_release(device_allocator);
     iree_hal_device_release(device);
     iree_vm_module_release(module);
@@ -480,12 +600,20 @@ iree_vm_module_t* iree_tooling_module_list_back(
 }
 
 typedef struct {
+  // VM instance used to register dependency modules.
   iree_vm_instance_t* instance;
+  // Host allocator used for transient and retained resolved objects.
   iree_allocator_t host_allocator;
+  // Resolved module list receiving discovered dependency modules.
   iree_tooling_module_list_t* resolved_list;
+  // Default device URI used when --device= was not specified.
   iree_string_view_t default_device_uri;
+  // Lead HAL device retained from the resolved HAL module, if any.
   iree_hal_device_t* device;
+  // Lead HAL allocator retained from the resolved HAL module, if any.
   iree_hal_allocator_t* device_allocator;
+  // Optional replay recorder retained when --hal_replay_output= is specified.
+  iree_hal_replay_recorder_t* replay_recorder;
 } iree_tooling_resolve_state_t;
 static iree_status_t iree_tooling_resolve_module_dependency_callback(
     void* user_data_ptr, const iree_vm_module_dependency_t* dependency) {
@@ -503,7 +631,8 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
   if (iree_string_view_equal(dependency->name, IREE_SV("hal"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_async_module(
         state->instance, state->default_device_uri, state->host_allocator,
-        &module, &state->device, &state->device_allocator));
+        &module, &state->device, &state->device_allocator,
+        &state->replay_recorder));
   } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_inline"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_inline_module(
         state->instance, state->host_allocator, &module,
@@ -542,14 +671,22 @@ iree_status_t iree_tooling_resolve_modules(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_tooling_module_list_t* resolved_list,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator) {
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(!user_module_count || user_modules);
   IREE_ASSERT_ARGUMENT(resolved_list);
   if (out_device) *out_device = NULL;
   if (out_device_allocator) *out_device_allocator = NULL;
+  if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--hal_replay_output requires a caller-owned replay recorder output");
+  }
 
   iree_tooling_resolve_state_t resolve_state = {
       .instance = instance,
@@ -558,6 +695,7 @@ iree_status_t iree_tooling_resolve_modules(
       .default_device_uri = default_device_uri,
       .device = NULL,
       .device_allocator = NULL,
+      .replay_recorder = NULL,
   };
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < user_module_count; ++i) {
@@ -577,6 +715,14 @@ iree_status_t iree_tooling_resolve_modules(
     if (!iree_status_is_ok(status)) break;
   }
 
+  if (iree_status_is_ok(status) &&
+      iree_tooling_hal_replay_capture_requested() &&
+      !resolve_state.replay_recorder) {
+    status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--hal_replay_output requires a module importing the async HAL module");
+  }
+
   if (iree_status_is_ok(status)) {
     if (out_device_allocator) {
       *out_device_allocator = resolve_state.device_allocator;
@@ -588,7 +734,14 @@ iree_status_t iree_tooling_resolve_modules(
     } else {
       iree_hal_device_release(resolve_state.device);
     }
+    if (out_replay_recorder) {
+      *out_replay_recorder = resolve_state.replay_recorder;
+    } else {
+      iree_hal_replay_recorder_release(resolve_state.replay_recorder);
+    }
   } else {
+    status = iree_tooling_close_hal_replay_recorder(
+        status, resolve_state.replay_recorder);
     iree_hal_allocator_release(resolve_state.device_allocator);
     iree_hal_device_release(resolve_state.device);
   }
@@ -671,15 +824,23 @@ iree_status_t iree_tooling_create_context_from_flags(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_vm_context_t** out_context,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator) {
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(!user_module_count || user_modules);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
   if (out_device) *out_device = NULL;
   if (out_device_allocator) *out_device_allocator = NULL;
+  if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--hal_replay_output requires a caller-owned replay recorder output");
+  }
 
   // Resolve all module dependencies into an ordered list.
   // All modules are retained in the list.
@@ -687,10 +848,16 @@ iree_status_t iree_tooling_create_context_from_flags(
   iree_tooling_module_list_initialize(&resolved_list);
   iree_hal_device_t* device = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_tooling_resolve_modules(
-              instance, user_module_count, user_modules, default_device_uri,
-              host_allocator, &resolved_list, &device, &device_allocator));
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
+  iree_status_t status = iree_tooling_resolve_modules(
+      instance, user_module_count, user_modules, default_device_uri,
+      host_allocator, &resolved_list, &device, &device_allocator,
+      &replay_recorder);
+  if (!iree_status_is_ok(status)) {
+    iree_tooling_module_list_reset(&resolved_list);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   iree_vm_context_flags_t flags = IREE_VM_CONTEXT_FLAG_NONE;
   if (FLAG_trace_execution) {
@@ -702,7 +869,7 @@ iree_status_t iree_tooling_create_context_from_flags(
   // Create the context with the full list of resolved modules.
   // The context retains the modules and we can release them afterward.
   iree_vm_context_t* context = NULL;
-  iree_status_t status = iree_vm_context_create_with_modules(
+  status = iree_vm_context_create_with_modules(
       instance, flags, resolved_list.count, resolved_list.values,
       host_allocator, &context);
   iree_tooling_module_list_reset(&resolved_list);
@@ -728,7 +895,13 @@ iree_status_t iree_tooling_create_context_from_flags(
     } else {
       iree_hal_device_release(device);
     }
+    if (out_replay_recorder) {
+      *out_replay_recorder = replay_recorder;
+    } else {
+      iree_hal_replay_recorder_release(replay_recorder);
+    }
   } else {
+    status = iree_tooling_close_hal_replay_recorder(status, replay_recorder);
     iree_hal_allocator_release(device_allocator);
     iree_hal_device_release(device);
     iree_vm_context_release(context);

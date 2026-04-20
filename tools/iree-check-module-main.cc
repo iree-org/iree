@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/modules/check/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -47,11 +48,16 @@ class CheckModuleTest : public ::testing::Test {
         instance_, module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(),
         iree_vm_instance_allocator(instance_), &context_, &device_,
-        /*out_device_allocator=*/NULL));
+        /*out_device_allocator=*/NULL, &replay_recorder_));
   }
 
   void TearDown() override {
     iree_vm_context_release(context_);
+    if (replay_recorder_) {
+      IREE_EXPECT_OK(iree_hal_replay_recorder_close(replay_recorder_));
+      iree_hal_replay_recorder_release(replay_recorder_);
+      replay_recorder_ = nullptr;
+    }
     iree_hal_device_release(device_);
   }
 
@@ -74,6 +80,7 @@ class CheckModuleTest : public ::testing::Test {
 
   iree_vm_context_t* context_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
+  iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
 };
 
 iree_status_t Run(iree_allocator_t host_allocator, int* out_exit_code) {

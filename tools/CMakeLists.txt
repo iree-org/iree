@@ -95,6 +95,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
@@ -113,6 +114,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::modules::check
     iree::testing::gtest
     iree::tooling::context_util
@@ -232,6 +234,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::io::file_handle
     iree::io::formats::irpa
     iree::io::parameter_index
