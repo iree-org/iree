@@ -164,6 +164,35 @@ func.func @general_contract_add_to_chain_fma(
 
 // -----
 
+#lhs_mp = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#rhs_mp = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#res_mp = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @mixed_precision_contract_to_chain_fma(
+    %A: vector<3x4x2xf16>,
+    %B: vector<4x3x2xf16>) -> vector<3x2xf32> {
+  %c0 = arith.constant dense<0.0> : vector<3x2xf32>
+  %out = vector.contract
+           { indexing_maps = [#lhs_mp, #rhs_mp, #res_mp],
+             iterator_types = ["parallel","parallel","reduction"],
+             kind = #vector.kind<add> }
+           %A, %B, %c0
+         : vector<3x4x2xf16>, vector<4x3x2xf16> into vector<3x2xf32>
+  return %out : vector<3x2xf32>
+}
+
+// CHECK-LABEL: func.func @mixed_precision_contract_to_chain_fma
+// CHECK-SAME:  (%[[LHS:.+]]: vector<3x4x2xf16>, %[[RHS:.+]]: vector<4x3x2xf16>)
+// CHECK-DAG:   %[[C0:.+]] = arith.constant dense<0.000000e+00> : vector<6xf32>
+// CHECK:       %[[EXT_LHS:.+]] = arith.extf %[[LHS]] : vector<3x4x2xf16> to vector<3x4x2xf32>
+// CHECK:       %[[EXT_RHS:.+]] = arith.extf %[[RHS]] : vector<4x3x2xf16> to vector<4x3x2xf32>
+// CHECK:       %[[FMA0:.*]] = math.fma {{.*}}, {{.*}}, %[[C0]] : vector<6xf32>
+// CHECK:       %[[FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA0]] : vector<6xf32>
+// CHECK:       %[[FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA1]] : vector<6xf32>
+// CHECK:       %[[FMA3:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA2]] : vector<6xf32>
+// CHECK:       return %{{.*}} : vector<3x2xf32>
+
+// -----
+
 // Only float-point types should be lowered to fmas.
 #lhs = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #rhs = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
