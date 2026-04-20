@@ -2760,12 +2760,8 @@ util.func public @scatter_chain_dispatch_ordering(
 
 // -----
 
-// Multi-result producer whose results feed a single consumer via operands
-// with different ranks (acc is 3D, sum is 2D). Previously the fusion infra
-// rejected this pair both in non-aggressive mode (getFusableUses counted 2
-// operand uses) and in aggressive mode (getRootParallelLoopToOpMap required
-// the two composed loop maps to be bit-equal, which fails because the sum
-// operand broadcasts away the N dim). Both modes should now fuse.
+// A single consumer reading multiple results of a multi-result producer via
+// operands with different ranks (acc is 3D, sum is 2D) should fuse.
 
 util.func public @online_attention_normalize_fusion(
     %Q: tensor<20x4096x16xf16>,
