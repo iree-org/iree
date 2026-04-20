@@ -244,6 +244,7 @@ static iree_status_t iree_hal_replay_recorder_allocator_import_buffer(
       allocator, buffer_id,
       IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
+  iree_hal_replay_recorder_mark_unsupported(&pending_record);
 
   iree_hal_buffer_t* base_buffer = NULL;
   iree_hal_buffer_t* replay_buffer = NULL;
@@ -292,6 +293,7 @@ static iree_status_t iree_hal_replay_recorder_allocator_export_buffer(
       allocator, IREE_HAL_REPLAY_OBJECT_ID_NONE,
       IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_EXPORT_BUFFER,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
+  iree_hal_replay_recorder_mark_unsupported(&pending_record);
   return iree_hal_replay_recorder_end_operation(
       &pending_record,
       iree_hal_allocator_export_buffer(

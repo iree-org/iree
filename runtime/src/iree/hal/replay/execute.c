@@ -2238,6 +2238,13 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION:
         status = iree_hal_replay_executor_replay_operation(&executor, &record);
         break;
+      case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
+        status = iree_make_status(
+            IREE_STATUS_UNIMPLEMENTED,
+            "replay contains unsupported captured operation %s",
+            iree_hal_replay_operation_code_string(
+                record.header.operation_code));
+        break;
       default:
         status = iree_make_status(
             IREE_STATUS_UNIMPLEMENTED,

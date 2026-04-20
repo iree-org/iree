@@ -177,6 +177,7 @@ struct ReplayRecordSummary {
   iree_host_size_t buffer_flush_range_record_count = 0;
   iree_host_size_t buffer_unmap_range_record_count = 0;
   iree_host_size_t queue_execute_record_count = 0;
+  iree_host_size_t unsupported_host_call_record_count = 0;
   iree_host_size_t buffer_range_data_payload_count = 0;
   iree_host_size_t device_queue_execute_payload_count = 0;
   iree_host_size_t semaphore_object_payload_count = 0;
@@ -257,12 +258,27 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         }
         EXPECT_EQ((uint32_t)IREE_STATUS_OK, record.header.status_code);
         break;
+      case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
+        if (record.header.operation_code ==
+            IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_HOST_CALL) {
+          ++summary.unsupported_host_call_record_count;
+        }
+        EXPECT_EQ((uint32_t)IREE_STATUS_OK, record.header.status_code);
+        break;
       default:
         break;
     }
   }
 
   return summary;
+}
+
+static iree_status_t CountHostCall(void* user_data, const uint64_t args[4],
+                                   iree_hal_host_call_context_t* context) {
+  (void)args;
+  (void)context;
+  ++*(int*)user_data;
+  return iree_ok_status();
 }
 
 TEST(ReplayRecorderTest, WrapDeviceGroupRecordsOrderedDeviceOperations) {
@@ -290,6 +306,36 @@ TEST(ReplayRecorderTest, WrapDeviceGroupRecordsOrderedDeviceOperations) {
   EXPECT_EQ(2u, summary.device_object_record_count);
   EXPECT_EQ(2u, summary.assign_topology_record_count);
   EXPECT_EQ(1u, summary.query_capabilities_record_count);
+}
+
+TEST(ReplayRecorderTest, WrappedDeviceRecordsHostCallAsUnsupported) {
+  std::vector<uint8_t> storage(16384, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  int call_count = 0;
+  iree_hal_host_call_t call =
+      iree_hal_make_host_call(CountHostCall, &call_count);
+  const uint64_t args[4] = {0, 1, 2, 3};
+  IREE_ASSERT_OK(iree_hal_device_queue_host_call(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), iree_hal_semaphore_list_empty(), call,
+      args, IREE_HAL_HOST_CALL_FLAG_NONE));
+  EXPECT_EQ(1, call_count);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
+  EXPECT_EQ(1u, summary.unsupported_host_call_record_count);
 }
 
 TEST(ReplayRecorderTest, WrappedAllocatorRecordsBuffersAndMapping) {

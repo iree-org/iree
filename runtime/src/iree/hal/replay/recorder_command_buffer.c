@@ -780,6 +780,7 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_collective(
   IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_command_buffer_passthrough(
       command_buffer, IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_COLLECTIVE,
       &pending_record));
+  iree_hal_replay_recorder_mark_unsupported(&pending_record);
   return iree_hal_replay_recorder_end_operation(
       &pending_record, iree_hal_command_buffer_collective(
                            command_buffer->base_command_buffer, channel, op,

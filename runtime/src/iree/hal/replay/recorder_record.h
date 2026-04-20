@@ -47,6 +47,10 @@ iree_status_t iree_hal_replay_recorder_begin_operation(
     iree_hal_replay_payload_type_t payload_type,
     iree_hal_replay_pending_record_t* out_pending_record);
 
+// Marks |pending_record| as a captured operation that cannot be replayed.
+void iree_hal_replay_recorder_mark_unsupported(
+    iree_hal_replay_pending_record_t* pending_record);
+
 iree_status_t iree_hal_replay_recorder_end_operation(
     iree_hal_replay_pending_record_t* pending_record,
     iree_status_t operation_status);

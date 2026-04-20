@@ -331,6 +331,12 @@ iree_status_t iree_hal_replay_recorder_begin_operation(
   return iree_ok_status();
 }
 
+void iree_hal_replay_recorder_mark_unsupported(
+    iree_hal_replay_pending_record_t* pending_record) {
+  pending_record->metadata.record_type =
+      IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED;
+}
+
 iree_status_t iree_hal_replay_recorder_end_operation_with_payload(
     iree_hal_replay_pending_record_t* pending_record,
     iree_status_t operation_status, iree_host_size_t iovec_count,
@@ -708,6 +714,7 @@ static iree_status_t iree_hal_replay_device_create_channel(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_CHANNEL,
       &pending_record));
+  iree_hal_replay_recorder_mark_unsupported(&pending_record);
   iree_status_t status = iree_hal_channel_create(
       device->base_device, queue_affinity, params, out_channel);
   status = iree_hal_replay_device_complete_operation(&pending_record, status);
@@ -1549,6 +1556,7 @@ static iree_status_t iree_hal_replay_device_queue_host_call(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_HOST_CALL,
       &pending_record));
+  iree_hal_replay_recorder_mark_unsupported(&pending_record);
   return iree_hal_replay_device_complete_operation(
       &pending_record,
       iree_hal_device_queue_host_call(

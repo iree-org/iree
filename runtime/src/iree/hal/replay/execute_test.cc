@@ -118,6 +118,14 @@ static iree_const_byte_span_t GetCapturedFileContents(
                                    (iree_host_size_t)file_header.file_length);
 }
 
+static iree_status_t NoopHostCall(void* user_data, const uint64_t args[4],
+                                  iree_hal_host_call_context_t* context) {
+  (void)user_data;
+  (void)args;
+  (void)context;
+  return iree_ok_status();
+}
+
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
 class ScopedTempFile {
@@ -716,6 +724,38 @@ TEST(ReplayExecuteTest, ExecutesRecordedQueueAlloca) {
   IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
                                               replay_group, &options,
                                               iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
+TEST(ReplayExecuteTest, RejectsUnsupportedHostCallRecord) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  iree_hal_host_call_t call =
+      iree_hal_make_host_call(NoopHostCall, /*user_data=*/nullptr);
+  const uint64_t args[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_device_queue_host_call(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), iree_hal_semaphore_list_empty(), call,
+      args, IREE_HAL_HOST_CALL_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
+                        iree_hal_replay_execute_file(
+                            GetCapturedFileContents(storage), replay_group,
+                            nullptr, iree_allocator_system()));
   iree_hal_device_group_release(replay_group);
   iree_hal_replay_recorder_release(recorder);
 }
