@@ -64,6 +64,35 @@ void iree_hal_replay_recorder_buffer_make_object_payload(
   out_payload->allowed_usage = iree_hal_buffer_allowed_usage(base_buffer);
 }
 
+iree_hal_replay_object_id_t iree_hal_replay_recorder_buffer_id_or_none(
+    iree_hal_buffer_t* buffer) {
+  if (!buffer) return IREE_HAL_REPLAY_OBJECT_ID_NONE;
+  if (iree_hal_replay_recorder_buffer_isa(buffer)) {
+    return iree_hal_replay_recorder_buffer_cast(buffer)->buffer_id;
+  }
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(buffer);
+  if (iree_hal_replay_recorder_buffer_isa(allocated_buffer)) {
+    return iree_hal_replay_recorder_buffer_cast(allocated_buffer)->buffer_id;
+  }
+  return IREE_HAL_REPLAY_OBJECT_ID_NONE;
+}
+
+void iree_hal_replay_recorder_buffer_ref_make_payload(
+    iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_replay_buffer_ref_payload_t* out_payload) {
+  memset(out_payload, 0, sizeof(*out_payload));
+  out_payload->offset = buffer_ref.offset;
+  out_payload->length = buffer_ref.length;
+  if (buffer_ref.buffer) {
+    out_payload->buffer_id =
+        iree_hal_replay_recorder_buffer_id_or_none(buffer_ref.buffer);
+    out_payload->offset += iree_hal_buffer_byte_offset(buffer_ref.buffer);
+  } else {
+    out_payload->buffer_slot = buffer_ref.buffer_slot;
+  }
+}
+
 iree_status_t iree_hal_replay_recorder_buffer_create_proxy(
     iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
     iree_hal_replay_object_id_t buffer_id, iree_hal_device_t* placement_device,

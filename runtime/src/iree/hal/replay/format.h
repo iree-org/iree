@@ -129,6 +129,30 @@ enum iree_hal_replay_operation_code_e {
   IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_UNMAP_RANGE = 201u,
   IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_INVALIDATE_RANGE = 202u,
   IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_FLUSH_RANGE = 203u,
+
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_BEGIN = 300u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_END = 301u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_BEGIN_DEBUG_GROUP = 302u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_END_DEBUG_GROUP = 303u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_EXECUTION_BARRIER = 304u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_SIGNAL_EVENT = 305u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_RESET_EVENT = 306u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_WAIT_EVENTS = 307u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_ADVISE_BUFFER = 308u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FILL_BUFFER = 309u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_UPDATE_BUFFER = 310u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_COPY_BUFFER = 311u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_COLLECTIVE = 312u,
+  IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_DISPATCH = 313u,
+
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_INFER_FORMAT = 400u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_CAN_PREPARE_FORMAT = 401u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_PREPARE_EXECUTABLE = 402u,
+
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_COUNT = 500u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_INFO = 501u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_PARAMETERS = 502u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_EXPORT_BY_NAME = 503u,
 };
 
 // Producer-defined payload schema stored in record headers.
@@ -139,6 +163,13 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_ALLOCATE_BUFFER = 2u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE = 3u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA = 4u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_OBJECT = 5u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_CACHE_OBJECT = 6u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_PREPARE = 7u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DISPATCH = 8u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_EXECUTE = 9u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_SEMAPHORE_OBJECT = 10u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER = 11u,
 };
 
 // Payload describing a captured buffer object.
@@ -218,6 +249,141 @@ typedef struct iree_hal_replay_buffer_range_data_payload_t {
   // Reserved for future buffer range metadata; must be zero.
   uint32_t reserved1;
 } iree_hal_replay_buffer_range_data_payload_t;
+
+// Payload describing a command buffer object.
+typedef struct iree_hal_replay_command_buffer_object_payload_t {
+  // Command buffer mode bits requested at creation.
+  uint32_t mode;
+  // Command categories allowed by the command buffer.
+  uint32_t command_categories;
+  // Queue affinity requested at creation.
+  uint64_t queue_affinity;
+  // Indirect binding capacity requested at creation.
+  uint64_t binding_capacity;
+} iree_hal_replay_command_buffer_object_payload_t;
+
+// Payload describing an executable cache object followed by identifier bytes.
+typedef struct iree_hal_replay_executable_cache_object_payload_t {
+  // Byte length of the executable cache identifier following this header.
+  uint64_t identifier_length;
+  // Reserved for future executable cache metadata; must be zero.
+  uint64_t reserved0;
+} iree_hal_replay_executable_cache_object_payload_t;
+
+// Payload describing one executable preparation request.
+typedef struct iree_hal_replay_executable_prepare_payload_t {
+  // Queue affinity from the executable parameters.
+  uint64_t queue_affinity;
+  // Byte length of executable data following the executable format bytes.
+  uint64_t executable_data_length;
+  // Number of 32-bit specialization constants following executable data.
+  uint64_t constant_count;
+  // Executable caching mode bits from the executable parameters.
+  uint32_t caching_mode;
+  // Byte length of the executable format string following this header.
+  uint32_t executable_format_length;
+  // Reserved for future executable preparation metadata; must be zero.
+  uint32_t reserved0;
+  // Reserved for future executable preparation metadata; must be zero.
+  uint32_t reserved1;
+} iree_hal_replay_executable_prepare_payload_t;
+
+// Payload describing a captured semaphore object.
+typedef struct iree_hal_replay_semaphore_object_payload_t {
+  // Queue affinity requested at creation.
+  uint64_t queue_affinity;
+  // Initial timeline payload value requested at creation.
+  uint64_t initial_value;
+  // Semaphore flag bits requested at creation.
+  uint64_t flags;
+  // Reserved for future semaphore object metadata; must be zero.
+  uint64_t reserved0;
+} iree_hal_replay_semaphore_object_payload_t;
+
+// Serialized replay reference to one semaphore timepoint.
+typedef struct iree_hal_replay_semaphore_timepoint_payload_t {
+  // Session-local semaphore object id.
+  iree_hal_replay_object_id_t semaphore_id;
+  // Timeline payload value associated with the semaphore.
+  uint64_t value;
+} iree_hal_replay_semaphore_timepoint_payload_t;
+
+// Serialized replay reference to a HAL buffer or indirect binding slot.
+typedef struct iree_hal_replay_buffer_ref_payload_t {
+  // Session-local buffer object id, or zero for an indirect binding slot.
+  iree_hal_replay_object_id_t buffer_id;
+  // Byte offset into the referenced buffer.
+  uint64_t offset;
+  // Byte length of the referenced buffer range.
+  uint64_t length;
+  // Indirect binding slot used when buffer_id is zero.
+  uint32_t buffer_slot;
+  // Reserved for future buffer reference metadata; must be zero.
+  uint32_t reserved0;
+} iree_hal_replay_buffer_ref_payload_t;
+
+// Payload describing a dispatch followed by constants and serialized buffer
+// references.
+typedef struct iree_hal_replay_dispatch_payload_t {
+  // Session-local executable object id.
+  iree_hal_replay_object_id_t executable_id;
+  // Queue affinity for immediate device queue dispatches, or zero when the
+  // dispatch is recorded into a command buffer.
+  uint64_t queue_affinity;
+  // Executable export ordinal to dispatch.
+  uint32_t export_ordinal;
+  // Dispatch flags.
+  uint32_t flags;
+  // Static or minimum workgroup size.
+  uint32_t workgroup_size[3];
+  // Static workgroup count.
+  uint32_t workgroup_count[3];
+  // Indirect workgroup count buffer reference.
+  iree_hal_replay_buffer_ref_payload_t workgroup_count_ref;
+  // Dynamic workgroup-local memory size in bytes.
+  uint32_t dynamic_workgroup_local_memory;
+  // Reserved for future dispatch metadata; must be zero.
+  uint32_t reserved0;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+  // Byte length of constant data following the semaphore lists.
+  uint64_t constants_length;
+  // Number of serialized buffer references following constant data.
+  uint64_t binding_count;
+} iree_hal_replay_dispatch_payload_t;
+
+// Payload describing a device queue execute request followed by a serialized
+// binding table.
+typedef struct iree_hal_replay_device_queue_execute_payload_t {
+  // Session-local command buffer object id.
+  iree_hal_replay_object_id_t command_buffer_id;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Execute flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+  // Number of serialized binding table entries following the semaphore lists.
+  uint64_t binding_count;
+} iree_hal_replay_device_queue_execute_payload_t;
+
+// Payload describing a command buffer copy operation.
+typedef struct iree_hal_replay_command_buffer_copy_buffer_payload_t {
+  // Source buffer range copied from.
+  iree_hal_replay_buffer_ref_payload_t source_ref;
+  // Target buffer range copied to.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Copy flags.
+  uint32_t flags;
+  // Reserved for future copy metadata; must be zero.
+  uint32_t reserved0;
+  // Reserved for future copy metadata; must be zero.
+  uint64_t reserved1;
+} iree_hal_replay_command_buffer_copy_buffer_payload_t;
 
 // Compression algorithm used for one replay file byte range.
 typedef uint16_t iree_hal_replay_compression_type_t;

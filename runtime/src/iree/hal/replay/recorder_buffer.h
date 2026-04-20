@@ -20,6 +20,13 @@ void iree_hal_replay_recorder_buffer_make_object_payload(
     iree_hal_buffer_t* base_buffer,
     iree_hal_replay_buffer_object_payload_t* out_payload);
 
+void iree_hal_replay_recorder_buffer_ref_make_payload(
+    iree_hal_buffer_ref_t buffer_ref,
+    iree_hal_replay_buffer_ref_payload_t* out_payload);
+
+iree_hal_replay_object_id_t iree_hal_replay_recorder_buffer_id_or_none(
+    iree_hal_buffer_t* buffer);
+
 iree_status_t iree_hal_replay_recorder_buffer_create_proxy(
     iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
     iree_hal_replay_object_id_t buffer_id, iree_hal_device_t* placement_device,

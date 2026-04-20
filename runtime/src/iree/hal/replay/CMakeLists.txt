@@ -86,6 +86,10 @@ iree_cc_library(
     "recorder_allocator.h"
     "recorder_buffer.c"
     "recorder_buffer.h"
+    "recorder_command_buffer.c"
+    "recorder_command_buffer.h"
+    "recorder_executable.c"
+    "recorder_executable.h"
     "recorder_record.h"
   DEPS
     ::file_writer

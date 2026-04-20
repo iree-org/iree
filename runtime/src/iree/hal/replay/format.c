@@ -157,6 +157,48 @@ IREE_API_EXPORT const char* iree_hal_replay_operation_code_string(
       return "buffer.invalidate_range";
     case IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_FLUSH_RANGE:
       return "buffer.flush_range";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_BEGIN:
+      return "command_buffer.begin";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_END:
+      return "command_buffer.end";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_BEGIN_DEBUG_GROUP:
+      return "command_buffer.begin_debug_group";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_END_DEBUG_GROUP:
+      return "command_buffer.end_debug_group";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_EXECUTION_BARRIER:
+      return "command_buffer.execution_barrier";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_SIGNAL_EVENT:
+      return "command_buffer.signal_event";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_RESET_EVENT:
+      return "command_buffer.reset_event";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_WAIT_EVENTS:
+      return "command_buffer.wait_events";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_ADVISE_BUFFER:
+      return "command_buffer.advise_buffer";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FILL_BUFFER:
+      return "command_buffer.fill_buffer";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_UPDATE_BUFFER:
+      return "command_buffer.update_buffer";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_COPY_BUFFER:
+      return "command_buffer.copy_buffer";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_COLLECTIVE:
+      return "command_buffer.collective";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_DISPATCH:
+      return "command_buffer.dispatch";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_INFER_FORMAT:
+      return "executable_cache.infer_format";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_CAN_PREPARE_FORMAT:
+      return "executable_cache.can_prepare_format";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_PREPARE_EXECUTABLE:
+      return "executable_cache.prepare_executable";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_COUNT:
+      return "executable.export_count";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_INFO:
+      return "executable.export_info";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_PARAMETERS:
+      return "executable.export_parameters";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_EXPORT_BY_NAME:
+      return "executable.lookup_export_by_name";
     default:
       return "unknown";
   }
@@ -175,6 +217,20 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "buffer_range";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA:
       return "buffer_range_data";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_OBJECT:
+      return "command_buffer_object";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_CACHE_OBJECT:
+      return "executable_cache_object";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_PREPARE:
+      return "executable_prepare";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DISPATCH:
+      return "dispatch";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_EXECUTE:
+      return "device_queue_execute";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_SEMAPHORE_OBJECT:
+      return "semaphore_object";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER:
+      return "command_buffer_copy_buffer";
     default:
       return "unknown";
   }
