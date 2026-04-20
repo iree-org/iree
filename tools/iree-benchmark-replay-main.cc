@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstring>
+
 #include "benchmark/benchmark.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
@@ -13,21 +15,25 @@
 #include "iree/io/file_contents.h"
 #include "iree/tooling/device_util.h"
 
+IREE_FLAG_LIST(
+    string, replay_file_remap,
+    "Remaps captured external file path prefixes before replay opens them. "
+    "Repeat as --replay_file_remap=captured_prefix=replay_prefix.");
+
 namespace {
 
 void BenchmarkReplay(iree_const_byte_span_t file_contents,
                      iree_hal_device_group_t* device_group,
                      iree_hal_profiling_from_flags_t* profiling,
+                     const iree_hal_replay_execute_options_t* options,
                      benchmark::State& state) {
   iree_allocator_t host_allocator = iree_allocator_system();
-  iree_hal_replay_execute_options_t options =
-      iree_hal_replay_execute_options_default();
   for (auto _ : state) {
     (void)_;
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("ReplayIteration");
     IREE_CHECK_OK(iree_hal_replay_execute_file(file_contents, device_group,
-                                               &options, host_allocator));
+                                               options, host_allocator));
     IREE_TRACE_ZONE_END(z0);
     state.PauseTiming();
     IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
@@ -65,6 +71,47 @@ iree_status_t CreateDeviceGroupFromList(
     iree_hal_device_group_builder_deinitialize(&builder);
   }
   return status;
+}
+
+iree_status_t ParseReplayFileRemaps(
+    iree_allocator_t host_allocator,
+    iree_hal_replay_file_path_remap_t** out_file_path_remaps,
+    iree_host_size_t* out_file_path_remap_count) {
+  IREE_ASSERT_ARGUMENT(out_file_path_remaps);
+  IREE_ASSERT_ARGUMENT(out_file_path_remap_count);
+  *out_file_path_remaps = nullptr;
+  *out_file_path_remap_count = 0;
+
+  iree_flag_string_list_t flag_list = FLAG_replay_file_remap_list();
+  if (flag_list.count == 0) return iree_ok_status();
+
+  iree_host_size_t remap_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+          flag_list.count, sizeof(**out_file_path_remaps), &remap_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "replay file remap list is too large");
+  }
+  iree_hal_replay_file_path_remap_t* file_path_remaps = nullptr;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, remap_size,
+                                             (void**)&file_path_remaps));
+  memset(file_path_remaps, 0, remap_size);
+  for (iree_host_size_t i = 0; i < flag_list.count; ++i) {
+    iree_string_view_t captured_prefix;
+    iree_string_view_t replay_prefix;
+    if (iree_string_view_split(flag_list.values[i], '=', &captured_prefix,
+                               &replay_prefix) < 0 ||
+        iree_string_view_is_empty(captured_prefix)) {
+      iree_allocator_free(host_allocator, file_path_remaps);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "--replay_file_remap values must be captured_prefix=replay_prefix");
+    }
+    file_path_remaps[i].captured_prefix = captured_prefix;
+    file_path_remaps[i].replay_prefix = replay_prefix;
+  }
+  *out_file_path_remaps = file_path_remaps;
+  *out_file_path_remap_count = flag_list.count;
+  return iree_ok_status();
 }
 
 }  // namespace
@@ -132,12 +179,23 @@ static int runMain(int argc, char** argv) {
         device_group, host_allocator, &profiling);
   }
 
+  iree_hal_replay_file_path_remap_t* file_path_remaps = nullptr;
+  iree_host_size_t file_path_remap_count = 0;
+  if (iree_status_is_ok(status)) {
+    status = ParseReplayFileRemaps(host_allocator, &file_path_remaps,
+                                   &file_path_remap_count);
+  }
+
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.file_path_remap_count = file_path_remap_count;
+  options.file_path_remaps = file_path_remaps;
   if (iree_status_is_ok(status)) {
     benchmark::RegisterBenchmark("BM_replay",
                                  [=](benchmark::State& state) -> void {
                                    BenchmarkReplay(file_contents->const_buffer,
                                                    device_group, profiling,
-                                                   state);
+                                                   &options, state);
                                  })
         ->MeasureProcessCPUTime()
         ->UseRealTime()
@@ -147,6 +205,7 @@ static int runMain(int argc, char** argv) {
 
   status =
       iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  iree_allocator_free(host_allocator, file_path_remaps);
   iree_hal_device_group_release(device_group);
   iree_hal_device_list_free(device_list);
   iree_async_proactor_pool_release(proactor_pool);

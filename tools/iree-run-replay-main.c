@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
@@ -13,6 +14,52 @@
 #include "iree/hal/replay/execute.h"
 #include "iree/io/file_contents.h"
 #include "iree/tooling/device_util.h"
+
+IREE_FLAG_LIST(
+    string, replay_file_remap,
+    "Remaps captured external file path prefixes before replay opens them. "
+    "Repeat as --replay_file_remap=captured_prefix=replay_prefix.");
+
+static iree_status_t iree_tooling_parse_replay_file_remaps(
+    iree_allocator_t host_allocator,
+    iree_hal_replay_file_path_remap_t** out_file_path_remaps,
+    iree_host_size_t* out_file_path_remap_count) {
+  IREE_ASSERT_ARGUMENT(out_file_path_remaps);
+  IREE_ASSERT_ARGUMENT(out_file_path_remap_count);
+  *out_file_path_remaps = NULL;
+  *out_file_path_remap_count = 0;
+
+  iree_flag_string_list_t flag_list = FLAG_replay_file_remap_list();
+  if (flag_list.count == 0) return iree_ok_status();
+
+  iree_host_size_t remap_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+          flag_list.count, sizeof(**out_file_path_remaps), &remap_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "replay file remap list is too large");
+  }
+  iree_hal_replay_file_path_remap_t* file_path_remaps = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, remap_size,
+                                             (void**)&file_path_remaps));
+  memset(file_path_remaps, 0, remap_size);
+  for (iree_host_size_t i = 0; i < flag_list.count; ++i) {
+    iree_string_view_t captured_prefix;
+    iree_string_view_t replay_prefix;
+    if (iree_string_view_split(flag_list.values[i], '=', &captured_prefix,
+                               &replay_prefix) < 0 ||
+        iree_string_view_is_empty(captured_prefix)) {
+      iree_allocator_free(host_allocator, file_path_remaps);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "--replay_file_remap values must be captured_prefix=replay_prefix");
+    }
+    file_path_remaps[i].captured_prefix = captured_prefix;
+    file_path_remaps[i].replay_prefix = replay_prefix;
+  }
+  *out_file_path_remaps = file_path_remaps;
+  *out_file_path_remap_count = flag_list.count;
+  return iree_ok_status();
+}
 
 static iree_status_t iree_tooling_create_device_group_from_list(
     iree_hal_device_list_t* device_list, iree_allocator_t host_allocator,
@@ -103,15 +150,25 @@ int main(int argc, char** argv) {
         device_group, host_allocator, &profiling);
   }
 
+  iree_hal_replay_file_path_remap_t* file_path_remaps = NULL;
+  iree_host_size_t file_path_remap_count = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_tooling_parse_replay_file_remaps(
+        host_allocator, &file_path_remaps, &file_path_remap_count);
+  }
+
   if (iree_status_is_ok(status)) {
     iree_hal_replay_execute_options_t options =
         iree_hal_replay_execute_options_default();
+    options.file_path_remap_count = file_path_remap_count;
+    options.file_path_remaps = file_path_remaps;
     status = iree_hal_replay_execute_file(
         file_contents->const_buffer, device_group, &options, host_allocator);
   }
 
   status =
       iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  iree_allocator_free(host_allocator, file_path_remaps);
   iree_hal_device_group_release(device_group);
   iree_hal_device_list_free(device_list);
   iree_async_proactor_pool_release(proactor_pool);

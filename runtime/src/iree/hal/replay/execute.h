@@ -21,11 +21,20 @@ enum iree_hal_replay_execute_flag_bits_t {
   IREE_HAL_REPLAY_EXECUTE_FLAG_NONE = 0u,
 };
 
+typedef struct iree_hal_replay_file_path_remap_t {
+  // Captured external file path prefix to replace.
+  iree_string_view_t captured_prefix;
+  // Replay-time path prefix substituted for |captured_prefix|.
+  iree_string_view_t replay_prefix;
+} iree_hal_replay_file_path_remap_t;
+
 typedef struct iree_hal_replay_execute_options_t {
   // Execution flags controlling replay behavior.
   iree_hal_replay_execute_flags_t flags;
-  // Reserved for future replay execution options; must be zero.
-  uint32_t reserved0;
+  // Number of entries in |file_path_remaps|.
+  iree_host_size_t file_path_remap_count;
+  // Optional captured-prefix to replay-prefix rewrites for external files.
+  const iree_hal_replay_file_path_remap_t* file_path_remaps;
 } iree_hal_replay_execute_options_t;
 
 static inline iree_hal_replay_execute_options_t

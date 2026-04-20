@@ -44,6 +44,8 @@ typedef struct iree_hal_replay_executor_t {
   iree_hal_device_group_t* device_group;
   // Host allocator used for temporary replay state.
   iree_allocator_t host_allocator;
+  // Execution options supplied by the caller.
+  const iree_hal_replay_execute_options_t* options;
   // Dense session-local object table indexed by replay object id.
   iree_hal_replay_object_entry_t* objects;
   // Number of entries in |objects|.
@@ -179,11 +181,14 @@ static iree_status_t iree_hal_replay_executor_scan_object_capacity(
 
 static iree_status_t iree_hal_replay_executor_initialize(
     iree_hal_replay_executor_t* executor, iree_const_byte_span_t file_contents,
-    iree_hal_device_group_t* device_group, iree_allocator_t host_allocator) {
+    iree_hal_device_group_t* device_group,
+    const iree_hal_replay_execute_options_t* options,
+    iree_allocator_t host_allocator) {
   memset(executor, 0, sizeof(*executor));
   executor->file_contents = file_contents;
   executor->device_group = device_group;
   executor->host_allocator = host_allocator;
+  executor->options = options;
   IREE_RETURN_IF_ERROR(iree_hal_replay_executor_scan_object_capacity(
       file_contents, &executor->object_capacity));
   if (executor->object_capacity == 0) return iree_ok_status();
@@ -632,6 +637,55 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_replay_executor_resolve_file_path(
+    iree_hal_replay_executor_t* executor, iree_string_view_t captured_path,
+    iree_string_view_t* out_resolved_path, char** out_resolved_path_storage) {
+  IREE_ASSERT_ARGUMENT(out_resolved_path);
+  IREE_ASSERT_ARGUMENT(out_resolved_path_storage);
+  *out_resolved_path = captured_path;
+  *out_resolved_path_storage = NULL;
+
+  const iree_hal_replay_file_path_remap_t* selected_remap = NULL;
+  for (iree_host_size_t i = 0; i < executor->options->file_path_remap_count;
+       ++i) {
+    const iree_hal_replay_file_path_remap_t* remap =
+        &executor->options->file_path_remaps[i];
+    if (iree_string_view_is_empty(remap->captured_prefix)) continue;
+    if (!iree_string_view_starts_with(captured_path, remap->captured_prefix)) {
+      continue;
+    }
+    if (!selected_remap ||
+        remap->captured_prefix.size > selected_remap->captured_prefix.size) {
+      selected_remap = remap;
+    }
+  }
+  if (!selected_remap) return iree_ok_status();
+
+  iree_string_view_t captured_suffix = iree_string_view_remove_prefix(
+      captured_path, selected_remap->captured_prefix.size);
+  iree_host_size_t resolved_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_add(selected_remap->replay_prefix.size,
+                                      captured_suffix.size, &resolved_length) ||
+          resolved_length == IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "remapped replay file path is too long");
+  }
+  char* resolved_path_storage = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(executor->host_allocator,
+                                             resolved_length + 1,
+                                             (void**)&resolved_path_storage));
+  memcpy(resolved_path_storage, selected_remap->replay_prefix.data,
+         selected_remap->replay_prefix.size);
+  memcpy(resolved_path_storage + selected_remap->replay_prefix.size,
+         captured_suffix.data, captured_suffix.size);
+  resolved_path_storage[resolved_length] = 0;
+  *out_resolved_path =
+      iree_make_string_view(resolved_path_storage, resolved_length);
+  *out_resolved_path_storage = resolved_path_storage;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_replay_executor_import_file(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -662,6 +716,9 @@ static iree_status_t iree_hal_replay_executor_import_file(
   iree_string_view_t path =
       iree_make_string_view((const char*)record->payload.data + sizeof(payload),
                             (iree_host_size_t)payload.reference_length);
+  char* resolved_path_storage = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_resolve_file_path(
+      executor, path, &path, &resolved_path_storage));
   iree_io_file_mode_t mode = 0;
   if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_READ)) {
     mode |= IREE_IO_FILE_MODE_READ;
@@ -671,18 +728,21 @@ static iree_status_t iree_hal_replay_executor_import_file(
   }
   if (mode == 0) mode = IREE_IO_FILE_MODE_READ;
   iree_io_file_handle_t* handle = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_io_file_handle_open(mode, path, executor->host_allocator, &handle));
+  iree_status_t status =
+      iree_io_file_handle_open(mode, path, executor->host_allocator, &handle);
 
   iree_hal_file_t* file = NULL;
-  iree_status_t status =
-      iree_hal_file_import(device_entry->value.device, payload.queue_affinity,
-                           payload.access, handle, payload.flags, &file);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_file_import(device_entry->value.device, payload.queue_affinity,
+                             payload.access, handle, payload.flags, &file);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_executor_validate_file_reference(&payload, handle,
                                                               file);
   }
   iree_io_file_handle_release(handle);
+  iree_allocator_free(executor->host_allocator, resolved_path_storage);
 
   if (iree_status_is_ok(status)) {
     iree_hal_replay_object_entry_t entry = {.value.file = file};
@@ -1980,10 +2040,15 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
   iree_hal_replay_execute_options_t default_options =
       iree_hal_replay_execute_options_default();
   if (!options) options = &default_options;
-  if (IREE_UNLIKELY(options->flags != IREE_HAL_REPLAY_EXECUTE_FLAG_NONE ||
-                    options->reserved0 != 0)) {
+  if (IREE_UNLIKELY(options->flags != IREE_HAL_REPLAY_EXECUTE_FLAG_NONE)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "replay execute reserved options must be zero");
+                            "replay execute flags are unsupported");
+  }
+  if (IREE_UNLIKELY(options->file_path_remap_count != 0 &&
+                    !options->file_path_remaps)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "replay execute file path remaps require a remap list");
   }
 
   iree_hal_replay_file_header_t file_header;
@@ -1997,7 +2062,7 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
 
   iree_hal_replay_executor_t executor;
   IREE_RETURN_IF_ERROR(iree_hal_replay_executor_initialize(
-      &executor, valid_contents, device_group, host_allocator));
+      &executor, valid_contents, device_group, options, host_allocator));
 
   iree_status_t status = iree_ok_status();
   uint64_t expected_sequence_ordinal = 0;
