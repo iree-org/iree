@@ -942,11 +942,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     if (useDirectLoad) {
       Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
       // Check if per-workgroup scale shape is DMA-aligned. Scale operands
-      // have shape [M/N, Ko] where Ko = kTileSize. Sub-aligned scales
-      // (e.g., 32x2 f8E8M0FNU for small matmuls) cannot use DMA because
-      // the padding creates undistributed memref.copy ops.
+      // have shape [M/N, Ko] where Ko = K-reduction-tile * koBlocksPerIntrinsic.
+      // reductionTileSizes[contractionK] counts MFMA invocations, not Ko
+      // elements; multiply by koBlocksPerIntrinsic to get the element count.
       int64_t scaleMDim = workgroupTileSizes[contractionM.back()];
-      int64_t scaleKoDim = reductionTileSizes[contractionK.back()];
+      auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
+      int64_t koBlocksPerIntrinsic = std::get<2>(smmaKind.getScaledMNKShape());
+      int64_t scaleKoDim =
+          reductionTileSizes[contractionK.back()] * koBlocksPerIntrinsic;
       int64_t scaleElements = scaleMDim * scaleKoDim;
       int64_t scaleBits = 8; // f8E8M0FNU is 8-bit
       ArrayRef<int64_t> dmaSizes;
