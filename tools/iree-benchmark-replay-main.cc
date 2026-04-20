@@ -27,7 +27,8 @@ IREE_FLAG_LIST(
     "Substitutes a captured executable payload. Repeat as "
     "--replay_executable_substitution=EXECUTABLE_ID=PATH to infer the format, "
     "or --replay_executable_substitution=EXECUTABLE_ID@FORMAT=PATH when the "
-    "format must be explicit.");
+    "format must be explicit. Use all=PATH or all@FORMAT=PATH to apply one "
+    "replacement to every captured executable.");
 IREE_FLAG(bool, agents_md, false,
           "Prints an agent-oriented Markdown guide for HAL replay capture and "
           "tooling workflows and exits.");
@@ -35,6 +36,8 @@ IREE_FLAG(bool, agents_md, false,
 namespace {
 
 typedef struct ReplayExecutableSubstitution {
+  // True when this replacement applies to every captured executable.
+  bool match_all;
   // Captured executable object id to replace.
   iree_hal_replay_object_id_t executable_id;
   // Optional replacement executable format.
@@ -94,7 +97,8 @@ iree_status_t ParseReplayExecutableSubstitutions(
       status =
           iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                            "--replay_executable_substitution values must be "
-                           "EXECUTABLE_ID=PATH or EXECUTABLE_ID@FORMAT=PATH");
+                           "EXECUTABLE_ID=PATH, EXECUTABLE_ID@FORMAT=PATH, "
+                           "all=PATH, or all@FORMAT=PATH");
       break;
     }
 
@@ -107,32 +111,44 @@ iree_status_t ParseReplayExecutableSubstitutions(
         status = iree_make_status(
             IREE_STATUS_INVALID_ARGUMENT,
             "--replay_executable_substitution selector must be "
-            "EXECUTABLE_ID or EXECUTABLE_ID@FORMAT");
+            "EXECUTABLE_ID, EXECUTABLE_ID@FORMAT, all, or all@FORMAT");
         break;
       }
       executable_format = maybe_format;
     }
 
     uint64_t executable_id = 0;
-    if (!iree_string_view_atoi_uint64(id_string, &executable_id) ||
-        executable_id == IREE_HAL_REPLAY_OBJECT_ID_NONE) {
-      status = iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "--replay_executable_substitution executable id must be a non-zero "
-          "integer");
-      break;
-    }
-    for (iree_host_size_t j = 0; j < i; ++j) {
-      if (out_state->entries[j].executable_id == executable_id) {
+    const bool match_all = iree_string_view_equal(id_string, IREE_SV("all"));
+    if (match_all) {
+      if (flag_list.count != 1) {
         status = iree_make_status(
             IREE_STATUS_INVALID_ARGUMENT,
-            "--replay_executable_substitution repeats executable id %" PRIu64,
-            executable_id);
+            "--replay_executable_substitution all selector cannot be combined "
+            "with other executable substitutions");
         break;
+      }
+    } else {
+      if (!iree_string_view_atoi_uint64(id_string, &executable_id) ||
+          executable_id == IREE_HAL_REPLAY_OBJECT_ID_NONE) {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "--replay_executable_substitution executable selector must be "
+            "a non-zero integer id or all");
+        break;
+      }
+      for (iree_host_size_t j = 0; j < i; ++j) {
+        if (out_state->entries[j].executable_id == executable_id) {
+          status = iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "--replay_executable_substitution repeats executable id %" PRIu64,
+              executable_id);
+          break;
+        }
       }
     }
     if (!iree_status_is_ok(status)) break;
 
+    out_state->entries[i].match_all = match_all;
     out_state->entries[i].executable_id =
         (iree_hal_replay_object_id_t)executable_id;
     out_state->entries[i].executable_format = executable_format;
@@ -156,7 +172,9 @@ iree_status_t ReplayExecutableSubstitutionCallback(
   memset(out_substitution, 0, sizeof(*out_substitution));
   for (iree_host_size_t i = 0; i < state->entry_count; ++i) {
     const ReplayExecutableSubstitution* entry = &state->entries[i];
-    if (entry->executable_id != request->executable_id) continue;
+    if (!entry->match_all && entry->executable_id != request->executable_id) {
+      continue;
+    }
     out_substitution->substitute = true;
     out_substitution->source = entry->source_path;
     out_substitution->executable_format = entry->executable_format;
