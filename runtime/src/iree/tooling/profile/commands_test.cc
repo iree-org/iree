@@ -30,9 +30,14 @@ TEST(ProfileCommandValidationTest, AcceptsReportFormats) {
   IREE_ASSERT_OK(iree_profile_command_validate_options(
       iree_profile_summary_command(), &options));
 
+  IREE_ASSERT_OK(iree_profile_command_validate_options(
+      iree_profile_statistics_command(), &options));
+
   options.format = IREE_SV("jsonl");
   IREE_ASSERT_OK(iree_profile_command_validate_options(
       iree_profile_summary_command(), &options));
+  IREE_ASSERT_OK(iree_profile_command_validate_options(
+      iree_profile_statistics_command(), &options));
 }
 
 TEST(ProfileCommandValidationTest, ExportUsesInterchangeFormat) {

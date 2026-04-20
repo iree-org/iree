@@ -20,6 +20,7 @@ static const uint64_t kSmokeCommandBufferId = 7;
 static const uint32_t kSmokeCommandIndex = 2;
 static const uint64_t kSmokeExecutableId = 13;
 static const uint32_t kSmokeExportOrdinal = 1;
+static const uint64_t kSmokeAllocationId = 31;
 static const uint64_t kSmokeSubmissionId = 77;
 
 static iree_status_t write_profile_chunk_iovecs(
@@ -287,6 +288,29 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
         sink, IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
         IREE_SV("host-execution-events"),
         iree_make_const_byte_span(host_events, sizeof(host_events)));
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_profile_memory_event_t memory_events[2];
+    memory_events[0] = iree_hal_profile_memory_event_default();
+    memory_events[0].type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE;
+    memory_events[0].result = IREE_STATUS_OK;
+    memory_events[0].event_id = 300;
+    memory_events[0].host_time_ns = 3200;
+    memory_events[0].allocation_id = kSmokeAllocationId;
+    memory_events[0].pool_id = 23;
+    memory_events[0].backing_id = 29;
+    memory_events[0].physical_device_ordinal = kSmokePhysicalDevice;
+    memory_events[0].length = 2048;
+    memory_events[0].alignment = 64;
+    memory_events[1] = memory_events[0];
+    memory_events[1].type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_FREE;
+    memory_events[1].event_id = 301;
+    memory_events[1].host_time_ns = 3300;
+    status = write_profile_chunk(
+        sink, IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
+        IREE_SV("memory-events"),
+        iree_make_const_byte_span(memory_events, sizeof(memory_events)));
   }
 
   if (iree_status_is_ok(status)) {

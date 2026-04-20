@@ -12,6 +12,7 @@
 #include "iree/tooling/profile/export.h"
 #include "iree/tooling/profile/memory.h"
 #include "iree/tooling/profile/projection.h"
+#include "iree/tooling/profile/statistics.h"
 #include "iree/tooling/profile/summary.h"
 
 #define IREE_PROFILE_COMMAND_REPORT_FORMATS \
@@ -78,6 +79,13 @@ static iree_status_t iree_profile_run_cat(
 static iree_status_t iree_profile_run_summary(
     const iree_profile_command_invocation_t* invocation) {
   return iree_profile_summary_file(
+      invocation->input_path, invocation->options->format,
+      invocation->output_file, invocation->options->host_allocator);
+}
+
+static iree_status_t iree_profile_run_statistics(
+    const iree_profile_command_invocation_t* invocation) {
+  return iree_profile_statistics_file(
       invocation->input_path, invocation->options->format,
       invocation->output_file, invocation->options->host_allocator);
 }
@@ -224,6 +232,13 @@ static const iree_profile_command_t kIreeProfileSummaryCommand = {
     .accepted_options = IREE_PROFILE_COMMAND_OPTION_NONE,
     .run = iree_profile_run_summary,
 };
+static const iree_profile_command_t kIreeProfileStatisticsCommand = {
+    .name = "statistics",
+    .summary = "Aggregate statistics reduced from raw profile chunks.",
+    .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
+    .accepted_options = IREE_PROFILE_COMMAND_OPTION_NONE,
+    .run = iree_profile_run_statistics,
+};
 
 const iree_profile_command_t* iree_profile_cat_command(void) {
   return &kIreeProfileCatCommand;
@@ -254,6 +269,9 @@ const iree_profile_command_t* iree_profile_queue_command(void) {
 }
 const iree_profile_command_t* iree_profile_summary_command(void) {
   return &kIreeProfileSummaryCommand;
+}
+const iree_profile_command_t* iree_profile_statistics_command(void) {
+  return &kIreeProfileStatisticsCommand;
 }
 
 iree_status_t iree_profile_command_validate_options(

@@ -50,11 +50,12 @@ int main(int argc, char** argv) {
   iree_allocator_t host_allocator = iree_allocator_system();
   int exit_code = EXIT_SUCCESS;
   const iree_profile_command_t* const commands[] = {
-      iree_profile_summary_command(),    iree_profile_explain_command(),
-      iree_profile_executable_command(), iree_profile_dispatch_command(),
-      iree_profile_command_command(),    iree_profile_counter_command(),
-      iree_profile_memory_command(),     iree_profile_queue_command(),
-      iree_profile_export_command(),     iree_profile_cat_command(),
+      iree_profile_summary_command(),  iree_profile_statistics_command(),
+      iree_profile_explain_command(),  iree_profile_executable_command(),
+      iree_profile_dispatch_command(), iree_profile_command_command(),
+      iree_profile_counter_command(),  iree_profile_memory_command(),
+      iree_profile_queue_command(),    iree_profile_export_command(),
+      iree_profile_cat_command(),
 #if IREE_PROFILE_HAVE_AMDGPU_ATT
       iree_profile_att_command(),
 #endif  // IREE_PROFILE_HAVE_AMDGPU_ATT

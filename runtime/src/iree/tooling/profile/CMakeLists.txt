@@ -121,6 +121,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    statistics
+  HDRS
+    "statistics.h"
+  SRCS
+    "statistics.c"
+  DEPS
+    ::common
+    ::reader
+    iree::base
+    iree::hal
+    iree::hal::utils::statistics_sink
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     cat
   HDRS
     "cat.h"
@@ -202,6 +218,7 @@ iree_cc_library(
     ::export
     ::memory
     ::projection
+    ::statistics
     ::summary
     iree::base
   PUBLIC
@@ -224,6 +241,7 @@ iree_cc_library(
     ::projection
     ::queue_query
     ::reader
+    ::statistics
     ::summary
   PUBLIC
 )

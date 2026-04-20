@@ -114,6 +114,7 @@ class IreeProfileCliTest(unittest.TestCase):
             command_rows = self._profile_jsonl(profile_path, "command")
             executable_rows = self._profile_jsonl(profile_path, "executable")
             dispatch_rows = self._profile_jsonl(profile_path, "dispatch")
+            statistics_rows = self._profile_jsonl(profile_path, "statistics")
 
         self.assertIn("summary", _row_type_set(summary_rows))
         self.assertIn("device_summary", _row_type_set(summary_rows))
@@ -127,6 +128,34 @@ class IreeProfileCliTest(unittest.TestCase):
             "executable_export_host_dispatch_group", _row_type_set(executable_rows)
         )
         self.assertIn("host_dispatch_group", _row_type_set(dispatch_rows))
+        self.assertIn("statistics_summary", _row_type_set(statistics_rows))
+        self.assertIn("statistics_row", _row_type_set(statistics_rows))
+
+    def test_statistics_reports_aggregate_row_families(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rows = self._profile_jsonl(self._create_profile(directory), "statistics")
+
+        summary = _find_row(rows, "statistics_summary")
+        self.assertGreater(summary["row_count"], 0)
+        self.assertEqual(summary["dropped_record_count"], 0)
+
+        row_types = {
+            row["row_type"] for row in rows if row.get("type") == "statistics_row"
+        }
+        self.assertIn("dispatch_export", row_types)
+        self.assertIn("queue_device_operation", row_types)
+        self.assertIn("queue_host_operation", row_types)
+        self.assertIn("host_execution_export", row_types)
+        self.assertIn("memory_lifecycle", row_types)
+
+        export_row = next(
+            row
+            for row in rows
+            if row.get("type") == "statistics_row"
+            and row.get("row_type") == "dispatch_export"
+        )
+        self.assertEqual(export_row["export_name"], "smoke_export")
+        self.assertGreater(export_row["total_duration_ns"], 0)
 
     def test_queue_projection_separates_host_and_device_time(self):
         with tempfile.TemporaryDirectory() as directory:

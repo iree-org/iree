@@ -98,6 +98,19 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "statistics",
+    srcs = ["statistics.c"],
+    hdrs = ["statistics.h"],
+    deps = [
+        ":common",
+        ":reader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:statistics_sink",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "cat",
     srcs = ["cat.c"],
     hdrs = ["cat.h"],
@@ -160,6 +173,7 @@ iree_runtime_cc_library(
         ":export",
         ":memory",
         ":projection",
+        ":statistics",
         ":summary",
         "//runtime/src/iree/base",
     ],
@@ -181,6 +195,7 @@ iree_runtime_cc_library(
         ":projection",
         ":queue_query",
         ":reader",
+        ":statistics",
         ":summary",
     ],
 )

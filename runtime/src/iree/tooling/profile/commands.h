@@ -89,6 +89,7 @@ const iree_profile_command_t* iree_profile_explain_command(void);
 const iree_profile_command_t* iree_profile_export_command(void);
 const iree_profile_command_t* iree_profile_memory_command(void);
 const iree_profile_command_t* iree_profile_queue_command(void);
+const iree_profile_command_t* iree_profile_statistics_command(void);
 const iree_profile_command_t* iree_profile_summary_command(void);
 
 // Validates |options| against |command| without opening the input bundle.
