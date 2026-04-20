@@ -857,6 +857,7 @@ static void iree_hal_amdgpu_profile_metadata_snapshot_deinitialize(
 static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     const iree_hal_amdgpu_profile_metadata_cursor_t* cursor,
+    bool emit_executable_artifacts,
     iree_hal_amdgpu_profile_metadata_snapshot_t* out_snapshot) {
   memset(out_snapshot, 0, sizeof(*out_snapshot));
   out_snapshot->host_allocator = registry->host_allocator;
@@ -923,7 +924,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
     }
   }
 
-  if (iree_status_is_ok(status) &&
+  if (iree_status_is_ok(status) && emit_executable_artifacts &&
       executable_code_object_record_data_length > 0) {
     status = iree_allocator_malloc(
         registry->host_allocator, executable_code_object_record_data_length,
@@ -938,7 +939,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
     }
   }
 
-  if (iree_status_is_ok(status) &&
+  if (iree_status_is_ok(status) && emit_executable_artifacts &&
       executable_code_object_load_record_count > 0) {
     iree_host_size_t byte_length = 0;
     status = IREE_STRUCT_LAYOUT(
@@ -1041,6 +1042,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_snapshot_copy(
 iree_status_t iree_hal_amdgpu_profile_metadata_write(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_hal_profile_sink_t* sink, uint64_t session_id, iree_string_view_t name,
+    bool emit_executable_artifacts,
     iree_hal_amdgpu_profile_metadata_cursor_t* cursor) {
   if (!sink) {
     return iree_ok_status();
@@ -1050,7 +1052,7 @@ iree_status_t iree_hal_amdgpu_profile_metadata_write(
 
   iree_hal_amdgpu_profile_metadata_snapshot_t snapshot;
   iree_status_t status = iree_hal_amdgpu_profile_metadata_snapshot_copy(
-      registry, cursor, &snapshot);
+      registry, cursor, emit_executable_artifacts, &snapshot);
 
   if (iree_status_is_ok(status) && snapshot.executable_record_count > 0) {
     iree_hal_profile_chunk_metadata_t metadata =

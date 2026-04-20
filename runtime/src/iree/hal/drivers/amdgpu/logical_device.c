@@ -884,16 +884,28 @@ iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
   return status;
 }
 
+static bool iree_hal_amdgpu_logical_device_profile_needs_executable_artifacts(
+    iree_hal_device_profiling_data_families_t data_families) {
+  return iree_any_bit_set(data_families,
+                          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
+                              IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_write_profile_metadata(
     iree_hal_amdgpu_logical_device_t* logical_device,
-    iree_hal_profile_sink_t* sink, uint64_t session_id) {
+    iree_hal_profile_sink_t* sink, uint64_t session_id,
+    iree_hal_device_profiling_data_families_t data_families) {
+  const bool emit_executable_artifacts =
+      iree_hal_amdgpu_logical_device_profile_needs_executable_artifacts(
+          data_families);
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_devices(
       logical_device, sink, session_id));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_queues(
       logical_device, sink, session_id));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_write(
       &logical_device->profile_metadata, sink, session_id,
-      logical_device->identifier, &logical_device->profiling.metadata_cursor));
+      logical_device->identifier, emit_executable_artifacts,
+      &logical_device->profiling.metadata_cursor));
   return iree_hal_amdgpu_logical_device_write_profile_clock_correlations(
       logical_device, sink, session_id);
 }
@@ -1591,9 +1603,6 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
       z0, iree_hal_amdgpu_logical_device_allocate_storage(
               identifier, topology, physical_device_size, host_allocator,
               &logical_device));
-  logical_device->retain_executable_code_object_images =
-      options->profiling.retain_executable_code_object_images;
-
   iree_status_t status =
       iree_hal_amdgpu_logical_device_initialize_host_resources(
           logical_device, options, create_params->proactor_pool,
@@ -2454,8 +2463,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_executable_cache(
       iree_hal_amdgpu_logical_device_cast(base_device);
   return iree_hal_amdgpu_executable_cache_create(
       &logical_device->system->libhsa, &logical_device->system->topology,
-      &logical_device->profile_metadata,
-      logical_device->retain_executable_code_object_images, identifier,
+      &logical_device->profile_metadata, identifier,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
@@ -2835,7 +2843,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_logical_device_write_profile_metadata(
-        logical_device, sink, session_id);
+        logical_device, sink, session_id, session_options.data_families);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_profile_counter_session_write_metadata(
@@ -2921,10 +2929,13 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_flush(
     return iree_ok_status();
   }
   iree_hal_profile_sink_t* sink = options->sink;
+  const bool emit_executable_artifacts =
+      iree_hal_amdgpu_logical_device_profile_needs_executable_artifacts(
+          options->data_families);
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_profile_metadata_write(
       &logical_device->profile_metadata, sink,
       logical_device->profiling.session_id, logical_device->identifier,
-      &logical_device->profiling.metadata_cursor));
+      emit_executable_artifacts, &logical_device->profiling.metadata_cursor));
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_write_profile_events(
       logical_device, sink, logical_device->profiling.session_id));
   IREE_RETURN_IF_ERROR(
@@ -2958,10 +2969,14 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_amdgpu_logical_device_profile_session_metadata(logical_device,
                                                               session_id);
+  const bool emit_executable_artifacts =
+      iree_hal_amdgpu_logical_device_profile_needs_executable_artifacts(
+          data_families);
 
   status = iree_hal_amdgpu_profile_metadata_write(
       &logical_device->profile_metadata, sink, session_id,
-      logical_device->identifier, &logical_device->profiling.metadata_cursor);
+      logical_device->identifier, emit_executable_artifacts,
+      &logical_device->profiling.metadata_cursor);
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_logical_device_write_profile_events(
         logical_device, sink, session_id);

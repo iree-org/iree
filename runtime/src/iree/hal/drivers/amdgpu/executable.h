@@ -102,16 +102,16 @@ iree_status_t iree_hal_amdgpu_executable_infer_format(
 // |libhsa| and |topology| are captured by-reference and must remain valid for
 // the lifetime of the cache.
 //
-// If |retain_profile_artifacts| is true, exact code-object image bytes and
-// loader load ranges are retained in profile metadata for offline
-// trace/disassembly workflows.
+// Exact code-object image bytes and loader load ranges are retained in profile
+// metadata for offline trace/disassembly workflows. Executable trace profiling
+// may begin after executable preparation, so this cold-path metadata is always
+// durable instead of being gated on an active profiling session.
 iree_status_t iree_hal_amdgpu_executable_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    bool retain_profile_artifacts, iree_allocator_t host_allocator,
-    iree_hal_executable_t** out_executable);
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
 // Returns the producer-local profile executable id assigned at creation.
 uint64_t iree_hal_amdgpu_executable_profile_id(

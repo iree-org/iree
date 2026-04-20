@@ -113,8 +113,9 @@ void iree_hal_amdgpu_profile_metadata_hash_code_object(
 // |out_executable_id|.
 //
 // This records the cheap executable/export metadata required to attribute
-// dispatch events and aggregate statistics. It does not retain code-object
-// image bytes or loader load ranges.
+// dispatch events and aggregate statistics. Code-object image bytes and loader
+// load ranges are registered separately so normal timing profiles can omit the
+// heavy records while executable trace profiles can still emit them.
 //
 // When |code_object_hash| is provided, each export receives an AMDGPU pipeline
 // hash. Inputs are appended in this order: code_object_hash[0] and
@@ -136,8 +137,8 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id);
 
-// Registers optional code-object image and load-range artifacts for an
-// executable previously registered with
+// Registers code-object image and load-range artifacts for an executable
+// previously registered with
 // iree_hal_amdgpu_profile_metadata_register_executable.
 //
 // These artifacts are needed by trace/disassembly workflows but are not
@@ -179,9 +180,16 @@ bool iree_hal_amdgpu_profile_metadata_export_matches(
     iree_string_view_t pattern);
 
 // Writes metadata records newer than |cursor| and advances |cursor| on success.
+//
+// When |emit_executable_artifacts| is false, executable code-object image and
+// load-range records are treated as consumed for this session but are not
+// written. This keeps normal timing profiles small while later
+// executable-trace sessions can still emit self-contained code-object bundles
+// from the durable registry.
 iree_status_t iree_hal_amdgpu_profile_metadata_write(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_hal_profile_sink_t* sink, uint64_t session_id, iree_string_view_t name,
+    bool emit_executable_artifacts,
     iree_hal_amdgpu_profile_metadata_cursor_t* cursor);
 
 #ifdef __cplusplus

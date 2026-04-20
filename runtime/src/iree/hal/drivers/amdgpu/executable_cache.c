@@ -24,8 +24,6 @@ typedef struct iree_hal_amdgpu_executable_cache_t {
   const iree_hal_amdgpu_topology_t* topology;
   // Borrowed logical-device profiling metadata registry.
   iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata;
-  // Retains exact code-object image artifacts and loader load ranges.
-  bool retain_executable_code_object_images;
 } iree_hal_amdgpu_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -41,8 +39,7 @@ iree_status_t iree_hal_amdgpu_executable_cache_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
-    bool retain_executable_code_object_images, iree_string_view_t identifier,
-    iree_allocator_t host_allocator,
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -67,8 +64,6 @@ iree_status_t iree_hal_amdgpu_executable_cache_create(
   executable_cache->libhsa = libhsa;
   executable_cache->topology = topology;
   executable_cache->profile_metadata = profile_metadata;
-  executable_cache->retain_executable_code_object_images =
-      retain_executable_code_object_images;
 
   *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
   IREE_TRACE_ZONE_END(z0);
@@ -128,15 +123,10 @@ static iree_status_t iree_hal_amdgpu_executable_cache_prepare_executable(
     iree_hal_executable_t** out_executable) {
   iree_hal_amdgpu_executable_cache_t* executable_cache =
       iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
-  const bool retain_profile_artifacts =
-      executable_cache->retain_executable_code_object_images ||
-      iree_any_bit_set(executable_params->caching_mode,
-                       IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING |
-                           IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING);
   return iree_hal_amdgpu_executable_create(
       executable_cache->libhsa, executable_cache->topology, executable_params,
-      executable_cache->profile_metadata, retain_profile_artifacts,
-      executable_cache->host_allocator, out_executable);
+      executable_cache->profile_metadata, executable_cache->host_allocator,
+      out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t

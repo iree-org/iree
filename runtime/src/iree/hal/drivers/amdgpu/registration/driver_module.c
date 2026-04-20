@@ -55,11 +55,6 @@ IREE_FLAG(bool, amdgpu_preallocate_pools, true,
           "Preallocates a reasonable number of resources in pools to reduce "
           "initial execution latency.");
 
-IREE_FLAG(
-    bool, amdgpu_retain_executable_code_object_images, false,
-    "Retains exact executable code-object images and loader load ranges in "
-    "AMDGPU profile metadata for ATT/disassembly exports.");
-
 IREE_FLAG(bool, amdgpu_exclusive_execution, false,
           "Reserved for exclusive queue scheduling; currently unsupported.");
 
@@ -206,9 +201,6 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   }
 
   device_options->preallocate_pools = FLAG_amdgpu_preallocate_pools;
-
-  device_options->profiling.retain_executable_code_object_images =
-      FLAG_amdgpu_retain_executable_code_object_images;
 
   device_options->exclusive_execution = FLAG_amdgpu_exclusive_execution;
 
