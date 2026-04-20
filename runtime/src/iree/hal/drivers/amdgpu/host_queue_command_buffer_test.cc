@@ -2643,11 +2643,15 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_TRUE(iree_all_bits_set(
         sample.flags,
         IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DISPATCH_EVENT |
-            IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION));
+            IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION |
+            IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE));
+    EXPECT_EQ(IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DISPATCH, sample.scope);
     EXPECT_EQ(sample.dispatch_event_id, event.event_id);
     EXPECT_EQ(sample.submission_id, event.submission_id);
     EXPECT_EQ(sample.command_buffer_id, event.command_buffer_id);
     EXPECT_EQ(sample.executable_id, event.executable_id);
+    EXPECT_EQ(sample.start_tick, event.start_tick);
+    EXPECT_EQ(sample.end_tick, event.end_tick);
     EXPECT_EQ(sample.command_index, event.command_index);
     EXPECT_EQ(sample.export_ordinal, event.export_ordinal);
     sample_value_count += sample.sample_value_count;

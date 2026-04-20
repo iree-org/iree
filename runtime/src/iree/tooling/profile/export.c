@@ -14,7 +14,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 11
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 12
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -59,6 +59,22 @@ static const char* iree_profile_export_device_class_name(
       return "npu";
     case IREE_HAL_PROFILE_DEVICE_CLASS_OTHER:
       return "other";
+    default:
+      return "unknown";
+  }
+}
+
+static const char* iree_profile_export_counter_sample_scope_name(
+    iree_hal_profile_counter_sample_scope_t scope) {
+  switch (scope) {
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_NONE:
+      return "none";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DISPATCH:
+      return "dispatch";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_COMMAND_OPERATION:
+      return "command_operation";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DEVICE_TIME_RANGE:
+      return "device_time_range";
     default:
       return "unknown";
   }
@@ -1013,7 +1029,6 @@ static iree_status_t iree_profile_export_process_counter_sample_records(
     const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
     FILE* file) {
-  (void)model;
   iree_profile_typed_record_iterator_t iterator;
   iree_profile_typed_record_iterator_initialize(
       record, sizeof(iree_hal_profile_counter_sample_record_t), &iterator);
@@ -1038,22 +1053,61 @@ static iree_status_t iree_profile_export_process_counter_sample_records(
     if (iree_status_is_ok(status)) {
       const uint64_t* values =
           (const uint64_t*)typed_record.inline_payload.data;
+      const bool has_device_tick_range = iree_all_bits_set(
+          sample_record.flags,
+          IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE);
+      iree_profile_export_device_time_t device_time = {0};
+      if (has_device_tick_range) {
+        device_time = iree_profile_export_calculate_device_time(
+            model, sample_record.physical_device_ordinal,
+            sample_record.start_tick, sample_record.end_tick);
+      }
       iree_profile_export_print_prefix(file, "counter_sample", record_index);
       fprintf(file,
               ",\"sample_id\":%" PRIu64 ",\"counter_set_id\":%" PRIu64
-              ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
-              ",\"command_buffer_id\":%" PRIu64
-              ",\"command_index\":%u,\"executable_id\":%" PRIu64
-              ",\"export_ordinal\":%u"
-              ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
-              ",\"stream_id\":%" PRIu64 ",\"flags\":%u,\"values\":[",
-              sample_record.sample_id, sample_record.counter_set_id,
-              sample_record.dispatch_event_id, sample_record.submission_id,
-              sample_record.command_buffer_id, sample_record.command_index,
-              sample_record.executable_id, sample_record.export_ordinal,
-              sample_record.physical_device_ordinal,
-              sample_record.queue_ordinal, sample_record.stream_id,
-              sample_record.flags);
+              ",\"scope\":",
+              sample_record.sample_id, sample_record.counter_set_id);
+      iree_profile_fprint_json_string(
+          file,
+          iree_make_cstring_view(iree_profile_export_counter_sample_scope_name(
+              sample_record.scope)));
+      fprintf(
+          file,
+          ",\"scope_value\":%u"
+          ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
+          ",\"command_buffer_id\":%" PRIu64
+          ",\"command_index\":%u,\"executable_id\":%" PRIu64
+          ",\"export_ordinal\":%u"
+          ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+          ",\"stream_id\":%" PRIu64
+          ",\"flags\":%u"
+          ",\"device_tick_range_present\":%s"
+          ",\"device_tick_domain\":\"device_tick\""
+          ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
+          ",\"duration_ticks\":%" PRIu64
+          ",\"device_tick_range_valid\":%s"
+          ",\"derived_time_available\":%s"
+          ",\"derived_time_domain\":\"driver_host_cpu_timestamp_ns\""
+          ",\"derived_time_basis\":\"first_last_clock_correlation\""
+          ",\"clock_fit_first_sample_id\":%" PRIu64
+          ",\"clock_fit_last_sample_id\":%" PRIu64
+          ",\"start_driver_host_cpu_time_ns\":%" PRId64
+          ",\"end_driver_host_cpu_time_ns\":%" PRId64
+          ",\"duration_time_domain\":\"device_tick_duration_ns\""
+          ",\"duration_ns\":%" PRId64 ",\"values\":[",
+          sample_record.scope, sample_record.dispatch_event_id,
+          sample_record.submission_id, sample_record.command_buffer_id,
+          sample_record.command_index, sample_record.executable_id,
+          sample_record.export_ordinal, sample_record.physical_device_ordinal,
+          sample_record.queue_ordinal, sample_record.stream_id,
+          sample_record.flags, has_device_tick_range ? "true" : "false",
+          sample_record.start_tick, sample_record.end_tick,
+          device_time.duration_ticks, device_time.is_valid ? "true" : "false",
+          device_time.has_derived_time ? "true" : "false",
+          device_time.clock_fit_first_sample_id,
+          device_time.clock_fit_last_sample_id,
+          device_time.start_driver_host_cpu_time_ns,
+          device_time.end_driver_host_cpu_time_ns, device_time.duration_ns);
       for (uint32_t i = 0; i < sample_record.sample_value_count; ++i) {
         if (i != 0) fputc(',', file);
         fprintf(file, "%" PRIu64, values[i]);

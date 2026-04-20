@@ -46,6 +46,8 @@ typedef struct iree_profile_counter_aggregate_t {
   uint32_t physical_device_ordinal;
   // Session-local queue ordinal for this aggregate row.
   uint32_t queue_ordinal;
+  // Scope measured by the samples contributing to this aggregate row.
+  iree_hal_profile_counter_sample_scope_t scope;
   // Producer-defined stream identifier for this aggregate row.
   uint64_t stream_id;
   // Producer-local counter set identifier for this aggregate row.

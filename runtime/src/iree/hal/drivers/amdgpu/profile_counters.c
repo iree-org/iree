@@ -1246,11 +1246,13 @@ static void iree_hal_amdgpu_profile_counter_initialize_sample_record(
     const iree_hal_amdgpu_profile_counter_sample_slot_t* slot,
     iree_hal_profile_counter_sample_record_t* out_record) {
   *out_record = iree_hal_profile_counter_sample_record_default();
-  out_record->flags = IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DISPATCH_EVENT;
+  out_record->flags = IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DISPATCH_EVENT |
+                      IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE;
   if (iree_any_bit_set(event->flags,
                        IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER)) {
     out_record->flags |= IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION;
   }
+  out_record->scope = IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DISPATCH;
   out_record->sample_id = slot->sample_id;
   out_record->counter_set_id = counter_set->counter_set_id;
   out_record->dispatch_event_id = event->event_id;
@@ -1258,6 +1260,8 @@ static void iree_hal_amdgpu_profile_counter_initialize_sample_record(
   out_record->command_buffer_id = event->command_buffer_id;
   out_record->executable_id = event->executable_id;
   out_record->stream_id = iree_hal_amdgpu_host_queue_profile_stream_id(queue);
+  out_record->start_tick = event->start_tick;
+  out_record->end_tick = event->end_tick;
   out_record->command_index = event->command_index;
   out_record->export_ordinal = event->export_ordinal;
   out_record->physical_device_ordinal =

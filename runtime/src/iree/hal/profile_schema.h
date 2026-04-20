@@ -1319,12 +1319,31 @@ enum iree_hal_profile_counter_sample_flag_bits_t {
   // |command_buffer_id| and |command_index| reference a command-buffer
   // operation in the same profile session.
   IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_COMMAND_OPERATION = 1u << 1,
+
+  // |start_tick| and |end_tick| contain a device-tick interval.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE = 1u << 2,
+};
+
+// Scope of one emitted hardware counter sample.
+typedef uint32_t iree_hal_profile_counter_sample_scope_t;
+enum iree_hal_profile_counter_sample_scope_e {
+  // Producer did not classify the measured scope.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_NONE = 0u,
+
+  // Sample describes one dispatch.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DISPATCH = 1u,
+
+  // Sample describes one encoded command-buffer operation.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_COMMAND_OPERATION = 2u,
+
+  // Sample describes a physical-device time range.
+  IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DEVICE_TIME_RANGE = 3u,
 };
 
 // Hardware counter sample followed by |sample_value_count| uint64_t values.
 //
 // Samples are intentionally vector-shaped: one sample record represents one
-// measured dispatch/range for one counter set, and counter metadata defines how
+// measured scope for one counter set, and counter metadata defines how
 // to split the trailing value vector into named counters. This keeps dense
 // dispatch-counter streams compact while preserving raw per-instance hardware
 // values for later tooling-side aggregation.
@@ -1333,6 +1352,10 @@ typedef struct iree_hal_profile_counter_sample_record_t {
   uint32_t record_length;
   // Flags describing which correlation fields are valid.
   iree_hal_profile_counter_sample_flags_t flags;
+  // Scope measured by this sample.
+  iree_hal_profile_counter_sample_scope_t scope;
+  // Reserved for future counter sample fields; must be zero.
+  uint32_t reserved0;
   // Producer-local sample identifier unique within the counter sample stream.
   uint64_t sample_id;
   // Producer-local counter set identifier defining the trailing value layout.
@@ -1347,6 +1370,12 @@ typedef struct iree_hal_profile_counter_sample_record_t {
   uint64_t executable_id;
   // Producer-defined stream identifier matching queue metadata, or 0.
   uint64_t stream_id;
+  // Device timestamp captured when sampling began, valid when
+  // IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE is set.
+  uint64_t start_tick;
+  // Device timestamp captured when sampling ended, valid when
+  // IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE is set.
+  uint64_t end_tick;
   // Command ordinal within a command buffer, or UINT32_MAX when absent.
   uint32_t command_index;
   // Executable export ordinal, or UINT32_MAX when absent.
@@ -1358,7 +1387,7 @@ typedef struct iree_hal_profile_counter_sample_record_t {
   // Number of trailing uint64_t sample values.
   uint32_t sample_value_count;
   // Reserved for future counter sample fields; must be zero.
-  uint32_t reserved0;
+  uint32_t reserved1;
 } iree_hal_profile_counter_sample_record_t;
 
 // Returns a default hardware counter sample record.
@@ -1773,7 +1802,7 @@ IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_set_record_t,
                                       32);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_record_t, 48);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_counter_sample_record_t,
-                                      88);
+                                      112);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
     iree_hal_profile_device_metric_source_record_t, 40);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
@@ -1796,7 +1825,7 @@ IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_set_record_t,
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_record_t,
                                      block_name_length, 36);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_sample_record_t,
-                                     sample_value_count, 80);
+                                     sample_value_count, 104);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
     iree_hal_profile_device_metric_source_record_t, name_length, 36);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(

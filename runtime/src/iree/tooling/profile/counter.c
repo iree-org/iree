@@ -56,6 +56,8 @@ typedef struct iree_profile_counter_aggregate_lookup_t {
   uint32_t physical_device_ordinal;
   // Session-local queue ordinal.
   uint32_t queue_ordinal;
+  // Scope measured by samples contributing to the aggregate.
+  iree_hal_profile_counter_sample_scope_t scope;
   // Producer-defined stream identifier.
   uint64_t stream_id;
   // Producer-local counter-set identifier.
@@ -82,12 +84,13 @@ static uint64_t iree_profile_counter_hash(uint64_t counter_set_id,
 
 static uint64_t iree_profile_counter_aggregate_hash(
     uint32_t physical_device_ordinal, uint32_t queue_ordinal,
-    uint64_t stream_id, uint64_t counter_set_id, uint32_t counter_ordinal,
-    uint64_t executable_id, uint32_t export_ordinal,
-    uint64_t command_buffer_id) {
+    uint64_t stream_id, iree_hal_profile_counter_sample_scope_t scope,
+    uint64_t counter_set_id, uint32_t counter_ordinal, uint64_t executable_id,
+    uint32_t export_ordinal, uint64_t command_buffer_id) {
   uint64_t hash = iree_profile_index_mix_u64(physical_device_ordinal);
   hash = iree_profile_index_combine_u64(hash, queue_ordinal);
   hash = iree_profile_index_combine_u64(hash, stream_id);
+  hash = iree_profile_index_combine_u64(hash, scope);
   hash = iree_profile_index_combine_u64(hash, counter_set_id);
   hash = iree_profile_index_combine_u64(hash, counter_ordinal);
   hash = iree_profile_index_combine_u64(hash, executable_id);
@@ -122,6 +125,7 @@ static bool iree_profile_counter_aggregate_matches(const void* user_data,
              lookup->physical_device_ordinal &&
          aggregate->queue_ordinal == lookup->queue_ordinal &&
          aggregate->stream_id == lookup->stream_id &&
+         aggregate->scope == lookup->scope &&
          aggregate->counter_set_id == lookup->counter_set_id &&
          aggregate->counter_ordinal == lookup->counter_ordinal &&
          aggregate->executable_id == lookup->executable_id &&
@@ -263,7 +267,8 @@ static const iree_profile_counter_t* iree_profile_counter_find_counter(
 
 static iree_status_t iree_profile_counter_get_aggregate(
     iree_profile_counter_context_t* context, uint32_t physical_device_ordinal,
-    uint32_t queue_ordinal, uint64_t stream_id, uint64_t counter_set_id,
+    uint32_t queue_ordinal, uint64_t stream_id,
+    iree_hal_profile_counter_sample_scope_t scope, uint64_t counter_set_id,
     uint32_t counter_ordinal, uint64_t executable_id, uint32_t export_ordinal,
     uint64_t command_buffer_id,
     iree_profile_counter_aggregate_t** out_aggregate) {
@@ -274,6 +279,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
       .physical_device_ordinal = physical_device_ordinal,
       .queue_ordinal = queue_ordinal,
       .stream_id = stream_id,
+      .scope = scope,
       .counter_set_id = counter_set_id,
       .counter_ordinal = counter_ordinal,
       .executable_id = executable_id,
@@ -281,7 +287,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
       .command_buffer_id = command_buffer_id,
   };
   const uint64_t hash = iree_profile_counter_aggregate_hash(
-      physical_device_ordinal, queue_ordinal, stream_id, counter_set_id,
+      physical_device_ordinal, queue_ordinal, stream_id, scope, counter_set_id,
       counter_ordinal, executable_id, export_ordinal, command_buffer_id);
   iree_host_size_t existing_index = 0;
   if (iree_profile_index_find(&context->aggregate_index, hash,
@@ -309,6 +315,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
   aggregate->physical_device_ordinal = physical_device_ordinal;
   aggregate->queue_ordinal = queue_ordinal;
   aggregate->stream_id = stream_id;
+  aggregate->scope = scope;
   aggregate->counter_set_id = counter_set_id;
   aggregate->counter_ordinal = counter_ordinal;
   aggregate->executable_id = executable_id;
@@ -462,6 +469,22 @@ static const char* iree_profile_counter_unit_name(
   }
 }
 
+static const char* iree_profile_counter_sample_scope_name(
+    iree_hal_profile_counter_sample_scope_t scope) {
+  switch (scope) {
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_NONE:
+      return "none";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DISPATCH:
+      return "dispatch";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_COMMAND_OPERATION:
+      return "command_operation";
+    case IREE_HAL_PROFILE_COUNTER_SAMPLE_SCOPE_DEVICE_TIME_RANGE:
+      return "device_time_range";
+    default:
+      return "unknown";
+  }
+}
+
 static bool iree_profile_counter_sample_matches_id(
     const iree_hal_profile_counter_sample_record_t* sample, int64_t id_filter) {
   if (id_filter < 0) return true;
@@ -563,6 +586,13 @@ static void iree_profile_counter_print_sample_jsonl(
     const iree_profile_counter_set_t* counter_set,
     const iree_profile_counter_t* counter, iree_string_view_t key,
     const uint8_t* sample_values, double value_sum, FILE* file) {
+  const bool has_device_tick_range = iree_all_bits_set(
+      sample->flags, IREE_HAL_PROFILE_COUNTER_SAMPLE_FLAG_DEVICE_TICK_RANGE);
+  const bool valid_device_tick_range =
+      has_device_tick_range && sample->start_tick != 0 &&
+      sample->end_tick != 0 && sample->end_tick >= sample->start_tick;
+  const uint64_t duration_ticks =
+      valid_device_tick_range ? sample->end_tick - sample->start_tick : 0;
   fprintf(file,
           "{\"type\":\"counter_sample\",\"sample_id\":%" PRIu64
           ",\"counter_set_id\":%" PRIu64 ",\"counter_set\":",
@@ -577,22 +607,36 @@ static void iree_profile_counter_print_sample_jsonl(
   iree_profile_fprint_json_string(
       file, iree_make_cstring_view(
                 iree_profile_counter_unit_name(counter->record.unit)));
+  fprintf(file, ",\"scope\":");
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(
+                iree_profile_counter_sample_scope_name(sample->scope)));
   fprintf(file,
+          ",\"scope_value\":%u"
           ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
           ",\"command_buffer_id\":%" PRIu64
           ",\"command_index\":%u,\"executable_id\":%" PRIu64
           ",\"export_ordinal\":%u,\"key\":",
-          sample->dispatch_event_id, sample->submission_id,
+          sample->scope, sample->dispatch_event_id, sample->submission_id,
           sample->command_buffer_id, sample->command_index,
           sample->executable_id, sample->export_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
           ",\"stream_id\":%" PRIu64
-          ",\"flags\":%u,\"value\":%.3f"
+          ",\"flags\":%u"
+          ",\"device_tick_range_present\":%s"
+          ",\"device_tick_domain\":\"device_tick\""
+          ",\"start_tick\":%" PRIu64 ",\"end_tick\":%" PRIu64
+          ",\"duration_ticks\":%" PRIu64
+          ",\"device_tick_range_valid\":%s"
+          ",\"value\":%.3f"
           ",\"values\":",
           sample->physical_device_ordinal, sample->queue_ordinal,
-          sample->stream_id, sample->flags, value_sum);
+          sample->stream_id, sample->flags,
+          has_device_tick_range ? "true" : "false", sample->start_tick,
+          sample->end_tick, duration_ticks,
+          valid_device_tick_range ? "true" : "false", value_sum);
   iree_profile_counter_print_sample_values_jsonl(counter, sample_values, file);
   fputs("}\n", file);
 }
@@ -692,7 +736,7 @@ static iree_status_t iree_profile_counter_process_sample_counter(
   iree_profile_counter_aggregate_t* aggregate = NULL;
   IREE_RETURN_IF_ERROR(iree_profile_counter_get_aggregate(
       counter_context, state->sample.physical_device_ordinal,
-      state->sample.queue_ordinal, state->sample.stream_id,
+      state->sample.queue_ordinal, state->sample.stream_id, state->sample.scope,
       state->sample.counter_set_id, counter->record.counter_ordinal,
       state->sample.executable_id, state->sample.export_ordinal,
       state->sample.command_buffer_id, &aggregate));
@@ -990,8 +1034,8 @@ static void iree_profile_counter_print_text_group(
   const iree_profile_counter_t* counter = row->counter;
   fprintf(file,
           "  %.*s / %.*s.%.*s\n"
-          "    device=%u queue=%u stream=%" PRIu64 " command_buffer=%" PRIu64
-          " executable=%" PRIu64
+          "    scope=%s device=%u queue=%u stream=%" PRIu64
+          " command_buffer=%" PRIu64 " executable=%" PRIu64
           " export=%u key=%.*s\n"
           "    samples=%" PRIu64 " raw_values=%" PRIu64
           " value[min/avg/stddev/max/total]=%.3f/%.3f/%.3f/%.3f/%.3f "
@@ -999,6 +1043,7 @@ static void iree_profile_counter_print_text_group(
           (int)counter_set->name.size, counter_set->name.data,
           (int)counter->block_name.size, counter->block_name.data,
           (int)counter->name.size, counter->name.data,
+          iree_profile_counter_sample_scope_name(aggregate->scope),
           aggregate->physical_device_ordinal, aggregate->queue_ordinal,
           aggregate->stream_id, aggregate->command_buffer_id,
           aggregate->executable_id, aggregate->export_ordinal,
@@ -1071,10 +1116,15 @@ static void iree_profile_counter_print_jsonl_group(
   const iree_profile_counter_t* counter = row->counter;
   fprintf(file,
           "{\"type\":\"counter_group\",\"physical_device_ordinal\":%u"
-          ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64
-          ",\"counter_set_id\":%" PRIu64 ",\"counter_set\":",
+          ",\"queue_ordinal\":%u,\"stream_id\":%" PRIu64 ",\"scope\":",
           aggregate->physical_device_ordinal, aggregate->queue_ordinal,
-          aggregate->stream_id, aggregate->counter_set_id);
+          aggregate->stream_id);
+  iree_profile_fprint_json_string(
+      file, iree_make_cstring_view(
+                iree_profile_counter_sample_scope_name(aggregate->scope)));
+  fprintf(file,
+          ",\"scope_value\":%u,\"counter_set_id\":%" PRIu64 ",\"counter_set\":",
+          aggregate->scope, aggregate->counter_set_id);
   iree_profile_fprint_json_string(file, counter_set->name);
   fprintf(file,
           ",\"counter_ordinal\":%u,\"counter\":", aggregate->counter_ordinal);
