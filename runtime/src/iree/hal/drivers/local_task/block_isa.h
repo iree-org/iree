@@ -60,6 +60,48 @@ enum iree_hal_cmd_flag_bits_e {
   IREE_HAL_CMD_FLAG_SEQUENTIAL = 1u << 2,
 };
 
+// Target byte length for each transfer tile. This is large enough to amortize
+// scheduling and CAS overhead while still giving large fills/copies enough
+// independent work to use the available CPU workers.
+#define IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES ((iree_device_size_t)64 * 1024)
+
+// Returns the number of transfer tiles required to cover |length| bytes.
+static inline uint64_t iree_hal_cmd_transfer_tile_count_u64(
+    iree_device_size_t length) {
+  if (length == 0) return 0;
+  return 1 + (uint64_t)((length - 1) / IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES);
+}
+
+// Returns true if |length| can be represented in the 32-bit tile counters used
+// by the block processor.
+static inline bool iree_hal_cmd_transfer_tile_count_is_representable(
+    iree_device_size_t length) {
+  return iree_hal_cmd_transfer_tile_count_u64(length) <= UINT32_MAX;
+}
+
+// Returns the number of transfer tiles required to cover |length| bytes.
+// Callers must have checked that the result is representable.
+static inline uint32_t iree_hal_cmd_transfer_tile_count(
+    iree_device_size_t length) {
+  return (uint32_t)iree_hal_cmd_transfer_tile_count_u64(length);
+}
+
+// Returns the byte offset of |tile| within a transfer range.
+static inline iree_device_size_t iree_hal_cmd_transfer_tile_offset(
+    uint32_t tile) {
+  return (iree_device_size_t)tile * IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES;
+}
+
+// Returns the byte length of |tile| within a transfer of |total_length| bytes.
+static inline iree_device_size_t iree_hal_cmd_transfer_tile_length(
+    iree_device_size_t total_length, uint32_t tile) {
+  const iree_device_size_t offset = iree_hal_cmd_transfer_tile_offset(tile);
+  const iree_device_size_t remaining_length = total_length - offset;
+  return remaining_length < IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES
+             ? remaining_length
+             : IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES;
+}
+
 //===----------------------------------------------------------------------===//
 // Command header
 //===----------------------------------------------------------------------===//
@@ -390,7 +432,8 @@ static_assert(sizeof(iree_hal_cmd_copy_t) == 32, "copy command is 4 qwords");
 
 // Copies inline host data (captured at recording time) to a device buffer.
 // The source data follows the command header inline in .text. At execution
-// the processor does a single memcpy. tile_count is always 1.
+// the processor does a single memcpy. UPDATE is effectively single-tile because
+// the inline command payload is capped at 2040 bytes.
 typedef struct iree_hal_cmd_update_t {
   iree_hal_cmd_header_t header;  // opcode=UPDATE
 
@@ -472,8 +515,9 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // .data is purely scratch: scheduling atomics + resolved binding pointers.
 //
 // "Tiles" are the universal scheduling primitive: a dispatch of N tiles is
-// N work items, a copy/fill is 1 tile (or N tiles for a parallelized
-// large transfer). All commands decompose into tiles.
+// N work items, a copy/fill is ceil(length / transfer tile length), and an
+// UPDATE is 0 or 1 tile due to the inline source-data command-size limit. All
+// commands decompose into tiles.
 //
 // Cache-line isolation is critical throughout. The existing task system
 // loses ~57% of runtime on some models to 48-64 threads hammering the same

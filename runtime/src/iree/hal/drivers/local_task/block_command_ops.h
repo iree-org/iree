@@ -65,8 +65,9 @@ void iree_hal_cmd_build_rollback(iree_hal_cmd_block_builder_t* builder,
 
 // Builds a FILL command into the builder.
 //
-// Appends a single-tile fill command that writes |pattern| (1/2/4 bytes)
-// repeated across |length| bytes of the target buffer.
+// Appends a fill command that writes |pattern| (1/2/4 bytes) repeated across
+// |length| bytes of the target buffer. Large fills decompose into transfer
+// tiles so multiple workers can participate.
 //
 // Returns 1 fixup entry via |out_fixups|:
 //   fixups[0]: target buffer (data_index pre-filled, caller resolves binding)
@@ -83,8 +84,9 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
 
 // Builds a COPY command into the builder.
 //
-// Appends a single-tile copy command that copies |length| bytes from the
-// source buffer to the target buffer.
+// Appends a copy command that copies |length| bytes from the source buffer to
+// the target buffer. Large copies decompose into transfer tiles so multiple
+// workers can participate.
 //
 // Returns 2 fixup entries via |out_fixups|:
 //   fixups[0]: source buffer (data_index pre-filled, caller resolves binding)

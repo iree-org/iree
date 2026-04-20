@@ -36,18 +36,24 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
   IREE_ASSERT_ARGUMENT(pattern);
   IREE_ASSERT_ARGUMENT(out_fixups);
   IREE_ASSERT_ARGUMENT(out_token);
+  if (IREE_UNLIKELY(
+          !iree_hal_cmd_transfer_tile_count_is_representable(length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "fill length exceeds block ISA tile capacity");
+  }
 
   uint16_t binding_data_base = builder->total_binding_count;
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   iree_hal_cmd_fill_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_fill_t);
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
-  out_token->tile_count = 1;
+  out_token->tile_count = tile_count;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
       builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_fill_t), 1, 1, 1, (void**)&cmd, &fixups));
+      sizeof(iree_hal_cmd_fill_t), 1, 1, tile_count, (void**)&cmd, &fixups));
 
   cmd->target_binding = binding_data_base;
   cmd->pattern_length = (uint8_t)pattern_length;
@@ -74,18 +80,24 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
   IREE_ASSERT_ARGUMENT(builder);
   IREE_ASSERT_ARGUMENT(out_fixups);
   IREE_ASSERT_ARGUMENT(out_token);
+  if (IREE_UNLIKELY(
+          !iree_hal_cmd_transfer_tile_count_is_representable(length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "copy length exceeds block ISA tile capacity");
+  }
 
   uint16_t binding_data_base = builder->total_binding_count;
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   iree_hal_cmd_copy_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_copy_t);
   out_token->fixup_count = 2;
   out_token->binding_count = 2;
-  out_token->tile_count = 1;
+  out_token->tile_count = tile_count;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
       builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
-      sizeof(iree_hal_cmd_copy_t), 2, 2, 1, (void**)&cmd, &fixups));
+      sizeof(iree_hal_cmd_copy_t), 2, 2, tile_count, (void**)&cmd, &fixups));
 
   cmd->source_binding = binding_data_base;
   cmd->target_binding = (uint16_t)(binding_data_base + 1);
@@ -115,8 +127,14 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
   IREE_ASSERT_ARGUMENT(source_buffer);
   IREE_ASSERT_ARGUMENT(out_fixups);
   IREE_ASSERT_ARGUMENT(out_token);
+  if (IREE_UNLIKELY(
+          !iree_hal_cmd_transfer_tile_count_is_representable(length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "update length exceeds block ISA tile capacity");
+  }
 
   uint16_t binding_data_base = builder->total_binding_count;
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   // Command includes trailing inline source data, 8-byte aligned.
   iree_host_size_t cmd_bytes =
@@ -127,10 +145,10 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
   out_token->cmd_bytes = cmd_bytes;
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
-  out_token->tile_count = 1;
+  out_token->tile_count = tile_count;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      builder, IREE_HAL_CMD_UPDATE, IREE_HAL_CMD_FLAG_NONE, cmd_bytes, 1, 1, 1,
-      (void**)&cmd, &fixups));
+      builder, IREE_HAL_CMD_UPDATE, IREE_HAL_CMD_FLAG_NONE, cmd_bytes, 1, 1,
+      tile_count, (void**)&cmd, &fixups));
 
   cmd->target_binding = binding_data_base;
   cmd->target_offset = 0;

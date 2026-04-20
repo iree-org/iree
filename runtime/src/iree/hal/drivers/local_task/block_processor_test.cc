@@ -26,7 +26,11 @@ namespace {
 // drain() in a loop until the recording completes.
 
 struct WorkerArgs {
+  // Shared processor context drained by all test workers.
   iree_hal_cmd_block_processor_context_t* context;
+  // Aggregate tile count used by tests that inspect scheduling shape.
+  iree_atomic_int64_t* total_tiles;
+  // Worker index passed through to the processor.
   uint32_t worker_index;
 };
 
@@ -40,6 +44,11 @@ static int worker_thread_entry(void* arg) {
     iree_hal_cmd_block_processor_drain(worker_args->context,
                                        worker_args->worker_index, &worker_state,
                                        &result);
+    if (result.tiles_executed != 0) {
+      iree_atomic_fetch_add(worker_args->total_tiles,
+                            (int64_t)result.tiles_executed,
+                            iree_memory_order_relaxed);
+    }
     if (!result.completed && result.tiles_executed == 0) {
       iree_thread_yield();
     }
@@ -204,19 +213,24 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
   // thread via drain() loop, joins, and returns the result.
   iree_status_t execute(const iree_hal_cmd_block_recording_t* recording,
                         const iree_hal_cmd_binding_entry_t* binding_table,
-                        iree_host_size_t binding_table_length) {
+                        iree_host_size_t binding_table_length,
+                        uint64_t* out_total_tiles_executed = nullptr) {
+    if (out_total_tiles_executed) *out_total_tiles_executed = 0;
+
     iree_hal_cmd_block_processor_context_t* context = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_cmd_block_processor_context_allocate(
         recording, binding_table, binding_table_length, worker_count(),
         iree_allocator_system(), &context));
     if (!context) return iree_ok_status();
 
+    iree_atomic_int64_t total_tiles_executed = IREE_ATOMIC_VAR_INIT(0);
     if (worker_count() > 1) {
       // Spawn worker threads (1..N-1).
       std::vector<WorkerArgs> args(worker_count());
       std::vector<iree_thread_t*> threads(worker_count() - 1, nullptr);
       for (uint32_t i = 0; i < worker_count(); ++i) {
         args[i].context = context;
+        args[i].total_tiles = &total_tiles_executed;
         args[i].worker_index = i;
       }
       for (uint32_t i = 1; i < worker_count(); ++i) {
@@ -246,6 +260,11 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
       iree_hal_cmd_block_processor_drain_result_t result;
       do {
         iree_hal_cmd_block_processor_drain(context, 0, &worker_state, &result);
+        if (result.tiles_executed != 0) {
+          iree_atomic_fetch_add(&total_tiles_executed,
+                                (int64_t)result.tiles_executed,
+                                iree_memory_order_relaxed);
+        }
         if (!result.completed && result.tiles_executed == 0) {
           iree_thread_yield();
         }
@@ -261,10 +280,19 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
       memset(&worker_state, 0, sizeof(worker_state));
       iree_hal_cmd_block_processor_drain_result_t result;
       iree_hal_cmd_block_processor_drain(context, 0, &worker_state, &result);
+      if (result.tiles_executed != 0) {
+        iree_atomic_fetch_add(&total_tiles_executed,
+                              (int64_t)result.tiles_executed,
+                              iree_memory_order_relaxed);
+      }
     }
 
     iree_status_t result =
         iree_hal_cmd_block_processor_context_consume_result(context);
+    if (out_total_tiles_executed) {
+      *out_total_tiles_executed = (uint64_t)iree_atomic_load(
+          &total_tiles_executed, iree_memory_order_relaxed);
+    }
     iree_hal_cmd_block_processor_context_free(context, iree_allocator_system());
     return result;
   }
@@ -464,6 +492,66 @@ TEST_P(BlockProcessorTest, FillCommand) {
   iree_hal_cmd_block_builder_deinitialize(&builder);
 }
 
+TEST_P(BlockProcessorTest, LargeFillCommandUsesTransferTiles) {
+  const iree_device_size_t fill_length =
+      IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES * 3 + 17;
+  const iree_device_size_t target_offset = 13;
+  const iree_device_size_t trailing_length = 19;
+  const iree_device_size_t buffer_length =
+      target_offset + fill_length + trailing_length;
+  std::vector<uint8_t> buffer((size_t)buffer_length, 0x11);
+
+  iree_hal_cmd_binding_entry_t table[] = {
+      {buffer.data(), buffer.size()},
+  };
+
+  iree_hal_cmd_fixup_t fixups[1];
+  memset(fixups, 0, sizeof(fixups));
+  fixups[0].host_ptr = NULL;
+  fixups[0].slot = 0;
+  fixups[0].data_index = 0;
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(&block_pool_, &builder);
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
+
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(fill_length);
+  iree_hal_cmd_fill_t* fill = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+      &builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
+      sizeof(iree_hal_cmd_fill_t), 1, 1, tile_count, (void**)&fill,
+      &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
+  fill->target_binding = 0;
+  fill->pattern_length = 1;
+  fill->params.direct.target_offset = target_offset;
+  fill->params.direct.length = fill_length;
+  fill->params.direct.pattern = 0xA5;
+
+  iree_hal_cmd_block_recording_t recording;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
+
+  uint64_t total_tiles_executed = 0;
+  IREE_ASSERT_OK(
+      execute(&recording, table, IREE_ARRAYSIZE(table), &total_tiles_executed));
+
+  EXPECT_EQ(total_tiles_executed, tile_count);
+  for (iree_device_size_t i = 0; i < target_offset; ++i) {
+    EXPECT_EQ(buffer[(size_t)i], 0x11) << "prefix byte " << i;
+  }
+  for (iree_device_size_t i = 0; i < fill_length; ++i) {
+    EXPECT_EQ(buffer[(size_t)(target_offset + i)], 0xA5) << "filled byte " << i;
+  }
+  for (iree_device_size_t i = target_offset + fill_length; i < buffer_length;
+       ++i) {
+    EXPECT_EQ(buffer[(size_t)i], 0x11) << "trailing byte " << i;
+  }
+
+  iree_hal_cmd_block_recording_release(&recording);
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+}
+
 TEST_P(BlockProcessorTest, CopyCommand) {
   uint32_t source[8] = {10, 20, 30, 40, 50, 60, 70, 80};
   uint32_t target[8];
@@ -511,6 +599,78 @@ TEST_P(BlockProcessorTest, CopyCommand) {
   EXPECT_EQ(target[3], 60u);
   // Rest untouched.
   EXPECT_EQ(target[4], 0u);
+
+  iree_hal_cmd_block_recording_release(&recording);
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+}
+
+TEST_P(BlockProcessorTest, LargeCopyCommandUsesTransferTiles) {
+  const iree_device_size_t copy_length =
+      IREE_HAL_CMD_TRANSFER_TILE_LENGTH_BYTES * 2 + 123;
+  const iree_device_size_t source_offset = 7;
+  const iree_device_size_t target_offset = 11;
+  const iree_device_size_t trailing_length = 23;
+  const iree_device_size_t source_length = source_offset + copy_length;
+  const iree_device_size_t target_length =
+      target_offset + copy_length + trailing_length;
+  std::vector<uint8_t> source((size_t)source_length);
+  std::vector<uint8_t> target((size_t)target_length, 0xCC);
+  for (iree_device_size_t i = 0; i < source_length; ++i) {
+    source[(size_t)i] = (uint8_t)(i * 13 + 7);
+  }
+
+  iree_hal_cmd_binding_entry_t table[] = {
+      {source.data(), source.size()},
+      {target.data(), target.size()},
+  };
+
+  iree_hal_cmd_fixup_t fixups[2];
+  memset(fixups, 0, sizeof(fixups));
+  fixups[0].host_ptr = NULL;
+  fixups[0].slot = 0;
+  fixups[0].data_index = 0;
+  fixups[1].host_ptr = NULL;
+  fixups[1].slot = 1;
+  fixups[1].data_index = 1;
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(&block_pool_, &builder);
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
+
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(copy_length);
+  iree_hal_cmd_copy_t* copy = NULL;
+  iree_hal_cmd_fixup_t* out_fixups = NULL;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+      &builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
+      sizeof(iree_hal_cmd_copy_t), 2, 2, tile_count, (void**)&copy,
+      &out_fixups));
+  memcpy(out_fixups, fixups, sizeof(fixups));
+  copy->source_binding = 0;
+  copy->target_binding = 1;
+  copy->params.direct.source_offset = source_offset;
+  copy->params.direct.target_offset = target_offset;
+  copy->params.direct.length = copy_length;
+
+  iree_hal_cmd_block_recording_t recording;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
+
+  uint64_t total_tiles_executed = 0;
+  IREE_ASSERT_OK(
+      execute(&recording, table, IREE_ARRAYSIZE(table), &total_tiles_executed));
+
+  EXPECT_EQ(total_tiles_executed, tile_count);
+  for (iree_device_size_t i = 0; i < target_offset; ++i) {
+    EXPECT_EQ(target[(size_t)i], 0xCC) << "prefix byte " << i;
+  }
+  for (iree_device_size_t i = 0; i < copy_length; ++i) {
+    EXPECT_EQ(target[(size_t)(target_offset + i)],
+              source[(size_t)(source_offset + i)])
+        << "copied byte " << i;
+  }
+  for (iree_device_size_t i = target_offset + copy_length; i < target_length;
+       ++i) {
+    EXPECT_EQ(target[(size_t)i], 0xCC) << "trailing byte " << i;
+  }
 
   iree_hal_cmd_block_recording_release(&recording);
   iree_hal_cmd_block_builder_deinitialize(&builder);

@@ -158,6 +158,30 @@ static uint32_t iree_hal_cmd_dispatch_tile_count(
   return workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
 }
 
+static iree_hal_fill_params_t iree_hal_cmd_fill_read_params(
+    const iree_hal_cmd_fill_t* fill, void** binding_ptrs) {
+  if (fill->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
+    const void* params_buffer =
+        binding_ptrs[fill->params.indirect.params_binding];
+    return *(
+        const iree_hal_fill_params_t*)((const uint8_t*)params_buffer +
+                                       fill->params.indirect.params_offset);
+  }
+  return fill->params.direct;
+}
+
+static iree_hal_copy_params_t iree_hal_cmd_copy_read_params(
+    const iree_hal_cmd_copy_t* copy, void** binding_ptrs) {
+  if (copy->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
+    const void* params_buffer =
+        binding_ptrs[copy->params.indirect.params_binding];
+    return *(
+        const iree_hal_copy_params_t*)((const uint8_t*)params_buffer +
+                                       copy->params.indirect.params_offset);
+  }
+  return copy->params.direct;
+}
+
 static const iree_hal_cmd_header_t* iree_hal_cmd_region_end(
     const iree_hal_cmd_barrier_t* barrier) {
   const iree_hal_cmd_header_t* cmd = iree_hal_cmd_next(&barrier->header);
@@ -177,10 +201,23 @@ static uint32_t iree_hal_cmd_region_tile_count(
         tile_count += iree_hal_cmd_dispatch_tile_count(
             (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs);
         break;
-      case IREE_HAL_CMD_FILL:
-      case IREE_HAL_CMD_COPY:
+      case IREE_HAL_CMD_FILL: {
+        const iree_hal_cmd_fill_t* fill = (const iree_hal_cmd_fill_t*)cmd;
+        const iree_hal_fill_params_t params =
+            iree_hal_cmd_fill_read_params(fill, binding_ptrs);
+        tile_count += iree_hal_cmd_transfer_tile_count(params.length);
+        break;
+      }
+      case IREE_HAL_CMD_COPY: {
+        const iree_hal_cmd_copy_t* copy = (const iree_hal_cmd_copy_t*)cmd;
+        const iree_hal_copy_params_t params =
+            iree_hal_cmd_copy_read_params(copy, binding_ptrs);
+        tile_count += iree_hal_cmd_transfer_tile_count(params.length);
+        break;
+      }
       case IREE_HAL_CMD_UPDATE:
-        tile_count += 1;
+        tile_count += iree_hal_cmd_transfer_tile_count(
+            ((const iree_hal_cmd_update_t*)cmd)->length);
         break;
       default:
         break;
@@ -354,6 +391,26 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
   }
 
   return iree_ok_status();
+}
+
+static bool iree_hal_cmd_transfer_claim_tile(iree_atomic_int64_t* tile_index,
+                                             int32_t region_epoch,
+                                             uint32_t tile_count,
+                                             uint32_t* out_tile) {
+  const int64_t epoch_shifted = (int64_t)region_epoch << 32;
+  int64_t current = iree_atomic_load(tile_index, iree_memory_order_relaxed);
+  while (true) {
+    if ((current >> 32) != region_epoch) return false;
+    uint32_t tile = (uint32_t)(current & 0xFFFFFFFF);
+    if (tile >= tile_count) return false;
+    int64_t desired = epoch_shifted | (int64_t)(tile + 1);
+    if (iree_atomic_compare_exchange_weak(tile_index, &current, desired,
+                                          iree_memory_order_relaxed,
+                                          iree_memory_order_relaxed)) {
+      *out_tile = tile;
+      return true;
+    }
+  }
 }
 
 static void iree_hal_cmd_block_processor_profile_atomic_min_i64(
@@ -542,93 +599,104 @@ static void iree_hal_cmd_block_processor_profile_emit_region(
   }
 }
 
-// Executes a FILL command. For multi-worker: claims the single tile via
-// epoch-tagged CAS; exactly one worker performs the fill. Returns 1 if this
-// worker performed the fill, 0 otherwise.
+static void iree_hal_cmd_execute_fill_tile(const iree_hal_cmd_fill_t* fill,
+                                           uint8_t* target,
+                                           const iree_hal_fill_params_t* params,
+                                           uint32_t tile) {
+  const iree_device_size_t tile_offset =
+      iree_hal_cmd_transfer_tile_offset(tile);
+  const iree_device_size_t tile_length =
+      iree_hal_cmd_transfer_tile_length(params->length, tile);
+  iree_hal_cmd_fill_pattern(target + params->target_offset + tile_offset,
+                            tile_length, params->pattern, fill->pattern_length);
+}
+
+// Executes a FILL command by claiming transfer tiles with the same epoch-tagged
+// CAS machinery used for dispatch workgroups.
 static uint32_t iree_hal_cmd_execute_fill(const iree_hal_cmd_fill_t* fill,
                                           void** binding_ptrs,
                                           iree_atomic_int64_t* tile_index,
                                           int32_t region_epoch,
                                           uint32_t worker_count) {
-  if (worker_count > 1) {
-    int64_t expected = (int64_t)region_epoch << 32;
-    int64_t desired = expected | 1;
-    if (!iree_atomic_compare_exchange_strong(tile_index, &expected, desired,
-                                             iree_memory_order_relaxed,
-                                             iree_memory_order_relaxed)) {
-      return 0;
+  uint8_t* target = (uint8_t*)binding_ptrs[fill->target_binding];
+  const iree_hal_fill_params_t params =
+      iree_hal_cmd_fill_read_params(fill, binding_ptrs);
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(params.length);
+  if (tile_count == 0) return 0;
+
+  uint32_t completed = 0;
+  if (worker_count == 1) {
+    for (uint32_t tile = 0; tile < tile_count; ++tile) {
+      iree_hal_cmd_execute_fill_tile(fill, target, &params, tile);
+    }
+    completed = tile_count;
+  } else {
+    uint32_t tile = 0;
+    while (iree_hal_cmd_transfer_claim_tile(tile_index, region_epoch,
+                                            tile_count, &tile)) {
+      iree_hal_cmd_execute_fill_tile(fill, target, &params, tile);
+      ++completed;
     }
   }
-
-  uint8_t* target = (uint8_t*)binding_ptrs[fill->target_binding];
-
-  if (fill->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
-    const void* params_buffer =
-        binding_ptrs[fill->params.indirect.params_binding];
-    const iree_hal_fill_params_t* params =
-        (const iree_hal_fill_params_t*)((const uint8_t*)params_buffer +
-                                        fill->params.indirect.params_offset);
-    iree_hal_cmd_fill_pattern(target + params->target_offset, params->length,
-                              params->pattern, fill->pattern_length);
-  } else {
-    iree_hal_cmd_fill_pattern(
-        target + fill->params.direct.target_offset, fill->params.direct.length,
-        fill->params.direct.pattern, fill->pattern_length);
-  }
-
-  return 1;
+  return completed;
 }
 
-// Executes a COPY command. For multi-worker: claims the single tile via
-// epoch-tagged CAS; exactly one worker performs the copy. Returns 1 if this
-// worker performed the copy, 0 otherwise.
+static void iree_hal_cmd_execute_copy_tile(const uint8_t* source,
+                                           uint8_t* target,
+                                           const iree_hal_copy_params_t* params,
+                                           uint32_t tile) {
+  const iree_device_size_t tile_offset =
+      iree_hal_cmd_transfer_tile_offset(tile);
+  const iree_device_size_t tile_length =
+      iree_hal_cmd_transfer_tile_length(params->length, tile);
+  memcpy(target + params->target_offset + tile_offset,
+         source + params->source_offset + tile_offset, (size_t)tile_length);
+}
+
+// Executes a COPY command by claiming transfer tiles with the same epoch-tagged
+// CAS machinery used for dispatch workgroups.
 static uint32_t iree_hal_cmd_execute_copy(const iree_hal_cmd_copy_t* copy,
                                           void** binding_ptrs,
                                           iree_atomic_int64_t* tile_index,
                                           int32_t region_epoch,
                                           uint32_t worker_count) {
-  if (worker_count > 1) {
-    int64_t expected = (int64_t)region_epoch << 32;
-    int64_t desired = expected | 1;
-    if (!iree_atomic_compare_exchange_strong(tile_index, &expected, desired,
-                                             iree_memory_order_relaxed,
-                                             iree_memory_order_relaxed)) {
-      return 0;
-    }
-  }
-
   const uint8_t* source = (const uint8_t*)binding_ptrs[copy->source_binding];
   uint8_t* target = (uint8_t*)binding_ptrs[copy->target_binding];
+  const iree_hal_copy_params_t params =
+      iree_hal_cmd_copy_read_params(copy, binding_ptrs);
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(params.length);
+  if (tile_count == 0) return 0;
 
-  if (copy->header.flags & IREE_HAL_CMD_FLAG_INDIRECT) {
-    const void* params_buffer =
-        binding_ptrs[copy->params.indirect.params_binding];
-    const iree_hal_copy_params_t* params =
-        (const iree_hal_copy_params_t*)((const uint8_t*)params_buffer +
-                                        copy->params.indirect.params_offset);
-    memcpy(target + params->target_offset, source + params->source_offset,
-           (size_t)params->length);
+  uint32_t completed = 0;
+  if (worker_count == 1) {
+    for (uint32_t tile = 0; tile < tile_count; ++tile) {
+      iree_hal_cmd_execute_copy_tile(source, target, &params, tile);
+    }
+    completed = tile_count;
   } else {
-    memcpy(target + copy->params.direct.target_offset,
-           source + copy->params.direct.source_offset,
-           (size_t)copy->params.direct.length);
+    uint32_t tile = 0;
+    while (iree_hal_cmd_transfer_claim_tile(tile_index, region_epoch,
+                                            tile_count, &tile)) {
+      iree_hal_cmd_execute_copy_tile(source, target, &params, tile);
+      ++completed;
+    }
   }
-
-  return 1;
+  return completed;
 }
 
 // Executes an UPDATE command. Copies inline host data from .text to a device
-// buffer. For multi-worker: claims the single tile via epoch-tagged CAS;
-// exactly one worker performs the memcpy. Returns 1 if this worker performed
-// the update, 0 otherwise.
+// buffer. UPDATE commands are at most one transfer tile because the inline
+// source payload is capped by the block ISA command size.
 static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
                                             void** binding_ptrs,
                                             iree_atomic_int64_t* tile_index,
                                             int32_t region_epoch,
                                             uint32_t worker_count) {
+  const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(update->length);
+  if (tile_count == 0) return 0;
   if (worker_count > 1) {
     int64_t expected = (int64_t)region_epoch << 32;
-    int64_t desired = expected | 1;
+    int64_t desired = expected | (int64_t)tile_count;
     if (!iree_atomic_compare_exchange_strong(tile_index, &expected, desired,
                                              iree_memory_order_relaxed,
                                              iree_memory_order_relaxed)) {
@@ -640,7 +708,7 @@ static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
   memcpy(target + update->target_offset, update->source_data,
          (size_t)update->length);
 
-  return 1;
+  return tile_count;
 }
 
 //===----------------------------------------------------------------------===//
@@ -890,7 +958,8 @@ static void iree_hal_cmd_block_processor_init_region(
 // no synchronization — just a straight-line interpreter. This is the path
 // for inline execution and small command buffers.
 static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
-    iree_hal_cmd_block_processor_context_t* context) {
+    iree_hal_cmd_block_processor_context_t* context,
+    uint32_t* out_tiles_executed) {
   const iree_hal_cmd_block_header_t* block = context->recording->first_block;
 
   while (block) {
@@ -910,30 +979,33 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
       switch (cmd->opcode) {
         case IREE_HAL_CMD_DISPATCH: {
           uint32_t tiles = 0;
+          iree_status_t status = iree_ok_status();
           if (IREE_UNLIKELY(context->profile.recorder != NULL)) {
-            IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles_profiled(
+            status = iree_hal_cmd_execute_dispatch_tiles_profiled(
                 context, (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
-                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
+                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles);
           } else {
-            IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_dispatch_tiles(
+            status = iree_hal_cmd_execute_dispatch_tiles(
                 (const iree_hal_cmd_dispatch_t*)cmd, binding_ptrs,
-                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles));
+                binding_lengths, NULL, 0, /*worker_index=*/0, 1, &tiles);
           }
+          *out_tiles_executed += tiles;
+          IREE_RETURN_IF_ERROR(status);
           break;
         }
         case IREE_HAL_CMD_FILL: {
-          iree_hal_cmd_execute_fill((const iree_hal_cmd_fill_t*)cmd,
-                                    binding_ptrs, NULL, 0, 1);
+          *out_tiles_executed += iree_hal_cmd_execute_fill(
+              (const iree_hal_cmd_fill_t*)cmd, binding_ptrs, NULL, 0, 1);
           break;
         }
         case IREE_HAL_CMD_COPY: {
-          iree_hal_cmd_execute_copy((const iree_hal_cmd_copy_t*)cmd,
-                                    binding_ptrs, NULL, 0, 1);
+          *out_tiles_executed += iree_hal_cmd_execute_copy(
+              (const iree_hal_cmd_copy_t*)cmd, binding_ptrs, NULL, 0, 1);
           break;
         }
         case IREE_HAL_CMD_UPDATE: {
-          iree_hal_cmd_execute_update((const iree_hal_cmd_update_t*)cmd,
-                                      binding_ptrs, NULL, 0, 1);
+          *out_tiles_executed += iree_hal_cmd_execute_update(
+              (const iree_hal_cmd_update_t*)cmd, binding_ptrs, NULL, 0, 1);
           break;
         }
         case IREE_HAL_CMD_BARRIER: {
@@ -1523,8 +1595,8 @@ void iree_hal_cmd_block_processor_drain(
 
   if (context->worker_count == 1) {
     // Single-worker fast path: no atomics, no synchronization.
-    iree_status_t status =
-        iree_hal_cmd_block_processor_execute_single_worker(context);
+    iree_status_t status = iree_hal_cmd_block_processor_execute_single_worker(
+        context, &out_result->tiles_executed);
     if (!iree_status_is_ok(status)) {
       iree_hal_cmd_block_processor_report_error(context, status);
     }

@@ -224,7 +224,8 @@ iree_status_t iree_hal_cmd_block_builder_end(
 //                  fixup_count but may differ for shared/aliased bindings.
 //   tile_count: scheduling tiles contributed by this command.
 //               DISPATCH: product of workgroup_count dimensions.
-//               FILL/COPY: 1 (single work item).
+//               FILL/COPY: ceil(length / transfer tile length).
+//               UPDATE: 0 or 1 due to inline command payload size.
 //
 // Returns a pointer to the command in the block via |out_cmd|. Header fields
 // (opcode, flags, size_qwords) are initialized. For DISPATCH commands,
