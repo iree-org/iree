@@ -1808,7 +1808,8 @@ static iree_status_t iree_hal_replay_executor_queue_execute(
                                              &device_entry);
   }
   iree_hal_replay_object_entry_t* command_buffer_entry = NULL;
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) &&
+      payload.command_buffer_id != IREE_HAL_REPLAY_OBJECT_ID_NONE) {
     status = iree_hal_replay_executor_lookup(
         executor, payload.command_buffer_id,
         IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER, &command_buffer_entry);
@@ -1818,10 +1819,20 @@ static iree_status_t iree_hal_replay_executor_queue_execute(
         (iree_host_size_t)payload.binding_count,
         bindings,
     };
-    status = iree_hal_device_queue_execute(
-        device_entry->value.device, payload.queue_affinity, wait_storage.list,
-        signal_storage.list, command_buffer_entry->value.command_buffer,
-        binding_table, payload.flags);
+    if (command_buffer_entry) {
+      status = iree_hal_device_queue_execute(
+          device_entry->value.device, payload.queue_affinity, wait_storage.list,
+          signal_storage.list, command_buffer_entry->value.command_buffer,
+          binding_table, payload.flags);
+    } else if (payload.binding_count == 0) {
+      status = iree_hal_device_queue_barrier(
+          device_entry->value.device, payload.queue_affinity, wait_storage.list,
+          signal_storage.list, payload.flags);
+    } else {
+      status = iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "replay queue barrier payload unexpectedly has bindings");
+    }
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_queue_flush(device_entry->value.device,

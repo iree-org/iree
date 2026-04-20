@@ -458,6 +458,55 @@ TEST(ReplayExecuteTest, ExecutesRecordedQueueTransfersAndDealloca) {
   iree_hal_replay_recorder_release(recorder);
 }
 
+TEST(ReplayExecuteTest, ExecutesRecordedQueueBarrier) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+
+  iree_hal_semaphore_t* semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY, /*initial_value=*/0,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
+  iree_hal_semaphore_t* semaphores[] = {semaphore};
+
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_list_t signal_list = {
+      IREE_ARRAYSIZE(semaphores),
+      semaphores,
+      &signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), signal_list, /*command_buffer=*/nullptr,
+      iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(
+      iree_hal_device_queue_flush(wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      signal_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_semaphore_release(semaphore);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
 TEST(ReplayExecuteTest, ExecutesRecordedCommandBufferTransfers) {
   std::vector<uint8_t> storage(65536, 0);
   iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
@@ -524,6 +573,94 @@ TEST(ReplayExecuteTest, ExecutesRecordedCommandBufferTransfers) {
   iree_hal_semaphore_release(semaphore);
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(buffer);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
+TEST(ReplayExecuteTest, ExecutesRecordedIndirectCommandBufferBindings) {
+  std::vector<uint8_t> storage(65536, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(wrapped_device);
+  ASSERT_NE(nullptr, allocator);
+
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                 IREE_HAL_BUFFER_USAGE_MAPPING |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_t* source_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(allocator, params, 16,
+                                                    &source_buffer));
+  iree_hal_buffer_t* target_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(allocator, params, 16,
+                                                    &target_buffer));
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      wrapped_device, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/1, &command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer, iree_hal_make_buffer_ref(source_buffer, 0, 16),
+      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, 0, 16),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  iree_hal_semaphore_t* semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY, /*initial_value=*/0,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
+  iree_hal_semaphore_t* semaphores[] = {semaphore};
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_list_t signal_list = {
+      IREE_ARRAYSIZE(semaphores),
+      semaphores,
+      &signal_value,
+  };
+  iree_hal_buffer_binding_t binding = {
+      target_buffer,
+      0,
+      16,
+  };
+  iree_hal_buffer_binding_table_t binding_table = {
+      1,
+      &binding,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), signal_list, command_buffer,
+      binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(
+      iree_hal_device_queue_flush(wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      signal_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_semaphore_release(semaphore);
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(target_buffer);
+  iree_hal_buffer_release(source_buffer);
 
   IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
   iree_hal_device_group_release(wrapped_group);
