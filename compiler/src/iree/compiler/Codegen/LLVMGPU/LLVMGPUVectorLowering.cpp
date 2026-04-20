@@ -191,6 +191,18 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
+static void getReductionAndParallelLoopDims(ArrayAttr iters,
+                                            SmallVectorImpl<int64_t> &red,
+                                            SmallVectorImpl<int64_t> &par) {
+  for (auto [idx, attr] : llvm::enumerate(iters)) {
+    if (vector::isReductionIterator(attr)) {
+      red.push_back(idx);
+    } else {
+      par.push_back(idx);
+    }
+  }
+}
+
 // Transposes the operands of a vector.contract so that LHS and RHS have
 // [reduction..., parallel...] physical layout, and the acc (if vector) has
 // parallel dims in the canonical order. Emits vector.broadcast for missing
@@ -414,18 +426,6 @@ private:
     return inv;
   }
 
-  static void getReductionAndParallelLoopDims(ArrayAttr iters,
-                                              SmallVectorImpl<int64_t> &red,
-                                              SmallVectorImpl<int64_t> &par) {
-    for (auto [idx, attr] : llvm::enumerate(iters)) {
-      if (vector::isReductionIterator(attr)) {
-        red.push_back(idx);
-      } else {
-        par.push_back(idx);
-      }
-    }
-  }
-
   static SmallVector<int64_t>
   getPermutationFromIndexingMap(AffineMap map, ArrayRef<int64_t> indices) {
     SmallVector<int64_t> dimToRes(map.getNumDims());
@@ -509,21 +509,21 @@ struct FlattenContractOperands final : OpRewritePattern<vector::ContractionOp> {
 
     // Check that the contract is in normalized [reduction..., parallel...] form
     // with identity maps on LHS/RHS.
-    ArrayAttr iteratorTypes = op.getIteratorTypes();
-    unsigned numDims = iteratorTypes.size();
-    unsigned numRedDims = 0;
-    for (unsigned i = 0; i < numDims; ++i) {
-      if (vector::isReductionIterator(iteratorTypes[i])) {
-        if (i != numRedDims) {
-          return failure();
-        }
-        ++numRedDims;
-      }
-    }
-    if (numRedDims == 0) {
+    SmallVector<int64_t> redDims, parDims;
+    getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
+    if (redDims.empty()) {
       return failure();
     }
-    unsigned numParDims = numDims - numRedDims;
+    unsigned numRedDims = redDims.size();
+    unsigned numParDims = parDims.size();
+    unsigned numDims = numRedDims + numParDims;
+
+    // Verify reduction dims come first (normalized form).
+    for (unsigned i = 0; i < numRedDims; ++i) {
+      if (redDims[i] != static_cast<int64_t>(i)) {
+        return failure();
+      }
+    }
 
     // Already 2D (one reduction + one parallel) — nothing to flatten.
     if (numRedDims <= 1 && numParDims <= 1) {
