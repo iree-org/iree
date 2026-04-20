@@ -1617,6 +1617,20 @@ SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
   return llvm::to_vector(getInputType().getShape());
 }
 
+ArrayAttr IREE::LinalgExt::ArgCompareOp::getIndexingMaps() {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  return Builder(getContext()).getAffineMapArrayAttr(maps);
+}
+
+AffineMap
+IREE::LinalgExt::ArgCompareOp::getMatchingIndexingMap(OpOperand *operand) {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  unsigned idx = operand->getOperandNumber();
+  assert(idx < maps.size() &&
+         "operand does not have an indexing map (e.g. index_base)");
+  return maps[idx];
+}
+
 MutableOperandRange ArgCompareOp::getDpsInitsMutable() {
   return MutableOperandRange(*this, /*numInputs=*/getInputIndex() ? 2 : 1,
                              /*numInits=*/2);

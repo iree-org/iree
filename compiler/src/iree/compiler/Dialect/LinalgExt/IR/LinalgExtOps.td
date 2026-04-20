@@ -785,6 +785,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   DeclareOpInterfaceMethods<LinalgFusionInterface,
    ["getIndexingMapsForResults", "getIndexingMapsForOperands",
     "getStaticLoopRanges"]>,
+  DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   ["generateScalarImplementation",
