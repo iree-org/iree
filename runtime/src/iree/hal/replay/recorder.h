@@ -34,10 +34,16 @@ enum iree_hal_replay_recorder_external_file_policy_e {
   // Host-allocation-backed files are always embedded inline because they have
   // no durable external identity to reference.
   IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE = 0u,
+  // Capture every byte of each imported fd-backed file inline.
+  //
+  // This makes replays hermetic but can make captures enormous. It must be
+  // selected explicitly and is intended for small fixtures or cases where the
+  // external file cannot be preserved beside the replay.
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_ALL = 1u,
   // Reject imported fd-backed files instead of producing a non-hermetic replay.
   //
   // Host-allocation-backed files are still embedded inline under this policy.
-  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL = 1u,
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL = 2u,
 };
 
 // Validation metadata captured for imported fd-backed HAL files.

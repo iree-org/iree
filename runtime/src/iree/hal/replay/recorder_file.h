@@ -24,7 +24,8 @@ iree_status_t iree_hal_replay_recorder_file_make_object_payload(
     iree_hal_replay_recorder_external_file_policy_t external_file_policy,
     iree_hal_replay_recorder_external_file_validation_t
         external_file_validation,
-    iree_byte_span_t reference_storage,
+    iree_allocator_t host_allocator, iree_byte_span_t path_reference_storage,
+    iree_byte_span_t* out_allocated_reference_storage,
     iree_hal_replay_file_object_payload_t* out_payload,
     iree_string_view_t* out_reference);
 

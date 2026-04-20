@@ -414,6 +414,8 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
           options->external_file_policy !=
               IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE &&
           options->external_file_policy !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_ALL &&
+          options->external_file_policy !=
               IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -897,6 +899,7 @@ static iree_status_t iree_hal_replay_device_import_file(
       device->base_device, queue_affinity, access, handle, flags, &base_file);
 
   char reference_storage[IREE_MAX_PATH];
+  iree_byte_span_t allocated_reference_storage = iree_byte_span_empty();
   iree_hal_replay_file_object_payload_t payload;
   iree_string_view_t reference = iree_string_view_empty();
   iree_status_t payload_status =
@@ -904,9 +907,10 @@ static iree_status_t iree_hal_replay_device_import_file(
           handle, queue_affinity, access, flags, base_file,
           device->recorder->options.external_file_policy,
           device->recorder->options.external_file_validation,
+          device->host_allocator,
           iree_make_byte_span((uint8_t*)reference_storage,
                               sizeof(reference_storage)),
-          &payload, &reference);
+          &allocated_reference_storage, &payload, &reference);
   if (iree_status_is_ok(status)) {
     status = payload_status;
   } else {
@@ -927,6 +931,7 @@ static iree_status_t iree_hal_replay_device_import_file(
       IREE_HAL_REPLAY_OBJECT_TYPE_FILE, file_id,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT, IREE_ARRAYSIZE(payload_iovecs),
       payload_iovecs);
+  iree_allocator_free(device->host_allocator, allocated_reference_storage.data);
 
   if (iree_status_is_ok(status)) {
     *out_file = replay_file;

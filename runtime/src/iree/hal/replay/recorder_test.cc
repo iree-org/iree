@@ -170,6 +170,10 @@ struct ReplayRecordSummary {
   iree_host_size_t buffer_object_record_count = 0;
   iree_host_size_t command_buffer_object_record_count = 0;
   iree_host_size_t semaphore_object_record_count = 0;
+  iree_host_size_t file_object_record_count = 0;
+  iree_host_size_t external_file_object_count = 0;
+  iree_host_size_t inline_file_object_count = 0;
+  uint64_t inline_file_reference_length = 0;
   iree_host_size_t assign_topology_record_count = 0;
   iree_host_size_t query_capabilities_record_count = 0;
   iree_host_size_t allocate_buffer_record_count = 0;
@@ -221,6 +225,33 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         } else if (record.header.object_type ==
                    IREE_HAL_REPLAY_OBJECT_TYPE_SEMAPHORE) {
           ++summary.semaphore_object_record_count;
+        } else if (record.header.object_type ==
+                   IREE_HAL_REPLAY_OBJECT_TYPE_FILE) {
+          ++summary.file_object_record_count;
+          EXPECT_EQ(IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT,
+                    record.header.payload_type);
+          iree_hal_replay_file_object_payload_t file_payload;
+          if (record.payload.data_length < sizeof(file_payload)) {
+            ADD_FAILURE() << "file object payload is short";
+            return summary;
+          }
+          memcpy(&file_payload, record.payload.data, sizeof(file_payload));
+          if (file_payload.reference_length > IREE_HOST_SIZE_MAX ||
+              sizeof(file_payload) +
+                      (iree_host_size_t)file_payload.reference_length !=
+                  record.payload.data_length) {
+            ADD_FAILURE() << "file object reference length mismatch";
+            return summary;
+          }
+          if (file_payload.reference_type ==
+              IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH) {
+            ++summary.external_file_object_count;
+          } else if (file_payload.reference_type ==
+                     IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES) {
+            ++summary.inline_file_object_count;
+            summary.inline_file_reference_length +=
+                file_payload.reference_length;
+          }
         }
         break;
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION:
@@ -468,6 +499,55 @@ TEST(ReplayRecorderTest, ExternalFileFailPolicyRejectsFdBackedFiles) {
   iree_hal_replay_recorder_release(recorder);
   iree_hal_device_group_release(wrapped_group);
   iree_hal_device_group_release(source_group);
+#else
+  GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
+}
+
+TEST(ReplayRecorderTest, ExternalFileCaptureAllPolicyEmbedsFdBackedFiles) {
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+  const uint8_t file_contents[4] = {0x00, 0x01, 0x02, 0x03};
+  ScopedTempFile source_file(
+      iree_make_const_byte_span(file_contents, sizeof(file_contents)));
+
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_options_t options =
+      iree_hal_replay_recorder_options_default();
+  options.external_file_policy =
+      IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_ALL;
+  iree_hal_replay_recorder_t* recorder =
+      CreateHostAllocationRecorder(&storage, &options);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_ASSERT_OK(iree_io_file_handle_open(
+      IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_RANDOM_ACCESS,
+      source_file.path_view(), iree_allocator_system(), &file_handle));
+  iree_hal_file_t* file = nullptr;
+  IREE_ASSERT_OK(iree_hal_file_import(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY, IREE_HAL_MEMORY_ACCESS_READ,
+      file_handle, IREE_HAL_EXTERNAL_FILE_FLAG_NONE, &file));
+  iree_io_file_handle_release(file_handle);
+  iree_hal_file_release(file);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
+  EXPECT_EQ(1u, summary.file_object_record_count);
+  EXPECT_EQ(0u, summary.external_file_object_count);
+  EXPECT_EQ(1u, summary.inline_file_object_count);
+  EXPECT_EQ(sizeof(file_contents), summary.inline_file_reference_length);
 #else
   GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";
 #endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||

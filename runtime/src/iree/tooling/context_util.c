@@ -243,8 +243,8 @@ IREE_FLAG(string, device_replay_output, "",
 IREE_FLAG(
     string, device_replay_file_policy, "reference",
     "Policy for imported fd-backed HAL files while recording a HAL replay. "
-    "Options are `reference` to capture external file paths or `fail` to "
-    "reject fd-backed files.");
+    "Options are `reference` to capture external file paths, `capture-all` to "
+    "embed every file byte inline, or `fail` to reject fd-backed files.");
 IREE_FLAG(
     string, device_replay_file_validation, "identity",
     "Validation metadata captured for referenced fd-backed HAL files. Options "
@@ -264,13 +264,17 @@ static iree_status_t iree_tooling_parse_device_replay_file_policy(
   if (iree_string_view_equal(value, IREE_SV("reference"))) {
     *out_policy = IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE;
     return iree_ok_status();
+  } else if (iree_string_view_equal(value, IREE_SV("capture-all"))) {
+    *out_policy = IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_CAPTURE_ALL;
+    return iree_ok_status();
   } else if (iree_string_view_equal(value, IREE_SV("fail"))) {
     *out_policy = IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL;
     return iree_ok_status();
   }
   return iree_make_status(
       IREE_STATUS_INVALID_ARGUMENT,
-      "--device_replay_file_policy must be `reference` or `fail`; got `%.*s`",
+      "--device_replay_file_policy must be `reference`, `capture-all`, or "
+      "`fail`; got `%.*s`",
       (int)value.size, value.data);
 }
 
