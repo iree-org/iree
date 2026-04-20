@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <inttypes.h>
+
 #include <cstring>
 
 #include "benchmark/benchmark.h"
@@ -20,11 +22,149 @@ IREE_FLAG_LIST(
     string, replay_file_remap,
     "Remaps captured external file path prefixes before replay opens them. "
     "Repeat as --replay_file_remap=captured_prefix=replay_prefix.");
+IREE_FLAG_LIST(
+    string, replay_executable_substitution,
+    "Substitutes a captured executable payload. Repeat as "
+    "--replay_executable_substitution=EXECUTABLE_ID=PATH to infer the format, "
+    "or --replay_executable_substitution=EXECUTABLE_ID@FORMAT=PATH when the "
+    "format must be explicit.");
 IREE_FLAG(bool, agents_md, false,
           "Prints an agent-oriented Markdown guide for HAL replay capture and "
           "tooling workflows and exits.");
 
 namespace {
+
+typedef struct ReplayExecutableSubstitution {
+  // Captured executable object id to replace.
+  iree_hal_replay_object_id_t executable_id;
+  // Optional replacement executable format.
+  iree_string_view_t executable_format;
+  // Replacement executable file path.
+  iree_string_view_t source_path;
+  // Mapped replacement executable file contents.
+  iree_io_file_contents_t* file_contents;
+} ReplayExecutableSubstitution;
+
+typedef struct ReplayExecutableSubstitutionState {
+  // Replacement entries parsed from --replay_executable_substitution.
+  ReplayExecutableSubstitution* entries;
+  // Number of entries in |entries|.
+  iree_host_size_t entry_count;
+} ReplayExecutableSubstitutionState;
+
+void ReleaseReplayExecutableSubstitutions(
+    iree_allocator_t host_allocator, ReplayExecutableSubstitutionState* state) {
+  for (iree_host_size_t i = 0; i < state->entry_count; ++i) {
+    iree_io_file_contents_free(state->entries[i].file_contents);
+  }
+  iree_allocator_free(host_allocator, state->entries);
+  memset(state, 0, sizeof(*state));
+}
+
+iree_status_t ParseReplayExecutableSubstitutions(
+    iree_allocator_t host_allocator,
+    ReplayExecutableSubstitutionState* out_state) {
+  IREE_ASSERT_ARGUMENT(out_state);
+  memset(out_state, 0, sizeof(*out_state));
+
+  iree_flag_string_list_t flag_list =
+      FLAG_replay_executable_substitution_list();
+  if (flag_list.count == 0) return iree_ok_status();
+
+  iree_host_size_t entry_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+          flag_list.count, sizeof(*out_state->entries), &entry_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "replay executable substitution list is too large");
+  }
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, entry_size,
+                                             (void**)&out_state->entries));
+  memset(out_state->entries, 0, entry_size);
+  out_state->entry_count = flag_list.count;
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < flag_list.count && iree_status_is_ok(status);
+       ++i) {
+    iree_string_view_t selector;
+    iree_string_view_t path;
+    if (iree_string_view_split(flag_list.values[i], '=', &selector, &path) <
+            0 ||
+        iree_string_view_is_empty(selector) ||
+        iree_string_view_is_empty(path)) {
+      status =
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                           "--replay_executable_substitution values must be "
+                           "EXECUTABLE_ID=PATH or EXECUTABLE_ID@FORMAT=PATH");
+      break;
+    }
+
+    iree_string_view_t id_string = selector;
+    iree_string_view_t executable_format = iree_string_view_empty();
+    iree_string_view_t maybe_format;
+    if (iree_string_view_split(selector, '@', &id_string, &maybe_format) >= 0) {
+      if (iree_string_view_is_empty(id_string) ||
+          iree_string_view_is_empty(maybe_format)) {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "--replay_executable_substitution selector must be "
+            "EXECUTABLE_ID or EXECUTABLE_ID@FORMAT");
+        break;
+      }
+      executable_format = maybe_format;
+    }
+
+    uint64_t executable_id = 0;
+    if (!iree_string_view_atoi_uint64(id_string, &executable_id) ||
+        executable_id == IREE_HAL_REPLAY_OBJECT_ID_NONE) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "--replay_executable_substitution executable id must be a non-zero "
+          "integer");
+      break;
+    }
+    for (iree_host_size_t j = 0; j < i; ++j) {
+      if (out_state->entries[j].executable_id == executable_id) {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "--replay_executable_substitution repeats executable id %" PRIu64,
+            executable_id);
+        break;
+      }
+    }
+    if (!iree_status_is_ok(status)) break;
+
+    out_state->entries[i].executable_id =
+        (iree_hal_replay_object_id_t)executable_id;
+    out_state->entries[i].executable_format = executable_format;
+    out_state->entries[i].source_path = path;
+    status = iree_io_file_contents_map(path, IREE_IO_FILE_ACCESS_READ,
+                                       host_allocator,
+                                       &out_state->entries[i].file_contents);
+  }
+  if (!iree_status_is_ok(status)) {
+    ReleaseReplayExecutableSubstitutions(host_allocator, out_state);
+  }
+  return status;
+}
+
+iree_status_t ReplayExecutableSubstitutionCallback(
+    void* user_data,
+    const iree_hal_replay_executable_substitution_request_t* request,
+    iree_hal_replay_executable_substitution_t* out_substitution) {
+  ReplayExecutableSubstitutionState* state =
+      (ReplayExecutableSubstitutionState*)user_data;
+  memset(out_substitution, 0, sizeof(*out_substitution));
+  for (iree_host_size_t i = 0; i < state->entry_count; ++i) {
+    const ReplayExecutableSubstitution* entry = &state->entries[i];
+    if (entry->executable_id != request->executable_id) continue;
+    out_substitution->substitute = true;
+    out_substitution->source = entry->source_path;
+    out_substitution->executable_format = entry->executable_format;
+    out_substitution->executable_data = entry->file_contents->const_buffer;
+    return iree_ok_status();
+  }
+  return iree_ok_status();
+}
 
 void BenchmarkReplay(iree_const_byte_span_t file_contents,
                      iree_hal_device_group_t* device_group,
@@ -190,10 +330,23 @@ static int runMain(int argc, char** argv) {
                                    &file_path_remap_count);
   }
 
+  ReplayExecutableSubstitutionState executable_substitutions;
+  memset(&executable_substitutions, 0, sizeof(executable_substitutions));
+  if (iree_status_is_ok(status)) {
+    status = ParseReplayExecutableSubstitutions(host_allocator,
+                                                &executable_substitutions);
+  }
+
   iree_hal_replay_execute_options_t options =
       iree_hal_replay_execute_options_default();
   options.file_path_remap_count = file_path_remap_count;
   options.file_path_remaps = file_path_remaps;
+  if (executable_substitutions.entry_count != 0) {
+    options.executable_substitution_callback.fn =
+        ReplayExecutableSubstitutionCallback;
+    options.executable_substitution_callback.user_data =
+        &executable_substitutions;
+  }
   if (iree_status_is_ok(status)) {
     benchmark::RegisterBenchmark("BM_replay",
                                  [=](benchmark::State& state) -> void {
@@ -209,6 +362,8 @@ static int runMain(int argc, char** argv) {
 
   status =
       iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  ReleaseReplayExecutableSubstitutions(host_allocator,
+                                       &executable_substitutions);
   iree_allocator_free(host_allocator, file_path_remaps);
   iree_hal_device_group_release(device_group);
   iree_hal_device_list_free(device_list);

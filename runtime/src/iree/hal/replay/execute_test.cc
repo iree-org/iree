@@ -25,6 +25,7 @@
 #include "iree/hal/drivers/local_sync/sync_device.h"
 #include "iree/hal/replay/file_reader.h"
 #include "iree/hal/replay/recorder.h"
+#include "iree/hal/testing/mock_device.h"
 #include "iree/io/file_handle.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -91,6 +92,22 @@ static iree_hal_device_group_t* CreateSyncDeviceGroup() {
   return group;
 }
 
+static iree_hal_device_group_t* CreateMockExecutableDeviceGroup() {
+  iree_hal_mock_device_options_t options;
+  iree_hal_mock_device_options_initialize(&options);
+  options.identifier = iree_make_cstring_view("mock-executable-device");
+  options.executable_cache_enabled = true;
+
+  iree_hal_device_t* device = nullptr;
+  IREE_CHECK_OK(
+      iree_hal_mock_device_create(&options, iree_allocator_system(), &device));
+  iree_hal_device_t* devices[] = {device};
+  iree_hal_device_group_t* group =
+      CreateDeviceGroup(devices, IREE_ARRAYSIZE(devices));
+  iree_hal_device_release(device);
+  return group;
+}
+
 static iree_hal_replay_recorder_t* CreateHostAllocationRecorder(
     std::vector<uint8_t>* storage,
     const iree_hal_replay_recorder_options_t* options = nullptr) {
@@ -126,6 +143,165 @@ static iree_status_t NoopHostCall(void* user_data, const uint64_t args[4],
   (void)args;
   (void)context;
   return iree_ok_status();
+}
+
+static std::vector<uint8_t> MakeMockExecutableData(uint8_t constant_count,
+                                                   uint8_t binding_count,
+                                                   uint8_t workgroup_size_x) {
+  std::vector<uint8_t> data(12, 0);
+  const uint32_t export_count = 1;
+  std::memcpy(data.data(), &export_count, sizeof(export_count));
+  data[4] = constant_count;
+  data[5] = binding_count;
+  data[6] = 0;  // flags
+  data[7] = workgroup_size_x;
+  data[8] = 1;
+  data[9] = 1;
+  return data;
+}
+
+static void CaptureMockExecutablePrepare(iree_const_byte_span_t executable_data,
+                                         std::vector<uint8_t>* storage) {
+  iree_hal_replay_recorder_t* recorder =
+      CreateHostAllocationRecorder(storage, nullptr);
+
+  iree_hal_device_group_t* source_group = CreateMockExecutableDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  iree_hal_executable_cache_t* executable_cache = nullptr;
+  IREE_ASSERT_OK(iree_hal_executable_cache_create(
+      wrapped_device, iree_make_cstring_view("mock-cache"), &executable_cache));
+
+  iree_hal_executable_params_t executable_params;
+  iree_hal_executable_params_initialize(&executable_params);
+  executable_params.caching_mode =
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+  executable_params.executable_format =
+      iree_make_cstring_view("mock-executable");
+  executable_params.executable_data = executable_data;
+
+  iree_hal_executable_t* executable = nullptr;
+  IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
+      executable_cache, &executable_params, &executable));
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
+typedef struct TestExecutableSubstitutionState {
+  iree_string_view_t source;
+  iree_string_view_t executable_format;
+  iree_const_byte_span_t executable_data;
+  iree_host_size_t invocation_count;
+  iree_hal_replay_object_id_t executable_id;
+} TestExecutableSubstitutionState;
+
+static iree_status_t TestExecutableSubstitutionCallback(
+    void* user_data,
+    const iree_hal_replay_executable_substitution_request_t* request,
+    iree_hal_replay_executable_substitution_t* out_substitution) {
+  TestExecutableSubstitutionState* state =
+      (TestExecutableSubstitutionState*)user_data;
+  ++state->invocation_count;
+  state->executable_id = request->executable_id;
+  EXPECT_EQ(request->device_id, 1u);
+  EXPECT_EQ(request->executable_cache_id, 2u);
+  EXPECT_EQ(request->executable_id, 3u);
+  EXPECT_EQ(std::string_view(request->captured_params->executable_format.data,
+                             request->captured_params->executable_format.size),
+            std::string_view("mock-executable"));
+  memset(out_substitution, 0, sizeof(*out_substitution));
+  out_substitution->substitute = true;
+  out_substitution->source = state->source;
+  out_substitution->executable_format = state->executable_format;
+  out_substitution->executable_data = state->executable_data;
+  return iree_ok_status();
+}
+
+TEST(ReplayExecuteTest, SubstitutesRecordedExecutablePayload) {
+  std::vector<uint8_t> captured_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> replacement_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> storage(32768, 0);
+  CaptureMockExecutablePrepare(
+      iree_make_const_byte_span(captured_data.data(), captured_data.size()),
+      &storage);
+
+  TestExecutableSubstitutionState substitution_state = {
+      /*.source=*/iree_make_cstring_view("replacement.mock"),
+      /*.executable_format=*/iree_make_cstring_view("mock-executable"),
+      /*.executable_data=*/
+      iree_make_const_byte_span(replacement_data.data(),
+                                replacement_data.size()),
+      /*.invocation_count=*/0,
+      /*.executable_id=*/IREE_HAL_REPLAY_OBJECT_ID_NONE,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.executable_substitution_callback.fn =
+      TestExecutableSubstitutionCallback;
+  options.executable_substitution_callback.user_data = &substitution_state;
+
+  iree_hal_device_group_t* replay_group = CreateMockExecutableDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  EXPECT_EQ(substitution_state.invocation_count, 1u);
+  EXPECT_EQ(substitution_state.executable_id, 3u);
+  iree_hal_device_group_release(replay_group);
+}
+
+TEST(ReplayExecuteTest, RejectsExecutableSubstitutionAbiMismatch) {
+  std::vector<uint8_t> captured_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> replacement_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/4,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> storage(32768, 0);
+  CaptureMockExecutablePrepare(
+      iree_make_const_byte_span(captured_data.data(), captured_data.size()),
+      &storage);
+
+  TestExecutableSubstitutionState substitution_state = {
+      /*.source=*/iree_make_cstring_view("replacement.mock"),
+      /*.executable_format=*/iree_make_cstring_view("mock-executable"),
+      /*.executable_data=*/
+      iree_make_const_byte_span(replacement_data.data(),
+                                replacement_data.size()),
+      /*.invocation_count=*/0,
+      /*.executable_id=*/IREE_HAL_REPLAY_OBJECT_ID_NONE,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.executable_substitution_callback.fn =
+      TestExecutableSubstitutionCallback;
+  options.executable_substitution_callback.user_data = &substitution_state;
+
+  iree_hal_device_group_t* replay_group = CreateMockExecutableDeviceGroup();
+  iree_status_t status = iree_hal_replay_execute_file(
+      GetCapturedFileContents(storage), replay_group, &options,
+      iree_allocator_system());
+  auto owned_status = ::iree::internal::ConsumeForTest(status);
+  EXPECT_THAT(owned_status,
+              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
+                  IREE_STATUS_FAILED_PRECONDITION)));
+  EXPECT_THAT(owned_status.ToString(), HasSubstr("ABI mismatch"));
+  EXPECT_THAT(owned_status.ToString(), HasSubstr("executable 3"));
+  EXPECT_EQ(substitution_state.invocation_count, 1u);
+  iree_hal_device_group_release(replay_group);
 }
 
 #if IREE_FILE_IO_ENABLE && \

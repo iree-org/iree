@@ -23,6 +23,8 @@
 #include "iree/hal/replay/format.h"
 #include "iree/io/file_handle.h"
 
+#define IREE_HAL_REPLAY_EXECUTABLE_FORMAT_CAPACITY 128
+
 typedef struct iree_hal_replay_object_entry_t {
   // Captured object type stored in this entry.
   iree_hal_replay_object_type_t type;
@@ -431,6 +433,186 @@ static iree_status_t iree_hal_replay_executor_replay_object(
   }
 }
 
+static iree_status_t
+iree_hal_replay_executor_compare_executable_export_parameters(
+    iree_hal_replay_executor_t* executor,
+    iree_hal_replay_object_id_t executable_id,
+    iree_hal_executable_t* captured_executable,
+    iree_hal_executable_t* replacement_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t parameter_count) {
+  if (parameter_count == 0) return iree_ok_status();
+  iree_host_size_t allocation_count = 0;
+  iree_host_size_t allocation_size = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(parameter_count, 2, &allocation_count) ||
+          !iree_host_size_checked_mul(
+              allocation_count, sizeof(iree_hal_executable_export_parameter_t),
+              &allocation_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable parameter metadata is too large");
+  }
+
+  iree_hal_executable_export_parameter_t* captured_parameters = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      executor->host_allocator, allocation_size, (void**)&captured_parameters));
+  iree_hal_executable_export_parameter_t* replacement_parameters =
+      captured_parameters + parameter_count;
+
+  iree_status_t status = iree_hal_executable_export_parameters(
+      captured_executable, export_ordinal, parameter_count,
+      captured_parameters);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_executable_export_parameters(
+        replacement_executable, export_ordinal, parameter_count,
+        replacement_parameters);
+  }
+  for (iree_host_size_t i = 0; i < parameter_count && iree_status_is_ok(status);
+       ++i) {
+    const iree_hal_executable_export_parameter_t* captured =
+        &captured_parameters[i];
+    const iree_hal_executable_export_parameter_t* replacement =
+        &replacement_parameters[i];
+    if (captured->type != replacement->type ||
+        captured->size != replacement->size ||
+        captured->flags != replacement->flags ||
+        captured->offset != replacement->offset) {
+      status = iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "substituted executable %" PRIu64 " export %" PRIu32
+          " parameter %" PRIhsz
+          " ABI mismatch: captured=(type=%u size=%u flags=0x%04x "
+          "offset=%u) replacement=(type=%u size=%u flags=0x%04x offset=%u)",
+          executable_id, export_ordinal, i, (uint32_t)captured->type,
+          (uint32_t)captured->size, (uint32_t)captured->flags,
+          (uint32_t)captured->offset, (uint32_t)replacement->type,
+          (uint32_t)replacement->size, (uint32_t)replacement->flags,
+          (uint32_t)replacement->offset);
+    }
+  }
+  iree_allocator_free(executor->host_allocator, captured_parameters);
+  return status;
+}
+
+static iree_status_t iree_hal_replay_executor_validate_executable_substitution(
+    iree_hal_replay_executor_t* executor,
+    iree_hal_replay_object_id_t executable_id,
+    iree_hal_executable_t* captured_executable,
+    iree_hal_executable_t* replacement_executable) {
+  iree_host_size_t captured_export_count =
+      iree_hal_executable_export_count(captured_executable);
+  iree_host_size_t replacement_export_count =
+      iree_hal_executable_export_count(replacement_executable);
+  if (IREE_UNLIKELY(captured_export_count != replacement_export_count)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "substituted executable %" PRIu64
+        " export count mismatch: captured=%" PRIhsz " replacement=%" PRIhsz,
+        executable_id, captured_export_count, replacement_export_count);
+  }
+  if (IREE_UNLIKELY(captured_export_count > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "executable export count exceeds HAL ordinal range");
+  }
+
+  for (iree_host_size_t i = 0; i < captured_export_count; ++i) {
+    const iree_hal_executable_export_ordinal_t export_ordinal =
+        (iree_hal_executable_export_ordinal_t)i;
+    iree_hal_executable_export_info_t captured_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+        captured_executable, export_ordinal, &captured_info));
+    iree_hal_executable_export_info_t replacement_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+        replacement_executable, export_ordinal, &replacement_info));
+
+    if (captured_info.flags != replacement_info.flags ||
+        captured_info.constant_count != replacement_info.constant_count ||
+        captured_info.binding_count != replacement_info.binding_count ||
+        captured_info.parameter_count != replacement_info.parameter_count ||
+        captured_info.workgroup_size[0] != replacement_info.workgroup_size[0] ||
+        captured_info.workgroup_size[1] != replacement_info.workgroup_size[1] ||
+        captured_info.workgroup_size[2] != replacement_info.workgroup_size[2]) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "substituted executable %" PRIu64 " export %" PRIu32
+          " ABI mismatch: captured=(flags=0x%016" PRIx64
+          " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u]) "
+          "replacement=(flags=0x%016" PRIx64
+          " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u])",
+          executable_id, export_ordinal, captured_info.flags,
+          (uint32_t)captured_info.constant_count,
+          (uint32_t)captured_info.binding_count,
+          (uint32_t)captured_info.parameter_count,
+          captured_info.workgroup_size[0], captured_info.workgroup_size[1],
+          captured_info.workgroup_size[2], replacement_info.flags,
+          (uint32_t)replacement_info.constant_count,
+          (uint32_t)replacement_info.binding_count,
+          (uint32_t)replacement_info.parameter_count,
+          replacement_info.workgroup_size[0],
+          replacement_info.workgroup_size[1],
+          replacement_info.workgroup_size[2]);
+    }
+    IREE_RETURN_IF_ERROR(
+        iree_hal_replay_executor_compare_executable_export_parameters(
+            executor, executable_id, captured_executable,
+            replacement_executable, export_ordinal,
+            captured_info.parameter_count));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_replay_executor_prepare_captured_executable(
+    iree_hal_executable_cache_t* executable_cache,
+    const iree_hal_executable_params_t* captured_params,
+    iree_hal_executable_t** out_executable) {
+  return iree_hal_executable_cache_prepare_executable(
+      executable_cache, captured_params, out_executable);
+}
+
+static iree_status_t iree_hal_replay_executor_prepare_substitute_executable(
+    iree_hal_executable_cache_t* executable_cache,
+    const iree_hal_executable_params_t* captured_params,
+    const iree_hal_replay_executable_substitution_t* substitution,
+    iree_hal_executable_t** out_executable) {
+  IREE_ASSERT_ARGUMENT(out_executable);
+  *out_executable = NULL;
+  if (IREE_UNLIKELY(substitution->executable_data.data_length != 0 &&
+                    !substitution->executable_data.data)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "substituted executable data has non-zero length but no data pointer");
+  }
+  if (IREE_UNLIKELY(substitution->executable_data.data_length == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "substituted executable data is empty");
+  }
+
+  iree_hal_executable_params_t replacement_params = *captured_params;
+  replacement_params.caching_mode &=
+      ~IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+  replacement_params.executable_data = substitution->executable_data;
+
+  char inferred_format[IREE_HAL_REPLAY_EXECUTABLE_FORMAT_CAPACITY] = {0};
+  if (iree_string_view_is_empty(substitution->executable_format)) {
+    iree_host_size_t inferred_size = 0;
+    IREE_RETURN_IF_ERROR(iree_status_annotate(
+        iree_hal_executable_cache_infer_format(
+            executable_cache, replacement_params.caching_mode,
+            replacement_params.executable_data, sizeof(inferred_format),
+            inferred_format, &inferred_size),
+        iree_make_cstring_view(
+            "inferring substituted executable format; provide an explicit "
+            "format if the target cache cannot infer one")));
+    replacement_params.executable_format =
+        iree_make_cstring_view(inferred_format);
+  } else {
+    replacement_params.executable_format = substitution->executable_format;
+  }
+  return iree_hal_executable_cache_prepare_executable(
+      executable_cache, &replacement_params, out_executable);
+}
+
 static iree_status_t iree_hal_replay_executor_prepare_executable(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -481,8 +663,56 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
   params.caching_mode = payload.caching_mode;
 
   iree_hal_executable_t* executable = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_executable_cache_prepare_executable(
-      cache_entry->value.executable_cache, &params, &executable));
+  iree_status_t status = iree_ok_status();
+  if (executor->options->executable_substitution_callback.fn) {
+    iree_hal_replay_executable_substitution_request_t request = {
+        .sequence_ordinal = record->header.sequence_ordinal,
+        .device_id = record->header.device_id,
+        .executable_cache_id = record->header.object_id,
+        .executable_id = record->header.related_object_id,
+        .captured_params = &params,
+    };
+    iree_hal_replay_executable_substitution_t substitution;
+    memset(&substitution, 0, sizeof(substitution));
+    status = executor->options->executable_substitution_callback.fn(
+        executor->options->executable_substitution_callback.user_data, &request,
+        &substitution);
+    if (iree_status_is_ok(status) && substitution.substitute) {
+      iree_hal_executable_t* captured_executable = NULL;
+      status = iree_status_annotate_f(
+          iree_hal_replay_executor_prepare_captured_executable(
+              cache_entry->value.executable_cache, &params,
+              &captured_executable),
+          "preparing captured executable %" PRIu64
+          " for substitution validation",
+          record->header.related_object_id);
+      if (iree_status_is_ok(status)) {
+        status = iree_status_annotate_f(
+            iree_hal_replay_executor_prepare_substitute_executable(
+                cache_entry->value.executable_cache, &params, &substitution,
+                &executable),
+            "preparing substitute for captured executable %" PRIu64
+            " from '%.*s'",
+            record->header.related_object_id, (int)substitution.source.size,
+            substitution.source.data);
+      }
+      if (iree_status_is_ok(status)) {
+        status = iree_hal_replay_executor_validate_executable_substitution(
+            executor, record->header.related_object_id, captured_executable,
+            executable);
+      }
+      iree_hal_executable_release(captured_executable);
+      if (!iree_status_is_ok(status)) {
+        iree_hal_executable_release(executable);
+        executable = NULL;
+      }
+    }
+  }
+  if (iree_status_is_ok(status) && !executable) {
+    status = iree_hal_replay_executor_prepare_captured_executable(
+        cache_entry->value.executable_cache, &params, &executable);
+  }
+  IREE_RETURN_IF_ERROR(status);
   iree_hal_replay_object_entry_t entry = {.value.executable = executable};
   return iree_hal_replay_executor_store(
       executor, record->header.related_object_id,
