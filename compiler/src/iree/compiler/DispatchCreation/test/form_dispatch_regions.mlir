@@ -2810,13 +2810,6 @@ util.func public @online_attention_normalize_fusion(
   util.return %norm : tensor<20x4096x64xf16>
 }
 
-//      CHECK-LABEL: @online_attention_normalize_fusion
-//            CHECK:   %[[D:.+]] = flow.dispatch.region -> (tensor<20x4096x64xf16>)
-//            CHECK:     iree_linalg_ext.online_attention
-//            CHECK:     %[[G:.+]] = linalg.generic
-//            CHECK:     flow.return %[[G]]
-//            CHECK:   util.return %[[D]]
-
 //      DEFAULT-LABEL: @online_attention_normalize_fusion
 //            DEFAULT:   %[[D:.+]] = flow.dispatch.region -> (tensor<20x4096x64xf16>)
 //            DEFAULT:     iree_linalg_ext.online_attention
