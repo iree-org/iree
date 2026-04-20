@@ -272,7 +272,10 @@ iree_runtime_cc_test(
 
 iree_runtime_cc_test(
     name = "host_queue_command_buffer_test",
-    srcs = ["host_queue_command_buffer_test.cc"],
+    srcs = [
+        "host_queue_command_buffer_internal.h",
+        "host_queue_command_buffer_test.cc",
+    ],
     group = "iree-hal-drivers-amdgpu-tests",
     tags = [
         "driver=amdgpu",

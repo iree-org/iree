@@ -143,11 +143,12 @@ static bool iree_hal_amdgpu_host_queue_resolve_wait(
 
   // Tier 1a: same-queue elision from the last_signal cache alone.
   // HAL queues are not FIFO: user-visible order comes from semaphore edges.
-  // This shortcut is valid only because the current AMDGPU host queue emits all
-  // AQL packets with BARRIER set, so submission order under submission_mutex
-  // creates a single in-queue dependency chain. If that policy is relaxed for
-  // independent HIP streams, this branch must emit an explicit same-queue
-  // dependency edge instead of returning purely from producer axis identity.
+  // This shortcut is valid only because AMDGPU queue submissions represent
+  // inline waits on the first payload packet with AQL BARRIER set, so
+  // submission order under submission_mutex creates a single in-queue
+  // dependency chain. If that policy is relaxed for independent HIP streams,
+  // this branch must emit an explicit same-queue dependency edge instead of
+  // returning purely from producer axis identity.
   if (signal_axis == queue->axis) {
     resolution->inline_acquire_scope =
         iree_hal_amdgpu_host_queue_max_fence_scope(

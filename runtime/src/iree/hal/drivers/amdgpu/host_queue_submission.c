@@ -788,8 +788,8 @@ static uint64_t iree_hal_amdgpu_host_queue_commit_signals(
 
     // Submission-time causal marker: merge queue's frontier into the
     // semaphore's frontier so same-queue and already-dominated cross-queue
-    // waits can resolve before GPU completion under the current all-barrier
-    // AQL queue policy.
+    // waits can resolve before GPU completion under the current submission
+    // boundary barrier policy.
     bool did_publish_frontier = queue->can_publish_frontier;
     if (did_publish_frontier) {
       if (is_amdgpu_semaphore) {

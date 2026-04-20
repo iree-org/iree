@@ -259,8 +259,11 @@ iree_hal_amdgpu_host_queue_command_buffer_packet_control(
     uint32_t packet_index, bool has_execution_barrier, bool is_final_packet) {
   const bool has_wait_prefix_barrier =
       packet_index == 0 && resolution->barrier_count > 0;
-  const bool has_barrier =
-      has_wait_prefix_barrier || has_execution_barrier || is_final_packet;
+  const bool has_inline_wait =
+      packet_index == 0 &&
+      resolution->inline_acquire_scope != IREE_HSA_FENCE_SCOPE_NONE;
+  const bool has_barrier = has_wait_prefix_barrier || has_inline_wait ||
+                           has_execution_barrier || is_final_packet;
   const iree_hsa_fence_scope_t acquire_scope =
       packet_index == 0
           ? iree_hal_amdgpu_host_queue_max_fence_scope(

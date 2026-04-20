@@ -278,6 +278,7 @@ iree_cc_test(
   NAME
     host_queue_command_buffer_test
   SRCS
+    "host_queue_command_buffer_internal.h"
     "host_queue_command_buffer_test.cc"
   DEPS
     ::amdgpu

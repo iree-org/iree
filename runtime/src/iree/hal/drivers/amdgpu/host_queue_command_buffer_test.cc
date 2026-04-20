@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/amdgpu/aql_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/executable.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
+#include "iree/hal/drivers/amdgpu/host_queue_command_buffer_internal.h"
 #include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
@@ -1327,12 +1328,43 @@ static void ExpectTwoDispatchOutputs(const TwoDispatchCommandBuffer& fixture) {
             memcmp(output_values1, expected_values, sizeof(expected_values)));
 }
 
-#if !defined(NDEBUG)
 static bool AqlHeaderHasBarrier(uint16_t header) {
   return ((header >> IREE_HSA_PACKET_HEADER_BARRIER) &
           ((1u << IREE_HSA_PACKET_HEADER_WIDTH_BARRIER) - 1u)) != 0;
 }
 
+TEST_F(HostQueueCommandBufferTest,
+       PacketControlBarriersFirstPayloadPacketForInlineWait) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+  iree_hal_amdgpu_host_queue_t* queue = test_device.first_host_queue();
+  ASSERT_NE(queue, nullptr);
+
+  iree_hal_amdgpu_wait_resolution_t resolution = {0};
+  resolution.inline_acquire_scope = IREE_HSA_FENCE_SCOPE_AGENT;
+  iree_hal_amdgpu_aql_packet_control_t control =
+      iree_hal_amdgpu_host_queue_command_buffer_packet_control(
+          queue, &resolution, iree_hal_semaphore_list_empty(),
+          /*packet_index=*/0, /*has_execution_barrier=*/false,
+          /*is_final_packet=*/false);
+  EXPECT_TRUE(control.has_barrier);
+  EXPECT_EQ(control.acquire_fence_scope, IREE_HSA_FENCE_SCOPE_AGENT);
+  EXPECT_EQ(control.release_fence_scope, IREE_HSA_FENCE_SCOPE_AGENT);
+
+  control = iree_hal_amdgpu_host_queue_command_buffer_packet_control(
+      queue, &resolution, iree_hal_semaphore_list_empty(), /*packet_index=*/1,
+      /*has_execution_barrier=*/false, /*is_final_packet=*/false);
+  EXPECT_FALSE(control.has_barrier);
+  EXPECT_EQ(control.acquire_fence_scope, IREE_HSA_FENCE_SCOPE_AGENT);
+  EXPECT_EQ(control.release_fence_scope, IREE_HSA_FENCE_SCOPE_AGENT);
+}
+
+#if !defined(NDEBUG)
 TEST_F(HostQueueCommandBufferTest,
        PacketSummaryOmitsInteriorBarriersWithoutExecutionBarrier) {
   iree_hal_amdgpu_logical_device_options_t options;
@@ -1412,6 +1444,17 @@ TEST_F(HostQueueCommandBufferTest,
   EXPECT_EQ(summary.packet_count, 2u);
   EXPECT_EQ(summary.barrier_packet_count, 1u);
   EXPECT_FALSE(AqlHeaderHasBarrier(summary.first_packet_header));
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
+
+  resolution.inline_acquire_scope = IREE_HSA_FENCE_SCOPE_AGENT;
+  summary = iree_hal_amdgpu_host_queue_command_buffer_packet_summary_t{};
+  IREE_ASSERT_OK(
+      iree_hal_amdgpu_host_queue_summarize_command_buffer_block_packets(
+          queue, &resolution, iree_hal_semaphore_list_empty(),
+          program->first_block, &summary));
+  EXPECT_EQ(summary.packet_count, 2u);
+  EXPECT_EQ(summary.barrier_packet_count, 2u);
+  EXPECT_TRUE(AqlHeaderHasBarrier(summary.first_packet_header));
   EXPECT_TRUE(AqlHeaderHasBarrier(summary.last_packet_header));
 
   iree_hal_executable_release(executable);
@@ -1661,7 +1704,7 @@ TEST_F(HostQueueCommandBufferTest,
           queue, &resolution, iree_hal_semaphore_list_empty(),
           program->first_block, &summary));
   EXPECT_EQ(summary.packet_count, 2u);
-  EXPECT_EQ(summary.barrier_packet_count, 1u);
+  EXPECT_EQ(summary.barrier_packet_count, 2u);
   EXPECT_EQ(summary.system_acquire_packet_count, 1u);
   EXPECT_EQ(summary.system_release_packet_count, 0u);
 
