@@ -25,6 +25,7 @@
 #include "iree/hal/replay/recorder_allocator.h"
 #include "iree/hal/replay/recorder_buffer.h"
 #include "iree/hal/replay/recorder_command_buffer.h"
+#include "iree/hal/replay/recorder_event.h"
 #include "iree/hal/replay/recorder_executable.h"
 #include "iree/hal/replay/recorder_record.h"
 
@@ -750,17 +751,45 @@ static iree_status_t iree_hal_replay_device_create_event(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
+  *out_event = NULL;
+
+  iree_hal_replay_object_id_t event_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_replay_recorder_reserve_object_id(device->recorder, &event_id));
+
+  iree_hal_replay_event_object_payload_t payload;
+  iree_hal_replay_recorder_event_make_object_payload(queue_affinity, flags,
+                                                     &payload);
+  iree_const_byte_span_t payload_iovec =
+      iree_make_const_byte_span(&payload, sizeof(payload));
+
   iree_hal_replay_pending_record_t pending_record;
-  IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
-      device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_EVENT,
-      &pending_record));
+  IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_begin_operation(
+      device->recorder, device->device_id, device->device_id, event_id,
+      IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_EVENT,
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT, &pending_record));
+
+  iree_hal_event_t* base_event = NULL;
+  iree_hal_event_t* replay_event = NULL;
   iree_status_t status = iree_hal_event_create(
-      device->base_device, queue_affinity, flags, out_event);
-  status = iree_hal_replay_device_complete_operation(&pending_record, status);
-  if (!iree_status_is_ok(status) && out_event && *out_event) {
-    iree_hal_event_release(*out_event);
-    *out_event = NULL;
+      device->base_device, queue_affinity, flags, &base_event);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_event_create_proxy(
+        device->recorder, device->device_id, event_id, base_event,
+        device->host_allocator, &replay_event);
   }
+  status = iree_hal_replay_recorder_end_creation_operation(
+      &pending_record, status, 1, &payload_iovec,
+      IREE_HAL_REPLAY_OBJECT_TYPE_EVENT, event_id,
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT, 1, &payload_iovec);
+
+  if (iree_status_is_ok(status)) {
+    *out_event = replay_event;
+  } else {
+    iree_hal_event_release(replay_event);
+  }
+  iree_hal_event_release(base_event);
   return status;
 }
 

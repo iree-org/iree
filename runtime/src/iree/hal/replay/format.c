@@ -247,6 +247,12 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "command_buffer_fill_buffer";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_UPDATE_BUFFER:
       return "command_buffer_update_buffer";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT:
+      return "event_object";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EVENT:
+      return "command_buffer_event";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS:
+      return "command_buffer_wait_events";
     default:
       return "unknown";
   }

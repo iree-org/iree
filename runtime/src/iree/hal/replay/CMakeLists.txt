@@ -103,6 +103,8 @@ iree_cc_library(
     "recorder_buffer.h"
     "recorder_command_buffer.c"
     "recorder_command_buffer.h"
+    "recorder_event.c"
+    "recorder_event.h"
     "recorder_executable.c"
     "recorder_executable.h"
     "recorder_record.h"

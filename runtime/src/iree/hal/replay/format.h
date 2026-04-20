@@ -178,6 +178,9 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_COPY = 17u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_FILL_BUFFER = 18u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_UPDATE_BUFFER = 19u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT = 20u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EVENT = 21u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS = 22u,
 };
 
 // Payload describing a captured buffer object.
@@ -308,6 +311,18 @@ typedef struct iree_hal_replay_semaphore_object_payload_t {
   uint64_t reserved0;
 } iree_hal_replay_semaphore_object_payload_t;
 
+// Payload describing a captured event object.
+typedef struct iree_hal_replay_event_object_payload_t {
+  // Queue affinity requested at creation.
+  uint64_t queue_affinity;
+  // Event flag bits requested at creation.
+  uint32_t flags;
+  // Reserved for future event object metadata; must be zero.
+  uint32_t reserved0;
+  // Reserved for future event object metadata; must be zero.
+  uint64_t reserved1;
+} iree_hal_replay_event_object_payload_t;
+
 // Serialized replay reference to one semaphore timepoint.
 typedef struct iree_hal_replay_semaphore_timepoint_payload_t {
   // Session-local semaphore object id.
@@ -347,6 +362,31 @@ typedef struct iree_hal_replay_buffer_barrier_payload_t {
   // Captured buffer reference the barrier applies to.
   iree_hal_replay_buffer_ref_payload_t buffer_ref;
 } iree_hal_replay_buffer_barrier_payload_t;
+
+// Payload describing a command buffer event signal/reset request.
+typedef struct iree_hal_replay_command_buffer_event_payload_t {
+  // Session-local event object id.
+  iree_hal_replay_object_id_t event_id;
+  // Source execution stage mask.
+  uint64_t source_stage_mask;
+} iree_hal_replay_command_buffer_event_payload_t;
+
+// Payload describing a command buffer event wait request followed by event ids
+// and barrier payloads.
+typedef struct iree_hal_replay_command_buffer_wait_events_payload_t {
+  // Source execution stage mask.
+  uint64_t source_stage_mask;
+  // Target execution stage mask.
+  uint64_t target_stage_mask;
+  // Number of event object ids following this header.
+  uint64_t event_count;
+  // Number of memory barrier payloads following event ids.
+  uint64_t memory_barrier_count;
+  // Number of buffer barrier payloads following the memory barriers.
+  uint64_t buffer_barrier_count;
+  // Reserved for future wait-events metadata; must be zero.
+  uint64_t reserved0;
+} iree_hal_replay_command_buffer_wait_events_payload_t;
 
 // Payload describing a command buffer execution barrier request.
 typedef struct iree_hal_replay_command_buffer_execution_barrier_payload_t {

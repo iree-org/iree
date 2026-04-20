@@ -285,6 +285,117 @@ TEST(ReplayDumpTest, EmitsExecutionBarrierRanges) {
   EXPECT_THAT(json_output, HasSubstr("\"buffer_barriers_range\""));
 }
 
+TEST(ReplayDumpTest, EmitsEventPayloads) {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_ASSERT_OK(iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+      iree_make_byte_span(storage.data(), storage.size()),
+      iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+      &file_handle));
+
+  iree_hal_replay_file_writer_t* writer = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_create(
+      file_handle, iree_allocator_system(), &writer));
+  iree_io_file_handle_release(file_handle);
+
+  iree_hal_replay_event_object_payload_t event_payload = {};
+  event_payload.queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
+  iree_const_byte_span_t event_iovec =
+      iree_make_const_byte_span(&event_payload, sizeof(event_payload));
+  iree_hal_replay_file_record_metadata_t event_metadata = {};
+  event_metadata.sequence_ordinal = 0;
+  event_metadata.object_id = 7;
+  event_metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OBJECT;
+  event_metadata.payload_type = IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT;
+  event_metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_EVENT;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_append_record(
+      writer, &event_metadata, 1, &event_iovec, nullptr));
+
+  iree_hal_replay_command_buffer_event_payload_t signal_payload = {};
+  signal_payload.event_id = 7;
+  signal_payload.source_stage_mask = IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE;
+  iree_const_byte_span_t signal_iovec =
+      iree_make_const_byte_span(&signal_payload, sizeof(signal_payload));
+  iree_hal_replay_file_record_metadata_t signal_metadata = {};
+  signal_metadata.sequence_ordinal = 1;
+  signal_metadata.object_id = 8;
+  signal_metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  signal_metadata.payload_type =
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EVENT;
+  signal_metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER;
+  signal_metadata.operation_code =
+      IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_SIGNAL_EVENT;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_append_record(
+      writer, &signal_metadata, 1, &signal_iovec, nullptr));
+
+  iree_hal_replay_command_buffer_wait_events_payload_t wait_payload = {};
+  wait_payload.source_stage_mask = IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE;
+  wait_payload.target_stage_mask = IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE;
+  wait_payload.event_count = 1;
+  wait_payload.memory_barrier_count = 1;
+  wait_payload.buffer_barrier_count = 1;
+  iree_hal_replay_object_id_t event_id = 7;
+  iree_hal_replay_memory_barrier_payload_t memory_barrier = {};
+  memory_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
+  memory_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_READ;
+  iree_hal_replay_buffer_barrier_payload_t buffer_barrier = {};
+  buffer_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE;
+  buffer_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_READ;
+  buffer_barrier.buffer_ref.buffer_id = 9;
+  buffer_barrier.buffer_ref.length = 32;
+  iree_const_byte_span_t wait_iovecs[4] = {
+      iree_make_const_byte_span(&wait_payload, sizeof(wait_payload)),
+      iree_make_const_byte_span(&event_id, sizeof(event_id)),
+      iree_make_const_byte_span(&memory_barrier, sizeof(memory_barrier)),
+      iree_make_const_byte_span(&buffer_barrier, sizeof(buffer_barrier)),
+  };
+  iree_hal_replay_file_record_metadata_t wait_metadata = {};
+  wait_metadata.sequence_ordinal = 2;
+  wait_metadata.object_id = 8;
+  wait_metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  wait_metadata.payload_type =
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS;
+  wait_metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER;
+  wait_metadata.operation_code =
+      IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_WAIT_EVENTS;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_append_record(
+      writer, &wait_metadata, IREE_ARRAYSIZE(wait_iovecs), wait_iovecs,
+      nullptr));
+
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_close(writer));
+  iree_hal_replay_file_writer_free(writer);
+
+  iree_hal_replay_dump_options_t text_options =
+      iree_hal_replay_dump_options_default();
+  std::string text_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &text_options, AppendToString,
+      &text_output, iree_allocator_system()));
+  EXPECT_THAT(text_output, HasSubstr("payload=event_object"));
+  EXPECT_THAT(text_output, HasSubstr("payload=command_buffer_event"));
+  EXPECT_THAT(text_output, HasSubstr("payload=command_buffer_wait_events"));
+  EXPECT_THAT(text_output, HasSubstr("events_range="));
+  EXPECT_THAT(text_output, HasSubstr("memory_barriers_range="));
+  EXPECT_THAT(text_output, HasSubstr("buffer_barriers_range="));
+
+  iree_hal_replay_dump_options_t json_options =
+      iree_hal_replay_dump_options_default();
+  json_options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
+  std::string json_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &json_options, AppendToString,
+      &json_output, iree_allocator_system()));
+  EXPECT_THAT(json_output, HasSubstr("\"payload_type\":\"event_object\""));
+  EXPECT_THAT(json_output,
+              HasSubstr("\"payload_type\":\"command_buffer_event\""));
+  EXPECT_THAT(json_output,
+              HasSubstr("\"payload_type\":\"command_buffer_wait_events\""));
+  EXPECT_THAT(json_output, HasSubstr("\"events_range\""));
+  EXPECT_THAT(json_output, HasSubstr("\"memory_barriers_range\""));
+  EXPECT_THAT(json_output, HasSubstr("\"buffer_barriers_range\""));
+}
+
 TEST(ReplayDumpTest, EmitsQueueTransferRanges) {
   std::vector<uint8_t> storage(4096, 0);
   iree_io_file_handle_t* file_handle = nullptr;

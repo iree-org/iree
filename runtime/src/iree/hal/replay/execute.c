@@ -25,6 +25,7 @@ typedef struct iree_hal_replay_object_entry_t {
     iree_hal_executable_cache_t* executable_cache;
     iree_hal_executable_t* executable;
     iree_hal_semaphore_t* semaphore;
+    iree_hal_event_t* event;
   } value;
 } iree_hal_replay_object_entry_t;
 
@@ -66,6 +67,9 @@ static void iree_hal_replay_executor_release_entry(
       break;
     case IREE_HAL_REPLAY_OBJECT_TYPE_SEMAPHORE:
       iree_hal_semaphore_release(entry->value.semaphore);
+      break;
+    case IREE_HAL_REPLAY_OBJECT_TYPE_EVENT:
+      iree_hal_event_release(entry->value.event);
       break;
     default:
       break;
@@ -542,6 +546,28 @@ static iree_status_t iree_hal_replay_executor_create_semaphore(
       IREE_HAL_REPLAY_OBJECT_TYPE_SEMAPHORE, entry);
 }
 
+static iree_status_t iree_hal_replay_executor_create_event(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT,
+      sizeof(iree_hal_replay_event_object_payload_t)));
+  iree_hal_replay_event_object_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+  iree_hal_replay_object_entry_t* device_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      &device_entry));
+  iree_hal_event_t* event = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_event_create(device_entry->value.device,
+                                             payload.queue_affinity,
+                                             payload.flags, &event));
+  iree_hal_replay_object_entry_t entry = {.value.event = event};
+  return iree_hal_replay_executor_store(
+      executor, record->header.related_object_id,
+      IREE_HAL_REPLAY_OBJECT_TYPE_EVENT, entry);
+}
+
 static iree_status_t iree_hal_replay_executor_allocate_buffer(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -966,6 +992,184 @@ static iree_status_t iree_hal_replay_executor_command_buffer_execution_barrier(
   }
   iree_allocator_free(executor->host_allocator, buffer_barriers);
   iree_allocator_free(executor->host_allocator, memory_barriers);
+  return status;
+}
+
+static iree_status_t iree_hal_replay_executor_command_buffer_event(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EVENT,
+      sizeof(iree_hal_replay_command_buffer_event_payload_t)));
+  iree_hal_replay_command_buffer_event_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+
+  iree_hal_replay_object_entry_t* command_buffer_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id,
+      IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER, &command_buffer_entry));
+  iree_hal_replay_object_entry_t* event_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, payload.event_id, IREE_HAL_REPLAY_OBJECT_TYPE_EVENT,
+      &event_entry));
+
+  switch (record->header.operation_code) {
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_SIGNAL_EVENT:
+      return iree_hal_command_buffer_signal_event(
+          command_buffer_entry->value.command_buffer, event_entry->value.event,
+          payload.source_stage_mask);
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_RESET_EVENT:
+      return iree_hal_command_buffer_reset_event(
+          command_buffer_entry->value.command_buffer, event_entry->value.event,
+          payload.source_stage_mask);
+    default:
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED, "replay operation %s is not an event op",
+          iree_hal_replay_operation_code_string(record->header.operation_code));
+  }
+}
+
+static iree_status_t iree_hal_replay_executor_command_buffer_wait_events(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS,
+      sizeof(iree_hal_replay_command_buffer_wait_events_payload_t)));
+  iree_hal_replay_command_buffer_wait_events_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+
+  iree_host_size_t event_payloads_size = 0;
+  iree_host_size_t memory_payloads_size = 0;
+  iree_host_size_t buffer_payloads_size = 0;
+  iree_host_size_t total_payload_size = 0;
+  if (IREE_UNLIKELY(
+          payload.event_count > IREE_HOST_SIZE_MAX ||
+          payload.memory_barrier_count > IREE_HOST_SIZE_MAX ||
+          payload.buffer_barrier_count > IREE_HOST_SIZE_MAX ||
+          !iree_host_size_checked_mul((iree_host_size_t)payload.event_count,
+                                      sizeof(iree_hal_replay_object_id_t),
+                                      &event_payloads_size) ||
+          !iree_host_size_checked_mul(
+              (iree_host_size_t)payload.memory_barrier_count,
+              sizeof(iree_hal_replay_memory_barrier_payload_t),
+              &memory_payloads_size) ||
+          !iree_host_size_checked_mul(
+              (iree_host_size_t)payload.buffer_barrier_count,
+              sizeof(iree_hal_replay_buffer_barrier_payload_t),
+              &buffer_payloads_size) ||
+          !iree_host_size_checked_add(sizeof(payload), event_payloads_size,
+                                      &total_payload_size) ||
+          !iree_host_size_checked_add(total_payload_size, memory_payloads_size,
+                                      &total_payload_size) ||
+          !iree_host_size_checked_add(total_payload_size, buffer_payloads_size,
+                                      &total_payload_size) ||
+          total_payload_size != record->payload.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay wait events payload length mismatch");
+  }
+
+  const iree_hal_replay_object_id_t* event_payloads =
+      (const iree_hal_replay_object_id_t*)(record->payload.data +
+                                           sizeof(payload));
+  const iree_hal_replay_memory_barrier_payload_t* memory_payloads =
+      (const iree_hal_replay_memory_barrier_payload_t*)(record->payload.data +
+                                                        sizeof(payload) +
+                                                        event_payloads_size);
+  const iree_hal_replay_buffer_barrier_payload_t* buffer_payloads =
+      (const iree_hal_replay_buffer_barrier_payload_t*)(record->payload.data +
+                                                        sizeof(payload) +
+                                                        event_payloads_size +
+                                                        memory_payloads_size);
+
+  const iree_hal_event_t** events = NULL;
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t events_size = 0;
+  if (payload.event_count) {
+    if (IREE_UNLIKELY(
+            !iree_host_size_checked_mul((iree_host_size_t)payload.event_count,
+                                        sizeof(*events), &events_size))) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "replay wait event count overflow");
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_allocator_malloc(executor->host_allocator, events_size,
+                                     (void**)&events);
+    }
+  }
+  for (iree_host_size_t i = 0;
+       i < payload.event_count && iree_status_is_ok(status); ++i) {
+    iree_hal_replay_object_entry_t* event_entry = NULL;
+    status = iree_hal_replay_executor_lookup(executor, event_payloads[i],
+                                             IREE_HAL_REPLAY_OBJECT_TYPE_EVENT,
+                                             &event_entry);
+    if (iree_status_is_ok(status)) {
+      events[i] = event_entry->value.event;
+    }
+  }
+
+  iree_hal_memory_barrier_t* memory_barriers = NULL;
+  iree_host_size_t memory_barriers_size = 0;
+  if (iree_status_is_ok(status) && payload.memory_barrier_count) {
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            (iree_host_size_t)payload.memory_barrier_count,
+            sizeof(*memory_barriers), &memory_barriers_size))) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "replay wait memory barrier count overflow");
+    }
+    if (iree_status_is_ok(status)) {
+      status =
+          iree_allocator_malloc(executor->host_allocator, memory_barriers_size,
+                                (void**)&memory_barriers);
+    }
+  }
+  for (iree_host_size_t i = 0;
+       i < payload.memory_barrier_count && iree_status_is_ok(status); ++i) {
+    memory_barriers[i].source_scope = memory_payloads[i].source_scope;
+    memory_barriers[i].target_scope = memory_payloads[i].target_scope;
+  }
+
+  iree_hal_buffer_barrier_t* buffer_barriers = NULL;
+  iree_host_size_t buffer_barriers_size = 0;
+  if (iree_status_is_ok(status) && payload.buffer_barrier_count) {
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            (iree_host_size_t)payload.buffer_barrier_count,
+            sizeof(*buffer_barriers), &buffer_barriers_size))) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "replay wait buffer barrier count overflow");
+    }
+    if (iree_status_is_ok(status)) {
+      status =
+          iree_allocator_malloc(executor->host_allocator, buffer_barriers_size,
+                                (void**)&buffer_barriers);
+    }
+  }
+  for (iree_host_size_t i = 0;
+       i < payload.buffer_barrier_count && iree_status_is_ok(status); ++i) {
+    buffer_barriers[i].source_scope = buffer_payloads[i].source_scope;
+    buffer_barriers[i].target_scope = buffer_payloads[i].target_scope;
+    status = iree_hal_replay_executor_make_buffer_ref(
+        executor, &buffer_payloads[i].buffer_ref,
+        &buffer_barriers[i].buffer_ref);
+  }
+
+  iree_hal_replay_object_entry_t* command_buffer_entry = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_lookup(
+        executor, record->header.object_id,
+        IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER, &command_buffer_entry);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_wait_events(
+        command_buffer_entry->value.command_buffer,
+        (iree_host_size_t)payload.event_count, events,
+        payload.source_stage_mask, payload.target_stage_mask,
+        (iree_host_size_t)payload.memory_barrier_count, memory_barriers,
+        (iree_host_size_t)payload.buffer_barrier_count, buffer_barriers);
+  }
+
+  iree_allocator_free(executor->host_allocator, buffer_barriers);
+  iree_allocator_free(executor->host_allocator, memory_barriers);
+  iree_allocator_free(executor->host_allocator, events);
   return status;
 }
 
@@ -1438,6 +1642,8 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
       return iree_hal_replay_executor_prepare_executable(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_COMMAND_BUFFER:
       return iree_hal_replay_executor_create_command_buffer(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_EVENT:
+      return iree_hal_replay_executor_create_event(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_SEMAPHORE:
       return iree_hal_replay_executor_create_semaphore(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER:
@@ -1477,6 +1683,12 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
     case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_EXECUTION_BARRIER:
       return iree_hal_replay_executor_command_buffer_execution_barrier(executor,
                                                                        record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_SIGNAL_EVENT:
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_RESET_EVENT:
+      return iree_hal_replay_executor_command_buffer_event(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_WAIT_EVENTS:
+      return iree_hal_replay_executor_command_buffer_wait_events(executor,
+                                                                 record);
     case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_DISPATCH:
       return iree_hal_replay_executor_command_buffer_dispatch(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FILL_BUFFER:
