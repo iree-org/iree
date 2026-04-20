@@ -311,3 +311,14 @@ util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> 
 //       CHECK:   %[[R0:.+]] = arith.addf %[[A0]], %[[B0]] : vector<4xf32>
 //       CHECK:   %[[R1:.+]] = arith.addf %[[A1]], %[[B1]] : vector<4xf32>
 //       CHECK:   util.return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+func.func @negative_vector_multi_reduction_rank_one(%arg0: vector<2xf32>, %acc: f32) -> f32 {
+    %0 = vector.multi_reduction <mul>, %arg0, %acc [0] : vector<2xf32> to f32
+    return %0 : f32
+}
+
+// CHECK-LABEL: func.func @negative_vector_multi_reduction_rank_one
+//       CHECK:   vector.multi_reduction
+//       CHECK:   return

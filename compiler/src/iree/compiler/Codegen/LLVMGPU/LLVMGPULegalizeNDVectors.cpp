@@ -717,6 +717,12 @@ struct ConvertVectorMultiReduction final
   LogicalResult
   matchAndRewrite(vector::MultiDimReductionOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+
+    SmallVector<Value> srcValues(adaptor.getSource());
+    if (srcValues.size() == 1) {
+      return failure();
+    }
+
     return failure();
   }
 };
