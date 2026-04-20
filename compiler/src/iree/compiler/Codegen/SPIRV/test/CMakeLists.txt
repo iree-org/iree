@@ -53,6 +53,7 @@ iree_lit_test_suite(
     "map_memref_storage_class.mlir"
     "materialize_executable_conditions.mlir"
     "physical_storage_buffer_addresses.mlir"
+    "pipeline_full_smoketests.mlir"
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"
