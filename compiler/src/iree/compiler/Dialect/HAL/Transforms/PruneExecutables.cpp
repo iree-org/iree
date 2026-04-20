@@ -174,6 +174,23 @@ struct PruneExecutablesPass
     eraseOps(exportRefAttrs.getArrayRef(), referenceMap);
     eraseOps(variantRefAttrs, referenceMap);
     eraseOps(executableRefAttrs, referenceMap);
+
+    // Renumber export ordinals to be contiguous from 0. Backend serializers
+    // index their flatbuffer `exports` vector by ordinal and assume a dense
+    // [0, N) range; leaving gaps from pruned exports produces invalid
+    // flatbuffers. Export symbol references are resolved by name via
+    // ResolveExportOrdinalsPass, so renumbering is a safe rewrite.
+    Builder builder(moduleOp.getContext());
+    for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+      for (auto variantOp :
+           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        int64_t nextOrdinal = 0;
+        for (auto exportOp :
+             variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+          exportOp.setOrdinalAttr(builder.getIndexAttr(nextOrdinal++));
+        }
+      }
+    }
   }
 };
 

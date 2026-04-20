@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "lower_transfer_gather_scatter_to_vector.mlir",
             "vector_ext_fold_unit_extent_dims.mlir",
             "vectorize_vector_ext_ops.mlir",
         ],

@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Transforms/Passes.h"
@@ -31,60 +30,19 @@
 namespace mlir::iree_compiler::IREE::VMVX {
 
 // ---------------------------------------------------------------------------
-// Variant configuration
-// ---------------------------------------------------------------------------
-
-void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  {
-    FunctionLikeNest funcPassManager(modulePassManager);
-    // ---------------------------------------------------------------------------
-    // Tensor-level optimization, kernel dispatch and lower to buffers.
-    // ---------------------------------------------------------------------------
-    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
-  }
-  modulePassManager.addPass(createMaterializeUserConfigsPass());
-  FunctionLikeNest(modulePassManager)
-      .addPass(createMaterializeDeviceEncodingPass)
-      // TODO: Remove the following pass the plumb support for
-      // #hal.descriptor_type memory space through the stack.
-      .addPass(createEraseHALDescriptorTypeFromMemRefPass);
-  modulePassManager.addPass(createVMVXSelectLoweringStrategyPass());
-}
-
-// ---------------------------------------------------------------------------
-// Variant Translation
+// Module-scope translation
 // ---------------------------------------------------------------------------
 
 static void
-buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
-  variantPassManager.addPass(createCreateDispatchConfigPass());
-
+buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    FunctionLikeNest(modulePassManager)
-        .addPass(createVMVXLowerExecutableTargetPass);
-
-    // Resolve workgroup distribution before lowering ukernels to calls.
-    // CPULowerToUKernelsPass (inside VMVXLowerExecutableTargetPass) lowers
-    // iree_codegen.query_tile_sizes to iree_codegen.ukernel.generic which is
-    // memory-effect-free at the tensor level (no memref operands). The WAR
-    // hack in materializeSliceFromOrdinals replaces it with a constant in
-    // the count region. After LowerUKernelOpsToCallsPass it becomes a
-    // func.call which is memory-effecting and would be rejected by the
-    // backward slice.
-    modulePassManager.addPass(createReconcileTranslationInfoPass());
-    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
-  }
-  variantPassManager.addPass(createPropagateDispatchConfigPass());
+  buildVMVXLoweringPassPipeline(modulePassManager);
 
   // ---------------------------------------------------------------------------
   // Linalg -> Vectors
   // ---------------------------------------------------------------------------
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   FunctionLikeNest(modulePassManager)
@@ -143,18 +101,17 @@ static void buildLoopOptimizationVMVXTransformPassPipeline(
       .addPass(createIREELoopInvariantCodeMotionPass);
 }
 
-void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
+void buildVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
   // ---------------------------------------------------------------------------
   // Linalg -> Scalars/Vectors
   // ---------------------------------------------------------------------------
 
-  buildVectorVMVXTransformPassPipeline(variantPassManager);
+  buildVectorVMVXTransformPassPipeline(modulePassManager);
 
   // ---------------------------------------------------------------------------
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------
 
-  OpPassManager &modulePassManager = variantPassManager.nest<mlir::ModuleOp>();
   modulePassManager.addPass(createMaterializeConstantsPass());
   modulePassManager.addPass(createConversionPass());
 
@@ -190,8 +147,8 @@ void registerVMVXPasses() {
   static PassPipelineRegistration<> transformPassPipeline(
       "iree-vmvx-transformation-pipeline",
       "Runs the full IREE VMVX dialect transformation pipeline",
-      [](OpPassManager &variantPassManager) {
-        buildVMVXTransformPassPipeline(variantPassManager);
+      [](OpPassManager &modulePassManager) {
+        buildVMVXTransformPassPipeline(modulePassManager);
       });
 }
 

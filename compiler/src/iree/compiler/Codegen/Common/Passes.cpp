@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -29,7 +30,8 @@ void addCommonTargetExecutablePreprocessingPasses(
       .addPass(createBufferizeCopyOnlyDispatchesPass)
       .addPass([&]() {
         return createDecomposeSoftmaxPass(useDecomposeSoftmaxFusion);
-      });
+      })
+      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
 }
 
 //===---------------------------------------------------------------------===//

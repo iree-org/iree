@@ -68,11 +68,11 @@ hal.executable public @main {
 // -----
 
 // CHECK-LABEL:  func.func @attention_2x10x4096x64x64x64_f16
-// CHECK:          iree_linalg_ext.attention
+// CHECK:          iree_linalg_ext.online_attention
 // CHECK-SAME:       __tuning_spec_applied__
 
 // MI300X-LABEL:  func.func @attention_2x10x4096x64x64x64_f16
-// MI300X:          iree_linalg_ext.attention
+// MI300X:          iree_linalg_ext.online_attention
 // MI300X-SAME:       __tuning_spec_applied__
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
@@ -80,6 +80,7 @@ hal.executable public @main {
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -100,22 +101,23 @@ hal.executable public @main {
         %query: tensor<2x10x4096x64xf16>,
         %key: tensor<2x10x64x64xf16>,
         %value: tensor<2x10x64x64xf16>
-      ) -> tensor<2x10x4096x64xf16> {
+      ) -> tensor<2x10x4096x64xf32> {
 
         %cst = arith.constant 1.250000e-01 : f16
-        %output = tensor.empty() : tensor<2x10x4096x64xf16>
+        %output = tensor.empty() : tensor<2x10x4096x64xf32>
+        %max = tensor.empty() : tensor<2x10x4096xf32>
+        %sum = tensor.empty() : tensor<2x10x4096xf32>
 
-        // Apply the attention operation directly to function inputs.
-        %result = iree_linalg_ext.attention {
-            indexing_maps = [#map, #map1, #map2, #map3, #map4]
+        %result:3 = iree_linalg_ext.online_attention {
+            indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]
         } ins(%query, %key, %value, %cst :
             tensor<2x10x4096x64xf16>, tensor<2x10x64x64xf16>, tensor<2x10x64x64xf16>, f16)
-          outs(%output : tensor<2x10x4096x64xf16>) {
+          outs(%output, %max, %sum : tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>) {
             ^bb0(%arg0: f32):
               iree_linalg_ext.yield %arg0 : f32
-          } -> tensor<2x10x4096x64xf16>
+          } -> tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>
 
-        return %result : tensor<2x10x4096x64xf16>
+        return %result#0 : tensor<2x10x4096x64xf32>
       }
     }
   }
@@ -124,11 +126,11 @@ hal.executable public @main {
 // -----
 
 // CHECK-LABEL:  func.func @attention_3x10x4096x64x64x32_f16
-// CHECK:          iree_linalg_ext.attention
+// CHECK:          iree_linalg_ext.online_attention
 // CHECK-NOT:       __tuning_spec_applied__
 
 // MI300X-LABEL:  func.func @attention_3x10x4096x64x64x32_f16
-// MI300X:          iree_linalg_ext.attention
+// MI300X:          iree_linalg_ext.online_attention
 // MI300X-NOT:       __tuning_spec_applied__
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
@@ -136,6 +138,7 @@ hal.executable public @main {
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -156,22 +159,23 @@ hal.executable public @main {
         %query: tensor<3x10x4096x64xf16>,
         %key: tensor<3x10x32x64xf16>,
         %value: tensor<3x10x64x32xf16>
-      ) -> tensor<3x10x4096x64xf16> {
+      ) -> tensor<3x10x4096x64xf32> {
 
         %cst = arith.constant 1.250000e-01 : f16
-        %output = tensor.empty() : tensor<3x10x4096x64xf16>
+        %output = tensor.empty() : tensor<3x10x4096x64xf32>
+        %max = tensor.empty() : tensor<3x10x4096xf32>
+        %sum = tensor.empty() : tensor<3x10x4096xf32>
 
-        // Apply the attention operation directly to function inputs.
-        %result = iree_linalg_ext.attention {
-            indexing_maps = [#map, #map1, #map2, #map3, #map4]
+        %result:3 = iree_linalg_ext.online_attention {
+            indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]
         } ins(%query, %key, %value, %cst :
             tensor<3x10x4096x64xf16>, tensor<3x10x32x64xf16>, tensor<3x10x64x32xf16>, f16)
-          outs(%output : tensor<3x10x4096x64xf16>) {
+          outs(%output, %max, %sum : tensor<3x10x4096x64xf32>, tensor<3x10x4096xf32>, tensor<3x10x4096xf32>) {
             ^bb0(%arg0: f32):
               iree_linalg_ext.yield %arg0 : f32
-          } -> tensor<3x10x4096x64xf16>
+          } -> tensor<3x10x4096x64xf32>, tensor<3x10x4096xf32>, tensor<3x10x4096xf32>
 
-        return %result : tensor<3x10x4096x64xf16>
+        return %result#0 : tensor<3x10x4096x64xf32>
       }
     }
   }

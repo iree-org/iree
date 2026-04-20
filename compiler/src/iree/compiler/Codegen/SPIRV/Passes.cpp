@@ -646,20 +646,27 @@ void buildSPIRVCodegenConfigurationPassPipeline(
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &modulePassManager) {
+void buildSPIRVCodegenPassPipeline(OpPassManager &modulePassManager,
+                                   bool includeSPIRVLowering) {
   modulePassManager.addPass(
       createSPIRVLowerExecutableUsingTransformDialectPass());
   FunctionLikeNest(modulePassManager)
       .addPass(createSPIRVLowerExecutableTargetPass)
       .addPass(createVerifyWorkgroupDistributionPass);
-  addMemRefLoweringPasses(modulePassManager);
-  FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
+
+  if (includeSPIRVLowering) {
+    addMemRefLoweringPasses(modulePassManager);
+    FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
+  }
+
   modulePassManager.addPass(createReconcileTranslationInfoPass());
   modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
-  addSPIRVLoweringPasses(modulePassManager);
+  if (includeSPIRVLowering) {
+    addSPIRVLoweringPasses(modulePassManager);
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using SPIR-V pass pipeline:\n";
@@ -759,12 +766,23 @@ void registerCodegenSPIRVPasses() {
         buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
       });
 
-  static PassPipelineRegistration<> LinalgSPIRVPipeline(
-      "iree-codegen-linalg-to-spirv-pipeline",
-      "Runs the progressive lowering pipeline from linalg to SPIR-V",
-      [](OpPassManager &modulePassManager) {
-        buildSPIRVCodegenPassPipeline(modulePassManager);
-      });
+  struct SPIRVLoweringPipelineOptions final
+      : PassPipelineOptions<SPIRVLoweringPipelineOptions> {
+    Option<bool> includeSPIRVLowering{
+        *this, "include-spirv-lowering",
+        llvm::cl::desc("Include the lowering to SPIR-V dialect."),
+        llvm::cl::init(true)};
+  };
+
+  static PassPipelineRegistration<SPIRVLoweringPipelineOptions>
+      LinalgSPIRVPipeline(
+          "iree-codegen-linalg-to-spirv-pipeline",
+          "Runs the progressive lowering pipeline from linalg to SPIR-V",
+          [](OpPassManager &modulePassManager,
+             const SPIRVLoweringPipelineOptions &options) {
+            buildSPIRVCodegenPassPipeline(modulePassManager,
+                                          options.includeSPIRVLowering);
+          });
 }
 
 } // namespace mlir::iree_compiler
