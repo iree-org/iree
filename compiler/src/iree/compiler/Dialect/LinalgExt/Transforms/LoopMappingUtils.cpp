@@ -48,43 +48,32 @@ llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   return llvm::SmallBitVector{};
 }
 
-/// Combine two composed iteration-space mappings from the same reference
-/// space into the same target op. `a` and `b` must have matching input and
-/// result arities; each result position is merged by treating the constant
-/// zero as a broadcast placeholder that yields to a concrete expression.
-/// Returns failure if the two maps disagree at any concrete position, which
-/// means the source operands force incompatible loop alignments.
+/// Combines two composed iteration-space maps from the same reference space
+/// into the same op. Broadcast-zero results yield to concrete expressions;
+/// returns failure only on a genuine conflict. A null `a` is treated as the
+/// identity — merging it with `b` returns `b`.
 static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
-  if (!a) {
+  if (!a || a == b)
     return b;
-  }
-  if (!b) {
-    return a;
-  }
-  if (a == b) {
-    return a;
-  }
-  if (a.getNumDims() != b.getNumDims() ||
-      a.getNumSymbols() != b.getNumSymbols() ||
-      a.getNumResults() != b.getNumResults()) {
-    return failure();
-  }
+  assert(a.getNumDims() == b.getNumDims() &&
+         a.getNumSymbols() == b.getNumSymbols() &&
+         a.getNumResults() == b.getNumResults() &&
+         "composed maps must share arity");
+
   auto isZero = [](AffineExpr e) {
     auto c = dyn_cast<AffineConstantExpr>(e);
     return c && c.getValue() == 0;
   };
+
   SmallVector<AffineExpr> merged;
   merged.reserve(a.getNumResults());
   for (auto [ea, eb] : llvm::zip_equal(a.getResults(), b.getResults())) {
-    if (ea == eb) {
+    if (ea == eb || isZero(eb))
       merged.push_back(ea);
-    } else if (isZero(ea)) {
+    else if (isZero(ea))
       merged.push_back(eb);
-    } else if (isZero(eb)) {
-      merged.push_back(ea);
-    } else {
+    else
       return failure();
-    }
   }
   return AffineMap::get(a.getNumDims(), a.getNumSymbols(), merged,
                         a.getContext());
