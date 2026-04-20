@@ -750,15 +750,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // Only enable direct load (global load DMA) for bf16 GEMMs on gfx950+.
+  // Only enable direct load (global load DMA) for f16/bf16 GEMMs on gfx950+.
   // TODO: Add support for scaled matmul (#22119) and convolution (#23907).
+  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
   Location loc = operands[0].getLoc();
   if (useDirectLoad &&
-      !(isGemm && lhsElemType.isBF16() && rhsElemType.isBF16() &&
+      !(isGemm && isF16OrBF16(lhsElemType) && isF16OrBF16(rhsElemType) &&
         targetSupportsGlobalLoadDMA(target))) {
     mlir::emitWarning(loc) << "direct load (global load DMA) is currently only "
-                              "supported for bf16 GEMMs "
-                              "on gfx950+, falling back to stream copies";
+                              "supported for f16/bf16 GEMMs on gfx950+, "
+                              "falling back to stream copies";
     useDirectLoad = false;
   }
 
