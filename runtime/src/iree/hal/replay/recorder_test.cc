@@ -295,7 +295,43 @@ TEST(ReplayRecorderTest, WrappedAllocatorRecordsBuffersAndMapping) {
   EXPECT_EQ(1u, summary.buffer_map_range_record_count);
   EXPECT_EQ(1u, summary.buffer_flush_range_record_count);
   EXPECT_EQ(1u, summary.buffer_unmap_range_record_count);
-  EXPECT_EQ(1u, summary.buffer_range_data_payload_count);
+  EXPECT_EQ(2u, summary.buffer_range_data_payload_count);
+}
+
+TEST(ReplayRecorderTest, PersistentWriteMapsFailLoud) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(wrapped_device);
+  ASSERT_NE(nullptr, allocator);
+
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_MAPPING | IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT;
+  iree_hal_buffer_t* buffer = nullptr;
+  IREE_ASSERT_OK(
+      iree_hal_allocator_allocate_buffer(allocator, params, 16, &buffer));
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNIMPLEMENTED,
+      iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+                                IREE_HAL_MEMORY_ACCESS_WRITE, 0, 16, &mapping));
+  iree_hal_buffer_release(buffer);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
 }
 
 TEST(ReplayRecorderTest, WrappedDeviceRecordsQueueExecuteSemaphores) {
