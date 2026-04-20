@@ -997,6 +997,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createLLVMGPUVectorFlatteningPass)
       .addPass(createLLVMGPULegalizeNDVectorsPass)
+      .addPass(createLLVMGPUVectorMultiReductionLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 

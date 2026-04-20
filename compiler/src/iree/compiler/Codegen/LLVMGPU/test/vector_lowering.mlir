@@ -39,28 +39,6 @@ module {
 
 // -----
 
-// Test multi_reduction lowering.
-
-func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
-  %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
-  %cst_5 = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
-  %22 = arith.mulf %a, %b : vector<2x1x8xf32>
-  %23 = arith.addf %22, %cst_5 : vector<2x1x8xf32>
-  %24 = vector.multi_reduction <add>, %23, %cst_4 [2] : vector<2x1x8xf32> to vector<2x1xf32>
-  return %24 : vector<2x1xf32>
-}
-
-// CHECK-LABEL: func.func @multi_reduction_f32
-// CHECK-SAME: %[[ARG0:.+]]: vector<2x1x8xf32>, %[[ARG1:.+]]: vector<2x1x8xf32>)
-// CHECK-DAG: %[[FMA:.+]] = math.fma %[[ARG0]], %[[ARG1]], %{{.*}} fastmath<contract> : vector<2x1x8xf32>
-// CHECK-DAG: %[[FMA1:.+]] = vector.extract %[[FMA]][0, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK-DAG: %[[RED1:.+]] = vector.reduction <add>, %[[FMA1]], %{{.*}} : vector<8xf32> into f32
-// CHECK-DAG: %[[FMA2:.+]] = vector.extract %[[FMA]][1, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK-DAG: %[[RED2:.+]] = vector.reduction <add>, %[[FMA2]], %{{.*}} : vector<8xf32> into f32
-// CHECK: vector.from_elements %[[RED1]], %[[RED2]] : vector<2x1xf32>
-
-// -----
-
 func.func @multi_reduction_no_uplift(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
   %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
   %cst_5 = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>

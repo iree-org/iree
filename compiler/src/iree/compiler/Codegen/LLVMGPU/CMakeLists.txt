@@ -90,6 +90,7 @@ iree_cc_library(
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorDistribute.cpp"
     "LLVMGPUVectorFlattening.cpp"
+    "LLVMGPUVectorMultiReductionLowering.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"

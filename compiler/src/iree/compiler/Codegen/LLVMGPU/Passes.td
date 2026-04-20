@@ -73,6 +73,14 @@ def LLVMGPUVectorFlatteningPass :
   ];
 }
 
+def LLVMGPUVectorMultiReductionLoweringPass :
+    InterfacePass<"iree-llvmgpu-vector-multi-reduction-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Lower vector.multi_reduction ops.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";

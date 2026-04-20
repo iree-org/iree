@@ -740,8 +740,8 @@ struct ConvertVectorMultiReduction final
   matchAndRewrite(vector::MultiDimReductionOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    SmallVector<Value> srcs(adaptor.getSource());
-    if (srcs.size() == 1) {
+    VectorType srcType = cast<VectorType>(op.getSource().getType());
+    if (srcType.getRank() <= 1) {
       return failure();
     }
 
@@ -754,6 +754,7 @@ struct ConvertVectorMultiReduction final
     Type resultType = op.getResult().getType();
     Value result = ub::PoisonOp::create(rewriter, loc, resultType);
 
+    SmallVector<Value> srcs(adaptor.getSource());
     for (int64_t i = 0, e = srcs.size(); i < e; i++) {
       Value accElem = vector::ExtractOp::create(rewriter, loc, acc, i);
       auto reduced = vector::MultiDimReductionOp::create(
