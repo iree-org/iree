@@ -107,6 +107,7 @@ iree_cc_test(
     ::dump
     ::file_writer
     iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
 )

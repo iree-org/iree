@@ -138,6 +138,7 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_OBJECT = 1u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_ALLOCATE_BUFFER = 2u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE = 3u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA = 4u,
 };
 
 // Payload describing a captured buffer object.
@@ -199,6 +200,24 @@ typedef struct iree_hal_replay_buffer_range_payload_t {
   // Reserved for future buffer range metadata; must be zero.
   uint32_t reserved1;
 } iree_hal_replay_buffer_range_payload_t;
+
+// Payload describing a buffer byte range operation with captured byte data.
+typedef struct iree_hal_replay_buffer_range_data_payload_t {
+  // Byte offset within the underlying allocation passed to the driver vtable.
+  uint64_t byte_offset;
+  // Byte length of the range passed to the driver vtable.
+  uint64_t byte_length;
+  // Captured byte length following this payload header.
+  uint64_t data_length;
+  // Mapping mode bits for map operations, or zero otherwise.
+  uint32_t mapping_mode;
+  // Memory access bits for map operations, or zero otherwise.
+  uint16_t memory_access;
+  // Reserved for future buffer range metadata; must be zero.
+  uint16_t reserved0;
+  // Reserved for future buffer range metadata; must be zero.
+  uint32_t reserved1;
+} iree_hal_replay_buffer_range_data_payload_t;
 
 // Compression algorithm used for one replay file byte range.
 typedef uint16_t iree_hal_replay_compression_type_t;

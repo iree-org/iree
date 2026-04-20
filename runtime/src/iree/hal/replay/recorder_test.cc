@@ -125,6 +125,7 @@ struct ReplayRecordSummary {
   iree_host_size_t buffer_map_range_record_count = 0;
   iree_host_size_t buffer_flush_range_record_count = 0;
   iree_host_size_t buffer_unmap_range_record_count = 0;
+  iree_host_size_t buffer_range_data_payload_count = 0;
 };
 
 static ReplayRecordSummary ParseReplayRecordSummary(
@@ -180,6 +181,10 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         } else if (record.header.operation_code ==
                    IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_UNMAP_RANGE) {
           ++summary.buffer_unmap_range_record_count;
+        }
+        if (record.header.payload_type ==
+            IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA) {
+          ++summary.buffer_range_data_payload_count;
         }
         EXPECT_EQ((uint32_t)IREE_STATUS_OK, record.header.status_code);
         break;
@@ -270,6 +275,7 @@ TEST(ReplayRecorderTest, WrappedAllocatorRecordsBuffersAndMapping) {
   EXPECT_EQ(1u, summary.buffer_map_range_record_count);
   EXPECT_EQ(1u, summary.buffer_flush_range_record_count);
   EXPECT_EQ(1u, summary.buffer_unmap_range_record_count);
+  EXPECT_EQ(1u, summary.buffer_range_data_payload_count);
 }
 
 }  // namespace

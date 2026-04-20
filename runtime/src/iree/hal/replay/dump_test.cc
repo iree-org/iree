@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "iree/hal/api.h"
 #include "iree/hal/replay/file_writer.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -107,6 +108,54 @@ TEST(ReplayDumpTest, EmitsJsonlWithPayloadRanges) {
   EXPECT_THAT(output, HasSubstr("\"payload_type\":\"buffer_object\""));
   EXPECT_THAT(output, HasSubstr("\"payload_range\""));
   EXPECT_THAT(output, HasSubstr("\"allocation_size\":256"));
+}
+
+TEST(ReplayDumpTest, EmitsBufferRangeDataRanges) {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_ASSERT_OK(iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+      iree_make_byte_span(storage.data(), storage.size()),
+      iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+      &file_handle));
+
+  iree_hal_replay_file_writer_t* writer = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_create(
+      file_handle, iree_allocator_system(), &writer));
+  iree_io_file_handle_release(file_handle);
+
+  iree_hal_replay_buffer_range_data_payload_t payload = {};
+  payload.byte_offset = 64;
+  payload.byte_length = 4;
+  payload.data_length = 4;
+  payload.memory_access = IREE_HAL_MEMORY_ACCESS_WRITE;
+  const uint8_t data[] = {0x01, 0x02, 0x03, 0x04};
+  iree_const_byte_span_t iovecs[2] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(data, sizeof(data)),
+  };
+  iree_hal_replay_file_record_metadata_t metadata = {};
+  metadata.sequence_ordinal = 0;
+  metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  metadata.payload_type = IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA;
+  metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER;
+  metadata.operation_code = IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_FLUSH_RANGE;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_append_record(writer, &metadata, 2,
+                                                           iovecs, nullptr));
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_close(writer));
+  iree_hal_replay_file_writer_free(writer);
+
+  iree_hal_replay_dump_options_t options =
+      iree_hal_replay_dump_options_default();
+  options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
+  std::string output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(MakeReplayFileContents(storage),
+                                           &options, AppendToString, &output,
+                                           iree_allocator_system()));
+
+  EXPECT_THAT(output, HasSubstr("\"payload_type\":\"buffer_range_data\""));
+  EXPECT_THAT(output, HasSubstr("\"data_range\""));
+  EXPECT_THAT(output, HasSubstr("\"length\":4"));
 }
 
 }  // namespace

@@ -120,8 +120,8 @@ static iree_status_t iree_hal_replay_dump_append_json_file_range(
 }
 
 static iree_status_t iree_hal_replay_dump_append_text_payload(
-    iree_string_builder_t* builder,
-    const iree_hal_replay_file_record_t* record) {
+    iree_string_builder_t* builder, const iree_hal_replay_file_record_t* record,
+    const iree_hal_replay_file_range_t* payload_range) {
   switch (record->header.payload_type) {
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE:
       return iree_ok_status();
@@ -165,14 +165,40 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
           payload.byte_offset, payload.byte_length, payload.mapping_mode,
           payload.memory_access);
     }
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA: {
+      if (record->payload.data_length <
+          sizeof(iree_hal_replay_buffer_range_data_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay buffer range data payload is short");
+      }
+      iree_hal_replay_buffer_range_data_payload_t payload;
+      memcpy(&payload, record->payload.data, sizeof(payload));
+      if (payload.data_length >
+          record->payload.data_length -
+              sizeof(iree_hal_replay_buffer_range_data_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay buffer range data extends past record");
+      }
+      const uint64_t data_offset =
+          payload_range->offset +
+          (uint64_t)sizeof(iree_hal_replay_buffer_range_data_payload_t);
+      return iree_string_builder_append_format(
+          builder,
+          " byte_offset=%" PRIu64 " byte_length=%" PRIu64
+          " data_range=[%" PRIu64 ", +%" PRIu64
+          "]"
+          " memory_access=0x%04" PRIx16,
+          payload.byte_offset, payload.byte_length, data_offset,
+          payload.data_length, payload.memory_access);
+    }
     default:
       return iree_ok_status();
   }
 }
 
 static iree_status_t iree_hal_replay_dump_append_json_payload(
-    iree_string_builder_t* builder,
-    const iree_hal_replay_file_record_t* record) {
+    iree_string_builder_t* builder, const iree_hal_replay_file_record_t* record,
+    const iree_hal_replay_file_range_t* payload_range) {
   switch (record->header.payload_type) {
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE:
       return iree_ok_status();
@@ -217,6 +243,39 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
           payload.byte_offset, payload.byte_length, payload.mapping_mode,
           payload.memory_access);
     }
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA: {
+      if (record->payload.data_length <
+          sizeof(iree_hal_replay_buffer_range_data_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay buffer range data payload is short");
+      }
+      iree_hal_replay_buffer_range_data_payload_t payload;
+      memcpy(&payload, record->payload.data, sizeof(payload));
+      if (payload.data_length >
+          record->payload.data_length -
+              sizeof(iree_hal_replay_buffer_range_data_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay buffer range data extends past record");
+      }
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          builder,
+          ",\"payload\":{\"byte_offset\":%" PRIu64 ",\"byte_length\":%" PRIu64
+          ",\"mapping_mode\":%" PRIu32 ",\"memory_access\":%" PRIu16,
+          payload.byte_offset, payload.byte_length, payload.mapping_mode,
+          payload.memory_access));
+      iree_hal_replay_file_range_t data_range =
+          iree_hal_replay_file_range_empty();
+      data_range.offset =
+          payload_range->offset +
+          (uint64_t)sizeof(iree_hal_replay_buffer_range_data_payload_t);
+      data_range.length = payload.data_length;
+      data_range.uncompressed_length = payload.data_length;
+      data_range.compression_type = IREE_HAL_REPLAY_COMPRESSION_TYPE_NONE;
+      data_range.digest_type = IREE_HAL_REPLAY_DIGEST_TYPE_NONE;
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
+          builder, "data_range", &data_range));
+      return iree_string_builder_append_cstring(builder, "}");
+    }
     default:
       return iree_string_builder_append_cstring(builder, ",\"payload\":null");
   }
@@ -255,8 +314,8 @@ static iree_status_t iree_hal_replay_dump_emit_text_record(
         builder, " payload=%s(%u) range=[%" PRIu64 ", +%" PRIu64 "]",
         iree_hal_replay_payload_type_string(header->payload_type),
         header->payload_type, payload_range->offset, payload_range->length));
-    IREE_RETURN_IF_ERROR(
-        iree_hal_replay_dump_append_text_payload(builder, record));
+    IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_text_payload(
+        builder, record, payload_range));
   }
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
   return iree_hal_replay_dump_emit(context, builder);
@@ -308,7 +367,7 @@ static iree_status_t iree_hal_replay_dump_emit_json_record(
   IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
       builder, "payload_range", payload_range));
   IREE_RETURN_IF_ERROR(
-      iree_hal_replay_dump_append_json_payload(builder, record));
+      iree_hal_replay_dump_append_json_payload(builder, record, payload_range));
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "}\n"));
   return iree_hal_replay_dump_emit(context, builder);
 }

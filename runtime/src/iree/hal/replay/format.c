@@ -173,6 +173,8 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "allocator_allocate_buffer";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE:
       return "buffer_range";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA:
+      return "buffer_range_data";
     default:
       return "unknown";
   }
