@@ -501,11 +501,6 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorMultiReductionReorderPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
-      // TODO: Delete after moving vector.multi_reduction unrolling to
-      // legalization stage.
-      vector::populateVectorMultiReductionFlatteningPatterns(
-          contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerReduction);
       // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
       // vector.transfer_read.
       IREE::VectorExt::populateVectorTransferGatherScatterLoweringPatterns(
