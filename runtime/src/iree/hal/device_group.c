@@ -202,6 +202,97 @@ static void iree_hal_device_group_compute_bitmaps(
   }
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_group_create_with_replacements(
+    iree_hal_device_group_t* source_group,
+    iree_hal_device_group_replacement_callback_t replacement_callback,
+    iree_allocator_t host_allocator, iree_hal_device_group_t** out_group) {
+  IREE_ASSERT_ARGUMENT(source_group);
+  IREE_ASSERT_ARGUMENT(out_group);
+  *out_group = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (IREE_UNLIKELY(!replacement_callback.fn)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "device group replacement callback function is required");
+  }
+
+  const iree_host_size_t device_count = source_group->device_count;
+  iree_hal_device_group_t* group = NULL;
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, sizeof(*group), (void**)&group);
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+  memset(group, 0, sizeof(*group));
+  iree_atomic_ref_count_init(&group->ref_count);
+  group->host_allocator = host_allocator;
+  group->device_count = device_count;
+  group->frontier_tracker = source_group->frontier_tracker;
+  iree_async_frontier_tracker_retain(group->frontier_tracker);
+  group->topology = source_group->topology;
+
+  for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_device_t* replacement_device = NULL;
+    status = replacement_callback.fn(source_group, i, source_group->devices[i],
+                                     replacement_callback.user_data,
+                                     &replacement_device);
+    if (iree_status_is_ok(status) && IREE_UNLIKELY(!replacement_device)) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "replacement device %" PRIhsz " must not be NULL", i);
+    }
+    if (iree_status_is_ok(status)) {
+      group->devices[i] = replacement_device;
+    } else {
+      iree_hal_device_release(replacement_device);
+    }
+    group->driver_names[i] = source_group->driver_names[i];
+  }
+
+  iree_host_size_t assigned_device_count = 0;
+  for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_device_topology_info_t topology_info;
+    memset(&topology_info, 0, sizeof(topology_info));
+    topology_info.topology_index = (uint32_t)i;
+    topology_info.topology = &group->topology;
+    topology_info.self_edge =
+        iree_hal_topology_query_edge(&group->topology, (uint32_t)i, (uint32_t)i)
+            .lo;
+    topology_info.frontier.tracker = group->frontier_tracker;
+    topology_info.frontier.base_axis = iree_async_axis_make_queue(
+        iree_async_frontier_tracker_session_epoch(group->frontier_tracker),
+        iree_async_frontier_tracker_machine_index(group->frontier_tracker),
+        (uint8_t)i, /*queue_index=*/0);
+
+    iree_hal_device_group_compute_bitmaps(&group->topology, (uint32_t)i,
+                                          &topology_info);
+
+    status =
+        iree_hal_device_assign_topology_info(group->devices[i], &topology_info);
+    if (iree_status_is_ok(status)) {
+      assigned_device_count = i + 1;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_group = group;
+  } else {
+    for (iree_host_size_t i = 0; i < assigned_device_count; ++i) {
+      iree_status_ignore(
+          iree_hal_device_assign_topology_info(group->devices[i], NULL));
+    }
+    iree_hal_device_group_release(group);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_group_builder_finalize(
     iree_hal_device_group_builder_t* builder, iree_allocator_t host_allocator,
     iree_hal_device_group_t** out_group) {

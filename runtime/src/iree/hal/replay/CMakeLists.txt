@@ -35,6 +35,24 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    recorder
+  HDRS
+    "recorder.h"
+  SRCS
+    "recorder.c"
+  DEPS
+    ::file
+    ::format
+    iree::base
+    iree::base::internal
+    iree::base::threading
+    iree::hal
+    iree::io::file_handle
+  PUBLIC
+)
+
 iree_cc_test(
   NAME
     file_test
@@ -43,6 +61,22 @@ iree_cc_test(
   DEPS
     ::file
     iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    recorder_test
+  SRCS
+    "recorder_test.cc"
+  DEPS
+    ::file
+    ::recorder
+    iree::async
+    iree::base
+    iree::hal
+    iree::hal::testing::mock_device
     iree::testing::gtest
     iree::testing::gtest_main
 )

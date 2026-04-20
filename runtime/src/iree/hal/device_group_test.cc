@@ -462,6 +462,79 @@ TEST(DeviceGroup, NullRetainRelease) {
 }
 
 //===----------------------------------------------------------------------===//
+// Replacement group tests
+//===----------------------------------------------------------------------===//
+
+typedef struct DeviceGroupReplacementContext {
+  iree_hal_device_t* replacements[2];
+  iree_host_size_t call_count;
+} DeviceGroupReplacementContext;
+
+static iree_status_t ReplaceDeviceWithRetainedMock(
+    iree_hal_device_group_t* source_group, iree_host_size_t device_index,
+    iree_hal_device_t* source_device, void* user_data,
+    iree_hal_device_t** out_replacement_device) {
+  DeviceGroupReplacementContext* context =
+      (DeviceGroupReplacementContext*)user_data;
+  EXPECT_EQ(source_device,
+            iree_hal_device_group_device_at(source_group, device_index));
+  iree_hal_device_retain(context->replacements[device_index]);
+  *out_replacement_device = context->replacements[device_index];
+  ++context->call_count;
+  return iree_ok_status();
+}
+
+TEST(DeviceGroup, CreateWithReplacementsPreservesTopology) {
+  iree_hal_device_t* device_a = CreateMockDevice("mock");
+  iree_hal_device_t* device_b = CreateMockDevice("mock");
+
+  iree_hal_device_group_builder_t builder;
+  InitializeDeviceGroupBuilder(&builder);
+  IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_a));
+  IREE_ASSERT_OK(iree_hal_device_group_builder_add_device(&builder, device_b));
+
+  iree_hal_device_group_t* source_group = NULL;
+  IREE_ASSERT_OK(iree_hal_device_group_builder_finalize(
+      &builder, iree_allocator_system(), &source_group));
+
+  iree_hal_device_t* replacement_a = CreateMockDevice("mock");
+  iree_hal_device_t* replacement_b = CreateMockDevice("mock");
+  DeviceGroupReplacementContext context = {};
+  context.replacements[0] = replacement_a;
+  context.replacements[1] = replacement_b;
+  iree_hal_device_group_replacement_callback_t replacement_callback = {};
+  replacement_callback.fn = ReplaceDeviceWithRetainedMock;
+  replacement_callback.user_data = &context;
+
+  iree_hal_device_group_t* replacement_group = NULL;
+  IREE_ASSERT_OK(iree_hal_device_group_create_with_replacements(
+      source_group, replacement_callback, iree_allocator_system(),
+      &replacement_group));
+
+  EXPECT_EQ(2u, context.call_count);
+  EXPECT_EQ(2u, iree_hal_device_group_device_count(replacement_group));
+  EXPECT_EQ(replacement_a,
+            iree_hal_device_group_device_at(replacement_group, 0));
+  EXPECT_EQ(replacement_b,
+            iree_hal_device_group_device_at(replacement_group, 1));
+  EXPECT_EQ(iree_hal_device_group_topology(source_group)->device_count,
+            iree_hal_device_group_topology(replacement_group)->device_count);
+  EXPECT_EQ(iree_hal_device_topology_info(replacement_a)->topology,
+            iree_hal_device_group_topology(replacement_group));
+  EXPECT_EQ(iree_hal_device_topology_info(replacement_a)->topology_index, 0u);
+  EXPECT_EQ(iree_hal_device_topology_info(replacement_b)->topology,
+            iree_hal_device_group_topology(replacement_group));
+  EXPECT_EQ(iree_hal_device_topology_info(replacement_b)->topology_index, 1u);
+
+  iree_hal_device_group_release(replacement_group);
+  iree_hal_device_release(replacement_a);
+  iree_hal_device_release(replacement_b);
+  iree_hal_device_group_release(source_group);
+  iree_hal_device_release(device_a);
+  iree_hal_device_release(device_b);
+}
+
+//===----------------------------------------------------------------------===//
 // Topology pointer stability tests
 //===----------------------------------------------------------------------===//
 
