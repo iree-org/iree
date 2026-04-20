@@ -197,6 +197,45 @@ static void CaptureMockExecutablePrepare(iree_const_byte_span_t executable_data,
   iree_hal_replay_recorder_release(recorder);
 }
 
+static void CorruptFirstCapturedExecutableData(std::vector<uint8_t>* storage) {
+  iree_const_byte_span_t file_contents =
+      iree_make_const_byte_span(storage->data(), storage->size());
+  iree_hal_replay_file_header_t file_header;
+  iree_host_size_t record_offset = 0;
+  IREE_ASSERT_OK(iree_hal_replay_file_parse_header(file_contents, &file_header,
+                                                   &record_offset));
+  file_contents = iree_make_const_byte_span(
+      storage->data(), static_cast<iree_host_size_t>(file_header.file_length));
+
+  while (record_offset < file_contents.data_length) {
+    iree_hal_replay_file_record_t record;
+    iree_host_size_t next_record_offset = record_offset;
+    IREE_ASSERT_OK(iree_hal_replay_file_parse_record(
+        file_contents, record_offset, &record, &next_record_offset));
+    if (record.header.payload_type !=
+        IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_PREPARE) {
+      record_offset = next_record_offset;
+      continue;
+    }
+
+    iree_hal_replay_executable_prepare_payload_t payload;
+    ASSERT_GE(record.payload.data_length, sizeof(payload));
+    std::memcpy(&payload, record.payload.data, sizeof(payload));
+    const iree_host_size_t data_offset =
+        sizeof(payload) + payload.executable_format_length;
+    ASSERT_GE(payload.executable_data_length, sizeof(uint32_t));
+    ASSERT_LE(data_offset + sizeof(uint32_t), record.payload.data_length);
+    auto* mutable_payload =
+        storage->data() + (record.payload.data - file_contents.data);
+    const uint32_t impossible_export_count = 0xFFFFFFFFu;
+    std::memcpy(mutable_payload + data_offset, &impossible_export_count,
+                sizeof(impossible_export_count));
+    return;
+  }
+
+  FAIL() << "expected an executable prepare record";
+}
+
 typedef struct TestExecutableSubstitutionState {
   iree_string_view_t source;
   iree_string_view_t executable_format;
@@ -260,6 +299,42 @@ TEST(ReplayExecuteTest, SubstitutesRecordedExecutablePayload) {
                                               iree_allocator_system()));
   EXPECT_EQ(substitution_state.invocation_count, 1u);
   EXPECT_EQ(substitution_state.executable_id, 3u);
+  iree_hal_device_group_release(replay_group);
+}
+
+TEST(ReplayExecuteTest, UsesRecordedExecutableMetadataForSubstitution) {
+  std::vector<uint8_t> captured_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> replacement_data =
+      MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
+                             /*workgroup_size_x=*/4);
+  std::vector<uint8_t> storage(32768, 0);
+  CaptureMockExecutablePrepare(
+      iree_make_const_byte_span(captured_data.data(), captured_data.size()),
+      &storage);
+  CorruptFirstCapturedExecutableData(&storage);
+
+  TestExecutableSubstitutionState substitution_state = {
+      /*.source=*/iree_make_cstring_view("replacement.mock"),
+      /*.executable_format=*/iree_make_cstring_view("mock-executable"),
+      /*.executable_data=*/
+      iree_make_const_byte_span(replacement_data.data(),
+                                replacement_data.size()),
+      /*.invocation_count=*/0,
+      /*.executable_id=*/IREE_HAL_REPLAY_OBJECT_ID_NONE,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.executable_substitution_callback.fn =
+      TestExecutableSubstitutionCallback;
+  options.executable_substitution_callback.user_data = &substitution_state;
+
+  iree_hal_device_group_t* replay_group = CreateMockExecutableDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  EXPECT_EQ(substitution_state.invocation_count, 1u);
   iree_hal_device_group_release(replay_group);
 }
 

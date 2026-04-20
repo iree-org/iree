@@ -73,6 +73,64 @@ static iree_const_byte_span_t MakeReplayFileContents(
       storage.data(), static_cast<iree_host_size_t>(file_header->file_length));
 }
 
+static std::vector<uint8_t> MakeExecutablePrepareReplayFileStorage() {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_CHECK_OK(iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+      iree_make_byte_span(storage.data(), storage.size()),
+      iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+      &file_handle));
+
+  iree_hal_replay_file_writer_t* writer = nullptr;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_create(
+      file_handle, iree_allocator_system(), &writer));
+  iree_io_file_handle_release(file_handle);
+
+  const char executable_format[] = "mock-executable";
+  const uint8_t executable_data[] = {0x00, 0x01, 0x02, 0x03};
+  const uint32_t constants[] = {0xABCD1234u};
+  iree_hal_replay_executable_metadata_header_t metadata_header = {};
+  metadata_header.export_count = 1;
+  iree_hal_replay_executable_export_metadata_t export_metadata = {};
+  export_metadata.binding_count = 2;
+  export_metadata.workgroup_size[0] = 3;
+  export_metadata.workgroup_size[1] = 1;
+  export_metadata.workgroup_size[2] = 1;
+  iree_hal_replay_executable_prepare_payload_t payload = {};
+  payload.queue_affinity = 0x1234;
+  payload.executable_data_length = sizeof(executable_data);
+  payload.constant_count = IREE_ARRAYSIZE(constants);
+  payload.caching_mode = IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+  payload.executable_format_length = sizeof(executable_format) - 1;
+  payload.executable_metadata_length =
+      sizeof(metadata_header) + sizeof(export_metadata);
+  iree_const_byte_span_t iovecs[] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(executable_format,
+                                sizeof(executable_format) - 1),
+      iree_make_const_byte_span(executable_data, sizeof(executable_data)),
+      iree_make_const_byte_span(constants, sizeof(constants)),
+      iree_make_const_byte_span(&metadata_header, sizeof(metadata_header)),
+      iree_make_const_byte_span(&export_metadata, sizeof(export_metadata)),
+  };
+  iree_hal_replay_file_record_metadata_t metadata = {};
+  metadata.sequence_ordinal = 0;
+  metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  metadata.payload_type = IREE_HAL_REPLAY_PAYLOAD_TYPE_EXECUTABLE_PREPARE;
+  metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_EXECUTABLE_CACHE;
+  metadata.object_id = 2;
+  metadata.related_object_id = 3;
+  metadata.operation_code =
+      IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_PREPARE_EXECUTABLE;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_append_record(
+      writer, &metadata, IREE_ARRAYSIZE(iovecs), iovecs, nullptr));
+
+  IREE_CHECK_OK(iree_hal_replay_file_writer_close(writer));
+  iree_hal_replay_file_writer_free(writer);
+  return storage;
+}
+
 TEST(ReplayDumpTest, EmitsTextSummary) {
   std::vector<uint8_t> storage = MakeReplayFileStorage();
   iree_hal_replay_dump_options_t options =
@@ -115,6 +173,33 @@ TEST(ReplayDumpTest, EmitsJsonlWithPayloadRanges) {
   EXPECT_THAT(output, HasSubstr("\"payload_type\":\"buffer_object\""));
   EXPECT_THAT(output, HasSubstr("\"payload_range\""));
   EXPECT_THAT(output, HasSubstr("\"allocation_size\":256"));
+}
+
+TEST(ReplayDumpTest, EmitsExecutableMetadataRanges) {
+  std::vector<uint8_t> storage = MakeExecutablePrepareReplayFileStorage();
+  iree_hal_replay_dump_options_t options =
+      iree_hal_replay_dump_options_default();
+
+  std::string text_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &options, AppendToString, &text_output,
+      iree_allocator_system()));
+
+  EXPECT_THAT(text_output, HasSubstr("payload=executable_prepare"));
+  EXPECT_THAT(text_output, HasSubstr("metadata_range=["));
+  EXPECT_THAT(text_output, HasSubstr("metadata_exports=1"));
+  EXPECT_THAT(text_output, HasSubstr("metadata_parameters=0"));
+
+  options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
+  std::string jsonl_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &options, AppendToString, &jsonl_output,
+      iree_allocator_system()));
+
+  EXPECT_THAT(jsonl_output, HasSubstr("\"executable_metadata_length\":"));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_range\""));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_export_count\":1"));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_parameter_count\":0"));
 }
 
 TEST(ReplayDumpTest, EmitsBufferRangeDataRanges) {

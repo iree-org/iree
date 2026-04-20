@@ -328,11 +328,53 @@ typedef struct iree_hal_replay_executable_prepare_payload_t {
   uint32_t caching_mode;
   // Byte length of the executable format string following this header.
   uint32_t executable_format_length;
-  // Reserved for future executable preparation metadata; must be zero.
-  uint32_t reserved0;
+  // Byte length of executable ABI metadata following specialization constants.
+  uint32_t executable_metadata_length;
   // Reserved for future executable preparation metadata; must be zero.
   uint32_t reserved1;
 } iree_hal_replay_executable_prepare_payload_t;
+
+// Header for executable ABI metadata appended to executable prepare payloads.
+typedef struct iree_hal_replay_executable_metadata_header_t {
+  // Number of export metadata records following this header.
+  uint64_t export_count;
+  // Total number of parameter metadata records after all export records.
+  uint64_t parameter_count;
+  // Reserved for future executable metadata; must be zero.
+  uint64_t reserved0;
+  // Reserved for future executable metadata; must be zero.
+  uint64_t reserved1;
+} iree_hal_replay_executable_metadata_header_t;
+
+// Captured executable export reflection used to validate substitutions.
+typedef struct iree_hal_replay_executable_export_metadata_t {
+  // Export behavior flags from iree_hal_executable_export_info_t.
+  uint64_t flags;
+  // Static or minimum workgroup size of the export.
+  uint32_t workgroup_size[3];
+  // Total number of 32-bit constants expected by the export.
+  uint16_t constant_count;
+  // Total number of buffer bindings expected by the export.
+  uint16_t binding_count;
+  // Number of parameter metadata records for this export.
+  uint16_t parameter_count;
+  // Reserved for future export metadata; must be zero.
+  uint16_t reserved0;
+} iree_hal_replay_executable_export_metadata_t;
+
+// Captured executable export parameter reflection.
+typedef struct iree_hal_replay_executable_parameter_metadata_t {
+  // Parameter offset in bytes or binding ordinal, depending on type.
+  uint16_t offset;
+  // Parameter flags from iree_hal_executable_export_parameter_t.
+  uint16_t flags;
+  // iree_hal_executable_export_parameter_type_t value.
+  uint8_t type;
+  // Parameter size in bytes.
+  uint8_t size;
+  // Reserved for future parameter metadata; must be zero.
+  uint16_t reserved0;
+} iree_hal_replay_executable_parameter_metadata_t;
 
 // Payload describing a captured semaphore object.
 typedef struct iree_hal_replay_semaphore_object_payload_t {

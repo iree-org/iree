@@ -562,6 +562,181 @@ static iree_status_t iree_hal_replay_executor_validate_executable_substitution(
   return iree_ok_status();
 }
 
+static iree_status_t
+iree_hal_replay_executor_validate_executable_substitution_metadata(
+    iree_hal_replay_executor_t* executor,
+    iree_hal_replay_object_id_t executable_id,
+    iree_const_byte_span_t executable_metadata,
+    iree_hal_executable_t* replacement_executable) {
+  if (IREE_UNLIKELY(executable_metadata.data_length <
+                    sizeof(iree_hal_replay_executable_metadata_header_t))) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay executable metadata is too short");
+  }
+  iree_hal_replay_executable_metadata_header_t header;
+  memcpy(&header, executable_metadata.data, sizeof(header));
+  if (IREE_UNLIKELY(header.reserved0 != 0 || header.reserved1 != 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay executable metadata reserved fields must "
+                            "be zero");
+  }
+  if (IREE_UNLIKELY(header.export_count > IREE_HOST_SIZE_MAX ||
+                    header.parameter_count > IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "replay executable metadata count overflow");
+  }
+  const iree_host_size_t captured_export_count =
+      (iree_host_size_t)header.export_count;
+  const iree_host_size_t captured_parameter_count =
+      (iree_host_size_t)header.parameter_count;
+
+  iree_host_size_t export_metadata_size = 0;
+  iree_host_size_t parameter_metadata_size = 0;
+  iree_host_size_t expected_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+                        captured_export_count,
+                        sizeof(iree_hal_replay_executable_export_metadata_t),
+                        &export_metadata_size) ||
+                    !iree_host_size_checked_mul(
+                        captured_parameter_count,
+                        sizeof(iree_hal_replay_executable_parameter_metadata_t),
+                        &parameter_metadata_size) ||
+                    !iree_host_size_checked_add(
+                        sizeof(iree_hal_replay_executable_metadata_header_t),
+                        export_metadata_size, &expected_length) ||
+                    !iree_host_size_checked_add(expected_length,
+                                                parameter_metadata_size,
+                                                &expected_length) ||
+                    expected_length != executable_metadata.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay executable metadata length mismatch");
+  }
+
+  const uint8_t* export_metadata_data =
+      executable_metadata.data +
+      sizeof(iree_hal_replay_executable_metadata_header_t);
+  const uint8_t* parameter_metadata_data =
+      export_metadata_data + export_metadata_size;
+  const iree_hal_replay_executable_export_metadata_t* export_metadata =
+      (const iree_hal_replay_executable_export_metadata_t*)export_metadata_data;
+  const iree_hal_replay_executable_parameter_metadata_t* parameter_metadata =
+      (const iree_hal_replay_executable_parameter_metadata_t*)
+          parameter_metadata_data;
+
+  iree_host_size_t replacement_export_count =
+      iree_hal_executable_export_count(replacement_executable);
+  if (IREE_UNLIKELY(captured_export_count != replacement_export_count)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "substituted executable %" PRIu64
+        " export count mismatch: captured=%" PRIu64 " replacement=%" PRIhsz,
+        executable_id, header.export_count, replacement_export_count);
+  }
+
+  iree_host_size_t parameter_index = 0;
+  for (iree_host_size_t i = 0; i < captured_export_count; ++i) {
+    const iree_hal_replay_executable_export_metadata_t* captured =
+        &export_metadata[i];
+    if (IREE_UNLIKELY(captured->reserved0 != 0)) {
+      return iree_make_status(IREE_STATUS_DATA_LOSS,
+                              "replay executable export metadata reserved "
+                              "fields must be zero");
+    }
+    if (IREE_UNLIKELY(captured->parameter_count >
+                      captured_parameter_count - parameter_index)) {
+      return iree_make_status(IREE_STATUS_DATA_LOSS,
+                              "replay executable metadata parameter count "
+                              "mismatch");
+    }
+    iree_hal_executable_export_info_t replacement_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+        replacement_executable, (iree_hal_executable_export_ordinal_t)i,
+        &replacement_info));
+    if (captured->flags != replacement_info.flags ||
+        captured->constant_count != replacement_info.constant_count ||
+        captured->binding_count != replacement_info.binding_count ||
+        captured->parameter_count != replacement_info.parameter_count ||
+        captured->workgroup_size[0] != replacement_info.workgroup_size[0] ||
+        captured->workgroup_size[1] != replacement_info.workgroup_size[1] ||
+        captured->workgroup_size[2] != replacement_info.workgroup_size[2]) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "substituted executable %" PRIu64 " export %" PRIhsz
+          " ABI mismatch: captured=(flags=0x%016" PRIx64
+          " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u]) "
+          "replacement=(flags=0x%016" PRIx64
+          " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u])",
+          executable_id, i, captured->flags, (uint32_t)captured->constant_count,
+          (uint32_t)captured->binding_count,
+          (uint32_t)captured->parameter_count, captured->workgroup_size[0],
+          captured->workgroup_size[1], captured->workgroup_size[2],
+          replacement_info.flags, (uint32_t)replacement_info.constant_count,
+          (uint32_t)replacement_info.binding_count,
+          (uint32_t)replacement_info.parameter_count,
+          replacement_info.workgroup_size[0],
+          replacement_info.workgroup_size[1],
+          replacement_info.workgroup_size[2]);
+    }
+
+    if (captured->parameter_count == 0) continue;
+    iree_host_size_t parameter_size = 0;
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            captured->parameter_count,
+            sizeof(iree_hal_executable_export_parameter_t), &parameter_size))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "executable parameter metadata is too large");
+    }
+    iree_hal_executable_export_parameter_t* replacement_parameters = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_malloc(executor->host_allocator, parameter_size,
+                              (void**)&replacement_parameters));
+    iree_status_t status = iree_hal_executable_export_parameters(
+        replacement_executable, (iree_hal_executable_export_ordinal_t)i,
+        captured->parameter_count, replacement_parameters);
+    for (iree_host_size_t j = 0;
+         j < captured->parameter_count && iree_status_is_ok(status); ++j) {
+      const iree_hal_replay_executable_parameter_metadata_t*
+          captured_parameter = &parameter_metadata[parameter_index + j];
+      if (IREE_UNLIKELY(captured_parameter->reserved0 != 0)) {
+        status = iree_make_status(IREE_STATUS_DATA_LOSS,
+                                  "replay executable parameter metadata "
+                                  "reserved fields must be zero");
+        break;
+      }
+      const iree_hal_executable_export_parameter_t* replacement_parameter =
+          &replacement_parameters[j];
+      if (captured_parameter->type != replacement_parameter->type ||
+          captured_parameter->size != replacement_parameter->size ||
+          captured_parameter->flags != replacement_parameter->flags ||
+          captured_parameter->offset != replacement_parameter->offset) {
+        status = iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "substituted executable %" PRIu64 " export %" PRIhsz
+            " parameter %" PRIhsz
+            " ABI mismatch: captured=(type=%u size=%u flags=0x%04x "
+            "offset=%u) replacement=(type=%u size=%u flags=0x%04x offset=%u)",
+            executable_id, i, j, (uint32_t)captured_parameter->type,
+            (uint32_t)captured_parameter->size,
+            (uint32_t)captured_parameter->flags,
+            (uint32_t)captured_parameter->offset,
+            (uint32_t)replacement_parameter->type,
+            (uint32_t)replacement_parameter->size,
+            (uint32_t)replacement_parameter->flags,
+            (uint32_t)replacement_parameter->offset);
+      }
+    }
+    parameter_index += captured->parameter_count;
+    iree_allocator_free(executor->host_allocator, replacement_parameters);
+    IREE_RETURN_IF_ERROR(status);
+  }
+  if (IREE_UNLIKELY(parameter_index != captured_parameter_count)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay executable metadata parameter count "
+                            "mismatch");
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_replay_executor_prepare_captured_executable(
     iree_hal_executable_cache_t* executable_cache,
     const iree_hal_executable_params_t* captured_params,
@@ -625,6 +800,7 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
   iree_host_size_t constant_bytes = 0;
   iree_host_size_t data_offset = 0;
   iree_host_size_t constants_offset = 0;
+  iree_host_size_t metadata_offset = 0;
   iree_host_size_t expected_length = 0;
   if (IREE_UNLIKELY(
           payload.executable_data_length > IREE_HOST_SIZE_MAX ||
@@ -638,7 +814,11 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
               data_offset, (iree_host_size_t)payload.executable_data_length,
               &constants_offset) ||
           !iree_host_size_checked_add(constants_offset, constant_bytes,
-                                      &expected_length) ||
+                                      &metadata_offset) ||
+          !iree_host_size_checked_add(
+              metadata_offset,
+              (iree_host_size_t)payload.executable_metadata_length,
+              &expected_length) ||
           expected_length != record->payload.data_length)) {
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
@@ -661,6 +841,9 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
   params.constant_count = (iree_host_size_t)payload.constant_count;
   params.constants = (const uint32_t*)(record->payload.data + constants_offset);
   params.caching_mode = payload.caching_mode;
+  iree_const_byte_span_t executable_metadata = iree_make_const_byte_span(
+      record->payload.data + metadata_offset,
+      (iree_host_size_t)payload.executable_metadata_length);
 
   iree_hal_executable_t* executable = NULL;
   iree_status_t status = iree_ok_status();
@@ -679,13 +862,15 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
         &substitution);
     if (iree_status_is_ok(status) && substitution.substitute) {
       iree_hal_executable_t* captured_executable = NULL;
-      status = iree_status_annotate_f(
-          iree_hal_replay_executor_prepare_captured_executable(
-              cache_entry->value.executable_cache, &params,
-              &captured_executable),
-          "preparing captured executable %" PRIu64
-          " for substitution validation",
-          record->header.related_object_id);
+      if (executable_metadata.data_length == 0) {
+        status = iree_status_annotate_f(
+            iree_hal_replay_executor_prepare_captured_executable(
+                cache_entry->value.executable_cache, &params,
+                &captured_executable),
+            "preparing captured executable %" PRIu64
+            " for substitution validation",
+            record->header.related_object_id);
+      }
       if (iree_status_is_ok(status)) {
         status = iree_status_annotate_f(
             iree_hal_replay_executor_prepare_substitute_executable(
@@ -697,9 +882,16 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
             substitution.source.data);
       }
       if (iree_status_is_ok(status)) {
-        status = iree_hal_replay_executor_validate_executable_substitution(
-            executor, record->header.related_object_id, captured_executable,
-            executable);
+        if (executable_metadata.data_length != 0) {
+          status =
+              iree_hal_replay_executor_validate_executable_substitution_metadata(
+                  executor, record->header.related_object_id,
+                  executable_metadata, executable);
+        } else {
+          status = iree_hal_replay_executor_validate_executable_substitution(
+              executor, record->header.related_object_id, captured_executable,
+              executable);
+        }
       }
       iree_hal_executable_release(captured_executable);
       if (!iree_status_is_ok(status)) {

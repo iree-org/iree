@@ -311,8 +311,9 @@ static bool iree_hal_replay_recorder_executable_cache_can_prepare_format(
 
 static iree_status_t iree_hal_replay_recorder_prepare_payload_iovecs(
     const iree_hal_executable_params_t* executable_params,
+    iree_const_byte_span_t executable_metadata,
     iree_hal_replay_executable_prepare_payload_t* out_payload,
-    iree_const_byte_span_t out_iovecs[4]) {
+    iree_const_byte_span_t out_iovecs[5]) {
   memset(out_payload, 0, sizeof(*out_payload));
   out_payload->queue_affinity = executable_params->queue_affinity;
   out_payload->executable_data_length =
@@ -321,6 +322,12 @@ static iree_status_t iree_hal_replay_recorder_prepare_payload_iovecs(
   out_payload->caching_mode = executable_params->caching_mode;
   out_payload->executable_format_length =
       executable_params->executable_format.size;
+  if (IREE_UNLIKELY(executable_metadata.data_length > UINT32_MAX)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable metadata byte length overflow");
+  }
+  out_payload->executable_metadata_length =
+      (uint32_t)executable_metadata.data_length;
 
   if (IREE_UNLIKELY(executable_params->constant_count > 0 &&
                     !executable_params->constants)) {
@@ -342,7 +349,156 @@ static iree_status_t iree_hal_replay_recorder_prepare_payload_iovecs(
   out_iovecs[2] = executable_params->executable_data;
   out_iovecs[3] =
       iree_make_const_byte_span(executable_params->constants, constant_bytes);
+  out_iovecs[4] = executable_metadata;
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
+    iree_hal_executable_t* executable, iree_allocator_t host_allocator,
+    iree_byte_span_t* out_storage, iree_const_byte_span_t* out_metadata) {
+  IREE_ASSERT_ARGUMENT(out_storage);
+  IREE_ASSERT_ARGUMENT(out_metadata);
+  *out_storage = iree_byte_span_empty();
+  *out_metadata = iree_const_byte_span_empty();
+
+  const iree_host_size_t export_count =
+      iree_hal_executable_export_count(executable);
+  iree_host_size_t export_info_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+          export_count, sizeof(iree_hal_executable_export_info_t),
+          &export_info_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable export metadata size overflow");
+  }
+
+  iree_hal_executable_export_info_t* export_infos = NULL;
+  if (export_info_size > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, export_info_size,
+                                               (void**)&export_infos));
+  }
+  iree_status_t status = iree_ok_status();
+  iree_host_size_t parameter_count = 0;
+  for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
+       ++i) {
+    status = iree_hal_executable_export_info(
+        executable, (iree_hal_executable_export_ordinal_t)i, &export_infos[i]);
+    if (iree_status_is_ok(status)) {
+      if (IREE_UNLIKELY(!iree_host_size_checked_add(
+              parameter_count, export_infos[i].parameter_count,
+              &parameter_count))) {
+        status =
+            iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "executable parameter metadata count overflow");
+      }
+    }
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    iree_allocator_free(host_allocator, export_infos);
+    return iree_ok_status();
+  }
+
+  iree_hal_executable_export_parameter_t* parameters = NULL;
+  iree_host_size_t parameter_info_size = 0;
+  if (parameter_count > 0) {
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            parameter_count, sizeof(iree_hal_executable_export_parameter_t),
+            &parameter_info_size))) {
+      iree_allocator_free(host_allocator, export_infos);
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "executable parameter metadata size overflow");
+    }
+    status = iree_allocator_malloc(host_allocator, parameter_info_size,
+                                   (void**)&parameters);
+    if (!iree_status_is_ok(status)) {
+      iree_allocator_free(host_allocator, export_infos);
+      return status;
+    }
+  }
+
+  iree_host_size_t parameter_index = 0;
+  for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
+       ++i) {
+    const iree_host_size_t export_parameter_count =
+        export_infos[i].parameter_count;
+    if (export_parameter_count == 0) continue;
+    status = iree_hal_executable_export_parameters(
+        executable, (iree_hal_executable_export_ordinal_t)i,
+        export_parameter_count, parameters + parameter_index);
+    parameter_index += export_parameter_count;
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    iree_allocator_free(host_allocator, parameters);
+    iree_allocator_free(host_allocator, export_infos);
+    return iree_ok_status();
+  }
+
+  iree_host_size_t metadata_size = 0;
+  iree_host_size_t export_metadata_size = 0;
+  iree_host_size_t parameter_metadata_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+                        export_count,
+                        sizeof(iree_hal_replay_executable_export_metadata_t),
+                        &export_metadata_size) ||
+                    !iree_host_size_checked_mul(
+                        parameter_count,
+                        sizeof(iree_hal_replay_executable_parameter_metadata_t),
+                        &parameter_metadata_size) ||
+                    !iree_host_size_checked_add(
+                        sizeof(iree_hal_replay_executable_metadata_header_t),
+                        export_metadata_size, &metadata_size) ||
+                    !iree_host_size_checked_add(metadata_size,
+                                                parameter_metadata_size,
+                                                &metadata_size))) {
+    iree_allocator_free(host_allocator, parameters);
+    iree_allocator_free(host_allocator, export_infos);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable replay metadata size overflow");
+  }
+
+  uint8_t* metadata_storage = NULL;
+  status = iree_allocator_malloc(host_allocator, metadata_size,
+                                 (void**)&metadata_storage);
+  if (iree_status_is_ok(status)) {
+    memset(metadata_storage, 0, metadata_size);
+    iree_hal_replay_executable_metadata_header_t* header =
+        (iree_hal_replay_executable_metadata_header_t*)metadata_storage;
+    header->export_count = export_count;
+    header->parameter_count = parameter_count;
+    iree_hal_replay_executable_export_metadata_t* export_metadata =
+        (iree_hal_replay_executable_export_metadata_t*)(metadata_storage +
+                                                        sizeof(*header));
+    iree_hal_replay_executable_parameter_metadata_t* parameter_metadata =
+        (iree_hal_replay_executable_parameter_metadata_t*)(metadata_storage +
+                                                           sizeof(*header) +
+                                                           export_metadata_size);
+
+    parameter_index = 0;
+    for (iree_host_size_t i = 0; i < export_count; ++i) {
+      export_metadata[i].flags = export_infos[i].flags;
+      export_metadata[i].workgroup_size[0] = export_infos[i].workgroup_size[0];
+      export_metadata[i].workgroup_size[1] = export_infos[i].workgroup_size[1];
+      export_metadata[i].workgroup_size[2] = export_infos[i].workgroup_size[2];
+      export_metadata[i].constant_count = export_infos[i].constant_count;
+      export_metadata[i].binding_count = export_infos[i].binding_count;
+      export_metadata[i].parameter_count = export_infos[i].parameter_count;
+      for (iree_host_size_t j = 0; j < export_infos[i].parameter_count; ++j) {
+        const iree_hal_executable_export_parameter_t* parameter =
+            &parameters[parameter_index++];
+        parameter_metadata->offset = parameter->offset;
+        parameter_metadata->flags = parameter->flags;
+        parameter_metadata->type = parameter->type;
+        parameter_metadata->size = parameter->size;
+        ++parameter_metadata;
+      }
+    }
+    *out_storage = iree_make_byte_span(metadata_storage, metadata_size);
+    *out_metadata = iree_make_const_byte_span(metadata_storage, metadata_size);
+  }
+  iree_allocator_free(host_allocator, parameters);
+  iree_allocator_free(host_allocator, export_infos);
+  return status;
 }
 
 static iree_status_t
@@ -359,9 +515,10 @@ iree_hal_replay_recorder_executable_cache_prepare_executable(
       executable_cache->recorder, &executable_id));
 
   iree_hal_replay_executable_prepare_payload_t operation_payload;
-  iree_const_byte_span_t operation_iovecs[4];
+  iree_const_byte_span_t operation_iovecs[5];
   IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_prepare_payload_iovecs(
-      executable_params, &operation_payload, operation_iovecs));
+      executable_params, iree_const_byte_span_empty(), &operation_payload,
+      operation_iovecs));
 
   iree_hal_replay_pending_record_t pending_record;
   IREE_RETURN_IF_ERROR(
@@ -375,14 +532,26 @@ iree_hal_replay_recorder_executable_cache_prepare_executable(
   iree_status_t status = iree_hal_executable_cache_prepare_executable(
       executable_cache->base_executable_cache, executable_params,
       &base_executable);
+  iree_byte_span_t executable_metadata_storage = iree_byte_span_empty();
+  iree_const_byte_span_t executable_metadata = iree_const_byte_span_empty();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_capture_executable_metadata(
+        base_executable, executable_cache->host_allocator,
+        &executable_metadata_storage, &executable_metadata);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_recorder_executable_create_proxy(
         executable_cache->recorder, executable_cache->device_id, executable_id,
         base_executable, executable_cache->host_allocator, &replay_executable);
   }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_prepare_payload_iovecs(
+        executable_params, executable_metadata, &operation_payload,
+        operation_iovecs);
+  }
   status = iree_hal_replay_recorder_end_creation_operation(
-      &pending_record, status, 4, operation_iovecs,
-      IREE_HAL_REPLAY_OBJECT_TYPE_EXECUTABLE, executable_id,
+      &pending_record, status, IREE_ARRAYSIZE(operation_iovecs),
+      operation_iovecs, IREE_HAL_REPLAY_OBJECT_TYPE_EXECUTABLE, executable_id,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, 0, NULL);
 
   if (iree_status_is_ok(status)) {
@@ -390,6 +559,8 @@ iree_hal_replay_recorder_executable_cache_prepare_executable(
   } else {
     iree_hal_executable_release(replay_executable);
   }
+  iree_allocator_free(executable_cache->host_allocator,
+                      executable_metadata_storage.data);
   iree_hal_executable_release(base_executable);
   return status;
 }
