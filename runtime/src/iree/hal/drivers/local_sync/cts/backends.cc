@@ -103,6 +103,9 @@ static bool local_sync_registered_ =
                "helper and cannot submit the dealloca that releases the first "
                "block while the second alloca is waiting on pool "
                "notification."},
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "sync driver blocks on semaphore waits during queue_alloca "
+               "and cannot model wait-before-signal queue submission."},
               {"QueueDispatchTest.DeferredNoopDispatch",
                "sync driver blocks on semaphore waits during queue_dispatch "
                "and cannot model wait-before-signal queue submission."},
@@ -114,12 +117,7 @@ static bool local_sync_registered_ =
                "and cannot model deferred command-buffer submission behind an "
                "unresolved wait."},
           },
-          /*expected_failures=*/
-          {
-              {"QueueAllocaTest.AllocaWithWaitSemaphores",
-               "background thread signaling deadlocks sync queue wait "
-               "(sync driver blocks on semaphore wait in queue_alloca)"},
-          }},
+          /*expected_failures=*/{}},
          {"events", "file_io", "host_calls", "mapping", "indirect"},
      }),
      true);
