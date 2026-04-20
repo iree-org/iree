@@ -75,13 +75,13 @@ static iree_status_t iree_profile_att_decoded_trace_initialize(
     iree_profile_att_decoded_trace_t* out_decoded_trace) {
   memset(out_decoded_trace, 0, sizeof(*out_decoded_trace));
   out_decoded_trace->host_allocator = host_allocator;
-  return iree_profile_att_disassembly_context_create(
+  return iree_profile_att_disassembly_context_allocate(
       host_allocator, comgr, &out_decoded_trace->disassembly);
 }
 
 void iree_profile_att_decoded_trace_deinitialize(
     iree_profile_att_decoded_trace_t* decoded_trace) {
-  iree_profile_att_disassembly_context_destroy(decoded_trace->disassembly);
+  iree_profile_att_disassembly_context_free(decoded_trace->disassembly);
   iree_allocator_t host_allocator = decoded_trace->host_allocator;
   iree_allocator_free(host_allocator, decoded_trace->instructions);
   memset(decoded_trace, 0, sizeof(*decoded_trace));

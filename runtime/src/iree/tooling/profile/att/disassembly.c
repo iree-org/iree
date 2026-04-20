@@ -266,7 +266,7 @@ iree_profile_att_disassembly_context_find_code_object(
   return NULL;
 }
 
-iree_status_t iree_profile_att_disassembly_context_create(
+iree_status_t iree_profile_att_disassembly_context_allocate(
     iree_allocator_t host_allocator,
     const iree_profile_att_comgr_library_t* comgr,
     iree_profile_att_disassembly_context_t** out_context) {
@@ -281,7 +281,7 @@ iree_status_t iree_profile_att_disassembly_context_create(
   return iree_ok_status();
 }
 
-void iree_profile_att_disassembly_context_destroy(
+void iree_profile_att_disassembly_context_free(
     iree_profile_att_disassembly_context_t* context) {
   if (!context) return;
   for (iree_host_size_t i = 0; i < context->code_object_decoder_count; ++i) {
