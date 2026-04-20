@@ -2,7 +2,7 @@
 // RUN:   --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 func.func @swizzle_load(%src: memref<?xf32>) -> vector<4xf32> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
 
   // 68 = (1 x 64, 4) -> (1, 8) = 72
   %offset = arith.constant 68 : index
@@ -19,7 +19,7 @@ func.func @swizzle_load(%src: memref<?xf32>) -> vector<4xf32> {
 // -----
 
 func.func @swizzle_store(%dst: memref<?xf32>, %src: vector<4xf32>) {
-  %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
 
   // 124 = (1 x 64, 60) -> (1, 64 % 64) = 64
   %offset = arith.constant 124 : index
@@ -36,7 +36,7 @@ func.func @swizzle_store(%dst: memref<?xf32>, %src: vector<4xf32>) {
 // -----
 
 func.func @swizzle_both(%src: memref<?xf32>) {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %c4 = arith.constant 4 : index
   %c44 = arith.constant 44 : index
   %c444 = arith.constant 444 : index
@@ -71,7 +71,7 @@ func.func @swizzle_both(%src: memref<?xf32>) {
 
 func.func @drop_swizzle_non_access_user(%src: memref<?xf32>) -> (memref<?xf32>, vector<4xf32>) {
   // expected-error @+1 {{unsupported SwizzleHintOp user}}
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 68 : index
   %1 = vector.load %0[%offset] : memref<?xf32>, vector<4xf32>
   return %0, %1: memref<?xf32>, vector<4xf32>
@@ -88,7 +88,7 @@ func.func @drop_swizzle_non_access_user(%src: memref<?xf32>) -> (memref<?xf32>, 
 // -----
 
 func.func @swizzle_unroll_load(%src: memref<?xf32>) -> (vector<4xf32>, vector<4xf32>) {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 60 : index
   %1 = vector.load %0[%offset] : memref<?xf32>, vector<8xf32>
   %2 = vector.extract_strided_slice %1 {offsets = [0], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
@@ -107,7 +107,7 @@ func.func @swizzle_unroll_load(%src: memref<?xf32>) -> (vector<4xf32>, vector<4x
 // -----
 
 func.func @swizzle_unroll_store(%dst: memref<?xf32>, %src0: vector<4xf32>, %src1: vector<4xf32>) {
-  %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 60 : index
   %cst = arith.constant dense<0.0> : vector<8xf32>
   %1 = vector.insert_strided_slice %src0, %cst {offsets = [0], strides = [1]} : vector<4xf32> into vector<8xf32>
@@ -128,7 +128,7 @@ func.func @swizzle_unroll_store(%dst: memref<?xf32>, %src0: vector<4xf32>, %src1
 // -----
 
 func.func @swizzle_dynamic(%src: memref<?xf32>, %vec: vector<4xf32>, %offset: index) -> vector<4xf32> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %1 = vector.load %0[%offset] : memref<?xf32>, vector<4xf32>
   vector.store %vec, %0[%offset] : memref<?xf32>, vector<4xf32>
   return %1: vector<4xf32>
@@ -158,7 +158,7 @@ func.func @swizzle_dynamic(%src: memref<?xf32>, %vec: vector<4xf32>, %offset: in
 // -----
 
 func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %offset_base: index) -> vector<4xf32> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %c16 = arith.constant 16 : index
   %c1040 = arith.constant 1040 : index
   %load_offset = arith.addi %offset_base, %c16 overflow<nsw> : index
@@ -199,7 +199,7 @@ func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %
 // Gather_to_lds source-side swizzle is handled by
 // AMDGPULowerCoalescedDMAToGatherLDS. ResolveSwizzleHints just drops the hint.
 func.func @gather_to_lds_passthrough(%src: memref<?xf32>, %offset: index) {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32> -> memref<?xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %lds = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   amdgpu.gather_to_lds %0[%offset], %lds[%c0] : vector<4xf32>, memref<?xf32>, memref<256xf32, #gpu.address_space<workgroup>>
@@ -216,7 +216,7 @@ func.func @gather_to_lds_passthrough(%src: memref<?xf32>, %offset: index) {
 // -----
 
 func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8> -> memref<?xi8>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
 
   //((int(1952/128) % 8 )^(int(1952/16) %8))*16+ int(1952/128)*128 -> 2000
   %offset = arith.constant 1952 : index
@@ -233,7 +233,7 @@ func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
 // -----
 
 func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 128, 2>] : memref<?xi8> -> memref<?xi8>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 128, 2>] : memref<?xi8>
 
   %offset = arith.constant 1056 : index
   %1 = vector.load %0[%offset] : memref<?xi8>, vector<16xi8>
@@ -256,7 +256,7 @@ func.func @gather_to_lds_src_passthrough(%global : memref<32768xi8, #amdgpu.addr
   %c0 = arith.constant 0 : index
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
-  %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>> -> memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
+  %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
   amdgpu.gather_to_lds %globalSwizzle[%offset], %lds[%c0]
     : vector<16xi8>, memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>, memref<32768xi8, #gpu.address_space<workgroup>>
 
@@ -277,8 +277,8 @@ func.func @gather_to_lds_dst_passthrough(%global : memref<32768xi8, #amdgpu.addr
   %c0 = arith.constant 0 : index
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
-  %ldsSwizzle = iree_codegen.swizzle_hint %lds[#iree_codegen.xor_shuffle<128, 16>] : memref<32768xi8, #gpu.address_space<workgroup>> -> memref<32768xi8, #gpu.address_space<workgroup>>
-  %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>> -> memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
+  %ldsSwizzle = iree_codegen.swizzle_hint %lds[#iree_codegen.xor_shuffle<128, 16>] : memref<32768xi8, #gpu.address_space<workgroup>>
+  %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
   amdgpu.gather_to_lds %globalSwizzle[%offset], %ldsSwizzle[%c0]
     : vector<16xi8>, memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>, memref<32768xi8, #gpu.address_space<workgroup>>
 
@@ -296,7 +296,7 @@ func.func @gather_to_lds_dst_passthrough(%global : memref<32768xi8, #amdgpu.addr
 
 // Verify that rank-1 contiguous memref with dynamic offset is accepted.
 func.func @swizzle_strided_rank1_after_multibuffer(%src: memref<4096xi8, strided<[1], offset: ?>>) -> vector<16xi8> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<4096xi8, strided<[1], offset: ?>> -> memref<4096xi8, strided<[1], offset: ?>>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<4096xi8, strided<[1], offset: ?>>
   // row 15, tile 2: 15*128+2*16 = 1952 -> (7 XOR 2)*16+15*128 = 2000
   %index = arith.constant 1952 : index
   %1 = vector.load %0[%index] : memref<4096xi8, strided<[1], offset: ?>>, vector<16xi8>
@@ -314,7 +314,7 @@ func.func @swizzle_strided_rank1_after_multibuffer(%src: memref<4096xi8, strided
 // Verify that swizzle_hint fails on non-flat (rank > 1) memrefs.
 func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector<4xf32> {
   // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32>'}}
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32> -> memref<32x64xf32>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32>
   %offset = arith.constant 0 : index
   %1 = vector.load %0[%offset, %offset] : memref<32x64xf32>, vector<4xf32>
   return %1: vector<4xf32>
@@ -324,7 +324,7 @@ func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector
 func.func @swizzle_hint_non_contiguous_memref_error() -> vector<4xf32> {
   %src = memref.alloc() : memref<32x64xf32, strided<[2, 1], offset: 0>>
   // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32, strided<[2, 1]>>'}}
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32, strided<[2, 1], offset: 0>> -> memref<32x64xf32, strided<[2, 1], offset: 0>>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32, strided<[2, 1], offset: 0>>
   %offset = arith.constant 0 : index
   %1 = vector.load %0[%offset, %offset] : memref<32x64xf32, strided<[2, 1], offset: 0>>, vector<4xf32>
   return %1: vector<4xf32>

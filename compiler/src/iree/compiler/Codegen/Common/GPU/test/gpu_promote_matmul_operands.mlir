@@ -329,13 +329,13 @@ func.func @promote_with_swizzle_operand(%a: tensor<32x64xf32>, %b: tensor<64x128
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x64xf32>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf32>
 //       CHECK:   %[[EMPTY_A:.+]] = tensor.empty() : tensor<2048xf32>
-//       CHECK:   %[[SWIZZLE_A:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<128, 16>] : tensor<2048xf32> -> tensor<2048xf32>
+//       CHECK:   %[[SWIZZLE_A:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<128, 16>] : tensor<2048xf32>
 //       CHECK:   %[[EXPAND_A:.+]] = tensor.expand_shape %[[SWIZZLE_A]] {{\[\[}}0, 1{{\]\]}} output_shape [32, 64] : tensor<2048xf32> into tensor<32x64xf32>
 //       CHECK:   %[[COPY_A:.+]] = linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //  CHECK-SAME:     ins(%[[A]] : tensor<32x64xf32>) outs(%[[EXPAND_A]] : tensor<32x64xf32>)
 //       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf32>
-//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32> -> tensor<8192xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32>
 //       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf32> into tensor<64x128xf32>
 //       CHECK:   %[[COPY_B:.+]] = linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
@@ -363,7 +363,7 @@ func.func @promote_with_swizzle_operand_f16(%a: tensor<32x64xf16>, %b: tensor<64
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x64xf16>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf16>
 //       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf16>
-//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<64, 8>] : tensor<8192xf16> -> tensor<8192xf16>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<64, 8>] : tensor<8192xf16>
 //       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf16> into tensor<64x128xf16>
 //       CHECK:   %[[COPY_B:.+]] = linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma

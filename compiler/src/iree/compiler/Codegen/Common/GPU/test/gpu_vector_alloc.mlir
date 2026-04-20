@@ -27,14 +27,15 @@ func.func @test(%vector: vector<16x16xf16>) -> vector<16x16xf16> {
 //         CHECK:    %[[OUT:.+]]   = iree_vector_ext.to_layout %[[READ]]
 
 // With --iree-codegen-gpu-enable-vector-alloc-swizzle the alloc is wrapped in
-// a SwizzleHintOp (flat-1D alloc + expand_shape). For reader element_tile =
-// [4, 1], accessWidth = max(writer=1, reader=1) = 1, innerDim = 16, maxPhase
-// = 16 → swizzle xor_shuffle<16, 1, 16, 1> is created.
+// a SwizzleHintOp on the multi-D tensor (FlattenSwizzleHintAllocs handles
+// the flat-1D + expand_shape conversion later, post-bufferization). For
+// reader element_tile = [4, 1], accessWidth = max(writer=1, reader=1) = 1,
+// innerDim = 16, maxPhase = 16 → swizzle xor_shuffle<16, 1, 16, 1>.
 
 //    SWZ-LABEL: func.func @test
-//         SWZ:    %[[FLAT:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<256xf16, #gpu.address_space<workgroup>>
-//         SWZ:    %[[HINT:.+]] = iree_codegen.swizzle_hint %[[FLAT]][#iree_codegen.xor_shuffle<16, 1, 16, 1>]
-//         SWZ:    tensor.expand_shape %[[HINT]]
+//         SWZ:    %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x16xf16, #gpu.address_space<workgroup>>
+//         SWZ:    %[[HINT:.+]] = iree_codegen.swizzle_hint %[[ALLOC]][#iree_codegen.xor_shuffle<16, 1, 16, 1>]
+//         SWZ:    vector.transfer_write %{{.*}}, %[[HINT]]
 
 // -----
 
@@ -58,10 +59,9 @@ func.func @test_wide(%vector: vector<16x128xf16>) -> vector<16x128xf16> {
 }
 
 //    SWZ-LABEL: func.func @test_wide
-//         SWZ:    %[[FLAT:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<2048xf16, #gpu.address_space<workgroup>>
-//         SWZ:    %[[HINT:.+]] = iree_codegen.swizzle_hint %[[FLAT]][#iree_codegen.xor_shuffle<128, 8, 128, 1>]
-//         SWZ:    %[[EXP:.+]]  = tensor.expand_shape %[[HINT]]
-//         SWZ:    vector.transfer_write %{{.*}}, %[[EXP]]
+//         SWZ:    %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x128xf16, #gpu.address_space<workgroup>>
+//         SWZ:    %[[HINT:.+]] = iree_codegen.swizzle_hint %[[ALLOC]][#iree_codegen.xor_shuffle<128, 8, 128, 1>]
+//         SWZ:    vector.transfer_write %{{.*}}, %[[HINT]]
 
 // -----
 

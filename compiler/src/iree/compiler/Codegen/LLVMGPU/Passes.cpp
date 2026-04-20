@@ -838,18 +838,18 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Tensor -> Memref
-  // FlattenSwizzleHintAllocs lowers multi-D alloc_tensors wrapped in a
-  // SwizzleHintOp (emitted by GPUVectorAlloc when swizzle is enabled) into
-  // a flat 1D alloc + expand_shape, which is what ResolveSwizzleHints needs.
-  // Skip the pass entirely when swizzle is off to keep the pipeline
-  // bit-identical to upstream.
-  if (clEnableVectorAllocSwizzle) {
-    funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
-  }
   addGPUBufferizePasses(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
+  // FlattenSwizzleHintAllocs rewrites a multi-D memref::AllocOp + SwizzleHintOp
+  // into the flat 1D alloc + SwizzleHintOp + memref.expand_shape form that
+  // ResolveSwizzleHints verifies. Only needed when GPUVectorAlloc emitted a
+  // hint (i.e. the swizzle flag is enabled); skipping preserves the upstream
+  // pipeline bit-for-bit when the flag is off.
+  if (clEnableVectorAllocSwizzle) {
+    funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
+  }
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());

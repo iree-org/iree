@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
@@ -47,7 +46,9 @@ namespace {
 // Allocates a tensor to copy the vector into a la bufferization.alloc_tensor.
 // This allocation is always static as vectors are currently always static
 // where this is used. When |swizzle| is provided, wraps the allocation with
-// a SwizzleHintOp using the flat-1D + expand_shape pattern.
+// a SwizzleHintOp; FlattenSwizzleHintAllocsPass later flattens the multi-D
+// alloc + hint into the flat-1D + expand_shape form that ResolveSwizzleHints
+// expects.
 static FailureOr<Value>
 allocateTensorForVector(OpBuilder &b, Location loc, Value vector,
                         std::optional<IREE::Codegen::XORShuffleAttr> swizzle) {
@@ -62,26 +63,18 @@ allocateTensorForVector(OpBuilder &b, Location loc, Value vector,
   RankedTensorType tensorType =
       RankedTensorType::get(vectorType.getShape(), vectorType.getElementType(),
                             sharedMemoryAddrSpace);
+  auto allocTensorOp = bufferization::AllocTensorOp::create(
+      b, loc, tensorType, ValueRange{}, Value());
+  allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
 
-  Value dest;
+  Value dest = allocTensorOp;
   if (swizzle) {
-    int64_t numElements = tensorType.getNumElements();
-    RankedTensorType flatType = RankedTensorType::get(
-        {numElements}, tensorType.getElementType(), sharedMemoryAddrSpace);
-    auto allocTensorOp = bufferization::AllocTensorOp::create(
-        b, loc, flatType, ValueRange{}, Value());
-    allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
-
-    Value swizzled =
-        IREE::Codegen::SwizzleHintOp::create(b, loc, allocTensorOp, *swizzle);
-    dest = tensor::ExpandShapeOp::create(
-        b, loc, tensorType, swizzled,
-        {llvm::to_vector(llvm::seq(tensorType.getRank()))});
-  } else {
-    auto allocTensorOp = bufferization::AllocTensorOp::create(
-        b, loc, tensorType, ValueRange{}, Value());
-    allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
-    dest = allocTensorOp;
+    // Let FlattenSwizzleHintAllocsPass handle the flat-1D + expand_shape
+    // rewrite post-bufferization. Creating the hint on the multi-D tensor
+    // keeps operand and result types identical, so bufferization produces
+    // matching memref types on both sides.
+    dest = IREE::Codegen::SwizzleHintOp::create(b, loc, tensorType,
+                                                allocTensorOp, *swizzle);
   }
 
   Value c0 = arith::ConstantIndexOp::create(b, loc, 0);
