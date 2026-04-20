@@ -253,6 +253,12 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "command_buffer_event";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS:
       return "command_buffer_wait_events";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT:
+      return "file_object";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ:
+      return "device_queue_read";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE:
+      return "device_queue_write";
     default:
       return "unknown";
   }

@@ -87,6 +87,7 @@ iree_cc_library(
     ::format
     iree::base
     iree::hal
+    iree::io::file_handle
   PUBLIC
 )
 
@@ -107,6 +108,8 @@ iree_cc_library(
     "recorder_event.h"
     "recorder_executable.c"
     "recorder_executable.h"
+    "recorder_file.c"
+    "recorder_file.h"
     "recorder_record.h"
   DEPS
     ::file_writer
@@ -147,6 +150,7 @@ iree_cc_test(
     iree::base
     iree::hal
     iree::hal::drivers::local_sync::sync_driver
+    iree::io::file_handle
     iree::testing::gtest
     iree::testing::gtest_main
 )

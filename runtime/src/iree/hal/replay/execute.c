@@ -10,8 +10,15 @@
 #include <stddef.h>
 #include <string.h>
 
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+#include <sys/stat.h>
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
+
 #include "iree/hal/replay/file_reader.h"
 #include "iree/hal/replay/format.h"
+#include "iree/io/file_handle.h"
 
 typedef struct iree_hal_replay_object_entry_t {
   // Captured object type stored in this entry.
@@ -26,6 +33,7 @@ typedef struct iree_hal_replay_object_entry_t {
     iree_hal_executable_t* executable;
     iree_hal_semaphore_t* semaphore;
     iree_hal_event_t* event;
+    iree_hal_file_t* file;
   } value;
 } iree_hal_replay_object_entry_t;
 
@@ -70,6 +78,9 @@ static void iree_hal_replay_executor_release_entry(
       break;
     case IREE_HAL_REPLAY_OBJECT_TYPE_EVENT:
       iree_hal_event_release(entry->value.event);
+      break;
+    case IREE_HAL_REPLAY_OBJECT_TYPE_FILE:
+      iree_hal_file_release(entry->value.file);
       break;
     default:
       break;
@@ -568,6 +579,122 @@ static iree_status_t iree_hal_replay_executor_create_event(
       IREE_HAL_REPLAY_OBJECT_TYPE_EVENT, entry);
 }
 
+static iree_status_t iree_hal_replay_executor_validate_file_reference(
+    const iree_hal_replay_file_object_payload_t* payload,
+    iree_io_file_handle_t* handle, iree_hal_file_t* file) {
+  const uint64_t file_length = iree_hal_file_length(file);
+  if (IREE_UNLIKELY(payload->file_length != file_length)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external replay file length mismatch: captured=%" PRIu64
+        " current=%" PRIu64,
+        payload->file_length, file_length);
+  }
+
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+  if (payload->file_device == 0 && payload->file_inode == 0 &&
+      payload->file_mtime_ns == 0) {
+    return iree_ok_status();
+  }
+  iree_io_file_handle_primitive_t primitive =
+      iree_io_file_handle_primitive(handle);
+  if (IREE_UNLIKELY(primitive.type != IREE_IO_FILE_HANDLE_TYPE_FD)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external replay file identity requires an fd-backed file");
+  }
+  struct stat file_stat;
+  if (IREE_UNLIKELY(fstat(primitive.value.fd, &file_stat) != 0)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "unable to stat external replay file");
+  }
+  const uint64_t file_device = (uint64_t)file_stat.st_dev;
+  const uint64_t file_inode = (uint64_t)file_stat.st_ino;
+  const uint64_t file_mtime_ns =
+      ((uint64_t)file_stat.st_mtim.tv_sec * 1000000000ull) +
+      (uint64_t)file_stat.st_mtim.tv_nsec;
+  if (IREE_UNLIKELY(payload->file_device != file_device ||
+                    payload->file_inode != file_inode ||
+                    payload->file_mtime_ns != file_mtime_ns)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external replay file identity mismatch: captured=(dev=%" PRIu64
+        ", inode=%" PRIu64 ", mtime_ns=%" PRIu64 ") current=(dev=%" PRIu64
+        ", inode=%" PRIu64 ", mtime_ns=%" PRIu64 ")",
+        payload->file_device, payload->file_inode, payload->file_mtime_ns,
+        file_device, file_inode, file_mtime_ns);
+  }
+#else
+  (void)handle;
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_replay_executor_import_file(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT,
+      sizeof(iree_hal_replay_file_object_payload_t)));
+  iree_hal_replay_file_object_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+  if (IREE_UNLIKELY(payload.reference_length > IREE_HOST_SIZE_MAX ||
+                    sizeof(payload) +
+                            (iree_host_size_t)payload.reference_length !=
+                        record->payload.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay file object payload length mismatch");
+  }
+  if (IREE_UNLIKELY(payload.reference_type !=
+                    IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "replay file reference type %" PRIu32
+                            " is not executable",
+                            payload.reference_type);
+  }
+
+  iree_hal_replay_object_entry_t* device_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      &device_entry));
+  iree_string_view_t path =
+      iree_make_string_view((const char*)record->payload.data + sizeof(payload),
+                            (iree_host_size_t)payload.reference_length);
+  iree_io_file_mode_t mode = 0;
+  if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_READ)) {
+    mode |= IREE_IO_FILE_MODE_READ;
+  }
+  if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
+    mode |= IREE_IO_FILE_MODE_WRITE;
+  }
+  if (mode == 0) mode = IREE_IO_FILE_MODE_READ;
+  iree_io_file_handle_t* handle = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_io_file_handle_open(mode, path, executor->host_allocator, &handle));
+
+  iree_hal_file_t* file = NULL;
+  iree_status_t status =
+      iree_hal_file_import(device_entry->value.device, payload.queue_affinity,
+                           payload.access, handle, payload.flags, &file);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_validate_file_reference(&payload, handle,
+                                                              file);
+  }
+  iree_io_file_handle_release(handle);
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_replay_object_entry_t entry = {.value.file = file};
+    status = iree_hal_replay_executor_store(
+        executor, record->header.related_object_id,
+        IREE_HAL_REPLAY_OBJECT_TYPE_FILE, entry);
+  } else {
+    iree_hal_file_release(file);
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_replay_executor_allocate_buffer(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -881,6 +1008,115 @@ static iree_status_t iree_hal_replay_executor_queue_copy(
         device_entry->value.device, payload.queue_affinity, wait_storage.list,
         signal_storage.list, source_ref.buffer, source_ref.offset,
         target_ref.buffer, target_ref.offset, target_ref.length, payload.flags);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_flush_and_wait(device_entry->value.device,
+                                                     payload.queue_affinity,
+                                                     signal_storage.list);
+  }
+  iree_hal_replay_semaphore_list_storage_deinitialize(&signal_storage,
+                                                      executor->host_allocator);
+  iree_hal_replay_semaphore_list_storage_deinitialize(&wait_storage,
+                                                      executor->host_allocator);
+  return status;
+}
+
+static iree_status_t iree_hal_replay_executor_queue_read(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ,
+      sizeof(iree_hal_replay_device_queue_read_payload_t)));
+  iree_hal_replay_device_queue_read_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+
+  iree_hal_replay_object_entry_t* device_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      &device_entry));
+  iree_hal_replay_semaphore_list_storage_t wait_storage;
+  iree_hal_replay_semaphore_list_storage_t signal_storage;
+  iree_const_byte_span_t trailing_payload;
+  iree_status_t status = iree_hal_replay_executor_make_queue_semaphore_lists(
+      executor, record, sizeof(payload), payload.wait_semaphore_count,
+      payload.signal_semaphore_count, /*trailing_payload_length=*/0,
+      &wait_storage, &signal_storage, &trailing_payload);
+  iree_hal_replay_object_entry_t* file_entry = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_lookup(executor, payload.source_file_id,
+                                             IREE_HAL_REPLAY_OBJECT_TYPE_FILE,
+                                             &file_entry);
+  }
+  iree_hal_buffer_ref_t target_ref;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_make_buffer_ref(
+        executor, &payload.target_ref, &target_ref);
+  }
+  if (iree_status_is_ok(status) && !target_ref.buffer) {
+    status = iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "replay queue read requires a direct target buffer reference");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_read(
+        device_entry->value.device, payload.queue_affinity, wait_storage.list,
+        signal_storage.list, file_entry->value.file, payload.source_offset,
+        target_ref.buffer, target_ref.offset, target_ref.length, payload.flags);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_flush_and_wait(device_entry->value.device,
+                                                     payload.queue_affinity,
+                                                     signal_storage.list);
+  }
+  iree_hal_replay_semaphore_list_storage_deinitialize(&signal_storage,
+                                                      executor->host_allocator);
+  iree_hal_replay_semaphore_list_storage_deinitialize(&wait_storage,
+                                                      executor->host_allocator);
+  return status;
+}
+
+static iree_status_t iree_hal_replay_executor_queue_write(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE,
+      sizeof(iree_hal_replay_device_queue_write_payload_t)));
+  iree_hal_replay_device_queue_write_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+
+  iree_hal_replay_object_entry_t* device_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      &device_entry));
+  iree_hal_replay_semaphore_list_storage_t wait_storage;
+  iree_hal_replay_semaphore_list_storage_t signal_storage;
+  iree_const_byte_span_t trailing_payload;
+  iree_status_t status = iree_hal_replay_executor_make_queue_semaphore_lists(
+      executor, record, sizeof(payload), payload.wait_semaphore_count,
+      payload.signal_semaphore_count, /*trailing_payload_length=*/0,
+      &wait_storage, &signal_storage, &trailing_payload);
+  iree_hal_buffer_ref_t source_ref;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_make_buffer_ref(
+        executor, &payload.source_ref, &source_ref);
+  }
+  iree_hal_replay_object_entry_t* file_entry = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_lookup(executor, payload.target_file_id,
+                                             IREE_HAL_REPLAY_OBJECT_TYPE_FILE,
+                                             &file_entry);
+  }
+  if (iree_status_is_ok(status) && !source_ref.buffer) {
+    status = iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "replay queue write requires a direct source buffer reference");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_write(
+        device_entry->value.device, payload.queue_affinity, wait_storage.list,
+        signal_storage.list, source_ref.buffer, source_ref.offset,
+        file_entry->value.file, payload.target_offset, source_ref.length,
+        payload.flags);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_executor_flush_and_wait(device_entry->value.device,
@@ -1644,6 +1880,8 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
       return iree_hal_replay_executor_create_command_buffer(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_EVENT:
       return iree_hal_replay_executor_create_event(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_IMPORT_FILE:
+      return iree_hal_replay_executor_import_file(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_CREATE_SEMAPHORE:
       return iree_hal_replay_executor_create_semaphore(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER:
@@ -1658,6 +1896,10 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
       return iree_hal_replay_executor_queue_update(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_COPY:
       return iree_hal_replay_executor_queue_copy(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_READ:
+      return iree_hal_replay_executor_queue_read(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_WRITE:
+      return iree_hal_replay_executor_queue_write(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_FLUSH_RANGE:
     case IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_UNMAP_RANGE:
       if (record->header.payload_type ==

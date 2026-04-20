@@ -181,6 +181,16 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_EVENT_OBJECT = 20u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EVENT = 21u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_WAIT_EVENTS = 22u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT = 23u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ = 24u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE = 25u,
+};
+
+// Type of external file reference captured for a HAL file object.
+typedef uint32_t iree_hal_replay_file_reference_type_t;
+enum iree_hal_replay_file_reference_type_e {
+  IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_NONE = 0u,
+  IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH = 1u,
 };
 
 // Payload describing a captured buffer object.
@@ -310,6 +320,33 @@ typedef struct iree_hal_replay_semaphore_object_payload_t {
   // Reserved for future semaphore object metadata; must be zero.
   uint64_t reserved0;
 } iree_hal_replay_semaphore_object_payload_t;
+
+// Payload describing a captured file object followed by external reference
+// bytes.
+typedef struct iree_hal_replay_file_object_payload_t {
+  // Queue affinity requested at import.
+  uint64_t queue_affinity;
+  // Accessible byte length reported by the imported HAL file.
+  uint64_t file_length;
+  // Platform file device identifier, or zero when unavailable.
+  uint64_t file_device;
+  // Platform file inode identifier, or zero when unavailable.
+  uint64_t file_inode;
+  // Platform file modification time in nanoseconds, or zero when unavailable.
+  uint64_t file_mtime_ns;
+  // Byte length of the external reference following this header.
+  uint64_t reference_length;
+  // HAL memory access bits allowed by this imported file.
+  uint32_t access;
+  // External HAL file flags requested at import.
+  uint32_t flags;
+  // iree_io_file_handle_type_t value of the imported source handle.
+  uint32_t handle_type;
+  // iree_hal_replay_file_reference_type_t value of the trailing reference.
+  uint32_t reference_type;
+  // Reserved for future file object metadata; must be zero.
+  uint64_t reserved0;
+} iree_hal_replay_file_object_payload_t;
 
 // Payload describing a captured event object.
 typedef struct iree_hal_replay_event_object_payload_t {
@@ -531,6 +568,42 @@ typedef struct iree_hal_replay_device_queue_copy_payload_t {
   // Number of signal semaphore timepoints following the wait timepoints.
   uint64_t signal_semaphore_count;
 } iree_hal_replay_device_queue_copy_payload_t;
+
+// Payload describing a device queue read request followed by semaphore lists.
+typedef struct iree_hal_replay_device_queue_read_payload_t {
+  // Session-local source file object id.
+  iree_hal_replay_object_id_t source_file_id;
+  // Source byte offset in the file.
+  uint64_t source_offset;
+  // Target buffer range read into.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Read flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_read_payload_t;
+
+// Payload describing a device queue write request followed by semaphore lists.
+typedef struct iree_hal_replay_device_queue_write_payload_t {
+  // Source buffer range written from.
+  iree_hal_replay_buffer_ref_payload_t source_ref;
+  // Session-local target file object id.
+  iree_hal_replay_object_id_t target_file_id;
+  // Target byte offset in the file.
+  uint64_t target_offset;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Write flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_write_payload_t;
 
 // Payload describing a command buffer fill operation followed by the fill
 // pattern bytes.

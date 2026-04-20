@@ -72,6 +72,7 @@ iree_runtime_cc_library(
         ":format",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 
@@ -89,6 +90,8 @@ iree_runtime_cc_library(
         "recorder_event.h",
         "recorder_executable.c",
         "recorder_executable.h",
+        "recorder_file.c",
+        "recorder_file.h",
         "recorder_record.h",
     ],
     hdrs = ["recorder.h"],
@@ -128,6 +131,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
