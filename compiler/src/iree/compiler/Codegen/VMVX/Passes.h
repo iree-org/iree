@@ -28,6 +28,19 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
                                 bool enableUKernels);
 
 //----------------------------------------------------------------------------//
+// VMVX Codegen Pipelines
+//----------------------------------------------------------------------------//
+
+/// Populates passes needed for preprocessing before codegen lowerings, as well
+/// as high level lowering strategy selection.
+void buildVMVXConfigurationPassPipeline(OpPassManager &modulePassManager);
+
+/// Populates passes needed to lower high level ops to VMVX-compatible ops via
+/// the structured ops path. The `modulePassManager` should operate on the
+/// module within the IREE::HAL::ExecutableOp.
+void buildVMVXLoweringPassPipeline(OpPassManager &modulePassManager);
+
+//----------------------------------------------------------------------------//
 // VMVX Linking Passes and Pipelines
 //----------------------------------------------------------------------------//
 

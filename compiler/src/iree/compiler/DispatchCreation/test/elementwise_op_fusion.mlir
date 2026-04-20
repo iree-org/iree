@@ -284,6 +284,48 @@ util.func public @fuse_attention_with_broadcast(%arg0: tensor<4x8x128x?xf16>, %a
 //  CHECK-SAME:       ins(%[[ARG1]], %[[ARG2]], %[[ARG0]], %[[ARG3]], %[[ARG4]] :
 //       CHECK:   util.return %[[ATTENTION]]
 
+// -----
+
+util.func public @dont_fuse_attention_with_broadcasted_away_n_dim(
+    %q: tensor<4x32x64x16xf16>,
+    %k: tensor<4x32x64x16xf16>,
+    %v: tensor<4x32x64xf16>,
+    %scale: f16) -> tensor<4x32x64x128xf16> {
+  %empty_v = tensor.empty() : tensor<4x32x64x128xf16>
+  %v_broadcast = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%v : tensor<4x32x64xf16>) outs(%empty_v : tensor<4x32x64x128xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<4x32x64x128xf16>
+  %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
+  %attention = iree_linalg_ext.attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+      ins(%q, %k, %v_broadcast, %scale :
+          tensor<4x32x64x16xf16>, tensor<4x32x64x16xf16>,
+          tensor<4x32x64x128xf16>, f16)
+      outs(%empty_out : tensor<4x32x64x128xf16>) {
+  ^bb0(%score: f16):
+    iree_linalg_ext.yield %score : f16
+  } -> tensor<4x32x64x128xf16>
+  util.return %attention : tensor<4x32x64x128xf16>
+}
+// CHECK-LABEL: func public @dont_fuse_attention_with_broadcasted_away_n_dim
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[V_BCAST:.+]] = linalg.generic
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     ins(%[[Q]], %[[K]], %[[V_BCAST]], %[[SCALE]] :
+//       CHECK:   util.return %[[ATTENTION]]
+
 
 // -----
 

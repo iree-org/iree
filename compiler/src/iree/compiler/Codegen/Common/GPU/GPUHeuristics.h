@@ -102,6 +102,10 @@ struct GPUMMAHeuristicSeeds {
   // per workgroup), which can improve performance when the GPU has enough work
   // to stay saturated.
   std::optional<int64_t> boostMNTileCountPerSubgroup = std::nullopt;
+  // Maximum output VGPRs per thread for the VGPR pressure cap. When set,
+  // adjustSeedsForTarget will reduce bestMNTileCountPerSubgroup to keep
+  // per-thread output register pressure within this limit.
+  std::optional<int64_t> maxOutputVGPRsPerThread = std::nullopt;
 };
 
 struct GPUMMASchedule {
@@ -112,6 +116,7 @@ struct GPUMMASchedule {
   SmallVector<int64_t, 2> mSizes;
   SmallVector<int64_t, 2> nSizes;
   SmallVector<int64_t, 2> kSizes;
+  SmallVector<int64_t, 2> batchSizes;
 
   // Number of subgroups along each M and N dimension.
   SmallVector<int64_t, 2> mSubgroupCounts;

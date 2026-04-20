@@ -297,6 +297,8 @@ def FormDispatchRegionsPass :
   let options = [
     Option<"aggressiveFusion", "aggressive-fusion", "bool",
            /*default=*/"false", "Aggressive mode enabling fusions not ready for all backends">,
+    Option<"fuseMultiUseProducers", "fuse-multi-use-producers", "bool",
+           /*default=*/"true", "Enable experimental fusion of producers with multiple non-dim uses">,
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
            /*default=*/"false", "Enable fusing pad with consumer">,
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
@@ -405,6 +407,17 @@ def AnnotateDataTilingHintsPass :
     attribute. Otherwise, it aggressively filters linalg ops and adds the
     data-tiling hint attribute to the operations.
   }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data-tiling annotation. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init<
+            mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
+            {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
+             mlir::iree_compiler::IREE::Encoding::EncodingOpType::scaled_matmul})}]>,
+  ];
 }
 
 def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",

@@ -388,6 +388,119 @@ IREE::transform_dialect::MatchAttentionOp::matchOperation(
   return DiagnosedSilenceableFailure::success();
 }
 
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchOnlineAttentionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto attentionOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(current);
+  if (!attentionOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation is not an online_attention operation.";
+  }
+  if (attentionOp.getMask()) {
+    return emitSilenceableFailure(loc)
+           << "Masked online_attention operations are not supported.";
+  }
+
+  Type targetQueryType = getQueryType();
+  Type currentQueryType =
+      getElementTypeOrSelf(attentionOp.getQuery().getType());
+  if (currentQueryType != targetQueryType) {
+    return emitSilenceableFailure(loc)
+           << "Query type doesn't match: expected " << targetQueryType
+           << ", got " << currentQueryType;
+  }
+
+  Type targetKeyType = getKeyType();
+  Type currentKeyType = getElementTypeOrSelf(attentionOp.getKey().getType());
+  if (currentKeyType != targetKeyType) {
+    return emitSilenceableFailure(loc)
+           << "Key type doesn't match: expected " << targetKeyType << ", got "
+           << currentKeyType;
+  }
+
+  Type targetValueType = getValueType();
+  Type currentValueType =
+      getElementTypeOrSelf(attentionOp.getValue().getType());
+  if (currentValueType != targetValueType) {
+    return emitSilenceableFailure(loc)
+           << "Value type doesn't match: expected " << targetValueType
+           << ", got " << currentValueType;
+  }
+
+  Type targetScaleType = getScaleType();
+  Type currentScaleType =
+      getElementTypeOrSelf(attentionOp.getScale().getType());
+  if (currentScaleType != targetScaleType) {
+    return emitSilenceableFailure(loc)
+           << "Scale type doesn't match: expected " << targetScaleType
+           << ", got " << currentScaleType;
+  }
+
+  Type targetOutputType = getOutputType();
+  Type currentOutputType =
+      getElementTypeOrSelf(attentionOp.getOutput().getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "Output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  Type targetMaxType = getMaxType();
+  Type currentMaxType = getElementTypeOrSelf(attentionOp.getMax().getType());
+  if (currentMaxType != targetMaxType) {
+    return emitSilenceableFailure(loc)
+           << "Max type doesn't match: expected " << targetMaxType << ", got "
+           << currentMaxType;
+  }
+
+  Type targetSumType = getSumType();
+  Type currentSumType = getElementTypeOrSelf(attentionOp.getSum().getType());
+  if (currentSumType != targetSumType) {
+    return emitSilenceableFailure(loc)
+           << "Sum type doesn't match: expected " << targetSumType << ", got "
+           << currentSumType;
+  }
+
+  ArrayAttr currentIndexingMaps = attentionOp.getIndexingMaps();
+  ArrayAttr targetIndexingMaps = getIndexingMaps();
+  if (currentIndexingMaps != targetIndexingMaps) {
+    return emitSilenceableFailure(loc) << "indexing maps don't match";
+  }
+
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+          attentionOp.getValueMap(), attentionOp.getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitSilenceableFailure(loc)
+           << "Failed to infer online_attention dimensions";
+  }
+  IREE::LinalgExt::AttentionOpDetail opInfo = *maybeOpInfo;
+  SmallVector<int64_t> iterationDomain = attentionOp.getStaticLoopRanges();
+
+  Builder builder(getContext());
+  auto iterationSizes = [&](ArrayRef<int64_t> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](int64_t dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(opInfo.getBatchDims()));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(opInfo.getMDims()));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(opInfo.getNDims()));
+  results.setParams(cast<OpResult>(getK1Dims()),
+                    iterationSizes(opInfo.getK1Dims()));
+  results.setParams(cast<OpResult>(getK2Dims()),
+                    iterationSizes(opInfo.getK2Dims()));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
 //===----------------------------------------------------------------------===//
 // MatchConvolutionOp
 //===----------------------------------------------------------------------===//

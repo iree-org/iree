@@ -73,7 +73,7 @@ func.func @matmul_static(%3: tensor<196x240xf32>, %4: tensor<240x40xf32>) -> ten
   %7 = linalg.matmul ins(%3, %4 : tensor<196x240xf32>, tensor<240x40xf32>) outs(%6 : tensor<196x40xf32>) -> tensor<196x40xf32>
   return %7 : tensor<196x40xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [49, 8, 0], distribution = [49, 8, 0], vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 4]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [14, 40, 0], distribution = [14, 40, 0], vector_common_parallel = [8, 8, 0], vector_reduction = [0, 0, 4]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -165,7 +165,7 @@ func.func @pack(%2: tensor<20x48xf32>) -> tensor<3x48x8x1xf32> attributes {hal.e
   %pack = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x48xf32> -> tensor<3x48x8x1xf32>
   return %pack : tensor<3x48x8x1xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 16], vector_common_parallel = [1, 1]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 24], vector_common_parallel = [1, 1]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>, {enable_decomposition}>
 //       CHECK: func.func @pack(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -226,7 +226,7 @@ func.func @gather_attention(
     %key_table: tensor<?x4x16x32xf16>, %indices: tensor<32x?xi64>,
     %value_table: tensor<?x4x16x32xf16>, %query: tensor<32x4x2x32xf16>,
     %mask: tensor<32x4x2x?x16xf16>, %dim0: index, %dim1: index,
-    %dim2: index, %dim3: index) -> tensor<32x4x2x32xf16>
+    %dim2: index, %dim3: index) -> tensor<32x4x2x32xf32>
     attributes {hal.executable.target = #executable_target} {
   %cst = arith.constant 1.767580e-01 : f16
   %empty = tensor.empty(%dim1) : tensor<32x?x4x16x32xf16>
@@ -236,29 +236,39 @@ func.func @gather_attention(
   %v_gather = iree_linalg_ext.gather dimension_map = [0]
       ins(%value_table, %indices : tensor<?x4x16x32xf16>, tensor<32x?xi64>)
       outs(%empty : tensor<32x?x4x16x32xf16>) -> tensor<32x?x4x16x32xf16>
-  %out = tensor.empty() : tensor<32x4x2x32xf16>
-  %result = iree_linalg_ext.attention {
+  %acc = tensor.empty() : tensor<32x4x2x32xf32>
+  %max = tensor.empty() : tensor<32x4x2xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %fill_acc = linalg.fill ins(%cst_0 : f32) outs(%acc : tensor<32x4x2x32xf32>) -> tensor<32x4x2x32xf32>
+  %fill_max = linalg.fill ins(%cst_1 : f32) outs(%max : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
+  %fill_sum = linalg.fill ins(%cst_2 : f32) outs(%max : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
+  %result:3 = iree_linalg_ext.online_attention {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]}
       ins(%query, %k_gather, %v_gather, %cst, %mask
           : tensor<32x4x2x32xf16>, tensor<32x?x4x16x32xf16>,
             tensor<32x?x4x16x32xf16>, f16, tensor<32x4x2x?x16xf16>)
-      outs(%out : tensor<32x4x2x32xf16>) {
+      outs(%fill_acc, %fill_max, %fill_sum
+          : tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
-  } -> tensor<32x4x2x32xf16>
-  return %result : tensor<32x4x2x32xf16>
+  } -> tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>
+  return %result#0 : tensor<32x4x2x32xf32>
 }
 // Gather ops should have vector_reduction set for dims mapping to attention
 // reduction dims (d5, d6). This is critical for correct vectorization.
 //  CHECK-DAG: #[[GATHER_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 1, 0, {{[0-9]+}}], vector_reduction = [0, 1, 0, 4, 0]>
-//  CHECK-DAG: #[[ATTN_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 2, 32, 0, 0, 0], vector_common_parallel = [1, 1, 1, 2, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 4]>
+//  CHECK-DAG: #[[ATTN_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 2, 32, 0, 0, 0], vector_common_parallel = [1, 1, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 4]>
 //      CHECK: func.func @gather_attention(
 //      CHECK:   iree_linalg_ext.gather
 // CHECK-SAME:     lowering_config = #[[GATHER_CONFIG]]
-//      CHECK:   iree_linalg_ext.attention
+//      CHECK:   iree_linalg_ext.online_attention
 // CHECK-SAME:     lowering_config = #[[ATTN_CONFIG]]

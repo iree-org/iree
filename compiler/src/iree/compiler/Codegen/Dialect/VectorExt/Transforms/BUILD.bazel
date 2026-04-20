@@ -37,6 +37,7 @@ iree_compiler_cc_library(
     srcs = [
         "BufferizationInterfaces.cpp",
         "DistributionPatterns.cpp",
+        "LowerTransferGatherScatterToVector.cpp",
         "Passes.cpp",
         "VectorExtFoldUnitExtentDims.cpp",
     ],
@@ -54,6 +55,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationInterfaces",
         "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

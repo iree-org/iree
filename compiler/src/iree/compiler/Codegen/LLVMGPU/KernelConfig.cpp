@@ -340,6 +340,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (!mma.getDistributionMappingKind()) {
       continue;
     }
+    // TODO: Add block intrinsic support for vector distribute convolutions.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Skip adding any virtual intrinsics since they are not tested for
     // convolutions.
@@ -575,6 +579,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize) {
       continue;
     }
+    // We currently dont use block intrinsics for GEMMs.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     // Intrinsics without distribution mapping cannot be distributed.
     if (!mma.getDistributionMappingKind()) {
       continue;
@@ -656,6 +664,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+
   // Tile all batch dimensions with unit size.
   for (int64_t batch : contractionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -742,7 +751,7 @@ setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
 
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    IREE::LinalgExt::AttentionOp op) {
+    IREE::LinalgExt::OnlineAttentionOp op) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -833,6 +842,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     if (!mma.getDistributionMappingKind()) {
       continue;
     }
+    // TODO: Enable block intrinsics for attention.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
@@ -920,7 +933,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
-  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
@@ -1042,10 +1055,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
-                                   qkAttrDict);
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
-                                   pvAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getQKAttrStr(), qkAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getPVAttrStr(), pvAttrDict);
 
   DictionaryAttr decompositionConfigDict =
       b.getDictionaryAttr(decompositionConfig);
@@ -1082,7 +1095,7 @@ struct AttentionReductionHeuristicSeeds {
 
 static LogicalResult setAttentionReductionConfig(
     AttentionReductionHeuristicSeeds &seeds, IREE::GPU::TargetAttr target,
-    FunctionOpInterface entryPoint, IREE::LinalgExt::AttentionOp op) {
+    FunctionOpInterface entryPoint, IREE::LinalgExt::OnlineAttentionOp op) {
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
@@ -1331,10 +1344,10 @@ static LogicalResult setAttentionReductionConfig(
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
-                                   qkAttrDict);
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
-                                   pvAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getQKAttrStr(), qkAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getPVAttrStr(), pvAttrDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   setAttentionPipelineAttributes(target, pipelineAttrs);
@@ -1355,7 +1368,7 @@ static LogicalResult setAttentionReductionConfig(
 static LogicalResult
 setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      FunctionOpInterface entryPoint,
-                                     IREE::LinalgExt::AttentionOp op) {
+                                     IREE::LinalgExt::OnlineAttentionOp op) {
 
   // This configuration is not really smart right now. It just makes sure that
   // attention always compiles and tries to distribute workload on threads,
@@ -1441,8 +1454,9 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
-    LDBG() << "VectorDistribution: trying to find a suitable attention config";
+  if (auto attnOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(computeOp)) {
+    LDBG() << "VectorDistribution: trying to find a suitable online attention "
+              "config";
     if (succeeded(setAttentionIntrinsicBasedVectorDistributionConfig(
             target, entryPoint, attnOp))) {
       return success();

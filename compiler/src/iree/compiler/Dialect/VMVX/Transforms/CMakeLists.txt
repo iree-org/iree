@@ -80,7 +80,6 @@ iree_cc_library(
     iree::compiler::Codegen::VMVX
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil

@@ -1,9 +1,11 @@
-// RUN: iree-opt %s  --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline, func.func(iree-llvmgpu-lower-executable-target))" \
+// RUN: iree-opt %s --iree-codegen-llvmgpu-configuration-pipeline \
+// RUN:     --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:     --iree-gpu-test-target=sm_60 \
 // RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_bufferize_spec.mlir@__transform_main | \
 // RUN: FileCheck %s
 
-// RUN: iree-opt %s  --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline, func.func(iree-llvmgpu-lower-executable-target))" \
+// RUN: iree-opt %s --iree-codegen-llvmgpu-configuration-pipeline \
+// RUN:     --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:     --iree-gpu-test-target=sm_60 \
 // RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir@__transform_main | \
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU
@@ -32,9 +34,7 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   //  CHECK: return
 
   // workgroup_size is explicitly set to [10, 11].
-  // FOREACH-TO-GPU: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = None workgroup_size = [10, 11, 1] subgroup_size = 32>
   // FOREACH-TO-GPU: func.func @matmul_static_dispatch_0()
-  // FOREACH-TO-GPU-SAME: translation_info = #[[TRANSLATION]]
   // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
   // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
   // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index
@@ -70,6 +70,7 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU-SAME: ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
   // FOREACH-TO-GPU: }
   // FOREACH-TO-GPU: gpu.barrier{{$}}
+  // FOREACH-TO-GPU: iree_codegen.dispatch_config @matmul_static_dispatch_0 workgroup_size = [10, 11, 1] subgroup_size = 32
 
   %7 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%6 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : tensor<250x1020xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<250x1020xf32>>

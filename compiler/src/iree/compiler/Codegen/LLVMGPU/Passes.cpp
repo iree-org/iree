@@ -556,6 +556,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createCombineSourceLayoutTransformationPass());
   CombineResultLayoutTransformationPassOptions combineLayoutOptions;
   combineLayoutOptions.scope =
       IREE::Codegen::RelayoutCombinationScope::Workgroup;
@@ -744,9 +745,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   tileAndDistributeToWorkgroup(funcPassManager,
                                /*strategy=*/reorderStrategy);
-
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -1139,7 +1137,8 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 }
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
-                                     bool useROCM, bool preserveDebugInfo) {
+                                     bool useROCM, bool preserveDebugInfo,
+                                     bool includeLLVMLowering) {
   modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
   LLVMGPULowerExecutableTargetPassOptions options;
   options.forROCDL = useROCM;
@@ -1162,7 +1161,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo);
+  if (includeLLVMLowering) {
+    addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo);
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";
@@ -1254,6 +1255,10 @@ void registerCodegenLLVMGPUPasses() {
     Option<bool> preserveDebugInfo{
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
+    Option<bool> includeLLVMLowering{
+        *this, "include-llvm-lowering",
+        llvm::cl::desc("Include the lowering to LLVM dialect."),
+        llvm::cl::init(true)};
   };
 
   static PassPipelineRegistration<> LLVMGPUConfigPipeline(
@@ -1271,7 +1276,8 @@ void registerCodegenLLVMGPUPasses() {
           [](OpPassManager &modulePassManager,
              const LLVMGPULoweringPipelineOptions &options) {
             buildLLVMGPUCodegenPassPipeline(modulePassManager, false,
-                                            options.preserveDebugInfo);
+                                            options.preserveDebugInfo,
+                                            options.includeLLVMLowering);
           });
 
   static PassPipelineRegistration<LLVMGPULoweringPipelineOptions>
@@ -1281,7 +1287,8 @@ void registerCodegenLLVMGPUPasses() {
           [](OpPassManager &modulePassManager,
              const LLVMGPULoweringPipelineOptions &options) {
             buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
-                                            options.preserveDebugInfo);
+                                            options.preserveDebugInfo,
+                                            options.includeLLVMLowering);
           });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(

@@ -9,7 +9,7 @@ func.func @transpose_f32(%2: tensor<32x32xf32>) -> tensor<32x32xf32> attributes 
   } -> tensor<32x32xf32>
   return %4 : tensor<32x32xf32>
 }
-//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[4], [4]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 32], vector_common_parallel = {{\[}}[4], [4]]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //       CHECK: func.func @transpose_f32(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -27,7 +27,7 @@ func.func @transpose_output_indexing_map_f32(%2: tensor<32x32xf32>) -> tensor<32
   } -> tensor<32x32xf32>
   return %4 : tensor<32x32xf32>
 }
-//   CHECK: #[[CONFIG:.+]] =  #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[4], [4]]>
+//   CHECK: #[[CONFIG:.+]] =  #iree_cpu.lowering_config<distribution = [4, 32], vector_common_parallel = {{\[}}[4], [4]]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //       CHECK: func.func @transpose_output_indexing_map_f32(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -45,7 +45,7 @@ func.func @transpose_f64(%2: tensor<32x32xf64>) -> tensor<32x32xf64> attributes 
    } -> tensor<32x32xf64>
    return %4 : tensor<32x32xf64>
 }
-//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 16], vector_common_parallel = {{\[}}[2], [2]]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 32], vector_common_parallel = {{\[}}[2], [2]]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //       CHECK: func.func @transpose_f64(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]

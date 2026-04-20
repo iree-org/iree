@@ -31,6 +31,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
     "DistributionPatterns.cpp"
+    "LowerTransferGatherScatterToVector.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
   DEPS
@@ -38,6 +39,7 @@ iree_cc_library(
     LLVMSupport
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass

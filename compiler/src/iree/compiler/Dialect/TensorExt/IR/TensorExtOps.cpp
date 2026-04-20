@@ -14,6 +14,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/Dominance.h"
 
@@ -49,12 +50,11 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
-      requiredCount += shapedType.getNumDynamicDims();
-    } else if (auto tensorType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                   value.getType())) {
-      requiredCount += tensorType.getNumDynamicDims();
-    }
+    requiredCount +=
+        TypeSwitch<Type, int64_t>(value.getType())
+            .Case<ShapedType, IREE::TensorExt::DispatchTensorType>(
+                [&](auto type) { return type.getNumDynamicDims(); })
+            .Default([&](Type /*type*/) { return 0; });
   }
   if (dynamicDims.size() != requiredCount) {
     return op->emitOpError()
@@ -63,6 +63,23 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
            << " dimension values are attached";
   }
   return success();
+}
+
+static Attribute getEncodingOrLayout(ShapedType type) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+    return tensorType.getEncoding();
+  }
+  if (auto memrefType = dyn_cast<MemRefType>(type)) {
+    return memrefType.getLayout();
+  }
+  return {};
+}
+
+static bool hasEncodingOrNonIdentityLayout(ShapedType type) {
+  if (auto memrefType = dyn_cast<MemRefType>(type)) {
+    return memrefType.getLayout() && !memrefType.getLayout().isIdentity();
+  }
+  return getEncodingOrLayout(type) != nullptr;
 }
 
 // Gets the dropped dimensions for `iree_tensor_ext.dispatch.tensor.load/store`.
@@ -561,6 +578,16 @@ OpFoldResult CastToRaggedShapeOp::getNumRaggedRowsAsOfr() {
   return IntegerAttr::get(IndexType::get(getContext()), resultShape[raggedDim]);
 }
 
+// Cast `v` to index type if it's not already index type.
+static Value castToIndexTypeOrSelf(RewriterBase &rewriter, Location loc,
+                                   Value v) {
+  if (v.getType() != rewriter.getIndexType()) {
+    return arith::IndexCastOp::create(rewriter, loc, rewriter.getIndexType(),
+                                      v);
+  }
+  return v;
+}
+
 // Starting at `v`, compute a backward slice dominated by the given `sparseOp`
 // and clone the operations in the slice, replacing any occurrence of
 // `dim(%sparseOp, givenDim)` with the value returned by
@@ -584,9 +611,9 @@ static FailureOr<SmallVector<Value>> cloneAndReplaceDimInBackwardSlice(
   IRMapping mapping;
   for (auto op : slice) {
     IntegerAttr attr;
-    if (!matchPattern(
-            op, m_Op<memref::DimOp>(matchers::m_Val(sparseOp->getResult(0)),
-                                    m_Constant(&attr)))) {
+    Value dimSource;
+    if (!matchDimOp(op, dimSource, attr) ||
+        dimSource != sparseOp->getResult(0)) {
       rewriter.clone(*op, mapping);
       continue;
     }
@@ -658,10 +685,16 @@ CastToRaggedShapeOp::getEstimatedLoopRange(RewriterBase &rewriter,
       cloneAndReplaceDimInBackwardSlice(
           rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
           [&](RewriterBase &rewriter, Location loc) {
-            OpFoldResult sourceDim =
-                memref::DimOp::create(rewriter, loc, getSource(),
-                                      expectedSparseDims[0])
-                    .getResult();
+            OpFoldResult sourceDim;
+            if (isa<MemRefType>(getSource().getType())) {
+              sourceDim = memref::DimOp::create(rewriter, loc, getSource(),
+                                                expectedSparseDims[0])
+                              .getResult();
+            } else {
+              sourceDim = tensor::DimOp::create(rewriter, loc, getSource(),
+                                                expectedSparseDims[0])
+                              .getResult();
+            }
             OpFoldResult numRaggedRows = getNumRaggedRowsAsOfr();
             AffineExpr s0, s1;
             bindSymbols(rewriter.getContext(), s0, s1);
@@ -691,103 +724,365 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
       getResultSparseEncoding().getSparseDimensions();
   assert(expectedSparseDims.size() == 2 &&
          "invalid specification of op with more than two sparse dimensions");
-  if (expectedSparseDims != sparseDims) {
-    return emitOpError(
-        "cannot lower the loop range for given sparse dimensions");
+
+  // Check that all requested sparse dims are valid.
+  for (int64_t sparseDim : sparseDims) {
+    if (!llvm::is_contained(expectedSparseDims, sparseDim)) {
+      return rewriter.notifyMatchFailure(
+          *this, "cannot lower the loop range for given sparse dimensions");
+    }
   }
   assert(givenRange.size() == sparseDims.size() &&
          "expected ranges for all dims");
 
-  // Generate the loop for outer sparse dimension.
+  // Generate the loop for sparse dimensions.
   Location loc = getLoc();
 
   // The upper bounds of the range is expected to be the
   // `memref.dim`/`tensor.dim` operation of the result of this operation.
   DominanceInfo dominanceInfo(getOperation()->getParentOp());
 
-  Value outerLb =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[0].offset);
-  Value outerUb =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[0].size);
-  Value outerStep =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[0].stride);
+  SmallVector<Value> ivs;
 
-  // Replace the `memref.dim`/`tensor.dim` operation in the backward slice of
-  // the upper bound with the number of ragged rows.
-  FailureOr<SmallVector<Value>> outerDimReplacementResult =
-      cloneAndReplaceDimInBackwardSlice(
-          rewriter, loc, dominanceInfo, outerUb, *this, expectedSparseDims[0],
-          [&](RewriterBase &rewriter, Location loc) {
-            OpFoldResult numRaggedRows = getNumRaggedRowsAsOfr();
-            Value numRaggedRowsVal =
-                getValueOrCreateConstantIndexOp(rewriter, loc, numRaggedRows);
-            return numRaggedRowsVal;
-          },
-          {outerUb});
-  if (failed(outerDimReplacementResult)) {
-    return emitOpError("failed to replace outer dim in backward slice");
+  // Find indices of outer and inner sparse dims in the sparseDims array.
+  auto outerIt = llvm::find(sparseDims, expectedSparseDims[0]);
+  auto innerIt = llvm::find(sparseDims, expectedSparseDims[1]);
+
+  // Handle outer sparse dimension (row) if present.
+  Value outerIv;
+  if (outerIt != sparseDims.end()) {
+    int64_t outerIdx = std::distance(sparseDims.begin(), outerIt);
+    Value outerLb = getValueOrCreateConstantIndexOp(
+        rewriter, loc, givenRange[outerIdx].offset);
+    Value outerUb = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    givenRange[outerIdx].size);
+    Value outerStep = getValueOrCreateConstantIndexOp(
+        rewriter, loc, givenRange[outerIdx].stride);
+
+    // Replace the `memref.dim`/`tensor.dim` operation in the backward slice of
+    // the upper bound with the number of ragged rows.
+    FailureOr<SmallVector<Value>> outerDimReplacementResult =
+        cloneAndReplaceDimInBackwardSlice(
+            rewriter, loc, dominanceInfo, outerUb, *this, expectedSparseDims[0],
+            [&](RewriterBase &rewriter, Location loc) {
+              OpFoldResult numRaggedRows = getNumRaggedRowsAsOfr();
+              Value numRaggedRowsVal =
+                  getValueOrCreateConstantIndexOp(rewriter, loc, numRaggedRows);
+              return numRaggedRowsVal;
+            },
+            {outerUb});
+    if (failed(outerDimReplacementResult)) {
+      return emitOpError("failed to replace outer dim in backward slice");
+    }
+
+    auto outerFor =
+        scf::ForOp::create(rewriter, loc, outerLb,
+                           outerDimReplacementResult.value()[0], outerStep);
+    outerIv = outerFor.getInductionVar();
+    Block *outerForBody = outerFor.getBody();
+    rewriter.setInsertionPointToStart(outerForBody);
+    ivs.push_back(outerIv);
   }
 
-  auto outerFor = scf::ForOp::create(
-      rewriter, loc, outerLb, outerDimReplacementResult.value()[0], outerStep);
-  Value outerIv = outerFor.getInductionVar();
-  Block *outerForBody = outerFor.getBody();
-  rewriter.setInsertionPointToStart(outerForBody);
+  // Handle inner sparse dimension (column) if present.
+  if (innerIt != sparseDims.end()) {
+    int64_t innerIdx = std::distance(sparseDims.begin(), innerIt);
+    // If we don't have an outer IV from this call, we cannot create the inner
+    // loop since it depends on the outer IV for computing column bounds.
+    if (!outerIv) {
+      return emitOpError(
+          "cannot lower inner sparse dimension without outer dimension");
+    }
 
-  // For the inner sparse dimension, lower to loops by creating a loop with
-  // - Lower bound being `max(givenLowerBound, column_lengths[outerIv])`
-  // - Upper bound obtained by replacing the `memref.dim %sparseOp, 1` with
-  //   `column_lengths[outerIv + 1]`
-  Value innerLb =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[1].offset);
-  Value innerUb =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[1].size);
-  Value innerStep =
-      getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[1].stride);
+    Value innerLb = getValueOrCreateConstantIndexOp(
+        rewriter, loc, givenRange[innerIdx].offset);
+    Value innerUb = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    givenRange[innerIdx].size);
+    Value innerStep = getValueOrCreateConstantIndexOp(
+        rewriter, loc, givenRange[innerIdx].stride);
 
-  // Replace the `memref.dim`/`tensor.dim` operation in the backward slice of
-  // the inner dim with the column length.
-  Value columnLengths = getColumnLengths();
-  FailureOr<SmallVector<Value>> innerDimReplacementResult =
-      cloneAndReplaceDimInBackwardSlice(
-          rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
-          [&](RewriterBase &rewriter, Location loc) {
-            Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
-            Value plusOne = arith::AddIOp::create(rewriter, loc, outerIv, one);
-            Value columnUb =
-                memref::LoadOp::create(rewriter, loc, columnLengths, plusOne);
-            if (columnUb.getType() != innerUb.getType()) {
-              columnUb = arith::IndexCastOp::create(
-                  rewriter, loc, innerUb.getType(), columnUb);
-            }
-            return columnUb;
-          },
-          {innerLb, innerUb});
-  if (failed(innerDimReplacementResult)) {
-    return emitOpError("failed to replace inner dims in backward slice");
+    // Replace the `memref.dim`/`tensor.dim` operation in the backward slice of
+    // the inner dim with the column length range (column_lengths[outerIv+1] -
+    // column_lengths[outerIv]). This ensures the loop variable iterates in
+    // relative index space (0, 1, 2, ...) which is correct for the dense output
+    // tensor. The sparse access resolution pass will adjust load indices to add
+    // column_lengths[outerIv] to get the linearized source index.
+    Value columnLengths = getColumnLengths();
+    FailureOr<SmallVector<Value>> innerDimReplacementResult =
+        cloneAndReplaceDimInBackwardSlice(
+            rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
+            [&](RewriterBase &rewriter, Location loc) {
+              Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+              Value plusOne =
+                  arith::AddIOp::create(rewriter, loc, outerIv, one);
+              Value columnEnd, columnStart;
+              if (isa<MemRefType>(columnLengths.getType())) {
+                columnEnd = memref::LoadOp::create(rewriter, loc, columnLengths,
+                                                   plusOne);
+                columnStart = memref::LoadOp::create(rewriter, loc,
+                                                     columnLengths, outerIv);
+              } else {
+                columnEnd = tensor::ExtractOp::create(rewriter, loc,
+                                                      columnLengths, plusOne);
+                columnStart = tensor::ExtractOp::create(rewriter, loc,
+                                                        columnLengths, outerIv);
+              }
+              columnEnd = castToIndexTypeOrSelf(rewriter, loc, columnEnd);
+              columnStart = castToIndexTypeOrSelf(rewriter, loc, columnStart);
+              // Compute column_lengths[outerIv+1] - column_lengths[outerIv]
+              AffineExpr s0, s1;
+              bindSymbols(rewriter.getContext(), s0, s1);
+              AffineMap subMap =
+                  AffineMap::get(0, 2, {s0 - s1}, rewriter.getContext());
+              OpFoldResult columnRangeOfr =
+                  affine::makeComposedFoldedAffineApply(
+                      rewriter, loc, subMap,
+                      ArrayRef<OpFoldResult>{columnEnd, columnStart});
+              return getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                     columnRangeOfr);
+            },
+            {innerLb, innerUb});
+    if (failed(innerDimReplacementResult)) {
+      return emitOpError("failed to replace inner dims in backward slice");
+    }
+
+    Value clonedLb = innerDimReplacementResult.value()[0];
+    Value clonedUb = innerDimReplacementResult.value()[1];
+    // Use the cloned lower bound directly - no need to max with
+    // column_lengths[outerIv] since the loop now iterates in relative index
+    // space.
+    auto innerFor =
+        scf::ForOp::create(rewriter, loc, clonedLb, clonedUb, innerStep);
+    Block *innerForBody = innerFor.getBody();
+    rewriter.setInsertionPointToStart(innerForBody);
+    Value innerIv = innerFor.getInductionVar();
+    ivs.push_back(innerIv);
   }
 
-  Value clonedLb = innerDimReplacementResult.value()[0];
-  Value clonedUb = innerDimReplacementResult.value()[1];
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap maxMap = AffineMap::get(0, 2, {s0, s1}, rewriter.getContext());
-  Value columnLb =
-      memref::LoadOp::create(rewriter, loc, columnLengths, outerIv);
-  if (columnLb.getType() != clonedLb.getType()) {
-    columnLb =
-        arith::IndexCastOp::create(rewriter, loc, clonedLb.getType(), columnLb);
-  }
-  OpFoldResult newLb = affine::makeComposedFoldedAffineMax(
-      rewriter, loc, maxMap, ArrayRef<OpFoldResult>{clonedLb, columnLb});
-  Value newLbVal = getValueOrCreateConstantIndexOp(rewriter, loc, newLb);
-  auto innerFor =
-      scf::ForOp::create(rewriter, loc, newLbVal, clonedUb, innerStep);
-  Block *innerForBody = innerFor.getBody();
-  rewriter.setInsertionPointToStart(innerForBody);
-  Value innerIv = innerFor.getInductionVar();
+  return ivs;
+}
 
-  return SmallVector<Value>{outerIv, innerIv};
+FailureOr<SmallVector<Range>> CastToRaggedShapeOp::resolveRange(
+    RewriterBase &rewriter, ArrayRef<Range> givenRanges,
+    const llvm::BitVector &inBounds, std::optional<Value> paddingValue) {
+  // NOTE: paddingValue parameter is accepted for interface compatibility.
+  // Future work: Generate conditional code/guards when paddingValue is provided
+  // to handle out-of-bounds accesses by returning the padding value.
+  (void)paddingValue; // Unused for now
+
+  ShapedType resultType = getResultType();
+
+  if (givenRanges.size() != resultType.getRank()) {
+    return emitOpError("expected givenRanges to have ")
+           << resultType.getRank() << " entries, but got "
+           << givenRanges.size();
+  }
+
+  if (inBounds.size() != givenRanges.size()) {
+    return emitOpError("expected inBounds to have ")
+           << givenRanges.size() << " bits, but got " << inBounds.size();
+  }
+
+  // Check if all accesses are in-bounds. Out-of-bounds handling is not yet
+  // supported.
+  if (!inBounds.all()) {
+    return emitOpError("out-of-bounds accesses are not yet supported");
+  }
+
+  SmallVector<int64_t> sparseDims =
+      getResultSparseEncoding().getSparseDimensions();
+  assert(sparseDims.size() == 2 &&
+         "invalid specification of op with more than two sparse dimensions");
+
+  // Verify constraints on sparse dimension ranges.
+  // For the outer sparse dimension: size must be 1, stride must be 1.
+  OpFoldResult ofrsToCheck[] = {givenRanges[sparseDims[0]].size,
+                                givenRanges[sparseDims[0]].stride};
+  if (!llvm::all_of(ofrsToCheck, isOneInteger)) {
+    return emitOpError("expected outer sparse dimension size and stride to be "
+                       "1 in givenRanges");
+  }
+
+  Location loc = getLoc();
+  SmallVector<Range> resolvedRange;
+
+  // Process all dimensions except the sparse dimensions.
+  int64_t resultRank = resultType.getRank();
+
+  // The outer sparse dimension index.
+  int64_t outerSparseDim = sparseDims[0];
+  int64_t innerSparseDim = sparseDims[1];
+
+  // Create a set of sparse dimensions for easy lookup.
+  llvm::SmallDenseSet<int64_t> sparseDimsSet(sparseDims.begin(),
+                                             sparseDims.end());
+
+  // Build the resolved range for the source.
+  for (int64_t resultDim = 0; resultDim < resultRank; ++resultDim) {
+    if (!sparseDimsSet.contains(resultDim)) {
+      // Non-sparse dimensions are preserved.
+      resolvedRange.push_back(givenRanges[resultDim]);
+      continue;
+    }
+    if (resultDim == innerSparseDim) {
+      // Skip the inner sparse dimension - it's already handled.
+      continue;
+    }
+    // This is the outer sparse dimension - compute the range for the
+    // corresponding source dimension.
+    Value columnLengths = getColumnLengths();
+
+    // Extract the column_lengths[offset_0] value.
+    Value offset0 = getValueOrCreateConstantIndexOp(
+        rewriter, loc, givenRanges[outerSparseDim].offset);
+    Value columnLengthsCurrent;
+    if (isa<MemRefType>(columnLengths.getType())) {
+      columnLengthsCurrent =
+          memref::LoadOp::create(rewriter, loc, columnLengths, offset0);
+    } else {
+      columnLengthsCurrent =
+          tensor::ExtractOp::create(rewriter, loc, columnLengths, offset0);
+    }
+    columnLengthsCurrent =
+        castToIndexTypeOrSelf(rewriter, loc, columnLengthsCurrent);
+
+    // Since we verified all accesses are in-bounds, we can use the requested
+    // size directly without clamping.
+    OpFoldResult sizeVal = givenRanges[innerSparseDim].size;
+    OpFoldResult strideVal = givenRanges[innerSparseDim].stride;
+
+    // offset = column_lengths[offset_0] + offset_1
+    // The linearized offset is the base offset from column_lengths plus the
+    // inner sparse dimension offset.
+    AffineExpr d0_offset, d1_offset;
+    bindDims(rewriter.getContext(), d0_offset, d1_offset);
+    AffineMap addMap =
+        AffineMap::get(2, 0, {d0_offset + d1_offset}, rewriter.getContext());
+    OpFoldResult linearizedOffset = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, addMap,
+        ArrayRef<OpFoldResult>{columnLengthsCurrent,
+                               givenRanges[innerSparseDim].offset});
+
+    resolvedRange.push_back(Range{linearizedOffset, sizeVal, strideVal});
+  }
+
+  return resolvedRange;
+}
+
+llvm::BitVector CastToRaggedShapeOp::getDistributionInfoForSparseDimensions() {
+  SmallVector<int64_t> sparseDims =
+      getResultSparseEncoding().getSparseDimensions();
+
+  // For ragged tensors with 2 sparse dimensions:
+  // - First sparse dimension (raggedRow) CAN be distributed.
+  // - Second sparse dimension (raggedRow + 1) CANNOT be distributed
+  //   because its bounds depend on the outer dimension.
+  llvm::BitVector result(sparseDims.size(), false);
+  if (!sparseDims.empty()) {
+    result.set(0); // Only first sparse dimension is distributable.
+  }
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.linearize_ragged_dims
+//===----------------------------------------------------------------------===//
+
+LogicalResult LinearizeRaggedDimsOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  ArrayRef<int64_t> resultShape =
+      cast<ShapedType>(getResult().getType()).getShape();
+  ValueRange dynamicDims = getResultDynamicDims();
+  SmallVector<OpFoldResult> mixedResultShapes =
+      getMixedValues(resultShape, dynamicDims, builder);
+  reifiedReturnShapes.emplace_back(std::move(mixedResultShapes));
+  return success();
+}
+
+LogicalResult LinearizeRaggedDimsOp::verify() {
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
+
+  // 1. Verify source has ragged tensor encoding.
+  auto raggedAttr =
+      dyn_cast_if_present<RaggedShapeAttr>(getEncodingOrLayout(sourceType));
+  if (!raggedAttr) {
+    return emitOpError("expected source type to have a ragged tensor encoding");
+  }
+
+  // Verify result does not have ragged encoding.
+  if (hasEncodingOrNonIdentityLayout(resultType)) {
+    return emitOpError(
+        "expected result type to have no encoding or identity layout");
+  }
+
+  // Get the sparse dimensions from the encoding.
+  SmallVector<int64_t> sparseDims = raggedAttr.getSparseDimensions();
+  if (sparseDims.empty()) {
+    return emitOpError("ragged tensor encoding has no sparse dimensions");
+  }
+
+  // Verify sparse dimensions are contiguous.
+  for (size_t i = 1; i < sparseDims.size(); ++i) {
+    if (sparseDims[i] != sparseDims[i - 1] + 1) {
+      return emitOpError("sparse dimensions must be contiguous, but got ")
+             << sparseDims[i - 1] << " and " << sparseDims[i];
+    }
+  }
+
+  int64_t sourceRank = sourceType.getRank();
+  int64_t resultRank = resultType.getRank();
+
+  // 2. Verify result rank: sparse dimensions are linearized into one dimension
+  // Result rank = source rank - number of sparse dimensions + 1.
+  int64_t expectedResultRank = sourceRank - sparseDims.size() + 1;
+  if (resultRank != expectedResultRank) {
+    return emitOpError("expected result rank to be ")
+           << expectedResultRank
+           << " (source rank - number of sparse dimensions + 1), but got "
+           << resultRank;
+  }
+
+  // 3. Build a set of sparse dimensions and a map from non-sparse source
+  // dimensions to result dimensions.
+  llvm::SmallDenseSet<int64_t> sparseDimSet(sparseDims.begin(),
+                                            sparseDims.end());
+
+  // Build mapping: non-sparse source dims -> result dims.
+  int64_t resultDimIndex = 0;
+  for (int64_t sourceDim = 0; sourceDim < sourceRank; ++sourceDim) {
+    if (sparseDimSet.contains(sourceDim)) {
+      if (sourceDim == sparseDims[0]) {
+        resultDimIndex++;
+      }
+      continue;
+    }
+
+    if (resultDimIndex >= resultRank) {
+      return emitOpError("result rank too small to accommodate all non-sparse "
+                         "source dimensions");
+    }
+
+    int64_t sourceSize = sourceType.getDimSize(sourceDim);
+    int64_t resultSize = resultType.getDimSize(resultDimIndex);
+    if (ShapedType::isStatic(sourceSize) && ShapedType::isStatic(resultSize) &&
+        sourceSize != resultSize) {
+      return emitOpError("expected source dimension ")
+             << sourceDim << " with size " << sourceSize
+             << " to be preserved in result dimension " << resultDimIndex
+             << " but got size " << resultSize;
+    }
+
+    resultDimIndex++;
+  }
+
+  // 4. Verify the correct number of dynamic dimensions are provided
+  if (failed(verifyOpDynamicDims(getOperation(), getResult(),
+                                 getResultDynamicDims()))) {
+    return failure();
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::TensorExt

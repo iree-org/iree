@@ -780,6 +780,33 @@ util.func @elementwise_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -
 
 // -----
 
+// CHECK-LABEL: util.func public @empty_with_noncollapsible_shape_add_inside_dispatch
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 16 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[CAP0:.+]] = arith.addi %[[C0]], %[[C1]] : index
+// CHECK-DAG:     %[[CAP1:.+]] = arith.addi %[[CAP0]], %[[C1]] : index
+// CHECK:     %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?xf32>{%[[COLLAPSED_DIM:.+]]})
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty(%[[EMPTY_DIM:.+]]) : tensor<?xf32>
+// CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]
+// CHECK-SAME:    output_shape [%[[CAP0]], %[[CAP1]]]
+// CHECK:     util.return %[[EXPAND]] : tensor<?x?xf32>
+util.func public @empty_with_noncollapsible_shape_add_inside_dispatch() -> tensor<?x?xf32> {
+  %c16 = arith.constant 16 : index
+  %c1 = arith.constant 1 : index
+  %captured_dim = arith.addi %c16, %c1 : index
+  %captured_dim2 = arith.addi %captured_dim, %c1 : index
+  %dispatch = flow.dispatch.region -> (tensor<?x?xf32>{%captured_dim, %captured_dim2}) {
+    %dim = arith.addi %captured_dim, %captured_dim2 : index
+    %empty = tensor.empty(%dim, %captured_dim2) : tensor<?x?xf32>
+    %cst = arith.constant 1.000000e+00 : f32
+    %filled = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+    flow.return %filled : tensor<?x?xf32>
+  }
+  util.return %dispatch : tensor<?x?xf32>
+}
+
+// -----
+
 util.func public @masked_attention_dynamic(%arg0: index, %arg1: tensor<4x8x4x?x32x128xf16>, %arg2: tensor<4x?x32x8x128xf16>, %arg3: tensor<4x?x32x8x128xf16>) -> tensor<4x?x32x8x4x128xf16> {
   %c32 = arith.constant 32 : index
   %0 = arith.divsi %arg0, %c32 : index

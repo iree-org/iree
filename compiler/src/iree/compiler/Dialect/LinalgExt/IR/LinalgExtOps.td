@@ -59,7 +59,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
-    Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
+    Takes two or three `inputs` (`update`, `indices`, and optional `mask`) and
+    one `outputs` value (`original`).
     The operation updates the value at the slices specified by `indices` by
     combining the current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
@@ -88,6 +89,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     `update` gets scattered to.
     Where `rank(original) = rank(update_slice) + index_depth`
 
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding scatter
+    update, leaving `original` unchanged for that batch element.
+
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
     scatter to the same location in `original` the final value in `original` is
@@ -100,6 +106,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let arguments = (ins
       AnyRankedTensorOrMemRef:$updates,
       AnyRankedTensorOrMemRef:$indices,
+      Optional<AnyRankedTensorOrMemRef>:$mask,
       AnyRankedTensorOrMemRef:$original,
       DenseI64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
@@ -109,7 +116,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
-    `ins` `(` $updates `,` $indices `:` type($updates) `,` type($indices) `)`
+    `ins` `(` $updates `,` $indices (`,` $mask^)? `:` type($updates) `,` type($indices) (`,` type($mask)^)? `)`
     `outs` `(` $original `:` type($original) `)`
     $region (`->` type($results)^)?
   }];
@@ -124,6 +131,13 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
     ShapedType getIndicesType() {
       return cast<ShapedType>(getIndices().getType());
+    }
+
+    std::optional<ShapedType> getMaskType() {
+      if (Value mask = getMask()) {
+        return cast<ShapedType>(mask.getType());
+      }
+      return std::nullopt;
     }
 
     ShapedType getOriginalType() {
@@ -174,8 +188,9 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "generateResultTileValue"]>]> {
   let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
-    Takes two inputs (`source` and `indices`) and outputs value (`output`).
-    The operation returns the value at the slices specified by `indices`.
+    Takes two or three inputs (`source`, `indices`, and optional `mask`) and
+    one output value (`output`). The operation returns the value at the slices
+    specified by `indices`.
 
     The size of the `dimension_map` attribute is used to determine how many
     indices are used to index into `source`, i.e. `index_depth`. The
@@ -187,17 +202,23 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     `source` into `output` using the indices in `indices`. See the documentation
     on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
     semantics.
+
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding gather
+    update, leaving `output` unchanged for that batch element.
   }];
   let arguments = (ins
       AnyRankedTensorOrMemRef:$source,
       AnyRankedTensorOrMemRef:$indices,
+      Optional<AnyRankedTensorOrMemRef>:$mask,
       AnyRankedTensorOrMemRef:$output,
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
-    `ins` `(` $source `,` $indices `:` type($source) `,` type($indices) `)`
+    `ins` `(` $source `,` $indices (`,` $mask^)? `:` type($source) `,` type($indices) (`,` type($mask)^)? `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
   }];
@@ -225,6 +246,13 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
 
     ShapedType getIndicesType(){
       return cast<ShapedType>(getIndices().getType());
+    }
+
+    std::optional<ShapedType> getMaskType() {
+      if (Value mask = getMask()) {
+        return cast<ShapedType>(mask.getType());
+      }
+      return std::nullopt;
     }
 
     ShapedType getOutputType(){
@@ -680,6 +708,77 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
+def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>
+]>{
+  let summary = [{Top-K v2 operator.}];
+  let description = [{
+    Selects the top-K elements along the given `dimension` using the given
+    `comparator`. K is determined by the output shape. The output sort
+    dimension must be less than or equal to the input sort dimension.
+
+    This op replaces the legacy `topk` op with several improvements:
+    output indices are optional instead of mandatory, input indices of any
+    integer type are supported for pre-permuted inputs, and the comparator
+    region uses a pure ordering predicate decoupled from the swap semantics
+    of the legacy op.
+
+    Accepts a single N-D input tensor of values and an optional N-D tensor of
+    input indices (any integer type). If input indices aren't provided, the
+    index mapping defaults to [0, N) along the sort dimension, where N is
+    the input size. Input indices may only be provided when output indices
+    are also present, since the comparator operates solely on values and
+    input indices only carry positional provenance to the output. Produces
+    output values and optionally output indices (integer type) tracking
+    original positions.
+
+    When `is_sorted` is present, the output top-K elements are guaranteed to
+    be in sorted order along the sort dimension. When absent (default), the
+    top-K elements are returned but their relative order is unspecified.
+
+    Comparator region accepts two scalar arguments of the input value element
+    type and yields an i1 indicating whether the first argument should be
+    ordered before the second.
+  }];
+
+  let arguments = (ins I64Attr:$dimension,
+                       UnitAttr:$is_sorted,
+                       AnyShaped:$values,
+                       Optional<AnyShaped>:$input_indices,
+                       AnyShaped:$output_values,
+                       Optional<AnyShaped>:$output_indices
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`is_sorted` $is_sorted^)?
+    `ins` `(` $values (`,` $input_indices^)? `:` type($values) (`,` type($input_indices)^)? `)`
+    `outs` `(` $output_values (`,` $output_indices^)? `:`
+               type($output_values) (`,` type($output_indices)^)? `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    ShapedType getInputType() {
+      return cast<ShapedType>(getValues().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    bool hasOutputIndices() {
+      return static_cast<bool>(getOutputIndices());
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable();
+  }];
+}
+
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
@@ -790,6 +889,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     Variadic<AnyRankedTensor>:$results
   );
   let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
@@ -966,7 +1066,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [IndexingMapOpInterface,
+    [DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1093,6 +1196,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+    int64_t getNumLoops() { return getIterationDomainRank(); }
 
     /* Decomposition control attributes */
 

@@ -556,6 +556,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
   size_t numDims = lbs.size();
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
+  int64_t targetThreads = clNumberOfRuntimeThreads;
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
         ShapedType::isDynamic(ubs[i])) {
@@ -567,8 +568,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     assert(lbs[i] <= ubs[i]);
     workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    int64_t targetSize =
-        std::min(workload[i] / clNumberOfRuntimeThreads, maxTileSizes[i]);
+    int64_t targetSize = std::min(workload[i] / targetThreads, maxTileSizes[i]);
     int64_t vectorSize = vectorSizeHints[i];
     if (vectorSize > 1) {
       // Pick the factor of dim which is closest to the target tile size and
@@ -589,6 +589,11 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
     distributedTileSizes[i] = std::min(candidateTileSize, maxTileSizes[i]);
+
+    int64_t numTilesAlongDim = workload[i] / distributedTileSizes[i];
+    if (numTilesAlongDim > 0) {
+      targetThreads = std::max<int64_t>(1, targetThreads / numTilesAlongDim);
+    }
   }
 
   reduceDistributionWorkgroups(workload, distributedTileSizes, maxTileSizes,
@@ -1894,20 +1899,21 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(M1);
   const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(N1);
 
-  // Helper to associate a cost to a candidate pair or tile sizes along the M
-  // and N dimensions.
-  auto evalTraversalCost = [=](int64_t numTilesM,
-                               int64_t numTilesN) -> int64_t {
-    // The cost model is a lower bound on the amount of data
-    // that will need to be loaded over the entire matmul. Note that each matrix
-    // (LHS, RHS) is traversed a number of times equal to the number of tiles
-    // of the opposite (RHS, LHS) matrix.
-    return numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
+  // Cost model.
+  auto evalCost = [=](int64_t numTilesM, int64_t numTilesN) -> int64_t {
+    // Note that each matrix (LHS, RHS) is traversed a number of times equal to
+    // the number of tiles of the opposite (RHS, LHS) matrix.
+    int64_t traversalCost =
+        numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
+    // Penalize failing to use the requested number of threads due to few tiles.
+    int64_t underutilizationCost = std::max<int64_t>(
+        1, clNumberOfRuntimeThreads / (numTilesM * numTilesN));
+    return traversalCost * underutilizationCost;
   };
 
   int64_t selectedTileM = 1;
   int64_t selectedTileN = 1;
-  int64_t selectedCost = evalTraversalCost(M1, N1);
+  int64_t selectedCost = evalCost(M1, N1);
 
   // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
   for (auto [tileM, numTilesM] : divisorsOfM1) {
@@ -1931,7 +1937,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
         continue;
       }
       // Evaluate the cost model and retain the better candidate.
-      int64_t candidateCost = evalTraversalCost(numTilesM, numTilesN);
+      int64_t candidateCost = evalCost(numTilesM, numTilesN);
       if (candidateCost < selectedCost) {
         selectedCost = candidateCost;
         selectedTileM = tileM;
@@ -2039,19 +2045,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   for (auto pos : dimPos) {
     distConfig.vectorSizeHints[pos] = vectorSize;
   }
+  // Note that, unlike the matmul ops itself (e.g. mmt4d), we do not take the
+  // inner tile sizes into account here. As PackOp is an element-wise op, the
+  // only reason to need multiple tiles is to distribute work to multiple
+  // threads. Memory locality should not be a concern; if it were a concern,
+  // that would be a codegen bug (suboptimal traversal within the tile).
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
-
-  // The default function aims to returns the number of workload per workgroup,
-  // but it does not know that it is working on packed domain. We need to take
-  // inner tile sizes into account and adjust the distribution tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
-      continue;
-    }
-    distTileSizes[pos] = distTileSizes[pos] / size;
-    distTileSizes[pos] = std::max(distTileSizes[pos], int64_t{1});
-  }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
   // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
@@ -2150,7 +2150,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                   IREE::LinalgExt::AttentionOp attnOp) {
+                                   IREE::LinalgExt::OnlineAttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
           attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
@@ -2161,7 +2161,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> lbs, ubs;
   getRangeBounds(attnOp, lbs, ubs);
 
-  LDBG() << "Attention Detail:";
+  LDBG() << "Online Attention Detail:";
   LDBG() << "Batch: " << llvm::interleaved_array(opInfo.getBatchDims());
   LDBG() << "M: " << llvm::interleaved_array(opInfo.getMDims());
   LDBG() << "K1: " << llvm::interleaved_array(opInfo.getK1Dims());
@@ -2271,7 +2271,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG() << "Set lowering_config for attnOp: " << loweringConfig;
+  LDBG() << "Set lowering_config for online attnOp: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, loweringConfig,
       getCPUTranslationInfo(attnOp.getContext(),
@@ -3030,7 +3030,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
             return setDefaultCustomOpLoweringConfig(entryPointFn, op,
                                                     initCPULaunchConfig);
           })
-          .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
+          .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
                 IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
                 linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })

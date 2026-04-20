@@ -9,11 +9,43 @@
 
 #include <functional>
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+
+// Specialize the default pass-option parser for `EncodingOpType` so TableGen-
+// emitted `Pass::(List)Option<EncodingOpType>` recognizes the enum literals
+// without a second template argument, which TableGen cannot supply.
+namespace mlir::detail {
+template <>
+struct PassOptions::GenericOptionParser<
+    ::mlir::iree_compiler::IREE::Encoding::EncodingOpType>
+    : public ::llvm::cl::parser<
+          ::mlir::iree_compiler::IREE::Encoding::EncodingOpType> {
+  using OpType = ::mlir::iree_compiler::IREE::Encoding::EncodingOpType;
+  using ::llvm::cl::parser<OpType>::parser;
+
+  std::optional<::llvm::StringRef> findArgStrForValue(const OpType &value) {
+    for (auto &it : this->Values) {
+      if (it.V.compare(value)) {
+        return it.Name;
+      }
+    }
+    return std::nullopt;
+  }
+
+  void initialize() {
+    addLiteralOption("matmul", OpType::matmul, "Contractions (matmul-like).");
+    addLiteralOption("scaled_matmul", OpType::scaled_matmul,
+                     "Scaled contractions.");
+    addLiteralOption("convolution", OpType::conv, "Convolutions.");
+  }
+};
+} // namespace mlir::detail
 
 namespace mlir::iree_compiler::DispatchCreation {
 

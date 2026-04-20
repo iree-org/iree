@@ -6,6 +6,7 @@
 
 #include "iree/compiler/DispatchCreation/Passes.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -60,6 +61,18 @@ static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
         clEnumValN(DispatchCreation::EncodingOptions::Padding, "padding",
                    "Encode tensors that need to be padded")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
+
+static llvm::cl::list<mlir::iree_compiler::IREE::Encoding::EncodingOpType>
+    clDataTilingOps(
+        "iree-dispatch-creation-experimental-set-data-tiling-ops",
+        llvm::cl::desc("Op families eligible for data-tiling annotation. "
+                       "Defaults to {matmul, scaled_matmul}, add convolution "
+                       "to enable experimental data tiling support."),
+        llvm::cl::list_init<
+            mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
+            {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
+             mlir::iree_compiler::IREE::Encoding::EncodingOpType::
+                 scaled_matmul}));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -212,7 +225,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass([&] {
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
-                options.enableAggressiveFusion,
+                options.enableAggressiveFusion, options.enableFuseMultiUse,
                 options.enableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
@@ -261,7 +274,14 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
           options.cseConstants = false;
           return IREE::Flow::createCanonicalizePass(options);
         })
-        .addPass(createAnnotateDataTilingHintsPass)
+        .addPass([&]() {
+          AnnotateDataTilingHintsPassOptions passOpts;
+          if (!clDataTilingOps.empty()) {
+            passOpts.opTypes.assign(clDataTilingOps.begin(),
+                                    clDataTilingOps.end());
+          }
+          return createAnnotateDataTilingHintsPass(passOpts);
+        })
         // Set encodings on all eligible ops. All ops should be in compiler
         // formed dispatch regions, so encodings will be placed inside of the
         // dispatch regions with the data-tiled op.
