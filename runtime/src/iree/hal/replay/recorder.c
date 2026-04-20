@@ -399,11 +399,10 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
   iree_hal_replay_recorder_options_t default_options =
       iree_hal_replay_recorder_options_default();
   if (!options) options = &default_options;
-  if (IREE_UNLIKELY(options->flags != IREE_HAL_REPLAY_RECORDER_FLAG_NONE ||
-                    options->reserved0 != 0)) {
+  if (IREE_UNLIKELY(options->flags != IREE_HAL_REPLAY_RECORDER_FLAG_NONE)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "replay recorder reserved options must be zero");
+                            "replay recorder flags are unknown");
   }
   if (IREE_UNLIKELY(
           options->external_file_policy !=
@@ -413,6 +412,16 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "replay recorder external file policy is unknown");
+  }
+  if (IREE_UNLIKELY(
+          options->external_file_validation !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_IDENTITY &&
+          options->external_file_validation !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_CONTENT_DIGEST)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "replay recorder external file validation is unknown");
   }
 
   iree_hal_replay_file_writer_t* writer = NULL;
@@ -887,6 +896,7 @@ static iree_status_t iree_hal_replay_device_import_file(
       iree_hal_replay_recorder_file_make_object_payload(
           handle, queue_affinity, access, flags, base_file,
           device->recorder->options.external_file_policy,
+          device->recorder->options.external_file_validation,
           iree_make_byte_span((uint8_t*)reference_storage,
                               sizeof(reference_storage)),
           &payload, &reference);

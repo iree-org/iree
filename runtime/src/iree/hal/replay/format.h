@@ -194,6 +194,30 @@ enum iree_hal_replay_file_reference_type_e {
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES = 2u,
 };
 
+// Validation method captured for a replay file reference.
+typedef uint32_t iree_hal_replay_file_validation_type_t;
+enum iree_hal_replay_file_validation_type_e {
+  // No validation metadata is available beyond the recorded file length.
+  IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE = 0u,
+  // Validate platform identity metadata such as device, inode, and mtime.
+  IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_IDENTITY = 1u,
+  // Validate file contents using the stored replay digest.
+  IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST = 2u,
+};
+
+// Digest algorithm used for replay file byte ranges or external file content.
+typedef uint16_t iree_hal_replay_digest_type_t;
+enum iree_hal_replay_digest_type_e {
+  // Digest bytes are not populated.
+  IREE_HAL_REPLAY_DIGEST_TYPE_NONE = 0u,
+  // FNV-1a 64-bit integrity checksum stored in the first 8 digest bytes.
+  //
+  // This is a cheap corruption check for local replay plumbing, not a security
+  // boundary. Stronger content hashes can be added without changing record
+  // shapes that store a 32-byte digest field.
+  IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64 = 1u,
+};
+
 // Payload describing a captured buffer object.
 typedef struct iree_hal_replay_buffer_object_payload_t {
   // Total allocation size, in bytes, reported by the source buffer.
@@ -344,8 +368,16 @@ typedef struct iree_hal_replay_file_object_payload_t {
   uint32_t handle_type;
   // iree_hal_replay_file_reference_type_t value of the trailing reference.
   uint32_t reference_type;
+  // iree_hal_replay_file_validation_type_t value describing validation.
+  uint32_t validation_type;
+  // iree_hal_replay_digest_type_t value used for |digest|.
+  iree_hal_replay_digest_type_t digest_type;
+  // Reserved for future file validation metadata; must be zero.
+  uint16_t reserved0;
   // Reserved for future file object metadata; must be zero.
-  uint64_t reserved0;
+  uint32_t reserved1;
+  // Digest bytes used when |validation_type| requires content validation.
+  uint8_t digest[32];
 } iree_hal_replay_file_object_payload_t;
 
 // Payload describing a captured event object.
@@ -652,19 +684,6 @@ typedef uint16_t iree_hal_replay_compression_type_t;
 enum iree_hal_replay_compression_type_e {
   // Range bytes are stored directly in the replay file.
   IREE_HAL_REPLAY_COMPRESSION_TYPE_NONE = 0u,
-};
-
-// Digest algorithm used for one replay file byte range.
-typedef uint16_t iree_hal_replay_digest_type_t;
-enum iree_hal_replay_digest_type_e {
-  // Digest bytes are not populated.
-  IREE_HAL_REPLAY_DIGEST_TYPE_NONE = 0u,
-  // FNV-1a 64-bit integrity checksum stored in the first 8 digest bytes.
-  //
-  // This is a cheap corruption check for local replay plumbing, not a security
-  // boundary. Stronger content hashes can be added without changing the range
-  // record shape.
-  IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64 = 1u,
 };
 
 // Bitfield specifying properties of one replay file byte range.

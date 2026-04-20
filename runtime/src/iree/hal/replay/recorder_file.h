@@ -22,6 +22,8 @@ iree_status_t iree_hal_replay_recorder_file_make_object_payload(
     iree_hal_memory_access_t access, iree_hal_external_file_flags_t flags,
     iree_hal_file_t* base_file,
     iree_hal_replay_recorder_external_file_policy_t external_file_policy,
+    iree_hal_replay_recorder_external_file_validation_t
+        external_file_validation,
     iree_byte_span_t reference_storage,
     iree_hal_replay_file_object_payload_t* out_payload,
     iree_string_view_t* out_reference);

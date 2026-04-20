@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/hal/replay/digest.h"
 #include "iree/hal/replay/file_reader.h"
 
 typedef struct iree_hal_replay_dump_context_t {
@@ -714,10 +715,14 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
           " access=0x%08" PRIx32 " flags=0x%08" PRIx32 " handle_type=%" PRIu32
           " reference_type=%" PRIu32 " file_device=%" PRIu64
           " file_inode=%" PRIu64 " file_mtime_ns=%" PRIu64
-          " reference_range=[%" PRIu64 ", +%" PRIu64 "]",
+          " validation_type=%" PRIu32 " digest_type=%" PRIu32
+          " digest_fnv1a64=0x%016" PRIx64 " reference_range=[%" PRIu64
+          ", +%" PRIu64 "]",
           payload.queue_affinity, payload.file_length, payload.access,
           payload.flags, payload.handle_type, payload.reference_type,
           payload.file_device, payload.file_inode, payload.file_mtime_ns,
+          payload.validation_type, (uint32_t)payload.digest_type,
+          iree_hal_replay_digest_load_fnv1a64(payload.digest),
           payload_range->offset + sizeof(payload), payload.reference_length);
     }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_DISPATCH: {
@@ -1384,11 +1389,15 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
           ",\"file_inode\":%" PRIu64 ",\"file_mtime_ns\":%" PRIu64
           ",\"reference_length\":%" PRIu64 ",\"access\":%" PRIu32
           ",\"flags\":%" PRIu32 ",\"handle_type\":%" PRIu32
-          ",\"reference_type\":%" PRIu32,
+          ",\"reference_type\":%" PRIu32 ",\"validation_type\":%" PRIu32
+          ",\"digest_type\":%" PRIu32 ",\"digest_fnv1a64\":\"0x%016" PRIx64
+          "\"",
           payload.queue_affinity, payload.file_length, payload.file_device,
           payload.file_inode, payload.file_mtime_ns, payload.reference_length,
           payload.access, payload.flags, payload.handle_type,
-          payload.reference_type));
+          payload.reference_type, payload.validation_type,
+          (uint32_t)payload.digest_type,
+          iree_hal_replay_digest_load_fnv1a64(payload.digest)));
       iree_hal_replay_file_range_t reference_range =
           iree_hal_replay_dump_payload_subrange(
               payload_range, sizeof(payload),

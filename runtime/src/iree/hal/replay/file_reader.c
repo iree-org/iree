@@ -9,29 +9,11 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/hal/replay/digest.h"
+
 #if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
 #error "IREE HAL replay file serialization requires little-endian hosts"
 #endif  // !IREE_ENDIANNESS_LITTLE
-
-#define IREE_HAL_REPLAY_FNV1A64_OFFSET_BASIS 0xcbf29ce484222325ull
-#define IREE_HAL_REPLAY_FNV1A64_PRIME 0x100000001b3ull
-
-static uint64_t iree_hal_replay_digest_fnv1a64_update(
-    uint64_t state, iree_const_byte_span_t bytes) {
-  for (iree_host_size_t i = 0; i < bytes.data_length; ++i) {
-    state ^= bytes.data[i];
-    state *= IREE_HAL_REPLAY_FNV1A64_PRIME;
-  }
-  return state;
-}
-
-static bool iree_hal_replay_digest_is_zero(const uint8_t digest[32]) {
-  uint8_t any_digest_byte = 0;
-  for (iree_host_size_t i = 0; i < 32; ++i) {
-    any_digest_byte |= digest[i];
-  }
-  return any_digest_byte == 0;
-}
 
 IREE_API_EXPORT iree_status_t
 iree_hal_replay_file_parse_header(iree_const_byte_span_t file_contents,
@@ -215,10 +197,10 @@ iree_hal_replay_file_range_validate(iree_const_byte_span_t file_contents,
       }
       return iree_ok_status();
     case IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64: {
-      uint64_t expected_digest = 0;
-      memcpy(&expected_digest, range->digest, sizeof(expected_digest));
+      const uint64_t expected_digest =
+          iree_hal_replay_digest_load_fnv1a64(range->digest);
       uint64_t actual_digest = iree_hal_replay_digest_fnv1a64_update(
-          IREE_HAL_REPLAY_FNV1A64_OFFSET_BASIS, contents);
+          iree_hal_replay_digest_fnv1a64_initialize(), contents);
       if (IREE_UNLIKELY(actual_digest != expected_digest)) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
                                 "replay file range digest mismatch");

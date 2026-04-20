@@ -6,9 +6,12 @@
 
 #include "iree/hal/replay/recorder_file.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "iree/hal/replay/digest.h"
 
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
@@ -36,6 +39,47 @@ static void iree_hal_replay_recorder_file_capture_fd_identity(
 #else
   (void)fd;
   (void)out_payload;
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
+}
+
+static iree_status_t iree_hal_replay_recorder_file_capture_fd_digest(
+    int fd, uint64_t file_length,
+    iree_hal_replay_file_object_payload_t* out_payload) {
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+  uint64_t state = iree_hal_replay_digest_fnv1a64_initialize();
+  uint64_t offset = 0;
+  uint8_t buffer[64 * 1024];
+  while (offset < file_length) {
+    uint64_t chunk_length = file_length - offset;
+    if (chunk_length > sizeof(buffer)) chunk_length = sizeof(buffer);
+    ssize_t read_length =
+        pread(fd, buffer, (size_t)chunk_length, (off_t)offset);
+    if (read_length < 0 && errno == EINTR) continue;
+    if (read_length <= 0) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "HAL replay recorder could not read fd-backed file for digest");
+    }
+    state = iree_hal_replay_digest_fnv1a64_update(
+        state,
+        iree_make_const_byte_span(buffer, (iree_host_size_t)read_length));
+    offset += (uint64_t)read_length;
+  }
+  out_payload->validation_type =
+      IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST;
+  out_payload->digest_type = IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64;
+  iree_hal_replay_digest_store_fnv1a64(state, out_payload->digest);
+  return iree_ok_status();
+#else
+  (void)fd;
+  (void)file_length;
+  (void)out_payload;
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "HAL replay recorder content-digest file validation requires POSIX file "
+      "IO");
 #endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
         // IREE_PLATFORM_LINUX)
 }
@@ -69,6 +113,8 @@ iree_status_t iree_hal_replay_recorder_file_make_object_payload(
     iree_hal_memory_access_t access, iree_hal_external_file_flags_t flags,
     iree_hal_file_t* base_file,
     iree_hal_replay_recorder_external_file_policy_t external_file_policy,
+    iree_hal_replay_recorder_external_file_validation_t
+        external_file_validation,
     iree_byte_span_t reference_storage,
     iree_hal_replay_file_object_payload_t* out_payload,
     iree_string_view_t* out_reference) {
@@ -122,6 +168,24 @@ iree_status_t iree_hal_replay_recorder_file_make_object_payload(
       out_payload->reference_type =
           IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH;
       out_payload->reference_length = out_reference->size;
+      switch (external_file_validation) {
+        case IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_IDENTITY:
+          out_payload->validation_type =
+              IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_IDENTITY;
+          out_payload->digest_type = IREE_HAL_REPLAY_DIGEST_TYPE_NONE;
+          break;
+        case IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_CONTENT_DIGEST: {
+          IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_file_capture_fd_digest(
+              primitive.value.fd, out_payload->file_length, out_payload));
+          break;
+        }
+        default:
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "HAL replay recorder external file validation %" PRIu32
+              " is unknown",
+              external_file_validation);
+      }
       break;
     }
     default:

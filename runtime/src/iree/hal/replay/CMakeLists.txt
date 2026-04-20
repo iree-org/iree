@@ -24,12 +24,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    digest
+  HDRS
+    "digest.h"
+  SRCS
+    "digest.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     file_writer
   HDRS
     "file_writer.h"
   SRCS
     "file_writer.c"
   DEPS
+    ::digest
     ::format
     iree::base
     iree::io::file_handle
@@ -45,6 +58,7 @@ iree_cc_library(
   SRCS
     "file_reader.c"
   DEPS
+    ::digest
     ::format
     iree::base
   PUBLIC
@@ -81,6 +95,7 @@ iree_cc_library(
   SRCS
     "dump.c"
   DEPS
+    ::digest
     ::file_reader
     ::format
     iree::base
@@ -95,6 +110,7 @@ iree_cc_library(
   SRCS
     "execute.c"
   DEPS
+    ::digest
     ::file_reader
     ::format
     iree::base
@@ -124,6 +140,7 @@ iree_cc_library(
     "recorder_file.h"
     "recorder_record.h"
   DEPS
+    ::digest
     ::file_writer
     ::format
     iree::base

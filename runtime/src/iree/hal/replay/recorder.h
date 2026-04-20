@@ -40,14 +40,28 @@ enum iree_hal_replay_recorder_external_file_policy_e {
   IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL = 1u,
 };
 
+// Validation metadata captured for imported fd-backed HAL files.
+typedef uint32_t iree_hal_replay_recorder_external_file_validation_t;
+enum iree_hal_replay_recorder_external_file_validation_e {
+  // Validate by platform identity metadata such as device, inode, and mtime.
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_IDENTITY = 0u,
+  // Validate by computing and recording a content digest.
+  //
+  // This reads every byte of each referenced fd-backed file during capture and
+  // replay. It must be selected explicitly and is intended for copied/staged
+  // parameter files where platform identity cannot be preserved.
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_CONTENT_DIGEST = 1u,
+};
+
 // Options controlling HAL replay recording.
 typedef struct iree_hal_replay_recorder_options_t {
   // Flags controlling recorder behavior.
   iree_hal_replay_recorder_flags_t flags;
   // Policy used when an imported file is backed by an external file path.
   iree_hal_replay_recorder_external_file_policy_t external_file_policy;
-  // Reserved for future recorder options; must be zero.
-  uint32_t reserved0;
+  // Validation metadata captured for referenced external files. The default is
+  // identity validation, which does not read file contents.
+  iree_hal_replay_recorder_external_file_validation_t external_file_validation;
 } iree_hal_replay_recorder_options_t;
 
 // Returns default replay recorder options.

@@ -6,6 +6,7 @@
 
 #include "iree/hal/replay/execute.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <string.h>
@@ -13,9 +14,11 @@
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
 #include <sys/stat.h>
+#include <unistd.h>
 #endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
         // IREE_PLATFORM_LINUX)
 
+#include "iree/hal/replay/digest.h"
 #include "iree/hal/replay/file_reader.h"
 #include "iree/hal/replay/format.h"
 #include "iree/io/file_handle.h"
@@ -596,18 +599,72 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
         payload->file_length, file_length);
   }
 
+  switch (payload->validation_type) {
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE:
+      return iree_ok_status();
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_IDENTITY:
+      break;
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST:
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "external replay file validation type %" PRIu32
+                              " is not executable",
+                              payload->validation_type);
+  }
+
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
-  if (payload->file_device == 0 && payload->file_inode == 0 &&
-      payload->file_mtime_ns == 0) {
-    return iree_ok_status();
-  }
   iree_io_file_handle_primitive_t primitive =
       iree_io_file_handle_primitive(handle);
   if (IREE_UNLIKELY(primitive.type != IREE_IO_FILE_HANDLE_TYPE_FD)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "external replay file identity requires an fd-backed file");
+        "external replay file validation requires an fd-backed file");
+  }
+  if (payload->validation_type ==
+      IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST) {
+    if (IREE_UNLIKELY(payload->digest_type !=
+                      IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64)) {
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "external replay file digest type %" PRIu32
+                              " is not executable",
+                              (uint32_t)payload->digest_type);
+    }
+    uint64_t state = iree_hal_replay_digest_fnv1a64_initialize();
+    uint64_t offset = 0;
+    uint8_t buffer[64 * 1024];
+    while (offset < payload->file_length) {
+      uint64_t chunk_length = payload->file_length - offset;
+      if (chunk_length > sizeof(buffer)) chunk_length = sizeof(buffer);
+      ssize_t read_length = pread(primitive.value.fd, buffer,
+                                  (size_t)chunk_length, (off_t)offset);
+      if (read_length < 0 && errno == EINTR) continue;
+      if (read_length <= 0) {
+        return iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "unable to read external replay file for digest validation");
+      }
+      state = iree_hal_replay_digest_fnv1a64_update(
+          state,
+          iree_make_const_byte_span(buffer, (iree_host_size_t)read_length));
+      offset += (uint64_t)read_length;
+    }
+    const uint64_t expected_digest =
+        iree_hal_replay_digest_load_fnv1a64(payload->digest);
+    if (IREE_UNLIKELY(state != expected_digest)) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "external replay file digest mismatch: expected=0x%016" PRIx64
+          " actual=0x%016" PRIx64,
+          expected_digest, state);
+    }
+    return iree_ok_status();
+  }
+
+  if (payload->file_device == 0 && payload->file_inode == 0 &&
+      payload->file_mtime_ns == 0) {
+    return iree_ok_status();
   }
   struct stat file_stat;
   if (IREE_UNLIKELY(fstat(primitive.value.fd, &file_stat) != 0)) {
@@ -632,6 +689,13 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
   }
 #else
   (void)handle;
+  if (payload->validation_type ==
+      IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "external replay file content-digest validation requires POSIX file "
+        "IO");
+  }
 #endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
         // IREE_PLATFORM_LINUX)
   return iree_ok_status();

@@ -22,10 +22,20 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "digest",
+    srcs = ["digest.c"],
+    hdrs = ["digest.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "file_writer",
     srcs = ["file_writer.c"],
     hdrs = ["file_writer.h"],
     deps = [
+        ":digest",
         ":format",
         "//runtime/src/iree/base",
         "//runtime/src/iree/io:file_handle",
@@ -38,6 +48,7 @@ iree_runtime_cc_library(
     srcs = ["file_reader.c"],
     hdrs = ["file_reader.h"],
     deps = [
+        ":digest",
         ":format",
         "//runtime/src/iree/base",
     ],
@@ -66,6 +77,7 @@ iree_runtime_cc_library(
     srcs = ["dump.c"],
     hdrs = ["dump.h"],
     deps = [
+        ":digest",
         ":file_reader",
         ":format",
         "//runtime/src/iree/base",
@@ -77,6 +89,7 @@ iree_runtime_cc_library(
     srcs = ["execute.c"],
     hdrs = ["execute.h"],
     deps = [
+        ":digest",
         ":file_reader",
         ":format",
         "//runtime/src/iree/base",
@@ -105,6 +118,7 @@ iree_runtime_cc_library(
     ],
     hdrs = ["recorder.h"],
     deps = [
+        ":digest",
         ":file_writer",
         ":format",
         "//runtime/src/iree/base",

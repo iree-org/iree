@@ -7,16 +7,13 @@
 #include "iree/hal/replay/file_writer.h"
 
 #include <stddef.h>
-#include <string.h>
 
+#include "iree/hal/replay/digest.h"
 #include "iree/io/stream.h"
 
 #if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
 #error "IREE HAL replay file serialization requires little-endian hosts"
 #endif  // !IREE_ENDIANNESS_LITTLE
-
-#define IREE_HAL_REPLAY_FNV1A64_OFFSET_BASIS 0xcbf29ce484222325ull
-#define IREE_HAL_REPLAY_FNV1A64_PRIME 0x100000001b3ull
 
 struct iree_hal_replay_file_writer_t {
   // Host allocator used for writer lifetime.
@@ -28,33 +25,6 @@ struct iree_hal_replay_file_writer_t {
   // True once the final file length has been written.
   bool closed;
 };
-
-static void iree_hal_replay_digest_clear(iree_hal_replay_file_range_t* range) {
-  memset(range->digest, 0, sizeof(range->digest));
-}
-
-static uint64_t iree_hal_replay_digest_fnv1a64_update(
-    uint64_t state, iree_const_byte_span_t bytes) {
-  for (iree_host_size_t i = 0; i < bytes.data_length; ++i) {
-    state ^= bytes.data[i];
-    state *= IREE_HAL_REPLAY_FNV1A64_PRIME;
-  }
-  return state;
-}
-
-static uint64_t iree_hal_replay_digest_fnv1a64_iovecs(
-    iree_host_size_t iovec_count, const iree_const_byte_span_t* iovecs) {
-  uint64_t state = IREE_HAL_REPLAY_FNV1A64_OFFSET_BASIS;
-  for (iree_host_size_t i = 0; i < iovec_count; ++i) {
-    state = iree_hal_replay_digest_fnv1a64_update(state, iovecs[i]);
-  }
-  return state;
-}
-
-static void iree_hal_replay_digest_store_fnv1a64(
-    uint64_t digest, iree_hal_replay_file_range_t* out_range) {
-  memcpy(out_range->digest, &digest, sizeof(digest));
-}
 
 static iree_status_t iree_hal_replay_file_write_file_header(
     iree_io_stream_t* stream, uint64_t file_length) {
@@ -259,11 +229,11 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_file_writer_append_record(
     out_payload_range->uncompressed_length = payload_length;
     out_payload_range->compression_type = IREE_HAL_REPLAY_COMPRESSION_TYPE_NONE;
     out_payload_range->digest_type = writer->payload_digest_type;
-    iree_hal_replay_digest_clear(out_payload_range);
+    iree_hal_replay_digest_clear(out_payload_range->digest);
     if (writer->payload_digest_type == IREE_HAL_REPLAY_DIGEST_TYPE_FNV1A_64) {
       iree_hal_replay_digest_store_fnv1a64(
           iree_hal_replay_digest_fnv1a64_iovecs(iovec_count, iovecs),
-          out_payload_range);
+          out_payload_range->digest);
     }
   }
   return status;

@@ -245,6 +245,13 @@ IREE_FLAG(
     "Policy for imported fd-backed HAL files while recording a HAL replay. "
     "Options are `reference` to capture external file paths or `fail` to "
     "reject fd-backed files.");
+IREE_FLAG(
+    string, device_replay_file_validation, "identity",
+    "Validation metadata captured for referenced fd-backed HAL files. Options "
+    "are `identity` for cheap length/dev/inode/mtime validation or `digest` "
+    "to read every file byte at capture and replay time. Use `digest` only "
+    "when referenced files will be copied or staged to a different "
+    "filesystem.");
 
 static bool iree_tooling_device_replay_capture_requested(void) {
   return strlen(FLAG_device_replay_output) != 0;
@@ -267,6 +274,26 @@ static iree_status_t iree_tooling_parse_device_replay_file_policy(
       (int)value.size, value.data);
 }
 
+static iree_status_t iree_tooling_parse_device_replay_file_validation(
+    iree_string_view_t value,
+    iree_hal_replay_recorder_external_file_validation_t* out_validation) {
+  IREE_ASSERT_ARGUMENT(out_validation);
+  if (iree_string_view_equal(value, IREE_SV("identity"))) {
+    *out_validation =
+        IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_IDENTITY;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(value, IREE_SV("digest"))) {
+    *out_validation =
+        IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_VALIDATION_CONTENT_DIGEST;
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "--device_replay_file_validation must be `identity` or `digest`; got "
+      "`%.*s`",
+      (int)value.size, value.data);
+}
+
 static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
     iree_allocator_t host_allocator,
     iree_hal_replay_recorder_t** out_replay_recorder) {
@@ -280,6 +307,9 @@ static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
   IREE_RETURN_IF_ERROR(iree_tooling_parse_device_replay_file_policy(
       iree_make_cstring_view(FLAG_device_replay_file_policy),
       &options.external_file_policy));
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_device_replay_file_validation(
+      iree_make_cstring_view(FLAG_device_replay_file_validation),
+      &options.external_file_validation));
 
   iree_io_file_handle_t* file_handle = NULL;
   iree_status_t status = iree_io_file_handle_create(
