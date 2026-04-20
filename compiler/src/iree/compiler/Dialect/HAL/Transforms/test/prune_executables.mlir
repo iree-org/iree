@@ -99,3 +99,35 @@ hal.executable private @exe {
 util.func private @user() attributes {
   some.ref = @exe::@variant::@used_export
 }
+
+// -----
+
+// Tests that after pruning unused exports the remaining exports are
+// renumbered to have contiguous ordinals starting from 0. Back-end
+// serializers index their flatbuffer exports vector by ordinal; if ordinals
+// are left sparse the downstream vector has gaps that compound into invalid
+// flatbuffers (ExportDef_ref_t at index N overwrites at a smaller index when
+// the vector is sized by pre-prune export count).
+
+#pipeline_layout_renumber = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @exe_renumber {
+  hal.executable.variant public @variant target(<"backend", "format">) {
+    // CHECK-NOT: @unused_a
+    hal.executable.export public @unused_a ordinal(1) layout(#pipeline_layout_renumber)
+    // CHECK: hal.executable.export public @used_0 ordinal(0)
+    hal.executable.export public @used_0 ordinal(0) layout(#pipeline_layout_renumber)
+    // CHECK: hal.executable.export public @used_1 ordinal(1)
+    hal.executable.export public @used_1 ordinal(2) layout(#pipeline_layout_renumber)
+    // CHECK-NOT: @unused_b
+    hal.executable.export public @unused_b ordinal(3) layout(#pipeline_layout_renumber)
+    // CHECK: hal.executable.export public @used_2 ordinal(2)
+    hal.executable.export public @used_2 ordinal(4) layout(#pipeline_layout_renumber)
+  }
+}
+util.func private @multi_user() attributes {
+  ref_0 = @exe_renumber::@variant::@used_0,
+  ref_1 = @exe_renumber::@variant::@used_1,
+  ref_2 = @exe_renumber::@variant::@used_2
+}
