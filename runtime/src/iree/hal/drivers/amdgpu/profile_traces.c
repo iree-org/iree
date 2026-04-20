@@ -219,6 +219,14 @@ iree_status_t iree_hal_amdgpu_profile_trace_session_allocate(
         "export pattern, command buffer/id, physical device, or queue filter "
         "to avoid tracing every dispatch");
   }
+#if defined(IREE_SANITIZER_ADDRESS)
+  IREE_TRACE_ZONE_END(z0);
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "AMDGPU executable trace profiling is disabled in ASAN builds because "
+      "ROCm aqlprofile ATT packet creation can abort before returning a "
+      "status; use a non-ASAN build for ATT traces");
+#endif  // IREE_SANITIZER_ADDRESS
 
   iree_hal_amdgpu_profile_trace_session_t* session = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
