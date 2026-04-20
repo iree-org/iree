@@ -181,6 +181,8 @@ struct ReplayRecordSummary {
   iree_host_size_t buffer_flush_range_record_count = 0;
   iree_host_size_t buffer_unmap_range_record_count = 0;
   iree_host_size_t queue_execute_record_count = 0;
+  iree_host_size_t unsupported_import_buffer_record_count = 0;
+  iree_host_size_t unsupported_export_buffer_record_count = 0;
   iree_host_size_t unsupported_host_call_record_count = 0;
   iree_host_size_t buffer_range_data_payload_count = 0;
   iree_host_size_t device_queue_execute_payload_count = 0;
@@ -291,7 +293,13 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         break;
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
         if (record.header.operation_code ==
-            IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_HOST_CALL) {
+            IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER) {
+          ++summary.unsupported_import_buffer_record_count;
+        } else if (record.header.operation_code ==
+                   IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_EXPORT_BUFFER) {
+          ++summary.unsupported_export_buffer_record_count;
+        } else if (record.header.operation_code ==
+                   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_HOST_CALL) {
           ++summary.unsupported_host_call_record_count;
         }
         EXPECT_EQ((uint32_t)IREE_STATUS_OK, record.header.status_code);
@@ -367,6 +375,61 @@ TEST(ReplayRecorderTest, WrappedDeviceRecordsHostCallAsUnsupported) {
 
   ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
   EXPECT_EQ(1u, summary.unsupported_host_call_record_count);
+}
+
+TEST(ReplayRecorderTest, WrappedAllocatorRecordsExternalBuffersAsUnsupported) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(wrapped_device);
+  ASSERT_NE(nullptr, allocator);
+
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_MAPPING | IREE_HAL_BUFFER_USAGE_SHARING_EXPORT;
+
+  uint8_t imported_storage[16] = {0};
+  iree_hal_external_buffer_t external_buffer = {};
+  external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
+  external_buffer.size = sizeof(imported_storage);
+  external_buffer.handle.host_allocation.ptr = imported_storage;
+  iree_hal_buffer_t* imported_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_allocator_import_buffer(
+      allocator, params, &external_buffer,
+      iree_hal_buffer_release_callback_null(), &imported_buffer));
+
+  iree_hal_buffer_t* allocated_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      allocator, params, sizeof(imported_storage), &allocated_buffer));
+  iree_hal_external_buffer_t exported_buffer = {};
+  IREE_ASSERT_OK(iree_hal_allocator_export_buffer(
+      allocator, allocated_buffer,
+      IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+      IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &exported_buffer));
+  EXPECT_EQ(IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+            exported_buffer.type);
+
+  iree_hal_buffer_release(allocated_buffer);
+  iree_hal_buffer_release(imported_buffer);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
+  EXPECT_EQ(1u, summary.unsupported_import_buffer_record_count);
+  EXPECT_EQ(1u, summary.unsupported_export_buffer_record_count);
+  EXPECT_EQ(2u, summary.buffer_object_record_count);
 }
 
 TEST(ReplayRecorderTest, WrappedAllocatorRecordsBuffersAndMapping) {
