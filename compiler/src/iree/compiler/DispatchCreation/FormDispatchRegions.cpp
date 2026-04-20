@@ -566,6 +566,39 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     return false;
   }
 
+  // If the root is a full reduction (no parallel loops) and the
+  // consumer has parallel work, only fuse when they share an input
+  // tensor. Without a shared input, fusing has no payoff.
+  {
+    Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
+    auto rootFusionOp =
+        dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+    if (rootFusionOp && rootFusionOp.getNumParallelLoops() == 0 &&
+        consumerFusionOp.getNumParallelLoops() > 0) {
+      SetVector<Value> fusionGroupInputs;
+      for (Operation *fusedOp :
+           tracker.getFusionGroup(producer).getFusedOperations()) {
+        if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(fusedOp)) {
+          for (OpOperand *in : dpsOp.getDpsInputOperands()) {
+            fusionGroupInputs.insert(in->get());
+          }
+        }
+      }
+      bool sharesInput = false;
+      if (auto dpsConsumer = dyn_cast<DestinationStyleOpInterface>(consumer)) {
+        for (OpOperand *in : dpsConsumer.getDpsInputOperands()) {
+          if (fusionGroupInputs.contains(in->get())) {
+            sharesInput = true;
+            break;
+          }
+        }
+      }
+      if (!sharesInput) {
+        return false;
+      }
+    }
+  }
+
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
