@@ -393,10 +393,21 @@ static bool isUnpackLikeOp(Operation *op) {
 static SmallVector<OpOperand *>
 getFusableUses(MLIRContext *context, Operation *op,
                DominanceInfo const &dominanceInfo, bool aggressiveFusion) {
-  if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
-                             return !isa<tensor::DimOp>(use.getOwner());
-                           }) != 1) {
-    return {};
+  // In non-aggressive mode, restrict fusion to producers whose results flow
+  // to a single consumer. Count distinct consumers rather than operand uses
+  // so that a single consumer reading multiple results from a multi-result
+  // producer (e.g. OnlineAttentionOp) still qualifies.
+  if (!aggressiveFusion) {
+    SmallPtrSet<Operation *, 4> consumers;
+    for (OpOperand &use : op->getUses()) {
+      if (isa<tensor::DimOp>(use.getOwner())) {
+        continue;
+      }
+      consumers.insert(use.getOwner());
+    }
+    if (consumers.size() != 1) {
+      return {};
+    }
   }
 
   // Collect all fusable user candidates.

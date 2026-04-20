@@ -48,6 +48,48 @@ llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   return llvm::SmallBitVector{};
 }
 
+/// Combine two composed iteration-space mappings from the same reference
+/// space into the same target op. `a` and `b` must have matching input and
+/// result arities; each result position is merged by treating the constant
+/// zero as a broadcast placeholder that yields to a concrete expression.
+/// Returns failure if the two maps disagree at any concrete position, which
+/// means the source operands force incompatible loop alignments.
+static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
+  if (!a) {
+    return b;
+  }
+  if (!b) {
+    return a;
+  }
+  if (a == b) {
+    return a;
+  }
+  if (a.getNumDims() != b.getNumDims() ||
+      a.getNumSymbols() != b.getNumSymbols() ||
+      a.getNumResults() != b.getNumResults()) {
+    return failure();
+  }
+  auto isZero = [](AffineExpr e) {
+    auto c = dyn_cast<AffineConstantExpr>(e);
+    return c && c.getValue() == 0;
+  };
+  SmallVector<AffineExpr> merged;
+  merged.reserve(a.getNumResults());
+  for (auto [ea, eb] : llvm::zip_equal(a.getResults(), b.getResults())) {
+    if (ea == eb) {
+      merged.push_back(ea);
+    } else if (isZero(ea)) {
+      merged.push_back(eb);
+    } else if (isZero(eb)) {
+      merged.push_back(ea);
+    } else {
+      return failure();
+    }
+  }
+  return AffineMap::get(a.getNumDims(), a.getNumSymbols(), merged,
+                        a.getContext());
+}
+
 static FailureOr<AffineMap>
 computeIterationSpaceMapping(AffineMap producerResultMap,
                              AffineMap consumerOperandMap,
@@ -110,7 +152,7 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
 
       FailureOr<AffineMap> composedMap = computeIterationSpaceMapping(
           producerMap, consumerMap, producerLoopMap);
-      if (failed(composedMap) || (resultMap && composedMap != resultMap)) {
+      if (failed(composedMap)) {
         return failure();
       }
       // Reject mappings that are all zeros (e.g., affine_map<(d0) -> (0)>).
@@ -120,7 +162,16 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
           composedMap->getNumResults() == composedMap->getNumOfZeroResults()) {
         return failure();
       }
-      resultMap = *composedMap;
+      // Multi-result producers (e.g. OnlineAttentionOp) can feed a single
+      // consumer via operands with different ranks, so two composed maps may
+      // each be valid while differing on broadcast-only dimensions. Merge them
+      // position-wise, letting concrete expressions override zero broadcast
+      // placeholders, and fail only on genuine conflicts.
+      FailureOr<AffineMap> merged = mergeComposedMaps(resultMap, *composedMap);
+      if (failed(merged)) {
+        return failure();
+      }
+      resultMap = *merged;
     }
   } else {
     // Compute mapping by examining consumer uses.
@@ -139,10 +190,14 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
       // consumers.
       FailureOr<AffineMap> composedMap = computeIterationSpaceMapping(
           consumerMap, producerMap, consumerLoopMap);
-      if (failed(composedMap) || (resultMap && composedMap != resultMap)) {
+      if (failed(composedMap)) {
         return failure();
       }
-      resultMap = *composedMap;
+      FailureOr<AffineMap> merged = mergeComposedMaps(resultMap, *composedMap);
+      if (failed(merged)) {
+        return failure();
+      }
+      resultMap = *merged;
 
       // Producers cannot be more parallel than consumers.
       if (compressUnusedDims(resultMap).getNumDims() !=
