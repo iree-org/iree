@@ -531,10 +531,11 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolRequiresWaitFrontierFlag) {
   iree_hal_buffer_release(queue1_buffer);
 }
 
-// Reuses a one-range explicit TLSF pool across two queues. This exercises the
-// generic suballocator that AMDGPU will use for variable-sized default pools,
-// not just the fixed-block CTS vehicle.
-TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
+// Uses a one-range explicit TLSF pool across two queues. This exercises the
+// generic suballocator used for variable-sized default pools. TLSF skips stale
+// cross-queue blocks and grows instead of returning hidden wait-frontier
+// reservations; fixed-block tests below cover notification-driven retry.
+TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueStaleBlockGrows) {
   IREE_TRACE_SCOPE();
 
   const iree_device_size_t allocation_size = 4096;
@@ -588,7 +589,8 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolCrossQueueWaitFrontier) {
   ASSERT_NE(queue1_buffer.get(), nullptr);
 
   iree_hal_pool_query_stats(pool.get(), &stats);
-  EXPECT_EQ(stats.wait_count, 1u);
+  EXPECT_EQ(stats.wait_count, 0u);
+  EXPECT_GT(stats.slab_count, 1u);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
                                               iree_infinite_timeout(),

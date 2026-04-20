@@ -26,6 +26,7 @@
 #include "iree/hal/local/profile.h"
 #include "iree/hal/local/transient_buffer.h"
 #include "iree/hal/memory/cpu_slab_provider.h"
+#include "iree/hal/memory/passthrough_pool.h"
 #include "iree/hal/memory/tlsf_pool.h"
 #include "iree/hal/utils/file_registry.h"
 
@@ -45,9 +46,21 @@ typedef struct iree_hal_task_device_t {
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
+
+  // Routes default queue allocations to the best device-owned pool.
+  iree_hal_pool_set_t default_pool_set;
+
+  // Shared slab provider backing the default queue-allocation pools.
   iree_hal_slab_provider_t* default_slab_provider;
+
+  // Shared notification published when default-pool reservations are released.
   iree_async_notification_t* default_pool_notification;
-  iree_hal_pool_t* default_pool;
+
+  // Suballocating pool used for requests up to the TLSF slab length.
+  iree_hal_pool_t* default_tlsf_pool;
+
+  // Direct per-allocation pool used for requests larger than one TLSF slab.
+  iree_hal_pool_t* default_oversized_pool;
 
   // Proactor pool for async I/O. Retained for the lifetime of the device to
   // ensure proactor threads outlive all device resources (semaphores, etc.).
@@ -93,6 +106,12 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable;
 #define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_FRONTIER_CAPACITY_DEFAULT \
   IREE_HAL_MEMORY_TLSF_DEFAULT_FRONTIER_CAPACITY
 
+// Catch-all priority for direct allocations in the default pool set.
+#define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_PRIORITY_OVERSIZED 0
+
+// Preferred priority for pooled allocations in the default pool set.
+#define IREE_HAL_TASK_DEVICE_DEFAULT_POOL_PRIORITY_TLSF 10
+
 static iree_hal_task_device_t* iree_hal_task_device_cast(
     iree_hal_device_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_task_device_vtable);
@@ -107,26 +126,38 @@ static bool iree_hal_task_device_query_pool_epoch(void* user_data,
                                                  epoch);
 }
 
-static iree_status_t iree_hal_task_device_create_default_pool(
+static iree_status_t iree_hal_task_device_create_default_pools(
     iree_hal_task_device_t* device, iree_async_proactor_t* proactor,
-    iree_allocator_t host_allocator,
+    iree_allocator_t host_allocator, iree_hal_pool_set_t* out_pool_set,
     iree_hal_slab_provider_t** out_slab_provider,
-    iree_async_notification_t** out_notification, iree_hal_pool_t** out_pool) {
+    iree_async_notification_t** out_notification,
+    iree_hal_pool_t** out_tlsf_pool, iree_hal_pool_t** out_oversized_pool) {
   IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_pool_set);
   IREE_ASSERT_ARGUMENT(out_slab_provider);
   IREE_ASSERT_ARGUMENT(out_notification);
-  IREE_ASSERT_ARGUMENT(out_pool);
+  IREE_ASSERT_ARGUMENT(out_tlsf_pool);
+  IREE_ASSERT_ARGUMENT(out_oversized_pool);
+  memset(out_pool_set, 0, sizeof(*out_pool_set));
   *out_slab_provider = NULL;
   *out_notification = NULL;
-  *out_pool = NULL;
+  *out_tlsf_pool = NULL;
+  *out_oversized_pool = NULL;
+
+  IREE_RETURN_IF_ERROR(iree_hal_pool_set_initialize(
+      /*initial_capacity=*/2, host_allocator, out_pool_set));
 
   iree_hal_slab_provider_t* slab_provider = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cpu_slab_provider_create(host_allocator, &slab_provider));
-
   iree_async_notification_t* notification = NULL;
-  iree_status_t status = iree_async_notification_create(
-      proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
+  iree_hal_pool_t* tlsf_pool = NULL;
+  iree_hal_pool_t* oversized_pool = NULL;
+
+  iree_status_t status =
+      iree_hal_cpu_slab_provider_create(host_allocator, &slab_provider);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_notification_create(
+        proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification);
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_tlsf_pool_options_t options = {
         .tlsf_options =
@@ -146,25 +177,72 @@ static iree_status_t iree_hal_task_device_create_default_pool(
             .fn = iree_hal_task_device_query_pool_epoch,
             .user_data = device,
         },
-        host_allocator, out_pool);
+        host_allocator, &tlsf_pool);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_passthrough_pool_options_t options = {0};
+    status = iree_hal_passthrough_pool_create(
+        options, slab_provider, notification, host_allocator, &oversized_pool);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_pool_set_register(
+        out_pool_set, IREE_HAL_TASK_DEVICE_DEFAULT_POOL_PRIORITY_OVERSIZED,
+        oversized_pool);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_pool_set_register(
+        out_pool_set, IREE_HAL_TASK_DEVICE_DEFAULT_POOL_PRIORITY_TLSF,
+        tlsf_pool);
   }
   if (iree_status_is_ok(status)) {
     *out_slab_provider = slab_provider;
     *out_notification = notification;
+    *out_tlsf_pool = tlsf_pool;
+    *out_oversized_pool = oversized_pool;
     slab_provider = NULL;
     notification = NULL;
+    tlsf_pool = NULL;
+    oversized_pool = NULL;
+  } else {
+    iree_hal_pool_set_deinitialize(out_pool_set);
   }
+  iree_hal_pool_release(oversized_pool);
+  iree_hal_pool_release(tlsf_pool);
   iree_async_notification_release(notification);
   iree_hal_slab_provider_release(slab_provider);
   return status;
 }
 
-static iree_status_t iree_hal_task_device_resolve_pool(
-    iree_hal_task_device_t* device, iree_hal_pool_t* pool,
+static iree_status_t iree_hal_task_device_select_alloca_pool(
+    iree_hal_task_device_t* device, iree_hal_pool_t* explicit_pool,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_pool_t** out_pool) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_pool);
-  *out_pool = pool ? pool : device->default_pool;
+  *out_pool = NULL;
+  if (explicit_pool) {
+    *out_pool = explicit_pool;
+    return iree_ok_status();
+  }
+
+  // Local-task CPU memory is semantically device-visible, but its shared slab
+  // provider reports the physical host properties used by all backing pools.
+  // Route with the physical bits while keeping the original params for the
+  // eventual buffer wrapper.
+  params.type &= ~IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.type &= ~IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  if (params.type == IREE_HAL_MEMORY_TYPE_NONE) {
+    params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  }
+  *out_pool = iree_hal_pool_set_select(&device->default_pool_set, params,
+                                       allocation_size);
+  if (!*out_pool) {
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "no default local-task pool can satisfy queue_alloca of %" PRIdsz
+        " bytes",
+        allocation_size);
+  }
   return iree_ok_status();
 }
 
@@ -251,10 +329,11 @@ iree_status_t iree_hal_task_device_create(
       device->proactor_pool, default_node_id, &device->proactor);
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_device_create_default_pool(
+    status = iree_hal_task_device_create_default_pools(
         device, device->proactor, device->host_allocator,
-        &device->default_slab_provider, &device->default_pool_notification,
-        &device->default_pool);
+        &device->default_pool_set, &device->default_slab_provider,
+        &device->default_pool_notification, &device->default_tlsf_pool,
+        &device->default_oversized_pool);
   }
 
   if (iree_status_is_ok(status)) {
@@ -329,7 +408,11 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
 
-  iree_hal_pool_release(device->default_pool);
+  if (device->default_pool_set.entries) {
+    iree_hal_pool_set_deinitialize(&device->default_pool_set);
+  }
+  iree_hal_pool_release(device->default_oversized_pool);
+  iree_hal_pool_release(device->default_tlsf_pool);
   iree_hal_slab_provider_release(device->default_slab_provider);
   iree_async_notification_release(device->default_pool_notification);
   iree_hal_allocator_release(device->device_allocator);
@@ -387,7 +470,8 @@ static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
     iree_hal_task_queue_trim(&device->queues[i]);
   }
   IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
-  IREE_RETURN_IF_ERROR(iree_hal_pool_trim(device->default_pool));
+  IREE_RETURN_IF_ERROR(iree_hal_pool_trim(device->default_tlsf_pool));
+  IREE_RETURN_IF_ERROR(iree_hal_pool_trim(device->default_oversized_pool));
 
   iree_arena_block_pool_trim(&device->small_block_pool);
   iree_arena_block_pool_trim(&device->large_block_pool);
@@ -643,11 +727,6 @@ static iree_status_t iree_hal_task_device_prepare_alloca_wrapper(
                             "queue_alloca allocation_size must be non-zero");
   }
 
-  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  iree_hal_pool_t* allocation_pool = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_task_device_resolve_pool(device, pool, &allocation_pool));
-
   // Local CPU slab providers report physical host properties while the local
   // HAL device exposes those bytes as device-local. Normalize through the
   // device allocator before creating the transient wrapper.
@@ -667,6 +746,11 @@ static iree_status_t iree_hal_task_device_prepare_alloca_wrapper(
         "queue_alloca params are not allocatable on this device: %.*s",
         (int)compatibility_value.size, compatibility_value.data);
   }
+
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_hal_pool_t* allocation_pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_device_select_alloca_pool(
+      device, pool, *params, allocation_size, &allocation_pool));
 
   iree_hal_buffer_placement_t placement = {
       .device = base_device,

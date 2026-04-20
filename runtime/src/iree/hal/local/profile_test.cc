@@ -515,6 +515,28 @@ TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataOnce) {
   iree_hal_local_executable_deinitialize(&executable.base);
 }
 
+TEST_F(LocalProfileRecorderTest, HostExecutionEnablesExecutableMetadata) {
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS));
+  EXPECT_TRUE(iree_hal_local_profile_recorder_is_enabled(
+      recorder_, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA));
+
+  FakeLocalExecutable executable;
+  iree_hal_local_executable_initialize(
+      &kFakeLocalExecutableVTable, iree_allocator_system(), &executable.base);
+  iree_hal_executable_t* base_executable =
+      reinterpret_cast<iree_hal_executable_t*>(&executable.base);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_record_executable(
+      recorder_, base_executable));
+
+  ASSERT_EQ(1u, sink_.executable_records.size());
+  ASSERT_EQ(2u, sink_.executable_export_records.size());
+  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+
+  iree_hal_local_executable_deinitialize(&executable.base);
+}
+
 TEST_F(LocalProfileRecorderTest, SinkBeginFailurePropagates) {
   sink_.fail_begin_session_status_code = IREE_STATUS_RESOURCE_EXHAUSTED;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,

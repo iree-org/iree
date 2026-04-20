@@ -190,8 +190,15 @@ iree_hal_amdgpu_slab_provider_query_memory_pool_properties(
       &global_flags));
 
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  iree_hal_buffer_usage_t supported_usage =
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH;
+  // Sharing hints do not affect HSA pool selection. Export is omitted because
+  // it requires dedicated platform export support.
+  const iree_hal_buffer_usage_t sharing_usage =
+      IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE |
+      IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT |
+      IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE;
+  iree_hal_buffer_usage_t supported_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                                            IREE_HAL_BUFFER_USAGE_DISPATCH |
+                                            sharing_usage;
   if (iree_any_bit_set(
           global_flags,
           HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED |

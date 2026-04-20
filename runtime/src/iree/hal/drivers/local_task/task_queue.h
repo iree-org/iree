@@ -160,9 +160,12 @@ struct iree_hal_task_queue_op_t {
       iree_hal_command_buffer_t* command_buffer;
       iree_hal_buffer_binding_table_t binding_table;
       // SCOPED buffer mappings for binding table resolution. Arena-allocated,
-      // indexed 1:1 with binding_table entries. Unmapped in op_destroy before
-      // the resource_set releases buffers. NULL when binding_table is empty.
+      // indexed 1:1 with resolved block binding entries. Unmapped in
+      // op_destroy before retained buffers are released. NULL when no mappings
+      // are required.
       iree_hal_buffer_mapping_t* binding_mappings;
+      // Number of entries in binding_mappings.
+      iree_host_size_t binding_mapping_count;
     } commands;
     struct {
       iree_hal_device_t* device;

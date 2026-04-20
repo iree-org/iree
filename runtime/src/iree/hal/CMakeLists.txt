@@ -135,6 +135,8 @@ iree_cc_test(
     "pool_test.cc"
   DEPS
     ::hal
+    iree::async
+    iree::async::platform
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

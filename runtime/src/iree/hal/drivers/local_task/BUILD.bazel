@@ -37,8 +37,10 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":block_builder",
+        ":block_command_ops",
         ":block_isa",
         "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal/local",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -63,6 +65,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/local:executable_loader",
+        "//runtime/src/iree/hal/local:transient_buffer",
         "//runtime/src/iree/hal/utils:resource_set",
     ],
 )
@@ -179,6 +182,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:profile",
         "//runtime/src/iree/hal/local:transient_buffer",
         "//runtime/src/iree/hal/memory:cpu_slab_provider",
+        "//runtime/src/iree/hal/memory:passthrough_pool",
         "//runtime/src/iree/hal/memory:tlsf_pool",
         "//runtime/src/iree/hal/utils:files",
         "//runtime/src/iree/hal/utils:resource_set",

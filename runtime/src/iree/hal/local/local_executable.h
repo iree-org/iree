@@ -30,6 +30,12 @@ typedef struct iree_hal_local_executable_t {
   // so execution has zero indirection.
   const iree_hal_executable_dispatch_v0_t* dispatch_ptrs;
 
+  // Number of exported entry points in |export_names|.
+  iree_host_size_t export_count;
+
+  // Optional per-entry point names used for diagnostics/tracing.
+  const char* const* export_names;
+
   // Process-local nonzero executable identifier used by profiling sessions.
   uint64_t profile_id;
 
@@ -62,6 +68,11 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 // Returns the process-local nonzero profiling identifier for |executable|.
 uint64_t iree_hal_local_executable_profile_id(
     const iree_hal_local_executable_t* executable);
+
+// Returns the export name if available or an empty string view otherwise.
+iree_string_view_t iree_hal_local_executable_export_name(
+    const iree_hal_local_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal);
 
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,

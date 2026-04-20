@@ -22,6 +22,8 @@ void iree_hal_local_executable_initialize(
   // Function attributes and pointers are populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
   out_base_executable->dispatch_ptrs = NULL;
+  out_base_executable->export_count = 0;
+  out_base_executable->export_names = NULL;
   out_base_executable->profile_id = (uint64_t)iree_atomic_fetch_add(
       &iree_hal_local_executable_next_profile_id, 1, iree_memory_order_relaxed);
 
@@ -42,6 +44,18 @@ uint64_t iree_hal_local_executable_profile_id(
     const iree_hal_local_executable_t* executable) {
   IREE_ASSERT_ARGUMENT(executable);
   return executable->profile_id;
+}
+
+iree_string_view_t iree_hal_local_executable_export_name(
+    const iree_hal_local_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal) {
+  IREE_ASSERT_ARGUMENT(executable);
+  if (export_ordinal >= executable->export_count ||
+      executable->export_names == NULL ||
+      executable->export_names[export_ordinal] == NULL) {
+    return iree_string_view_empty();
+  }
+  return iree_make_cstring_view(executable->export_names[export_ordinal]);
 }
 
 iree_status_t iree_hal_local_executable_issue_call(

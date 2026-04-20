@@ -41,6 +41,8 @@ extern "C" {
 //      b. Check usage compatibility: pool supports at least the required
 //         usage bits.
 //      c. Check size: allocation_size is within the pool's min/max range.
+//         This is how fixed-size/slab-size pools decline oversized requests
+//         and let lower-priority direct pools serve them.
 //   2. Among compatible pools, return the one with the highest priority.
 //   3. If no pool matches, return NULL.
 //

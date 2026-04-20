@@ -184,6 +184,17 @@ TEST_F(PassthroughPoolTest, ReserveRelease) {
   iree_hal_pool_release_reservation(pool_, &reservation, NULL);
 }
 
+TEST_F(PassthroughPoolTest, ReserveRejectsUnsupportedAlignment) {
+  iree_hal_pool_reservation_t reservation;
+  iree_hal_pool_acquire_info_t reserve_info;
+  iree_hal_pool_acquire_result_t result;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_hal_pool_acquire_reservation(
+                            pool_, 4096, IREE_HAL_HEAP_BUFFER_ALIGNMENT * 2,
+                            NULL, IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation,
+                            &reserve_info, &result));
+}
+
 TEST_F(PassthroughPoolTest, StatsTrackReserveRelease) {
   iree_hal_pool_stats_t stats;
   iree_hal_pool_query_stats(pool_, &stats);

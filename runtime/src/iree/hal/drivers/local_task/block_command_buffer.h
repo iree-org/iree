@@ -40,6 +40,40 @@ bool iree_hal_block_command_buffer_isa(
 const iree_hal_cmd_block_recording_t* iree_hal_block_command_buffer_recording(
     iree_hal_command_buffer_t* command_buffer);
 
+// Returns direct transient bindings that must be mapped after queue waits have
+// resolved. The returned storage is owned by |command_buffer| and remains valid
+// for its lifetime.
+const iree_hal_buffer_binding_t* iree_hal_block_command_buffer_late_bindings(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_host_size_t* out_late_binding_count);
+
+// Returns the distinct executable list recorded for profiling metadata.
+//
+// Returned executable pointers are retained by the command buffer resource set
+// and remain valid for the command buffer lifetime. The list is populated while
+// recording so a profiling session can later replay an existing command buffer
+// without scanning its encoded command stream.
+iree_hal_executable_t* const* iree_hal_block_command_buffer_profile_executables(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_host_size_t* out_executable_count);
+
+// Returns the number of command-buffer operations recorded for profiling.
+iree_host_size_t iree_hal_block_command_buffer_profile_operation_count(
+    iree_hal_command_buffer_t* command_buffer);
+
+// Returns immutable command-buffer metadata and operation records for
+// profiling.
+//
+// The operation record storage is owned by |command_buffer| and remains valid
+// for its lifetime. Records are populated while recording so a profiling
+// session can later replay an existing command buffer without scanning its
+// encoded command stream.
+void iree_hal_block_command_buffer_profile_metadata(
+    iree_hal_command_buffer_t* command_buffer, uint32_t physical_device_ordinal,
+    iree_hal_profile_command_buffer_record_t* out_command_buffer,
+    const iree_hal_profile_command_operation_record_t** out_operations,
+    iree_host_size_t* out_operation_count);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

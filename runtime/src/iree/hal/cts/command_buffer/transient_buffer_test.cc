@@ -405,12 +405,9 @@ TEST_P(TransientBufferTest, FillTransientWithZeroAccessFlags) {
 // Transient buffer resolution
 //===----------------------------------------------------------------------===//
 
-// Rejects a static transient buffer reference before the alloca has committed.
-// Static command-buffer references bake or otherwise retain a record-time
-// pointer identity; callers that need queue-ordered alloca -> execute reuse
-// must record an indirect binding and provide the transient through the
-// queue_execute binding table.
-TEST_P(AsyncTransientBufferTest, StaticRefRecordedBeforeAllocaCommitFails) {
+// Records a static transient buffer reference before the alloca has committed,
+// then executes the command buffer after the alloca signal resolves.
+TEST_P(AsyncTransientBufferTest, StaticRefRecordedBeforeAllocaCommitExecutes) {
   const iree_device_size_t buffer_size = 256;
 
   SemaphoreList alloca_wait(device_, {0}, {1});
@@ -433,15 +430,23 @@ TEST_P(AsyncTransientBufferTest, StaticRefRecordedBeforeAllocaCommitFails) {
       /*binding_capacity=*/0, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   uint32_t pattern = 0xA55A1337u;
-  IREE_EXPECT_STATUS_IS(
-      IREE_STATUS_FAILED_PRECONDITION,
-      iree_hal_command_buffer_fill_buffer(
-          command_buffer, iree_hal_make_buffer_ref(transient, 0, buffer_size),
-          &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, iree_hal_make_buffer_ref(transient, 0, buffer_size),
+      &pattern, sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList execute_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, execute_signal,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
 
   IREE_ASSERT_OK(release_alloca_wait.SignalNow());
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      alloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+      execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto data = ReadBufferData<uint32_t>(transient);
+  EXPECT_THAT(data, Each(pattern));
 
   IREE_ASSERT_OK(DeallocateTransient(transient));
 }

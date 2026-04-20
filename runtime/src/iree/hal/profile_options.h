@@ -54,8 +54,10 @@ enum iree_hal_device_profiling_data_family_bits_t {
   IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES = 1ull << 4,
 
   // Executable/code-object/export metadata needed for offline analysis. Some
-  // producers may emit this implicitly when another requested family references
-  // executable ids, but this bit lets callers request metadata by itself.
+  // producers also use this as the cheap metadata family for command-buffer
+  // records needed to interpret command-index joins. Producers may emit this
+  // implicitly when another requested family references executable ids, but
+  // this bit lets callers request metadata by itself.
   IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA = 1ull << 5,
 
   // Heavyweight executable trace artifacts such as instruction/thread traces

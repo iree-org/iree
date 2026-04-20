@@ -42,11 +42,11 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
                             "fill length exceeds block ISA tile capacity");
   }
 
-  uint16_t binding_data_base = builder->total_binding_count;
   const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   iree_hal_cmd_fill_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
+  out_token->command = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_fill_t);
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
@@ -55,6 +55,8 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
       builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE,
       sizeof(iree_hal_cmd_fill_t), 1, 1, tile_count, (void**)&cmd, &fixups));
 
+  const uint16_t binding_data_base =
+      (uint16_t)(builder->total_binding_count - out_token->binding_count);
   cmd->target_binding = binding_data_base;
   cmd->pattern_length = (uint8_t)pattern_length;
   cmd->params.direct.target_offset = 0;
@@ -65,6 +67,7 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
   // Pre-fill fixup data_index. Caller sets span.
   fixups[0].data_index = binding_data_base;
 
+  out_token->command = &cmd->header;
   *out_fixups = fixups;
   return iree_ok_status();
 }
@@ -86,11 +89,11 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
                             "copy length exceeds block ISA tile capacity");
   }
 
-  uint16_t binding_data_base = builder->total_binding_count;
   const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   iree_hal_cmd_copy_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
+  out_token->command = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_copy_t);
   out_token->fixup_count = 2;
   out_token->binding_count = 2;
@@ -99,6 +102,8 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
       builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE,
       sizeof(iree_hal_cmd_copy_t), 2, 2, tile_count, (void**)&cmd, &fixups));
 
+  const uint16_t binding_data_base =
+      (uint16_t)(builder->total_binding_count - out_token->binding_count);
   cmd->source_binding = binding_data_base;
   cmd->target_binding = (uint16_t)(binding_data_base + 1);
   cmd->params.direct.source_offset = 0;
@@ -109,6 +114,7 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
   fixups[0].data_index = binding_data_base;
   fixups[1].data_index = (uint16_t)(binding_data_base + 1);
 
+  out_token->command = &cmd->header;
   *out_fixups = fixups;
   return iree_ok_status();
 }
@@ -133,7 +139,6 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
                             "update length exceeds block ISA tile capacity");
   }
 
-  uint16_t binding_data_base = builder->total_binding_count;
   const uint32_t tile_count = iree_hal_cmd_transfer_tile_count(length);
 
   // Command includes trailing inline source data, 8-byte aligned.
@@ -142,6 +147,7 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
 
   iree_hal_cmd_update_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
+  out_token->command = NULL;
   out_token->cmd_bytes = cmd_bytes;
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
@@ -150,6 +156,8 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
       builder, IREE_HAL_CMD_UPDATE, IREE_HAL_CMD_FLAG_NONE, cmd_bytes, 1, 1,
       tile_count, (void**)&cmd, &fixups));
 
+  const uint16_t binding_data_base =
+      (uint16_t)(builder->total_binding_count - out_token->binding_count);
   cmd->target_binding = binding_data_base;
   cmd->target_offset = 0;
   cmd->length = length;
@@ -161,6 +169,7 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
   // Pre-fill fixup data_index. Caller sets span.
   fixups[0].data_index = binding_data_base;
 
+  out_token->command = &cmd->header;
   *out_fixups = fixups;
   return iree_ok_status();
 }
@@ -232,8 +241,6 @@ iree_status_t iree_hal_cmd_build_dispatch(
         (uint32_t)dispatch_attrs.binding_count, binding_count);
   }
 
-  uint16_t binding_data_base = builder->total_binding_count;
-
   // Compute command size: fixed header + trailing constants, 8-byte aligned.
   iree_host_size_t cmd_bytes =
       iree_host_align(offsetof(iree_hal_cmd_dispatch_t, constants) +
@@ -255,6 +262,7 @@ iree_status_t iree_hal_cmd_build_dispatch(
   // Append the command and reserve fixup storage for all bindings.
   iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
+  out_token->command = NULL;
   out_token->cmd_bytes = cmd_bytes;
   out_token->fixup_count = total_binding_count;
   out_token->binding_count = total_binding_count;
@@ -266,6 +274,9 @@ iree_status_t iree_hal_cmd_build_dispatch(
       cmd_bytes, total_binding_count, total_binding_count, tile_count,
       (void**)&cmd, &fixups));
 
+  const uint16_t binding_data_base =
+      (uint16_t)(builder->total_binding_count - total_binding_count);
+
   // Fill dispatch command fields.
   cmd->constant_count = dispatch_attrs.constant_count;
   cmd->binding_count = dispatch_attrs.binding_count;
@@ -273,6 +284,7 @@ iree_status_t iree_hal_cmd_build_dispatch(
   cmd->executable = local_executable;
   cmd->export_ordinal = (uint16_t)export_ordinal;
   cmd->reserved = 0;
+  cmd->profile.command_index = UINT32_MAX;
   cmd->function = local_executable->dispatch_ptrs
                       ? local_executable->dispatch_ptrs[export_ordinal]
                       : NULL;
@@ -312,6 +324,7 @@ iree_status_t iree_hal_cmd_build_dispatch(
         (uint16_t)(binding_data_base + binding_count);
   }
 
+  out_token->command = &cmd->header;
   *out_fixups = fixups;
   return iree_ok_status();
 }

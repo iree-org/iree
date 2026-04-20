@@ -12,8 +12,8 @@
 // (for direct queue operations) call these same functions.
 //
 // Each build function:
-//   - Captures binding_data_base from the builder's current state
 //   - Appends the ISA command via the builder (may trigger block splits)
+//   - Captures the block-local binding_data_base after any split
 //   - Fills all command-specific fields
 //   - Pre-fills fixup data_index values (binding_data_base + i)
 //   - Returns the fixup array for the caller to resolve bindings
@@ -43,9 +43,19 @@ extern "C" {
 // Token returned by build functions for rollback on post-build failures.
 // Captures the parameters needed by iree_hal_cmd_block_builder_pop_cmd().
 typedef struct iree_hal_cmd_build_token_t {
+  // Command header appended by the build operation.
+  iree_hal_cmd_header_t* command;
+
+  // Number of command-stream bytes appended.
   iree_host_size_t cmd_bytes;
+
+  // Number of fixup records appended.
   uint16_t fixup_count;
+
+  // Number of .data binding slots consumed.
   uint16_t binding_count;
+
+  // Number of scheduling tiles contributed by the command.
   uint32_t tile_count;
 } iree_hal_cmd_build_token_t;
 

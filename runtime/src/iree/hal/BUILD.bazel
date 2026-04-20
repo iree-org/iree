@@ -155,6 +155,8 @@ iree_runtime_cc_test(
     srcs = ["pool_test.cc"],
     deps = [
         ":hal",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

@@ -68,6 +68,17 @@ typedef struct iree_hal_local_profile_event_ring_snapshot_t {
   iree_host_size_t second_record_count;
 } iree_hal_local_profile_event_ring_snapshot_t;
 
+typedef struct iree_hal_local_profile_id_set_t {
+  // Open-addressed nonzero ids whose metadata was emitted.
+  uint64_t* ids;
+
+  // Power-of-two slot count in |ids|.
+  iree_host_size_t capacity;
+
+  // Number of occupied id slots.
+  iree_host_size_t count;
+} iree_hal_local_profile_id_set_t;
+
 struct iree_hal_local_profile_recorder_t {
   // Host allocator used for recorder-owned storage.
   iree_allocator_t host_allocator;
@@ -108,14 +119,14 @@ struct iree_hal_local_profile_recorder_t {
   // Ring of memory lifecycle event records.
   iree_hal_local_profile_event_ring_t memory_event_ring;
 
-  // Open-addressed set of executable ids whose metadata was emitted.
-  uint64_t* emitted_executable_ids;
+  // Metadata ids already emitted to the session sink.
+  struct {
+    // Executable ids whose metadata was emitted.
+    iree_hal_local_profile_id_set_t executables;
 
-  // Power-of-two slot count in |emitted_executable_ids|.
-  iree_host_size_t emitted_executable_id_capacity;
-
-  // Number of occupied executable id slots.
-  iree_host_size_t emitted_executable_id_count;
+    // Command-buffer ids whose metadata was emitted.
+    iree_hal_local_profile_id_set_t command_buffers;
+  } emitted;
 };
 
 static bool iree_hal_local_profile_recorder_requests_data(
@@ -141,6 +152,12 @@ iree_hal_local_profile_recorder_resolve_profiling_options(
           profiling_options)) {
     resolved_options.data_families =
         iree_hal_local_profile_recorder_lightweight_statistics_data_families();
+  }
+  if (iree_hal_device_profiling_options_requests_data(
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    resolved_options.data_families |=
+        IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
   }
   resolved_options.flags &=
       ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
@@ -483,7 +500,8 @@ void iree_hal_local_profile_recorder_destroy(
               "active local profile recorders must be ended before destroy");
   iree_allocator_t host_allocator = recorder->host_allocator;
   iree_allocator_free(host_allocator, recorder->event_storage);
-  iree_allocator_free(host_allocator, recorder->emitted_executable_ids);
+  iree_allocator_free(host_allocator, recorder->emitted.executables.ids);
+  iree_allocator_free(host_allocator, recorder->emitted.command_buffers.ids);
   iree_hal_device_profiling_options_storage_free(recorder->options_storage,
                                                  host_allocator);
   iree_allocator_free(host_allocator, recorder->name_storage);
@@ -500,98 +518,98 @@ bool iree_hal_local_profile_recorder_is_enabled(
                                                          data_families);
 }
 
-static iree_host_size_t iree_hal_local_profile_hash_executable_id(
-    uint64_t executable_id, iree_host_size_t capacity) {
-  executable_id ^= executable_id >> 33;
-  executable_id *= 0xff51afd7ed558ccdull;
-  executable_id ^= executable_id >> 33;
-  executable_id *= 0xc4ceb9fe1a85ec53ull;
-  executable_id ^= executable_id >> 33;
-  return (iree_host_size_t)executable_id & (capacity - 1);
+static iree_host_size_t iree_hal_local_profile_hash_id(
+    uint64_t id, iree_host_size_t capacity) {
+  id ^= id >> 33;
+  id *= 0xff51afd7ed558ccdull;
+  id ^= id >> 33;
+  id *= 0xc4ceb9fe1a85ec53ull;
+  id ^= id >> 33;
+  return (iree_host_size_t)id & (capacity - 1);
 }
 
-static bool iree_hal_local_profile_find_executable_id_slot(
-    const uint64_t* executable_ids, iree_host_size_t capacity,
-    uint64_t executable_id, iree_host_size_t* out_slot) {
-  IREE_ASSERT(capacity != 0);
-  iree_host_size_t slot =
-      iree_hal_local_profile_hash_executable_id(executable_id, capacity);
-  while (executable_ids[slot] != 0) {
-    if (executable_ids[slot] == executable_id) {
+static bool iree_hal_local_profile_id_set_find_slot(
+    const iree_hal_local_profile_id_set_t* set, uint64_t id,
+    iree_host_size_t* out_slot) {
+  IREE_ASSERT(set->capacity != 0);
+  iree_host_size_t slot = iree_hal_local_profile_hash_id(id, set->capacity);
+  while (set->ids[slot] != 0) {
+    if (set->ids[slot] == id) {
       *out_slot = slot;
       return true;
     }
-    slot = (slot + 1) & (capacity - 1);
+    slot = (slot + 1) & (set->capacity - 1);
   }
   *out_slot = slot;
   return false;
 }
 
-static iree_status_t iree_hal_local_profile_recorder_reserve_executable_ids(
-    iree_hal_local_profile_recorder_t* recorder,
-    iree_host_size_t minimum_capacity) {
+static iree_status_t iree_hal_local_profile_id_set_reserve(
+    iree_allocator_t host_allocator, iree_hal_local_profile_id_set_t* set,
+    iree_host_size_t minimum_capacity, const char* label) {
   if (IREE_UNLIKELY(minimum_capacity > IREE_HOST_SIZE_MAX / 2)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "local profiling executable metadata set is too large");
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "local profiling %s metadata set is too large",
+                            label);
   }
   const iree_host_size_t required_capacity = minimum_capacity * 2;
-  iree_host_size_t capacity = recorder->emitted_executable_id_capacity;
+  iree_host_size_t capacity = set->capacity;
   if (required_capacity <= capacity) return iree_ok_status();
   capacity = capacity != 0 ? capacity : 16;
   while (required_capacity > capacity) {
     if (IREE_UNLIKELY(capacity > IREE_HOST_SIZE_MAX / 2)) {
-      return iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "local profiling executable metadata set is too large");
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "local profiling %s metadata set is too large",
+                              label);
     }
     capacity *= 2;
   }
 
   iree_host_size_t byte_length = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-          capacity, sizeof(*recorder->emitted_executable_ids), &byte_length))) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "local profiling executable metadata set size overflow");
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(capacity, sizeof(*set->ids),
+                                                &byte_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "local profiling %s metadata set size overflow",
+                            label);
   }
-  uint64_t* executable_ids = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      recorder->host_allocator, byte_length, (void**)&executable_ids));
-  memset(executable_ids, 0, byte_length);
-  for (iree_host_size_t i = 0; i < recorder->emitted_executable_id_capacity;
-       ++i) {
-    const uint64_t executable_id = recorder->emitted_executable_ids[i];
-    if (executable_id == 0) continue;
+  uint64_t* ids = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, byte_length, (void**)&ids));
+  memset(ids, 0, byte_length);
+  iree_hal_local_profile_id_set_t new_set = {
+      .ids = ids,
+      .capacity = capacity,
+  };
+  for (iree_host_size_t i = 0; i < set->capacity; ++i) {
+    const uint64_t id = set->ids[i];
+    if (id == 0) continue;
     iree_host_size_t slot = 0;
-    iree_hal_local_profile_find_executable_id_slot(executable_ids, capacity,
-                                                   executable_id, &slot);
-    executable_ids[slot] = executable_id;
+    iree_hal_local_profile_id_set_find_slot(&new_set, id, &slot);
+    ids[slot] = id;
   }
+  new_set.count = set->count;
 
-  iree_allocator_free(recorder->host_allocator,
-                      recorder->emitted_executable_ids);
-  recorder->emitted_executable_ids = executable_ids;
-  recorder->emitted_executable_id_capacity = capacity;
+  iree_allocator_free(host_allocator, set->ids);
+  *set = new_set;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_local_profile_recorder_mark_executable_emitted(
-    iree_hal_local_profile_recorder_t* recorder, uint64_t executable_id,
+static iree_status_t iree_hal_local_profile_recorder_mark_id_emitted(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_id_set_t* set, uint64_t id, const char* label,
     bool* out_should_emit) {
   *out_should_emit = false;
 
   iree_slim_mutex_lock(&recorder->mutex);
-  iree_status_t status = iree_hal_local_profile_recorder_reserve_executable_ids(
-      recorder, recorder->emitted_executable_id_count + 1);
+  iree_status_t status = iree_hal_local_profile_id_set_reserve(
+      recorder->host_allocator, set, set->count + 1, label);
   if (iree_status_is_ok(status)) {
     iree_host_size_t slot = 0;
-    const bool already_emitted = iree_hal_local_profile_find_executable_id_slot(
-        recorder->emitted_executable_ids,
-        recorder->emitted_executable_id_capacity, executable_id, &slot);
+    const bool already_emitted =
+        iree_hal_local_profile_id_set_find_slot(set, id, &slot);
     if (!already_emitted) {
-      recorder->emitted_executable_ids[slot] = executable_id;
-      ++recorder->emitted_executable_id_count;
+      set->ids[slot] = id;
+      ++set->count;
       *out_should_emit = true;
     }
   }
@@ -599,15 +617,14 @@ static iree_status_t iree_hal_local_profile_recorder_mark_executable_emitted(
   return status;
 }
 
-static bool iree_hal_local_profile_recorder_has_emitted_executable(
-    iree_hal_local_profile_recorder_t* recorder, uint64_t executable_id) {
+static bool iree_hal_local_profile_recorder_has_emitted_id(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_id_set_t* set, uint64_t id) {
   iree_slim_mutex_lock(&recorder->mutex);
   bool has_emitted = false;
-  if (recorder->emitted_executable_id_capacity != 0) {
+  if (set->capacity != 0) {
     iree_host_size_t slot = 0;
-    has_emitted = iree_hal_local_profile_find_executable_id_slot(
-        recorder->emitted_executable_ids,
-        recorder->emitted_executable_id_capacity, executable_id, &slot);
+    has_emitted = iree_hal_local_profile_id_set_find_slot(set, id, &slot);
   }
   iree_slim_mutex_unlock(&recorder->mutex);
   return has_emitted;
@@ -718,8 +735,8 @@ iree_status_t iree_hal_local_profile_recorder_record_executable(
       iree_hal_local_executable_cast(executable);
   const uint64_t executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  if (iree_hal_local_profile_recorder_has_emitted_executable(recorder,
-                                                             executable_id)) {
+  if (iree_hal_local_profile_recorder_has_emitted_id(
+          recorder, &recorder->emitted.executables, executable_id)) {
     return iree_ok_status();
   }
 
@@ -751,8 +768,9 @@ iree_status_t iree_hal_local_profile_recorder_record_executable(
 
   bool should_emit = false;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_local_profile_recorder_mark_executable_emitted(
-        recorder, executable_id, &should_emit);
+    status = iree_hal_local_profile_recorder_mark_id_emitted(
+        recorder, &recorder->emitted.executables, executable_id, "executable",
+        &should_emit);
   }
   if (iree_status_is_ok(status) && should_emit) {
     status = iree_hal_local_profile_recorder_write_records(
@@ -767,6 +785,41 @@ iree_status_t iree_hal_local_profile_recorder_record_executable(
   }
   iree_allocator_free(recorder->host_allocator, export_data);
   return status;
+}
+
+iree_status_t iree_hal_local_profile_recorder_record_command_buffer(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_profile_command_buffer_record_t* command_buffer,
+    iree_host_size_t operation_count,
+    const iree_hal_profile_command_operation_record_t* operations) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
+    return iree_ok_status();
+  }
+  if (IREE_UNLIKELY(!command_buffer ||
+                    command_buffer->command_buffer_id == 0)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "local profiling command-buffer metadata requires a nonzero id");
+  }
+  if (IREE_UNLIKELY(operation_count != 0 && !operations)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "local profiling command-buffer operation records are required");
+  }
+
+  bool should_emit = false;
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_mark_id_emitted(
+      recorder, &recorder->emitted.command_buffers,
+      command_buffer->command_buffer_id, "command-buffer", &should_emit));
+  if (!should_emit) return iree_ok_status();
+
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_write_records(
+      recorder, IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS, command_buffer,
+      /*record_count=*/1, sizeof(*command_buffer)));
+  return iree_hal_local_profile_recorder_write_records(
+      recorder, IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS, operations,
+      operation_count, sizeof(*operations));
 }
 
 static bool iree_hal_local_profile_queue_scope_is_valid(

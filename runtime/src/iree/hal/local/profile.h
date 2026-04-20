@@ -249,6 +249,16 @@ iree_status_t iree_hal_local_profile_recorder_record_executable(
     iree_hal_local_profile_recorder_t* recorder,
     iree_hal_executable_t* executable);
 
+// Emits command-buffer and operation metadata once per recorder session.
+//
+// Returns OK without work when metadata is not enabled. The caller owns
+// |command_buffer| and |operations|; the recorder does not retain them.
+iree_status_t iree_hal_local_profile_recorder_record_command_buffer(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_profile_command_buffer_record_t* command_buffer,
+    iree_host_size_t operation_count,
+    const iree_hal_profile_command_operation_record_t* operations);
+
 // Appends one host-timestamped queue event to |recorder|.
 //
 // |out_event_id| may be NULL. When provided it receives the assigned event id,

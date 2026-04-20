@@ -23,9 +23,10 @@ extern "C" {
 
 // Options for creating a HAL pool that wraps iree_hal_memory_tlsf_t.
 typedef struct iree_hal_tlsf_pool_options_t {
-  // Raw TLSF allocator configuration. The pool acquires one slab of at least
-  // tlsf_options.range_length bytes and manages the first
-  // tlsf_options.range_length bytes of that slab.
+  // Raw TLSF allocator configuration for each slab. The range length is the
+  // fixed slab size and the maximum single reservation served by this pool.
+  // Live-pressure exhaustion grows by acquiring another slab of this size.
+  // Larger requests are oversized for TLSF and should route to a direct pool.
   iree_hal_memory_tlsf_options_t tlsf_options;
 
   // Logical byte budget for live reservations in this pool. 0 means unlimited.
@@ -36,7 +37,7 @@ typedef struct iree_hal_tlsf_pool_options_t {
   iree_string_view_t trace_name;
 } iree_hal_tlsf_pool_options_t;
 
-// Creates a TLSF-backed HAL pool over one slab from |slab_provider|.
+// Creates a growable TLSF-backed HAL pool over slabs from |slab_provider|.
 //
 // |notification| is published on reservation release and skips platform wake
 // work when no waiter is observing it.
@@ -53,12 +54,10 @@ typedef struct iree_hal_tlsf_pool_options_t {
 // before searching TLSF.
 //
 // Recycled blocks whose frontiers are not dominated by the requester are
-// skipped by default. If the caller sets
-// IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER, the pool may return one such
-// block as IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT after preferring any immediately
-// usable block. In that case out_info->wait_frontier points to
-// reservation-owned storage that remains valid until the reservation is
-// released.
+// skipped. When no immediately-usable block fits, the pool grows with another
+// slab instead of returning wait-frontier reservations; queue-visible
+// backpressure remains a budget/provider concern, not a hidden dependency
+// between arbitrary transient allocations.
 IREE_API_EXPORT iree_status_t iree_hal_tlsf_pool_create(
     iree_hal_tlsf_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,

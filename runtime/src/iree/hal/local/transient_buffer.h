@@ -45,6 +45,13 @@ iree_status_t iree_hal_local_transient_buffer_create(
 // Returns true if |buffer| is a local transient buffer wrapper.
 bool iree_hal_local_transient_buffer_isa(const iree_hal_buffer_t* buffer);
 
+// Returns true if |buffer| has a committed backing buffer visible to callers.
+//
+// This is a cheap state query for queue implementations that need to decide
+// whether a transient can be mapped immediately or must be resolved after its
+// queue allocation dependency has completed.
+bool iree_hal_local_transient_buffer_is_committed(iree_hal_buffer_t* buffer);
+
 // Returns the stable profiling id assigned to this transient buffer wrapper.
 //
 // The id is process-global and nonzero. Producers use it as a session-local

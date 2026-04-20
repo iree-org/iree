@@ -9,8 +9,13 @@
 #include <string.h>
 
 typedef struct iree_hal_pool_set_entry_t {
-  iree_hal_pool_t* pool;  // retained
+  // Retained pool reference selected when |capabilities| match.
+  iree_hal_pool_t* pool;
+
+  // Selection priority. Higher values win when multiple pools match.
   int32_t priority;
+
+  // Cached pool capabilities captured at registration time.
   iree_hal_pool_capabilities_t capabilities;
 } iree_hal_pool_set_entry_t;
 

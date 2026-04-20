@@ -192,13 +192,15 @@ typedef struct iree_hal_pool_capabilities_t {
   // that isn't host-visible can't serve MAPPING usage.
   iree_hal_buffer_usage_t supported_usage;
 
-  // Minimum allocation size in bytes. Fixed-block pools: block_size. TLSF:
-  // alignment. Arena: 1. 0 means no minimum.
+  // Minimum allocation size in bytes. Fixed-block pools use their block size.
+  // Suballocating pools may round internally and report 0 or 1 when they have
+  // no practical lower bound.
   iree_device_size_t min_allocation_size;
 
-  // Maximum allocation size in bytes. Fixed-block pools: block_size (or
-  // block_count * block_size for multi-block). TLSF: range_length.
-  // 0 means no maximum.
+  // Strategy-specific maximum single reservation in bytes. Fixed-block pools
+  // use their block size, TLSF pools use their slab size, and pass-through
+  // pools report 0 for no strategy limit. Budgets are reported separately and
+  // enforced by acquire_reservation().
   iree_device_size_t max_allocation_size;
 } iree_hal_pool_capabilities_t;
 

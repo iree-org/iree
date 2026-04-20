@@ -165,6 +165,7 @@ typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // Zero means no work was available (either the region was exhausted by
   // other workers or the processor is between region transitions).
   uint32_t tiles_executed;
+
   // True when the entire recording has finished (all blocks processed and
   // RETURN reached) or an error has been reported. Once true, all
   // subsequent drain() calls also return completed=true.

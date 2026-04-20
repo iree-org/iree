@@ -427,6 +427,39 @@ static iree_status_t iree_hal_task_queue_profile_set_dispatch(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_queue_profile_record_command_buffer(
+    iree_hal_task_queue_op_t* operation,
+    iree_hal_command_buffer_t* command_buffer) {
+  iree_hal_task_queue_profile_operation_t* profile_operation =
+      iree_hal_task_queue_profile_operation(operation);
+  if (!profile_operation) return iree_ok_status();
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_operation->recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_profile_command_buffer_record_t command_buffer_record;
+  const iree_hal_profile_command_operation_record_t* operations = NULL;
+  iree_host_size_t operation_count = 0;
+  iree_hal_block_command_buffer_profile_metadata(
+      command_buffer, profile_operation->scope.physical_device_ordinal,
+      &command_buffer_record, &operations, &operation_count);
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_command_buffer(
+      profile_operation->recorder, &command_buffer_record, operation_count,
+      operations));
+
+  iree_host_size_t executable_count = 0;
+  iree_hal_executable_t* const* executables =
+      iree_hal_block_command_buffer_profile_executables(command_buffer,
+                                                        &executable_count);
+  for (iree_host_size_t i = 0; i < executable_count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+        profile_operation->recorder, executables[i]));
+  }
+  return iree_ok_status();
+}
+
 static void iree_hal_task_queue_profile_set_command_buffer(
     iree_hal_task_queue_op_t* operation,
     iree_hal_command_buffer_t* command_buffer) {
@@ -435,6 +468,10 @@ static void iree_hal_task_queue_profile_set_command_buffer(
   if (!profile_operation) return;
   profile_operation->command_buffer_id =
       command_buffer ? iree_hal_command_buffer_profile_id(command_buffer) : 0;
+  if (command_buffer && iree_hal_block_command_buffer_isa(command_buffer)) {
+    profile_operation->operation_count = iree_hal_task_queue_profile_count(
+        iree_hal_block_command_buffer_profile_operation_count(command_buffer));
+  }
 }
 
 static void iree_hal_task_queue_profile_record_queue_event(
@@ -563,15 +600,15 @@ static void iree_hal_task_queue_op_destroy(iree_hal_task_queue_op_t* operation,
   // signal until writes are visible. Must also precede resource_set_free
   // (which drops the buffer references the mappings point into).
   //
-  // The mappings array is 1:1 with binding_table entries; NULL-buffer slots
-  // have zeroed mappings that unmap_range handles as no-ops.
+  // The mappings array is 1:1 with resolved block binding entries; NULL-buffer
+  // slots have zeroed mappings that unmap_range handles as no-ops.
   //
   // On the success path, an unmap failure becomes the operation's failure
   // status (surfaced to semaphores below). On the failure path, we already
   // have an error to propagate so unmap failures are secondary.
   if (operation->type == IREE_HAL_TASK_QUEUE_OP_COMMANDS &&
       operation->commands.binding_mappings) {
-    for (iree_host_size_t i = 0; i < operation->commands.binding_table.count;
+    for (iree_host_size_t i = 0; i < operation->commands.binding_mapping_count;
          ++i) {
       iree_status_t unmap_status =
           iree_hal_buffer_unmap_range(&operation->commands.binding_mappings[i]);
@@ -1423,6 +1460,23 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_queue_resolve_binding_entry(
+    const iree_hal_buffer_binding_t* binding,
+    iree_hal_buffer_mapping_t* mapping,
+    iree_hal_cmd_binding_entry_t* out_entry) {
+  if (binding->buffer) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        binding->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_ANY, binding->offset, binding->length, mapping));
+    out_entry->base = mapping->contents.data;
+    out_entry->length = mapping->contents.data_length;
+  } else {
+    out_entry->base = NULL;
+    out_entry->length = 0;
+  }
+  return iree_ok_status();
+}
+
 // Handles a COMMANDS operation: extracts the recording from the command buffer
 // and routes it through the compute process.
 static iree_status_t iree_hal_task_queue_drain_commands(
@@ -1440,42 +1494,52 @@ static iree_status_t iree_hal_task_queue_drain_commands(
   const iree_hal_cmd_block_recording_t* recording =
       iree_hal_block_command_buffer_recording(
           operation->commands.command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_profile_record_command_buffer(
+      operation, operation->commands.command_buffer));
 
-  // Resolve the HAL binding table to block ISA binding entries. Each entry
-  // maps a HAL buffer to a host pointer for indirect fixup resolution.
+  // Resolve the HAL binding table to block ISA binding entries. External
+  // entries come first at their declared binding table slots, followed by
+  // late direct transient entries recorded by the command buffer.
+  iree_host_size_t late_binding_count = 0;
+  const iree_hal_buffer_binding_t* late_bindings =
+      iree_hal_block_command_buffer_late_bindings(
+          operation->commands.command_buffer, &late_binding_count);
+
   // The entries and SCOPED mappings are allocated from the operation's arena.
   // Mappings are tracked on the operation for unmap in op_destroy.
   const iree_hal_cmd_binding_entry_t* binding_table = NULL;
   iree_host_size_t binding_table_length = 0;
   const iree_hal_buffer_binding_table_t hal_table =
       operation->commands.binding_table;
-  if (hal_table.count > 0) {
+  const iree_host_size_t late_binding_base =
+      operation->commands.command_buffer->binding_capacity;
+  const iree_host_size_t resolved_binding_count =
+      iree_max(hal_table.count, late_binding_base + late_binding_count);
+  if (resolved_binding_count > 0) {
     iree_hal_cmd_binding_entry_t* entries = NULL;
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(&operation->arena,
-                                             hal_table.count * sizeof(*entries),
-                                             (void**)&entries));
+    IREE_RETURN_IF_ERROR(iree_arena_allocate(
+        &operation->arena, resolved_binding_count * sizeof(*entries),
+        (void**)&entries));
+    memset(entries, 0, resolved_binding_count * sizeof(*entries));
     iree_hal_buffer_mapping_t* mappings = NULL;
     IREE_RETURN_IF_ERROR(iree_arena_allocate(
-        &operation->arena, hal_table.count * sizeof(*mappings),
+        &operation->arena, resolved_binding_count * sizeof(*mappings),
         (void**)&mappings));
-    memset(mappings, 0, hal_table.count * sizeof(*mappings));
-    for (iree_host_size_t i = 0; i < hal_table.count; ++i) {
-      const iree_hal_buffer_binding_t* binding = &hal_table.bindings[i];
-      if (binding->buffer) {
-        IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-            binding->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-            IREE_HAL_MEMORY_ACCESS_ANY, binding->offset, binding->length,
-            &mappings[i]));
-        entries[i].base = mappings[i].contents.data;
-        entries[i].length = mappings[i].contents.data_length;
-      } else {
-        entries[i].base = NULL;
-        entries[i].length = 0;
-      }
-    }
+    memset(mappings, 0, resolved_binding_count * sizeof(*mappings));
     operation->commands.binding_mappings = mappings;
+    operation->commands.binding_mapping_count = resolved_binding_count;
+    for (iree_host_size_t i = 0; i < hal_table.count; ++i) {
+      IREE_RETURN_IF_ERROR(iree_hal_task_queue_resolve_binding_entry(
+          &hal_table.bindings[i], &mappings[i], &entries[i]));
+    }
+    for (iree_host_size_t i = 0; i < late_binding_count; ++i) {
+      const iree_host_size_t binding_index = late_binding_base + i;
+      IREE_RETURN_IF_ERROR(iree_hal_task_queue_resolve_binding_entry(
+          &late_bindings[i], &mappings[binding_index],
+          &entries[binding_index]));
+    }
     binding_table = entries;
-    binding_table_length = hal_table.count;
+    binding_table_length = resolved_binding_count;
   }
 
   return iree_hal_task_queue_drain_recording(
@@ -2253,7 +2317,6 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
       return iree_ok_status();
     }
 
-    // Drain the block processor.
     if (IREE_UNLIKELY(queue->profile_recorder)) {
       iree_hal_task_queue_profile_start_host_execution(item->operation);
     }
@@ -2261,8 +2324,13 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         &item->worker_states[worker_index % item->worker_count];
     iree_hal_cmd_block_processor_drain_result_t processor_result;
     memset(&processor_result, 0, sizeof(processor_result));
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_drain, "iree_hal_local_task_compute_drain");
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_drain, (int64_t)worker_index);
     iree_hal_cmd_block_processor_drain(item->processor_context, worker_index,
                                        worker_state, &processor_result);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_drain,
+                                     (int64_t)processor_result.tiles_executed);
+    IREE_TRACE_ZONE_END(z_drain);
 
     // Handle per-recording completion via CLOSED flag. The first worker to set
     // CLOSED only publishes the next recording; the last drainer consumes the
@@ -3141,6 +3209,7 @@ iree_status_t iree_hal_task_queue_submit_commands(
     operation->commands.command_buffer = batch->command_buffer;
     operation->commands.binding_table = iree_hal_buffer_binding_table_empty();
     operation->commands.binding_mappings = NULL;
+    operation->commands.binding_mapping_count = 0;
     iree_hal_task_queue_profile_add_host_flags(
         operation, IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER);
     iree_hal_task_queue_profile_set_command_buffer(operation,

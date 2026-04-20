@@ -89,9 +89,16 @@ static void iree_hal_cpu_slab_provider_query_properties(
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
       IREE_HAL_MEMORY_TYPE_HOST_COHERENT | IREE_HAL_MEMORY_TYPE_HOST_CACHED;
   *out_supported_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                         IREE_HAL_BUFFER_USAGE_DISPATCH |
+                         IREE_HAL_BUFFER_USAGE_SHARING_EXPORT |
+                         IREE_HAL_BUFFER_USAGE_SHARING_REPLICATE |
+                         IREE_HAL_BUFFER_USAGE_SHARING_CONCURRENT |
+                         IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE |
                          IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
-                         IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT;
+                         IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+                         IREE_HAL_BUFFER_USAGE_MAPPING_OPTIONAL |
+                         IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM |
+                         IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE;
 }
 
 // Forces the OS to back all virtual pages in the slab with physical memory

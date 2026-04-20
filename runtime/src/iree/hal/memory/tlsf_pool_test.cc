@@ -275,6 +275,39 @@ TEST_F(TLSFPoolTest, ReleaseWithObserverSignalsNotification) {
   iree_async_notification_end_observe(notification_);
 }
 
+TEST_F(TLSFPoolTest, ReserveRejectsOversizedAllocation) {
+  iree_hal_pool_reservation_t reservation;
+  iree_hal_pool_acquire_info_t reserve_info;
+  iree_hal_pool_acquire_result_t result;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_OUT_OF_RANGE,
+                        iree_hal_pool_acquire_reservation(
+                            pool_, 8192, 16, /*requester_frontier=*/NULL,
+                            IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation,
+                            &reserve_info, &result));
+}
+
+TEST_F(TLSFPoolTest, ReserveGrowsForLivePressure) {
+  iree_hal_pool_reservation_t first_reservation;
+  iree_hal_pool_acquire_info_t reserve_info;
+  iree_hal_pool_acquire_result_t result;
+  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+      pool_, 4096, 16, /*requester_frontier=*/NULL,
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &first_reservation, &reserve_info,
+      &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+
+  iree_hal_pool_reservation_t second_reservation;
+  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+      pool_, 4096, 16, /*requester_frontier=*/NULL,
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &second_reservation, &reserve_info,
+      &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_NE(second_reservation.slab_index, first_reservation.slab_index);
+
+  iree_hal_pool_release_reservation(pool_, &second_reservation, NULL);
+  iree_hal_pool_release_reservation(pool_, &first_reservation, NULL);
+}
+
 TEST(TLSFPool, ReleaseNodeReuseAvoidsRepeatedHostAllocation) {
   iree_hal_test_counting_allocator_t allocator_state = {
       /*.backing_allocator=*/iree_allocator_system(),
@@ -432,7 +465,7 @@ TEST(TLSFPool, ReserveSkipsStaleHeadAndReturnsFreshLaterBlock) {
   iree_hal_slab_provider_release(slab_provider);
 }
 
-TEST(TLSFPool, ReserveCanReturnStaleBlockWhenWaitAllowed) {
+TEST(TLSFPool, ReserveGrowsInsteadOfWaitingForStaleBlock) {
   iree_allocator_t allocator = iree_allocator_system();
   iree_hal_slab_provider_t* slab_provider = NULL;
   IREE_ASSERT_OK(iree_hal_cpu_slab_provider_create(allocator, &slab_provider));
@@ -460,22 +493,18 @@ TEST(TLSFPool, ReserveCanReturnStaleBlockWhenWaitAllowed) {
   iree_hal_pool_release_reservation(pool, &reservation, death);
 
   MAKE_FRONTIER(requester, 1, E(TestQueueAxis(0), 10));
+  iree_hal_pool_reservation_t grown_reservation;
   IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
       pool, 256, 16, requester, IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER,
-      &reservation, &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT);
-  ASSERT_NE(reserve_info.wait_frontier, nullptr);
-  EXPECT_EQ(reserve_info.wait_frontier->entry_count, 1u);
-  EXPECT_EQ(reserve_info.wait_frontier->entries[0].axis, TestQueueAxis(0));
-  EXPECT_EQ(reserve_info.wait_frontier->entries[0].epoch, 20u);
+      &grown_reservation, &reserve_info, &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_EQ(reserve_info.wait_frontier, nullptr);
+  EXPECT_NE(grown_reservation.slab_index, 0u);
 
   iree_hal_pool_stats_t stats;
   iree_hal_pool_query_stats(pool, &stats);
   EXPECT_EQ(stats.reuse_miss_count, 1u);
-  EXPECT_EQ(stats.wait_count, 1u);
-
-  iree_hal_pool_release_reservation(pool, &reservation,
-                                    reserve_info.wait_frontier);
+  EXPECT_EQ(stats.wait_count, 0u);
 
   MAKE_FRONTIER(dominating_requester, 1, E(TestQueueAxis(0), 20));
   IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
@@ -485,6 +514,7 @@ TEST(TLSFPool, ReserveCanReturnStaleBlockWhenWaitAllowed) {
   EXPECT_EQ(reservation.offset, 0u);
 
   iree_hal_pool_release_reservation(pool, &reservation, NULL);
+  iree_hal_pool_release_reservation(pool, &grown_reservation, NULL);
   iree_hal_pool_release(pool);
   iree_async_notification_release(notification);
   iree_hal_slab_provider_release(slab_provider);
@@ -521,22 +551,27 @@ TEST(TLSFPool, ReserveRejectedTaintRemainsRejected) {
 
   MAKE_FRONTIER(requester, 2, E(TestQueueAxis(0), 100),
                 E(TestQueueAxis(1), 100));
+  iree_hal_pool_reservation_t first_grown_reservation;
   IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
       pool, 256, 16, requester, IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER,
-      &reservation, &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_EXHAUSTED);
+      &first_grown_reservation, &reserve_info, &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_NE(first_grown_reservation.slab_index, 0u);
 
+  iree_hal_pool_reservation_t second_grown_reservation;
   IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
       pool, 256, 16, requester, IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER,
-      &reservation, &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_EXHAUSTED);
+      &second_grown_reservation, &reserve_info, &result));
+  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
 
   iree_hal_pool_stats_t stats;
   iree_hal_pool_query_stats(pool, &stats);
   EXPECT_EQ(stats.reuse_miss_count, 2u);
-  EXPECT_EQ(stats.exhausted_count, 2u);
+  EXPECT_EQ(stats.exhausted_count, 0u);
   EXPECT_EQ(stats.wait_count, 0u);
 
+  iree_hal_pool_release_reservation(pool, &second_grown_reservation, NULL);
+  iree_hal_pool_release_reservation(pool, &first_grown_reservation, NULL);
   iree_hal_pool_release(pool);
   iree_async_notification_release(notification);
   iree_hal_slab_provider_release(slab_provider);
@@ -674,7 +709,7 @@ TEST_F(TLSFPoolTest, QueryCapabilitiesAndBudget) {
                                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL));
   EXPECT_TRUE(iree_all_bits_set(capabilities.supported_usage,
                                 IREE_HAL_BUFFER_USAGE_TRANSFER));
-  EXPECT_EQ(capabilities.min_allocation_size, 16u);
+  EXPECT_EQ(capabilities.min_allocation_size, 1u);
   EXPECT_EQ(capabilities.max_allocation_size, 4096u);
 
   iree_hal_pool_release(pool_);

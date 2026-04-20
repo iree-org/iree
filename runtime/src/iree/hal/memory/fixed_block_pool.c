@@ -288,10 +288,7 @@ static iree_status_t iree_hal_fixed_block_pool_acquire_reservation(
                             alignment);
   }
   if (size > pool->block_size) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "reservation size %" PRIdsz
-                            " exceeds fixed block size %" PRIdsz,
-                            size, pool->block_size);
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
   if (alignment > pool->block_size || (pool->block_size % alignment) != 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

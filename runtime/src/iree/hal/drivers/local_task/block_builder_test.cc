@@ -8,7 +8,9 @@
 
 #include <cstring>
 
+#include "iree/hal/drivers/local_task/block_command_ops.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
+#include "iree/hal/local/local_executable.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -201,6 +203,60 @@ TEST_F(BlockBuilderTest, SingleDispatch) {
         << "fixup[" << i << "] data_index mismatch";
     EXPECT_EQ(block_fixups[i].offset, (iree_device_size_t)(i * 256))
         << "fixup[" << i << "] offset mismatch";
+  }
+
+  iree_hal_cmd_block_recording_release(&recording);
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+}
+
+TEST_F(BlockBuilderTest, CommandOpSplitKeepsBindingIndicesBlockLocal) {
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(&block_pool_, &builder);
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
+
+  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {
+      .constant_count = 0,
+      .binding_count = 12,
+  };
+  iree_hal_local_executable_t executable = {};
+  executable.dispatch_attrs = &dispatch_attrs;
+
+  iree_hal_dispatch_config_t config = {
+      .workgroup_size = {1, 1, 1},
+      .workgroup_count = {1, 1, 1},
+  };
+  for (int i = 0; i < 100; ++i) {
+    iree_hal_cmd_fixup_t* fixups = NULL;
+    iree_hal_cmd_build_token_t token = {0};
+    IREE_ASSERT_OK(iree_hal_cmd_build_dispatch(
+        &builder, (iree_hal_executable_t*)&executable, /*export_ordinal=*/0,
+        config, iree_const_byte_span_empty(), dispatch_attrs.binding_count,
+        IREE_HAL_DISPATCH_FLAG_NONE, &fixups, &token));
+  }
+
+  iree_hal_cmd_block_recording_t recording;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
+  EXPECT_GT(recording.block_count, 1u);
+
+  for (const iree_hal_cmd_block_header_t* block = recording.first_block; block;
+       block = block->next_block) {
+    const iree_hal_cmd_fixup_t* fixups = iree_hal_cmd_block_fixups(block);
+    for (uint16_t i = 0; i < block->fixup_count; ++i) {
+      EXPECT_LT(fixups[i].data_index, block->total_binding_count);
+    }
+
+    const iree_hal_cmd_header_t* command = iree_hal_cmd_block_commands(block);
+    while (command->opcode != IREE_HAL_CMD_BRANCH &&
+           command->opcode != IREE_HAL_CMD_RETURN) {
+      if (command->opcode == IREE_HAL_CMD_DISPATCH) {
+        const iree_hal_cmd_dispatch_t* dispatch =
+            (const iree_hal_cmd_dispatch_t*)command;
+        EXPECT_LE(
+            (uint32_t)dispatch->binding_data_base + dispatch->binding_count,
+            (uint32_t)block->total_binding_count);
+      }
+      command = iree_hal_cmd_next(command);
+    }
   }
 
   iree_hal_cmd_block_recording_release(&recording);

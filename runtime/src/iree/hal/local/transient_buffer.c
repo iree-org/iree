@@ -105,6 +105,13 @@ bool iree_hal_local_transient_buffer_isa(const iree_hal_buffer_t* buffer) {
                               &iree_hal_local_transient_buffer_vtable);
 }
 
+bool iree_hal_local_transient_buffer_is_committed(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_local_transient_buffer_t* buffer =
+      iree_hal_local_transient_buffer_cast(base_buffer);
+  return iree_hal_local_transient_buffer_load_committed(buffer) != NULL;
+}
+
 uint64_t iree_hal_local_transient_buffer_profile_id(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_local_transient_buffer_t* buffer =

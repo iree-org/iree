@@ -327,11 +327,17 @@ typedef struct iree_hal_cmd_dispatch_t {
   //   function(&executable->environment, &dispatch_state, &workgroup_state)
   iree_hal_executable_dispatch_v0_t function;
 
-  // Export ordinal within the executable. Packed with workgroup_size to
-  // fill the 4 bytes between the 8-byte function pointer and the 4-byte-
-  // aligned workgroup_size array.
+  // Export ordinal within the executable.
   uint16_t export_ordinal;
+
+  // Reserved for future dispatch command fields.
   uint16_t reserved;
+
+  // Profiling sideband data.
+  struct {
+    // Command-buffer-global operation index used for profiling joins.
+    uint32_t command_index;
+  } profile;
 
   // Workgroup grid dimensions.
   uint32_t workgroup_size[3];
@@ -371,8 +377,8 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint32_t constants[];
 } iree_hal_cmd_dispatch_t;
 
-static_assert(offsetof(iree_hal_cmd_dispatch_t, constants) == 64,
-              "dispatch fixed part is 64 bytes; constants[] follows");
+static_assert(offsetof(iree_hal_cmd_dispatch_t, constants) == 68,
+              "dispatch fixed part is 68 bytes; constants[] follows");
 
 //===----------------------------------------------------------------------===//
 // FILL command

@@ -7,6 +7,7 @@
 #include "iree/hal/memory/passthrough_pool.h"
 
 #include "iree/async/notification.h"
+#include "iree/base/internal/math.h"
 #include "iree/hal/memory/tracing.h"
 
 //===----------------------------------------------------------------------===//
@@ -192,9 +193,26 @@ static iree_status_t iree_hal_passthrough_pool_acquire_reservation(
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
   iree_hal_passthrough_pool_t* pool = (iree_hal_passthrough_pool_t*)base_pool;
-  (void)alignment;
   (void)requester_frontier;
   (void)flags;
+
+  if (size == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "reservation size must be > 0");
+  }
+  if (alignment == 0 || !iree_device_size_is_power_of_two(alignment)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "reservation alignment (%" PRIdsz
+                            ") must be a power of two > 0",
+                            alignment);
+  }
+  if (alignment > IREE_HAL_HEAP_BUFFER_ALIGNMENT) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "reservation alignment %" PRIdsz
+                            " exceeds pass-through pool alignment %" PRIdsz,
+                            alignment,
+                            (iree_device_size_t)IREE_HAL_HEAP_BUFFER_ALIGNMENT);
+  }
 
   iree_hal_slab_t slab;
   IREE_RETURN_IF_ERROR(
