@@ -233,3 +233,119 @@ func.func @attention3x3x4() {
   ) : tensor<3x3x4xf32>
   return
 }
+
+func.func @online_attention1x3x4() {
+  %cst0 = arith.constant 0.0 : f32
+  %cst_neg_inf = arith.constant 0xFF800000 : f32
+  %cst_one = arith.constant 1.0 : f32
+  %scale = arith.constant 0.5 : f32
+  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                          [0.5, 0.6, 0.7, 0.8],
+                                          [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %value = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %acc_e = tensor.empty() : tensor<1x3x4xf32>
+  %ms_e = tensor.empty() : tensor<1x3xf32>
+  %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<1x3x4xf32>) -> tensor<1x3x4xf32>
+  %max = linalg.fill ins(%cst_neg_inf : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
+  %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
+  %r:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]
+  } ins(%query, %key, %value, %scale :
+        tensor<1x3x4xf32>, tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32)
+    outs(%acc, %max, %sum :
+         tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>) {
+  ^bb0(%score : f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>
+  %out_e = tensor.empty() : tensor<1x3x4xf32>
+  %normalized = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%r#0, %r#2 : tensor<1x3x4xf32>, tensor<1x3xf32>)
+    outs(%out_e : tensor<1x3x4xf32>) {
+  ^bb0(%a: f32, %s: f32, %_: f32):
+    %inv = arith.divf %cst_one, %s : f32
+    %v = arith.mulf %a, %inv : f32
+    linalg.yield %v : f32
+  } -> tensor<1x3x4xf32>
+  check.expect_almost_eq_const(
+      %normalized,
+      dense<[[[0.5530, 0.6530, 0.7530, 0.8530],
+              [0.6328, 0.7328, 0.8328, 0.9328],
+              [0.7011, 0.8011, 0.9011, 1.0011]]]> : tensor<1x3x4xf32>
+  ) : tensor<1x3x4xf32>
+  return
+}
+
+func.func @causal_online_attention1x3x4() {
+  %cst0 = arith.constant 0.0 : f32
+  %cst_neg_inf = arith.constant 0xFF800000 : f32
+  %cst_one = arith.constant 1.0 : f32
+  %scale = arith.constant 0.5 : f32
+  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                          [0.5, 0.6, 0.7, 0.8],
+                                          [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %value = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %mask = util.unfoldable_constant dense<[[[true, false,  false],
+                                           [true, true,   false],
+                                           [true, true,   true]]]> : tensor<1x3x3xi1>
+  %acc_e = tensor.empty() : tensor<1x3x4xf32>
+  %ms_e = tensor.empty() : tensor<1x3xf32>
+  %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<1x3x4xf32>) -> tensor<1x3x4xf32>
+  %max = linalg.fill ins(%cst_neg_inf : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
+  %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
+  %r:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]
+  } ins(%query, %key, %value, %scale, %mask :
+        tensor<1x3x4xf32>, tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32, tensor<1x3x3xi1>)
+    outs(%acc, %max, %sum :
+         tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>) {
+  ^bb0(%score : f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>
+  %out_e = tensor.empty() : tensor<1x3x4xf32>
+  %normalized = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%r#0, %r#2 : tensor<1x3x4xf32>, tensor<1x3xf32>)
+    outs(%out_e : tensor<1x3x4xf32>) {
+  ^bb0(%a: f32, %s: f32, %_: f32):
+    %inv = arith.divf %cst_one, %s : f32
+    %v = arith.mulf %a, %inv : f32
+    linalg.yield %v : f32
+  } -> tensor<1x3x4xf32>
+  check.expect_almost_eq_const(
+      %normalized,
+      dense<[[[0.1000, 0.2000, 0.3000, 0.4000],
+              [0.3509, 0.4509, 0.5509, 0.6509],
+              [0.7011, 0.8011, 0.9011, 1.0011]]]> : tensor<1x3x4xf32>
+  ) : tensor<1x3x4xf32>
+  return
+}
