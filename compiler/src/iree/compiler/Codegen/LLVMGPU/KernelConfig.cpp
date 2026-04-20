@@ -332,21 +332,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
-    // TODO: Add block intrinsic support for vector distribute convolutions.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
+  // Skip adding any virtual intrinsics since they are not tested for
+  // convolutions.
+  // TODO: Add block intrinsic support for vector distribute convolutions.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/false, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Skip adding any virtual intrinsics since they are not tested for
-    // convolutions.
   }
 
   if (intrinsics.empty()) {
@@ -575,20 +566,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // We currently dont use block intrinsics for GEMMs.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
+  // Skip adding any virtual intrinsics since they are not tested for matmuls.
+  // We currently dont use block intrinsics for GEMMs.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/false, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Skip adding any virtual intrinsics since they are not tested for matmuls.
   }
 
   if (intrinsics.empty()) {
@@ -834,26 +816,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   MLIRContext *context = op.getContext();
-  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
-    if (mma.getSubgroupSize() != targetSubgroupSize) {
-      continue;
-    }
-    // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind()) {
-      continue;
-    }
-    // TODO: Enable block intrinsics for attention.
-    if (mma.isBlockIntrinsic()) {
-      continue;
-    }
+  // TODO: Enable block intrinsics for attention.
+  for (IREE::GPU::MmaInterfaceAttr mma : getMMAAttrs(
+           target, /*includeVirtual=*/true, /*includeBlockIntrinsic=*/false)) {
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
   }
 
   if (intrinsics.empty()) {
@@ -2591,77 +2557,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     return success();
   }
 
-  Operation *rootOperation = nullptr;
-
-  // Find the root operation. linalg.generic, linalg.fill, linalg.pack,
-  // linalg.unpack, and scatter are not root operations if there are other
-  // compute operations present. Also, construct a set of generic ops that
-  // are to be skipped. These generic ops that are used to compute scatter
-  // indices are not root operations.
-  llvm::SmallDenseSet<Operation *, 4> genericToSkip;
-  for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::CopyOp, linalg::GenericOp, linalg::FillOp,
-             IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapStoreOp,
-             linalg::PackOp, linalg::UnPackOp>(op)) {
-      rootOperation = op;
-      break;
-    }
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      // linalg.generic with `reduction` iterator types are roots as well.
-      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-        rootOperation = op;
-        break;
-      }
-    }
-
-    if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
-      Value indices = scatterOp.getIndices();
-      if (!indices.getDefiningOp()) {
-        continue;
-      }
-
-      // Mark scatter's backward slices(inclusive) as to skip.
-      BackwardSliceOptions options;
-      options.inclusive = true;
-      SetVector<Operation *> slices;
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(indices, &slices, options);
-      assert(result.succeeded());
-      genericToSkip.insert(slices.begin(), slices.end());
-    }
-  }
-
-  // Generic ops take priority over pack, unpack, scatter, and fill ops as the
-  // root op.
-  if (!rootOperation) {
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::GenericOp>(op) && !genericToSkip.contains(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  // Pack and unpack ops take priority over scatter and fill ops as the root op.
-  if (!rootOperation) {
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<linalg::PackOp, linalg::UnPackOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  if (!rootOperation) {
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapStoreOp,
-              linalg::CopyOp, linalg::FillOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
+  Operation *rootOperation = GetRootOperation(computeOps);
   if (!rootOperation) {
     // No root operation found, set it to none.
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(

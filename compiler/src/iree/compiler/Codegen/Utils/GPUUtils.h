@@ -332,6 +332,18 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp);
 // tuner root op attribute (i.e., have the `root_op` UnitAttr).
 SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
 
+// Returns the root operation from a list of compute ops.
+Operation *GetRootOperation(ArrayRef<Operation *> computeOps);
+
+// Returns the available scaled MMA attributes for the given target.
+SmallVector<IREE::GPU::ScaledMMAAttr>
+getScaledMMAAttrs(IREE::GPU::TargetAttr target);
+
+// Returns the available MMA and virtual MMA attributes for the given target.
+SmallVector<IREE::GPU::MmaInterfaceAttr>
+getMMAAttrs(IREE::GPU::TargetAttr target, bool includeVirtual = false,
+            bool includeBlockIntrinsic = true);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
