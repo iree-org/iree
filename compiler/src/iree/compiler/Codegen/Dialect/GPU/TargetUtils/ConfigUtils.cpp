@@ -572,7 +572,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
-    bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
+    bool scaled, bool &useDirectLoad, int64_t prefetchNumStages,
     int64_t splitReductionTripCnt, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
@@ -750,13 +750,15 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-  // compilation doesn't support it. Once this is fixed, we should use global
-  // load DMA here when possible.
+  // Only enable direct load (global load DMA) for bf16 GEMMs on gfx950+.
+  // TODO: Add support for scaled matmul (#22119) and convolution (#23907).
   Location loc = operands[0].getLoc();
-  if (scaled && useDirectLoad) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
-                              "supported for scaled matmuls, ignoring";
+  if (useDirectLoad &&
+      !(isGemm && lhsElemType.isBF16() && rhsElemType.isBF16() &&
+        targetSupportsGlobalLoadDMA(target))) {
+    mlir::emitWarning(loc) << "direct load (global load DMA) is currently only "
+                              "supported for bf16 GEMMs "
+                              "on gfx950+, falling back to stream copies";
     useDirectLoad = false;
   }
 
@@ -879,16 +881,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (useDirectLoad) {
     Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
-    // innermost (contiguous reads) to avoid LDS bank conflicts.
-    if (lhsElemType.isBF16() && !transposedLhs) {
+    // Apply XOR swizzle for DMA operands whose reduction dim is innermost
+    // (contiguous reads) to avoid LDS bank conflicts.
+    if (!transposedLhs) {
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
       if (succeeded(lhsSwizzleAttr)) {
         lhsAttr = *lhsSwizzleAttr;
       }
     }
-    if (rhsElemType.isBF16() && transposedRhs) {
+    if (transposedRhs) {
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
       if (succeeded(rhsSwizzleAttr)) {
