@@ -150,6 +150,12 @@ struct EncodingAttrPropagationInterface final
               })) {
             return false;
           }
+          // Only support permutation for now. Projected permutations mean that
+          // there are some broadcast dimensions, and it is unclear how to
+          // represent encodings for this case. Bail out for now.
+          if (!genericOp.getMatchingIndexingMap(target).isPermutation()) {
+            return false;
+          }
           return true;
         })
         .Default(false);
