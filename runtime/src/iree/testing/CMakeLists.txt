@@ -8,7 +8,7 @@
 
 iree_add_all_subdirs()
 
-if(IREE_ENABLE_THREADING)
+if(IREE_ENABLE_THREADING AND IREE_ENABLE_THIRD_PARTY_BENCHMARK)
   iree_cc_library(
     NAME
       benchmark
