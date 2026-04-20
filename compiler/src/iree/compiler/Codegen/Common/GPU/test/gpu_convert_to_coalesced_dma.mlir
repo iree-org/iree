@@ -803,7 +803,7 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
   attributes {hal.executable.target = #exec_target_swizzle_linearize, translation_info = #translation_swizzle_linearize} {
   // Swizzle promotion creates: tensor.empty -> swizzle_hint -> expand_shape
   %empty = tensor.empty() : tensor<2048xf32>
-  %swizzled = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<128, 16>] : tensor<2048xf32>
+  %swizzled = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<128, 16>] : tensor<2048xf32> -> tensor<2048xf32>
   %expanded = tensor.expand_shape %swizzled [[0, 1]] output_shape [128, 16]
       : tensor<2048xf32> into tensor<128x16xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}

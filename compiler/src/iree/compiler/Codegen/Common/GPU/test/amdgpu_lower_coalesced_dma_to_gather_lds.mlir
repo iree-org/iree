@@ -1614,8 +1614,7 @@ func.func @lower_dma_with_dest_swizzle(
     hal.executable.target = #executable_target_rocm_hsaco_fb_swizzle,
     translation_info = #translation_swizzle} {
   %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
-  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>]
-      : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>] : memref<512xf32, #gpu.address_space<workgroup>> -> memref<512xf32, #gpu.address_space<workgroup>>
   %dest = memref.expand_shape %swizzled [[0, 1]]
       output_shape [4, 128]
       : memref<512xf32, #gpu.address_space<workgroup>>
@@ -1680,8 +1679,7 @@ func.func @lower_dma_with_chained_view_ops(
     hal.executable.target = #executable_target_rocm_hsaco_fb_swizzle_chain,
     translation_info = #translation_swizzle_chain} {
   %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
-  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>]
-      : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>] : memref<512xf32, #gpu.address_space<workgroup>> -> memref<512xf32, #gpu.address_space<workgroup>>
   %expanded = memref.expand_shape %swizzled [[0, 1]]
       output_shape [4, 128]
       : memref<512xf32, #gpu.address_space<workgroup>>
@@ -1730,8 +1728,7 @@ func.func @lower_dma_with_incompatible_swizzle(
     hal.executable.target = #executable_target_rocm_hsaco_fb_bad_swizzle,
     translation_info = #translation_bad_swizzle} {
   %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
-  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 2>]
-      : memref<512xf32, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 2>] : memref<512xf32, #gpu.address_space<workgroup>> -> memref<512xf32, #gpu.address_space<workgroup>>
   %dest = memref.expand_shape %swizzled [[0, 1]]
       output_shape [4, 128]
       : memref<512xf32, #gpu.address_space<workgroup>>

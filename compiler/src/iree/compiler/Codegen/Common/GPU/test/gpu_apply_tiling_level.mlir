@@ -800,9 +800,9 @@ func.func @matmul_transpose_b_with_swizzle(%5: tensor<64x64xf32>, %6: tensor<64x
   %c0 = arith.constant 0 : index
   %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
   %9 = tensor.empty() : tensor<64x1280xf16>
-  %swizzle_9 = iree_codegen.swizzle_hint %9[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %swizzle_9 = iree_codegen.swizzle_hint %9[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16> -> tensor<64x1280xf16>
   %10 = tensor.empty() : tensor<64x1280xf16>
-  %swizzle_10 = iree_codegen.swizzle_hint %10[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %swizzle_10 = iree_codegen.swizzle_hint %10[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16> -> tensor<64x1280xf16>
   %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
     %extracted_slice = tensor.extract_slice %6[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
     %extracted_slice_0 = tensor.extract_slice %swizzle_9[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
@@ -828,4 +828,4 @@ func.func @matmul_transpose_b_with_swizzle(%5: tensor<64x64xf32>, %6: tensor<64x
 
 // THREAD-LABEL: func.func @matmul_transpose_b_with_swizzle
 //       THREAD:     %2 = tensor.empty() : tensor<64x4xf16>
-//       THREAD:     %3 = iree_codegen.swizzle_hint %2[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x4xf16>
+//       THREAD:     %3 = iree_codegen.swizzle_hint %2[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x4xf16> -> tensor<64x4xf16>

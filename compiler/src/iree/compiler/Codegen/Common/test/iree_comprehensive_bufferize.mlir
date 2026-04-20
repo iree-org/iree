@@ -3007,7 +3007,7 @@ func.func @swizzle_hint(%arg0: tensor<1024xf32>) -> tensor<1024xf32> {
   %c64 = arith.constant 63 : index
   %c512 = arith.constant 512 : index
   %temp = bufferization.alloc_tensor() : tensor<512xf32>
-  %swizzled.temp = iree_codegen.swizzle_hint %temp[#iree_codegen.rotate_rows<256, 4>] : tensor<512xf32>
+  %swizzled.temp = iree_codegen.swizzle_hint %temp[#iree_codegen.rotate_rows<256, 4>] : tensor<512xf32> -> tensor<512xf32>
   %1 = scf.forall (%arg2) in (64) shared_outs(%arg3 = %swizzled.temp) -> tensor<512xf32> {
     %off = arith.muli %arg2, %c4 : index
     %slice = tensor.extract_slice %arg0[%off] [4] [1] : tensor<1024xf32> to tensor<4xf32>
@@ -3033,7 +3033,7 @@ func.func @swizzle_hint(%arg0: tensor<1024xf32>) -> tensor<1024xf32> {
 
 // CHECK-LABEL: func.func @swizzle_hint
 // CHECK: %[[SHARED:.+]] = memref.alloc() : memref<512xf32>
-// CHECK: %[[SWIZZLED:.+]] = iree_codegen.swizzle_hint %[[SHARED]][{{.*}}] : memref<512xf32>
+// CHECK: %[[SWIZZLED:.+]] = iree_codegen.swizzle_hint %[[SHARED]][{{.*}}] : memref<512xf32> -> memref<512xf32>
 // CHECK-COUNT-2: memref.subview %[[SWIZZLED]]
 
 // -----

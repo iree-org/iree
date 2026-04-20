@@ -136,7 +136,7 @@ def IREECodegen_FusionBarrierOp :
 //===----------------------------------------------------------------------===//
 
 def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
-    SameOperandsAndResultType, Pure]> {
+    SameOperandsAndResultShape, SameOperandsAndResultElementType, Pure]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
     Optimization hint to swizzle all accesses to the memref or tensor that this takes a
@@ -180,8 +180,15 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
                        IREECodegen_AnySwizzleAttr:$swizzle);
   let results = (outs AnyRankedTensorOrMemRef:$result);
 
+  let builders = [
+    OpBuilder<(ins "Value":$operand,
+                   "IREE::Codegen::SwizzleAttrInterface":$swizzle), [{
+      build($_builder, $_state, operand.getType(), operand, swizzle);
+    }]>
+  ];
+
   let assemblyFormat = [{
-    $operand `[` $swizzle attr-dict `]` `:` type($result)
+    $operand `[` $swizzle attr-dict `]` `:` type($operand) `->` type($result)
   }];
 }
 

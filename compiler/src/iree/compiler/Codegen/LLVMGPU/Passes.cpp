@@ -69,6 +69,11 @@ static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
+// Declared in GPUVectorAlloc.cpp; used here to make padding and swizzle
+// mutually exclusive — when swizzle is enabled, the padding pass is skipped
+// (padding changes row strides and breaks the XOR swizzle's address math).
+extern llvm::cl::opt<bool> clEnableVectorAllocSwizzle;
+
 static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
@@ -833,6 +838,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Tensor -> Memref
+  // FlattenSwizzleHintAllocs lowers multi-D alloc_tensors wrapped in a
+  // SwizzleHintOp (emitted by GPUVectorAlloc when swizzle is enabled) into
+  // a flat 1D alloc + expand_shape, which is what ResolveSwizzleHints needs.
+  // Skip the pass entirely when swizzle is off to keep the pipeline
+  // bit-identical to upstream.
+  if (clEnableVectorAllocSwizzle) {
+    funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
+  }
   addGPUBufferizePasses(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -847,7 +860,13 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  if (options.enableReduceSharedMemoryBankConflicts) {
+  // Padding and swizzle are mutually exclusive: padding changes the row
+  // stride to a non-power-of-2, which breaks the XOR swizzle's address
+  // math (the swizzle formula assumes rowStride == rowWidth). Only run
+  // padding when swizzle is NOT enabled. Default: swizzle off, padding
+  // runs — preserving the upstream compilation flow.
+  if (options.enableReduceSharedMemoryBankConflicts &&
+      !clEnableVectorAllocSwizzle) {
     GPUReduceBankConflictsPassOptions options = {};
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
