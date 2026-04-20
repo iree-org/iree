@@ -379,6 +379,41 @@ TEST(ReplayExecuteTest, RejectsExecutableSubstitutionAbiMismatch) {
   iree_hal_device_group_release(replay_group);
 }
 
+TEST(ReplayExecuteTest, RejectsTargetDeviceCountMismatch) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_device_t* replay_device_a = CreateSyncDevice("local-sync-a");
+  iree_hal_device_t* replay_device_b = CreateSyncDevice("local-sync-b");
+  iree_hal_device_t* replay_devices[] = {replay_device_a, replay_device_b};
+  iree_hal_device_group_t* replay_group =
+      CreateDeviceGroup(replay_devices, IREE_ARRAYSIZE(replay_devices));
+  iree_hal_device_release(replay_device_a);
+  iree_hal_device_release(replay_device_b);
+
+  iree_status_t status = iree_hal_replay_execute_file(
+      GetCapturedFileContents(storage), replay_group, nullptr,
+      iree_allocator_system());
+  auto owned_status = ::iree::internal::ConsumeForTest(status);
+  EXPECT_THAT(owned_status,
+              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
+                  IREE_STATUS_FAILED_PRECONDITION)));
+  EXPECT_THAT(owned_status.ToString(), HasSubstr("captured 1 device"));
+  EXPECT_THAT(owned_status.ToString(), HasSubstr("contains 2 device"));
+
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
 #if IREE_FILE_IO_ENABLE && \
     (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
 class ScopedTempFile {

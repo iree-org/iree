@@ -2733,6 +2733,16 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
         break;
     }
   }
+  if (iree_status_is_ok(status) &&
+      executor.next_device_index !=
+          iree_hal_device_group_device_count(executor.device_group)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "replay captured %" PRIhsz
+        " device(s) but the target device group contains %" PRIhsz " device(s)",
+        executor.next_device_index,
+        iree_hal_device_group_device_count(executor.device_group));
+  }
 
   iree_hal_replay_executor_deinitialize(&executor);
   return status;
