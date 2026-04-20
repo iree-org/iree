@@ -1334,7 +1334,7 @@ private:
           llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
       int64_t totalWarps = llvm::product_of(positiveWarps);
       feasibleNumWarps =
-          computeMaxFeasibleNumWarps(shape, totalWarps, minElementsPerTransfer);
+          computeMaxFeasibleNumWarps(shape, totalWarps, *minAligned);
       // The whole-tile alignment check in isCopyDMAConvertible is exactly the
       // numWarps==1 feasibility check, so reaching here with feasible==0
       // means the pre-check is out of sync with this distribution policy.
@@ -1344,13 +1344,71 @@ private:
       effectiveNumWarps = {feasibleNumWarps};
     }
 
+    // Check if per-warp tiling would produce a sub-aligned tile even though the
+    // workgroup tile is DMA-aligned. Simulate what ConvertCopyToCoalescedDMA
+    // will see after warp-tiling: computeSubgroupTileSizes keeps the innermost
+    // dim whole and distributes outer dims, so per-warp tile has the same
+    // innermost dim and outer dims shrunk by numWarps. If the per-warp output
+    // traces to tensor.empty() (which it will when the current output does,
+    // since the warp forall passes through the same init), availableElements =
+    // product of per-warp shape; otherwise availableElements = innermostDim.
+    //
+    // If the per-warp availableElements would not be DMA-aligned, padCopyForDMA
+    // creates a temp alloc and an undistributed memref.copy → runtime error.
+    // Use identity tiling so ConvertCopyToCoalescedDMA sees the aligned
+    // workgroup tile directly and distributes all lanes in a single pass.
+    bool useIdentityTiling = false;
+    if (!isPadFusion && availableElements % *minAligned == 0) {
+      // Compute per-warp available elements after normal warp-tiling.
+      auto [warpTileSizes, _numTiled] =
+          computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
+      int64_t perWarpAvailable = innermostDim;
+      bool outputTracesEmpty = false;
+      if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
+        outputTracesEmpty =
+            tracesToTensorEmpty(copyOp.getOutputs()[0]) &&
+            llvm::none_of(shape, ShapedType::isDynamic);
+      }
+      if (outputTracesEmpty) {
+        perWarpAvailable = 1;
+        for (auto [ts, dim] : llvm::zip(warpTileSizes, shape)) {
+          int64_t tileVal =
+              getConstantIntValue(ts).value_or(ShapedType::kDynamic);
+          if (ShapedType::isDynamic(tileVal))
+            perWarpAvailable = ShapedType::kDynamic;
+          if (ShapedType::isDynamic(perWarpAvailable))
+            break;
+          perWarpAvailable *= tileVal;
+        }
+      }
+      if (!ShapedType::isDynamic(perWarpAvailable) &&
+          perWarpAvailable % *minAligned != 0) {
+        useIdentityTiling = true;
+      }
+    }
+
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
 
-    // Distribute across subgroups (warps) for both pad fusion and non-pad
-    // cases.
-    std::tie(tileSizes, numTiledDims) =
-        computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
+    if (isPadFusion || useIdentityTiling) {
+      // For pad fusion: single-iteration wrapper forall so the DMA sees the
+      // full pre-pad source (TODO #23365: proper subgroup tiling).
+      // For workgroup-aligned but per-warp-sub-aligned copies: identity tiling
+      // lets ConvertCopyToCoalescedDMA distribute all elements across lanes
+      // directly, without a temp alloc or undistributed memref.copy.
+      // Bail out if any dimension is dynamic since we need static tile sizes.
+      if (llvm::any_of(shape, ShapedType::isDynamic)) {
+        return failure();
+      }
+      for (int64_t i = 0; i < rank; ++i) {
+        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+        ++numTiledDims;
+      }
+    } else {
+      // Distribute across subgroups (warps) for non-pad, non-identity cases.
+      std::tie(tileSizes, numTiledDims) =
+          computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
+    }
 
     if (numTiledDims == 0) {
       return failure();

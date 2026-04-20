@@ -79,16 +79,15 @@ func.func @scaled_matmul_dma()
 }
 
 // Verify pipeline completes and produces scaled MFMA compute ops.
-// LHS/RHS are promoted to workgroup shared memory and scales use thread-based
-// copies. The compute uses 16x16x128 scaled MFMA instructions.
+// LHS/RHS and scales are promoted to workgroup shared memory via DMA.
+// Scale copies must not produce any undistributed memref.copy (which would
+// indicate padCopyForDMA created a temp alloc instead of identity tiling).
+// The compute uses 16x16x128 scaled MFMA instructions.
 
 // CHECK-LABEL: func.func @scaled_matmul_dma
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf8E8M0FNU, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf4E2M1FN, #gpu.address_space<workgroup>>
+//   CHECK-NOT:   memref.copy
 //       CHECK:   gpu.thread_id
 //       CHECK:   scf.for
-// TODO: The DMA config is set but the pipeline currently lowers LHS/RHS copies
-// via vector.transfer_read/write instead of amdgpu.gather_to_lds. Once the DMA
-// lowering path handles scaled matmul operands, add:
-//   COM: CHECK: amdgpu.gather_to_lds
 //       CHECK:     amdgpu.scaled_mfma 16x16x128
