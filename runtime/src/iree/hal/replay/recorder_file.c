@@ -6,6 +6,7 @@
 
 #include "iree/hal/replay/recorder_file.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -63,10 +64,12 @@ static iree_string_view_t iree_hal_replay_recorder_file_capture_fd_path(
         // IREE_PLATFORM_LINUX)
 }
 
-void iree_hal_replay_recorder_file_make_object_payload(
+iree_status_t iree_hal_replay_recorder_file_make_object_payload(
     iree_io_file_handle_t* handle, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_hal_external_file_flags_t flags,
-    iree_hal_file_t* base_file, iree_byte_span_t reference_storage,
+    iree_hal_file_t* base_file,
+    iree_hal_replay_recorder_external_file_policy_t external_file_policy,
+    iree_byte_span_t reference_storage,
     iree_hal_replay_file_object_payload_t* out_payload,
     iree_string_view_t* out_reference) {
   memset(out_payload, 0, sizeof(*out_payload));
@@ -80,21 +83,55 @@ void iree_hal_replay_recorder_file_make_object_payload(
   iree_io_file_handle_primitive_t primitive =
       iree_io_file_handle_primitive(handle);
   switch (primitive.type) {
+    case IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION: {
+      iree_byte_span_t host_allocation = primitive.value.host_allocation;
+      out_payload->reference_type =
+          IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES;
+      out_payload->reference_length = host_allocation.data_length;
+      if (!base_file) {
+        out_payload->file_length = host_allocation.data_length;
+      }
+      *out_reference = iree_make_string_view((const char*)host_allocation.data,
+                                             host_allocation.data_length);
+      break;
+    }
     case IREE_IO_FILE_HANDLE_TYPE_FD: {
+      if (external_file_policy ==
+          IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "HAL replay recorder external file policy forbids fd-backed file "
+            "references");
+      } else if (external_file_policy !=
+                 IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "HAL replay recorder external file policy %" PRIu32 " is unknown",
+            external_file_policy);
+      }
       iree_hal_replay_recorder_file_capture_fd_identity(primitive.value.fd,
                                                         out_payload);
       *out_reference = iree_hal_replay_recorder_file_capture_fd_path(
           primitive.value.fd, reference_storage);
-      if (!iree_string_view_is_empty(*out_reference)) {
-        out_payload->reference_type =
-            IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH;
-        out_payload->reference_length = out_reference->size;
+      if (iree_string_view_is_empty(*out_reference)) {
+        return iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "HAL replay recorder could not capture a path for an fd-backed "
+            "file");
       }
+      out_payload->reference_type =
+          IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH;
+      out_payload->reference_length = out_reference->size;
       break;
     }
     default:
-      break;
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "HAL replay recorder cannot capture imported file handles of type "
+          "%" PRIu32,
+          (uint32_t)primitive.type);
   }
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

@@ -6,9 +6,18 @@
 
 #include "iree/hal/replay/recorder.h"
 
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
+
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+#include <stdlib.h>
+#include <unistd.h>
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
 
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
@@ -99,7 +108,8 @@ static iree_hal_device_group_t* CreateSyncDeviceGroup() {
 }
 
 static iree_hal_replay_recorder_t* CreateHostAllocationRecorder(
-    std::vector<uint8_t>* storage) {
+    std::vector<uint8_t>* storage,
+    const iree_hal_replay_recorder_options_t* options = nullptr) {
   iree_io_file_handle_t* file_handle = nullptr;
   IREE_CHECK_OK(iree_io_file_handle_wrap_host_allocation(
       IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
@@ -109,10 +119,49 @@ static iree_hal_replay_recorder_t* CreateHostAllocationRecorder(
 
   iree_hal_replay_recorder_t* recorder = nullptr;
   IREE_CHECK_OK(iree_hal_replay_recorder_create(
-      file_handle, nullptr, iree_allocator_system(), &recorder));
+      file_handle, options, iree_allocator_system(), &recorder));
   iree_io_file_handle_release(file_handle);
   return recorder;
 }
+
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+class ScopedTempFile {
+ public:
+  explicit ScopedTempFile(iree_const_byte_span_t contents) {
+    char path_template[] = "/tmp/iree_hal_replay_recorder_file_XXXXXX";
+    const int fd = mkstemp(path_template);
+    EXPECT_GE(fd, 0);
+    if (fd < 0) return;
+    iree_host_size_t total_written = 0;
+    while (total_written < contents.data_length) {
+      ssize_t written = write(fd, contents.data + total_written,
+                              contents.data_length - total_written);
+      if (written < 0 && errno == EINTR) continue;
+      EXPECT_GT(written, 0);
+      if (written <= 0) break;
+      total_written += (iree_host_size_t)written;
+    }
+    EXPECT_EQ(contents.data_length, total_written);
+    EXPECT_EQ(0, close(fd));
+    path_ = path_template;
+  }
+
+  ~ScopedTempFile() {
+    if (!path_.empty()) {
+      unlink(path_.c_str());
+    }
+  }
+
+  iree_string_view_t path_view() const {
+    return iree_make_string_view(path_.data(), path_.size());
+  }
+
+ private:
+  std::string path_;
+};
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
 
 struct ReplayRecordSummary {
   iree_host_size_t session_record_count = 0;
@@ -332,6 +381,51 @@ TEST(ReplayRecorderTest, PersistentWriteMapsFailLoud) {
   iree_hal_replay_recorder_release(recorder);
   iree_hal_device_group_release(wrapped_group);
   iree_hal_device_group_release(source_group);
+}
+
+TEST(ReplayRecorderTest, ExternalFileFailPolicyRejectsFdBackedFiles) {
+#if IREE_FILE_IO_ENABLE && \
+    (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX))
+  const uint8_t file_contents[4] = {0x00, 0x01, 0x02, 0x03};
+  ScopedTempFile source_file(
+      iree_make_const_byte_span(file_contents, sizeof(file_contents)));
+
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_options_t options =
+      iree_hal_replay_recorder_options_default();
+  options.external_file_policy =
+      IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL;
+  iree_hal_replay_recorder_t* recorder =
+      CreateHostAllocationRecorder(&storage, &options);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_ASSERT_OK(iree_io_file_handle_open(
+      IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_RANDOM_ACCESS,
+      source_file.path_view(), iree_allocator_system(), &file_handle));
+  iree_hal_file_t* file = nullptr;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_FAILED_PRECONDITION,
+      iree_hal_file_import(wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                           IREE_HAL_MEMORY_ACCESS_READ, file_handle,
+                           IREE_HAL_EXTERNAL_FILE_FLAG_NONE, &file));
+  EXPECT_EQ(nullptr, file);
+  iree_io_file_handle_release(file_handle);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+#else
+  GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";
+#endif  // IREE_FILE_IO_ENABLE && (IREE_PLATFORM_ANDROID ||
+        // IREE_PLATFORM_LINUX)
 }
 
 TEST(ReplayRecorderTest, WrappedDeviceRecordsQueueExecuteSemaphores) {

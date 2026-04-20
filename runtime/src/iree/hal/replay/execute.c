@@ -686,6 +686,79 @@ static iree_status_t iree_hal_replay_executor_resolve_file_path(
   return iree_ok_status();
 }
 
+typedef struct iree_hal_replay_executor_inline_file_release_t {
+  // Host allocator used for the inline file copy and this release record.
+  iree_allocator_t host_allocator;
+} iree_hal_replay_executor_inline_file_release_t;
+
+static void iree_hal_replay_executor_inline_file_release(
+    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
+  iree_hal_replay_executor_inline_file_release_t* release =
+      (iree_hal_replay_executor_inline_file_release_t*)user_data;
+  iree_allocator_t host_allocator = release->host_allocator;
+  iree_allocator_free(host_allocator,
+                      handle_primitive.value.host_allocation.data);
+  iree_allocator_free(host_allocator, release);
+}
+
+static iree_io_file_access_t iree_hal_replay_executor_make_file_access(
+    iree_hal_memory_access_t access) {
+  iree_io_file_access_t file_access = 0;
+  if (iree_any_bit_set(access, IREE_HAL_MEMORY_ACCESS_READ)) {
+    file_access |= IREE_IO_FILE_ACCESS_READ;
+  }
+  if (iree_any_bit_set(access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
+    file_access |= IREE_IO_FILE_ACCESS_WRITE;
+  }
+  return file_access ? file_access : IREE_IO_FILE_ACCESS_READ;
+}
+
+static iree_status_t iree_hal_replay_executor_wrap_inline_file(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_object_payload_t* payload,
+    iree_const_byte_span_t reference, iree_io_file_handle_t** out_handle) {
+  IREE_ASSERT_ARGUMENT(out_handle);
+  *out_handle = NULL;
+
+  if (IREE_UNLIKELY(payload->file_length != reference.data_length)) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "inline replay file length mismatch: file_length=%" PRIu64
+        " reference_length=%" PRIhsz,
+        payload->file_length, reference.data_length);
+  }
+
+  iree_hal_replay_executor_inline_file_release_t* release = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      executor->host_allocator, sizeof(*release), (void**)&release));
+  release->host_allocator = executor->host_allocator;
+
+  uint8_t* file_bytes = NULL;
+  iree_status_t status = iree_ok_status();
+  if (reference.data_length != 0) {
+    status = iree_allocator_malloc(executor->host_allocator,
+                                   reference.data_length, (void**)&file_bytes);
+    if (iree_status_is_ok(status)) {
+      memcpy(file_bytes, reference.data, reference.data_length);
+    }
+  }
+  iree_io_file_handle_release_callback_t release_callback = {
+      .fn = iree_hal_replay_executor_inline_file_release,
+      .user_data = release,
+  };
+  if (iree_status_is_ok(status)) {
+    status = iree_io_file_handle_wrap_host_allocation(
+        iree_hal_replay_executor_make_file_access(payload->access),
+        iree_make_byte_span(file_bytes, reference.data_length),
+        release_callback, executor->host_allocator, out_handle);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(executor->host_allocator, file_bytes);
+    iree_allocator_free(executor->host_allocator, release);
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_replay_executor_import_file(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -701,35 +774,49 @@ static iree_status_t iree_hal_replay_executor_import_file(
     return iree_make_status(IREE_STATUS_DATA_LOSS,
                             "replay file object payload length mismatch");
   }
-  if (IREE_UNLIKELY(payload.reference_type !=
-                    IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "replay file reference type %" PRIu32
-                            " is not executable",
-                            payload.reference_type);
-  }
 
   iree_hal_replay_object_entry_t* device_entry = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
       executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
       &device_entry));
-  iree_string_view_t path =
-      iree_make_string_view((const char*)record->payload.data + sizeof(payload),
-                            (iree_host_size_t)payload.reference_length);
-  char* resolved_path_storage = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_resolve_file_path(
-      executor, path, &path, &resolved_path_storage));
-  iree_io_file_mode_t mode = 0;
-  if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_READ)) {
-    mode |= IREE_IO_FILE_MODE_READ;
-  }
-  if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    mode |= IREE_IO_FILE_MODE_WRITE;
-  }
-  if (mode == 0) mode = IREE_IO_FILE_MODE_READ;
+
+  iree_const_byte_span_t reference =
+      iree_make_const_byte_span(record->payload.data + sizeof(payload),
+                                (iree_host_size_t)payload.reference_length);
   iree_io_file_handle_t* handle = NULL;
-  iree_status_t status =
-      iree_io_file_handle_open(mode, path, executor->host_allocator, &handle);
+  char* resolved_path_storage = NULL;
+  iree_status_t status = iree_ok_status();
+  switch (payload.reference_type) {
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH: {
+      iree_string_view_t path = iree_make_string_view(
+          (const char*)reference.data, reference.data_length);
+      status = iree_hal_replay_executor_resolve_file_path(
+          executor, path, &path, &resolved_path_storage);
+      iree_io_file_mode_t mode = 0;
+      if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_READ)) {
+        mode |= IREE_IO_FILE_MODE_READ;
+      }
+      if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
+        mode |= IREE_IO_FILE_MODE_WRITE;
+      }
+      if (mode == 0) mode = IREE_IO_FILE_MODE_READ;
+      if (iree_status_is_ok(status)) {
+        status = iree_io_file_handle_open(mode, path, executor->host_allocator,
+                                          &handle);
+      }
+      break;
+    }
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES:
+      status = iree_hal_replay_executor_wrap_inline_file(executor, &payload,
+                                                         reference, &handle);
+      break;
+    default:
+      status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "replay file reference type %" PRIu32
+                                " is not executable",
+                                payload.reference_type);
+      break;
+  }
 
   iree_hal_file_t* file = NULL;
   if (iree_status_is_ok(status)) {
@@ -737,7 +824,9 @@ static iree_status_t iree_hal_replay_executor_import_file(
         iree_hal_file_import(device_entry->value.device, payload.queue_affinity,
                              payload.access, handle, payload.flags, &file);
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) &&
+      payload.reference_type ==
+          IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH) {
     status = iree_hal_replay_executor_validate_file_reference(&payload, handle,
                                                               file);
   }

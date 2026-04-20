@@ -240,9 +240,31 @@ IREE_FLAG(string, hal_replay_output, "",
           "Writes a HAL replay capture stream to the specified .ireereplay "
           "file. The HAL module device group is wrapped so operations across "
           "all devices are emitted into one ordered replay.");
+IREE_FLAG(
+    string, hal_replay_file_policy, "reference",
+    "Policy for imported fd-backed HAL files while recording a HAL replay. "
+    "Options are `reference` to capture external file paths or `fail` to "
+    "reject fd-backed files.");
 
 static bool iree_tooling_hal_replay_capture_requested(void) {
   return strlen(FLAG_hal_replay_output) != 0;
+}
+
+static iree_status_t iree_tooling_parse_hal_replay_file_policy(
+    iree_string_view_t value,
+    iree_hal_replay_recorder_external_file_policy_t* out_policy) {
+  IREE_ASSERT_ARGUMENT(out_policy);
+  if (iree_string_view_equal(value, IREE_SV("reference"))) {
+    *out_policy = IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE;
+    return iree_ok_status();
+  } else if (iree_string_view_equal(value, IREE_SV("fail"))) {
+    *out_policy = IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL;
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "--hal_replay_file_policy must be `reference` or `fail`; got `%.*s`",
+      (int)value.size, value.data);
 }
 
 static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
@@ -253,6 +275,12 @@ static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
 
   if (!iree_tooling_hal_replay_capture_requested()) return iree_ok_status();
 
+  iree_hal_replay_recorder_options_t options =
+      iree_hal_replay_recorder_options_default();
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_hal_replay_file_policy(
+      iree_make_cstring_view(FLAG_hal_replay_file_policy),
+      &options.external_file_policy));
+
   iree_io_file_handle_t* file_handle = NULL;
   iree_status_t status = iree_io_file_handle_create(
       IREE_IO_FILE_MODE_WRITE | IREE_IO_FILE_MODE_SEQUENTIAL_SCAN |
@@ -260,8 +288,6 @@ static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
       iree_make_cstring_view(FLAG_hal_replay_output),
       /*initial_size=*/0, host_allocator, &file_handle);
   if (iree_status_is_ok(status)) {
-    iree_hal_replay_recorder_options_t options =
-        iree_hal_replay_recorder_options_default();
     status = iree_hal_replay_recorder_create(
         file_handle, &options, host_allocator, out_replay_recorder);
   }

@@ -191,6 +191,7 @@ typedef uint32_t iree_hal_replay_file_reference_type_t;
 enum iree_hal_replay_file_reference_type_e {
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_NONE = 0u,
   IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH = 1u,
+  IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES = 2u,
 };
 
 // Payload describing a captured buffer object.
@@ -321,8 +322,7 @@ typedef struct iree_hal_replay_semaphore_object_payload_t {
   uint64_t reserved0;
 } iree_hal_replay_semaphore_object_payload_t;
 
-// Payload describing a captured file object followed by external reference
-// bytes.
+// Payload describing a captured file object followed by file reference bytes.
 typedef struct iree_hal_replay_file_object_payload_t {
   // Queue affinity requested at import.
   uint64_t queue_affinity;
@@ -334,7 +334,7 @@ typedef struct iree_hal_replay_file_object_payload_t {
   uint64_t file_inode;
   // Platform file modification time in nanoseconds, or zero when unavailable.
   uint64_t file_mtime_ns;
-  // Byte length of the external reference following this header.
+  // Byte length of the file reference following this header.
   uint64_t reference_length;
   // HAL memory access bits allowed by this imported file.
   uint32_t access;

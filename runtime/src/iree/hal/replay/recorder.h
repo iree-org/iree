@@ -26,10 +26,26 @@ enum iree_hal_replay_recorder_flag_bits_t {
   IREE_HAL_REPLAY_RECORDER_FLAG_NONE = 0u,
 };
 
+// Policy for capturing imported fd-backed HAL files.
+typedef uint32_t iree_hal_replay_recorder_external_file_policy_t;
+enum iree_hal_replay_recorder_external_file_policy_e {
+  // Capture external files by path and replay against the original file.
+  //
+  // Host-allocation-backed files are always embedded inline because they have
+  // no durable external identity to reference.
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE = 0u,
+  // Reject imported fd-backed files instead of producing a non-hermetic replay.
+  //
+  // Host-allocation-backed files are still embedded inline under this policy.
+  IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL = 1u,
+};
+
 // Options controlling HAL replay recording.
 typedef struct iree_hal_replay_recorder_options_t {
   // Flags controlling recorder behavior.
   iree_hal_replay_recorder_flags_t flags;
+  // Policy used when an imported file is backed by an external file path.
+  iree_hal_replay_recorder_external_file_policy_t external_file_policy;
   // Reserved for future recorder options; must be zero.
   uint32_t reserved0;
 } iree_hal_replay_recorder_options_t;

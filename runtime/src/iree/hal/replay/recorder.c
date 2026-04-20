@@ -48,6 +48,8 @@ struct iree_hal_replay_recorder_t {
   iree_atomic_ref_count_t ref_count;
   // Host allocator used for recorder lifetime.
   iree_allocator_t host_allocator;
+  // Immutable recorder options captured at creation.
+  iree_hal_replay_recorder_options_t options;
   // Mutex serializing writer access and assigning capture-order ordinals.
   iree_slim_mutex_t mutex;
   // Append-only replay file writer owned by the recorder.
@@ -403,6 +405,15 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "replay recorder reserved options must be zero");
   }
+  if (IREE_UNLIKELY(
+          options->external_file_policy !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_REFERENCE &&
+          options->external_file_policy !=
+              IREE_HAL_REPLAY_RECORDER_EXTERNAL_FILE_POLICY_FAIL)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "replay recorder external file policy is unknown");
+  }
 
   iree_hal_replay_file_writer_t* writer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -416,6 +427,7 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
     memset(recorder, 0, sizeof(*recorder));
     iree_atomic_ref_count_init(&recorder->ref_count);
     recorder->host_allocator = host_allocator;
+    recorder->options = *options;
     iree_slim_mutex_initialize(&recorder->mutex);
     recorder->writer = writer;
     recorder->next_object_id = 1;
@@ -871,11 +883,18 @@ static iree_status_t iree_hal_replay_device_import_file(
   char reference_storage[IREE_MAX_PATH];
   iree_hal_replay_file_object_payload_t payload;
   iree_string_view_t reference = iree_string_view_empty();
-  iree_hal_replay_recorder_file_make_object_payload(
-      handle, queue_affinity, access, flags, base_file,
-      iree_make_byte_span((uint8_t*)reference_storage,
-                          sizeof(reference_storage)),
-      &payload, &reference);
+  iree_status_t payload_status =
+      iree_hal_replay_recorder_file_make_object_payload(
+          handle, queue_affinity, access, flags, base_file,
+          device->recorder->options.external_file_policy,
+          iree_make_byte_span((uint8_t*)reference_storage,
+                              sizeof(reference_storage)),
+          &payload, &reference);
+  if (iree_status_is_ok(status)) {
+    status = payload_status;
+  } else {
+    iree_status_ignore(payload_status);
+  }
   iree_const_byte_span_t payload_iovecs[2] = {
       iree_make_const_byte_span(&payload, sizeof(payload)),
       iree_make_const_byte_span(reference.data, reference.size),
