@@ -171,6 +171,7 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_SEMAPHORE_OBJECT = 10u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER = 11u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA = 12u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EXECUTION_BARRIER = 13u,
 };
 
 // Payload describing a captured buffer object.
@@ -322,6 +323,38 @@ typedef struct iree_hal_replay_buffer_ref_payload_t {
   // Reserved for future buffer reference metadata; must be zero.
   uint32_t reserved0;
 } iree_hal_replay_buffer_ref_payload_t;
+
+// Payload describing one captured memory barrier.
+typedef struct iree_hal_replay_memory_barrier_payload_t {
+  // Access scopes prior to the barrier.
+  uint32_t source_scope;
+  // Access scopes following the barrier.
+  uint32_t target_scope;
+} iree_hal_replay_memory_barrier_payload_t;
+
+// Payload describing one captured buffer barrier.
+typedef struct iree_hal_replay_buffer_barrier_payload_t {
+  // Access scopes prior to the barrier.
+  uint32_t source_scope;
+  // Access scopes following the barrier.
+  uint32_t target_scope;
+  // Captured buffer reference the barrier applies to.
+  iree_hal_replay_buffer_ref_payload_t buffer_ref;
+} iree_hal_replay_buffer_barrier_payload_t;
+
+// Payload describing a command buffer execution barrier request.
+typedef struct iree_hal_replay_command_buffer_execution_barrier_payload_t {
+  // Source execution stage mask.
+  uint64_t source_stage_mask;
+  // Target execution stage mask.
+  uint64_t target_stage_mask;
+  // Execution barrier flags.
+  uint64_t flags;
+  // Number of memory barrier payloads following this header.
+  uint64_t memory_barrier_count;
+  // Number of buffer barrier payloads following the memory barriers.
+  uint64_t buffer_barrier_count;
+} iree_hal_replay_command_buffer_execution_barrier_payload_t;
 
 // Payload describing a dispatch followed by constants and serialized buffer
 // references.

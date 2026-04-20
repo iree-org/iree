@@ -222,4 +222,67 @@ TEST(ReplayDumpTest, EmitsQueueAllocaSemaphoreRanges) {
   EXPECT_THAT(json_output, HasSubstr("\"signal_semaphores_range\""));
 }
 
+TEST(ReplayDumpTest, EmitsExecutionBarrierRanges) {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_ASSERT_OK(iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+      iree_make_byte_span(storage.data(), storage.size()),
+      iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+      &file_handle));
+
+  iree_hal_replay_file_writer_t* writer = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_create(
+      file_handle, iree_allocator_system(), &writer));
+  iree_io_file_handle_release(file_handle);
+
+  iree_hal_replay_command_buffer_execution_barrier_payload_t payload = {};
+  payload.source_stage_mask = IREE_HAL_EXECUTION_STAGE_DISPATCH;
+  payload.target_stage_mask = IREE_HAL_EXECUTION_STAGE_TRANSFER;
+  payload.memory_barrier_count = 1;
+  iree_hal_replay_memory_barrier_payload_t memory_barrier = {};
+  memory_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
+  memory_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_READ;
+  iree_const_byte_span_t iovecs[2] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(&memory_barrier, sizeof(memory_barrier)),
+  };
+  iree_hal_replay_file_record_metadata_t metadata = {};
+  metadata.sequence_ordinal = 0;
+  metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  metadata.payload_type =
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EXECUTION_BARRIER;
+  metadata.object_type = IREE_HAL_REPLAY_OBJECT_TYPE_COMMAND_BUFFER;
+  metadata.operation_code =
+      IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_EXECUTION_BARRIER;
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_append_record(writer, &metadata, 2,
+                                                           iovecs, nullptr));
+  IREE_ASSERT_OK(iree_hal_replay_file_writer_close(writer));
+  iree_hal_replay_file_writer_free(writer);
+
+  iree_hal_replay_dump_options_t text_options =
+      iree_hal_replay_dump_options_default();
+  std::string text_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &text_options, AppendToString,
+      &text_output, iree_allocator_system()));
+  EXPECT_THAT(text_output,
+              HasSubstr("payload=command_buffer_execution_barrier"));
+  EXPECT_THAT(text_output, HasSubstr("memory_barriers_range="));
+  EXPECT_THAT(text_output, HasSubstr("buffer_barriers_range="));
+
+  iree_hal_replay_dump_options_t json_options =
+      iree_hal_replay_dump_options_default();
+  json_options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
+  std::string json_output;
+  IREE_ASSERT_OK(iree_hal_replay_dump_file(
+      MakeReplayFileContents(storage), &json_options, AppendToString,
+      &json_output, iree_allocator_system()));
+  EXPECT_THAT(
+      json_output,
+      HasSubstr("\"payload_type\":\"command_buffer_execution_barrier\""));
+  EXPECT_THAT(json_output, HasSubstr("\"memory_barriers_range\""));
+  EXPECT_THAT(json_output, HasSubstr("\"buffer_barriers_range\""));
+}
+
 }  // namespace
