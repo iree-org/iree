@@ -501,9 +501,12 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorMultiReductionReorderPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
+      // TODO: Delete after moving vector.multi_reduction unrolling to
+      // legalization stage.
       vector::populateVectorMultiReductionFlatteningPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
+      // TODO: Move to legalization stage.
       vector::populateVectorMultiReductionUnrollingPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
