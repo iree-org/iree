@@ -22,11 +22,11 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    file
+    file_writer
   HDRS
-    "file.h"
+    "file_writer.h"
   SRCS
-    "file.c"
+    "file_writer.c"
   DEPS
     ::format
     iree::base
@@ -37,13 +37,42 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    file_reader
+  HDRS
+    "file_reader.h"
+  SRCS
+    "file_reader.c"
+  DEPS
+    ::format
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file
+  HDRS
+    "file.h"
+  DEPS
+    ::file_reader
+    ::file_writer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     recorder
   HDRS
     "recorder.h"
   SRCS
     "recorder.c"
+    "recorder_allocator.c"
+    "recorder_allocator.h"
+    "recorder_buffer.c"
+    "recorder_buffer.h"
+    "recorder_record.h"
   DEPS
-    ::file
+    ::file_writer
     ::format
     iree::base
     iree::base::internal
@@ -71,11 +100,13 @@ iree_cc_test(
   SRCS
     "recorder_test.cc"
   DEPS
-    ::file
+    ::file_reader
     ::recorder
     iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::hal
+    iree::hal::drivers::local_sync::sync_driver
     iree::hal::testing::mock_device
     iree::testing::gtest
     iree::testing::gtest_main

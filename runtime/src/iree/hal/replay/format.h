@@ -108,7 +108,97 @@ enum iree_hal_replay_operation_code_e {
   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_PROFILING_END = 26u,
   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_EXTERNAL_CAPTURE_BEGIN = 27u,
   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_EXTERNAL_CAPTURE_END = 28u,
+
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_TRIM = 100u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_QUERY_MEMORY_HEAPS = 101u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER = 102u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER = 103u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_EXPORT_BUFFER = 104u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_QUERY_GRANULARITY =
+      105u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_RESERVE = 106u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_RELEASE = 107u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_PHYSICAL_MEMORY_ALLOCATE = 108u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_PHYSICAL_MEMORY_FREE = 109u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_MAP = 110u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_UNMAP = 111u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_PROTECT = 112u,
+  IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_VIRTUAL_MEMORY_ADVISE = 113u,
+
+  IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_MAP_RANGE = 200u,
+  IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_UNMAP_RANGE = 201u,
+  IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_INVALIDATE_RANGE = 202u,
+  IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_FLUSH_RANGE = 203u,
 };
+
+// Producer-defined payload schema stored in record headers.
+typedef uint32_t iree_hal_replay_payload_type_t;
+enum iree_hal_replay_payload_type_e {
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE = 0u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_OBJECT = 1u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_ALLOCATE_BUFFER = 2u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE = 3u,
+};
+
+// Payload describing a captured buffer object.
+typedef struct iree_hal_replay_buffer_object_payload_t {
+  // Total allocation size, in bytes, reported by the source buffer.
+  uint64_t allocation_size;
+  // Byte offset of this buffer view within the underlying allocation.
+  uint64_t byte_offset;
+  // Byte length of this buffer view.
+  uint64_t byte_length;
+  // Queue affinity from the buffer placement metadata.
+  uint64_t queue_affinity;
+  // Buffer placement flags from the buffer placement metadata.
+  uint32_t placement_flags;
+  // Memory type bits assigned to the buffer.
+  uint32_t memory_type;
+  // Buffer usage bits allowed by the buffer.
+  uint32_t allowed_usage;
+  // Memory access bits allowed by the buffer.
+  uint16_t allowed_access;
+  // Reserved for future buffer object metadata; must be zero.
+  uint16_t reserved0;
+  // Reserved for future buffer object metadata; must be zero.
+  uint32_t reserved1;
+} iree_hal_replay_buffer_object_payload_t;
+
+// Payload describing an allocator buffer allocation request.
+typedef struct iree_hal_replay_allocator_allocate_buffer_payload_t {
+  // Requested allocation size, in bytes.
+  uint64_t allocation_size;
+  // Requested queue affinity from the canonicalized buffer params.
+  uint64_t queue_affinity;
+  // Requested minimum alignment, in bytes.
+  uint64_t min_alignment;
+  // Requested buffer usage bits.
+  uint32_t usage;
+  // Requested memory type bits.
+  uint32_t type;
+  // Requested memory access bits.
+  uint16_t access;
+  // Reserved for future allocation request metadata; must be zero.
+  uint16_t reserved0;
+  // Reserved for future allocation request metadata; must be zero.
+  uint32_t reserved1;
+} iree_hal_replay_allocator_allocate_buffer_payload_t;
+
+// Payload describing a buffer byte range operation.
+typedef struct iree_hal_replay_buffer_range_payload_t {
+  // Byte offset within the underlying allocation passed to the driver vtable.
+  uint64_t byte_offset;
+  // Byte length of the range passed to the driver vtable.
+  uint64_t byte_length;
+  // Mapping mode bits for map operations, or zero otherwise.
+  uint32_t mapping_mode;
+  // Memory access bits for map operations, or zero otherwise.
+  uint16_t memory_access;
+  // Reserved for future buffer range metadata; must be zero.
+  uint16_t reserved0;
+  // Reserved for future buffer range metadata; must be zero.
+  uint32_t reserved1;
+} iree_hal_replay_buffer_range_payload_t;
 
 // Compression algorithm used for one replay file byte range.
 typedef uint16_t iree_hal_replay_compression_type_t;

@@ -21,7 +21,10 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
-#include "iree/hal/replay/file.h"
+#include "iree/hal/replay/file_writer.h"
+#include "iree/hal/replay/recorder_allocator.h"
+#include "iree/hal/replay/recorder_buffer.h"
+#include "iree/hal/replay/recorder_record.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_replay_recorder_t
@@ -45,13 +48,6 @@ struct iree_hal_replay_recorder_t {
   // True once the writer has been closed.
   bool closed;
 };
-
-typedef struct iree_hal_replay_pending_record_t {
-  // Recorder whose mutex is held until the pending record is completed.
-  iree_hal_replay_recorder_t* recorder;
-  // Metadata to write once the intercepted operation has completed.
-  iree_hal_replay_file_record_metadata_t metadata;
-} iree_hal_replay_pending_record_t;
 
 static uint64_t iree_hal_replay_current_thread_id(void) {
 #if defined(IREE_SYNCHRONIZATION_DISABLE_UNSAFE)
@@ -99,6 +95,14 @@ static void iree_hal_replay_recorder_fail_locked(
   }
 }
 
+void iree_hal_replay_recorder_fail(iree_hal_replay_recorder_t* recorder,
+                                   iree_status_t status) {
+  IREE_ASSERT_ARGUMENT(recorder);
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_hal_replay_recorder_fail_locked(recorder, status);
+  iree_slim_mutex_unlock(&recorder->mutex);
+}
+
 static iree_status_t iree_hal_replay_recorder_append_record_locked(
     iree_hal_replay_recorder_t* recorder,
     iree_hal_replay_file_record_metadata_t metadata,
@@ -125,37 +129,73 @@ static iree_status_t iree_hal_replay_recorder_record_session(
   return status;
 }
 
-static iree_status_t iree_hal_replay_recorder_record_device_object(
+iree_status_t iree_hal_replay_recorder_reserve_object_id(
     iree_hal_replay_recorder_t* recorder,
-    iree_hal_replay_object_id_t* out_device_id) {
-  IREE_ASSERT_ARGUMENT(out_device_id);
-  *out_device_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+    iree_hal_replay_object_id_t* out_object_id) {
+  IREE_ASSERT_ARGUMENT(recorder);
+  IREE_ASSERT_ARGUMENT(out_object_id);
+  *out_object_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
 
   iree_slim_mutex_lock(&recorder->mutex);
   iree_status_t status = iree_hal_replay_recorder_check_open_locked(recorder);
-  iree_hal_replay_object_id_t device_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+  iree_hal_replay_object_id_t object_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
   if (iree_status_is_ok(status)) {
-    device_id = recorder->next_object_id++;
-    iree_hal_replay_file_record_metadata_t metadata = {
-        .device_id = device_id,
-        .object_id = device_id,
-        .record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OBJECT,
-        .object_type = IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
-    };
-    status = iree_hal_replay_recorder_append_record_locked(recorder, metadata,
-                                                           0, NULL, NULL);
+    object_id = recorder->next_object_id++;
   }
   iree_slim_mutex_unlock(&recorder->mutex);
 
-  if (iree_status_is_ok(status)) *out_device_id = device_id;
+  if (iree_status_is_ok(status)) *out_object_id = object_id;
   return status;
 }
 
-static iree_status_t iree_hal_replay_recorder_begin_operation(
+static iree_status_t iree_hal_replay_recorder_append_object_locked(
+    iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
+    iree_hal_replay_object_id_t object_id,
+    iree_hal_replay_object_type_t object_type,
+    iree_hal_replay_payload_type_t payload_type, iree_host_size_t iovec_count,
+    const iree_const_byte_span_t* iovecs) {
+  iree_hal_replay_file_record_metadata_t metadata = {
+      .device_id = device_id,
+      .object_id = object_id,
+      .record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OBJECT,
+      .payload_type = payload_type,
+      .object_type = object_type,
+  };
+  return iree_hal_replay_recorder_append_record_locked(
+      recorder, metadata, iovec_count, iovecs, NULL);
+}
+
+iree_status_t iree_hal_replay_recorder_record_object(
+    iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
+    iree_hal_replay_object_type_t object_type,
+    iree_hal_replay_payload_type_t payload_type, iree_host_size_t iovec_count,
+    const iree_const_byte_span_t* iovecs,
+    iree_hal_replay_object_id_t* out_object_id) {
+  IREE_ASSERT_ARGUMENT(out_object_id);
+  *out_object_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_hal_replay_recorder_check_open_locked(recorder);
+  iree_hal_replay_object_id_t object_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+  if (iree_status_is_ok(status)) {
+    object_id = recorder->next_object_id++;
+    status = iree_hal_replay_recorder_append_object_locked(
+        recorder, device_id, object_id, object_type, payload_type, iovec_count,
+        iovecs);
+  }
+  iree_slim_mutex_unlock(&recorder->mutex);
+
+  if (iree_status_is_ok(status)) *out_object_id = object_id;
+  return status;
+}
+
+iree_status_t iree_hal_replay_recorder_begin_operation(
     iree_hal_replay_recorder_t* recorder, iree_hal_replay_object_id_t device_id,
     iree_hal_replay_object_id_t object_id,
     iree_hal_replay_object_id_t related_object_id,
+    iree_hal_replay_object_type_t object_type,
     iree_hal_replay_operation_code_t operation_code,
+    iree_hal_replay_payload_type_t payload_type,
     iree_hal_replay_pending_record_t* out_pending_record) {
   IREE_ASSERT_ARGUMENT(out_pending_record);
   memset(out_pending_record, 0, sizeof(*out_pending_record));
@@ -175,20 +215,59 @@ static iree_status_t iree_hal_replay_recorder_begin_operation(
       .object_id = object_id,
       .related_object_id = related_object_id,
       .record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION,
-      .object_type = IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      .payload_type = payload_type,
+      .object_type = object_type,
       .operation_code = operation_code,
   };
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_replay_recorder_end_operation(
+iree_status_t iree_hal_replay_recorder_end_operation_with_payload(
     iree_hal_replay_pending_record_t* pending_record,
-    iree_status_t operation_status) {
+    iree_status_t operation_status, iree_host_size_t iovec_count,
+    const iree_const_byte_span_t* iovecs) {
   iree_hal_replay_recorder_t* recorder = pending_record->recorder;
   pending_record->metadata.status_code =
       (uint32_t)iree_status_code(operation_status);
   iree_status_t record_status = iree_hal_replay_file_writer_append_record(
-      recorder->writer, &pending_record->metadata, 0, NULL, NULL);
+      recorder->writer, &pending_record->metadata, iovec_count, iovecs, NULL);
+  iree_hal_replay_recorder_fail_locked(recorder, record_status);
+  iree_slim_mutex_unlock(&recorder->mutex);
+  if (!iree_status_is_ok(record_status)) {
+    iree_status_ignore(operation_status);
+    return record_status;
+  }
+  return operation_status;
+}
+
+iree_status_t iree_hal_replay_recorder_end_operation(
+    iree_hal_replay_pending_record_t* pending_record,
+    iree_status_t operation_status) {
+  return iree_hal_replay_recorder_end_operation_with_payload(
+      pending_record, operation_status, 0, NULL);
+}
+
+iree_status_t iree_hal_replay_recorder_end_creation_operation(
+    iree_hal_replay_pending_record_t* pending_record,
+    iree_status_t operation_status, iree_host_size_t operation_iovec_count,
+    const iree_const_byte_span_t* operation_iovecs,
+    iree_hal_replay_object_type_t created_object_type,
+    iree_hal_replay_object_id_t created_object_id,
+    iree_hal_replay_payload_type_t object_payload_type,
+    iree_host_size_t object_iovec_count,
+    const iree_const_byte_span_t* object_iovecs) {
+  iree_hal_replay_recorder_t* recorder = pending_record->recorder;
+  pending_record->metadata.status_code =
+      (uint32_t)iree_status_code(operation_status);
+  iree_status_t record_status = iree_hal_replay_file_writer_append_record(
+      recorder->writer, &pending_record->metadata, operation_iovec_count,
+      operation_iovecs, NULL);
+  if (iree_status_is_ok(record_status) && iree_status_is_ok(operation_status)) {
+    record_status = iree_hal_replay_recorder_append_object_locked(
+        recorder, pending_record->metadata.device_id, created_object_id,
+        created_object_type, object_payload_type, object_iovec_count,
+        object_iovecs);
+  }
   iree_hal_replay_recorder_fail_locked(recorder, record_status);
   iree_slim_mutex_unlock(&recorder->mutex);
   if (!iree_status_is_ok(record_status)) {
@@ -305,6 +384,8 @@ typedef struct iree_hal_replay_device_t {
   iree_hal_device_group_t* base_group;
   // Underlying device receiving forwarded HAL calls.
   iree_hal_device_t* base_device;
+  // Recording allocator returned from iree_hal_device_allocator.
+  iree_hal_allocator_t* allocator;
   // Session-local object id assigned to this wrapper.
   iree_hal_replay_object_id_t device_id;
   // Topology information assigned to this wrapper during group creation.
@@ -336,7 +417,8 @@ static iree_status_t iree_hal_replay_device_begin_operation(
     iree_hal_replay_pending_record_t* out_pending_record) {
   return iree_hal_replay_recorder_begin_operation(
       device->recorder, device->device_id, device->device_id,
-      IREE_HAL_REPLAY_OBJECT_ID_NONE, operation_code, out_pending_record);
+      IREE_HAL_REPLAY_OBJECT_ID_NONE, IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      operation_code, IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, out_pending_record);
 }
 
 static iree_status_t iree_hal_replay_device_complete_operation(
@@ -351,6 +433,7 @@ static void iree_hal_replay_device_destroy(iree_hal_device_t* base_device) {
   iree_allocator_t host_allocator = device->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_allocator_release(device->allocator);
   iree_hal_device_release(device->base_device);
   iree_hal_device_group_release(device->base_group);
   iree_hal_replay_recorder_release(device->recorder);
@@ -374,13 +457,30 @@ static iree_allocator_t iree_hal_replay_device_host_allocator(
 static iree_hal_allocator_t* iree_hal_replay_device_allocator(
     iree_hal_device_t* base_device) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
-  return iree_hal_device_allocator(device->base_device);
+  return device->allocator;
 }
 
 static void iree_hal_replay_replace_device_allocator(
     iree_hal_device_t* base_device, iree_hal_allocator_t* new_allocator) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
+  if (!new_allocator) {
+    iree_hal_device_replace_allocator(device->base_device, new_allocator);
+    iree_hal_allocator_release(device->allocator);
+    device->allocator = NULL;
+    return;
+  }
+  iree_hal_allocator_t* new_replay_allocator = NULL;
+  iree_status_t status = iree_hal_replay_recorder_wrap_allocator(
+      device->recorder, device->device_id, base_device, new_allocator,
+      device->host_allocator, &new_replay_allocator);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_replay_recorder_fail(device->recorder, status);
+    iree_status_ignore(status);
+    return;
+  }
   iree_hal_device_replace_allocator(device->base_device, new_allocator);
+  iree_hal_allocator_release(device->allocator);
+  device->allocator = new_replay_allocator;
 }
 
 static void iree_hal_replay_replace_channel_provider(
@@ -606,18 +706,59 @@ static iree_status_t iree_hal_replay_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
+  *out_buffer = NULL;
+
+  iree_hal_replay_object_id_t buffer_id = IREE_HAL_REPLAY_OBJECT_ID_NONE;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_replay_recorder_reserve_object_id(device->recorder, &buffer_id));
+
+  iree_hal_buffer_params_t canonical_params = params;
+  iree_hal_buffer_params_canonicalize(&canonical_params);
+  iree_hal_replay_allocator_allocate_buffer_payload_t operation_payload;
+  iree_hal_replay_recorder_allocator_make_allocate_buffer_payload(
+      &canonical_params, allocation_size, &operation_payload);
+  iree_const_byte_span_t operation_iovec = iree_make_const_byte_span(
+      (const uint8_t*)&operation_payload, sizeof(operation_payload));
+
   iree_hal_replay_pending_record_t pending_record;
-  IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
-      device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_ALLOCA,
-      &pending_record));
+  IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_begin_operation(
+      device->recorder, device->device_id, device->device_id, buffer_id,
+      IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE,
+      IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_ALLOCA,
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_ALLOCATE_BUFFER, &pending_record));
+
+  iree_hal_buffer_t* base_buffer = NULL;
+  iree_hal_buffer_t* replay_buffer = NULL;
   iree_status_t status = iree_hal_device_queue_alloca(
       device->base_device, queue_affinity, wait_semaphore_list,
-      signal_semaphore_list, pool, params, allocation_size, flags, out_buffer);
-  status = iree_hal_replay_device_complete_operation(&pending_record, status);
-  if (!iree_status_is_ok(status) && out_buffer && *out_buffer) {
-    iree_hal_buffer_release(*out_buffer);
-    *out_buffer = NULL;
+      signal_semaphore_list, pool, params, allocation_size, flags,
+      &base_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_buffer_create_proxy(
+        device->recorder, device->device_id, buffer_id, base_device,
+        base_buffer, device->host_allocator, &replay_buffer);
   }
+
+  iree_hal_replay_buffer_object_payload_t object_payload;
+  if (iree_status_is_ok(status)) {
+    iree_hal_replay_recorder_buffer_make_object_payload(base_buffer,
+                                                        &object_payload);
+  } else {
+    memset(&object_payload, 0, sizeof(object_payload));
+  }
+  iree_const_byte_span_t object_iovec = iree_make_const_byte_span(
+      (const uint8_t*)&object_payload, sizeof(object_payload));
+  status = iree_hal_replay_recorder_end_creation_operation(
+      &pending_record, status, 1, &operation_iovec,
+      IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER, buffer_id,
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_OBJECT, 1, &object_iovec);
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = replay_buffer;
+  } else {
+    iree_hal_buffer_release(replay_buffer);
+  }
+  iree_hal_buffer_release(base_buffer);
   return status;
 }
 
@@ -631,11 +772,17 @@ static iree_status_t iree_hal_replay_device_queue_dealloca(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_DEALLOCA,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_dealloca(device->base_device, queue_affinity,
-                                     wait_semaphore_list, signal_semaphore_list,
-                                     buffer, flags));
+  iree_hal_buffer_t* base_buffer = NULL;
+  iree_hal_buffer_t* temporary_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      buffer, device->host_allocator, &base_buffer, &temporary_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_dealloca(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, base_buffer, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_fill(
@@ -650,12 +797,19 @@ static iree_status_t iree_hal_replay_device_queue_fill(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_FILL,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_fill(device->base_device, queue_affinity,
-                                 wait_semaphore_list, signal_semaphore_list,
-                                 target_buffer, target_offset, length, pattern,
-                                 pattern_length, flags));
+  iree_hal_buffer_t* base_target_buffer = NULL;
+  iree_hal_buffer_t* temporary_target_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      target_buffer, device->host_allocator, &base_target_buffer,
+      &temporary_target_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_fill(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, base_target_buffer, target_offset, length,
+        pattern, pattern_length, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_update(
@@ -670,12 +824,19 @@ static iree_status_t iree_hal_replay_device_queue_update(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_UPDATE,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_update(device->base_device, queue_affinity,
-                                   wait_semaphore_list, signal_semaphore_list,
-                                   source_buffer, source_offset, target_buffer,
-                                   target_offset, length, flags));
+  iree_hal_buffer_t* base_target_buffer = NULL;
+  iree_hal_buffer_t* temporary_target_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      target_buffer, device->host_allocator, &base_target_buffer,
+      &temporary_target_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_update(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, source_buffer, source_offset, base_target_buffer,
+        target_offset, length, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_copy(
@@ -690,12 +851,27 @@ static iree_status_t iree_hal_replay_device_queue_copy(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_COPY,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_copy(device->base_device, queue_affinity,
-                                 wait_semaphore_list, signal_semaphore_list,
-                                 source_buffer, source_offset, target_buffer,
-                                 target_offset, length, flags));
+  iree_hal_buffer_t* base_source_buffer = NULL;
+  iree_hal_buffer_t* temporary_source_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      source_buffer, device->host_allocator, &base_source_buffer,
+      &temporary_source_buffer);
+  iree_hal_buffer_t* base_target_buffer = NULL;
+  iree_hal_buffer_t* temporary_target_buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+        target_buffer, device->host_allocator, &base_target_buffer,
+        &temporary_target_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_copy(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, base_source_buffer, source_offset,
+        base_target_buffer, target_offset, length, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_source_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_read(
@@ -710,12 +886,19 @@ static iree_status_t iree_hal_replay_device_queue_read(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_READ,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_read(device->base_device, queue_affinity,
-                                 wait_semaphore_list, signal_semaphore_list,
-                                 source_file, source_offset, target_buffer,
-                                 target_offset, length, flags));
+  iree_hal_buffer_t* base_target_buffer = NULL;
+  iree_hal_buffer_t* temporary_target_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      target_buffer, device->host_allocator, &base_target_buffer,
+      &temporary_target_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_read(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, source_file, source_offset, base_target_buffer,
+        target_offset, length, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_write(
@@ -730,12 +913,19 @@ static iree_status_t iree_hal_replay_device_queue_write(
   IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
       device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_WRITE,
       &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_write(device->base_device, queue_affinity,
-                                  wait_semaphore_list, signal_semaphore_list,
-                                  source_buffer, source_offset, target_file,
-                                  target_offset, length, flags));
+  iree_hal_buffer_t* base_source_buffer = NULL;
+  iree_hal_buffer_t* temporary_source_buffer = NULL;
+  iree_status_t status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+      source_buffer, device->host_allocator, &base_source_buffer,
+      &temporary_source_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_write(
+        device->base_device, queue_affinity, wait_semaphore_list,
+        signal_semaphore_list, base_source_buffer, source_offset, target_file,
+        target_offset, length, flags);
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_source_buffer);
+  return iree_hal_replay_device_complete_operation(&pending_record, status);
 }
 
 static iree_status_t iree_hal_replay_device_queue_host_call(
@@ -766,16 +956,59 @@ static iree_status_t iree_hal_replay_device_queue_dispatch(
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
+
+  iree_hal_buffer_ref_list_t base_bindings = bindings;
+  iree_hal_buffer_ref_t* binding_storage = NULL;
+  iree_hal_buffer_t** temporary_buffers = NULL;
+  iree_status_t status = iree_ok_status();
+  if (bindings.count) {
+    status = iree_allocator_malloc(device->host_allocator,
+                                   bindings.count * sizeof(*binding_storage),
+                                   (void**)&binding_storage);
+    if (iree_status_is_ok(status)) {
+      status = iree_allocator_malloc(
+          device->host_allocator, bindings.count * sizeof(*temporary_buffers),
+          (void**)&temporary_buffers);
+    }
+    if (iree_status_is_ok(status)) {
+      memset(temporary_buffers, 0, bindings.count * sizeof(*temporary_buffers));
+      memcpy(binding_storage, bindings.values,
+             bindings.count * sizeof(*binding_storage));
+      for (iree_host_size_t i = 0;
+           i < bindings.count && iree_status_is_ok(status); ++i) {
+        if (binding_storage[i].buffer) {
+          status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+              binding_storage[i].buffer, device->host_allocator,
+              &binding_storage[i].buffer, &temporary_buffers[i]);
+        }
+      }
+      base_bindings.values = binding_storage;
+    }
+  }
+
   iree_hal_replay_pending_record_t pending_record;
-  IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
-      device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_DISPATCH,
-      &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_dispatch(device->base_device, queue_affinity,
-                                     wait_semaphore_list, signal_semaphore_list,
-                                     executable, export_ordinal, config,
-                                     constants, bindings, flags));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_device_begin_operation(
+        device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_DISPATCH,
+        &pending_record);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_device_complete_operation(
+        &pending_record,
+        iree_hal_device_queue_dispatch(
+            device->base_device, queue_affinity, wait_semaphore_list,
+            signal_semaphore_list, executable, export_ordinal, config,
+            constants, base_bindings, flags));
+  }
+
+  if (temporary_buffers) {
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      iree_hal_replay_recorder_buffer_release_temporary(temporary_buffers[i]);
+    }
+  }
+  iree_allocator_free(device->host_allocator, temporary_buffers);
+  iree_allocator_free(device->host_allocator, binding_storage);
+  return status;
 }
 
 static iree_status_t iree_hal_replay_device_queue_execute(
@@ -786,15 +1019,60 @@ static iree_status_t iree_hal_replay_device_queue_execute(
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_execute_flags_t flags) {
   iree_hal_replay_device_t* device = iree_hal_replay_device_cast(base_device);
+
+  iree_hal_buffer_binding_table_t base_binding_table = binding_table;
+  iree_hal_buffer_binding_t* binding_storage = NULL;
+  iree_hal_buffer_t** temporary_buffers = NULL;
+  iree_status_t status = iree_ok_status();
+  if (binding_table.count) {
+    status = iree_allocator_malloc(
+        device->host_allocator, binding_table.count * sizeof(*binding_storage),
+        (void**)&binding_storage);
+    if (iree_status_is_ok(status)) {
+      status = iree_allocator_malloc(
+          device->host_allocator,
+          binding_table.count * sizeof(*temporary_buffers),
+          (void**)&temporary_buffers);
+    }
+    if (iree_status_is_ok(status)) {
+      memset(temporary_buffers, 0,
+             binding_table.count * sizeof(*temporary_buffers));
+      memcpy(binding_storage, binding_table.bindings,
+             binding_table.count * sizeof(*binding_storage));
+      for (iree_host_size_t i = 0;
+           i < binding_table.count && iree_status_is_ok(status); ++i) {
+        if (binding_storage[i].buffer) {
+          status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+              binding_storage[i].buffer, device->host_allocator,
+              &binding_storage[i].buffer, &temporary_buffers[i]);
+        }
+      }
+      base_binding_table.bindings = binding_storage;
+    }
+  }
+
   iree_hal_replay_pending_record_t pending_record;
-  IREE_RETURN_IF_ERROR(iree_hal_replay_device_begin_operation(
-      device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_EXECUTE,
-      &pending_record));
-  return iree_hal_replay_device_complete_operation(
-      &pending_record,
-      iree_hal_device_queue_execute(device->base_device, queue_affinity,
-                                    wait_semaphore_list, signal_semaphore_list,
-                                    command_buffer, binding_table, flags));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_device_begin_operation(
+        device, IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_EXECUTE,
+        &pending_record);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_device_complete_operation(
+        &pending_record,
+        iree_hal_device_queue_execute(
+            device->base_device, queue_affinity, wait_semaphore_list,
+            signal_semaphore_list, command_buffer, base_binding_table, flags));
+  }
+
+  if (temporary_buffers) {
+    for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
+      iree_hal_replay_recorder_buffer_release_temporary(temporary_buffers[i]);
+    }
+  }
+  iree_allocator_free(device->host_allocator, temporary_buffers);
+  iree_allocator_free(device->host_allocator, binding_storage);
+  return status;
 }
 
 static iree_status_t iree_hal_replay_device_queue_flush(
@@ -895,11 +1173,22 @@ static iree_status_t iree_hal_replay_wrap_device(
   device->base_device = base_device;
   iree_hal_device_retain(device->base_device);
 
-  iree_status_t status = iree_hal_replay_recorder_record_device_object(
-      recorder, &device->device_id);
+  iree_status_t status = iree_hal_replay_recorder_record_object(
+      recorder, IREE_HAL_REPLAY_OBJECT_ID_NONE,
+      IREE_HAL_REPLAY_OBJECT_TYPE_DEVICE, IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, 0,
+      NULL, &device->device_id);
+  iree_hal_allocator_t* base_allocator =
+      iree_status_is_ok(status) ? iree_hal_device_allocator(device->base_device)
+                                : NULL;
+  if (iree_status_is_ok(status) && base_allocator) {
+    status = iree_hal_replay_recorder_wrap_allocator(
+        recorder, device->device_id, (iree_hal_device_t*)device, base_allocator,
+        host_allocator, &device->allocator);
+  }
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
+    iree_hal_allocator_release(device->allocator);
     iree_hal_device_release(device->base_device);
     iree_hal_device_group_release(device->base_group);
     iree_hal_replay_recorder_release(device->recorder);
