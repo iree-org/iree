@@ -322,3 +322,20 @@ func.func @negative_vector_multi_reduction_rank_one(%arg0: vector<2xf32>, %acc: 
 // CHECK-LABEL: func.func @negative_vector_multi_reduction_rank_one
 //       CHECK:   vector.multi_reduction
 //       CHECK:   return
+
+// -----
+
+func.func @vector_multi_reduction_2d(%src: vector<2x4xf32>, %acc: vector<2xf32>) -> vector<2xf32> {
+    %0 = vector.multi_reduction <mul>, %src, %acc [1] : vector<2x4xf32> to vector<2xf32>
+    return %0 : vector<2xf32>
+}
+
+// CHECK-LABEL: func.func @vector_multi_reduction_2d
+//  CHECK-SAME:   (%[[S0:.+]]: vector<4xf32>, %[[S1:.+]]: vector<4xf32>, %[[ACC:.+]]: vector<2xf32>)
+//       CHECK:   %[[A0:.+]] = vector.extract %[[ACC]][0] : f32 from vector<2xf32>
+//       CHECK:   %[[R0:.+]] = vector.multi_reduction <mul>, %[[S0]], %[[A0]] [0] : vector<4xf32> to f32
+//       CHECK:   %[[INS0:.+]] = vector.insert %[[R0]], %{{.*}} [0] : f32 into vector<2xf32>
+//       CHECK:   %[[A1:.+]] = vector.extract %[[ACC]][1] : f32 from vector<2xf32>
+//       CHECK:   %[[R1:.+]] = vector.multi_reduction <mul>, %[[S1]], %[[A1]] [0] : vector<4xf32> to f32
+//       CHECK:   %[[INS1:.+]] = vector.insert %[[R1]], %[[INS0]] [1] : f32 into vector<2xf32>
+//       CHECK:   return %[[INS1]] : vector<2xf32>
