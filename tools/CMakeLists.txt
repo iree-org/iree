@@ -95,6 +95,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::help
     iree::hal::replay::recorder
     iree::modules::hal::types
     iree::tooling::context_util
@@ -234,6 +235,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal::replay::dump
+    iree::hal::replay::help
     iree::io::file_handle
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
@@ -251,6 +253,7 @@ iree_cc_binary(
     iree::base::tooling::flags
     iree::hal
     iree::hal::replay::execute
+    iree::hal::replay::help
     iree::io::file_handle
     iree::tooling::device_util
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
@@ -270,6 +273,7 @@ iree_cc_binary(
     iree::base::tooling::flags
     iree::hal
     iree::hal::replay::execute
+    iree::hal::replay::help
     iree::io::file_handle
     iree::tooling::device_util
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
@@ -351,6 +355,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::help
     iree::tooling::context_util
     iree::tooling::run_module
     iree::vm

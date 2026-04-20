@@ -64,6 +64,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/help.h"
 #include "iree/hal/replay/recorder.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
@@ -83,6 +84,9 @@ IREE_FLAG(int32_t, batch_size, 1,
           "used during compilation.");
 IREE_FLAG(int32_t, batch_concurrency, 1,
           "Number of invocations within a batch that should run concurrently.");
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 static iree_status_t parse_completion_wait_flags(iree_string_view_t flag_name,
                                                  void* storage,
@@ -665,16 +669,17 @@ static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
-  iree_flags_set_usage(
-      "iree-benchmark-module",
-      "Benchmarks a function within a compiled IREE module and handles I/O\n"
-      "parsing. Modules can be provided by file path (`--module=file.vmfb`)\n"
-      "or read from stdin (`--module=-`) and the function to execute\n"
-      "matches the original name provided to the compiler\n"
-      "(`--function=foo` for `func.func @foo`).\n");
+  iree_flags_set_usage("iree-benchmark-module",
+                       iree_hal_replay_capture_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    return EXIT_SUCCESS;
+  }
   ::benchmark::Initialize(&argc, argv);
 
   iree::IREEBenchmark iree_benchmark;

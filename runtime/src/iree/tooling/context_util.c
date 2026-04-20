@@ -236,21 +236,21 @@ static iree_status_t iree_hal_module_device_policy_from_flags(
 // HAL execution model management
 //===----------------------------------------------------------------------===//
 
-IREE_FLAG(string, hal_replay_output, "",
+IREE_FLAG(string, device_replay_output, "",
           "Writes a HAL replay capture stream to the specified .ireereplay "
           "file. The HAL module device group is wrapped so operations across "
           "all devices are emitted into one ordered replay.");
 IREE_FLAG(
-    string, hal_replay_file_policy, "reference",
+    string, device_replay_file_policy, "reference",
     "Policy for imported fd-backed HAL files while recording a HAL replay. "
     "Options are `reference` to capture external file paths or `fail` to "
     "reject fd-backed files.");
 
-static bool iree_tooling_hal_replay_capture_requested(void) {
-  return strlen(FLAG_hal_replay_output) != 0;
+static bool iree_tooling_device_replay_capture_requested(void) {
+  return strlen(FLAG_device_replay_output) != 0;
 }
 
-static iree_status_t iree_tooling_parse_hal_replay_file_policy(
+static iree_status_t iree_tooling_parse_device_replay_file_policy(
     iree_string_view_t value,
     iree_hal_replay_recorder_external_file_policy_t* out_policy) {
   IREE_ASSERT_ARGUMENT(out_policy);
@@ -263,7 +263,7 @@ static iree_status_t iree_tooling_parse_hal_replay_file_policy(
   }
   return iree_make_status(
       IREE_STATUS_INVALID_ARGUMENT,
-      "--hal_replay_file_policy must be `reference` or `fail`; got `%.*s`",
+      "--device_replay_file_policy must be `reference` or `fail`; got `%.*s`",
       (int)value.size, value.data);
 }
 
@@ -273,19 +273,19 @@ static iree_status_t iree_tooling_create_hal_replay_recorder_from_flags(
   IREE_ASSERT_ARGUMENT(out_replay_recorder);
   *out_replay_recorder = NULL;
 
-  if (!iree_tooling_hal_replay_capture_requested()) return iree_ok_status();
+  if (!iree_tooling_device_replay_capture_requested()) return iree_ok_status();
 
   iree_hal_replay_recorder_options_t options =
       iree_hal_replay_recorder_options_default();
-  IREE_RETURN_IF_ERROR(iree_tooling_parse_hal_replay_file_policy(
-      iree_make_cstring_view(FLAG_hal_replay_file_policy),
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_device_replay_file_policy(
+      iree_make_cstring_view(FLAG_device_replay_file_policy),
       &options.external_file_policy));
 
   iree_io_file_handle_t* file_handle = NULL;
   iree_status_t status = iree_io_file_handle_create(
       IREE_IO_FILE_MODE_WRITE | IREE_IO_FILE_MODE_SEQUENTIAL_SCAN |
           IREE_IO_FILE_MODE_SHARE_READ,
-      iree_make_cstring_view(FLAG_hal_replay_output),
+      iree_make_cstring_view(FLAG_device_replay_output),
       /*initial_size=*/0, host_allocator, &file_handle);
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_recorder_create(
@@ -327,11 +327,11 @@ static iree_status_t iree_tooling_load_hal_async_module(
   if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+  if (iree_tooling_device_replay_capture_requested() && !out_replay_recorder) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "--hal_replay_output requires a caller-owned replay recorder output");
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--device_replay_output requires a caller-owned "
+                            "replay recorder output");
   }
 
   // Register required types before creating the module.
@@ -393,7 +393,7 @@ static iree_status_t iree_tooling_load_hal_async_module(
   iree_hal_replay_recorder_t* replay_recorder = NULL;
   iree_hal_device_group_t* replay_device_group = NULL;
   if (iree_status_is_ok(status) &&
-      iree_tooling_hal_replay_capture_requested()) {
+      iree_tooling_device_replay_capture_requested()) {
     status = iree_tooling_create_hal_replay_recorder_from_flags(
         host_allocator, &replay_recorder);
     if (iree_status_is_ok(status)) {
@@ -638,7 +638,8 @@ typedef struct {
   iree_hal_device_t* device;
   // Lead HAL allocator retained from the resolved HAL module, if any.
   iree_hal_allocator_t* device_allocator;
-  // Optional replay recorder retained when --hal_replay_output= is specified.
+  // Optional replay recorder retained when --device_replay_output= is
+  // specified.
   iree_hal_replay_recorder_t* replay_recorder;
 } iree_tooling_resolve_state_t;
 static iree_status_t iree_tooling_resolve_module_dependency_callback(
@@ -707,11 +708,11 @@ iree_status_t iree_tooling_resolve_modules(
   if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+  if (iree_tooling_device_replay_capture_requested() && !out_replay_recorder) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "--hal_replay_output requires a caller-owned replay recorder output");
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--device_replay_output requires a caller-owned "
+                            "replay recorder output");
   }
 
   iree_tooling_resolve_state_t resolve_state = {
@@ -742,11 +743,12 @@ iree_status_t iree_tooling_resolve_modules(
   }
 
   if (iree_status_is_ok(status) &&
-      iree_tooling_hal_replay_capture_requested() &&
+      iree_tooling_device_replay_capture_requested() &&
       !resolve_state.replay_recorder) {
     status = iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "--hal_replay_output requires a module importing the async HAL module");
+        "--device_replay_output requires a module importing the async HAL "
+        "module");
   }
 
   if (iree_status_is_ok(status)) {
@@ -861,11 +863,11 @@ iree_status_t iree_tooling_create_context_from_flags(
   if (out_replay_recorder) *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (iree_tooling_hal_replay_capture_requested() && !out_replay_recorder) {
+  if (iree_tooling_device_replay_capture_requested() && !out_replay_recorder) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "--hal_replay_output requires a caller-owned replay recorder output");
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--device_replay_output requires a caller-owned "
+                            "replay recorder output");
   }
 
   // Resolve all module dependencies into an ordered list.

@@ -9,9 +9,13 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/replay/dump.h"
+#include "iree/hal/replay/help.h"
 #include "iree/io/file_contents.h"
 
 IREE_FLAG(string, format, "text", "Output format: text, jsonl, or c.");
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 static iree_status_t iree_dump_replay_parse_format(
     const char* value, iree_hal_replay_dump_format_t* out_format) {
@@ -49,14 +53,15 @@ int main(int argc, char** argv) {
   iree_allocator_t host_allocator = iree_allocator_system();
   int exit_code = EXIT_SUCCESS;
 
-  iree_flags_set_usage(
-      "iree-dump-replay",
-      "Dumps information from an IREE HAL replay file.\n"
-      "\n"
-      "The text format is intended for humans. The jsonl format emits one\n"
-      "object per line and reports blob data as byte ranges in the original\n"
-      ".ireereplay file.\n");
+  iree_flags_set_usage("iree-dump-replay", iree_hal_replay_dump_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(exit_code);
+    return exit_code;
+  }
 
   iree_status_t status = iree_ok_status();
   if (argc != 2) {

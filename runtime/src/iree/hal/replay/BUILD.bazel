@@ -53,6 +53,15 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "help",
+    srcs = ["help.c"],
+    hdrs = ["help.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "dump",
     srcs = ["dump.c"],
     hdrs = ["dump.h"],

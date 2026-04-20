@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/replay/execute.h"
+#include "iree/hal/replay/help.h"
 #include "iree/io/file_contents.h"
 #include "iree/tooling/device_util.h"
 
@@ -19,6 +20,9 @@ IREE_FLAG_LIST(
     string, replay_file_remap,
     "Remaps captured external file path prefixes before replay opens them. "
     "Repeat as --replay_file_remap=captured_prefix=replay_prefix.");
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 namespace {
 
@@ -119,17 +123,17 @@ iree_status_t ParseReplayFileRemaps(
 static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-replay");
 
-  iree_flags_set_usage(
-      "iree-benchmark-replay",
-      "Benchmarks deterministic execution of an IREE HAL replay file.\n"
-      "\n"
-      "Use --device= to select the target HAL device, matching\n"
-      "iree-benchmark-module. Benchmark flags are forwarded to Google\n"
-      "Benchmark. HAL-native profiling flags capture the timed replay work\n"
-      "and profiling flushes are excluded from benchmark timing.\n");
+  iree_flags_set_usage("iree-benchmark-replay",
+                       iree_hal_replay_benchmark_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    return EXIT_SUCCESS;
+  }
   ::benchmark::Initialize(&argc, argv);
 
   iree_allocator_t host_allocator = iree_allocator_system();

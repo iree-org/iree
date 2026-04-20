@@ -60,8 +60,8 @@ iree_vm_module_t* iree_tooling_module_list_back(
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
 // |out_replay_recorder| will contain a recorder that must be closed after all
-// HAL work is complete when --hal_replay_output= is specified. Pass NULL only
-// when no replay capture flag is expected.
+// HAL work is complete when --device_replay_output= is specified. Pass NULL
+// only when no replay capture flag is expected.
 //
 // If multiple devices are created the one returned (and its corresponding
 // allocator) are considered the 'lead' device for bookkeeping purposes.
@@ -101,8 +101,8 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
 // |out_replay_recorder| will contain a recorder that must be closed after all
-// HAL work is complete when --hal_replay_output= is specified. Pass NULL only
-// when no replay capture flag is expected.
+// HAL work is complete when --device_replay_output= is specified. Pass NULL
+// only when no replay capture flag is expected.
 //
 // If multiple devices are created the one returned (and its corresponding
 // allocator) are considered the 'lead' device for bookkeeping purposes.

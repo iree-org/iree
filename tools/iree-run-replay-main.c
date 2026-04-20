@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/replay/execute.h"
+#include "iree/hal/replay/help.h"
 #include "iree/io/file_contents.h"
 #include "iree/tooling/device_util.h"
 
@@ -19,6 +20,9 @@ IREE_FLAG_LIST(
     string, replay_file_remap,
     "Remaps captured external file path prefixes before replay opens them. "
     "Repeat as --replay_file_remap=captured_prefix=replay_prefix.");
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 static iree_status_t iree_tooling_parse_replay_file_remaps(
     iree_allocator_t host_allocator,
@@ -96,15 +100,15 @@ int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_flags_set_usage(
-      "iree-run-replay",
-      "Executes an IREE HAL replay file against one or more HAL devices.\n"
-      "\n"
-      "The replay stream is executed deterministically in capture order. Use\n"
-      "--device= to select the target HAL device, matching iree-run-module.\n"
-      "HAL-native profiling flags capture only replay execution, not tool\n"
-      "setup or teardown.\n");
+  iree_flags_set_usage("iree-run-replay", iree_hal_replay_run_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
+  }
 
   iree_allocator_t host_allocator = iree_allocator_system();
   iree_status_t status = iree_ok_status();

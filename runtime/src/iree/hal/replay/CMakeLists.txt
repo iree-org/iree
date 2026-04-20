@@ -63,6 +63,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    help
+  HDRS
+    "help.h"
+  SRCS
+    "help.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     dump
   HDRS
     "dump.h"
