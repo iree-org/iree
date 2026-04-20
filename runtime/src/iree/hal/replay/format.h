@@ -172,6 +172,12 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_COPY_BUFFER = 11u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA = 12u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EXECUTION_BARRIER = 13u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_DEALLOCA = 14u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_FILL = 15u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_UPDATE = 16u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_COPY = 17u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_FILL_BUFFER = 18u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_UPDATE_BUFFER = 19u,
 };
 
 // Payload describing a captured buffer object.
@@ -418,6 +424,101 @@ typedef struct iree_hal_replay_device_queue_alloca_payload_t {
   // Number of signal semaphore timepoints following the wait timepoints.
   uint64_t signal_semaphore_count;
 } iree_hal_replay_device_queue_alloca_payload_t;
+
+// Payload describing a device queue dealloca request followed by semaphore
+// lists.
+typedef struct iree_hal_replay_device_queue_dealloca_payload_t {
+  // Buffer range submitted for queue-ordered deallocation.
+  iree_hal_replay_buffer_ref_payload_t buffer_ref;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Dealloca flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_dealloca_payload_t;
+
+// Payload describing a device queue fill request followed by semaphore lists
+// and the fill pattern bytes.
+typedef struct iree_hal_replay_device_queue_fill_payload_t {
+  // Target buffer range filled by the queue operation.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Fill flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+  // Byte length of the captured fill pattern following the semaphore lists.
+  uint64_t pattern_length;
+} iree_hal_replay_device_queue_fill_payload_t;
+
+// Payload describing a device queue update request followed by semaphore lists
+// and the captured source bytes.
+typedef struct iree_hal_replay_device_queue_update_payload_t {
+  // Target buffer range updated by the queue operation.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Update flags.
+  uint64_t flags;
+  // Caller-provided source byte offset, retained for diagnostics/projection.
+  uint64_t source_offset;
+  // Byte length of the captured source data following the semaphore lists.
+  uint64_t data_length;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_update_payload_t;
+
+// Payload describing a device queue copy request followed by semaphore lists.
+typedef struct iree_hal_replay_device_queue_copy_payload_t {
+  // Source buffer range copied from.
+  iree_hal_replay_buffer_ref_payload_t source_ref;
+  // Target buffer range copied to.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Queue affinity used for the submission.
+  uint64_t queue_affinity;
+  // Copy flags.
+  uint64_t flags;
+  // Number of wait semaphore timepoints following this header.
+  uint64_t wait_semaphore_count;
+  // Number of signal semaphore timepoints following the wait timepoints.
+  uint64_t signal_semaphore_count;
+} iree_hal_replay_device_queue_copy_payload_t;
+
+// Payload describing a command buffer fill operation followed by the fill
+// pattern bytes.
+typedef struct iree_hal_replay_command_buffer_fill_buffer_payload_t {
+  // Target buffer range filled by the command.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Fill flags.
+  uint32_t flags;
+  // Reserved for future fill metadata; must be zero.
+  uint32_t reserved0;
+  // Byte length of the captured fill pattern following this header.
+  uint64_t pattern_length;
+} iree_hal_replay_command_buffer_fill_buffer_payload_t;
+
+// Payload describing a command buffer update operation followed by the captured
+// source bytes.
+typedef struct iree_hal_replay_command_buffer_update_buffer_payload_t {
+  // Target buffer range updated by the command.
+  iree_hal_replay_buffer_ref_payload_t target_ref;
+  // Update flags.
+  uint32_t flags;
+  // Reserved for future update metadata; must be zero.
+  uint32_t reserved0;
+  // Caller-provided source byte offset, retained for diagnostics/projection.
+  uint64_t source_offset;
+  // Byte length of the captured source data following this header.
+  uint64_t data_length;
+} iree_hal_replay_command_buffer_update_buffer_payload_t;
 
 // Payload describing a command buffer copy operation.
 typedef struct iree_hal_replay_command_buffer_copy_buffer_payload_t {

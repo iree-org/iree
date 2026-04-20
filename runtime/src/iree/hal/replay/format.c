@@ -235,6 +235,18 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "device_queue_alloca";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_EXECUTION_BARRIER:
       return "command_buffer_execution_barrier";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_DEALLOCA:
+      return "device_queue_dealloca";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_FILL:
+      return "device_queue_fill";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_UPDATE:
+      return "device_queue_update";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_COPY:
+      return "device_queue_copy";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_FILL_BUFFER:
+      return "command_buffer_fill_buffer";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_UPDATE_BUFFER:
+      return "command_buffer_update_buffer";
     default:
       return "unknown";
   }

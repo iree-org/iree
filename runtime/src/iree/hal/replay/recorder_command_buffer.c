@@ -430,6 +430,17 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_fill_buffer(
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_replay_recorder_command_buffer_t* command_buffer =
       iree_hal_replay_recorder_command_buffer_cast(base_command_buffer);
+  iree_hal_replay_command_buffer_fill_buffer_payload_t payload;
+  memset(&payload, 0, sizeof(payload));
+  iree_hal_replay_recorder_buffer_ref_make_payload(target_ref,
+                                                   &payload.target_ref);
+  payload.flags = flags;
+  payload.pattern_length = pattern_length;
+  iree_const_byte_span_t iovecs[2] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(pattern, pattern_length),
+  };
+
   iree_hal_buffer_ref_t base_target_ref = target_ref;
   iree_hal_buffer_t* temporary_target_buffer = NULL;
   iree_status_t status = iree_ok_status();
@@ -438,18 +449,21 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_fill_buffer(
         target_ref.buffer, command_buffer->host_allocator,
         &base_target_ref.buffer, &temporary_target_buffer);
   }
-  iree_hal_replay_pending_record_t pending_record;
+  iree_hal_replay_pending_record_t pending_record = {0};
   if (iree_status_is_ok(status)) {
-    status = iree_hal_replay_recorder_command_buffer_passthrough(
+    status = iree_hal_replay_recorder_command_buffer_begin_operation(
         command_buffer,
         IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FILL_BUFFER,
+        IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_FILL_BUFFER,
         &pending_record);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_replay_recorder_end_operation(
-        &pending_record, iree_hal_command_buffer_fill_buffer(
-                             command_buffer->base_command_buffer,
-                             base_target_ref, pattern, pattern_length, flags));
+    status = iree_hal_replay_recorder_end_operation_with_payload(
+        &pending_record,
+        iree_hal_command_buffer_fill_buffer(command_buffer->base_command_buffer,
+                                            base_target_ref, pattern,
+                                            pattern_length, flags),
+        IREE_ARRAYSIZE(iovecs), iovecs);
   }
   iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
   return status;
@@ -461,6 +475,32 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_update_buffer(
     iree_hal_update_flags_t flags) {
   iree_hal_replay_recorder_command_buffer_t* command_buffer =
       iree_hal_replay_recorder_command_buffer_cast(base_command_buffer);
+  if (IREE_UNLIKELY(target_ref.length > IREE_HOST_SIZE_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "replay command buffer update length exceeds host size");
+  }
+  if (IREE_UNLIKELY(target_ref.length != 0 && !source_buffer)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "replay command buffer update source buffer is required");
+  }
+
+  iree_hal_replay_command_buffer_update_buffer_payload_t payload;
+  memset(&payload, 0, sizeof(payload));
+  iree_hal_replay_recorder_buffer_ref_make_payload(target_ref,
+                                                   &payload.target_ref);
+  payload.flags = flags;
+  payload.source_offset = source_offset;
+  payload.data_length = target_ref.length;
+  const uint8_t* source_data =
+      target_ref.length ? (const uint8_t*)source_buffer + source_offset : NULL;
+  iree_const_byte_span_t iovecs[2] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(source_data,
+                                (iree_host_size_t)payload.data_length),
+  };
+
   iree_hal_buffer_ref_t base_target_ref = target_ref;
   iree_hal_buffer_t* temporary_target_buffer = NULL;
   iree_status_t status = iree_ok_status();
@@ -469,18 +509,21 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_update_buffer(
         target_ref.buffer, command_buffer->host_allocator,
         &base_target_ref.buffer, &temporary_target_buffer);
   }
-  iree_hal_replay_pending_record_t pending_record;
+  iree_hal_replay_pending_record_t pending_record = {0};
   if (iree_status_is_ok(status)) {
-    status = iree_hal_replay_recorder_command_buffer_passthrough(
+    status = iree_hal_replay_recorder_command_buffer_begin_operation(
         command_buffer,
         IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_UPDATE_BUFFER,
+        IREE_HAL_REPLAY_PAYLOAD_TYPE_COMMAND_BUFFER_UPDATE_BUFFER,
         &pending_record);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_replay_recorder_end_operation(
-        &pending_record, iree_hal_command_buffer_update_buffer(
-                             command_buffer->base_command_buffer, source_buffer,
-                             source_offset, base_target_ref, flags));
+    status = iree_hal_replay_recorder_end_operation_with_payload(
+        &pending_record,
+        iree_hal_command_buffer_update_buffer(
+            command_buffer->base_command_buffer, source_buffer, source_offset,
+            base_target_ref, flags),
+        IREE_ARRAYSIZE(iovecs), iovecs);
   }
   iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
   return status;
