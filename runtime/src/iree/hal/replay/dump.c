@@ -22,6 +22,37 @@ typedef struct iree_hal_replay_dump_context_t {
   iree_allocator_t host_allocator;
 } iree_hal_replay_dump_context_t;
 
+typedef struct iree_hal_replay_dump_file_summary_t {
+  // Total top-level records in the replay file.
+  uint64_t record_count;
+  // Number of HAL object records.
+  uint64_t object_count;
+  // Number of replayable HAL operation records.
+  uint64_t operation_count;
+  // Number of explicitly unsupported HAL operation records.
+  uint64_t unsupported_count;
+  // Number of HAL file object records.
+  uint64_t file_object_count;
+  // Number of file objects referencing environment files by path.
+  uint64_t external_file_count;
+  // Number of file objects embedded inline in the replay file.
+  uint64_t inline_file_count;
+  // Number of file objects using unknown future reference types.
+  uint64_t unknown_file_reference_count;
+  // Number of external file references validated by platform identity.
+  uint64_t identity_file_validation_count;
+  // Number of external file references validated by content digest.
+  uint64_t digest_file_validation_count;
+  // Number of file references with no validation beyond length.
+  uint64_t no_file_validation_count;
+  // Number of file references using unknown future validation modes.
+  uint64_t unknown_file_validation_count;
+  // Total captured length of externally referenced files.
+  uint64_t external_file_total_length;
+  // Total embedded inline file bytes.
+  uint64_t inline_file_total_length;
+} iree_hal_replay_dump_file_summary_t;
+
 static iree_status_t iree_hal_replay_dump_emit(
     iree_hal_replay_dump_context_t* context, iree_string_builder_t* builder) {
   if (iree_string_builder_size(builder) == 0) return iree_ok_status();
@@ -118,6 +149,119 @@ static iree_status_t iree_hal_replay_dump_append_json_file_range(
       ",\"digest_type\":%u}",
       field_name, range->offset, range->length, range->uncompressed_length,
       (uint32_t)range->compression_type, (uint32_t)range->digest_type);
+}
+
+static iree_status_t iree_hal_replay_dump_summary_scan_file_object(
+    const iree_hal_replay_file_record_t* record,
+    iree_hal_replay_dump_file_summary_t* summary) {
+  if (record->payload.data_length <
+      sizeof(iree_hal_replay_file_object_payload_t)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay file object payload is short");
+  }
+  iree_hal_replay_file_object_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+  if (payload.reference_length > IREE_HOST_SIZE_MAX ||
+      sizeof(payload) + (iree_host_size_t)payload.reference_length !=
+          record->payload.data_length) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay file object payload length mismatch");
+  }
+
+  ++summary->file_object_count;
+  switch (payload.reference_type) {
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH:
+      ++summary->external_file_count;
+      summary->external_file_total_length += payload.file_length;
+      break;
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES:
+      ++summary->inline_file_count;
+      summary->inline_file_total_length += payload.reference_length;
+      break;
+    default:
+      ++summary->unknown_file_reference_count;
+      break;
+  }
+  switch (payload.validation_type) {
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE:
+      ++summary->no_file_validation_count;
+      break;
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_IDENTITY:
+      ++summary->identity_file_validation_count;
+      break;
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST:
+      ++summary->digest_file_validation_count;
+      break;
+    default:
+      ++summary->unknown_file_validation_count;
+      break;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_replay_dump_scan_summary(
+    iree_const_byte_span_t valid_contents, iree_host_size_t record_offset,
+    iree_hal_replay_dump_file_summary_t* out_summary) {
+  memset(out_summary, 0, sizeof(*out_summary));
+  uint64_t expected_sequence_ordinal = 0;
+  while (record_offset < valid_contents.data_length) {
+    iree_hal_replay_file_record_t record;
+    IREE_RETURN_IF_ERROR(iree_hal_replay_file_parse_record(
+        valid_contents, record_offset, &record, &record_offset));
+    if (record.header.sequence_ordinal != expected_sequence_ordinal++) {
+      return iree_make_status(IREE_STATUS_DATA_LOSS,
+                              "replay record sequence ordinal mismatch");
+    }
+
+    ++out_summary->record_count;
+    switch (record.header.record_type) {
+      case IREE_HAL_REPLAY_FILE_RECORD_TYPE_OBJECT:
+        ++out_summary->object_count;
+        if (record.header.payload_type ==
+            IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT) {
+          IREE_RETURN_IF_ERROR(iree_hal_replay_dump_summary_scan_file_object(
+              &record, out_summary));
+        }
+        break;
+      case IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION:
+        ++out_summary->operation_count;
+        break;
+      case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
+        ++out_summary->unsupported_count;
+        break;
+      default:
+        break;
+    }
+  }
+  return iree_ok_status();
+}
+
+static const char* iree_hal_replay_dump_file_reference_type_string(
+    iree_hal_replay_file_reference_type_t reference_type) {
+  switch (reference_type) {
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_NONE:
+      return "none";
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH:
+      return "external_path";
+    case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_INLINE_BYTES:
+      return "inline_bytes";
+    default:
+      return "unknown";
+  }
+}
+
+static const char* iree_hal_replay_dump_file_validation_type_string(
+    iree_hal_replay_file_validation_type_t validation_type) {
+  switch (validation_type) {
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_NONE:
+      return "none";
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_IDENTITY:
+      return "identity";
+    case IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST:
+      return "digest";
+    default:
+      return "unknown";
+  }
 }
 
 static iree_hal_replay_file_range_t iree_hal_replay_dump_payload_subrange(
@@ -713,14 +857,19 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
           builder,
           " queue_affinity=%" PRIu64 " file_length=%" PRIu64
           " access=0x%08" PRIx32 " flags=0x%08" PRIx32 " handle_type=%" PRIu32
-          " reference_type=%" PRIu32 " file_device=%" PRIu64
+          " reference_type=%s(%" PRIu32 ") file_device=%" PRIu64
           " file_inode=%" PRIu64 " file_mtime_ns=%" PRIu64
-          " validation_type=%" PRIu32 " digest_type=%" PRIu32
+          " validation_type=%s(%" PRIu32 ") digest_type=%" PRIu32
           " digest_fnv1a64=0x%016" PRIx64 " reference_range=[%" PRIu64
           ", +%" PRIu64 "]",
           payload.queue_affinity, payload.file_length, payload.access,
-          payload.flags, payload.handle_type, payload.reference_type,
-          payload.file_device, payload.file_inode, payload.file_mtime_ns,
+          payload.flags, payload.handle_type,
+          iree_hal_replay_dump_file_reference_type_string(
+              payload.reference_type),
+          payload.reference_type, payload.file_device, payload.file_inode,
+          payload.file_mtime_ns,
+          iree_hal_replay_dump_file_validation_type_string(
+              payload.validation_type),
           payload.validation_type, (uint32_t)payload.digest_type,
           iree_hal_replay_digest_load_fnv1a64(payload.digest),
           payload_range->offset + sizeof(payload), payload.reference_length);
@@ -1382,22 +1531,29 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
         return iree_make_status(IREE_STATUS_DATA_LOSS,
                                 "replay file object payload length mismatch");
       }
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          builder,
-          ",\"payload\":{\"queue_affinity\":%" PRIu64
-          ",\"file_length\":%" PRIu64 ",\"file_device\":%" PRIu64
-          ",\"file_inode\":%" PRIu64 ",\"file_mtime_ns\":%" PRIu64
-          ",\"reference_length\":%" PRIu64 ",\"access\":%" PRIu32
-          ",\"flags\":%" PRIu32 ",\"handle_type\":%" PRIu32
-          ",\"reference_type\":%" PRIu32 ",\"validation_type\":%" PRIu32
-          ",\"digest_type\":%" PRIu32 ",\"digest_fnv1a64\":\"0x%016" PRIx64
-          "\"",
-          payload.queue_affinity, payload.file_length, payload.file_device,
-          payload.file_inode, payload.file_mtime_ns, payload.reference_length,
-          payload.access, payload.flags, payload.handle_type,
-          payload.reference_type, payload.validation_type,
-          (uint32_t)payload.digest_type,
-          iree_hal_replay_digest_load_fnv1a64(payload.digest)));
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(
+              builder,
+              ",\"payload\":{\"queue_affinity\":%" PRIu64
+              ",\"file_length\":%" PRIu64 ",\"file_device\":%" PRIu64
+              ",\"file_inode\":%" PRIu64 ",\"file_mtime_ns\":%" PRIu64
+              ",\"reference_length\":%" PRIu64 ",\"access\":%" PRIu32
+              ",\"flags\":%" PRIu32 ",\"handle_type\":%" PRIu32
+              ",\"reference_type\":%" PRIu32 ",\"reference_type_name\":\"%s\""
+              ",\"validation_type\":%" PRIu32 ",\"validation_type_name\":\"%s\""
+              ",\"digest_type\":%" PRIu32 ",\"digest_fnv1a64\":\"0x%016" PRIx64
+              "\"",
+              payload.queue_affinity, payload.file_length, payload.file_device,
+              payload.file_inode, payload.file_mtime_ns,
+              payload.reference_length, payload.access, payload.flags,
+              payload.handle_type, payload.reference_type,
+              iree_hal_replay_dump_file_reference_type_string(
+                  payload.reference_type),
+              payload.validation_type,
+              iree_hal_replay_dump_file_validation_type_string(
+                  payload.validation_type),
+              (uint32_t)payload.digest_type,
+              iree_hal_replay_digest_load_fnv1a64(payload.digest)));
       iree_hal_replay_file_range_t reference_range =
           iree_hal_replay_dump_payload_subrange(
               payload_range, sizeof(payload),
@@ -2087,13 +2243,44 @@ static iree_status_t iree_hal_replay_dump_emit_json_record(
 
 static iree_status_t iree_hal_replay_dump_emit_text_file(
     iree_hal_replay_dump_context_t* context, iree_string_builder_t* builder,
-    const iree_hal_replay_file_header_t* header) {
+    const iree_hal_replay_file_header_t* header,
+    const iree_hal_replay_dump_file_summary_t* summary) {
+  const bool environment_referenced = summary->external_file_count != 0;
+  const bool hermetic =
+      !environment_referenced && summary->unknown_file_reference_count == 0;
+  const bool strict_replay_supported =
+      summary->unsupported_count == 0 &&
+      summary->unknown_file_reference_count == 0 &&
+      summary->unknown_file_validation_count == 0;
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder,
       "IREE HAL replay v%u.%u\nfile_length: %" PRIu64
-      "\nheader_length: %u\nrecords:\n",
+      "\nheader_length: %u\nsummary:\n"
+      "  hermetic: %s\n"
+      "  environment_referenced: %s\n"
+      "  strict_replay_supported: %s\n"
+      "  records: total=%" PRIu64 " objects=%" PRIu64 " operations=%" PRIu64
+      " unsupported=%" PRIu64
+      "\n"
+      "  files: total=%" PRIu64 " external=%" PRIu64 " inline=%" PRIu64
+      " unknown=%" PRIu64
+      "\n"
+      "  file_bytes: external=%" PRIu64 " inline=%" PRIu64
+      "\n"
+      "  file_validation: identity=%" PRIu64 " digest=%" PRIu64 " none=%" PRIu64
+      " unknown=%" PRIu64 "\nrecords:\n",
       header->version_major, header->version_minor, header->file_length,
-      header->header_length));
+      header->header_length, hermetic ? "yes" : "no",
+      environment_referenced ? "yes" : "no",
+      strict_replay_supported ? "yes" : "no", summary->record_count,
+      summary->object_count, summary->operation_count,
+      summary->unsupported_count, summary->file_object_count,
+      summary->external_file_count, summary->inline_file_count,
+      summary->unknown_file_reference_count,
+      summary->external_file_total_length, summary->inline_file_total_length,
+      summary->identity_file_validation_count,
+      summary->digest_file_validation_count, summary->no_file_validation_count,
+      summary->unknown_file_validation_count));
   return iree_hal_replay_dump_emit(context, builder);
 }
 
@@ -2106,6 +2293,42 @@ static iree_status_t iree_hal_replay_dump_emit_json_file(
       ",\"header_length\":%u,\"flags\":%u,\"file_length\":%" PRIu64 "}\n",
       header->version_major, header->version_minor, header->header_length,
       header->flags, header->file_length));
+  return iree_hal_replay_dump_emit(context, builder);
+}
+
+static iree_status_t iree_hal_replay_dump_emit_json_summary(
+    iree_hal_replay_dump_context_t* context, iree_string_builder_t* builder,
+    const iree_hal_replay_dump_file_summary_t* summary) {
+  const bool environment_referenced = summary->external_file_count != 0;
+  const bool hermetic =
+      !environment_referenced && summary->unknown_file_reference_count == 0;
+  const bool strict_replay_supported =
+      summary->unsupported_count == 0 &&
+      summary->unknown_file_reference_count == 0 &&
+      summary->unknown_file_validation_count == 0;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder,
+      "{\"kind\":\"summary\",\"hermetic\":%s,\"environment_referenced\":%s"
+      ",\"strict_replay_supported\":%s"
+      ",\"record_count\":%" PRIu64 ",\"object_count\":%" PRIu64
+      ",\"operation_count\":%" PRIu64 ",\"unsupported_count\":%" PRIu64
+      ",\"file_object_count\":%" PRIu64 ",\"external_file_count\":%" PRIu64
+      ",\"inline_file_count\":%" PRIu64
+      ",\"unknown_file_reference_count\":%" PRIu64
+      ",\"external_file_total_length\":%" PRIu64
+      ",\"inline_file_total_length\":%" PRIu64
+      ",\"file_validation\":{\"identity\":%" PRIu64 ",\"digest\":%" PRIu64
+      ",\"none\":%" PRIu64 ",\"unknown\":%" PRIu64 "}}\n",
+      hermetic ? "true" : "false", environment_referenced ? "true" : "false",
+      strict_replay_supported ? "true" : "false", summary->record_count,
+      summary->object_count, summary->operation_count,
+      summary->unsupported_count, summary->file_object_count,
+      summary->external_file_count, summary->inline_file_count,
+      summary->unknown_file_reference_count,
+      summary->external_file_total_length, summary->inline_file_total_length,
+      summary->identity_file_validation_count,
+      summary->digest_file_validation_count, summary->no_file_validation_count,
+      summary->unknown_file_validation_count));
   return iree_hal_replay_dump_emit(context, builder);
 }
 
@@ -2138,6 +2361,9 @@ iree_hal_replay_dump_file(iree_const_byte_span_t file_contents,
   } else {
     file_header.file_length = file_contents.data_length;
   }
+  iree_hal_replay_dump_file_summary_t summary;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_replay_dump_scan_summary(valid_contents, offset, &summary));
 
   iree_hal_replay_dump_context_t context = {
       .write = write,
@@ -2149,11 +2375,15 @@ iree_hal_replay_dump_file(iree_const_byte_span_t file_contents,
 
   iree_status_t status = iree_ok_status();
   if (options->format == IREE_HAL_REPLAY_DUMP_FORMAT_TEXT) {
-    status =
-        iree_hal_replay_dump_emit_text_file(&context, &builder, &file_header);
+    status = iree_hal_replay_dump_emit_text_file(&context, &builder,
+                                                 &file_header, &summary);
   } else {
     status =
         iree_hal_replay_dump_emit_json_file(&context, &builder, &file_header);
+    if (iree_status_is_ok(status)) {
+      status =
+          iree_hal_replay_dump_emit_json_summary(&context, &builder, &summary);
+    }
   }
 
   uint64_t expected_sequence_ordinal = 0;

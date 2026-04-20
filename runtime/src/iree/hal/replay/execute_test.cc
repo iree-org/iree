@@ -31,6 +31,8 @@
 
 namespace {
 
+using ::testing::HasSubstr;
+
 static iree_hal_device_t* CreateSyncDevice(const char* identifier) {
   iree_async_proactor_pool_t* proactor_pool = nullptr;
   IREE_CHECK_OK(iree_async_proactor_pool_create(
@@ -579,10 +581,16 @@ TEST(ReplayExecuteTest, CopiedFdBackedQueueReadFailsIdentityValidation) {
       iree_hal_replay_execute_options_default();
   options.file_path_remap_count = 1;
   options.file_path_remaps = &file_path_remap;
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
-                        iree_hal_replay_execute_file(
-                            GetCapturedFileContents(storage), replay_group,
-                            &options, iree_allocator_system()));
+  iree_status_t status = iree_hal_replay_execute_file(
+      GetCapturedFileContents(storage), replay_group, &options,
+      iree_allocator_system());
+  auto owned_status = ::iree::internal::ConsumeForTest(status);
+  EXPECT_THAT(owned_status,
+              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
+                  IREE_STATUS_FAILED_PRECONDITION)));
+  EXPECT_THAT(owned_status.ToString(),
+              HasSubstr("--device_replay_file_validation=digest"));
+  EXPECT_THAT(owned_status.ToString(), HasSubstr("--replay_file_remap"));
   iree_hal_device_group_release(replay_group);
 #else
   GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";

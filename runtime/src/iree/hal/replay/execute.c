@@ -589,14 +589,17 @@ static iree_status_t iree_hal_replay_executor_create_event(
 
 static iree_status_t iree_hal_replay_executor_validate_file_reference(
     const iree_hal_replay_file_object_payload_t* payload,
+    iree_string_view_t captured_path, iree_string_view_t resolved_path,
     iree_io_file_handle_t* handle, iree_hal_file_t* file) {
   const uint64_t file_length = iree_hal_file_length(file);
   if (IREE_UNLIKELY(payload->file_length != file_length)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "external replay file length mismatch: captured=%" PRIu64
-        " current=%" PRIu64,
-        payload->file_length, file_length);
+        "external replay file length mismatch for '%.*s' captured as '%.*s': "
+        "captured=%" PRIu64 " current=%" PRIu64
+        "; restore the matching file or fix --replay_file_remap",
+        (int)resolved_path.size, resolved_path.data, (int)captured_path.size,
+        captured_path.data, payload->file_length, file_length);
   }
 
   switch (payload->validation_type) {
@@ -643,7 +646,8 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
       if (read_length <= 0) {
         return iree_make_status(
             IREE_STATUS_UNAVAILABLE,
-            "unable to read external replay file for digest validation");
+            "unable to read external replay file '%.*s' for digest validation",
+            (int)resolved_path.size, resolved_path.data);
       }
       state = iree_hal_replay_digest_fnv1a64_update(
           state,
@@ -655,9 +659,11 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
     if (IREE_UNLIKELY(state != expected_digest)) {
       return iree_make_status(
           IREE_STATUS_FAILED_PRECONDITION,
-          "external replay file digest mismatch: expected=0x%016" PRIx64
-          " actual=0x%016" PRIx64,
-          expected_digest, state);
+          "external replay file digest mismatch for '%.*s' captured as "
+          "'%.*s': expected=0x%016" PRIx64 " actual=0x%016" PRIx64
+          "; restore the matching file or fix --replay_file_remap",
+          (int)resolved_path.size, resolved_path.data, (int)captured_path.size,
+          captured_path.data, expected_digest, state);
     }
     return iree_ok_status();
   }
@@ -669,7 +675,8 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
   struct stat file_stat;
   if (IREE_UNLIKELY(fstat(primitive.value.fd, &file_stat) != 0)) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "unable to stat external replay file");
+                            "unable to stat external replay file '%.*s'",
+                            (int)resolved_path.size, resolved_path.data);
   }
   const uint64_t file_device = (uint64_t)file_stat.st_dev;
   const uint64_t file_inode = (uint64_t)file_stat.st_ino;
@@ -681,14 +688,22 @@ static iree_status_t iree_hal_replay_executor_validate_file_reference(
                     payload->file_mtime_ns != file_mtime_ns)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "external replay file identity mismatch: captured=(dev=%" PRIu64
-        ", inode=%" PRIu64 ", mtime_ns=%" PRIu64 ") current=(dev=%" PRIu64
-        ", inode=%" PRIu64 ", mtime_ns=%" PRIu64 ")",
-        payload->file_device, payload->file_inode, payload->file_mtime_ns,
-        file_device, file_inode, file_mtime_ns);
+        "external replay file identity mismatch for '%.*s' captured as '%.*s': "
+        "captured=(dev=%" PRIu64 ", inode=%" PRIu64 ", mtime_ns=%" PRIu64
+        ") current=(dev=%" PRIu64 ", inode=%" PRIu64 ", mtime_ns=%" PRIu64
+        "); identity validation is the default and does not read file "
+        "contents; restore the original file identity, fix "
+        "--replay_file_remap, or recapture with "
+        "--device_replay_file_validation=digest when copied/staged files are "
+        "intentional",
+        (int)resolved_path.size, resolved_path.data, (int)captured_path.size,
+        captured_path.data, payload->file_device, payload->file_inode,
+        payload->file_mtime_ns, file_device, file_inode, file_mtime_ns);
   }
 #else
   (void)handle;
+  (void)captured_path;
+  (void)resolved_path;
   if (payload->validation_type ==
       IREE_HAL_REPLAY_FILE_VALIDATION_TYPE_CONTENT_DIGEST) {
     return iree_make_status(
@@ -849,13 +864,17 @@ static iree_status_t iree_hal_replay_executor_import_file(
                                 (iree_host_size_t)payload.reference_length);
   iree_io_file_handle_t* handle = NULL;
   char* resolved_path_storage = NULL;
+  iree_string_view_t captured_external_path = iree_string_view_empty();
+  iree_string_view_t resolved_external_path = iree_string_view_empty();
   iree_status_t status = iree_ok_status();
   switch (payload.reference_type) {
     case IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH: {
       iree_string_view_t path = iree_make_string_view(
           (const char*)reference.data, reference.data_length);
+      captured_external_path = path;
       status = iree_hal_replay_executor_resolve_file_path(
           executor, path, &path, &resolved_path_storage);
+      resolved_external_path = path;
       iree_io_file_mode_t mode = 0;
       if (iree_any_bit_set(payload.access, IREE_HAL_MEMORY_ACCESS_READ)) {
         mode |= IREE_IO_FILE_MODE_READ;
@@ -867,6 +886,15 @@ static iree_status_t iree_hal_replay_executor_import_file(
       if (iree_status_is_ok(status)) {
         status = iree_io_file_handle_open(mode, path, executor->host_allocator,
                                           &handle);
+        if (!iree_status_is_ok(status)) {
+          status = iree_status_annotate_f(
+              status,
+              "opening external replay file '%.*s' captured as '%.*s'; use "
+              "--replay_file_remap=CAPTURED_PREFIX=REPLAY_PREFIX if the "
+              "parameter root moved",
+              (int)path.size, path.data, (int)captured_external_path.size,
+              captured_external_path.data);
+        }
       }
       break;
     }
@@ -891,8 +919,8 @@ static iree_status_t iree_hal_replay_executor_import_file(
   if (iree_status_is_ok(status) &&
       payload.reference_type ==
           IREE_HAL_REPLAY_FILE_REFERENCE_TYPE_EXTERNAL_PATH) {
-    status = iree_hal_replay_executor_validate_file_reference(&payload, handle,
-                                                              file);
+    status = iree_hal_replay_executor_validate_file_reference(
+        &payload, captured_external_path, resolved_external_path, handle, file);
   }
   iree_io_file_handle_release(handle);
   iree_allocator_free(executor->host_allocator, resolved_path_storage);
