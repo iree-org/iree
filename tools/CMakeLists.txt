@@ -64,6 +64,7 @@ if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 
+if(IREE_BUILD_BENCHMARKS)
 iree_cc_binary(
   NAME
     iree-benchmark-executable
@@ -104,6 +105,7 @@ iree_cc_binary(
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
+endif()
 
 iree_cc_binary(
   NAME
@@ -257,6 +259,7 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
+if(IREE_BUILD_BENCHMARKS)
 iree_cc_binary(
   NAME
     iree-benchmark-replay
@@ -275,6 +278,7 @@ iree_cc_binary(
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
+endif()
 
 iree_cc_binary(
   NAME
