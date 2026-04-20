@@ -1,5 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-multi-use-producers=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-MULTI-USE
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions))" --split-input-file %s | FileCheck %s --check-prefix=DEFAULT
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
@@ -2756,3 +2757,73 @@ util.func public @scatter_chain_dispatch_ordering(
 //      CHECK:     iree_linalg_ext.scatter
 // CHECK-SAME:       outs(%[[S2]]
 //      CHECK:   util.return %[[S3]]
+
+// -----
+
+// Multi-result producer whose results feed a single consumer via operands
+// with different ranks (acc is 3D, sum is 2D). Previously the fusion infra
+// rejected this pair both in non-aggressive mode (getFusableUses counted 2
+// operand uses) and in aggressive mode (getRootParallelLoopToOpMap required
+// the two composed loop maps to be bit-equal, which fails because the sum
+// operand broadcasts away the N dim). Both modes should now fuse.
+
+util.func public @online_attention_normalize_fusion(
+    %Q: tensor<20x4096x16xf16>,
+    %K: tensor<20x1024x16xf16>,
+    %V: tensor<20x1024x64xf16>) -> tensor<20x4096x64xf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_neg = arith.constant -3.40282347E+38 : f32
+  %cst_one = arith.constant 1.000000e+00 : f32
+  %scale = arith.constant 1.0 : f16
+  %acc_e = tensor.empty() : tensor<20x4096x64xf32>
+  %ms_e = tensor.empty() : tensor<20x4096xf32>
+  %out_e = tensor.empty() : tensor<20x4096x64xf16>
+  %acc = linalg.fill ins(%cst : f32) outs(%acc_e : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
+  %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %sum = linalg.fill ins(%cst : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %r:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [
+      affine_map<(b, m, n, k1, k2) -> (b, m, k1)>,
+      affine_map<(b, m, n, k1, k2) -> (b, k2, k1)>,
+      affine_map<(b, m, n, k1, k2) -> (b, k2, n)>,
+      affine_map<(b, m, n, k1, k2) -> ()>,
+      affine_map<(b, m, n, k1, k2) -> (b, m, n)>,
+      affine_map<(b, m, n, k1, k2) -> (b, m)>,
+      affine_map<(b, m, n, k1, k2) -> (b, m)>
+    ]
+  } ins(%Q, %K, %V, %scale : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
+    outs(%acc, %max, %sum : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+  %norm = linalg.generic {
+    indexing_maps = [
+      affine_map<(b, m, n) -> (b, m, n)>,
+      affine_map<(b, m, n) -> (b, m)>,
+      affine_map<(b, m, n) -> (b, m, n)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%r#0, %r#2 : tensor<20x4096x64xf32>, tensor<20x4096xf32>)
+    outs(%out_e : tensor<20x4096x64xf16>) {
+  ^bb0(%a: f32, %s: f32, %_: f16):
+    %inv = arith.divf %cst_one, %s : f32
+    %v = arith.mulf %a, %inv : f32
+    %v16 = arith.truncf %v : f32 to f16
+    linalg.yield %v16 : f16
+  } -> tensor<20x4096x64xf16>
+  util.return %norm : tensor<20x4096x64xf16>
+}
+
+//      CHECK-LABEL: @online_attention_normalize_fusion
+//            CHECK:   %[[D:.+]] = flow.dispatch.region -> (tensor<20x4096x64xf16>)
+//            CHECK:     iree_linalg_ext.online_attention
+//            CHECK:     %[[G:.+]] = linalg.generic
+//            CHECK:     flow.return %[[G]]
+//            CHECK:   util.return %[[D]]
+
+//      DEFAULT-LABEL: @online_attention_normalize_fusion
+//            DEFAULT:   %[[D:.+]] = flow.dispatch.region -> (tensor<20x4096x64xf16>)
+//            DEFAULT:     iree_linalg_ext.online_attention
+//            DEFAULT:     %[[G:.+]] = linalg.generic
+//            DEFAULT:     flow.return %[[G]]
+//            DEFAULT:   util.return %[[D]]
