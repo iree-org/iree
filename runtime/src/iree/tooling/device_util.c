@@ -516,14 +516,17 @@ struct iree_hal_profiling_from_flags_t {
   // Host allocator used for this session object.
   iree_allocator_t host_allocator;
 
-  // Device retained while profiling/capture state is active.
-  iree_hal_device_t* device;
+  // Devices retained while profiling/capture state is active.
+  iree_hal_device_t** devices;
 
-  // True when a nonempty HAL-native profiling session is active.
-  bool native_profile_active;
+  // Number of entries in |devices| and the active-state arrays.
+  iree_host_size_t device_count;
 
-  // True when iree_hal_device_external_capture_begin succeeded.
-  bool external_capture_active;
+  // Per-device true when a nonempty HAL-native profiling session is active.
+  bool* native_profile_active;
+
+  // Per-device true when iree_hal_device_external_capture_begin succeeded.
+  bool* external_capture_active;
 
   // Periodic flush interval in milliseconds, or 0 when disabled.
   iree_duration_t flush_interval_ms;
@@ -689,6 +692,14 @@ static iree_status_t iree_hal_device_external_capture_begin_from_flags(
   return iree_hal_device_external_capture_begin(device, &options);
 }
 
+static bool iree_hal_profiling_from_flags_any_native_profile_active(
+    const iree_hal_profiling_from_flags_t* profiling) {
+  for (iree_host_size_t i = 0; i < profiling->device_count; ++i) {
+    if (profiling->native_profile_active[i]) return true;
+  }
+  return false;
+}
+
 static bool iree_hal_profiling_from_flags_flush_should_stop(void* arg) {
   iree_hal_profiling_from_flags_t* profiling =
       (iree_hal_profiling_from_flags_t*)arg;
@@ -715,11 +726,18 @@ static iree_status_t iree_hal_profiling_from_flags_consume_flush_status(
 
 iree_status_t iree_hal_flush_profiling_from_flags(
     iree_hal_profiling_from_flags_t* profiling) {
-  if (!profiling || !profiling->native_profile_active) {
+  if (!profiling ||
+      !iree_hal_profiling_from_flags_any_native_profile_active(profiling)) {
     return iree_ok_status();
   }
   iree_slim_mutex_lock(&profiling->flush_mutex);
-  iree_status_t status = iree_hal_device_profiling_flush(profiling->device);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < profiling->device_count; ++i) {
+    if (profiling->native_profile_active[i]) {
+      status = iree_status_join(
+          status, iree_hal_device_profiling_flush(profiling->devices[i]));
+    }
+  }
   iree_slim_mutex_unlock(&profiling->flush_mutex);
   return status;
 }
@@ -747,7 +765,8 @@ static int iree_hal_profiling_from_flags_flush_thread_main(void* arg) {
 
 static iree_status_t iree_hal_profiling_from_flags_start_periodic_flush(
     iree_hal_profiling_from_flags_t* profiling) {
-  if (!profiling->native_profile_active || profiling->flush_interval_ms == 0) {
+  if (!iree_hal_profiling_from_flags_any_native_profile_active(profiling) ||
+      profiling->flush_interval_ms == 0) {
     return iree_ok_status();
   }
 
@@ -788,12 +807,26 @@ static iree_status_t iree_hal_profiling_from_flags_stop_periodic_flush(
   return status;
 }
 
-iree_status_t iree_hal_begin_profiling_from_flags(
-    iree_hal_device_t* device, iree_allocator_t host_allocator,
+static void iree_hal_profiling_from_flags_release_devices(
+    iree_hal_profiling_from_flags_t* profiling) {
+  if (!profiling) return;
+  for (iree_host_size_t i = 0; i < profiling->device_count; ++i) {
+    iree_hal_device_release(profiling->devices[i]);
+  }
+  iree_allocator_free(profiling->host_allocator,
+                      profiling->external_capture_active);
+  iree_allocator_free(profiling->host_allocator,
+                      profiling->native_profile_active);
+  iree_allocator_free(profiling->host_allocator, profiling->devices);
+}
+
+static iree_status_t iree_hal_begin_device_list_profiling_from_flags(
+    iree_host_size_t device_count, iree_hal_device_t* const* devices,
+    iree_allocator_t host_allocator,
     iree_hal_profiling_from_flags_t** out_profiling) {
   IREE_ASSERT_ARGUMENT(out_profiling);
   *out_profiling = NULL;
-  if (!device) return iree_ok_status();
+  if (device_count == 0) return iree_ok_status();
 
   const iree_flag_string_list_t counter_names =
       FLAG_device_profiling_counter_list();
@@ -877,14 +910,58 @@ iree_status_t iree_hal_begin_profiling_from_flags(
                                              (void**)&profiling));
   memset(profiling, 0, sizeof(*profiling));
   profiling->host_allocator = host_allocator;
-  profiling->device = device;
   profiling->flush_interval_ms = FLAG_device_profiling_flush_interval_ms;
   iree_slim_mutex_initialize(&profiling->flush_mutex);
-  iree_hal_device_retain(device);
+
+  iree_host_size_t devices_size = 0;
+  iree_host_size_t active_size = 0;
+  bool allocation_sizes_valid =
+      iree_host_size_checked_mul(device_count, sizeof(*profiling->devices),
+                                 &devices_size) &&
+      iree_host_size_checked_mul(device_count,
+                                 sizeof(*profiling->native_profile_active),
+                                 &active_size);
+  if (IREE_UNLIKELY(!allocation_sizes_valid)) {
+    iree_slim_mutex_deinitialize(&profiling->flush_mutex);
+    iree_allocator_free(host_allocator, profiling);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profiling device list is too large");
+  }
+
+  iree_status_t status = iree_allocator_malloc(host_allocator, devices_size,
+                                               (void**)&profiling->devices);
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, active_size,
+                                   (void**)&profiling->native_profile_active);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, active_size,
+                                   (void**)&profiling->external_capture_active);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_profiling_from_flags_release_devices(profiling);
+    iree_slim_mutex_deinitialize(&profiling->flush_mutex);
+    iree_allocator_free(host_allocator, profiling);
+    return status;
+  }
+  memset(profiling->devices, 0, devices_size);
+  memset(profiling->native_profile_active, 0, active_size);
+  memset(profiling->external_capture_active, 0, active_size);
+  profiling->device_count = device_count;
+  for (iree_host_size_t i = 0; i < device_count; ++i) {
+    if (!devices[i]) {
+      iree_hal_profiling_from_flags_release_devices(profiling);
+      iree_slim_mutex_deinitialize(&profiling->flush_mutex);
+      iree_allocator_free(host_allocator, profiling);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "profiling device list contains a null device");
+    }
+    profiling->devices[i] = devices[i];
+    iree_hal_device_retain(profiling->devices[i]);
+  }
 
   iree_hal_profile_sink_t* sink = NULL;
   iree_hal_profile_statistics_sink_t* statistics_sink = NULL;
-  iree_status_t status = iree_ok_status();
   if (statistics_requested) {
     status = iree_hal_profile_statistics_sink_create(host_allocator,
                                                      &statistics_sink);
@@ -896,16 +973,23 @@ iree_status_t iree_hal_begin_profiling_from_flags(
   }
   if (iree_status_is_ok(status)) {
     options.sink = sink;
-    status = iree_hal_device_profiling_begin(device, &options);
-    profiling->native_profile_active =
-        iree_status_is_ok(status) &&
-        (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
-         iree_hal_device_profiling_options_requests_lightweight_statistics(
-             &options));
+    for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
+         ++i) {
+      status = iree_hal_device_profiling_begin(profiling->devices[i], &options);
+      profiling->native_profile_active[i] =
+          iree_status_is_ok(status) &&
+          (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
+           iree_hal_device_profiling_options_requests_lightweight_statistics(
+               &options));
+    }
   }
   if (iree_status_is_ok(status) && external_capture_requested) {
-    status = iree_hal_device_external_capture_begin_from_flags(device);
-    profiling->external_capture_active = iree_status_is_ok(status);
+    for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
+         ++i) {
+      status = iree_hal_device_external_capture_begin_from_flags(
+          profiling->devices[i]);
+      profiling->external_capture_active[i] = iree_status_is_ok(status);
+    }
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_profiling_from_flags_start_periodic_flush(profiling);
@@ -913,15 +997,19 @@ iree_status_t iree_hal_begin_profiling_from_flags(
   if (!iree_status_is_ok(status)) {
     status = iree_status_join(
         status, iree_hal_profiling_from_flags_stop_periodic_flush(profiling));
-    if (profiling->external_capture_active) {
-      status = iree_status_join(
-          status, iree_hal_device_external_capture_end(profiling->device));
+    for (iree_host_size_t i = profiling->device_count; i > 0; --i) {
+      if (profiling->external_capture_active[i - 1]) {
+        status = iree_status_join(status, iree_hal_device_external_capture_end(
+                                              profiling->devices[i - 1]));
+      }
     }
-    if (profiling->native_profile_active) {
-      status = iree_status_join(
-          status, iree_hal_device_profiling_end(profiling->device));
+    for (iree_host_size_t i = profiling->device_count; i > 0; --i) {
+      if (profiling->native_profile_active[i - 1]) {
+        status = iree_status_join(
+            status, iree_hal_device_profiling_end(profiling->devices[i - 1]));
+      }
     }
-    iree_hal_device_release(profiling->device);
+    iree_hal_profiling_from_flags_release_devices(profiling);
     iree_slim_mutex_deinitialize(&profiling->flush_mutex);
     iree_allocator_free(host_allocator, profiling);
   } else {
@@ -937,26 +1025,68 @@ iree_status_t iree_hal_begin_profiling_from_flags(
   return status;
 }
 
+iree_status_t iree_hal_begin_profiling_from_flags(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_profiling_from_flags_t** out_profiling) {
+  IREE_ASSERT_ARGUMENT(out_profiling);
+  *out_profiling = NULL;
+  if (!device) return iree_ok_status();
+  return iree_hal_begin_device_list_profiling_from_flags(
+      1, &device, host_allocator, out_profiling);
+}
+
+iree_status_t iree_hal_begin_device_group_profiling_from_flags(
+    iree_hal_device_group_t* device_group, iree_allocator_t host_allocator,
+    iree_hal_profiling_from_flags_t** out_profiling) {
+  IREE_ASSERT_ARGUMENT(out_profiling);
+  *out_profiling = NULL;
+  if (!device_group) return iree_ok_status();
+  iree_host_size_t device_count =
+      iree_hal_device_group_device_count(device_group);
+  if (device_count == 0) return iree_ok_status();
+
+  iree_hal_device_t** devices = NULL;
+  iree_host_size_t devices_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(device_count, sizeof(*devices),
+                                                &devices_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profiling device group is too large");
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, devices_size, (void**)&devices));
+  for (iree_host_size_t i = 0; i < device_count; ++i) {
+    devices[i] = iree_hal_device_group_device_at(device_group, i);
+  }
+  iree_status_t status = iree_hal_begin_device_list_profiling_from_flags(
+      device_count, devices, host_allocator, out_profiling);
+  iree_allocator_free(host_allocator, devices);
+  return status;
+}
+
 iree_status_t iree_hal_end_profiling_from_flags(
     iree_hal_profiling_from_flags_t* profiling) {
   if (!profiling) return iree_ok_status();
 
   iree_status_t status =
       iree_hal_profiling_from_flags_stop_periodic_flush(profiling);
-  if (profiling->external_capture_active) {
-    status = iree_status_join(
-        status, iree_hal_device_external_capture_end(profiling->device));
+  for (iree_host_size_t i = profiling->device_count; i > 0; --i) {
+    if (profiling->external_capture_active[i - 1]) {
+      status = iree_status_join(status, iree_hal_device_external_capture_end(
+                                            profiling->devices[i - 1]));
+    }
   }
-  if (profiling->native_profile_active) {
-    status = iree_status_join(status,
-                              iree_hal_device_profiling_end(profiling->device));
+  for (iree_host_size_t i = profiling->device_count; i > 0; --i) {
+    if (profiling->native_profile_active[i - 1]) {
+      status = iree_status_join(
+          status, iree_hal_device_profiling_end(profiling->devices[i - 1]));
+    }
   }
   if (profiling->statistics_sink) {
     status = iree_status_join(status, iree_hal_profile_statistics_sink_fprint(
                                           stderr, profiling->statistics_sink));
     iree_hal_profile_statistics_sink_release(profiling->statistics_sink);
   }
-  iree_hal_device_release(profiling->device);
+  iree_hal_profiling_from_flags_release_devices(profiling);
   iree_slim_mutex_deinitialize(&profiling->flush_mutex);
   iree_allocator_free(profiling->host_allocator, profiling);
   return status;

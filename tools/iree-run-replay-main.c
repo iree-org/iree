@@ -54,7 +54,9 @@ int main(int argc, char** argv) {
       "Executes an IREE HAL replay file against one or more HAL devices.\n"
       "\n"
       "The replay stream is executed deterministically in capture order. Use\n"
-      "--device= to select the target HAL device, matching iree-run-module.\n");
+      "--device= to select the target HAL device, matching iree-run-module.\n"
+      "HAL-native profiling flags capture only replay execution, not tool\n"
+      "setup or teardown.\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
   iree_allocator_t host_allocator = iree_allocator_system();
@@ -95,6 +97,12 @@ int main(int argc, char** argv) {
         device_list, host_allocator, &device_group);
   }
 
+  iree_hal_profiling_from_flags_t* profiling = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_begin_device_group_profiling_from_flags(
+        device_group, host_allocator, &profiling);
+  }
+
   if (iree_status_is_ok(status)) {
     iree_hal_replay_execute_options_t options =
         iree_hal_replay_execute_options_default();
@@ -102,6 +110,8 @@ int main(int argc, char** argv) {
         file_contents->const_buffer, device_group, &options, host_allocator);
   }
 
+  status =
+      iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
   iree_hal_device_group_release(device_group);
   iree_hal_device_list_free(device_list);
   iree_async_proactor_pool_release(proactor_pool);

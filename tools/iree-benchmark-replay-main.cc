@@ -17,14 +17,21 @@ namespace {
 
 void BenchmarkReplay(iree_const_byte_span_t file_contents,
                      iree_hal_device_group_t* device_group,
+                     iree_hal_profiling_from_flags_t* profiling,
                      benchmark::State& state) {
   iree_allocator_t host_allocator = iree_allocator_system();
   iree_hal_replay_execute_options_t options =
       iree_hal_replay_execute_options_default();
   for (auto _ : state) {
     (void)_;
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "BenchmarkIteration");
+    IREE_TRACE_FRAME_MARK_NAMED("ReplayIteration");
     IREE_CHECK_OK(iree_hal_replay_execute_file(file_contents, device_group,
                                                &options, host_allocator));
+    IREE_TRACE_ZONE_END(z0);
+    state.PauseTiming();
+    IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
+    state.ResumeTiming();
   }
   state.SetItemsProcessed(state.iterations());
 }
@@ -71,7 +78,8 @@ static int runMain(int argc, char** argv) {
       "\n"
       "Use --device= to select the target HAL device, matching\n"
       "iree-benchmark-module. Benchmark flags are forwarded to Google\n"
-      "Benchmark.\n");
+      "Benchmark. HAL-native profiling flags capture the timed replay work\n"
+      "and profiling flushes are excluded from benchmark timing.\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
@@ -115,11 +123,21 @@ static int runMain(int argc, char** argv) {
         CreateDeviceGroupFromList(device_list, host_allocator, &device_group);
   }
 
+  // Start profiling after tool setup. The replay payload itself may contain
+  // setup operations captured from the original application; those remain part
+  // of the benchmark because they are user HAL traffic.
+  iree_hal_profiling_from_flags_t* profiling = nullptr;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_begin_device_group_profiling_from_flags(
+        device_group, host_allocator, &profiling);
+  }
+
   if (iree_status_is_ok(status)) {
     benchmark::RegisterBenchmark("BM_replay",
                                  [=](benchmark::State& state) -> void {
                                    BenchmarkReplay(file_contents->const_buffer,
-                                                   device_group, state);
+                                                   device_group, profiling,
+                                                   state);
                                  })
         ->MeasureProcessCPUTime()
         ->UseRealTime()
@@ -127,6 +145,8 @@ static int runMain(int argc, char** argv) {
     ::benchmark::RunSpecifiedBenchmarks();
   }
 
+  status =
+      iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
   iree_hal_device_group_release(device_group);
   iree_hal_device_list_free(device_list);
   iree_async_proactor_pool_release(proactor_pool);
