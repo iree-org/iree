@@ -231,6 +231,24 @@ void LayoutAnalysis::propagateOneForward(Value val,
       }
     }
 
+    if (auto scanOp = dyn_cast<vector::ScanOp>(user)) {
+      if (scanOp.getSource() == val) {
+        // source to dest: same layout (shape preserved).
+        addCandidate(scanOp.getDest(), layout);
+        // source to accumulated_value: project out scan dim.
+        int64_t rank = cast<VectorType>(val.getType()).getRank();
+        SmallVector<bool> projMask(rank, false);
+        projMask[scanOp.getReductionDim()] = true;
+        addCandidate(scanOp.getAccumulatedValue(), layout.project(projMask));
+        continue;
+      }
+      if (scanOp.getInitialValue() == val) {
+        // init to accumulated_value: same layout (same shape).
+        addCandidate(scanOp.getAccumulatedValue(), layout);
+        continue;
+      }
+    }
+
     if (auto transpose = dyn_cast<vector::TransposeOp>(user)) {
       if (transpose.getVector() == val) {
         addCandidate(transpose.getResult(),
@@ -392,6 +410,20 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(multiReduce.getResult());
     setLayoutOrClone(&multiReduce.getAccMutable(), layout);
+    return;
+  }
+
+  // scan: dest layout -> source gets same layout, init gets projected layout.
+  if (auto scanOp = dyn_cast<vector::ScanOp>(op)) {
+    VectorLayoutInterface layout = getResolvedLayout(scanOp.getDest());
+    if (layout) {
+      setLayoutOrClone(&scanOp.getSourceMutable(), layout);
+      int64_t rank = scanOp.getSourceType().getRank();
+      SmallVector<bool> projMask(rank, false);
+      projMask[scanOp.getReductionDim()] = true;
+      VectorLayoutInterface initLayout = layout.project(projMask);
+      setLayoutOrClone(&scanOp.getInitialValueMutable(), initLayout);
+    }
     return;
   }
 

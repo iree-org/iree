@@ -1059,3 +1059,61 @@ func.func @argcompare_dimension_0(%input: vector<16x16xf16>,
   } -> vector<16xf16>, vector<16xi32>
   func.return %result#0, %result#1 : vector<16xf16>, vector<16xi32>
 }
+
+// -----
+
+// Test vector.scan forward propagation from source: source layout propagates
+// to dest (same shape) and accumulated_value (scan dim projected out).
+
+#layout_scan_fwd_src = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @scan_source_forward_propagation(%src: vector<16x16xf16>, %init: vector<16xf16>) -> (vector<16x16xf16>, vector<16xf16>) {
+  %srcl = iree_vector_ext.to_layout %src to layout(#layout_scan_fwd_src) : vector<16x16xf16>
+  // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [8, 16], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
+  // expected-remark @below {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  %out:2 = vector.scan <add>, %srcl, %init {inclusive = true, reduction_dim = 0 : i64}
+    : vector<16x16xf16>, vector<16xf16>
+  func.return %out#0, %out#1 : vector<16x16xf16>, vector<16xf16>
+}
+
+// -----
+
+// Test vector.scan backward propagation: result layout propagates back to
+// source (same) and initial_value (scan dim projected out).
+
+#layout_scan_bwd = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @scan_backward_propagation(%arr: memref<16x16xf16>, %arr_init: memref<16xf16>) -> (vector<16x16xf16>, vector<16xf16>) {
+  %c0 = arith.constant 0 : index
+  %cst_0 = arith.constant 0.0 : f16
+  // Source transfer_read gets layout from backward propagation through scan.
+  %src = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
+  // expected-remark @above {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [8, 16], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
+  // Init transfer_read gets projected layout (dim 0 removed) from backward
+  // propagation: [2, 1] x [1, 1] x [1, 1] x [8, 16] projects to [1] x [1] x [1] x [16].
+  %init = vector.transfer_read %arr_init[%c0], %cst_0 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
+  // expected-remark @above {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
+  // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [8, 16], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
+  %out:2 = vector.scan <add>, %src, %init {inclusive = false, reduction_dim = 0 : i64}
+    : vector<16x16xf16>, vector<16xf16>
+  %destl = iree_vector_ext.to_layout %out#0 to layout(#layout_scan_bwd) : vector<16x16xf16>
+  func.return %destl, %out#1 : vector<16x16xf16>, vector<16xf16>
+}
