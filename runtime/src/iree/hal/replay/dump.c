@@ -153,6 +153,80 @@ static iree_status_t iree_hal_replay_dump_append_json_buffer_ref(
       buffer_ref->buffer_slot);
 }
 
+static iree_status_t iree_hal_replay_dump_append_text_semaphores(
+    iree_string_builder_t* builder, const char* label,
+    const iree_hal_replay_semaphore_timepoint_payload_t* semaphores,
+    iree_host_size_t semaphore_count) {
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_format(builder, " %s=[", label));
+  for (iree_host_size_t i = 0; i < semaphore_count; ++i) {
+    if (i > 0) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ","));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "{semaphore_id=%" PRIu64 " value=%" PRIu64 "}",
+        semaphores[i].semaphore_id, semaphores[i].value));
+  }
+  return iree_string_builder_append_cstring(builder, "]");
+}
+
+static iree_status_t iree_hal_replay_dump_append_json_semaphores(
+    iree_string_builder_t* builder, const char* field_name,
+    const iree_hal_replay_semaphore_timepoint_payload_t* semaphores,
+    iree_host_size_t semaphore_count) {
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_format(builder, ",\"%s\":[", field_name));
+  for (iree_host_size_t i = 0; i < semaphore_count; ++i) {
+    if (i > 0) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ","));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "{\"semaphore_id\":%" PRIu64 ",\"value\":%" PRIu64 "}",
+        semaphores[i].semaphore_id, semaphores[i].value));
+  }
+  return iree_string_builder_append_cstring(builder, "]");
+}
+
+static iree_status_t iree_hal_replay_dump_append_text_buffer_refs(
+    iree_string_builder_t* builder, const char* label,
+    const iree_hal_replay_buffer_ref_payload_t* buffer_refs,
+    iree_host_size_t buffer_ref_count) {
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_format(builder, " %s=[", label));
+  for (iree_host_size_t i = 0; i < buffer_ref_count; ++i) {
+    if (i > 0) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ","));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder,
+        "{buffer_id=%" PRIu64 " offset=%" PRIu64 " length=%" PRIu64
+        " slot=%" PRIu32 "}",
+        buffer_refs[i].buffer_id, buffer_refs[i].offset, buffer_refs[i].length,
+        buffer_refs[i].buffer_slot));
+  }
+  return iree_string_builder_append_cstring(builder, "]");
+}
+
+static iree_status_t iree_hal_replay_dump_append_json_buffer_refs(
+    iree_string_builder_t* builder, const char* field_name,
+    const iree_hal_replay_buffer_ref_payload_t* buffer_refs,
+    iree_host_size_t buffer_ref_count) {
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_format(builder, ",\"%s\":[", field_name));
+  for (iree_host_size_t i = 0; i < buffer_ref_count; ++i) {
+    if (i > 0) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ","));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder,
+        "{\"buffer_id\":%" PRIu64 ",\"offset\":%" PRIu64 ",\"length\":%" PRIu64
+        ",\"buffer_slot\":%" PRIu32 "}",
+        buffer_refs[i].buffer_id, buffer_refs[i].offset, buffer_refs[i].length,
+        buffer_refs[i].buffer_slot));
+  }
+  return iree_string_builder_append_cstring(builder, "]");
+}
+
 static iree_status_t iree_hal_replay_dump_dispatch_layout(
     const iree_hal_replay_file_record_t* record,
     const iree_hal_replay_dispatch_payload_t* payload,
@@ -700,14 +774,37 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_queue_execute_layout(
           record, &payload, &wait_offset, &wait_size, &signal_offset,
           &signal_size, &bindings_offset, &bindings_size));
-      return iree_string_builder_append_format(
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           builder,
           " command_buffer_id=%" PRIu64 " queue_affinity=%" PRIu64
           " flags=0x%016" PRIx64 " wait_count=%" PRIu64 " signal_count=%" PRIu64
-          " bindings_range=[%" PRIu64 ", +%" PRIhsz "]",
+          " wait_range=[%" PRIu64 ", +%" PRIhsz "] signal_range=[%" PRIu64
+          ", +%" PRIhsz "] bindings_range=[%" PRIu64 ", +%" PRIhsz "]",
           payload.command_buffer_id, payload.queue_affinity, payload.flags,
           payload.wait_semaphore_count, payload.signal_semaphore_count,
-          payload_range->offset + bindings_offset, bindings_size);
+          payload_range->offset + wait_offset, wait_size,
+          payload_range->offset + signal_offset, signal_size,
+          payload_range->offset + bindings_offset, bindings_size));
+      const iree_hal_replay_semaphore_timepoint_payload_t* wait_payloads =
+          (const iree_hal_replay_semaphore_timepoint_payload_t*)(record->payload
+                                                                     .data +
+                                                                 wait_offset);
+      const iree_hal_replay_semaphore_timepoint_payload_t* signal_payloads =
+          (const iree_hal_replay_semaphore_timepoint_payload_t*)(record->payload
+                                                                     .data +
+                                                                 signal_offset);
+      const iree_hal_replay_buffer_ref_payload_t* binding_payloads =
+          (const iree_hal_replay_buffer_ref_payload_t*)(record->payload.data +
+                                                        bindings_offset);
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_text_semaphores(
+          builder, "wait_semaphores", wait_payloads,
+          (iree_host_size_t)payload.wait_semaphore_count));
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_text_semaphores(
+          builder, "signal_semaphores", signal_payloads,
+          (iree_host_size_t)payload.signal_semaphore_count));
+      return iree_hal_replay_dump_append_text_buffer_refs(
+          builder, "bindings", binding_payloads,
+          (iree_host_size_t)payload.binding_count);
     }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA: {
       if (record->payload.data_length <
@@ -1401,6 +1498,26 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
           builder, "signal_semaphores_range", &signal_range));
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
           builder, "bindings_range", &bindings_range));
+      const iree_hal_replay_semaphore_timepoint_payload_t* wait_payloads =
+          (const iree_hal_replay_semaphore_timepoint_payload_t*)(record->payload
+                                                                     .data +
+                                                                 wait_offset);
+      const iree_hal_replay_semaphore_timepoint_payload_t* signal_payloads =
+          (const iree_hal_replay_semaphore_timepoint_payload_t*)(record->payload
+                                                                     .data +
+                                                                 signal_offset);
+      const iree_hal_replay_buffer_ref_payload_t* binding_payloads =
+          (const iree_hal_replay_buffer_ref_payload_t*)(record->payload.data +
+                                                        bindings_offset);
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_semaphores(
+          builder, "wait_semaphores", wait_payloads,
+          (iree_host_size_t)payload.wait_semaphore_count));
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_semaphores(
+          builder, "signal_semaphores", signal_payloads,
+          (iree_host_size_t)payload.signal_semaphore_count));
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_buffer_refs(
+          builder, "bindings", binding_payloads,
+          (iree_host_size_t)payload.binding_count));
       return iree_string_builder_append_cstring(builder, "}");
     }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_ALLOCA: {
