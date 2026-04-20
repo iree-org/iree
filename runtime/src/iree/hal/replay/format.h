@@ -325,6 +325,22 @@ static inline bool iree_hal_replay_file_record_type_is_known(
   }
 }
 
+// Returns a stable textual name for a replay file record type.
+IREE_API_EXPORT const char* iree_hal_replay_file_record_type_string(
+    iree_hal_replay_file_record_type_t record_type);
+
+// Returns a stable textual name for a replay object type.
+IREE_API_EXPORT const char* iree_hal_replay_object_type_string(
+    iree_hal_replay_object_type_t object_type);
+
+// Returns a stable textual name for a replay operation code.
+IREE_API_EXPORT const char* iree_hal_replay_operation_code_string(
+    iree_hal_replay_operation_code_t operation_code);
+
+// Returns a stable textual name for a replay payload type.
+IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
+    iree_hal_replay_payload_type_t payload_type);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

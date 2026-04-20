@@ -15,6 +15,8 @@ iree_cc_library(
     format
   HDRS
     "format.h"
+  SRCS
+    "format.c"
   DEPS
     iree::base
   PUBLIC
@@ -61,6 +63,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    dump
+  HDRS
+    "dump.h"
+  SRCS
+    "dump.c"
+  DEPS
+    ::file_reader
+    ::format
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     recorder
   HDRS
     "recorder.h"
@@ -80,6 +96,19 @@ iree_cc_library(
     iree::hal
     iree::io::file_handle
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dump_test
+  SRCS
+    "dump_test.cc"
+  DEPS
+    ::dump
+    ::file_writer
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

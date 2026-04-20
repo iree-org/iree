@@ -227,6 +227,20 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-dump-replay
+  SRCS
+    "iree-dump-replay-main.c"
+  DEPS
+    iree::base
+    iree::base::tooling::flags
+    iree::hal::replay::dump
+    iree::io::file_handle
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-encode-parameters
   SRCS
     "iree-encode-parameters-main.c"

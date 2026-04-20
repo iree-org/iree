@@ -159,6 +159,17 @@ iree_runtime_cc_binary(
 )
 
 iree_runtime_cc_binary(
+    name = "iree-dump-replay",
+    srcs = ["iree-dump-replay-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/replay:dump",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-encode-parameters",
     srcs = ["iree-encode-parameters-main.c"],
     deps = [
