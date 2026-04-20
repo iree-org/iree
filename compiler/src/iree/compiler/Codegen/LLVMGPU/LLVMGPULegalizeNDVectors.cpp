@@ -710,6 +710,17 @@ struct ConvertVectorBitcast final
   }
 };
 
+struct ConvertVectorMultiReduction final
+    : public OpConversionPattern<vector::MultiDimReductionOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
 /// Convert any ReturnLike op with 1:N type-converted operands.
 struct ConvertReturnLike final
     : public OpTraitConversionPattern<OpTrait::ReturnLike> {
@@ -750,7 +761,8 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
-        ConvertVectorBroadcast, ConvertVectorBitcast>(typeConverter, ctx);
+        ConvertVectorBroadcast, ConvertVectorBitcast
+	ConvertVectorMultiReduction>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
