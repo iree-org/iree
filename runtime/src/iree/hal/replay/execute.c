@@ -2665,6 +2665,17 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
   }
 }
 
+static iree_status_t iree_hal_replay_executor_replay_unsupported(
+    const iree_hal_replay_file_record_t* record) {
+  if (record->header.status_code != IREE_STATUS_OK) {
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "replay contains unsupported captured operation %s",
+      iree_hal_replay_operation_code_string(record->header.operation_code));
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
     iree_const_byte_span_t file_contents, iree_hal_device_group_t* device_group,
     const iree_hal_replay_execute_options_t* options,
@@ -2719,11 +2730,7 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_execute_file(
         status = iree_hal_replay_executor_replay_operation(&executor, &record);
         break;
       case IREE_HAL_REPLAY_FILE_RECORD_TYPE_UNSUPPORTED:
-        status = iree_make_status(
-            IREE_STATUS_UNIMPLEMENTED,
-            "replay contains unsupported captured operation %s",
-            iree_hal_replay_operation_code_string(
-                record.header.operation_code));
+        status = iree_hal_replay_executor_replay_unsupported(&record);
         break;
       default:
         status = iree_make_status(
