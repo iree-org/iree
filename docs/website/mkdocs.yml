@@ -252,6 +252,8 @@ nav:
       - "Performance":
           - "developers/performance/benchmarking.md"
           - "developers/performance/profiling.md"
+          - "developers/performance/device-profiling.md"
+          - "developers/performance/device-replay.md"
           - "developers/performance/profiling-cpu-events.md"
           - "developers/performance/profiling-gpu-vulkan.md"
           - "developers/performance/profiling-with-tracy.md"
