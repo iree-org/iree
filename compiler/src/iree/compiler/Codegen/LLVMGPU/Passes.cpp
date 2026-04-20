@@ -995,6 +995,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // This pass needs to run before SCF -> CF.
   // Lower vector operations and legalize all operations to 1D vectors.
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(createLLVMGPUVectorFlatteningPass)
       .addPass(createLLVMGPULegalizeNDVectorsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
