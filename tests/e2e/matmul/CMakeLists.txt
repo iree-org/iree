@@ -2666,6 +2666,42 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cdna4_mxfp4_partial_dt
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f4E2M1FN"
+    "--acc_type=f32"
+    "--mx_scale_type=f8E8M0FNU"
+    "--mx_block_size=32"
+    "--shapes=custom_mnk"
+    "--mnk=4096,4096,4096"
+    "--mnk=1000,2048,4096"
+    "--mnk_dynamicities=static,static,static"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    --iree-dispatch-creation-data-tiling=true
+    --iree-rocm-encoding-layout-resolver=data-tiling
+    --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cdna4_mxfp4_dt_tensor_ukernel_medium
   TEST_TYPE
     matmul

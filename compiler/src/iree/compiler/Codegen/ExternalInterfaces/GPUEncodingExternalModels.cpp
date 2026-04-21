@@ -34,12 +34,14 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -51,6 +53,13 @@
 #include <numeric>
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
+
+static llvm::cl::opt<bool> clNoHoistDataOperandsScaledMMA(
+    "test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma",
+    llvm::cl::desc(
+        "Use unshuffled data operands for scaled matmuls: data operands "
+        "are pack-only (row-major), scales are fully shuffled."),
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -367,6 +376,58 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   auto scaledMmaInterleaveK = DenseI64ArrayAttr::get(
       ctx, {kScaledMMAOperandLhsScale, kScaledMMAOperandRhsScale});
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
+
+  if (clNoHoistDataOperandsScaledMMA) {
+    if (succeeded(matmulSizes) && !ShapedType::isDynamic(matmulSizes->M) &&
+        !ShapedType::isDynamic(matmulSizes->N) &&
+        !ShapedType::isDynamic(matmulSizes->K)) {
+      GPUMatmulShapeType problem(
+          {matmulSizes->M}, {matmulSizes->N}, {matmulSizes->K, matmulSizes->Kb},
+          /*batch=*/{}, eTypes[kScaledMMAOperandLhs],
+          eTypes[kScaledMMAOperandRhs], eTypes[kScaledMMAOperandAcc],
+          eTypes[kScaledMMAOperandLhsScale], eTypes[kScaledMMAOperandRhsScale]);
+      padProblemForHeuristic(problem);
+      // No real Location available here (called from type converter, not an
+      // op). UnknownLoc means scheduler diagnostics lack source attribution.
+      auto schedule = getMmaScheduleFromProblemAndTarget(
+          target, problem, UnknownLoc::get(ctx),
+          /*transposedLhs=*/false, /*transposedRhs=*/false,
+          /*isGemm=*/true, /*scaled=*/true,
+          /*useDirectLoad=*/false, /*prefetchNumStages=*/2);
+      if (schedule) {
+        intrinsicsM = schedule->getTotalMTileSize();
+        intrinsicsN = schedule->getTotalNTileSize();
+        subgroupsM = schedule->getTotalMSubgroupCount();
+        subgroupsN = schedule->getTotalNSubgroupCount();
+        intrinsicsK = schedule->getTotalKTileSize();
+        subgroupsK = 1;
+      } else {
+        // Scheduler couldn't find a valid schedule. Keep the fixed defaults
+        // for M/N/subgroups computed earlier and only bump K. This produces a
+        // tile where the K dimension is the length of 1 cache line in CDNA4.
+        intrinsicsK = 2;
+      }
+    }
+    // For dynamic dimensions we still create an unshuffled attr with the
+    // fixed-size defaults, which is conservative but correct.
+    auto scaledMmaInterleaveM =
+        DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandLhsScale});
+    auto scaledMmaInterleaveN =
+        DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandRhsScale});
+    auto unshuffledOperands = DenseI64ArrayAttr::get(
+        ctx, {kScaledMMAOperandLhs, kScaledMMAOperandRhs});
+    return DataTiledScaledMMAAttr::get(
+        ctx, intrinsicScaledMma.getIntrinsic(),
+        intrinsicScaledMma.getLhsElemType(),
+        intrinsicScaledMma.getRhsElemType(),
+        intrinsicScaledMma.getAccElemType(), intrinsicsM, subgroupsM,
+        intrinsicsN, subgroupsN, intrinsicsK, subgroupsK,
+        /*operands_interleaving_intrinsics_m=*/scaledMmaInterleaveM,
+        /*operands_interleaving_intrinsics_n=*/scaledMmaInterleaveN,
+        /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK,
+        /*unshuffled_operands=*/unshuffledOperands);
+  }
+
   return DataTiledScaledMMAAttr::get(
       ctx, intrinsicScaledMma.getIntrinsic(),
       intrinsicScaledMma.getLhsElemType(), intrinsicScaledMma.getRhsElemType(),
