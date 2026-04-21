@@ -57,6 +57,22 @@ struct DispatchTensorLoadOpInterface
     : BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface,
           IREE::TensorExt::DispatchTensorLoadOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    return {};
+  }
+
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);

@@ -1070,7 +1070,7 @@ func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg
 //  CHECK-SAME:     workgroup = [64, 0]
 
 // -----
-// This test is to check that we c promote in such cases since we have codegen issues with this case
+// This test is to check that we don't C promote in such cases. We have had codegen issues with this case
 // see https://github.com/iree-org/iree/issues/23038
 func.func @unaligned_matmul_biasadd(%lhs : tensor<513x513xf16>, %rhs : tensor<513x513xf16>, %bias : tensor<513x513xf32>) -> tensor<513x513xf32> {
     %c0 = arith.constant 0.0 : f32
@@ -1089,7 +1089,7 @@ func.func @unaligned_matmul_biasadd(%lhs : tensor<513x513xf16>, %rhs : tensor<51
     return %mm : tensor<513x513xf32>
 }
 // CHECK-LABEL: func.func @unaligned_matmul_biasadd(
-//           CHECK: promote_operands = [0, 1, 2]
+//           CHECK: promote_operands = [0, 1]
 
 // -----
 // Dont c promote if the shape is aligned even with bias add.
@@ -1172,7 +1172,7 @@ func.func @gemm_with_dps_init_producer(
 }
 
 //     CHECK-LABEL: gemm_with_dps_init_producer
-//           CHECK: promote_operands = [0, 1, 2]
+//           CHECK: promote_operands = [0, 1]
 
 // -----
 

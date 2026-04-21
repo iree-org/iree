@@ -78,6 +78,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUTransformOps",
+        "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:MemRefDialect",

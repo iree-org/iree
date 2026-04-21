@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRBufferizationTransformOps
     MLIRGPUDialect
     MLIRGPUTransformOps
+    MLIRGPUTransforms
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransformOps

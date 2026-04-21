@@ -12,13 +12,15 @@
 # Enable bzlmod (required for LLVM integration as of Nov 2025)
 common --enable_bzlmod
 
+# Bazel 8 disallows empty globs by default; IREE has test directories that
+# may legitimately contain no files yet.
+common --noincompatible_disallow_empty_glob
+
 # Prevent invalid caching if input files are modified during a build.
-build --experimental_guard_against_concurrent_changes
+build --guard_against_concurrent_changes
 # Default to optimized builds
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
-# Legacy from when we depended on TensorFlow, might not be needed in IREE.
-common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
 
