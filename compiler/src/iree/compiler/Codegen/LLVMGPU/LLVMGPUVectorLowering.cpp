@@ -520,20 +520,6 @@ struct LLVMGPUVectorLoweringPass final
         return signalPassFailure();
       }
     }
-
-    {
-      RewritePatternSet vectorToLoopsPatterns(&getContext());
-      VectorTransferToSCFOptions vectorToSCFOptions;
-      vectorToSCFOptions.enableFullUnroll();
-      populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
-                                            vectorToSCFOptions);
-      memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
-      vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-      if (failed(applyPatternsGreedily(funcOp,
-                                       std::move(vectorToLoopsPatterns)))) {
-        return signalPassFailure();
-      }
-    }
   }
 };
 } // namespace
