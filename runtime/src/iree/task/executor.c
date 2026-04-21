@@ -327,6 +327,10 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
   // schedule_state and the worker's final needs_drain load must participate in
   // the same seq-cst order as the stores.
   iree_atomic_store(&process->needs_drain, 1, iree_memory_order_seq_cst);
+  // Wake any workers retained near this process without active drainer claims.
+  // The epoch is separate from needs_drain: a warm worker only needs to know
+  // that process-local state changed and that it should rejoin scheduling.
+  iree_task_process_advance_retention_epoch(process);
 
   if (budget <= 1) {
     // Sequential process: immediate list with Dekker sleeping protocol.

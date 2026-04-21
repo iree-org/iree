@@ -53,15 +53,29 @@ typedef struct iree_task_process_drain_result_t {
 
   // True if this drain() call did not perform useful work but the process
   // should remain on an active worker and be retried soon. Cooperative
-  // processes use this to express warm-retention and handoff policy. Unlike
+  // processes use this to express active handoff policy. Unlike
   // did_work, this does not publish a shared cross-drainer progress signal.
   bool keep_active;
+
+  // True if this drain() call did not perform useful work and the worker
+  // should wait near the compute slot without remaining an active drainer.
+  // Only wake_budget > 1 compute-slot processes can use this. While warm, the
+  // worker is counted in the process warm-retainer count and does not call
+  // drain() again until the process retention epoch changes.
+  bool keep_warm;
 
   // True if keep_active must be visible to peer drainers. Use this when a
   // cooperative process may make mixed keep/release decisions across workers;
   // the last drainer consumes the shared publication before releasing the
   // process. This has no effect unless keep_active is also true.
   bool publish_keep_active;
+
+  // Retention epoch observed by the drain function when setting keep_warm.
+  // The warm worker waits until iree_task_process_retention_epoch(process)
+  // differs from this value, then leaves warm state and rejoins scheduling.
+  // Drain functions that set keep_warm must fill this from a process-owned or
+  // process-associated epoch before returning no-work.
+  int32_t keep_warm_epoch;
 } iree_task_process_drain_result_t;
 
 // Called by workers to do bounded work on a process. Multiple workers may call
@@ -143,10 +157,11 @@ typedef enum iree_task_process_schedule_state_e {
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
-//   Line 2: scheduling (wake_budget, retain_drain). Written by drain functions
-//           and read by the executor's wake/release scheduler.
-//   Line 3: slist intrusion + dependent list. The slist_next field is used
-//           by the immediate list; dependents are resolved at completion.
+//   Line 2: scheduling (wake_budget, retain_drain, retention_epoch). Written
+//           by drain functions and read by the executor's wake/release
+//           scheduler.
+//   Line 3: slist intrusion. The slist_next field is used by the immediate
+//           list and dependent activation chains.
 struct iree_task_process_t {
   //--- Cache line 0: immutable after initialization -------------------------
 
@@ -231,6 +246,16 @@ struct iree_task_process_t {
   // release a non-terminal process.
   iree_atomic_int32_t retain_drain;
 
+  // Monotonic process-local epoch used to release warm retainers. Scheduling
+  // advances the epoch whenever external work is published; cooperative drain
+  // functions may also advance it when process-local state changes in a way
+  // that should make warm workers rejoin active draining.
+  iree_atomic_int32_t retention_epoch;
+
+  // Number of workers retained near this process without active drainer
+  // claims. Slot release is not allowed while this is non-zero.
+  iree_atomic_int32_t warm_retainers;
+
   //--- Cache line 3: list intrusion ----------------------------------------
 
   iree_alignas(iree_hardware_destructive_interference_size)
@@ -239,6 +264,32 @@ struct iree_task_process_t {
       // offset for IREE_TYPED_ATOMIC_SLIST_WRAPPER.
       iree_atomic_slist_intrusive_ptr_t slist_next;
 };
+
+static_assert(offsetof(iree_task_process_t, suspend_count) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "process activation state must start on its own cache line");
+static_assert(offsetof(iree_task_process_t, wake_budget) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "process scheduling state must start on its own cache line");
+static_assert(offsetof(iree_task_process_t, retention_epoch) -
+                      offsetof(iree_task_process_t, wake_budget) <
+                  iree_hardware_destructive_interference_size,
+              "warm-retention epoch must stay on the scheduling cache line");
+static_assert(offsetof(iree_task_process_t, warm_retainers) -
+                      offsetof(iree_task_process_t, wake_budget) <
+                  iree_hardware_destructive_interference_size,
+              "warm-retainer count must stay on the scheduling cache line");
+static_assert(offsetof(iree_task_process_t, warm_retainers) +
+                      sizeof(iree_atomic_int32_t) -
+                      offsetof(iree_task_process_t, wake_budget) <=
+                  iree_hardware_destructive_interference_size,
+              "process scheduling state must fit on one cache line");
+static_assert(offsetof(iree_task_process_t, slist_next) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "process list state must start on its own cache line");
 
 // Typed slist wrapper for the immediate list.
 IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_task_process, iree_task_process_t,
@@ -348,6 +399,26 @@ static inline bool iree_task_process_is_terminal(
 static inline int32_t iree_task_process_wake_budget(
     const iree_task_process_t* process) {
   return iree_atomic_load(&process->wake_budget, iree_memory_order_relaxed);
+}
+
+// Returns the process-local warm-retention epoch.
+static inline int32_t iree_task_process_retention_epoch(
+    const iree_task_process_t* process) {
+  return iree_atomic_load(&process->retention_epoch, iree_memory_order_acquire);
+}
+
+// Returns the number of workers currently retained warm near the process.
+static inline int32_t iree_task_process_warm_retainer_count(
+    const iree_task_process_t* process) {
+  return iree_atomic_load(&process->warm_retainers, iree_memory_order_acquire);
+}
+
+// Advances the process-local warm-retention epoch and returns the new value.
+static inline int32_t iree_task_process_advance_retention_epoch(
+    iree_task_process_t* process) {
+  return iree_atomic_fetch_add(&process->retention_epoch, 1,
+                               iree_memory_order_acq_rel) +
+         1;
 }
 
 #ifdef __cplusplus

@@ -72,6 +72,22 @@ static void iree_hal_cmd_fill_pattern(uint8_t* target,
   }
 }
 
+// Advances the task-process retention epoch, if one is attached.
+static void iree_hal_cmd_block_processor_advance_retention_epoch(
+    iree_hal_cmd_block_processor_context_t* context) {
+  if (context->retention_epoch_ptr) {
+    iree_atomic_fetch_add(context->retention_epoch_ptr, 1,
+                          iree_memory_order_release);
+  }
+}
+
+// Marks the processor completed and releases any warm task workers.
+static void iree_hal_cmd_block_processor_mark_completed(
+    iree_hal_cmd_block_processor_context_t* context) {
+  iree_atomic_store(&context->completed, 1, iree_memory_order_release);
+  iree_hal_cmd_block_processor_advance_retention_epoch(context);
+}
+
 // Records the first error encountered by any worker. Thread-safe via CAS.
 // If another worker already recorded an error, the losing reporter frees its
 // status. Also sets the completed flag so that all workers exit on their next
@@ -84,7 +100,7 @@ static void iree_hal_cmd_block_processor_report_error(
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
     iree_status_free(status);
   }
-  iree_atomic_store(&context->completed, 1, iree_memory_order_release);
+  iree_hal_cmd_block_processor_mark_completed(context);
 }
 
 // Returns true if any worker has reported an error (early exit check).
@@ -1322,6 +1338,7 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
     iree_hal_cmd_block_processor_budget_update_t budget_update =
         iree_hal_cmd_block_processor_update_budget(context,
                                                    next_remaining_tiles);
+    iree_hal_cmd_block_processor_advance_retention_epoch(context);
     IREE_TRACE(iree_hal_cmd_block_processor_trace_region_transition(
         completed_region_index, completed_barrier->dispatch_count, next_region,
         next_remaining_tiles, budget_update));
@@ -1349,7 +1366,7 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
         completed_region_index, completed_barrier->dispatch_count, -1, 0,
         budget_update));
     (void)budget_update;
-    iree_atomic_store(&context->completed, 1, iree_memory_order_release);
+    iree_hal_cmd_block_processor_mark_completed(context);
     out_result->completed = true;
     iree_hal_cmd_block_processor_profile_append_region_events(
         context, profile_events, profile_event_count);
@@ -1392,6 +1409,7 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
         (void)budget_update;
         iree_atomic_fetch_add(&context->block_sequence, 1,
                               iree_memory_order_release);
+        iree_hal_cmd_block_processor_advance_retention_epoch(context);
         iree_hal_cmd_block_processor_profile_append_region_events(
             context, profile_events, profile_event_count);
         return;
@@ -1401,7 +1419,7 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
       const iree_hal_cmd_header_t* next_terminator =
           iree_hal_cmd_find_terminator(next_block);
       if (!next_terminator || next_terminator->opcode == IREE_HAL_CMD_RETURN) {
-        iree_atomic_store(&context->completed, 1, iree_memory_order_release);
+        iree_hal_cmd_block_processor_mark_completed(context);
         out_result->completed = true;
         iree_hal_cmd_block_processor_profile_append_region_events(
             context, profile_events, profile_event_count);
@@ -1465,6 +1483,7 @@ drain_start:
   // the worker sees an odd (ready) value.
   int32_t block_sequence =
       iree_atomic_load(&context->block_sequence, iree_memory_order_acquire);
+  out_result->block_sequence = block_sequence;
   if ((block_sequence & 1) == 0) {
     // Block transition in progress. Bail and retry on next drain().
     IREE_TRACE(out_result->reason =
@@ -1497,12 +1516,10 @@ drain_start:
   // the new epoch and corrupting the next region's tile claims.
   int32_t region_epoch =
       iree_atomic_load(&state->region_epoch, iree_memory_order_acquire);
+  out_result->region_epoch = region_epoch;
   int32_t active_region =
       iree_atomic_load(&state->active_region_index, iree_memory_order_relaxed);
-  IREE_TRACE({
-    out_result->active_region = active_region;
-    out_result->region_epoch = region_epoch;
-  });
+  IREE_TRACE({ out_result->active_region = active_region; });
 
   // All regions in this block are done. The completer is handling the
   // block terminator (or has already set completed).
@@ -1724,6 +1741,26 @@ int32_t iree_hal_cmd_block_processor_context_wake_budget(
   return context ? context->current_wake_budget : 1;
 }
 
+bool iree_hal_cmd_block_processor_context_did_advance(
+    const iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_block_processor_drain_result_t* drain_result) {
+  if (!context || !drain_result) return true;
+  if (iree_atomic_load(&context->completed, iree_memory_order_acquire)) {
+    return true;
+  }
+  if (drain_result->block_sequence != 0) {
+    int32_t block_sequence =
+        iree_atomic_load(&context->block_sequence, iree_memory_order_acquire);
+    if (block_sequence != drain_result->block_sequence) return true;
+  }
+  if (drain_result->region_epoch != 0) {
+    int32_t region_epoch = iree_atomic_load(&context->state->region_epoch,
+                                            iree_memory_order_acquire);
+    if (region_epoch != drain_result->region_epoch) return true;
+  }
+  return false;
+}
+
 iree_status_t iree_hal_cmd_block_processor_context_allocate(
     const iree_hal_cmd_block_recording_t* recording,
     const iree_hal_cmd_binding_entry_t* binding_table,
@@ -1776,10 +1813,11 @@ void iree_hal_cmd_block_processor_drain(
     iree_hal_cmd_block_processor_drain_result_t* out_result) {
   out_result->tiles_executed = 0;
   out_result->completed = false;
+  out_result->block_sequence = 0;
+  out_result->region_epoch = 0;
   IREE_TRACE({
     out_result->reason = IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_UNKNOWN;
     out_result->active_region = -1;
-    out_result->region_epoch = 0;
     out_result->remaining_tiles = 0;
   });
 

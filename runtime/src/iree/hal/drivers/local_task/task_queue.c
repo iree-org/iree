@@ -1531,6 +1531,8 @@ static iree_status_t iree_hal_task_queue_drain_recording(
     processor_context->wake_budget_ptr = &queue->compute_process.wake_budget;
     processor_context->desired_wake_ptr =
         iree_task_executor_desired_wake_ptr(queue->executor);
+    processor_context->retention_epoch_ptr =
+        &queue->compute_process.retention_epoch;
     if (profile_operation) {
       iree_hal_cmd_block_processor_context_set_profile_recorder(
           processor_context, profile_operation->recorder,
@@ -2477,18 +2479,37 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         z_drain, queue, item, worker_index,
         IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROCESSOR, &processor_result));
 
+    bool processor_did_work = true;
+    bool processor_keep_active = false;
+    bool processor_publish_keep_active = false;
+    bool processor_keep_warm = false;
+    int32_t processor_keep_warm_epoch = 0;
+    if (!processor_result.completed && processor_result.tiles_executed == 0) {
+      // Sample the process epoch before validating the processor state. If a
+      // transition races after this sample, the warm waiter will observe the
+      // epoch change immediately; if the transition already happened,
+      // context_did_advance catches the stale no-work observation.
+      processor_keep_warm_epoch = iree_task_process_retention_epoch(process);
+      if (iree_hal_cmd_block_processor_context_did_advance(
+              item->processor_context, &processor_result)) {
+        processor_keep_active = true;
+        processor_publish_keep_active = true;
+      } else {
+        processor_keep_warm = true;
+      }
+      processor_did_work = false;
+    }
+
     // Release our drainer claim. If we were the last drainer after close,
     // fire final cleanup.
     iree_hal_task_queue_compute_item_leave(queue, item, registered_generation);
     IREE_TRACE_ZONE_END(z_drain);
 
-    bool processor_keep_active =
-        !processor_result.completed && processor_result.tiles_executed == 0;
-    if (processor_keep_active) {
-      iree_processor_yield();
-    }
-    out_result->did_work = !processor_keep_active;
+    out_result->did_work = processor_did_work;
     out_result->keep_active = processor_keep_active;
+    out_result->publish_keep_active = processor_publish_keep_active;
+    out_result->keep_warm = processor_keep_warm;
+    out_result->keep_warm_epoch = processor_keep_warm_epoch;
     out_result->completed = false;
     return iree_ok_status();
   }

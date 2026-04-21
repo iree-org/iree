@@ -63,6 +63,10 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
   iree_atomic_int32_t completion_claimed;
 } iree_task_compute_slot_t;
 
+static_assert(sizeof(iree_task_compute_slot_t) <=
+                  iree_hardware_destructive_interference_size,
+              "compute slots must fit within one cache line");
+
 // Generation increment for the active_drainers tagged counter.
 // Adding this to the 64-bit value increments the generation by 1.
 #define IREE_TASK_SLOT_GEN_INCREMENT ((int64_t)1 << 32)

@@ -669,6 +669,50 @@ static void shared_keep_active_completion(iree_task_process_t* process,
   context->completed.store(true, std::memory_order_release);
 }
 
+// Context for a compute process that retains a worker warm after the first
+// no-work drain. The second drain must not happen until the test advances the
+// process retention epoch via schedule_process.
+struct WarmRetainerContext {
+  std::atomic<int32_t> drain_count{0};
+  std::atomic<int32_t> premature_drain_count{0};
+  std::atomic<bool> first_drain_done{false};
+  std::atomic<bool> allow_second_drain{false};
+  std::atomic<bool> completed{false};
+  iree_status_code_t completion_status_code = IREE_STATUS_OK;
+};
+
+static iree_status_t warm_retainer_drain(
+    iree_task_process_t* process, uint32_t worker_index,
+    iree_task_process_drain_result_t* result) {
+  (void)worker_index;
+  auto* context = reinterpret_cast<WarmRetainerContext*>(process->user_data);
+  int32_t count = context->drain_count.fetch_add(1, std::memory_order_acq_rel);
+  if (count == 0) {
+    result->keep_warm = true;
+    result->keep_warm_epoch = iree_task_process_retention_epoch(process);
+    context->first_drain_done.store(true, std::memory_order_release);
+    return iree_ok_status();
+  }
+  if (!context->allow_second_drain.load(std::memory_order_acquire)) {
+    context->premature_drain_count.fetch_add(1, std::memory_order_relaxed);
+    result->did_work = true;
+    result->completed = true;
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "warm retainer re-entered before epoch advance");
+  }
+  result->did_work = true;
+  result->completed = true;
+  return iree_ok_status();
+}
+
+static void warm_retainer_completion(iree_task_process_t* process,
+                                     iree_status_t status) {
+  auto* context = reinterpret_cast<WarmRetainerContext*>(process->user_data);
+  context->completion_status_code = iree_status_code(status);
+  iree_status_free(status);
+  context->completed.store(true, std::memory_order_release);
+}
+
 TEST(ExecutorProcessTest, ComputeSlotSingleProcess) {
   iree_task_executor_t* executor = CreateExecutor(4);
 
@@ -893,6 +937,41 @@ TEST(ExecutorProcessTest, ComputeSlotSharedKeepActiveKeepsSlotLive) {
     return context.completed.load(std::memory_order_acquire);
   })) << "shared keep-active process did not complete";
   EXPECT_GE(context.drain_count.load(std::memory_order_acquire), 3);
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotWarmRetainerWaitsForEpochAdvance) {
+  iree_task_executor_t* executor = CreateExecutor(1);
+
+  WarmRetainerContext context;
+  iree_task_process_t process;
+  iree_task_process_initialize(warm_retainer_drain,
+                               /*suspend_count=*/0, /*wake_budget=*/2,
+                               &process);
+  process.completion_fn = warm_retainer_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.first_drain_done.load(std::memory_order_acquire);
+  })) << "warm-retainer process did not reach first drain";
+  ASSERT_TRUE(SpinUntil([&] {
+    return iree_task_process_warm_retainer_count(&process) == 1;
+  })) << "worker did not enter warm-retainer state";
+  EXPECT_EQ(context.drain_count.load(std::memory_order_acquire), 1);
+  EXPECT_EQ(context.premature_drain_count.load(std::memory_order_acquire), 0);
+
+  context.allow_second_drain.store(true, std::memory_order_release);
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.completed.load(std::memory_order_acquire);
+  })) << "warm-retainer process did not complete after epoch advance";
+  EXPECT_EQ(context.completion_status_code, IREE_STATUS_OK);
+  EXPECT_EQ(context.premature_drain_count.load(std::memory_order_acquire), 0);
+  EXPECT_GE(context.drain_count.load(std::memory_order_acquire), 2);
 
   iree_task_executor_release(executor);
 }

@@ -134,6 +134,12 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   iree_atomic_int32_t* wake_budget_ptr;
   iree_atomic_int32_t* desired_wake_ptr;
 
+  // Process-local retention epoch advanced after region, block, and terminal
+  // transitions. Warm task workers use this to wait near the compute process
+  // without repeatedly entering the block processor while no tiles are
+  // currently claimable.
+  iree_atomic_int32_t* retention_epoch_ptr;
+
   struct {
     // Optional recorder receiving command-buffer dispatch execution records.
     iree_hal_local_profile_recorder_t* recorder;
@@ -154,6 +160,19 @@ typedef struct iree_hal_cmd_block_processor_context_t {
     iree_host_size_t dispatch_capacity;
   } profile;
 } iree_hal_cmd_block_processor_context_t;
+
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, completed) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor completion flag must start on its own cache line");
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, block_sequence) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor block sequence must start on its own cache line");
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, error_status) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor error state must start on its own cache line");
 
 // Per-worker state maintained by the caller across drain() calls. Each worker
 // has its own instance — no sharing, no atomic access. Initialize with
@@ -204,14 +223,21 @@ typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // subsequent drain() calls also return completed=true.
   bool completed;
 
+  // Block sequence observed by the drain, or 0 if no multi-worker block state
+  // was sampled. Callers use this on no-work drains to detect that a block
+  // transition raced the decision to retain a warm worker.
+  int32_t block_sequence;
+
+  // Region epoch observed by the drain, or 0 if no active region was sampled.
+  // Callers use this on no-work drains to detect that a region transition
+  // raced the decision to retain a warm worker.
+  int32_t region_epoch;
+
   // Trace-only diagnostic reason describing why this drain call returned.
   IREE_TRACE(iree_hal_cmd_block_processor_drain_reason_t reason;)
 
   // Trace-only active region index observed by this drain, or -1 if absent.
   IREE_TRACE(int32_t active_region;)
-
-  // Trace-only region epoch observed by this drain, or 0 if absent.
-  IREE_TRACE(int32_t region_epoch;)
 
   // Trace-only remaining tile count observed after the drain decision.
   IREE_TRACE(uint32_t remaining_tiles;)
@@ -299,6 +325,13 @@ void iree_hal_cmd_block_processor_drain(
     iree_hal_cmd_block_processor_context_t* context, uint32_t worker_index,
     iree_hal_cmd_block_processor_worker_state_t* worker_state,
     iree_hal_cmd_block_processor_drain_result_t* out_result);
+
+// Returns true if the context has advanced since |drain_result| observed it.
+// Used only on no-work drains before arming warm retention so workers do not
+// sleep through a region/block/terminal transition that already happened.
+bool iree_hal_cmd_block_processor_context_did_advance(
+    const iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_block_processor_drain_result_t* drain_result);
 
 // Consumes and returns the first error encountered by any worker during
 // execution. Returns iree_ok_status() if all workers completed
