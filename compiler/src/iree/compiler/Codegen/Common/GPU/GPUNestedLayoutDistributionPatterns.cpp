@@ -808,73 +808,17 @@ static Value broadcastFromProjected(RewriterBase &rewriter, Location loc,
   return vector::BroadcastOp::create(rewriter, loc, targetType, expanded);
 }
 
-/// Broadcast every element of |source| from the last lane in a scan cluster
-/// to all lanes. The cluster is defined by |clusterSize| threads at
-/// |clusterStride| spacing within a subgroup of |subgroupSize| lanes.
-/// Handles pack/unpack for types narrower than 32 bits.
-static Value broadcastFromLastClusterLane(RewriterBase &rewriter, Location loc,
-                                          Value source, int64_t clusterSize,
-                                          int64_t clusterStride,
-                                          int64_t subgroupSize) {
-  auto vecTy = cast<VectorType>(source.getType());
-  Type elemTy = vecTy.getElementType();
-  unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
-  constexpr unsigned shuffleBitwidth = 32;
-  auto shuffleIntType = rewriter.getIntegerType(shuffleBitwidth);
-  auto equivIntType = rewriter.getIntegerType(bitwidth);
-
-  // Compute the lane ID of the last thread in the scan cluster:
-  //   lanePos = (laneId / clusterStride) % clusterSize
-  //   lastLane = laneId - lanePos * clusterStride
-  //              + (clusterSize - 1) * clusterStride
-  auto i32 = rewriter.getI32Type();
-  Value laneId = gpu::LaneIdOp::create(rewriter, loc, /*upper_bound=*/nullptr);
-  Value laneIdI32 = arith::IndexCastOp::create(rewriter, loc, i32, laneId);
-  Value strideCst = arith::ConstantOp::create(
-      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterStride));
-  Value sizeCst = arith::ConstantOp::create(
-      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterSize));
-  Value lanePos = arith::RemUIOp::create(
-      rewriter, loc,
-      arith::DivUIOp::create(rewriter, loc, laneIdI32, strideCst), sizeCst);
-  Value posTimesStride =
-      arith::MulIOp::create(rewriter, loc, lanePos, strideCst);
-  Value baseLane =
-      arith::SubIOp::create(rewriter, loc, laneIdI32, posTimesStride);
-  Value lastOffset = arith::ConstantOp::create(
-      rewriter, loc, i32,
-      rewriter.getI32IntegerAttr((clusterSize - 1) * clusterStride));
-  Value lastLane = arith::AddIOp::create(rewriter, loc, baseLane, lastOffset);
-  Value widthCst = arith::ConstantOp::create(
-      rewriter, loc, i32, rewriter.getI32IntegerAttr(subgroupSize));
-
-  // Shuffle each scalar element from the last lane.
-  Value result = source;
-  for (int64_t i = 0, n = vecTy.getNumElements(); i < n; ++i) {
-    SmallVector<int64_t> idx;
-    int64_t remaining = i;
-    for (int64_t d = vecTy.getRank() - 1; d >= 0; --d) {
-      idx.push_back(remaining % vecTy.getDimSize(d));
-      remaining /= vecTy.getDimSize(d);
-    }
-    std::reverse(idx.begin(), idx.end());
-
-    Value scalar = vector::ExtractOp::create(rewriter, loc, source, idx);
-    Value packed = scalar;
-    if (bitwidth < shuffleBitwidth) {
-      packed = arith::BitcastOp::create(rewriter, loc, equivIntType, packed);
-      packed = arith::ExtUIOp::create(rewriter, loc, shuffleIntType, packed);
-    }
-    auto shuffle = gpu::ShuffleOp::create(rewriter, loc, packed, lastLane,
-                                          widthCst, gpu::ShuffleMode::IDX);
-    Value shuffled = shuffle.getShuffleResult();
-    if (bitwidth < shuffleBitwidth) {
-      shuffled = arith::TruncIOp::create(rewriter, loc, equivIntType, shuffled);
-      shuffled = arith::BitcastOp::create(rewriter, loc, elemTy, shuffled);
-    }
-    result = vector::InsertOp::create(rewriter, loc, shuffled, result, idx);
+/// Converts a linearized element number into vector indices in row-major order.
+static SmallVector<int64_t> getVectorElementIndices(VectorType vectorType,
+                                                    int64_t linearIndex) {
+  SmallVector<int64_t> indices;
+  indices.reserve(vectorType.getRank());
+  for (int64_t d = vectorType.getRank() - 1; d >= 0; --d) {
+    indices.push_back(linearIndex % vectorType.getDimSize(d));
+    linearIndex /= vectorType.getDimSize(d);
   }
-  return result;
+  std::reverse(indices.begin(), indices.end());
+  return indices;
 }
 
 struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
@@ -1779,18 +1723,11 @@ private:
                           rewriter, loc, rewriter.getZeroAttr(outIdxType))
                           .getResult();
 
-    SmallVector<int64_t> outShape(outValType.getShape());
-    SmallVector<int64_t> outIndices(outValType.getRank(), 0);
     int64_t outNumElements = outValType.getNumElements();
 
     for (int64_t linearIdx = 0; linearIdx < outNumElements; ++linearIdx) {
-      int64_t tmp = linearIdx;
-      for (int64_t i = static_cast<int64_t>(outIndices.size()) - 1; i >= 0;
-           --i) {
-        int64_t extent = outShape[i];
-        outIndices[i] = tmp % extent;
-        tmp /= extent;
-      }
+      SmallVector<int64_t> outIndices =
+          getVectorElementIndices(outValType, linearIdx);
 
       Value accVal =
           vector::ExtractOp::create(rewriter, loc, initVal, outIndices);
@@ -2242,6 +2179,68 @@ private:
   int64_t maxBitsPerShuffle;
 };
 
+/// Broadcast every element of |source| from the last lane in a scan cluster
+/// to all lanes. The cluster is defined by |clusterSize| threads at
+/// |clusterStride| spacing within a subgroup of |subgroupSize| lanes.
+/// Handles pack/unpack for types narrower than 32 bits.
+static Value broadcastFromLastClusterLane(RewriterBase &rewriter, Location loc,
+                                          Value source, int64_t clusterSize,
+                                          int64_t clusterStride,
+                                          int64_t subgroupSize) {
+  auto vecTy = cast<VectorType>(source.getType());
+  Type elemTy = vecTy.getElementType();
+  unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
+  constexpr unsigned shuffleBitwidth = 32;
+  auto shuffleIntType = rewriter.getIntegerType(shuffleBitwidth);
+  auto equivIntType = rewriter.getIntegerType(bitwidth);
+
+  // Compute the lane ID of the last thread in the scan cluster:
+  //   lanePos = (laneId / clusterStride) % clusterSize
+  //   lastLane = laneId - lanePos * clusterStride
+  //              + (clusterSize - 1) * clusterStride
+  auto i32 = rewriter.getI32Type();
+  Value laneId = gpu::LaneIdOp::create(rewriter, loc, /*upper_bound=*/nullptr);
+  Value laneIdI32 = arith::IndexCastOp::create(rewriter, loc, i32, laneId);
+  Value strideCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterStride));
+  Value sizeCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterSize));
+  Value lanePos = arith::RemUIOp::create(
+      rewriter, loc,
+      arith::DivUIOp::create(rewriter, loc, laneIdI32, strideCst), sizeCst);
+  Value posTimesStride =
+      arith::MulIOp::create(rewriter, loc, lanePos, strideCst);
+  Value baseLane =
+      arith::SubIOp::create(rewriter, loc, laneIdI32, posTimesStride);
+  Value lastOffset = arith::ConstantOp::create(
+      rewriter, loc, i32,
+      rewriter.getI32IntegerAttr((clusterSize - 1) * clusterStride));
+  Value lastLane = arith::AddIOp::create(rewriter, loc, baseLane, lastOffset);
+  Value widthCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(subgroupSize));
+
+  // Shuffle each scalar element from the last lane.
+  Value result = source;
+  for (int64_t i = 0, n = vecTy.getNumElements(); i < n; ++i) {
+    SmallVector<int64_t> idx = getVectorElementIndices(vecTy, i);
+    Value scalar = vector::ExtractOp::create(rewriter, loc, source, idx);
+    Value packed = scalar;
+    if (bitwidth < shuffleBitwidth) {
+      packed = arith::BitcastOp::create(rewriter, loc, equivIntType, packed);
+      packed = arith::ExtUIOp::create(rewriter, loc, shuffleIntType, packed);
+    }
+    auto shuffle = gpu::ShuffleOp::create(rewriter, loc, packed, lastLane,
+                                          widthCst, gpu::ShuffleMode::IDX);
+    Value shuffled = shuffle.getShuffleResult();
+    if (bitwidth < shuffleBitwidth) {
+      shuffled = arith::TruncIOp::create(rewriter, loc, equivIntType, shuffled);
+      shuffled = arith::BitcastOp::create(rewriter, loc, elemTy, shuffled);
+    }
+    result = vector::InsertOp::create(rewriter, loc, shuffled, result, idx);
+  }
+  return result;
+}
+
 /// Helper to create a `iree_gpu.subgroup_scan` op for a scalar value, using
 /// `vector::CombiningKind` to build the combiner region.
 static std::pair<Value, Value>
@@ -2371,11 +2370,9 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     }
 
     Type elemTy = source.getType().getElementType();
-    unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
-    if (elemBitwidth > maxBitsPerShuffle) {
-      return rewriter.notifyMatchFailure(
-          scanOp, llvm::formatv("element bitwidth {0} > maxBitsPerShuffle {1}",
-                                elemBitwidth, maxBitsPerShuffle));
+    if (failed(checkBitwidthForShuffle(scanOp, elemTy, maxBitsPerShuffle,
+                                       "element", rewriter))) {
+      return failure();
     }
 
     // Reject multi-subgroup for now.
@@ -2474,14 +2471,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
         subgroupTotal = localTotal;
 
         for (int64_t i = 0, n = totalType.getNumElements(); i < n; ++i) {
-          SmallVector<int64_t> idx;
-          int64_t remaining = i;
-          for (int64_t d = totalType.getRank() - 1; d >= 0; --d) {
-            idx.push_back(remaining % totalType.getDimSize(d));
-            remaining /= totalType.getDimSize(d);
-          }
-          std::reverse(idx.begin(), idx.end());
-
+          SmallVector<int64_t> idx = getVectorElementIndices(totalType, i);
           Value scalar =
               vector::ExtractOp::create(rewriter, loc, localTotal, idx);
           auto [scanResult, scanTotal] =
