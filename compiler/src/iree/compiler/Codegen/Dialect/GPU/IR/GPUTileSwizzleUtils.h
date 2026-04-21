@@ -19,9 +19,18 @@ Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                                 int operandIndex);
 
 /// Returns the swizzle for the full data-tiled-scaled-mma tile, including all
-/// the relevant unrolling and expansion factors.
+/// the relevant unrolling and expansion factors. For operands listed in
+/// `unshuffled_operands`, the permutation is reset to identity.
 Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                                 unsigned operandIdx);
+
+/// Returns the swizzle with the non-identity permutation that encodes thread
+/// stride (tstride) ordering. Used for thread ID delinearization in
+/// populateOperandOffsetsSizesStrides, where the permutation must reflect the
+/// MMA layout's tstrides rather than the physical data layout.
+Codegen::TileSwizzle
+getDistributionSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
+                       unsigned operandIdx);
 
 /// Returns the swizzle for the data-tiled-mma tile, based on the `fragment`
 /// and contraction dimensions required from the `encoding`.

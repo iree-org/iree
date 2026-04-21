@@ -472,6 +472,12 @@ def IREEGPU_DataTiledScaledMMAAttr :
     types for the scales operands are always Float8E8M0FNUType, so they are not
     specified on the attribute.
 
+    The optional |unswizzled_operands| field lists operand indices whose data
+    layout is unswizzled (pack and expand only, no transpose). When set, those
+    operands get an identity permutation in the swizzle and use a distribution
+    swizzle for thread ID delinearization. Other operands are fully swizzled as
+    usual. When empty (default), all operands are fully data-tiled.
+
     The other fields are similar to DataTiledMMAAttr, refer to its documentation.
   }];
 
@@ -503,7 +509,15 @@ def IREEGPU_DataTiledScaledMMAAttr :
           OptionalParameter<
               "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
           OptionalParameter<
-              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k,
+          OptionalParameter<
+              "DenseI64ArrayAttr",
+              "Operand indices with row-major (unshuffled) layout.">:$unshuffled_operands);
+
+  let extraClassDeclaration = [{
+    bool isUnshuffledOperand(unsigned idx) const;
+    bool hasUnshuffledOperands() const;
+  }];
 }
 
 def IREEGPU_VirtualMMAIntrinsicAttr
