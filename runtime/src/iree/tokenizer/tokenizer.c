@@ -2633,13 +2633,39 @@ iree_status_t iree_tokenizer_encode_state_feed(
   // buffer is smaller than max_token_length (configuration error).
   if (iree_status_is_ok(status) && chunk.size > 0 && *out_bytes_consumed == 0 &&
       total_tokens == 0) {
+    // Distinguish between two failure modes:
+    //
+    // (a) Output buffer is full (output.capacity == 0 on entry to this feed
+    //     call). A pending special token cannot be emitted because there is no
+    //     room, so the trailing input byte is stuck. This is a recoverable
+    //     condition: the caller should retry with a larger output buffer.
+    //
+    // (b) True deadlock: ring buffer too small for max_token_length, or an
+    //     unhandled edge case in the segment/normalizer state machine. This
+    //     is a programming error and should not happen in practice.
+    if (output.capacity == 0) {
+      return iree_make_status(
+          IREE_STATUS_RESOURCE_EXHAUSTED,
+          "encode output buffer full with %" PRIhsz
+          " bytes of input still pending; retry with a larger token buffer",
+          chunk.size);
+    }
     return iree_make_status(
         IREE_STATUS_INTERNAL,
         "encode deadlock: no progress despite partial segment handling "
         "(logical_capacity=%" PRIhsz " bytes, used=%" PRIhsz
-        " bytes, pending_input=%" PRIhsz " bytes, has_partial=%" PRIu32 ")",
+        " bytes, pending_input=%" PRIhsz " bytes, has_partial=%" PRIu32
+        " segment_count=%" PRIhsz " segments_consumed=%" PRIhsz
+        " pending_special=%" PRId32
+        " normalizer_pending=%d model_pending=%d)",
         state->capacity_mask + 1, state->write_position - state->read_position,
-        chunk.size, (uint32_t)state->has_partial_segment);
+        chunk.size, (uint32_t)state->has_partial_segment,
+        state->segment_count, state->segments_consumed,
+        (int32_t)state->pending_special_token,
+        (state->normalizer_state &&
+         iree_tokenizer_normalizer_state_has_pending(state->normalizer_state))
+            ? 1 : 0,
+        iree_tokenizer_model_state_has_pending(state->model_state) ? 1 : 0);
   }
 
   return status;
