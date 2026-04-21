@@ -22,19 +22,15 @@ func.func @broadcast_read_lowering(%arg0: memref<4096x32xf16>) -> vector<1x8xf16
 func.func @transfer_gather_unroll_embedding_lookup(%arg0: memref<4096x64xf16>, %arg1: vector<4xindex>) -> (vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>) {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
-  %0 = ub.poison : vector<64xf16>
-  %1 = ub.poison : vector<64xf16>
-  %2 = ub.poison : vector<64xf16>
-  %3 = ub.poison : vector<64xf16>
-  %4 = vector.extract %arg1[0] : index from vector<4xindex>
+  %0 = vector.extract %arg1[0] : index from vector<4xindex>
+  %1 = vector.transfer_read %arg0[%0, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %2 = vector.extract %arg1[1] : index from vector<4xindex>
+  %3 = vector.transfer_read %arg0[%2, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %4 = vector.extract %arg1[2] : index from vector<4xindex>
   %5 = vector.transfer_read %arg0[%4, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %6 = vector.extract %arg1[1] : index from vector<4xindex>
+  %6 = vector.extract %arg1[3] : index from vector<4xindex>
   %7 = vector.transfer_read %arg0[%6, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %8 = vector.extract %arg1[2] : index from vector<4xindex>
-  %9 = vector.transfer_read %arg0[%8, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %10 = vector.extract %arg1[3] : index from vector<4xindex>
-  %11 = vector.transfer_read %arg0[%10, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  return %5, %7, %9, %11 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
+  return %1, %3, %5, %7 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
 }
 
 // After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
@@ -48,19 +44,15 @@ func.func @transfer_gather_unroll_embedding_lookup(%arg0: memref<4096x64xf16>, %
 func.func @transfer_gather_unroll_masked(%arg0: memref<4096x64xf16>, %arg1: vector<4xindex>, %arg2: vector<64xi1>, %arg3: vector<64xi1>, %arg4: vector<64xi1>, %arg5: vector<64xi1>) -> (vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>) {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
-  %0 = ub.poison : vector<64xf16>
-  %1 = ub.poison : vector<64xf16>
-  %2 = ub.poison : vector<64xf16>
-  %3 = ub.poison : vector<64xf16>
-  %4 = vector.extract %arg1[0] : index from vector<4xindex>
-  %5 = vector.transfer_read %arg0[%4, %c0], %cst, %arg2 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %6 = vector.extract %arg1[1] : index from vector<4xindex>
-  %7 = vector.transfer_read %arg0[%6, %c0], %cst, %arg3 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %8 = vector.extract %arg1[2] : index from vector<4xindex>
-  %9 = vector.transfer_read %arg0[%8, %c0], %cst, %arg4 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %10 = vector.extract %arg1[3] : index from vector<4xindex>
-  %11 = vector.transfer_read %arg0[%10, %c0], %cst, %arg5 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  return %5, %7, %9, %11 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
+  %0 = vector.extract %arg1[0] : index from vector<4xindex>
+  %1 = vector.transfer_read %arg0[%0, %c0], %cst, %arg2 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %2 = vector.extract %arg1[1] : index from vector<4xindex>
+  %3 = vector.transfer_read %arg0[%2, %c0], %cst, %arg3 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %4 = vector.extract %arg1[2] : index from vector<4xindex>
+  %5 = vector.transfer_read %arg0[%4, %c0], %cst, %arg4 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %6 = vector.extract %arg1[3] : index from vector<4xindex>
+  %7 = vector.transfer_read %arg0[%6, %c0], %cst, %arg5 {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  return %1, %3, %5, %7 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
 }
 
 // After unrolling, mask slices are passed to each sub-gather.
@@ -75,111 +67,71 @@ func.func @transfer_gather_unroll_masked(%arg0: memref<4096x64xf16>, %arg1: vect
 func.func @transfer_gather_unroll_transposed_index(%arg0: memref<4096x64xf16>, %arg1: vector<4xindex>, %arg2: vector<4xindex>, %arg3: vector<4xindex>, %arg4: vector<4xindex>, %arg5: vector<4xindex>, %arg6: vector<4xindex>, %arg7: vector<4xindex>, %arg8: vector<4xindex>) -> (vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>) {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
-  %0 = ub.poison : vector<64xf16>
-  %1 = ub.poison : vector<64xf16>
-  %2 = ub.poison : vector<64xf16>
-  %3 = ub.poison : vector<64xf16>
-  %4 = ub.poison : vector<64xf16>
-  %5 = ub.poison : vector<64xf16>
-  %6 = ub.poison : vector<64xf16>
-  %7 = ub.poison : vector<64xf16>
-  %8 = ub.poison : vector<64xf16>
-  %9 = ub.poison : vector<64xf16>
-  %10 = ub.poison : vector<64xf16>
-  %11 = ub.poison : vector<64xf16>
-  %12 = ub.poison : vector<64xf16>
-  %13 = ub.poison : vector<64xf16>
-  %14 = ub.poison : vector<64xf16>
-  %15 = ub.poison : vector<64xf16>
-  %16 = ub.poison : vector<64xf16>
-  %17 = ub.poison : vector<64xf16>
-  %18 = ub.poison : vector<64xf16>
-  %19 = ub.poison : vector<64xf16>
-  %20 = ub.poison : vector<64xf16>
-  %21 = ub.poison : vector<64xf16>
-  %22 = ub.poison : vector<64xf16>
-  %23 = ub.poison : vector<64xf16>
-  %24 = ub.poison : vector<64xf16>
-  %25 = ub.poison : vector<64xf16>
-  %26 = ub.poison : vector<64xf16>
-  %27 = ub.poison : vector<64xf16>
-  %28 = ub.poison : vector<64xf16>
-  %29 = ub.poison : vector<64xf16>
-  %30 = ub.poison : vector<64xf16>
-  %31 = ub.poison : vector<64xf16>
-  %32 = ub.poison : vector<64xf16>
-  %33 = ub.poison : vector<64xf16>
-  %34 = ub.poison : vector<64xf16>
-  %35 = ub.poison : vector<64xf16>
-  %36 = ub.poison : vector<64xf16>
-  %37 = ub.poison : vector<64xf16>
-  %38 = ub.poison : vector<64xf16>
-  %39 = ub.poison : vector<64xf16>
-  %40 = vector.extract %arg1[0] : index from vector<4xindex>
+  %0 = vector.extract %arg1[0] : index from vector<4xindex>
+  %1 = vector.transfer_read %arg0[%0, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %2 = vector.extract %arg2[0] : index from vector<4xindex>
+  %3 = vector.transfer_read %arg0[%2, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %4 = vector.extract %arg3[0] : index from vector<4xindex>
+  %5 = vector.transfer_read %arg0[%4, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %6 = vector.extract %arg4[0] : index from vector<4xindex>
+  %7 = vector.transfer_read %arg0[%6, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %8 = vector.extract %arg5[0] : index from vector<4xindex>
+  %9 = vector.transfer_read %arg0[%8, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %10 = vector.extract %arg6[0] : index from vector<4xindex>
+  %11 = vector.transfer_read %arg0[%10, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %12 = vector.extract %arg7[0] : index from vector<4xindex>
+  %13 = vector.transfer_read %arg0[%12, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %14 = vector.extract %arg8[0] : index from vector<4xindex>
+  %15 = vector.transfer_read %arg0[%14, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %16 = vector.extract %arg1[1] : index from vector<4xindex>
+  %17 = vector.transfer_read %arg0[%16, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %18 = vector.extract %arg2[1] : index from vector<4xindex>
+  %19 = vector.transfer_read %arg0[%18, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %20 = vector.extract %arg3[1] : index from vector<4xindex>
+  %21 = vector.transfer_read %arg0[%20, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %22 = vector.extract %arg4[1] : index from vector<4xindex>
+  %23 = vector.transfer_read %arg0[%22, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %24 = vector.extract %arg5[1] : index from vector<4xindex>
+  %25 = vector.transfer_read %arg0[%24, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %26 = vector.extract %arg6[1] : index from vector<4xindex>
+  %27 = vector.transfer_read %arg0[%26, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %28 = vector.extract %arg7[1] : index from vector<4xindex>
+  %29 = vector.transfer_read %arg0[%28, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %30 = vector.extract %arg8[1] : index from vector<4xindex>
+  %31 = vector.transfer_read %arg0[%30, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %32 = vector.extract %arg1[2] : index from vector<4xindex>
+  %33 = vector.transfer_read %arg0[%32, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %34 = vector.extract %arg2[2] : index from vector<4xindex>
+  %35 = vector.transfer_read %arg0[%34, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %36 = vector.extract %arg3[2] : index from vector<4xindex>
+  %37 = vector.transfer_read %arg0[%36, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %38 = vector.extract %arg4[2] : index from vector<4xindex>
+  %39 = vector.transfer_read %arg0[%38, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
+  %40 = vector.extract %arg5[2] : index from vector<4xindex>
   %41 = vector.transfer_read %arg0[%40, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %42 = vector.extract %arg2[0] : index from vector<4xindex>
+  %42 = vector.extract %arg6[2] : index from vector<4xindex>
   %43 = vector.transfer_read %arg0[%42, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %44 = vector.extract %arg3[0] : index from vector<4xindex>
+  %44 = vector.extract %arg7[2] : index from vector<4xindex>
   %45 = vector.transfer_read %arg0[%44, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %46 = vector.extract %arg4[0] : index from vector<4xindex>
+  %46 = vector.extract %arg8[2] : index from vector<4xindex>
   %47 = vector.transfer_read %arg0[%46, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %48 = vector.extract %arg5[0] : index from vector<4xindex>
+  %48 = vector.extract %arg1[3] : index from vector<4xindex>
   %49 = vector.transfer_read %arg0[%48, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %50 = vector.extract %arg6[0] : index from vector<4xindex>
+  %50 = vector.extract %arg2[3] : index from vector<4xindex>
   %51 = vector.transfer_read %arg0[%50, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %52 = vector.extract %arg7[0] : index from vector<4xindex>
+  %52 = vector.extract %arg3[3] : index from vector<4xindex>
   %53 = vector.transfer_read %arg0[%52, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %54 = vector.extract %arg8[0] : index from vector<4xindex>
+  %54 = vector.extract %arg4[3] : index from vector<4xindex>
   %55 = vector.transfer_read %arg0[%54, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %56 = vector.extract %arg1[1] : index from vector<4xindex>
+  %56 = vector.extract %arg5[3] : index from vector<4xindex>
   %57 = vector.transfer_read %arg0[%56, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %58 = vector.extract %arg2[1] : index from vector<4xindex>
+  %58 = vector.extract %arg6[3] : index from vector<4xindex>
   %59 = vector.transfer_read %arg0[%58, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %60 = vector.extract %arg3[1] : index from vector<4xindex>
+  %60 = vector.extract %arg7[3] : index from vector<4xindex>
   %61 = vector.transfer_read %arg0[%60, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %62 = vector.extract %arg4[1] : index from vector<4xindex>
+  %62 = vector.extract %arg8[3] : index from vector<4xindex>
   %63 = vector.transfer_read %arg0[%62, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %64 = vector.extract %arg5[1] : index from vector<4xindex>
-  %65 = vector.transfer_read %arg0[%64, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %66 = vector.extract %arg6[1] : index from vector<4xindex>
-  %67 = vector.transfer_read %arg0[%66, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %68 = vector.extract %arg7[1] : index from vector<4xindex>
-  %69 = vector.transfer_read %arg0[%68, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %70 = vector.extract %arg8[1] : index from vector<4xindex>
-  %71 = vector.transfer_read %arg0[%70, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %72 = vector.extract %arg1[2] : index from vector<4xindex>
-  %73 = vector.transfer_read %arg0[%72, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %74 = vector.extract %arg2[2] : index from vector<4xindex>
-  %75 = vector.transfer_read %arg0[%74, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %76 = vector.extract %arg3[2] : index from vector<4xindex>
-  %77 = vector.transfer_read %arg0[%76, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %78 = vector.extract %arg4[2] : index from vector<4xindex>
-  %79 = vector.transfer_read %arg0[%78, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %80 = vector.extract %arg5[2] : index from vector<4xindex>
-  %81 = vector.transfer_read %arg0[%80, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %82 = vector.extract %arg6[2] : index from vector<4xindex>
-  %83 = vector.transfer_read %arg0[%82, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %84 = vector.extract %arg7[2] : index from vector<4xindex>
-  %85 = vector.transfer_read %arg0[%84, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %86 = vector.extract %arg8[2] : index from vector<4xindex>
-  %87 = vector.transfer_read %arg0[%86, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %88 = vector.extract %arg1[3] : index from vector<4xindex>
-  %89 = vector.transfer_read %arg0[%88, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %90 = vector.extract %arg2[3] : index from vector<4xindex>
-  %91 = vector.transfer_read %arg0[%90, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %92 = vector.extract %arg3[3] : index from vector<4xindex>
-  %93 = vector.transfer_read %arg0[%92, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %94 = vector.extract %arg4[3] : index from vector<4xindex>
-  %95 = vector.transfer_read %arg0[%94, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %96 = vector.extract %arg5[3] : index from vector<4xindex>
-  %97 = vector.transfer_read %arg0[%96, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %98 = vector.extract %arg6[3] : index from vector<4xindex>
-  %99 = vector.transfer_read %arg0[%98, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %100 = vector.extract %arg7[3] : index from vector<4xindex>
-  %101 = vector.transfer_read %arg0[%100, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  %102 = vector.extract %arg8[3] : index from vector<4xindex>
-  %103 = vector.transfer_read %arg0[%102, %c0], %cst {in_bounds = [true]} : memref<4096x64xf16>, vector<64xf16>
-  return %41, %43, %45, %47, %49, %51, %53, %55, %57, %59, %61, %63, %65, %67, %69, %71, %73, %75, %77, %79, %81, %83, %85, %87, %89, %91, %93, %95, %97, %99, %101, %103 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
+  return %1, %3, %5, %7, %9, %11, %13, %15, %17, %19, %21, %23, %25, %27, %29, %31, %33, %35, %37, %39, %41, %43, %45, %47, %49, %51, %53, %55, %57, %59, %61, %63 : vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>, vector<64xf16>
 }
 
 // After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
