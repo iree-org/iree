@@ -399,11 +399,10 @@ getFusableUses(MLIRContext *context, Operation *op,
   // producer (e.g. OnlineAttentionOp) still qualifies.
   if (!aggressiveFusion) {
     SmallPtrSet<Operation *, 4> consumers;
-    for (OpOperand &use : op->getUses()) {
-      if (isa<tensor::DimOp>(use.getOwner())) {
-        continue;
+    for (Operation *user : op->getUsers()) {
+      if (!isa<tensor::DimOp>(user)) {
+        consumers.insert(user);
       }
-      consumers.insert(use.getOwner());
     }
     if (consumers.size() != 1) {
       return {};

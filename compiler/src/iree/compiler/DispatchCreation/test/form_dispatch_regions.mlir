@@ -2816,3 +2816,40 @@ util.func public @online_attention_normalize_fusion(
 //            DEFAULT:     %[[G:.+]] = linalg.generic
 //            DEFAULT:     flow.return %[[G]]
 //            DEFAULT:   util.return %[[D]]
+
+// -----
+
+// Multi-result producer whose outputs use differently-permuted indexing maps.
+// The two composed iteration-space maps land concrete (non-broadcast)
+// expressions at the same positions, so mergeComposedMaps must reject the
+// merge and producer fusion must not happen.
+
+util.func public @multi_result_conflict_no_fusion(%x: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %e0 = tensor.empty() : tensor<16x16xf32>
+  %e1 = tensor.empty() : tensor<16x16xf32>
+  %out_e = tensor.empty() : tensor<16x16xf32>
+  %out = linalg.fill ins(%cst : f32) outs(%out_e : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %p:2 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d1, d0)>
+    ],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%x : tensor<16x16xf32>)
+    outs(%e0, %e1 : tensor<16x16xf32>, tensor<16x16xf32>) {
+  ^bb0(%in: f32, %o0: f32, %o1: f32):
+    linalg.yield %in, %in : f32, f32
+  } -> (tensor<16x16xf32>, tensor<16x16xf32>)
+  %m = linalg.matmul ins(%p#0, %p#1 : tensor<16x16xf32>, tensor<16x16xf32>)
+                    outs(%out : tensor<16x16xf32>) -> tensor<16x16xf32>
+  util.return %m : tensor<16x16xf32>
+}
+
+//      DEFAULT-LABEL: @multi_result_conflict_no_fusion
+//            DEFAULT:   %[[P:.+]]:2 = flow.dispatch.region
+//            DEFAULT:     linalg.generic
+//            DEFAULT:   flow.dispatch.region
+//            DEFAULT:     linalg.matmul ins(%[[P]]#0, %[[P]]#1
+//            DEFAULT:     flow.return

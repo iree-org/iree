@@ -48,19 +48,14 @@ llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   return llvm::SmallBitVector{};
 }
 
-/// Combines two composed iteration-space maps from the same reference space
-/// into the same op. Broadcast-zero results yield to concrete expressions;
-/// returns failure only on a genuine conflict. A null `a` is treated as the
-/// identity — merging it with `b` returns `b`.
+/// Combines two composed iteration-space maps result-wise. A constant `0`
+/// is a broadcast placeholder and yields to a concrete expression; two
+/// different concrete expressions at the same position are a conflict. A
+/// null `a` acts as the identity.
 static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
   if (!a || a == b) {
     return b;
   }
-  assert(a.getNumDims() == b.getNumDims() &&
-         a.getNumSymbols() == b.getNumSymbols() &&
-         a.getNumResults() == b.getNumResults() &&
-         "composed maps must share arity");
-
   auto isZero = [](AffineExpr e) {
     auto c = dyn_cast<AffineConstantExpr>(e);
     return c && c.getValue() == 0;
