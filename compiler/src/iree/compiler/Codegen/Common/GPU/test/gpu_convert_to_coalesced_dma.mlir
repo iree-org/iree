@@ -923,16 +923,16 @@ func.func @copy_scale_padding(%source: tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8
 
 // -----
 
-// Test: workgroup-aligned but per-warp sub-aligned scale copy uses identity
-// tiling (not padCopyForDMA). Scale tile is 128x4 f8E8M0FNU = 512 elements.
-// With dma_sizes=[32,128], subgroup_size=64:
+// Test: workgroup-aligned but per-warp-sub-aligned scale copy caps the
+// participating warps instead of collapsing to a single identity-tiled warp.
+// Scale tile is 128x4 f8E8M0FNU = 512 elements. With dma_sizes=[32,128],
+// subgroup_size=64:
 //   min DMA granularity = 64 * (32/8) = 256 elements
 // Workgroup total: 512 % 256 == 0 → aligned.
-// Per-warp: 512 / 8 warps = 64 elements → 64 % 256 != 0 → sub-aligned.
-// Fix: applySubgroupTiling uses identity tiling (step=(128,4), trip=1) instead
-// of warp-tiling (step=(16,4)), so ConvertCopyToCoalescedDMA sees the full
-// 512-element tile and distributes across 64 lanes with 8 elements/lane,
-// needing 2 gather passes. No temp alloc, no undistributed memref.copy.
+// Naive per-warp at 8 warps: 512 / 8 = 64 elements → 64 % 256 != 0 → sub-aligned.
+// Fix: cap usable warps at maxSegments = 512 / 256 = 2, so warp tile = 64x4
+// (= 256 elements) and padCopyForDMA does not fire. Two warps issue one DMA
+// each in parallel instead of one warp running two sequential DMAs.
 
 #gpu_target_scale_identity = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -946,25 +946,27 @@ func.func @copy_scale_padding(%source: tensor<64x2xf8E8M0FNU>) -> tensor<64x2xf8
 // 8 warps: workgroup_size[0] / subgroup_size = 512 / 64 = 8
 #translation_scale_identity = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_scale_identity_tiling
+// CHECK-LABEL: func.func @copy_scale_capped_warps
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x4xf8E8M0FNU>
-func.func @copy_scale_identity_tiling(%source: tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
+func.func @copy_scale_capped_warps(%source: tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
   attributes {hal.executable.target = #exec_target_scale_identity, translation_info = #translation_scale_identity} {
   %empty = tensor.empty() : tensor<128x4xf8E8M0FNU>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<128x4xf8E8M0FNU>)
     outs(%empty : tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
 
-  // Identity-tiling outer forall: step=(128,4), trip count=1 (no warp split).
-  // This avoids creating 64-element per-warp tiles that are below the 256-element
-  // DMA minimum and would require padCopyForDMA + undistributed memref.copy.
-  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (128, 4) step (128, 4)
+  // Outer warp forall: 2 iterations, step=(64,4). Each iteration = 1 warp,
+  // DMA-aligned per-warp tile. The redundant_on_distribute attribute tells
+  // downstream fusion + distribution to drop the warp guard so every
+  // subgroup redundantly issues the same DMA instead of running only the
+  // first warp.
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (128, 4) step (64, 4)
 
-  // Inner lane forall: 64 lanes, each handling 8 elements (512/64=8).
+  // Inner lane forall: 64 lanes per warp, each handles 4 elements (256/64=4).
   // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
   // CHECK:     iree_gpu.coalesced_gather_dma
-  // CHECK-SAME:  tensor<128x4xf8E8M0FNU>, tensor<128x4xf8E8M0FNU>
-  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK-SAME:  tensor<64x4xf8E8M0FNU>, tensor<64x4xf8E8M0FNU>
+  // CHECK: } {iree_gpu.redundant_on_distribute, mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
 
   return %result : tensor<128x4xf8E8M0FNU>
 }

@@ -1207,60 +1207,43 @@ private:
       }
     }
 
-    // Check if per-warp tiling would produce a sub-aligned tile even though the
-    // workgroup tile is DMA-aligned. Simulate what ConvertCopyToCoalescedDMA
-    // will see after warp-tiling: computeSubgroupTileSizes keeps the innermost
-    // dim whole and distributes outer dims, so per-warp tile has the same
-    // innermost dim and outer dims shrunk by numWarps. If the per-warp output
-    // traces to tensor.empty() (which it will when the current output does,
-    // since the warp forall passes through the same init), availableElements =
-    // product of per-warp shape; otherwise availableElements = innermostDim.
-    //
-    // If the per-warp availableElements would not be DMA-aligned, padCopyForDMA
-    // creates a temp alloc and an undistributed memref.copy → runtime error.
-    // Use identity tiling so ConvertCopyToCoalescedDMA sees the aligned
-    // workgroup tile directly and distributes all lanes in a single pass.
-    bool useIdentityTiling = false;
+    // When the workgroup tile is DMA-aligned but the naive per-warp tile from
+    // computeSubgroupTileSizes would be sub-aligned, padCopyForDMA runs at
+    // warp level and produces a temp alloc + undistributed memref.copy →
+    // runtime error. Cap the participating warps at the number of full DMA
+    // segments in the tile so each warp sees an aligned slice. The cap is
+    // only meaningful when output traces to tensor.empty (otherwise warp
+    // tiles share the innermost dim, already checked for alignment above).
+    SmallVector<int64_t> effectiveNumWarps = numWarps;
+    bool cappedWarps = false;
     if (!isPadFusion && availableElements % *minAligned == 0) {
-      // Compute per-warp available elements after normal warp-tiling.
-      auto [warpTileSizes, _numTiled] =
-          computeSubgroupTileSizes(rewriter, shape, numWarps);
-      int64_t perWarpAvailable = innermostDim;
       bool outputTracesEmpty = false;
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
         outputTracesEmpty = tracesToTensorEmpty(copyOp.getOutputs()[0]) &&
                             llvm::none_of(shape, ShapedType::isDynamic);
       }
       if (outputTracesEmpty) {
-        perWarpAvailable = 1;
-        for (auto [ts, dim] : llvm::zip(warpTileSizes, shape)) {
-          int64_t tileVal =
-              getConstantIntValue(ts).value_or(ShapedType::kDynamic);
-          if (ShapedType::isDynamic(tileVal)) {
-            perWarpAvailable = ShapedType::kDynamic;
-          }
-          if (ShapedType::isDynamic(perWarpAvailable)) {
-            break;
-          }
-          perWarpAvailable *= tileVal;
+        int64_t totalWarps = 1;
+        for (int64_t n : numWarps) {
+          totalWarps *= std::max<int64_t>(n, 1);
         }
-      }
-      if (!ShapedType::isDynamic(perWarpAvailable) &&
-          perWarpAvailable % *minAligned != 0) {
-        useIdentityTiling = true;
+        int64_t maxSegments = availableElements / *minAligned;
+        if (maxSegments < totalWarps) {
+          // Collapse onto a single dim; computeSubgroupTileSizes only uses
+          // the product, so the layout of effectiveNumWarps doesn't matter.
+          effectiveNumWarps.assign(numWarps.size(), 1);
+          effectiveNumWarps.front() = maxSegments;
+          cappedWarps = true;
+        }
       }
     }
 
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
 
-    if (isPadFusion || useIdentityTiling) {
+    if (isPadFusion) {
       // For pad fusion: single-iteration wrapper forall so the DMA sees the
       // full pre-pad source (TODO #23365: proper subgroup tiling).
-      // For workgroup-aligned but per-warp-sub-aligned copies: identity tiling
-      // lets ConvertCopyToCoalescedDMA distribute all elements across lanes
-      // directly, without a temp alloc or undistributed memref.copy.
-      // Bail out if any dimension is dynamic since we need static tile sizes.
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         return failure();
       }
@@ -1269,9 +1252,8 @@ private:
         ++numTiledDims;
       }
     } else {
-      // Compute tile sizes for subgroup-level distribution.
       std::tie(tileSizes, numTiledDims) =
-          computeSubgroupTileSizes(rewriter, shape, numWarps);
+          computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
     }
 
     if (numTiledDims == 0) {
@@ -1287,6 +1269,23 @@ private:
     rewriter.setInsertionPoint(op);
     FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
         rewriter, cast<TilingInterface>(op.getOperation()), tilingOptions);
+
+    // When the warp count was capped below the workgroup's warp count, the
+    // generated forall has fewer iterations than warps. GPUDistributeForall
+    // would otherwise emit a scf.for guarded on the warp id (→ scf.if at
+    // flatten), leaving the unused warps idle. Mark the forall so the
+    // distribute pass broadcasts the body across all warps instead: every
+    // warp issues the same gather_to_lds redundantly. Safe because a DMA
+    // write of identical data to the same LDS offset is idempotent.
+    if (cappedWarps && succeeded(tilingResult)) {
+      for (LoopLikeOpInterface loop : tilingResult->loops) {
+        if (auto forall = dyn_cast<scf::ForallOp>(loop.getOperation())) {
+          forall->setAttr("iree_gpu.redundant_on_distribute",
+                          UnitAttr::get(context));
+          break;
+        }
+      }
+    }
 
     return tilingResult;
   }
