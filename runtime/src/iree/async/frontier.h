@@ -151,9 +151,27 @@ static inline uint8_t iree_async_axis_queue_index(iree_async_axis_t axis) {
 // A single (axis, epoch) pair within a frontier. States that the given axis
 // must have reached at least the given epoch for this entry to be satisfied.
 typedef struct iree_async_frontier_entry_t {
+  // Timeline participant being constrained.
   iree_async_axis_t axis;
+  // Minimum completed epoch required on the axis.
   uint64_t epoch;
 } iree_async_frontier_entry_t;
+
+// Fields shared by all frontier header representations. This is used by both
+// the variable-length frontier type and fixed-capacity frontier storage so that
+// field comments and layout stay in one place.
+#define IREE_ASYNC_FRONTIER_HEADER_FIELDS                           \
+  /* Number of valid entries in the frontier. */                    \
+  uint8_t entry_count;                                              \
+  /* Reserved bytes preserving the fixed frontier header layout. */ \
+  uint8_t reserved[7]
+
+// Fixed-size frontier header. Useful for embedding a frontier header before
+// trailing entry storage in another variable-size record.
+typedef struct iree_alignas(iree_alignof(iree_async_frontier_entry_t))
+    iree_async_frontier_header_t {
+  IREE_ASYNC_FRONTIER_HEADER_FIELDS;
+} iree_async_frontier_header_t;
 
 // A frontier is a vector clock: a set of (axis, epoch) pairs that together
 // define a causal position in the distributed system. A frontier answers the
@@ -267,10 +285,29 @@ typedef struct iree_async_frontier_entry_t {
 // The entry_count is uint8_t: maximum 255 entries per frontier (sufficient
 // for rack-scale systems with hundreds of queues).
 typedef struct iree_async_frontier_t {
-  uint8_t entry_count;
-  uint8_t reserved[7];
+  IREE_ASYNC_FRONTIER_HEADER_FIELDS;
+  // Variable-length frontier entries sorted by ascending axis.
   iree_async_frontier_entry_t entries[];
 } iree_async_frontier_t;
+
+static_assert(offsetof(iree_async_frontier_t, entries) ==
+                  sizeof(iree_async_frontier_header_t),
+              "frontier header must match frontier FAM offset");
+static_assert(iree_alignof(iree_async_frontier_header_t) ==
+                  iree_alignof(iree_async_frontier_t),
+              "frontier header must match frontier alignment");
+
+#define IREE_ASYNC_FIXED_FRONTIER_TYPE(type_name, entry_capacity)              \
+  typedef struct type_name {                                                   \
+    IREE_ASYNC_FRONTIER_HEADER_FIELDS;                                         \
+    /* Fixed-capacity frontier entries sorted by ascending axis. */            \
+    iree_async_frontier_entry_t entries[(entry_capacity)];                     \
+  } type_name;                                                                 \
+  static_assert(offsetof(type_name, entries) == sizeof(iree_async_frontier_t), \
+                #type_name " entries must alias iree_async_frontier_t FAM");   \
+  static_assert(                                                               \
+      iree_alignof(type_name) == iree_alignof(iree_async_frontier_t),          \
+      #type_name " must match iree_async_frontier_t alignment")
 
 // A frontier with exactly one (axis, epoch) entry, sized for stack allocation.
 // Memory-layout-compatible with iree_async_frontier_t when cast — the entries
@@ -279,24 +316,32 @@ typedef struct iree_async_frontier_t {
 // This is the common case for single-queue drivers: one queue produces one axis
 // entry per signal. Declare on the stack and use the as_frontier accessor for
 // API calls that take iree_async_frontier_t*.
-typedef struct iree_async_single_frontier_t {
-  uint8_t entry_count;
-  uint8_t reserved[7];
-  iree_async_frontier_entry_t entries[1];
-} iree_async_single_frontier_t;
+IREE_ASYNC_FIXED_FRONTIER_TYPE(iree_async_single_frontier_t, 1);
+
+// Casts fixed-capacity frontier storage to the variable-size frontier view.
+static inline iree_async_frontier_t* iree_async_fixed_frontier_as_frontier(
+    void* storage) {
+  return (iree_async_frontier_t*)storage;
+}
+
+// Casts fixed-capacity frontier storage to the const variable-size view.
+static inline const iree_async_frontier_t*
+iree_async_fixed_frontier_as_const_frontier(const void* storage) {
+  return (const iree_async_frontier_t*)storage;
+}
 
 // Returns a pointer to the layout-compatible iree_async_frontier_t within a
 // single-entry frontier. Valid for all frontier APIs (compare, merge, etc.).
 static inline iree_async_frontier_t* iree_async_single_frontier_as_frontier(
     iree_async_single_frontier_t* single) {
-  return (iree_async_frontier_t*)single;
+  return iree_async_fixed_frontier_as_frontier(single);
 }
 
 // Returns a const pointer to the layout-compatible iree_async_frontier_t.
 static inline const iree_async_frontier_t*
 iree_async_single_frontier_as_const_frontier(
     const iree_async_single_frontier_t* single) {
-  return (const iree_async_frontier_t*)single;
+  return iree_async_fixed_frontier_as_const_frontier(single);
 }
 
 // Initializes a single-entry frontier for the given axis and epoch.
