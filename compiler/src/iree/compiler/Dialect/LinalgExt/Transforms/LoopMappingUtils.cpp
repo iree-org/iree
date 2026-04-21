@@ -53,8 +53,9 @@ llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 /// returns failure only on a genuine conflict. A null `a` is treated as the
 /// identity — merging it with `b` returns `b`.
 static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
-  if (!a || a == b)
+  if (!a || a == b) {
     return b;
+  }
   assert(a.getNumDims() == b.getNumDims() &&
          a.getNumSymbols() == b.getNumSymbols() &&
          a.getNumResults() == b.getNumResults() &&
@@ -68,12 +69,13 @@ static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
   SmallVector<AffineExpr> merged;
   merged.reserve(a.getNumResults());
   for (auto [ea, eb] : llvm::zip_equal(a.getResults(), b.getResults())) {
-    if (ea == eb || isZero(eb))
+    if (ea == eb || isZero(eb)) {
       merged.push_back(ea);
-    else if (isZero(ea))
+    } else if (isZero(ea)) {
       merged.push_back(eb);
-    else
+    } else {
       return failure();
+    }
   }
   return AffineMap::get(a.getNumDims(), a.getNumSymbols(), merged,
                         a.getContext());
