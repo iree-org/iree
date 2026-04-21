@@ -20,6 +20,7 @@
 #include "iree/hal/memory/slab_provider.h"
 #include "iree/hal/memory/tlsf_pool.h"
 #include "iree/hal/pool.h"
+#include "iree/hal/pool_set.h"
 
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
@@ -228,8 +229,12 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_hal_slab_provider_t* default_slab_provider;
   // TLSF options derived from device options and HSA memory-pool properties.
   iree_hal_tlsf_pool_options_t default_pool_options;
-  // Frontier-aware default queue-allocation pool for this physical device.
+  // Routes default queue allocations to the best device-owned pool.
+  iree_hal_pool_set_t default_pool_set;
+  // Frontier-aware suballocating pool used up to the TLSF slab length.
   iree_hal_pool_t* default_pool;
+  // Direct per-allocation pool used for requests larger than one TLSF slab.
+  iree_hal_pool_t* default_oversized_pool;
 
   // Fixed-size staging pool for non-mappable queue_read/queue_write transfers.
   iree_hal_amdgpu_staging_pool_t file_staging_pool;

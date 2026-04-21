@@ -135,9 +135,44 @@ static void iree_hal_amdgpu_host_queue_release_transient_buffer_reservation(
   }
 }
 
-static iree_hal_pool_t* iree_hal_amdgpu_host_queue_resolve_pool(
-    iree_hal_amdgpu_host_queue_t* queue, iree_hal_pool_t* pool) {
-  return pool ? pool : queue->default_pool;
+static void iree_hal_amdgpu_host_queue_apply_pool_optimal_memory_type(
+    const iree_hal_pool_capabilities_t* capabilities,
+    iree_hal_buffer_params_t* params) {
+  if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
+    params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+    params->type |= capabilities->memory_type;
+  }
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_select_alloca_pool(
+    iree_hal_amdgpu_host_queue_t* queue, iree_hal_pool_t* explicit_pool,
+    iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_hal_pool_t** out_allocation_pool,
+    iree_hal_pool_capabilities_t* out_capabilities) {
+  if (explicit_pool) {
+    iree_hal_pool_query_capabilities(explicit_pool, out_capabilities);
+    iree_hal_amdgpu_host_queue_apply_pool_optimal_memory_type(out_capabilities,
+                                                              params);
+    *out_allocation_pool = explicit_pool;
+    return iree_ok_status();
+  }
+
+  iree_hal_pool_capabilities_t default_capabilities;
+  iree_hal_pool_query_capabilities(queue->default_pool, &default_capabilities);
+  iree_hal_amdgpu_host_queue_apply_pool_optimal_memory_type(
+      &default_capabilities, params);
+
+  iree_hal_pool_t* selected_pool = iree_hal_pool_set_select(
+      queue->default_pool_set, *params, allocation_size);
+  if (IREE_UNLIKELY(!selected_pool)) {
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "no default AMDGPU pool can satisfy queue_alloca of %" PRIdsz " bytes",
+        allocation_size);
+  }
+  iree_hal_pool_query_capabilities(selected_pool, out_capabilities);
+  *out_allocation_pool = selected_pool;
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
@@ -164,16 +199,11 @@ iree_status_t iree_hal_amdgpu_host_queue_prepare_alloca_wrapper(
                             "queue_alloca allocation_size must be non-zero");
   }
 
-  iree_hal_pool_t* allocation_pool =
-      iree_hal_amdgpu_host_queue_resolve_pool(queue, pool);
-
   iree_hal_buffer_params_canonicalize(params);
   iree_hal_pool_capabilities_t capabilities;
-  iree_hal_pool_query_capabilities(allocation_pool, &capabilities);
-  if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
-    params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
-    params->type |= capabilities.memory_type;
-  }
+  iree_hal_pool_t* allocation_pool = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_select_alloca_pool(
+      queue, pool, params, allocation_size, &allocation_pool, &capabilities));
   if (IREE_UNLIKELY(
           !iree_all_bits_set(capabilities.memory_type, params->type))) {
     iree_bitfield_string_temp_t requested_type_string;

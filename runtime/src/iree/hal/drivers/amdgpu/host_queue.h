@@ -448,7 +448,10 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // the physical device and immutable for the queue's lifetime.
   const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context;
 
-  // Borrowed default pool for this queue's physical device.
+  // Borrowed default pool set for this queue's physical device.
+  const iree_hal_pool_set_t* default_pool_set;
+
+  // Borrowed TLSF default pool for this queue's physical device.
   iree_hal_pool_t* default_pool;
 
   // Borrowed transient wrapper pool for queue_alloca results.
@@ -588,7 +591,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_arena_block_pool_t* block_pool,
     iree_hal_amdgpu_block_pool_t* profiling_signal_block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_hal_pool_t* default_pool,
+    const iree_hal_pool_set_t* default_pool_set, iree_hal_pool_t* default_pool,
     iree_hal_amdgpu_transient_buffer_pool_t* transient_buffer_pool,
     iree_hal_amdgpu_staging_pool_t* staging_pool,
     iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,

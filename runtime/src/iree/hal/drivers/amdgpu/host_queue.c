@@ -334,7 +334,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_arena_block_pool_t* block_pool,
     iree_hal_amdgpu_block_pool_t* profiling_signal_block_pool,
     const iree_hal_amdgpu_device_buffer_transfer_context_t* transfer_context,
-    iree_hal_pool_t* default_pool,
+    const iree_hal_pool_set_t* default_pool_set, iree_hal_pool_t* default_pool,
     iree_hal_amdgpu_transient_buffer_pool_t* transient_buffer_pool,
     iree_hal_amdgpu_staging_pool_t* staging_pool,
     iree_host_size_t device_ordinal, uint32_t aql_queue_capacity,
@@ -348,6 +348,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(profiling_signal_block_pool);
   IREE_ASSERT_ARGUMENT(transfer_context);
+  IREE_ASSERT_ARGUMENT(default_pool_set);
   IREE_ASSERT_ARGUMENT(default_pool);
   IREE_ASSERT_ARGUMENT(transient_buffer_pool);
   IREE_ASSERT_ARGUMENT(out_queue);
@@ -391,6 +392,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   out_queue->block_pool = block_pool;
   out_queue->can_publish_frontier = true;
   out_queue->transfer_context = transfer_context;
+  out_queue->default_pool_set = default_pool_set;
   out_queue->default_pool = default_pool;
   out_queue->transient_buffer_pool = transient_buffer_pool;
   out_queue->staging_pool = staging_pool;

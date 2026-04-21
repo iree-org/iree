@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/async/frontier.h"
-#include "iree/async/notification.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
@@ -74,6 +72,8 @@ class TestLogicalDevice {
     return (iree_hal_amdgpu_logical_device_t*)base_device;
   }
 
+  iree_hal_device_t* hal_device() const { return base_device; }
+
  private:
   // Creation context supplying the proactor pool and frontier tracker.
   iree::hal::cts::DeviceCreateContext create_context;
@@ -118,7 +118,7 @@ TEST_F(SlabProviderTest,
   iree_hal_buffer_release(buffer);
 }
 
-TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolReturnsWaitFrontier) {
+TEST_F(SlabProviderTest, DefaultQueueAllocaRoutesOversizedRequests) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
   options.default_pool.range_length = 4096;
@@ -127,48 +127,58 @@ TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolReturnsWaitFrontier) {
   IREE_ASSERT_OK(
       test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
 
-  auto* device = test_device.device();
-  ASSERT_GE(device->physical_device_count, 1u);
-  iree_hal_pool_t* default_pool = device->physical_devices[0]->default_pool;
-  ASSERT_NE(default_pool, nullptr);
+  iree_hal_semaphore_t* signal_semaphore = NULL;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      test_device.hal_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &signal_semaphore));
+  iree_hal_semaphore_t* alloca_signal_semaphores[] = {signal_semaphore};
+  uint64_t alloca_signal_values[] = {1};
+  iree_hal_semaphore_list_t alloca_signal_list = {
+      IREE_ARRAYSIZE(alloca_signal_semaphores),
+      alloca_signal_semaphores,
+      alloca_signal_values,
+  };
 
-  iree_hal_pool_capabilities_t capabilities;
-  iree_hal_pool_query_capabilities(default_pool, &capabilities);
-  ASSERT_NE(capabilities.max_allocation_size, 0u);
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
 
-  iree_hal_pool_reservation_t reservation;
-  iree_hal_pool_acquire_info_t reserve_info;
-  iree_hal_pool_acquire_result_t result;
-  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
-      default_pool, capabilities.max_allocation_size,
-      capabilities.min_allocation_size, /*requester_frontier=*/NULL,
-      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      test_device.hal_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), alloca_signal_list, /*pool=*/NULL,
+      params, /*allocation_size=*/8192, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+  ASSERT_NE(buffer, nullptr);
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      alloca_signal_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
-  const iree_async_axis_t death_axis =
-      iree_async_axis_make_queue(0xFE, 0xFE, 0xFE, 0xFE);
-  iree_async_single_frontier_t death_frontier;
-  iree_async_single_frontier_initialize(&death_frontier, death_axis, 1);
-  iree_hal_pool_release_reservation(
-      default_pool, &reservation,
-      iree_async_single_frontier_as_const_frontier(&death_frontier));
+  iree_hal_semaphore_t* dealloca_wait_semaphores[] = {signal_semaphore};
+  uint64_t dealloca_wait_values[] = {1};
+  iree_hal_semaphore_list_t dealloca_wait_list = {
+      IREE_ARRAYSIZE(dealloca_wait_semaphores),
+      dealloca_wait_semaphores,
+      dealloca_wait_values,
+  };
+  iree_hal_semaphore_t* dealloca_signal_semaphores[] = {signal_semaphore};
+  uint64_t dealloca_signal_values[] = {2};
+  iree_hal_semaphore_list_t dealloca_signal_list = {
+      IREE_ARRAYSIZE(dealloca_signal_semaphores),
+      dealloca_signal_semaphores,
+      dealloca_signal_values,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      test_device.hal_device(), IREE_HAL_QUEUE_AFFINITY_ANY, dealloca_wait_list,
+      dealloca_signal_list, buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal_list,
+                                              iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
 
-  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
-      default_pool, capabilities.max_allocation_size,
-      capabilities.min_allocation_size, /*requester_frontier=*/NULL,
-      IREE_HAL_POOL_RESERVE_FLAG_ALLOW_WAIT_FRONTIER, &reservation,
-      &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_NEEDS_WAIT);
-  ASSERT_NE(reserve_info.wait_frontier, nullptr);
-  EXPECT_EQ(reserve_info.wait_frontier->entry_count, 1u);
-  EXPECT_EQ(reserve_info.wait_frontier->entries[0].axis, death_axis);
-  EXPECT_EQ(reserve_info.wait_frontier->entries[0].epoch, 1u);
-
-  iree_hal_pool_release_reservation(default_pool, &reservation,
-                                    reserve_info.wait_frontier);
+  iree_hal_buffer_release(buffer);
+  iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolSignalsNotification) {
+TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolGrowsAdditionalSlabs) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
   options.default_pool.range_length = 4096;
@@ -186,43 +196,49 @@ TEST_F(SlabProviderTest, DefaultPhysicalDevicePoolSignalsNotification) {
   iree_hal_pool_query_capabilities(default_pool, &capabilities);
   ASSERT_NE(capabilities.max_allocation_size, 0u);
 
-  iree_hal_pool_reservation_t reservation;
-  iree_hal_pool_acquire_info_t reserve_info;
-  iree_hal_pool_acquire_result_t result;
-  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+  iree_hal_pool_reservation_t first_reservation = {0};
+  iree_hal_pool_acquire_info_t first_info = {0};
+  iree_hal_pool_acquire_result_t first_result = IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
+  iree::Status first_status(iree_hal_pool_acquire_reservation(
       default_pool, capabilities.max_allocation_size,
       capabilities.min_allocation_size, /*requester_frontier=*/NULL,
-      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
-  EXPECT_EQ(result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &first_reservation, &first_info,
+      &first_result));
+  const bool first_acquired =
+      first_status.ok() && (first_result == IREE_HAL_POOL_ACQUIRE_OK ||
+                            first_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH);
 
-  iree_hal_pool_reservation_t exhausted_reservation;
-  iree_hal_pool_acquire_info_t exhausted_info;
-  iree_hal_pool_acquire_result_t exhausted_result;
-  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
+  iree_hal_pool_reservation_t second_reservation = {0};
+  iree_hal_pool_acquire_info_t second_info = {0};
+  iree_hal_pool_acquire_result_t second_result =
+      IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
+  iree::Status second_status(iree_hal_pool_acquire_reservation(
       default_pool, capabilities.max_allocation_size,
       capabilities.min_allocation_size, /*requester_frontier=*/NULL,
-      IREE_HAL_POOL_RESERVE_FLAG_NONE, &exhausted_reservation, &exhausted_info,
-      &exhausted_result));
-  EXPECT_EQ(exhausted_result, IREE_HAL_POOL_ACQUIRE_EXHAUSTED);
+      IREE_HAL_POOL_RESERVE_FLAG_NONE, &second_reservation, &second_info,
+      &second_result));
+  const bool second_acquired =
+      second_status.ok() && (second_result == IREE_HAL_POOL_ACQUIRE_OK ||
+                             second_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH);
 
-  iree_async_notification_t* notification =
-      iree_hal_pool_notification(default_pool);
-  const uint32_t wait_token =
-      iree_async_notification_begin_observe(notification);
-  iree_hal_pool_release_reservation(default_pool, &reservation,
-                                    /*death_frontier=*/NULL);
-  EXPECT_TRUE(iree_async_notification_wait_for_token(notification, wait_token,
-                                                     iree_make_timeout_ms(0)));
-  iree_async_notification_end_observe(notification);
+  iree_hal_pool_stats_t stats;
+  iree_hal_pool_query_stats(default_pool, &stats);
 
-  IREE_ASSERT_OK(iree_hal_pool_acquire_reservation(
-      default_pool, capabilities.max_allocation_size,
-      capabilities.min_allocation_size, /*requester_frontier=*/NULL,
-      IREE_HAL_POOL_RESERVE_FLAG_NONE, &reservation, &reserve_info, &result));
-  EXPECT_TRUE(result == IREE_HAL_POOL_ACQUIRE_OK ||
-              result == IREE_HAL_POOL_ACQUIRE_OK_FRESH);
-  iree_hal_pool_release_reservation(default_pool, &reservation,
-                                    /*death_frontier=*/NULL);
+  if (second_acquired) {
+    iree_hal_pool_release_reservation(default_pool, &second_reservation,
+                                      /*death_frontier=*/NULL);
+  }
+  if (first_acquired) {
+    iree_hal_pool_release_reservation(default_pool, &first_reservation,
+                                      /*death_frontier=*/NULL);
+  }
+
+  EXPECT_TRUE(first_status.ok()) << first_status.ToString();
+  EXPECT_EQ(first_result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_TRUE(second_status.ok()) << second_status.ToString();
+  EXPECT_EQ(second_result, IREE_HAL_POOL_ACQUIRE_OK_FRESH);
+  EXPECT_EQ(stats.reservation_count, 2u);
+  EXPECT_GE(stats.slab_count, 2u);
 }
 
 }  // namespace
