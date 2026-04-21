@@ -368,6 +368,29 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    host_queue_staging_test
+  SRCS
+    "host_queue_staging_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    ::queue_affinity
+    iree::base
+    iree::hal
+    iree::hal::cts::util::test_base
+    iree::hal::drivers::amdgpu::util::packet
+    iree::io::file_handle
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     profile_metadata_test
   SRCS
     "profile_metadata_test.cc"

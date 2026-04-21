@@ -361,6 +361,28 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "host_queue_staging_test",
+    srcs = ["host_queue_staging_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        ":queue_affinity",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:packet",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "profile_metadata_test",
     srcs = ["profile_metadata_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",
