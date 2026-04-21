@@ -2645,7 +2645,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
+def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
@@ -2656,6 +2656,7 @@ def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
   Util_HoistableOpInterface,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [

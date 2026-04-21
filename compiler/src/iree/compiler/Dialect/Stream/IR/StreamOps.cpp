@@ -3238,6 +3238,27 @@ bool AsyncDispatchOp::preferCloneToConsumers() {
   return !consumesAny;
 }
 
+void AsyncDispatchOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // A non-tied resource result is a fresh allocation: the dispatch creates a
+  // new buffer that didn't exist before. Reporting Allocate prevents CSE from
+  // merging two identical dispatch calls that each produce their own buffer,
+  // which would cause both consumers to alias the same buffer and corrupt
+  // each other's in-place mutations (e.g. two ScatterElements sharing one
+  // zero-initialized buffer).
+  //
+  // When all results are tied, the dispatch transforms existing buffers
+  // in-place and no allocation occurs — CSE may legitimately merge identical
+  // calls.
+  for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
+    if (isa<IREE::Stream::ResourceType>(getResult(i).getType()) &&
+        !getTiedResultOperandIndex(i).has_value()) {
+      effects.emplace_back(MemoryEffects::Allocate::get());
+      return;
+    }
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // stream.async.func
 //===----------------------------------------------------------------------===//
