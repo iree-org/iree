@@ -117,15 +117,20 @@ iree_status_t iree_hal_null_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
+  device->frontier_tracker = create_params->frontier.base_axis != 0
+                                 ? create_params->frontier.tracker
+                                 : NULL;
   device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
-                              device->axis, /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(
+        device->frontier_tracker, device->axis, /*semaphore=*/NULL);
   }
-  iree_status_t status =
-      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
+  }
 
   // TODO(null): pass device handles and pool configuration to the allocator.
   // Some implementations may share allocators across multiple devices created

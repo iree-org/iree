@@ -602,15 +602,20 @@ iree_status_t iree_hal_cuda_device_create(
         iree_hal_cuda_device_cast(*out_device);
     cuda_device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(cuda_device->proactor_pool);
-    cuda_device->frontier_tracker = create_params->frontier.tracker;
+    cuda_device->frontier_tracker = create_params->frontier.base_axis != 0
+                                        ? create_params->frontier.tracker
+                                        : NULL;
     cuda_device->axis = create_params->frontier.base_axis;
     iree_atomic_store(&cuda_device->epoch, 0, iree_memory_order_relaxed);
     if (cuda_device->frontier_tracker) {
-      iree_async_axis_table_add(&cuda_device->frontier_tracker->axis_table,
-                                cuda_device->axis, /*semaphore=*/NULL);
+      status = iree_async_frontier_tracker_register_axis(
+          cuda_device->frontier_tracker, cuda_device->axis,
+          /*semaphore=*/NULL);
     }
-    status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
-                                          &cuda_device->proactor);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
+                                            &cuda_device->proactor);
+    }
   }
 
   iree_hal_cuda_event_pool_t* device_event_pool = NULL;
