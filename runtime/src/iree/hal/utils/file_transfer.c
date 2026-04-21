@@ -576,9 +576,9 @@ static iree_status_t iree_hal_transfer_operation_launch_read(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_device_queue_alloca(
               operation->device, operation->queue_affinity, wait_semaphore_list,
-              alloca_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT,
-              staging_buffer_params, operation->staging_buffer_size,
-              IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
+              alloca_semaphore_list, /*pool=*/NULL, staging_buffer_params,
+              operation->staging_buffer_size, IREE_HAL_ALLOCA_FLAG_NONE,
+              &operation->staging_buffer));
 
   // Run each worker to completion. Workers greedily consume chunks and exit
   // when there are no more chunks or enough workers are already covering the
@@ -713,9 +713,9 @@ static iree_status_t iree_hal_transfer_operation_launch_write(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_device_queue_alloca(
               operation->device, operation->queue_affinity, wait_semaphore_list,
-              alloca_semaphore_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT,
-              staging_buffer_params, operation->staging_buffer_size,
-              IREE_HAL_ALLOCA_FLAG_NONE, &operation->staging_buffer));
+              alloca_semaphore_list, /*pool=*/NULL, staging_buffer_params,
+              operation->staging_buffer_size, IREE_HAL_ALLOCA_FLAG_NONE,
+              &operation->staging_buffer));
 
   // Run each worker to completion. Workers greedily consume chunks and exit
   // when there are no more chunks remaining.

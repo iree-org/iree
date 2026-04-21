@@ -63,8 +63,8 @@ iree_status_t iree_hal_cuda_memory_pools_trim(
 // The allocation will be stream-ordered on |stream|.
 iree_status_t iree_hal_cuda_memory_pools_alloca(
     iree_hal_cuda_memory_pools_t* pools, CUstream stream,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
 // Asynchronously deallocates a buffer from its pool.

@@ -446,11 +446,11 @@ HalBuffer HalDevice::QueueAlloca(uint64_t allocation_size,
   }
 
   iree_hal_buffer_t* out_buffer;
-  // TODO: Accept params for queue affinity and pool.
+  // TODO: Accept params for queue affinity.
   CheckApiStatus(iree_hal_device_queue_alloca(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
-                     signal_list, IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-                     allocation_size, IREE_HAL_ALLOCA_FLAG_NONE, &out_buffer),
+                     signal_list, /*pool=*/NULL, params, allocation_size,
+                     IREE_HAL_ALLOCA_FLAG_NONE, &out_buffer),
                  "allocating memory on queue");
   return HalBuffer::StealFromRawPtr(out_buffer);
 }
