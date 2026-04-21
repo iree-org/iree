@@ -35,9 +35,9 @@ func.func @transfer_gather_unroll_embedding_lookup(%arg0: memref<4096x64xf16>, %
 
 // After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
 // CHECK-LABEL: func.func @transfer_gather_unroll_embedding_lookup
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 // CHECK-COUNT-4: vector.load
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 
 // -----
 
@@ -58,9 +58,9 @@ func.func @transfer_gather_unroll_masked(%arg0: memref<4096x64xf16>, %arg1: vect
 // After unrolling, mask slices are passed to each sub-gather.
 // The masked rank-1 gathers lower to vector.maskedload ops.
 // CHECK-LABEL: func.func @transfer_gather_unroll_masked
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 // CHECK-COUNT-4: vector.maskedload
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 
 // -----
 
@@ -137,9 +137,9 @@ func.func @transfer_gather_unroll_transposed_index(%arg0: memref<4096x64xf16>, %
 // After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
 // the 3D gather becomes 4*8=32 contiguous loads.
 // CHECK-LABEL: func.func @transfer_gather_unroll_transposed_index
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 // CHECK-COUNT-32: vector.load
-// CHECK-NOT: transfer_gather
+// CHECK-NOT: transfer_read
 
 // -----
 
