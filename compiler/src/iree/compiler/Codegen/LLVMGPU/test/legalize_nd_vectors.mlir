@@ -463,3 +463,19 @@ func.func @transfer_write_2d_oob(%vec: vector<2x4xf32>, %A: memref<?x?xf32>, %i:
 //       CHECK:     vector.transfer_write %[[V1]], %[[A]][%[[I1]], %[[J1]]] {in_bounds = [true]}
 //       CHECK:   }
 //       CHECK:   return
+
+// -----
+
+// transfer_write on tensor: each unrolled rank-1 write chains the SSA result
+// as the destination for the next write.
+func.func @transfer_write_tensor(%vec: vector<3x4xf32>, %dest: tensor<?x?xf32>, %i: index, %j: index) -> tensor<?x?xf32> {
+  %res = vector.transfer_write %vec, %dest[%i, %j] {in_bounds = [true, true]} : vector<3x4xf32>, tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @transfer_write_tensor
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[DEST:.+]]: tensor<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//  CHECK-SAME:   -> tensor<?x?xf32>
+//       CHECK:   %[[W0:.+]] = vector.transfer_write %[[V0]], %[[DEST]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   %[[W1:.+]] = vector.transfer_write %[[V1]], %[[W0]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   %[[W2:.+]] = vector.transfer_write %[[V2]], %[[W1]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   return %[[W2]] : tensor<?x?xf32>
