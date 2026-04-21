@@ -158,6 +158,9 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
       rewriter, rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
       newLoopParams->upperBounds, newLoopParams->steps, forallOp.getOutputs(),
       forallOp.getMapping());
+  // Preserve discardable attributes (e.g. pipeline hints set by earlier
+  // passes). Without this, normalization silently drops them.
+  newLoop->setDiscardableAttrs(forallOp->getDiscardableAttrDictionary());
   rewriter.eraseOp(newLoop.getTerminator());
   rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
                        newLoop.getBody()->getArguments());
