@@ -158,6 +158,20 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "slab_cache",
+    srcs = ["slab_cache.c"],
+    hdrs = ["slab_cache.h"],
+    deps = [
+        ":slab_provider",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "slab_provider",
     srcs = ["slab_provider.c"],
     hdrs = ["slab_provider.h"],

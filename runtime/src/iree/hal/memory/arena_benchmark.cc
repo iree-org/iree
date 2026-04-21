@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdio>
+
 #include "benchmark/benchmark.h"
 #include "iree/hal/memory/arena.h"
 
@@ -11,8 +13,7 @@ namespace {
 
 static iree_hal_memory_arena_options_t BenchOptions() {
   iree_hal_memory_arena_options_t options = {};
-  // 64MB keeps the burst benchmarks inside one arena reset cycle.
-  options.capacity = 64 * 1024 * 1024;
+  options.capacity = 64 * 1024 * 1024;  // 64 MB
   options.frontier_capacity = 4;
   return options;
 }
@@ -42,11 +43,20 @@ static void BM_AcquireBurst(benchmark::State& state) {
       BenchOptions(), iree_allocator_system(), &arena));
 
   for (auto _ : state) {
+    int acquired_count = 0;
     for (int i = 0; i < batch_size; ++i) {
       iree_hal_memory_arena_allocation_t alloc;
-      IREE_CHECK_OK(iree_hal_memory_arena_acquire(arena, 256, 16, &alloc));
+      iree_status_t status =
+          iree_hal_memory_arena_acquire(arena, 256, 16, &alloc);
+      if (!iree_status_is_ok(status)) {
+        iree_status_fprint(stderr, status);
+        iree_status_free(status);
+        state.SkipWithError("unexpected exhaustion");
+        break;
+      }
+      ++acquired_count;
     }
-    for (int i = 0; i < batch_size; ++i) {
+    for (int i = 0; i < acquired_count; ++i) {
       iree_hal_memory_arena_release(arena, NULL);
     }
   }

@@ -174,6 +174,23 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    slab_cache
+  HDRS
+    "slab_cache.h"
+  SRCS
+    "slab_cache.c"
+  DEPS
+    ::slab_provider
+    iree::base
+    iree::base::internal
+    iree::base::internal::atomic_slist
+    iree::base::threading
+    iree::base::threading::thread
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     slab_provider
   HDRS
     "slab_provider.h"

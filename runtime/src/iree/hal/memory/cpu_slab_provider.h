@@ -21,9 +21,9 @@ extern "C" {
 // Reports memory type HOST_LOCAL | HOST_VISIBLE | HOST_COHERENT | HOST_CACHED
 // and supports all buffer usage flags (TRANSFER, DISPATCH, MAPPING, etc.).
 //
-// This is the simplest slab provider - intended for CPU-only testing and as
+// This is the simplest slab provider; intended for CPU-only testing and as
 // the backing for pass-through pools on host targets.
-IREE_API_EXPORT iree_status_t iree_hal_cpu_slab_provider_create(
+iree_status_t iree_hal_cpu_slab_provider_create(
     iree_allocator_t host_allocator, iree_hal_slab_provider_t** out_provider);
 
 #ifdef __cplusplus

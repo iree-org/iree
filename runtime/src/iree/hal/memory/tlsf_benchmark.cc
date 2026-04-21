@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -14,9 +15,7 @@ namespace {
 
 static iree_hal_memory_tlsf_options_t BenchOptions() {
   iree_hal_memory_tlsf_options_t options = {};
-  // 256MB is large enough that the synthetic fragmented workload should not
-  // fail due to total arena capacity.
-  options.range_length = 256 * 1024 * 1024;
+  options.range_length = 256 * 1024 * 1024;  // 256 MB
   options.alignment = 16;
   options.initial_block_capacity = 4096;
   options.frontier_capacity = 8;
@@ -60,7 +59,7 @@ static void BM_FreeNoCoalesce(benchmark::State& state) {
   // Actually, allocate left, middle, right to ensure adjacency.
   iree_hal_memory_tlsf_allocation_t middle;
   IREE_CHECK_OK(iree_hal_memory_tlsf_allocate(&tlsf, size, &middle));
-  // Free right - but then middle's right neighbor would be free. Fix:
+  // Free right, but then middle's right neighbor would be free. Fix:
   // keep right allocated and use a 4-block pattern.
   // Simpler: just allocate two guards and benchmark free of a block between.
   iree_hal_memory_tlsf_free(&tlsf, middle.block_index, NULL);
@@ -104,7 +103,7 @@ static void BM_FreeCoalesceBoth(benchmark::State& state) {
     // Free outer blocks (they coalesce with the rest of the range).
     iree_hal_memory_tlsf_free(&tlsf, a.block_index, NULL);
     iree_hal_memory_tlsf_free(&tlsf, c.block_index, NULL);
-    // Free middle - coalesces both directions.
+    // Free middle; coalesces both directions.
     iree_hal_memory_tlsf_free(&tlsf, b.block_index, NULL);
     // Re-allocate all three.
     IREE_CHECK_OK(iree_hal_memory_tlsf_allocate(&tlsf, size, &a));
@@ -134,8 +133,15 @@ static void BM_FragmentedWorkload(benchmark::State& state) {
     for (int i = 0; i < batch_size; ++i) {
       iree_hal_memory_tlsf_allocation_t alloc;
       iree_device_size_t size = 16 * (1 + (i * 7) % 32);
-      IREE_CHECK_OK(iree_hal_memory_tlsf_allocate(&tlsf, size, &alloc));
-      allocs.push_back(alloc);
+      iree_status_t status = iree_hal_memory_tlsf_allocate(&tlsf, size, &alloc);
+      if (iree_status_is_ok(status)) {
+        allocs.push_back(alloc);
+      } else {
+        iree_status_fprint(stderr, status);
+        iree_status_free(status);
+        state.SkipWithError("unexpected exhaustion");
+        break;
+      }
     }
     // Free every other block.
     for (size_t i = 0; i < allocs.size(); i += 2) {

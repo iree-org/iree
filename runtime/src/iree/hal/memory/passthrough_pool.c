@@ -147,7 +147,7 @@ static void iree_hal_passthrough_pool_owned_buffer_release(
 // Create / Destroy
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_passthrough_pool_create(
+iree_status_t iree_hal_passthrough_pool_create(
     iree_hal_passthrough_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification, iree_allocator_t host_allocator,

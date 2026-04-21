@@ -207,7 +207,7 @@ iree_hal_memory_tlsf_find_suitable_block(iree_hal_memory_tlsf_t* tlsf,
     return tlsf->free_lists[fl][found_sl];
   }
 
-  // No block in the current FL level - search higher FL levels.
+  // No block in the current FL level; search higher FL levels.
   // The mask ~0ull << (fl + 1) is UB when fl==63 (shift by 64). Rewrite using
   // iree_shr: iree_shr(~0ull, 63 - fl) produces a mask with the bottom fl+1
   // bits set, and its complement gives us only the FL levels above fl.
@@ -233,7 +233,7 @@ static void iree_hal_memory_tlsf_merge_frontiers(
   iree_async_frontier_t* target_frontier =
       iree_hal_memory_tlsf_block_frontier(tlsf, target_block);
 
-  // If target is already tainted, nothing to do - the frontier is meaningless.
+  // If target is already tainted, nothing to do; the frontier is meaningless.
   if (target_block->flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED) return;
 
   if (!iree_async_frontier_merge(target_frontier, tlsf->frontier_capacity,
@@ -479,7 +479,7 @@ iree_status_t iree_hal_memory_tlsf_try_allocate(
     // Update free bytes (the remainder stays free).
     tlsf->bytes_free -= aligned_length;
   } else {
-    // Cannot split - give the whole block (may be slightly over-sized).
+    // Cannot split; give the whole block (may be slightly over-sized).
     tlsf->bytes_free -= block->length;
   }
 
@@ -559,7 +559,7 @@ static void iree_hal_memory_tlsf_free_impl(
                          sizeof(iree_async_frontier_entry_t));
         }
       } else {
-        // Death frontier too large for inline storage - taint.
+        // Death frontier too large for inline storage; taint.
         iree_async_frontier_initialize(block_frontier, 0);
         block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
         tlsf->tainted_coalesce_count++;
@@ -594,7 +594,7 @@ static void iree_hal_memory_tlsf_free_impl(
         }
 
         // Transfer taint flag. A tainted right neighbor means the merged
-        // block's frontier is untrustworthy - the merge_frontiers call above
+        // block's frontier is untrustworthy; the merge_frontiers call above
         // will have been a no-op (tainted source has entry_count==0), but the
         // taint itself must propagate. Zero the frontier to prevent stale data
         // from being misinterpreted as valid entries.
@@ -639,7 +639,7 @@ static void iree_hal_memory_tlsf_free_impl(
       }
 
       // Transfer taint flag. As with right coalesce, a tainted source means
-      // the merged block's frontier cannot be trusted - zero it.
+      // the merged block's frontier cannot be trusted; zero it.
       if (block->flags & IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED) {
         left_block->flags |= IREE_HAL_MEMORY_TLSF_BLOCK_FLAG_TAINTED;
         iree_hal_memory_tlsf_block_frontier(tlsf, left_block)->entry_count = 0;

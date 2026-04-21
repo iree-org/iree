@@ -31,7 +31,7 @@ typedef struct iree_hal_fixed_block_pool_options_t {
 
   // Logical byte budget for live reservations in this pool. 0 means unlimited.
   // This is checked before each reservation and can return
-  // IREE_HAL_POOL_ACQUIRE_OVER_BUDGET without touching the allocator.
+  // IREE_HAL_POOL_RESERVE_OVER_BUDGET without touching the allocator.
   iree_device_size_t budget_limit;
 
   // Optional named-memory trace identifier for logical reservations returned by
