@@ -121,6 +121,26 @@ static void iree_hal_metal_allocator_query_statistics(
   });
 }
 
+static iree_status_t iree_hal_metal_allocator_query_memory_heaps(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator, iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
+  const iree_host_size_t count = 1;
+  if (out_count) *out_count = count;
+  if (capacity < count) {
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  heaps[0] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      .allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH |
+                       IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = ~(iree_device_size_t)0,
+      .min_alignment = 4,
+  };
+  return iree_ok_status();
+}
+
 static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -424,14 +444,106 @@ static iree_status_t iree_hal_metal_allocator_export_buffer(
   return iree_make_status(IREE_STATUS_UNAVAILABLE, "unsupported exporting to external buffer");
 }
 
+static bool iree_hal_metal_allocator_supports_virtual_memory(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
+  return false;
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_query_granularity(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator, iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
+  *out_minimum_page_size = 0;
+  *out_recommended_page_size = 0;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_reserve(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator, iree_hal_queue_affinity_t queue_affinity,
+    iree_device_size_t size, iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
+  *out_virtual_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_release(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_physical_memory_allocate(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator, iree_hal_buffer_params_t params,
+    iree_device_size_t size, iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
+  *out_physical_memory = NULL;
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_physical_memory_free(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_map(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer, iree_device_size_t virtual_offset,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory, iree_device_size_t physical_offset,
+    iree_device_size_t size) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_unmap(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer, iree_device_size_t virtual_offset,
+    iree_device_size_t size) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_protect(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer, iree_device_size_t virtual_offset,
+    iree_device_size_t size, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_protection_t protection) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_metal_allocator_virtual_memory_advise(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer, iree_device_size_t virtual_offset,
+    iree_device_size_t size, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_advice_t advice) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "Metal allocator does not support virtual memory");
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_metal_allocator_vtable = {
     .destroy = iree_hal_metal_allocator_destroy,
     .host_allocator = iree_hal_metal_allocator_host_allocator,
     .trim = iree_hal_metal_allocator_trim,
     .query_statistics = iree_hal_metal_allocator_query_statistics,
+    .query_memory_heaps = iree_hal_metal_allocator_query_memory_heaps,
     .query_buffer_compatibility = iree_hal_metal_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_metal_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_metal_allocator_deallocate_buffer,
     .import_buffer = iree_hal_metal_allocator_import_buffer,
     .export_buffer = iree_hal_metal_allocator_export_buffer,
+    .supports_virtual_memory = iree_hal_metal_allocator_supports_virtual_memory,
+    .virtual_memory_query_granularity = iree_hal_metal_allocator_virtual_memory_query_granularity,
+    .virtual_memory_reserve = iree_hal_metal_allocator_virtual_memory_reserve,
+    .virtual_memory_release = iree_hal_metal_allocator_virtual_memory_release,
+    .physical_memory_allocate = iree_hal_metal_allocator_physical_memory_allocate,
+    .physical_memory_free = iree_hal_metal_allocator_physical_memory_free,
+    .virtual_memory_map = iree_hal_metal_allocator_virtual_memory_map,
+    .virtual_memory_unmap = iree_hal_metal_allocator_virtual_memory_unmap,
+    .virtual_memory_protect = iree_hal_metal_allocator_virtual_memory_protect,
+    .virtual_memory_advise = iree_hal_metal_allocator_virtual_memory_advise,
 };

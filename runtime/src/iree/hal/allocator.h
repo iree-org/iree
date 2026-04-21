@@ -475,7 +475,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
 //===----------------------------------------------------------------------===//
-// Virtual Memory Management (Optional)
+// Virtual Memory Management
 //===----------------------------------------------------------------------===//
 
 // Returns true if the allocator supports virtual memory management operations.
@@ -703,8 +703,7 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_external_buffer_flags_t requested_flags,
       iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
-  // Virtual memory management operations (optional).
-  // All entries may be NULL if virtual memory is not supported.
+  // Virtual memory management operations.
   bool(IREE_API_PTR* supports_virtual_memory)(
       iree_hal_allocator_t* IREE_RESTRICT allocator);
   iree_status_t(IREE_API_PTR* virtual_memory_query_granularity)(
