@@ -2812,8 +2812,9 @@ util.func public @online_attention_normalize_fusion(
 
 //      DEFAULT-LABEL: @online_attention_normalize_fusion
 //            DEFAULT:   %[[D:.+]] = flow.dispatch.region -> (tensor<20x4096x64xf16>)
-//            DEFAULT:     iree_linalg_ext.online_attention
+//            DEFAULT:     %[[R:.+]]:3 = iree_linalg_ext.online_attention
 //            DEFAULT:     %[[G:.+]] = linalg.generic
+//       DEFAULT-SAME:       ins(%[[R]]#0, %[[R]]#2
 //            DEFAULT:     flow.return %[[G]]
 //            DEFAULT:   util.return %[[D]]
 
