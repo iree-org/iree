@@ -491,22 +491,35 @@ static bool iree_task_worker_wait_warm_compute_process(
   }
 #endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 
+  bool spin_wait_resolved = false;
+  bool spin_wait_result = false;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
+                              "iree_task_worker_wait_warm_compute_spin");
   while (true) {
     if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
         IREE_TASK_WORKER_STATE_EXITING) {
-      return false;
+      spin_wait_resolved = true;
+      spin_wait_result = false;
+      break;
     }
     if (iree_task_process_is_terminal(process)) {
-      return false;
+      spin_wait_resolved = true;
+      spin_wait_result = false;
+      break;
     }
     if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
-      return true;
+      spin_wait_resolved = true;
+      spin_wait_result = true;
+      break;
     }
 #if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
     if (iree_time_now() >= spin_deadline_ns) break;
 #endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
     iree_processor_yield();
   }
+  IREE_TRACE_ZONE_END(z_warm_spin);
+
+  if (spin_wait_resolved) return spin_wait_result;
 
 #if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
   while (true) {
@@ -914,13 +927,10 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       iree_task_worker_mark_idle(worker);
       is_active = false;
 
-      IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
-                                  "iree_task_worker_main_pump_wake_wait");
       iree_notification_commit_wait(
           &worker->wake_notification, wait_token,
           /*spin_ns=*/worker->executor->worker_spin_ns,
           /*deadline_ns=*/IREE_TIME_INFINITE_FUTURE);
-      IREE_TRACE_ZONE_END(z_wait);
 
       // Woke from a wait - query the processor ID in case we migrated during
       // the sleep.
