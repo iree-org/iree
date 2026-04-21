@@ -405,9 +405,13 @@ static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_
 static iree_status_t iree_hal_metal_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_allocator_pool_t pool,
+    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  if (IREE_UNLIKELY(pool)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Metal device does not support queue allocation pools");
+  }
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   iree_status_t status = iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
                                                       IREE_ASYNC_WAIT_FLAG_NONE);
