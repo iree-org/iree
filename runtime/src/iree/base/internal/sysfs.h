@@ -77,6 +77,12 @@ iree_status_t iree_sysfs_parse_cpu_list(iree_string_view_t text,
                                         iree_sysfs_cpu_list_callback_t callback,
                                         void* user_data);
 
+// Tries to parse a Linux CPU list without allocating an iree_status_t. Returns
+// false when the input is malformed.
+bool iree_sysfs_try_parse_cpu_list(iree_string_view_t text,
+                                   iree_sysfs_cpu_list_callback_t callback,
+                                   void* user_data);
+
 // Parses a size string with optional K suffix (case-insensitive).
 // Whitespace is trimmed before parsing.
 // Examples: "32K" -> 32768, "1024K" -> 1048576, "1024" -> 1024
@@ -94,8 +100,18 @@ iree_status_t iree_sysfs_parse_size_string(iree_string_view_t text,
 // Reads a sysfs file and parses it as a uint32.
 iree_status_t iree_sysfs_read_uint32(const char* path, uint32_t* out_value);
 
+// Tries to read a sysfs file and parse it as a uint32 without allocating an
+// iree_status_t. Returns false when the file is absent, unreadable, too large,
+// or malformed.
+bool iree_sysfs_try_read_uint32(const char* path, uint32_t* out_value);
+
 // Reads a sysfs file and parses it as a size string (e.g., "32K").
 iree_status_t iree_sysfs_read_size(const char* path, uint64_t* out_size);
+
+// Tries to read a sysfs file and parse it as a size string without allocating
+// an iree_status_t. Returns false when the file is absent, unreadable, too
+// large, or malformed.
+bool iree_sysfs_try_read_size(const char* path, uint64_t* out_size);
 
 #ifdef __cplusplus
 }  // extern "C"

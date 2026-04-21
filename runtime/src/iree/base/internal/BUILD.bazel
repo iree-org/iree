@@ -453,6 +453,16 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "sysfs_test",
+    srcs = ["sysfs_test.cc"],
+    deps = [
+        ":sysfs",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "time",
     srcs = ["time.c"],

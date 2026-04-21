@@ -63,40 +63,34 @@ static uint32_t iree_sysfs_query_processor_count(void) {
                 iree_sysfs_get_root_path());
   char buffer[256];
   iree_host_size_t length = 0;
-  iree_status_t status =
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
-  if (iree_status_is_ok(status)) {
+  if (iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
     iree_sysfs_cpu_count_context_t ctx = {.max_cpu_id = 0};
-    status = iree_sysfs_parse_cpu_list(iree_make_string_view(buffer, length),
-                                       iree_sysfs_count_cpus_callback, &ctx);
-    if (iree_status_is_ok(status)) {
+    if (iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                      iree_sysfs_count_cpus_callback, &ctx)) {
       uint32_t count = ctx.max_cpu_id + 1;
       return count;  // Convert max ID to count.
     }
   }
-  iree_status_ignore(status);
 
   // Fallback to /sys/devices/system/cpu/kernel_max.
   iree_snprintf(path, sizeof(path), "%s/cpu/kernel_max",
                 iree_sysfs_get_root_path());
   uint32_t kernel_max = 0;
-  status = iree_sysfs_read_uint32(path, &kernel_max);
-  if (iree_status_is_ok(status)) {
+  if (iree_sysfs_try_read_uint32(path, &kernel_max)) {
     return kernel_max + 1;  // kernel_max is 0-based.
   }
-  iree_status_ignore(status);
 
   return 0;  // Unknown.
 }
 
 // Reads the core ID for a specific logical processor.
-// Returns IREE_STATUS_NOT_FOUND if the file doesn't exist.
-static iree_status_t iree_sysfs_query_core_id(uint32_t processor,
-                                              uint32_t* out_core_id) {
+// Returns false if the file doesn't exist or can't be parsed.
+static bool iree_sysfs_try_query_core_id(uint32_t processor,
+                                         uint32_t* out_core_id) {
   char path[256];
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/core_id",
                 iree_sysfs_get_root_path(), processor);
-  return iree_sysfs_read_uint32(path, out_core_id);
+  return iree_sysfs_try_read_uint32(path, out_core_id);
 }
 
 // Gets the current CPU ID using the getcpu syscall.
@@ -121,34 +115,28 @@ static inline bool iree_sysfs_is_valid_cluster(uint32_t cluster_id) {
 
 // Reads the cluster ID for a specific logical processor.
 // Tries multiple fallback sources if cluster_id is not available.
-// Returns IREE_STATUS_NOT_FOUND if no cluster info is available.
-static iree_status_t iree_sysfs_query_cluster_id(uint32_t processor,
-                                                 uint32_t* out_cluster_id) {
+// Returns false if no cluster info is available.
+static bool iree_sysfs_try_query_cluster_id(uint32_t processor,
+                                            uint32_t* out_cluster_id) {
   *out_cluster_id = UINT32_MAX;
   char path[256];
 
   // Try cluster_id first (kernel 5.16+).
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/cluster_id",
                 iree_sysfs_get_root_path(), processor);
-  iree_status_t status = iree_sysfs_read_uint32(path, out_cluster_id);
-  if (iree_status_is_ok(status)) {
-    return status;
+  if (iree_sysfs_try_read_uint32(path, out_cluster_id)) {
+    return true;
   }
-  iree_status_ignore(status);
 
   // Fallback to physical_package_id (socket/package).
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/physical_package_id",
                 iree_sysfs_get_root_path(), processor);
-  status = iree_sysfs_read_uint32(path, out_cluster_id);
-  if (iree_status_is_ok(status)) {
-    return status;
+  if (iree_sysfs_try_read_uint32(path, out_cluster_id)) {
+    return true;
   }
-  iree_status_ignore(status);
 
   // No cluster info available.
-  return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "no cluster information available for CPU %u",
-                          processor);
+  return false;
 }
 
 // Reads the CPU capacity for a specific logical processor.
@@ -159,7 +147,7 @@ static uint32_t iree_sysfs_query_cpu_capacity(uint32_t processor) {
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cpu_capacity",
                 iree_sysfs_get_root_path(), processor);
   uint32_t capacity = 0;
-  iree_status_ignore(iree_sysfs_read_uint32(path, &capacity));
+  iree_sysfs_try_read_uint32(path, &capacity);
   return capacity;
 }
 
@@ -178,8 +166,8 @@ typedef struct {
 } iree_sysfs_cache_info_t;
 
 // Queries cache information for a specific cache index.
-// Returns IREE_STATUS_NOT_FOUND if the cache index doesn't exist.
-static iree_status_t iree_sysfs_query_cache_level(
+// Returns false if the cache index doesn't exist or can't be parsed.
+static bool iree_sysfs_try_query_cache_level(
     uint32_t processor, uint32_t cache_index,
     iree_sysfs_cache_info_t* out_cache) {
   // Read cache type (Data, Instruction, or Unified).
@@ -189,8 +177,9 @@ static iree_status_t iree_sysfs_query_cache_level(
                 iree_sysfs_get_root_path(), processor, cache_index);
   char buffer[64];
   iree_host_size_t length = 0;
-  IREE_RETURN_IF_ERROR(
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length));
+  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
+    return false;
+  }
 
   iree_string_view_t type_str =
       iree_string_view_trim(iree_make_string_view(buffer, length));
@@ -202,17 +191,17 @@ static iree_status_t iree_sysfs_query_cache_level(
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/level",
                 iree_sysfs_get_root_path(), processor, cache_index);
   uint32_t level = 0;
-  iree_status_ignore(iree_sysfs_read_uint32(path, &level));
+  iree_sysfs_try_read_uint32(path, &level);
   out_cache->level = level;
 
   // Read cache size (optional - ignore failures).
   iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/cache/index%u/size",
                 iree_sysfs_get_root_path(), processor, cache_index);
   uint64_t size = 0;
-  iree_status_ignore(iree_sysfs_read_size(path, &size));
+  iree_sysfs_try_read_size(path, &size);
   out_cache->size = size;
 
-  return iree_ok_status();
+  return true;
 }
 
 // Queries all cache levels for a processor and populates the group's cache
@@ -229,10 +218,7 @@ static void iree_sysfs_populate_cache_info(
   for (uint32_t cache_index = 0; cache_index < IREE_SYSFS_MAX_CACHE_INDICES;
        ++cache_index) {
     iree_sysfs_cache_info_t cache = {0};
-    iree_status_t status =
-        iree_sysfs_query_cache_level(processor, cache_index, &cache);
-    if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+    if (!iree_sysfs_try_query_cache_level(processor, cache_index, &cache)) {
       break;  // No more cache levels.
     }
 
@@ -288,8 +274,8 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
   iree_host_size_t unique_clusters = 0;
   for (uint32_t cpu = 0; cpu < processor_count; ++cpu) {
     uint32_t cluster_id = 0;
-    iree_status_t status = iree_sysfs_query_cluster_id(cpu, &cluster_id);
-    if (iree_status_is_ok(status) && iree_sysfs_is_valid_cluster(cluster_id)) {
+    if (iree_sysfs_try_query_cluster_id(cpu, &cluster_id) &&
+        iree_sysfs_is_valid_cluster(cluster_id)) {
       bool cluster_seen = false;
       for (iree_host_size_t i = 0; i < unique_clusters; ++i) {
         if (cluster_ids[i] == cluster_id) {
@@ -302,7 +288,6 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
         ++unique_clusters;
       }
     }
-    iree_status_ignore(status);
   }
 
   return unique_clusters > 0 ? unique_clusters : 1;
@@ -311,14 +296,12 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   const uint32_t current_cpu = iree_sysfs_query_current_cpu();
   uint32_t cluster_id = 0;
-  iree_status_t status = iree_sysfs_query_cluster_id(current_cpu, &cluster_id);
-  if (iree_status_is_ok(status)) {
+  if (iree_sysfs_try_query_cluster_id(current_cpu, &cluster_id)) {
     if (!iree_sysfs_is_valid_cluster(cluster_id)) {
       return 0;  // Invalid clusters are node 0.
     }
     return cluster_id;
   }
-  iree_status_ignore(status);
   return 0;  // Fallback to node 0.
 }
 
@@ -366,10 +349,7 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
 
   char buffer[256];
   iree_host_size_t length = 0;
-  iree_status_t status =
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
+  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
     return false;
   }
 
@@ -378,11 +358,9 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
       .topology = topology,
       .group_mask = 0,
   };
-  status =
-      iree_sysfs_parse_cpu_list(iree_make_string_view(buffer, length),
-                                iree_sysfs_accumulate_sharing_groups, &ctx);
-  const bool valid = iree_status_is_ok(status);
-  iree_status_ignore(status);
+  const bool valid =
+      iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                    iree_sysfs_accumulate_sharing_groups, &ctx);
   *out_group_mask = ctx.group_mask;
   return valid;
 }
@@ -402,10 +380,7 @@ static bool iree_sysfs_find_sharing_cache_mask(
   for (uint32_t cache_index = 0; cache_index < IREE_SYSFS_MAX_CACHE_INDICES;
        ++cache_index) {
     iree_sysfs_cache_info_t cache = {0};
-    iree_status_t status =
-        iree_sysfs_query_cache_level(processor, cache_index, &cache);
-    if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+    if (!iree_sysfs_try_query_cache_level(processor, cache_index, &cache)) {
       break;  // No more cache levels.
     }
 
@@ -510,12 +485,9 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 
     // Query cluster ID for affinity grouping.
     uint32_t cluster_id = 0;
-    iree_status_t cluster_status =
-        iree_sysfs_query_cluster_id(cpu_ids[i], &cluster_id);
-    if (iree_status_is_ok(cluster_status)) {
+    if (iree_sysfs_try_query_cluster_id(cpu_ids[i], &cluster_id)) {
       group->ideal_thread_affinity.group = cluster_id;
     }
-    iree_status_ignore(cluster_status);
   }
 
   iree_status_t status =
@@ -562,10 +534,7 @@ static bool iree_sysfs_read_cache_shared_core_mask(
 
   char buffer[256];
   iree_host_size_t length = 0;
-  iree_status_t status =
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
+  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
     return false;
   }
 
@@ -575,10 +544,9 @@ static bool iree_sysfs_read_cache_shared_core_mask(
       .core_count = core_count,
       .core_mask = 0,
   };
-  status = iree_sysfs_parse_cpu_list(iree_make_string_view(buffer, length),
-                                     iree_sysfs_accumulate_core_mask, &ctx);
-  const bool valid = iree_status_is_ok(status);
-  iree_status_ignore(status);
+  const bool valid =
+      iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                    iree_sysfs_accumulate_core_mask, &ctx);
   *out_mask = ctx.core_mask;
   return valid;
 }
@@ -598,10 +566,7 @@ static bool iree_sysfs_find_sharing_core_mask(
   for (uint32_t cache_index = 0; cache_index < IREE_SYSFS_MAX_CACHE_INDICES;
        ++cache_index) {
     iree_sysfs_cache_info_t cache = {0};
-    iree_status_t status =
-        iree_sysfs_query_cache_level(processor, cache_index, &cache);
-    if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+    if (!iree_sysfs_try_query_cache_level(processor, cache_index, &cache)) {
       break;  // No more cache levels.
     }
 
@@ -760,9 +725,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   for (uint32_t cpu = 0; cpu < processor_count && core_count < max_core_count;
        ++cpu) {
     uint32_t core_id = 0;
-    iree_status_t status = iree_sysfs_query_core_id(cpu, &core_id);
-    if (!iree_status_is_ok(status)) {
-      iree_status_ignore(status);
+    if (!iree_sysfs_try_query_core_id(cpu, &core_id)) {
       continue;  // Skip CPUs we can't query.
     }
 
@@ -770,16 +733,13 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     if (node_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY) {
       // Only filter if cluster info is valid and doesn't match.
       uint32_t cluster_id = 0;
-      iree_status_t cluster_status =
-          iree_sysfs_query_cluster_id(cpu, &cluster_id);
       // When invalid we skip filtering on invalid values to avoid removing all
       // cores on homogeneous systems.
-      if (iree_status_is_ok(cluster_status) &&
+      if (iree_sysfs_try_query_cluster_id(cpu, &cluster_id) &&
           iree_sysfs_is_valid_cluster(cluster_id) &&
           cluster_id != (uint32_t)node_id) {
         continue;  // Wrong cluster.
       }
-      iree_status_ignore(cluster_status);
     }
 
     // Filter by performance level on heterogeneous systems (ARM big.LITTLE).
@@ -803,13 +763,11 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     for (iree_host_size_t i = 0; i < core_count; ++i) {
       const uint32_t existing_cpu = core_map[i];
       uint32_t existing_core_id = 0;
-      iree_status_t existing_status =
-          iree_sysfs_query_core_id(existing_cpu, &existing_core_id);
-      if (iree_status_is_ok(existing_status) && existing_core_id == core_id) {
+      if (iree_sysfs_try_query_core_id(existing_cpu, &existing_core_id) &&
+          existing_core_id == core_id) {
         core_seen = true;
         break;
       }
-      iree_status_ignore(existing_status);
     }
     if (!core_seen) {
       // First processor in this core.
@@ -882,12 +840,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     group->ideal_thread_affinity.id = processor;
 
     uint32_t cluster_id = 0;
-    iree_status_t cluster_status =
-        iree_sysfs_query_cluster_id(processor, &cluster_id);
-    if (iree_status_is_ok(cluster_status)) {
+    if (iree_sysfs_try_query_cluster_id(processor, &cluster_id)) {
       group->ideal_thread_affinity.group = cluster_id;
-    } else {
-      iree_status_ignore(cluster_status);
     }
   }
 
