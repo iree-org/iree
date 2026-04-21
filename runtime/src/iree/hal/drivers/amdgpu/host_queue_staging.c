@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "iree/async/operations/file.h"
+#include "iree/hal/drivers/amdgpu/access_policy.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 #include "iree/hal/drivers/amdgpu/host_queue_blit.h"
@@ -114,6 +115,19 @@ iree_status_t iree_hal_amdgpu_staging_pool_options_verify(
                             options->slot_size, options->slot_count);
   }
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_staging_pool_resolve_access_agents(
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_amdgpu_access_agent_list_t* out_agent_list) {
+  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = queue_affinity_mask,
+      .physical_device_count = topology->gpu_agent_count,
+      .queue_count_per_physical_device = topology->gpu_agent_queue_count,
+  };
+  return iree_hal_amdgpu_access_agent_list_resolve(
+      topology, domain, queue_affinity_mask, out_agent_list);
 }
 
 static void iree_hal_amdgpu_staging_allocation_release(
@@ -350,10 +364,13 @@ iree_status_t iree_hal_amdgpu_staging_pool_initialize(
         HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &allocation_base);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hsa_amd_agents_allow_access(
-        IREE_LIBHSA(libhsa), (uint32_t)topology->all_agent_count,
-        topology->all_agents,
-        /*flags=*/NULL, allocation_base);
+    iree_hal_amdgpu_access_agent_list_t access_agents;
+    status = iree_hal_amdgpu_staging_pool_resolve_access_agents(
+        topology, queue_affinity_mask, &access_agents);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_access_allow_agent_list(libhsa, &access_agents,
+                                                       allocation_base);
+    }
   }
 
   void* host_ptr = NULL;

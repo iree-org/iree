@@ -25,6 +25,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    access_policy
+  HDRS
+    "access_policy.h"
+  SRCS
+    "access_policy.c"
+  DEPS
+    ::queue_affinity
+    iree::base
+    iree::hal
+    iree::hal::drivers::amdgpu::util::libhsa
+    iree::hal::drivers::amdgpu::util::topology
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     amdgpu
   HDRS
     "api.h"
@@ -102,6 +118,7 @@ iree_cc_library(
     "transient_buffer.h"
     "virtual_queue.h"
   DEPS
+    ::access_policy
     ::queue_affinity
     iree::async
     iree::async::util::proactor_pool
@@ -204,6 +221,21 @@ iree_cc_library(
     iree::hal::memory::slab_provider
     iree::hal::memory::tracing
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    access_policy_test
+  SRCS
+    "access_policy_test.cc"
+  DEPS
+    ::access_policy
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(

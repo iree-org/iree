@@ -23,6 +23,19 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "access_policy",
+    srcs = ["access_policy.c"],
+    hdrs = ["access_policy.h"],
+    deps = [
+        ":queue_affinity",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:libhsa",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "amdgpu",
     srcs = [
         "allocator.c",
@@ -102,6 +115,7 @@ iree_runtime_cc_library(
         "api.h",
     ],
     deps = [
+        ":access_policy",
         ":queue_affinity",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
@@ -205,6 +219,19 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/drivers/amdgpu/util:vmem",
         "//runtime/src/iree/hal/memory:slab_provider",
         "//runtime/src/iree/hal/memory:tracing",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "access_policy_test",
+    srcs = ["access_policy_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    deps = [
+        ":access_policy",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

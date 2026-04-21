@@ -8,6 +8,7 @@
 
 #include <stddef.h>
 
+#include "iree/hal/drivers/amdgpu/access_policy.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
@@ -125,6 +126,20 @@ static bool iree_hal_amdgpu_slab_provider_record_memory_event(
     slab_handle->profile_allocation_id = allocation_id;
   }
   return recorded;
+}
+
+static iree_status_t iree_hal_amdgpu_slab_provider_resolve_access_agents(
+    const iree_hal_amdgpu_slab_provider_t* provider,
+    iree_hal_amdgpu_access_agent_list_t* out_agent_list) {
+  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+      .supported_affinity = provider->queue_affinity_mask,
+      .physical_device_count = provider->topology->gpu_agent_count,
+      .queue_count_per_physical_device =
+          provider->topology->gpu_agent_queue_count,
+  };
+  return iree_hal_amdgpu_access_agent_list_resolve(
+      provider->topology, domain, provider->queue_affinity_mask,
+      out_agent_list);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -340,11 +355,13 @@ static iree_status_t iree_hal_amdgpu_slab_provider_acquire_slab(
         (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &base_ptr);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hsa_amd_agents_allow_access(
-        IREE_LIBHSA(provider->libhsa),
-        (uint32_t)provider->topology->all_agent_count,
-        provider->topology->all_agents,
-        /*flags=*/NULL, base_ptr);
+    iree_hal_amdgpu_access_agent_list_t access_agents;
+    status = iree_hal_amdgpu_slab_provider_resolve_access_agents(
+        provider, &access_agents);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_access_allow_agent_list(
+          provider->libhsa, &access_agents, base_ptr);
+    }
   }
 
   if (iree_status_is_ok(status)) {

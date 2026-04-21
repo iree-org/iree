@@ -6,6 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/allocator.h"
 
+#include "iree/hal/drivers/amdgpu/access_policy.h"
 #include "iree/hal/drivers/amdgpu/buffer.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/queue_affinity.h"
@@ -185,23 +186,44 @@ static iree_status_t iree_hal_amdgpu_allocator_query_pool_properties(
   return iree_ok_status();
 }
 
-static bool iree_hal_amdgpu_allocator_select_device_ordinal(
-    const iree_hal_amdgpu_allocator_t* allocator,
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_host_size_t* out_device_ordinal) {
-  const iree_hal_amdgpu_queue_affinity_domain_t domain = {
+static iree_hal_amdgpu_queue_affinity_domain_t
+iree_hal_amdgpu_allocator_queue_affinity_domain(
+    const iree_hal_amdgpu_allocator_t* allocator) {
+  return (iree_hal_amdgpu_queue_affinity_domain_t){
       .supported_affinity = allocator->logical_device->queue_affinity_mask,
       .physical_device_count = allocator->topology->gpu_agent_count,
       .queue_count_per_physical_device =
           allocator->topology->gpu_agent_queue_count,
   };
+}
+
+static bool iree_hal_amdgpu_allocator_select_device_ordinal(
+    const iree_hal_amdgpu_allocator_t* allocator,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t* out_queue_affinity,
+    iree_host_size_t* out_device_ordinal) {
+  const iree_hal_amdgpu_queue_affinity_domain_t domain =
+      iree_hal_amdgpu_allocator_queue_affinity_domain(allocator);
   iree_hal_amdgpu_queue_affinity_resolved_t resolved;
   if (!iree_hal_amdgpu_queue_affinity_try_resolve(domain, queue_affinity,
                                                   &resolved)) {
     return false;
   }
+  if (out_queue_affinity) {
+    *out_queue_affinity = resolved.queue_affinity;
+  }
   *out_device_ordinal = resolved.physical_device_ordinal;
   return true;
+}
+
+static iree_status_t iree_hal_amdgpu_allocator_resolve_access_agents(
+    const iree_hal_amdgpu_allocator_t* allocator,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_amdgpu_access_agent_list_t* out_agent_list) {
+  return iree_hal_amdgpu_access_agent_list_resolve(
+      allocator->topology,
+      iree_hal_amdgpu_allocator_queue_affinity_domain(allocator),
+      queue_affinity, out_agent_list);
 }
 
 static bool iree_hal_amdgpu_allocator_resolve_placement(
@@ -210,10 +232,13 @@ static bool iree_hal_amdgpu_allocator_resolve_placement(
   memset(out_placement, 0, sizeof(*out_placement));
 
   iree_host_size_t device_ordinal = 0;
+  iree_hal_queue_affinity_t queue_affinity = 0;
   if (!iree_hal_amdgpu_allocator_select_device_ordinal(
-          allocator, params->queue_affinity, &device_ordinal)) {
+          allocator, params->queue_affinity, &queue_affinity,
+          &device_ordinal)) {
     return false;
   }
+  params->queue_affinity = queue_affinity;
 
   const iree_hal_memory_type_t requested_type = params->type;
   const iree_hal_memory_type_t required_type =
@@ -587,11 +612,9 @@ static void iree_hal_amdgpu_allocator_record_buffer_import(
 
   uint32_t physical_device_ordinal = UINT32_MAX;
   iree_host_size_t selected_device_ordinal = 0;
-  const iree_hal_queue_affinity_t queue_affinity =
-      params.queue_affinity ? params.queue_affinity
-                            : IREE_HAL_QUEUE_AFFINITY_ANY;
   if (iree_hal_amdgpu_allocator_select_device_ordinal(
-          allocator, queue_affinity, &selected_device_ordinal)) {
+          allocator, params.queue_affinity, /*out_queue_affinity=*/NULL,
+          &selected_device_ordinal)) {
     physical_device_ordinal = (uint32_t)selected_device_ordinal;
   }
 
@@ -706,15 +729,17 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
       IREE_LIBHSA(allocator->libhsa), memory_placement.memory_pool->memory_pool,
       (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &host_ptr);
 
-  // Grant the logical topology access to the allocation. This is intentionally
-  // broad while allocator sharing semantics remain topology-wide.
+  // Grant the physical devices selected by the buffer placement access. A
+  // placement of ANY remains intentionally broad within the logical topology,
+  // but never expands to all ROCR-visible platform agents.
+  iree_hal_amdgpu_access_agent_list_t access_agents;
   if (iree_status_is_ok(status)) {
-    const iree_hal_amdgpu_topology_t* topology =
-        &allocator->logical_device->system->topology;
-    status = iree_hsa_amd_agents_allow_access(
-        IREE_LIBHSA(allocator->libhsa), (uint32_t)topology->all_agent_count,
-        topology->all_agents,
-        /*flags=*/NULL, host_ptr);
+    status = iree_hal_amdgpu_allocator_resolve_access_agents(
+        allocator, compat_params.queue_affinity, &access_agents);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_access_allow_agent_list(allocator->libhsa,
+                                                     &access_agents, host_ptr);
   }
 
   // Wrap in a HAL buffer.
@@ -913,9 +938,14 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, external_buffer->size);
   void* host_ptr = external_buffer->handle.host_allocation.ptr;
   void* agent_ptr = NULL;
-  iree_status_t status = iree_hsa_amd_memory_lock(
-      IREE_LIBHSA(allocator->libhsa), host_ptr, (size_t)external_buffer->size,
-      /*agents=*/NULL, /*num_agent=*/0, &agent_ptr);
+  iree_hal_amdgpu_access_agent_list_t access_agents;
+  iree_status_t status = iree_hal_amdgpu_allocator_resolve_access_agents(
+      allocator, compat_params.queue_affinity, &access_agents);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_access_lock_host_allocation(
+        allocator->libhsa, &access_agents, host_ptr, external_buffer->size,
+        &agent_ptr);
+  }
 
   iree_hal_amdgpu_imported_host_release_data_t* release_data = NULL;
   if (iree_status_is_ok(status)) {
