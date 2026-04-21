@@ -156,6 +156,18 @@ func.func @mma_inner_tiled_invalid_inner_types_distributed_nonopaque(%lhs: tenso
 
 // -----
 
+func.func @subgroup_scan_exclusive_without_identity(%x: f32) -> (f32, f32) {
+  // expected-error @+1 {{exclusive scan requires an identity operand}}
+  %scan, %total = iree_gpu.subgroup_scan(%x) cluster(size = 4) {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %add = arith.addf %lhs, %rhs : f32
+    iree_gpu.yield %add : f32
+  } : f32
+  return %scan, %total : f32, f32
+}
+
+// -----
+
 func.func @vector_multi_mma_with_wrong_number_of_permutations(%lhs: vector<2x3x4xf16>, %rhs: vector<3x5x4xf16>, %acc: vector<2x5x4xf32>) -> vector<2x5x4xf32> {
   // expected-error @+1 {{op mismatch between the number of permutations (2) and the number of operands (3)}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {

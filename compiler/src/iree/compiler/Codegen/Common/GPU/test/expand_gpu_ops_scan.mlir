@@ -6,7 +6,7 @@
 
 #translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_f32(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info} {
-  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero) cluster(size = 4) {
+  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) cluster(size = 4) {
   ^bb0(%lhs: f32, %rhs: f32):
     %add = arith.addf %lhs, %rhs : f32
     iree_gpu.yield %add : f32
@@ -61,7 +61,7 @@ func.func @scan_add_f32(%x: f32, %zero: f32) -> (f32, f32) attributes {translati
 
 #translation_info2 = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
 func.func @scan_add_f32_stride16(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info2} {
-  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero) cluster(size = 4, stride = 16) {
+  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) cluster(size = 4, stride = 16) {
   ^bb0(%lhs: f32, %rhs: f32):
     %add = arith.addf %lhs, %rhs : f32
     iree_gpu.yield %add : f32
@@ -118,7 +118,7 @@ func.func @scan_add_f32_stride16(%x: f32, %zero: f32) -> (f32, f32) attributes {
 
 #translation_info3 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_i32(%x: i32, %zero: i32) -> (i32, i32) attributes {translation_info = #translation_info3} {
-  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero) cluster(size = 4) {
+  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : i32) cluster(size = 4) {
   ^bb0(%lhs: i32, %rhs: i32):
     %add = arith.addi %lhs, %rhs : i32
     iree_gpu.yield %add : i32
@@ -150,7 +150,7 @@ func.func @scan_add_i32(%x: i32, %zero: i32) -> (i32, i32) attributes {translati
 
 #translation_info4 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_f16(%x: f16, %zero: f16) -> (f16, f16) attributes {translation_info = #translation_info4} {
-  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero) cluster(size = 4) {
+  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f16) cluster(size = 4) {
   ^bb0(%lhs: f16, %rhs: f16):
     %add = arith.addf %lhs, %rhs : f16
     iree_gpu.yield %add : f16
@@ -189,7 +189,7 @@ func.func @scan_add_f16(%x: f16, %zero: f16) -> (f16, f16) attributes {translati
 
 #translation_info5 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_full_subgroup(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info5} {
-  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero) {
+  %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) {
   ^bb0(%lhs: f32, %rhs: f32):
     %add = arith.addf %lhs, %rhs : f32
     iree_gpu.yield %add : f32
@@ -215,3 +215,53 @@ func.func @scan_full_subgroup(%x: f32, %zero: f32) -> (f32, f32) attributes {tra
 // CHECK:         gpu.shuffle idx
 // CHECK:         arith.select
 // CHECK-NOT:     gpu.shuffle
+
+// -----
+
+// Inclusive scan with cluster_size=4, f32 addf.
+// Expects 2 shuffle steps for inclusive scan, then total shuffle from last
+// lane. No exclusive shift shuffle or identity select.
+
+#translation_info6 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+func.func @scan_inclusive_add_f32(%x: f32) -> (f32, f32) attributes {translation_info = #translation_info6} {
+  %scan, %total = iree_gpu.subgroup_scan inclusive (%x) cluster(size = 4) {
+  ^bb0(%lhs: f32, %rhs: f32):
+    %add = arith.addf %lhs, %rhs : f32
+    iree_gpu.yield %add : f32
+  } : f32
+  return %scan, %total : f32, f32
+}
+
+// CHECK-LABEL: func.func @scan_inclusive_add_f32
+// CHECK-SAME:    (%[[X:.+]]: f32)
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : i32
+// CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : i32
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : i32
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : i32
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : i32
+// CHECK:         %[[LANE:.+]] = gpu.lane_id
+// CHECK:         %[[LANE_I32:.+]] = arith.index_cast %[[LANE]] : index to i32
+// CHECK:         %[[POS:.+]] = arith.remui %[[LANE_I32]], %[[C4]]
+//
+// Inclusive scan step 0: offset=1, threshold=1
+// CHECK:         %[[SRC0:.+]] = arith.subi %[[LANE_I32]], %[[C1]]
+// CHECK:         %[[SHUF0:.+]], %{{.+}} = gpu.shuffle idx %[[X]], %[[SRC0]], %[[C32]]
+// CHECK:         %[[ADD0:.+]] = arith.addf %[[SHUF0]], %[[X]]
+// CHECK:         %[[PRED0:.+]] = arith.cmpi uge, %[[POS]], %[[C1]]
+// CHECK:         %[[SEL0:.+]] = arith.select %[[PRED0]], %[[ADD0]], %[[X]]
+//
+// Inclusive scan step 1: offset=2, threshold=2
+// CHECK:         %[[SRC1:.+]] = arith.subi %[[LANE_I32]], %[[C2]]
+// CHECK:         %[[SHUF1:.+]], %{{.+}} = gpu.shuffle idx %[[SEL0]], %[[SRC1]], %[[C32]]
+// CHECK:         %[[ADD1:.+]] = arith.addf %[[SHUF1]], %[[SEL0]]
+// CHECK:         %[[PRED1:.+]] = arith.cmpi uge, %[[POS]], %[[C2]]
+// CHECK:         %[[INCL:.+]] = arith.select %[[PRED1]], %[[ADD1]], %[[SEL0]]
+//
+// Total: shuffle from last lane in cluster
+// CHECK:         %[[BASE:.+]] = arith.subi %[[LANE_I32]], %[[POS]]
+// CHECK:         %[[LAST:.+]] = arith.addi %[[BASE]], %[[C3]]
+// CHECK:         %[[TOTAL_SHUF:.+]], %{{.+}} = gpu.shuffle idx %[[INCL]], %[[LAST]], %[[C32]]
+//
+// No exclusive shift — inclusive result used directly
+// CHECK-NOT:     gpu.shuffle
+// CHECK:         return %[[INCL]], %[[TOTAL_SHUF]]

@@ -132,6 +132,14 @@ LogicalResult SubgroupScanOp::verify() {
   if (!llvm::isPowerOf2_32(stride)) {
     return emitOpError("cluster_stride must be a power of 2");
   }
+  if (!getInclusive() && !getIdentity()) {
+    return emitOpError("exclusive scan requires an identity operand");
+  }
+  if (Value id = getIdentity()) {
+    if (id.getType() != getValue().getType()) {
+      return emitOpError("identity type must match value type");
+    }
+  }
   return success();
 }
 

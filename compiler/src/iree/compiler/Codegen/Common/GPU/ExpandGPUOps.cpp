@@ -44,7 +44,8 @@ static Value inlineCombiner(RewriterBase &rewriter, Location loc,
 
 /// Lower `iree_gpu.subgroup_scan` to a Hillis-Steele scan using
 /// `gpu.shuffle idx`.
-/// First computes an inclusive scan, then derives the exclusive result by
+/// Computes an inclusive scan via Hillis-Steele. For inclusive mode, the
+/// result is used directly. For exclusive mode, derives the result by
 /// shifting right by one cluster position and inserting the identity at
 /// position 0. Also computes the cluster total by shuffling from the last
 /// lane in each cluster.
@@ -58,7 +59,6 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value val = op.getValue();
-    Value identity = op.getIdentity();
     uint32_t clusterSize = op.getClusterSize().value_or(subgroupSize);
     uint32_t clusterStride = op.getClusterStride();
     Type valTy = val.getType();
@@ -182,11 +182,19 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
                                subgroupSizeCst, gpu::ShuffleMode::IDX);
     Value total = unpackFn(totalShuffle.getShuffleResult());
 
+    if (op.getInclusive()) {
+      // Inclusive: use the Hillis-Steele result directly.
+      rewriter.replaceOp(op, {val, total});
+      return success();
+    }
+
     // Derive exclusive result: shift inclusive result right by one cluster
     // position, insert identity at position 0.
     //   predLane = laneIdI32 - clusterStride
     //   shifted = shuffle idx val, predLane
     //   scanResult = (lanePos == 0) ? identity : shifted
+    Value scanResult;
+    Value identity = op.getIdentity();
     Value predLane = arith::SubIOp::create(rewriter, loc, laneIdI32, strideCst);
     Value packedForShift = packFn(val);
     auto shiftShuffle =
@@ -198,7 +206,7 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
                                            rewriter.getI32IntegerAttr(0));
     Value isFirstLane = arith::CmpIOp::create(
         rewriter, loc, arith::CmpIPredicate::eq, lanePos, zero);
-    Value scanResult =
+    scanResult =
         arith::SelectOp::create(rewriter, loc, isFirstLane, identity, shifted);
 
     rewriter.replaceOp(op, {scanResult, total});
