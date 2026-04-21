@@ -79,6 +79,31 @@ iree_status_t iree_sysfs_read_small_file(const char* path, char* buffer,
   return iree_ok_status();
 }
 
+bool iree_sysfs_try_read_small_file(const char* path, char* buffer,
+                                    size_t buffer_size,
+                                    iree_host_size_t* out_length) {
+  IREE_ASSERT_ARGUMENT(path);
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(buffer_size > 0);
+  IREE_ASSERT_ARGUMENT(out_length);
+  *out_length = 0;
+
+  FILE* file = fopen(path, "r");
+  if (!file) return false;
+
+  const size_t bytes_read = fread(buffer, 1, buffer_size - 1, file);
+  if (ferror(file) || (bytes_read == buffer_size - 1 && !feof(file))) {
+    fclose(file);
+    return false;
+  }
+  fclose(file);
+
+  IREE_ASSERT(bytes_read < buffer_size);
+  buffer[bytes_read] = '\0';
+  *out_length = bytes_read;
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // Parsing utilities
 //===----------------------------------------------------------------------===//

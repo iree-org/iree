@@ -49,6 +49,14 @@ iree_status_t iree_sysfs_read_small_file(const char* path, char* buffer,
                                          size_t buffer_size,
                                          iree_host_size_t* out_length);
 
+// Tries to read a small sysfs file into the provided buffer.
+// Returns false when the file cannot be read or does not fit in |buffer|. This
+// is for optional sysfs data where missing files are expected and should not
+// allocate an iree_status_t.
+bool iree_sysfs_try_read_small_file(const char* path, char* buffer,
+                                    size_t buffer_size,
+                                    iree_host_size_t* out_length);
+
 //===----------------------------------------------------------------------===//
 // Parsing utilities
 //===----------------------------------------------------------------------===//

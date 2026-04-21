@@ -50,6 +50,13 @@ iree_status_t iree_hal_platform_query_numa_distance(uint8_t node_a,
                                                     uint8_t node_b,
                                                     uint8_t* out_distance);
 
+// Tries to query the NUMA distance between two nodes without producing status
+// diagnostics for optional platform data. Returns false when either node is
+// outside the platform node range. Missing platform distance data is reported
+// as a conservative default distance and returns true.
+bool iree_hal_platform_try_query_numa_distance(uint8_t node_a, uint8_t node_b,
+                                               uint8_t* out_distance);
+
 //===----------------------------------------------------------------------===//
 // PCIe topology
 //===----------------------------------------------------------------------===//
