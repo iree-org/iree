@@ -300,6 +300,24 @@ const iree_profile_model_executable_t* iree_profile_model_find_executable(
   return NULL;
 }
 
+static iree_profile_model_executable_t*
+iree_profile_model_find_executable_mutable(iree_profile_model_t* model,
+                                           uint64_t executable_id) {
+  if (!model) return NULL;
+  const iree_profile_model_executable_lookup_t lookup = {
+      .model = model,
+      .executable_id = executable_id,
+  };
+  iree_host_size_t index = 0;
+  if (iree_profile_index_find(&model->executable_index,
+                              iree_profile_model_executable_hash(executable_id),
+                              iree_profile_model_executable_matches, &lookup,
+                              &index)) {
+    return &model->executables[index];
+  }
+  return NULL;
+}
+
 const iree_profile_model_export_t* iree_profile_model_find_export(
     const iree_profile_model_t* model, uint64_t executable_id,
     uint32_t export_ordinal) {
@@ -647,6 +665,17 @@ iree_status_t iree_profile_model_resolve_dispatch_key(
 static iree_status_t iree_profile_model_append_export(
     iree_profile_model_t* model,
     const iree_profile_model_export_t* export_info) {
+  iree_profile_model_executable_t* executable =
+      iree_profile_model_find_executable_mutable(model,
+                                                 export_info->executable_id);
+  if (!executable) {
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "executable export references missing executable metadata "
+        "executable=%" PRIu64 " export=%u",
+        export_info->executable_id, export_info->export_ordinal);
+  }
+
   const iree_profile_model_export_lookup_t lookup = {
       .model = model,
       .executable_id = export_info->executable_id,
@@ -673,6 +702,15 @@ static iree_status_t iree_profile_model_append_export(
   IREE_RETURN_IF_ERROR(iree_profile_index_insert(
       &model->export_index, model->host_allocator, hash, export_index));
   model->exports[export_index] = *export_info;
+  model->exports[export_index].next_export_index = IREE_HOST_SIZE_MAX;
+  if (executable->first_export_index == IREE_HOST_SIZE_MAX) {
+    executable->first_export_index = export_index;
+  } else {
+    model->exports[executable->last_export_index].next_export_index =
+        export_index;
+  }
+  executable->last_export_index = export_index;
+  ++executable->export_row_count;
   ++model->export_count;
   return iree_ok_status();
 }
@@ -706,6 +744,9 @@ static iree_status_t iree_profile_model_append_executable(
   iree_profile_model_executable_t* executable_info =
       &model->executables[executable_index];
   executable_info->record = *record;
+  executable_info->first_export_index = IREE_HOST_SIZE_MAX;
+  executable_info->last_export_index = IREE_HOST_SIZE_MAX;
+  executable_info->export_row_count = 0;
   ++model->executable_count;
   return iree_ok_status();
 }

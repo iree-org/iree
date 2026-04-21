@@ -34,12 +34,20 @@ typedef struct iree_profile_model_export_t {
   uint64_t pipeline_hash[2];
   // Borrowed export name from the mapped profile bundle.
   iree_string_view_t name;
+  // Next export row owned by the same executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t next_export_index;
 } iree_profile_model_export_t;
 
 // Executable metadata indexed by session-local executable id.
 typedef struct iree_profile_model_executable_t {
   // Immutable executable metadata record borrowed from the profile bundle.
   iree_hal_profile_executable_record_t record;
+  // First export row owned by this executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t first_export_index;
+  // Last export row owned by this executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t last_export_index;
+  // Number of export rows linked to this executable.
+  iree_host_size_t export_row_count;
 } iree_profile_model_executable_t;
 
 // Command-buffer metadata indexed by session-local command-buffer id.

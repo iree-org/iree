@@ -32,6 +32,20 @@ static iree_hal_profile_file_record_t MakeCommandBuffersChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeExecutablesChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES;
+  return chunk;
+}
+
+static iree_hal_profile_file_record_t MakeExecutableExportsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS;
+  return chunk;
+}
+
 static iree_hal_profile_file_record_t MakeCommandOperationsChunk(
     const std::vector<uint8_t>& payload) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
@@ -84,6 +98,28 @@ static void AppendCommandOperation(
     std::vector<uint8_t>* payload,
     const iree_hal_profile_command_operation_record_t& record) {
   AppendPlainRecord(payload, record);
+}
+
+static void AppendExecutable(std::vector<uint8_t>* payload,
+                             uint64_t executable_id, uint32_t export_count) {
+  iree_hal_profile_executable_record_t record =
+      iree_hal_profile_executable_record_default();
+  record.executable_id = executable_id;
+  record.export_count = export_count;
+  AppendPlainRecord(payload, record);
+}
+
+static void AppendExecutableExport(std::vector<uint8_t>* payload,
+                                   uint64_t executable_id,
+                                   uint32_t export_ordinal,
+                                   iree_string_view_t name) {
+  iree_hal_profile_executable_export_record_t record =
+      iree_hal_profile_executable_export_record_default();
+  record.executable_id = executable_id;
+  record.export_ordinal = export_ordinal;
+  record.name_length = name.size;
+  record.record_length = sizeof(record) + name.size;
+  AppendRecordWithPayload(payload, record, name);
 }
 
 static void AppendMetricSource(std::vector<uint8_t>* payload,
@@ -221,6 +257,64 @@ TEST(ProfileModelTest, AcceptsLinearCommandOperationsWithoutBlockStructure) {
   ASSERT_EQ(1u, model.command_operation_count);
   EXPECT_FALSE(iree_hal_profile_command_operation_has_block_structure(
       &model.command_operations[0].record));
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, LinksExecutableExportsByOwner) {
+  std::vector<uint8_t> executable_payload;
+  AppendExecutable(&executable_payload, 5, 2);
+  AppendExecutable(&executable_payload, 7, 1);
+  iree_hal_profile_file_record_t executable_chunk =
+      MakeExecutablesChunk(executable_payload);
+
+  std::vector<uint8_t> export_payload;
+  AppendExecutableExport(&export_payload, 5, 0, IREE_SV("main"));
+  AppendExecutableExport(&export_payload, 7, 0, IREE_SV("side"));
+  AppendExecutableExport(&export_payload, 5, 1, IREE_SV("tail"));
+  iree_hal_profile_file_record_t export_chunk =
+      MakeExecutableExportsChunk(export_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_ASSERT_OK(
+      iree_profile_model_process_metadata_record(&model, &executable_chunk));
+  IREE_ASSERT_OK(
+      iree_profile_model_process_metadata_record(&model, &export_chunk));
+
+  const iree_profile_model_executable_t* executable =
+      iree_profile_model_find_executable(&model, 5);
+  ASSERT_NE(executable, nullptr);
+  ASSERT_EQ(2u, executable->export_row_count);
+  ASSERT_NE(IREE_HOST_SIZE_MAX, executable->first_export_index);
+  const iree_profile_model_export_t* first_export =
+      &model.exports[executable->first_export_index];
+  EXPECT_EQ(5u, first_export->executable_id);
+  EXPECT_EQ(0u, first_export->export_ordinal);
+  ASSERT_NE(IREE_HOST_SIZE_MAX, first_export->next_export_index);
+  const iree_profile_model_export_t* second_export =
+      &model.exports[first_export->next_export_index];
+  EXPECT_EQ(5u, second_export->executable_id);
+  EXPECT_EQ(1u, second_export->export_ordinal);
+  EXPECT_EQ(IREE_HOST_SIZE_MAX, second_export->next_export_index);
+
+  const iree_profile_model_executable_t* other_executable =
+      iree_profile_model_find_executable(&model, 7);
+  ASSERT_NE(other_executable, nullptr);
+  EXPECT_EQ(1u, other_executable->export_row_count);
+  iree_profile_model_deinitialize(&model);
+}
+
+TEST(ProfileModelTest, RejectsExecutableExportWithoutOwner) {
+  std::vector<uint8_t> export_payload;
+  AppendExecutableExport(&export_payload, 5, 0, IREE_SV("main"));
+  iree_hal_profile_file_record_t export_chunk =
+      MakeExecutableExportsChunk(export_payload);
+
+  iree_profile_model_t model;
+  iree_profile_model_initialize(iree_allocator_system(), &model);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DATA_LOSS,
+      iree_profile_model_process_metadata_record(&model, &export_chunk));
   iree_profile_model_deinitialize(&model);
 }
 
