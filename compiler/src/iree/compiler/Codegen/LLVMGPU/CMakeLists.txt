@@ -63,11 +63,31 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    LLVMGPUConstraintGenerator
+  HDRS
+    "LLVMGPUConstraintGenerator.h"
+  SRCS
+    "LLVMGPUConstraintGenerator.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSMT
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::HAL::IR::HALDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
-    "LLVMGPUConstraintGenerator.h"
     "Passes.h"
     "ROCDLPasses.h"
   SRCS
@@ -80,7 +100,6 @@ iree_cc_library(
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
-    "LLVMGPUConstraintGenerator.cpp"
     "LLVMGPULegalizeNDVectors.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
@@ -99,6 +118,7 @@ iree_cc_library(
     "ROCDLPrefetching.cpp"
     "Verifiers.cpp"
   DEPS
+    ::LLVMGPUConstraintGenerator
     ::PassHeaders
     ::PassesIncGen
     ::ROCDLPassHeaders

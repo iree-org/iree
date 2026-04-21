@@ -19,7 +19,7 @@ iree_compiler_cc_test(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/TargetUtils:KnownTargets",
-        "//compiler/src/iree/compiler/Codegen/LLVMGPU",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU:LLVMGPUConstraintGenerator",
         "//compiler/src/iree/testing:gtest_main",
         "@com_google_googletest//:gtest",
         "@llvm-project//mlir:ArithDialect",

@@ -85,6 +85,32 @@ iree_compiler_cc_library(
 )
 
 ################################################################################
+# Constraint generator
+################################################################################
+
+iree_compiler_cc_library(
+    name = "LLVMGPUConstraintGenerator",
+    srcs = [
+        "LLVMGPUConstraintGenerator.cpp",
+    ],
+    hdrs = [
+        "LLVMGPUConstraintGenerator.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:GPUHeuristics",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:SMTDialect",
+    ],
+)
+
+################################################################################
 # Common library
 ################################################################################
 
@@ -100,7 +126,6 @@ iree_compiler_cc_library(
         "LLVMGPUAssignConstantOrdinals.cpp",
         "LLVMGPUCastAddressSpaceFunction.cpp",
         "LLVMGPUConfigureTensorLayouts.cpp",
-        "LLVMGPUConstraintGenerator.cpp",
         "LLVMGPULegalizeNDVectors.cpp",
         "LLVMGPULinkExecutables.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
@@ -122,11 +147,11 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
-        "LLVMGPUConstraintGenerator.h",
         "Passes.h",
         "ROCDLPasses.h",
     ],
     deps = [
+        ":LLVMGPUConstraintGenerator",
         ":PassHeaders",
         ":PassesIncGen",
         ":ROCDLPassHeaders",

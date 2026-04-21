@@ -27,7 +27,7 @@ iree_cc_test(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
-    iree::compiler::Codegen::LLVMGPU
+    iree::compiler::Codegen::LLVMGPU::LLVMGPUConstraintGenerator
     iree::testing::gtest_main
 )
 
