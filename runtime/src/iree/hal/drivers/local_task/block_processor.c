@@ -89,6 +89,44 @@ static void iree_hal_cmd_block_processor_advance_retention_epoch(
   }
 }
 
+#if defined(IREE_RUNTIME_USE_FUTEX)
+static iree_time_t iree_hal_cmd_block_processor_retention_deadline_after(
+    iree_time_t now, iree_duration_t duration) {
+  if (duration <= IREE_DURATION_ZERO) return now;
+  iree_time_t deadline = now + duration;
+  return deadline < now ? IREE_TIME_INFINITE_FUTURE : deadline;
+}
+
+static void iree_hal_cmd_block_processor_extend_retention_deadline(
+    iree_hal_cmd_block_processor_context_t* context, iree_time_t deadline) {
+  if (!context->retention_spin_deadline_ns_ptr) return;
+  int64_t current_deadline = iree_atomic_load(
+      context->retention_spin_deadline_ns_ptr, iree_memory_order_relaxed);
+  while (current_deadline < deadline) {
+    if (iree_atomic_compare_exchange_weak(
+            context->retention_spin_deadline_ns_ptr, &current_deadline,
+            deadline, iree_memory_order_release, iree_memory_order_relaxed)) {
+      return;
+    }
+  }
+}
+#endif  // IREE_RUNTIME_USE_FUTEX
+
+// Keeps warm task workers alive across region-transition bookkeeping.
+static void iree_hal_cmd_block_processor_begin_retention_transition(
+    iree_hal_cmd_block_processor_context_t* context) {
+#if defined(IREE_RUNTIME_USE_FUTEX)
+  if (context->retention_transition_spin_ns <= IREE_DURATION_ZERO) return;
+  if (!context->retention_spin_deadline_ns_ptr) return;
+  const iree_time_t now = iree_time_now();
+  iree_hal_cmd_block_processor_extend_retention_deadline(
+      context, iree_hal_cmd_block_processor_retention_deadline_after(
+                   now, context->retention_transition_spin_ns));
+#else
+  (void)context;
+#endif  // IREE_RUNTIME_USE_FUTEX
+}
+
 // Marks the processor completed and releases any warm task workers.
 static void iree_hal_cmd_block_processor_mark_completed(
     iree_hal_cmd_block_processor_context_t* context) {
@@ -1718,6 +1756,7 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
   if (next_region < (int32_t)block->region_count) {
     // Another region in this block. Cache the barrier pointer, assign a new
     // global epoch, and initialize .data for the next region.
+    iree_hal_cmd_block_processor_begin_retention_transition(context);
     iree_atomic_store(&state->cached_barrier, (intptr_t)next_barrier,
                       iree_memory_order_relaxed);
     int32_t region_epoch = context->next_epoch;

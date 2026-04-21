@@ -475,6 +475,34 @@ static bool iree_task_worker_try_release_compute_process(
   return false;
 }
 
+#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+static iree_time_t iree_task_worker_deadline_after(iree_time_t now,
+                                                   iree_duration_t duration) {
+  if (duration <= IREE_DURATION_ZERO) return now;
+  iree_time_t deadline = now + duration;
+  return deadline < now ? IREE_TIME_INFINITE_FUTURE : deadline;
+}
+
+static iree_time_t iree_task_worker_seed_warm_spin_deadline(
+    iree_task_process_t* process, iree_time_t now) {
+  int64_t current_deadline = iree_atomic_load(
+      &process->retention_spin_deadline_ns, iree_memory_order_acquire);
+  if (current_deadline > now) return current_deadline;
+
+  const iree_time_t new_deadline = iree_task_worker_deadline_after(
+      now, (iree_duration_t)IREE_TASK_WARM_WAIT_SPIN_NS);
+  while (current_deadline <= now) {
+    if (iree_atomic_compare_exchange_weak(&process->retention_spin_deadline_ns,
+                                          &current_deadline, new_deadline,
+                                          iree_memory_order_release,
+                                          iree_memory_order_acquire)) {
+      return new_deadline;
+    }
+  }
+  return current_deadline;
+}
+#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+
 // Waits as a warm retainer until the process changes retention epoch, reaches a
 // terminal state, or this worker is asked to exit. While waiting the worker
 // does not hold an active drainer claim and must not touch process-specific
@@ -483,46 +511,53 @@ static bool iree_task_worker_wait_warm_compute_process(
     iree_task_worker_t* worker, iree_task_process_t* process,
     int32_t keep_warm_epoch) {
 #if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-  const iree_time_t spin_start_ns = iree_time_now();
-  iree_time_t spin_deadline_ns =
-      spin_start_ns + (iree_duration_t)IREE_TASK_WARM_WAIT_SPIN_NS;
-  if (spin_deadline_ns < spin_start_ns) {
-    spin_deadline_ns = IREE_TIME_INFINITE_FUTURE;
-  }
-#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-
-  bool spin_wait_resolved = false;
-  bool spin_wait_result = false;
-  IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
-                              "iree_task_worker_wait_warm_compute_spin");
+  bool seed_spin_deadline = true;
   while (true) {
-    if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
-        IREE_TASK_WORKER_STATE_EXITING) {
-      spin_wait_resolved = true;
-      spin_wait_result = false;
-      break;
-    }
-    if (iree_task_process_is_terminal(process)) {
-      spin_wait_resolved = true;
-      spin_wait_result = false;
-      break;
-    }
-    if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
-      spin_wait_resolved = true;
-      spin_wait_result = true;
-      break;
-    }
-#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-    if (iree_time_now() >= spin_deadline_ns) break;
-#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-    iree_processor_yield();
-  }
-  IREE_TRACE_ZONE_END(z_warm_spin);
+    iree_time_t now = iree_time_now();
+    iree_time_t spin_deadline_ns =
+        seed_spin_deadline
+            ? iree_task_worker_seed_warm_spin_deadline(process, now)
+            : iree_atomic_load(&process->retention_spin_deadline_ns,
+                               iree_memory_order_acquire);
+    seed_spin_deadline = false;
+    if (spin_deadline_ns > now) {
+      bool spin_wait_resolved = false;
+      bool spin_wait_result = false;
+      IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
+                                  "iree_task_worker_wait_warm_compute_spin");
+      while (true) {
+        if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
+            IREE_TASK_WORKER_STATE_EXITING) {
+          spin_wait_resolved = true;
+          spin_wait_result = false;
+          break;
+        }
+        if (iree_task_process_is_terminal(process)) {
+          spin_wait_resolved = true;
+          spin_wait_result = false;
+          break;
+        }
+        if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
+          spin_wait_resolved = true;
+          spin_wait_result = true;
+          break;
+        }
 
-  if (spin_wait_resolved) return spin_wait_result;
+        now = iree_time_now();
+        if (now >= spin_deadline_ns) {
+          const iree_time_t extended_deadline = iree_atomic_load(
+              &process->retention_spin_deadline_ns, iree_memory_order_acquire);
+          if (extended_deadline <= spin_deadline_ns) break;
+          spin_deadline_ns = extended_deadline;
+          continue;
+        }
+        iree_processor_yield();
+      }
+      IREE_TRACE_ZONE_END(z_warm_spin);
 
-#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-  while (true) {
+      if (spin_wait_resolved) return spin_wait_result;
+    }
+
     if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
         IREE_TASK_WORKER_STATE_EXITING) {
       return false;
@@ -544,6 +579,14 @@ static bool iree_task_worker_wait_warm_compute_process(
                             iree_memory_order_acq_rel);
       return true;
     }
+    const iree_time_t transition_deadline_ns = iree_atomic_load(
+        &process->retention_spin_deadline_ns, iree_memory_order_acquire);
+    now = iree_time_now();
+    if (transition_deadline_ns > now) {
+      iree_atomic_fetch_sub(&process->retention_sleepers, 1,
+                            iree_memory_order_acq_rel);
+      continue;
+    }
 
     const iree_time_t sleep_start_ns = iree_time_now();
     iree_time_t sleep_deadline_ns =
@@ -556,11 +599,34 @@ static bool iree_task_worker_wait_warm_compute_process(
                         (uint32_t)current_epoch, sleep_deadline_ns);
     iree_atomic_fetch_sub(&process->retention_sleepers, 1,
                           iree_memory_order_acq_rel);
+
+    if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
+      return true;
+    }
     if (wait_status != IREE_STATUS_OK &&
         wait_status != IREE_STATUS_DEADLINE_EXCEEDED &&
         wait_status != IREE_STATUS_UNAVAILABLE) {
       return true;
     }
+  }
+#else
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
+                              "iree_task_worker_wait_warm_compute_spin");
+  while (true) {
+    if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
+        IREE_TASK_WORKER_STATE_EXITING) {
+      IREE_TRACE_ZONE_END(z_warm_spin);
+      return false;
+    }
+    if (iree_task_process_is_terminal(process)) {
+      IREE_TRACE_ZONE_END(z_warm_spin);
+      return false;
+    }
+    if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
+      IREE_TRACE_ZONE_END(z_warm_spin);
+      return true;
+    }
+    iree_processor_yield();
   }
 #endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 }

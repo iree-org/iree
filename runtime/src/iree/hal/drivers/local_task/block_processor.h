@@ -143,6 +143,12 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // Warm task workers sleeping on retention_epoch_ptr.
   iree_atomic_int32_t* retention_sleepers_ptr;
 
+  // Shared warm-retainer spin deadline in host nanoseconds.
+  iree_atomic_int64_t* retention_spin_deadline_ns_ptr;
+
+  // Duration to keep warm retainers spinning during region transitions.
+  iree_duration_t retention_transition_spin_ns;
+
   struct {
     // Optional recorder receiving command-buffer dispatch execution records.
     iree_hal_local_profile_recorder_t* recorder;

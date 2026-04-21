@@ -1430,6 +1430,10 @@ static iree_status_t iree_hal_task_queue_drain_recording(
         &queue->compute_process.retention_epoch;
     processor_context->retention_sleepers_ptr =
         &queue->compute_process.retention_sleepers;
+    processor_context->retention_spin_deadline_ns_ptr =
+        &queue->compute_process.retention_spin_deadline_ns;
+    processor_context->retention_transition_spin_ns =
+        IREE_TASK_WARM_WAIT_TRANSITION_SPIN_NS;
     if (profile_operation) {
       iree_hal_cmd_block_processor_context_set_profile_recorder(
           processor_context, profile_operation->recorder,

@@ -55,6 +55,8 @@ void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
   iree_atomic_store(&out_process->warm_retainers, 0, iree_memory_order_relaxed);
   iree_atomic_store(&out_process->retention_sleepers, 0,
                     iree_memory_order_relaxed);
+  iree_atomic_store(&out_process->retention_spin_deadline_ns, 0,
+                    iree_memory_order_relaxed);
 
   IREE_TRACE_ZONE_END(z0);
 }

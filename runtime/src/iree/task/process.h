@@ -158,9 +158,8 @@ typedef enum iree_task_process_schedule_state_e {
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
-//   Line 2: scheduling (wake_budget, retain_drain, retention_epoch). Written
-//           by drain functions and read by the executor's wake/release
-//           scheduler.
+//   Line 2: scheduling and warm retention. Written by drain functions and read
+//           by the executor's wake/release scheduler.
 //   Line 3: slist intrusion. The slist_next field is used by the immediate
 //           list and dependent activation chains.
 struct iree_task_process_t {
@@ -260,6 +259,9 @@ struct iree_task_process_t {
   // Number of warm retainers sleeping on retention_epoch.
   iree_atomic_int32_t retention_sleepers;
 
+  // Shared warm-retainer spin deadline in host nanoseconds.
+  iree_atomic_int64_t retention_spin_deadline_ns;
+
   //--- Cache line 3: list intrusion ----------------------------------------
 
   iree_alignas(iree_hardware_destructive_interference_size)
@@ -289,8 +291,8 @@ static_assert(offsetof(iree_task_process_t, retention_sleepers) -
                       offsetof(iree_task_process_t, wake_budget) <
                   iree_hardware_destructive_interference_size,
               "retention sleeper count must stay on the scheduling cache line");
-static_assert(offsetof(iree_task_process_t, retention_sleepers) +
-                      sizeof(iree_atomic_int32_t) -
+static_assert(offsetof(iree_task_process_t, retention_spin_deadline_ns) +
+                      sizeof(iree_atomic_int64_t) -
                       offsetof(iree_task_process_t, wake_budget) <=
                   iree_hardware_destructive_interference_size,
               "process scheduling state must fit on one cache line");

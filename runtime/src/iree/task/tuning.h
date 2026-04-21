@@ -48,13 +48,24 @@ extern "C" {
 // FANOUT=1 is a conservative default that avoids CAS contention.
 #define IREE_TASK_WAKE_FANOUT (1)
 
-// Time a warm-retained worker spins near a compute process before sleeping on
-// the process-local retention epoch. This keeps short inter-region gaps out of
-// the kernel while bounding wasted CPU on long tails. Define to -1 to force the
-// legacy busy-yield behavior on platforms where futex waits are not desired.
+// Time warm-retained workers spin near a compute process before sleeping on the
+// process-local retention epoch. Workers share a process-local deadline so
+// late-arriving retainers do not each get a fresh private spin window. This
+// keeps short inter-region gaps out of the kernel while bounding wasted CPU on
+// long tails. Define to -1 to force the legacy busy-yield behavior on platforms
+// where futex waits are not desired.
 #ifndef IREE_TASK_WARM_WAIT_SPIN_NS
 #define IREE_TASK_WARM_WAIT_SPIN_NS (10 * 1000)
 #endif  // IREE_TASK_WARM_WAIT_SPIN_NS
+
+// Time warm-retained workers spin after the last tile in a region completes
+// and before the next region becomes claimable. The completer publishes this
+// shared deadline before running region-transition bookkeeping so workers
+// already spinning near the process can survive short handoff gaps. Sleeping
+// retainers remain parked until the retention epoch advances.
+#ifndef IREE_TASK_WARM_WAIT_TRANSITION_SPIN_NS
+#define IREE_TASK_WARM_WAIT_TRANSITION_SPIN_NS (3 * 1000)
+#endif  // IREE_TASK_WARM_WAIT_TRANSITION_SPIN_NS
 
 // Maximum time a warm-retained worker sleeps before polling for executor exit.
 // Normal work publication wakes sleepers immediately by advancing the retention
