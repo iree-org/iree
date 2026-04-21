@@ -185,10 +185,10 @@ func.func @transfer_gather_unroll_embedding_lookup(
   return %out : vector<4x64xf16>
 }
 
-// After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
+// After unrolling + canonicalization, the 2D gather becomes 4 transfer_read
 // CHECK-LABEL: func.func @transfer_gather_unroll_embedding_lookup
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-4: vector.load
+// CHECK-COUNT-4: vector.transfer_read
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -212,10 +212,10 @@ func.func @transfer_gather_unroll_masked(
 }
 
 // After unrolling, mask slices are passed to each sub-gather.
-// The masked rank-1 gathers lower to vector.maskedload ops.
+// The masked rank-1 gathers lower to masked transfer_read ops.
 // CHECK-LABEL: func.func @transfer_gather_unroll_masked
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-4: vector.maskedload
+// CHECK-COUNT-4: vector.transfer_read %{{.*}}, %{{.*}}, %{{.*}}
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -239,10 +239,10 @@ func.func @transfer_gather_unroll_transposed_index(
 }
 
 // After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
-// the 3D gather becomes 4*8=32 contiguous loads.
+// the 3D gather becomes 4*8=32 transfer_reads.
 // CHECK-LABEL: func.func @transfer_gather_unroll_transposed_index
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-32: vector.load
+// CHECK-COUNT-32: vector.transfer_read
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -263,9 +263,9 @@ func.func @transfer_scatter_unroll_embedding_write(
   return
 }
 
-// After unrolling, the 2D scatter becomes 4 rank-1 stores.
+// After unrolling, the 2D scatter becomes 4 rank-1 transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_embedding_write
-// CHECK-COUNT-4: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+// CHECK-COUNT-4: vector.transfer_write {{.+}} : vector<64xf16>, memref<4096x64xf16>
 
 // -----
 
@@ -286,9 +286,9 @@ func.func @transfer_scatter_unroll_masked(
   return
 }
 
-// After unrolling, mask slices are passed to each masked store.
+// After unrolling, mask slices are passed to each masked transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_masked
-// CHECK-COUNT-4: vector.maskedstore {{.+}} : memref<4096x64xf16>, vector<64xi1>, vector<64xf16>
+// CHECK-COUNT-4: vector.transfer_write %{{.+}}, %{{.+}}, %{{.+}} : vector<64xf16>, memref<4096x64xf16>
 
 // -----
 
@@ -333,6 +333,6 @@ func.func @transfer_scatter_unroll_transposed_index(
 }
 
 // After two rounds of unrolling (d0=4 then d1=8), the 3D scatter
-// becomes 4*8=32 rank-1 stores.
+// becomes 4*8=32 rank-1 transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
-// CHECK-COUNT-32: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+// CHECK-COUNT-32: vector.transfer_write {{.+}} : vector<64xf16>, memref<4096x64xf16>
