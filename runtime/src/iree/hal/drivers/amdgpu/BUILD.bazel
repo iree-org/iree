@@ -222,6 +222,26 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "allocator_test",
+    srcs = ["allocator_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":amdgpu",
+        ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "aql_command_buffer_test",
     srcs = ["aql_command_buffer_test.cc"],
     group = "iree-hal-drivers-amdgpu-tests",

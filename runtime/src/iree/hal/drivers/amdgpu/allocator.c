@@ -21,8 +21,33 @@
 static const char* IREE_HAL_AMDGPU_ALLOCATOR_ID = "iree-hal-amdgpu-unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
-// HSA memory-pool allocations are reported and rounded to this alignment.
-#define IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT 256
+typedef struct iree_hal_amdgpu_allocator_memory_pool_t {
+  // HSA memory pool used for allocations.
+  hsa_amd_memory_pool_t memory_pool;
+
+  // Allocation sizes submitted to HSA are rounded up to this granule.
+  iree_device_size_t allocation_granule;
+
+  // Base-pointer alignment guaranteed by HSA allocations from |memory_pool|.
+  iree_device_size_t allocation_alignment;
+
+  // Maximum single HSA allocation size supported by |memory_pool|.
+  iree_device_size_t max_allocation_size;
+} iree_hal_amdgpu_allocator_memory_pool_t;
+
+typedef struct iree_hal_amdgpu_allocator_memory_pools_t {
+  // Coarse-grained GPU-local pools used for default device-local allocations.
+  iree_hal_amdgpu_allocator_memory_pool_t
+      device_coarse[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
+
+  // Fine-grained GPU-local pools used only for explicit host-visible requests.
+  iree_hal_amdgpu_allocator_memory_pool_t
+      device_fine[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
+
+  // Fine-grained host-local pools nearest to each GPU.
+  iree_hal_amdgpu_allocator_memory_pool_t
+      host_fine[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
+} iree_hal_amdgpu_allocator_memory_pools_t;
 
 typedef struct iree_hal_amdgpu_allocator_t {
   // HAL resource header for allocator lifetime management.
@@ -40,14 +65,8 @@ typedef struct iree_hal_amdgpu_allocator_t {
   // Unowned topology used to resolve queue affinity to a physical device.
   const iree_hal_amdgpu_topology_t* topology;
 
-  // Coarse-grained GPU-local pools used for default device-local allocations.
-  hsa_amd_memory_pool_t device_coarse_pools[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
-
-  // Fine-grained GPU-local pools used only for explicit host-visible requests.
-  hsa_amd_memory_pool_t device_fine_pools[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
-
-  // Fine-grained host-local pools nearest to each GPU.
-  hsa_amd_memory_pool_t host_fine_pools[IREE_HAL_AMDGPU_MAX_GPU_AGENT];
+  // Cached HSA memory pool properties used for placement and heap queries.
+  iree_hal_amdgpu_allocator_memory_pools_t memory_pools;
 
   IREE_STATISTICS(
       // Aggregate allocation statistics reported through the HAL allocator API.
@@ -56,7 +75,7 @@ typedef struct iree_hal_amdgpu_allocator_t {
 
 typedef struct iree_hal_amdgpu_allocator_placement_t {
   // HSA memory pool selected for the allocation.
-  hsa_amd_memory_pool_t memory_pool;
+  const iree_hal_amdgpu_allocator_memory_pool_t* memory_pool;
 
   // Physical device ordinal owning |memory_pool|.
   uint32_t physical_device_ordinal;
@@ -108,6 +127,64 @@ static iree_hal_amdgpu_allocator_t* iree_hal_amdgpu_allocator_cast(
   return (iree_hal_amdgpu_allocator_t*)base_value;
 }
 
+static iree_status_t iree_hal_amdgpu_allocator_query_pool_properties(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_allocator_memory_pool_t* out_pool) {
+  memset(out_pool, 0, sizeof(*out_pool));
+
+  bool allocation_allowed = false;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+      IREE_LIBHSA(libhsa), memory_pool,
+      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALLOWED, &allocation_allowed));
+  if (!allocation_allowed) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "AMDGPU allocator memory pool does not support runtime allocations");
+  }
+
+  size_t allocation_granule = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+      IREE_LIBHSA(libhsa), memory_pool,
+      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_GRANULE, &allocation_granule));
+  if (allocation_granule == 0 ||
+      !iree_device_size_is_power_of_two(allocation_granule)) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "invalid HSA runtime allocation granule for an AMDGPU memory pool: "
+        "%" PRIhsz,
+        (iree_host_size_t)allocation_granule);
+  }
+
+  size_t allocation_alignment = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+      IREE_LIBHSA(libhsa), memory_pool,
+      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALIGNMENT, &allocation_alignment));
+  if (allocation_alignment == 0 ||
+      !iree_device_size_is_power_of_two(allocation_alignment)) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "invalid HSA runtime allocation alignment for an AMDGPU memory pool: "
+        "%" PRIhsz,
+        (iree_host_size_t)allocation_alignment);
+  }
+
+  size_t max_allocation_size = 0;
+  IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+      IREE_LIBHSA(libhsa), memory_pool, HSA_AMD_MEMORY_POOL_INFO_ALLOC_MAX_SIZE,
+      &max_allocation_size));
+  if (max_allocation_size == 0) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "invalid HSA max allocation size for an AMDGPU memory pool");
+  }
+
+  out_pool->memory_pool = memory_pool;
+  out_pool->allocation_granule = (iree_device_size_t)allocation_granule;
+  out_pool->allocation_alignment = (iree_device_size_t)allocation_alignment;
+  out_pool->max_allocation_size = (iree_device_size_t)max_allocation_size;
+  return iree_ok_status();
+}
+
 static bool iree_hal_amdgpu_allocator_select_device_ordinal(
     const iree_hal_amdgpu_allocator_t* allocator,
     iree_hal_queue_affinity_t queue_affinity,
@@ -148,7 +225,7 @@ static bool iree_hal_amdgpu_allocator_resolve_placement(
   const bool requires_device_local =
       iree_all_bits_set(required_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL);
 
-  hsa_amd_memory_pool_t memory_pool = {0};
+  const iree_hal_amdgpu_allocator_memory_pool_t* memory_pool = NULL;
   iree_hal_memory_type_t memory_type = 0;
   // Sharing hints do not affect HSA pool selection. Export is omitted because
   // it requires dedicated platform export support.
@@ -161,19 +238,19 @@ static bool iree_hal_amdgpu_allocator_resolve_placement(
                                             sharing_usage;
   if (requires_host_local) {
     if (requires_device_local) return false;
-    memory_pool = allocator->host_fine_pools[device_ordinal];
+    memory_pool = &allocator->memory_pools.host_fine[device_ordinal];
     memory_type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   } else if (requires_host_visible) {
-    memory_pool = allocator->device_fine_pools[device_ordinal];
+    memory_pool = &allocator->memory_pools.device_fine[device_ordinal];
     memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                   IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
                   IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
   } else {
-    memory_pool = allocator->device_coarse_pools[device_ordinal];
+    memory_pool = &allocator->memory_pools.device_coarse[device_ordinal];
     memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   }
-  if (!memory_pool.handle) return false;
+  if (!memory_pool->memory_pool.handle) return false;
   if (!iree_all_bits_set(memory_type, required_type)) return false;
 
   if (iree_any_bit_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
@@ -234,16 +311,31 @@ iree_status_t iree_hal_amdgpu_allocator_create(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0;
        i < topology->gpu_agent_count && iree_status_is_ok(status); ++i) {
+    hsa_amd_memory_pool_t device_coarse_pool = {0};
     status = iree_hal_amdgpu_find_coarse_global_memory_pool(
-        libhsa, topology->gpu_agents[i], &allocator->device_coarse_pools[i]);
+        libhsa, topology->gpu_agents[i], &device_coarse_pool);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_allocator_query_pool_properties(
+          libhsa, device_coarse_pool,
+          &allocator->memory_pools.device_coarse[i]);
+    }
+
+    hsa_amd_memory_pool_t device_fine_pool = {0};
     if (iree_status_is_ok(status)) {
       status = iree_hal_amdgpu_find_fine_global_memory_pool(
-          libhsa, topology->gpu_agents[i], &allocator->device_fine_pools[i]);
+          libhsa, topology->gpu_agents[i], &device_fine_pool);
     }
     if (iree_status_is_ok(status)) {
+      status = iree_hal_amdgpu_allocator_query_pool_properties(
+          libhsa, device_fine_pool, &allocator->memory_pools.device_fine[i]);
+    }
+
+    if (iree_status_is_ok(status)) {
       const iree_host_size_t host_ordinal = topology->gpu_cpu_map[i];
-      allocator->host_fine_pools[i] =
-          logical_device->system->host_memory_pools[host_ordinal].fine_pool;
+      status = iree_hal_amdgpu_allocator_query_pool_properties(
+          libhsa,
+          logical_device->system->host_memory_pools[host_ordinal].fine_pool,
+          &allocator->memory_pools.host_fine[i]);
     }
   }
 
@@ -289,16 +381,61 @@ static void iree_hal_amdgpu_allocator_query_statistics(
   });
 }
 
+static iree_device_size_t iree_hal_amdgpu_allocator_min_pool_limit(
+    iree_device_size_t lhs, iree_device_size_t rhs) {
+  return lhs < rhs ? lhs : rhs;
+}
+
+static void iree_hal_amdgpu_allocator_query_pool_family_limits(
+    const iree_hal_amdgpu_allocator_memory_pool_t* pools,
+    iree_host_size_t pool_count, iree_device_size_t* out_max_allocation_size,
+    iree_device_size_t* out_min_alignment) {
+  iree_device_size_t max_allocation_size = pools[0].max_allocation_size;
+  iree_device_size_t min_alignment = pools[0].allocation_alignment;
+  for (iree_host_size_t i = 1; i < pool_count; ++i) {
+    max_allocation_size = iree_hal_amdgpu_allocator_min_pool_limit(
+        max_allocation_size, pools[i].max_allocation_size);
+    min_alignment = iree_hal_amdgpu_allocator_min_pool_limit(
+        min_alignment, pools[i].allocation_alignment);
+  }
+  *out_max_allocation_size = max_allocation_size;
+  *out_min_alignment = min_alignment;
+}
+
 static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_host_size_t capacity,
     iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
     iree_host_size_t* IREE_RESTRICT out_count) {
+  iree_hal_amdgpu_allocator_t* allocator =
+      iree_hal_amdgpu_allocator_cast(base_allocator);
   const iree_host_size_t heap_count = 3;
   *out_count = heap_count;
-  if (capacity < heap_count) return iree_ok_status();
+  if (capacity < heap_count) {
+    // NOTE: lightweight as this is hit in normal pre-sizing usage.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
 
   memset(heaps, 0, heap_count * sizeof(*heaps));
+
+  iree_device_size_t device_coarse_max_allocation_size = 0;
+  iree_device_size_t device_coarse_min_alignment = 0;
+  iree_hal_amdgpu_allocator_query_pool_family_limits(
+      allocator->memory_pools.device_coarse,
+      allocator->topology->gpu_agent_count, &device_coarse_max_allocation_size,
+      &device_coarse_min_alignment);
+
+  iree_device_size_t device_fine_max_allocation_size = 0;
+  iree_device_size_t device_fine_min_alignment = 0;
+  iree_hal_amdgpu_allocator_query_pool_family_limits(
+      allocator->memory_pools.device_fine, allocator->topology->gpu_agent_count,
+      &device_fine_max_allocation_size, &device_fine_min_alignment);
+
+  iree_device_size_t host_fine_max_allocation_size = 0;
+  iree_device_size_t host_fine_min_alignment = 0;
+  iree_hal_amdgpu_allocator_query_pool_family_limits(
+      allocator->memory_pools.host_fine, allocator->topology->gpu_agent_count,
+      &host_fine_max_allocation_size, &host_fine_min_alignment);
 
   // Sharing hints do not affect HSA pool selection. Export is omitted because
   // it requires dedicated platform export support.
@@ -318,23 +455,23 @@ static iree_status_t iree_hal_amdgpu_allocator_query_memory_heaps(
   heaps[0].type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   heaps[0].allowed_usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
                            IREE_HAL_BUFFER_USAGE_DISPATCH | sharing_usage;
-  heaps[0].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[0].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
+  heaps[0].max_allocation_size = device_coarse_max_allocation_size;
+  heaps[0].min_alignment = device_coarse_min_alignment;
 
   // Heap 1: fine-grained device-local memory for explicit host visibility.
   heaps[1].type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                   IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
                   IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
   heaps[1].allowed_usage = mappable_usage;
-  heaps[1].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[1].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
+  heaps[1].max_allocation_size = device_fine_max_allocation_size;
+  heaps[1].min_alignment = device_fine_min_alignment;
 
   // Heap 2: fine-grained host-local memory visible to the device.
   heaps[2].type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   heaps[2].allowed_usage = mappable_usage;
-  heaps[2].max_allocation_size = ~(iree_device_size_t)0;
-  heaps[2].min_alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
+  heaps[2].max_allocation_size = host_fine_max_allocation_size;
+  heaps[2].min_alignment = host_fine_min_alignment;
 
   return iree_ok_status();
 }
@@ -352,9 +489,44 @@ iree_hal_amdgpu_allocator_query_buffer_compatibility(
                                                    &placement)) {
     return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   }
+  if (!iree_device_size_is_valid_alignment(params->min_alignment)) {
+    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+  }
 
-  iree_hal_buffer_compatibility_t compatibility =
-      IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
+  // Guard against 0-byte allocations.
+  if (*allocation_size == 0) *allocation_size = 4;
+
+  iree_device_size_t aligned_allocation_size = 0;
+  if (!iree_device_size_checked_align(*allocation_size,
+                                      placement.memory_pool->allocation_granule,
+                                      &aligned_allocation_size)) {
+    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+  }
+  *allocation_size = aligned_allocation_size;
+
+  const bool allocation_size_valid =
+      aligned_allocation_size <= placement.memory_pool->max_allocation_size;
+  const bool allocation_alignment_valid =
+      params->min_alignment == 0 ||
+      params->min_alignment <= placement.memory_pool->allocation_alignment;
+
+  const bool allocation_compatible =
+      allocation_size_valid && allocation_alignment_valid;
+  const bool import_compatible =
+      allocation_size_valid &&
+      iree_all_bits_set(params->type,
+                        IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
+      !iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL);
+  if (!allocation_compatible && !import_compatible) {
+    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+  }
+
+  iree_hal_buffer_compatibility_t compatibility = 0;
+  if (allocation_compatible) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
+  }
+
   if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
   }
@@ -362,21 +534,9 @@ iree_hal_amdgpu_allocator_query_buffer_compatibility(
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
   }
 
-  if (iree_all_bits_set(params->type,
-                        IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
-      !iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+  if (import_compatible) {
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
   }
-
-  // Guard against 0-byte allocations.
-  if (*allocation_size == 0) *allocation_size = 4;
-
-  // Align to the HSA memory pool minimum.
-  *allocation_size =
-      iree_device_size_ceil_div(*allocation_size,
-                                IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT) *
-      IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
 
   return compatibility;
 }
@@ -398,13 +558,13 @@ static void iree_hal_amdgpu_allocator_record_buffer_allocate(
       iree_hal_profile_memory_event_default();
   event.type = IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_BUFFER_ALLOCATE;
   event.allocation_id = allocation_id;
-  event.pool_id = memory_placement->memory_pool.handle;
+  event.pool_id = memory_placement->memory_pool->memory_pool.handle;
   event.backing_id = (uint64_t)(uintptr_t)host_ptr;
   event.physical_device_ordinal = memory_placement->physical_device_ordinal;
   event.memory_type = memory_placement->memory_type;
   event.buffer_usage = params.usage;
   event.length = allocation_size;
-  event.alignment = IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT;
+  event.alignment = memory_placement->memory_pool->allocation_alignment;
   if (iree_hal_amdgpu_logical_device_record_profile_memory_event(
           (iree_hal_device_t*)allocator->logical_device, &event)) {
     iree_hal_amdgpu_buffer_set_profile_allocation(
@@ -498,26 +658,56 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
-  // Guard against 0-byte allocations and align to the HSA memory pool minimum.
+  if (IREE_UNLIKELY(
+          !iree_device_size_is_valid_alignment(params->min_alignment))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "requested AMDGPU allocation alignment %" PRIu64
+                            " is not a power-of-two",
+                            (uint64_t)params->min_alignment);
+  }
+  if (IREE_UNLIKELY(params->min_alignment != 0 &&
+                    params->min_alignment >
+                        memory_placement.memory_pool->allocation_alignment)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "requested AMDGPU allocation alignment %" PRIu64
+        " exceeds HSA memory pool alignment %" PRIu64,
+        (uint64_t)params->min_alignment,
+        (uint64_t)memory_placement.memory_pool->allocation_alignment);
+  }
+
+  // Guard against 0-byte allocations and align to the HSA allocation granule.
   if (allocation_size == 0) allocation_size = 4;
-  if (!iree_device_size_checked_align(allocation_size,
-                                      IREE_HAL_AMDGPU_ALLOCATOR_MIN_ALIGNMENT,
-                                      &allocation_size)) {
+  if (!iree_device_size_checked_align(
+          allocation_size, memory_placement.memory_pool->allocation_granule,
+          &allocation_size)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "allocation size %" PRIdsz
-                            " overflows HSA memory pool alignment",
+                            " overflows HSA memory pool allocation granule",
                             allocation_size);
+  }
+  if (IREE_UNLIKELY(allocation_size >
+                    memory_placement.memory_pool->max_allocation_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "AMDGPU allocation size %" PRIu64
+        " exceeds HSA memory pool max allocation size %" PRIu64,
+        (uint64_t)allocation_size,
+        (uint64_t)memory_placement.memory_pool->max_allocation_size);
   }
 
   // Allocate from the resolved HSA memory pool.
   void* host_ptr = NULL;
   iree_status_t status = iree_hsa_amd_memory_pool_allocate(
-      IREE_LIBHSA(allocator->libhsa), memory_placement.memory_pool,
+      IREE_LIBHSA(allocator->libhsa), memory_placement.memory_pool->memory_pool,
       (size_t)allocation_size, HSA_AMD_MEMORY_POOL_STANDARD_FLAG, &host_ptr);
 
-  // Grant all agents access to the allocation. The call is cheap when access
-  // is already permitted and required for correctness when it isn't.
+  // Grant the logical topology access to the allocation. This is intentionally
+  // broad while allocator sharing semantics remain topology-wide.
   if (iree_status_is_ok(status)) {
     const iree_hal_amdgpu_topology_t* topology =
         &allocator->logical_device->system->topology;
@@ -539,8 +729,8 @@ static iree_status_t iree_hal_amdgpu_allocator_allocate_buffer(
     };
     status = iree_hal_amdgpu_buffer_create(
         allocator->libhsa, buffer_placement, memory_placement.memory_type,
-        IREE_HAL_MEMORY_ACCESS_ALL, compat_params.usage, allocation_size,
-        byte_length, host_ptr, iree_hal_buffer_release_callback_null(),
+        compat_params.access, compat_params.usage, allocation_size, byte_length,
+        host_ptr, iree_hal_buffer_release_callback_null(),
         allocator->host_allocator, &buffer);
   }
 
@@ -649,6 +839,24 @@ static iree_status_t iree_hal_amdgpu_allocator_import_buffer(
   if (IREE_UNLIKELY(!external_buffer->handle.host_allocation.ptr)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "host allocation import requires a non-null ptr");
+  }
+  if (IREE_UNLIKELY(
+          !iree_device_size_is_valid_alignment(params->min_alignment))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "requested AMDGPU import alignment %" PRIu64
+                            " is not a power-of-two",
+                            (uint64_t)params->min_alignment);
+  }
+  if (IREE_UNLIKELY(params->min_alignment != 0 &&
+                    (params->min_alignment > IREE_HOST_SIZE_MAX ||
+                     !iree_host_ptr_has_alignment(
+                         external_buffer->handle.host_allocation.ptr,
+                         (iree_host_size_t)params->min_alignment)))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "host allocation import pointer does not satisfy requested AMDGPU "
+        "alignment %" PRIu64,
+        (uint64_t)params->min_alignment);
   }
   if (IREE_UNLIKELY(external_buffer->size == 0)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

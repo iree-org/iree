@@ -223,6 +223,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    allocator_test
+  SRCS
+    "allocator_test.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    iree::base
+    iree::hal
+    iree::hal::cts::util::test_base
+    iree::hal::drivers::amdgpu::util::topology
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
     aql_command_buffer_test
   SRCS
     "aql_command_buffer_test.cc"
