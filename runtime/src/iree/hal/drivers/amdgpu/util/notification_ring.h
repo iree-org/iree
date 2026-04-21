@@ -54,9 +54,9 @@ typedef struct iree_hal_resource_set_t iree_hal_resource_set_t;
 // Default notification ring capacity.
 #define IREE_HAL_AMDGPU_DEFAULT_NOTIFICATION_CAPACITY 1024
 
-// Sentinel value in frontier_snapshot_t::entry_count indicating the reader
-// should wrap to byte 0 of the frontier ring. Written when a snapshot doesn't
-// fit in the remaining buffer space.
+// Sentinel value in frontier_snapshot_t::frontier.entry_count indicating the
+// reader should wrap to byte 0 of the frontier ring. Written when a snapshot
+// doesn't fit in the remaining buffer space.
 #define IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL 0xFF
 
 // Maximum number of frontier entries in one snapshot.
@@ -118,18 +118,17 @@ static_assert(sizeof(iree_hal_amdgpu_notification_entry_t) == 32,
 // queue's accumulated frontier at the end of a same-semaphore span. The
 // drain reads one snapshot per coalesced flush.
 //
-// Variable-size: the header is followed by entry_count frontier entries.
-// Total size: sizeof(header) + entry_count *
+// Variable-size: the header is followed by frontier.entry_count frontier
+// entries. Total size: sizeof(header) + frontier.entry_count *
 // sizeof(iree_async_frontier_entry_t).
 typedef struct iree_hal_amdgpu_frontier_snapshot_t {
   // Epoch at the end of the same-semaphore span this snapshot covers.
   uint64_t epoch;
-  // Number of frontier entries following this header. 0xFF is a sentinel
-  // indicating the reader should wrap to byte 0 (not a real snapshot).
-  uint8_t entry_count;
-  // Reserved padding that makes the trailing frontier entries 8-byte aligned.
-  uint8_t reserved[7];
-  // Followed by entry_count x iree_async_frontier_entry_t.
+  // Frontier header followed by frontier.entry_count entries. An entry_count
+  // of 0xFF is a sentinel indicating the reader should wrap to byte 0 (not a
+  // real snapshot).
+  iree_async_frontier_header_t frontier;
+  // Followed by frontier.entry_count x iree_async_frontier_entry_t.
 } iree_hal_amdgpu_frontier_snapshot_t;
 
 //===----------------------------------------------------------------------===//

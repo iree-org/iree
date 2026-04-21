@@ -29,14 +29,6 @@
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 #include "iree/hal/utils/resource_set.h"
 
-// The inline frontier on host_queue_t uses the same {entry_count, reserved[7],
-// entries[N]} layout as iree_async_frontier_t + FAM. Verify the entries field
-// starts at the FAM offset so iree_hal_amdgpu_host_queue_frontier() is valid.
-static_assert(offsetof(iree_hal_amdgpu_host_queue_t, frontier.entries) -
-                      offsetof(iree_hal_amdgpu_host_queue_t, frontier) ==
-                  sizeof(iree_async_frontier_t),
-              "inline frontier entries must align with frontier_t FAM offset");
-
 static const iree_hal_amdgpu_virtual_queue_vtable_t
     iree_hal_amdgpu_host_queue_vtable;
 

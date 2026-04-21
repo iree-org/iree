@@ -18,16 +18,6 @@ static_assert(sizeof(iree_hal_amdgpu_frontier_snapshot_t) % 8 == 0,
 static_assert(sizeof(iree_async_frontier_entry_t) % 8 == 0,
               "frontier entry must be 8-byte aligned size");
 
-// read_frontier_snapshot casts &snapshot->entry_count to
-// iree_async_frontier_t*. The region from entry_count to end-of-header must be
-// exactly sizeof(frontier_t) so that the FAM entries[] of the cast frontier
-// align with the snapshot's trailing entries.
-static_assert(sizeof(iree_hal_amdgpu_frontier_snapshot_t) -
-                      offsetof(iree_hal_amdgpu_frontier_snapshot_t,
-                               entry_count) ==
-                  sizeof(iree_async_frontier_t),
-              "snapshot entry_count region must match frontier_t layout");
-
 static inline iree_host_size_t
 iree_hal_amdgpu_notification_ring_frontier_offset(
     const iree_hal_amdgpu_notification_ring_t* ring,
@@ -50,7 +40,7 @@ static inline iree_host_size_t
 iree_hal_amdgpu_notification_ring_frontier_snapshot_size(
     const iree_hal_amdgpu_frontier_snapshot_t* snapshot) {
   return sizeof(*snapshot) +
-         snapshot->entry_count * sizeof(iree_async_frontier_entry_t);
+         snapshot->frontier.entry_count * sizeof(iree_async_frontier_entry_t);
 }
 
 iree_status_t iree_hal_amdgpu_reclaim_entry_prepare(
@@ -436,7 +426,8 @@ void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
       iree_hal_amdgpu_frontier_snapshot_t* sentinel =
           (iree_hal_amdgpu_frontier_snapshot_t*)(ring->frontier_ring.data +
                                                  write_offset);
-      sentinel->entry_count = IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL;
+      sentinel->frontier.entry_count =
+          IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL;
     }
     write += remaining;
     write_offset = 0;
@@ -447,8 +438,8 @@ void iree_hal_amdgpu_notification_ring_push_frontier_snapshot(
       (iree_hal_amdgpu_frontier_snapshot_t*)(ring->frontier_ring.data +
                                              write_offset);
   snapshot->epoch = epoch;
-  snapshot->entry_count = entry_count;
-  memset(snapshot->reserved, 0, sizeof(snapshot->reserved));
+  snapshot->frontier.entry_count = entry_count;
+  memset(snapshot->frontier.reserved, 0, sizeof(snapshot->frontier.reserved));
   if (entry_count > 0) {
     memcpy(snapshot + 1, frontier->entries,
            entry_count * sizeof(iree_async_frontier_entry_t));
@@ -467,7 +458,8 @@ iree_hal_amdgpu_notification_ring_frontier_snapshot_at(
   const iree_hal_amdgpu_frontier_snapshot_t* snapshot =
       (const iree_hal_amdgpu_frontier_snapshot_t*)(ring->frontier_ring.data +
                                                    read_offset);
-  if (snapshot->entry_count == IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL) {
+  if (snapshot->frontier.entry_count ==
+      IREE_HAL_AMDGPU_FRONTIER_SNAPSHOT_SENTINEL) {
     *inout_read += ring->frontier_ring.capacity - read_offset;
     snapshot =
         (const iree_hal_amdgpu_frontier_snapshot_t*)ring->frontier_ring.data;
@@ -528,10 +520,10 @@ iree_hal_amdgpu_notification_ring_read_frontier_snapshot(
                                                    read + snapshot_size,
                                                    iree_memory_order_release);
 
-  // The snapshot's {entry_count, reserved[7], entries[]} region starting at
-  // &snapshot->entry_count is layout-compatible with iree_async_frontier_t.
-  // Return a pointer to it — valid until the next read advances past it.
-  return (const iree_async_frontier_t*)&snapshot->entry_count;
+  // The snapshot's frontier header is followed by entries[] and is
+  // layout-compatible with iree_async_frontier_t. Return a pointer to it —
+  // valid until the next read advances past it.
+  return (const iree_async_frontier_t*)&snapshot->frontier;
 }
 
 static const iree_async_frontier_t*

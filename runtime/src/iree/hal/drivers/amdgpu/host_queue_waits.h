@@ -7,37 +7,18 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_WAITS_H_
 #define IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_WAITS_H_
 
-#include <stddef.h>
-
 #include "iree/hal/drivers/amdgpu/host_queue.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-//===----------------------------------------------------------------------===//
-// Fixed-capacity frontier storage
-//===----------------------------------------------------------------------===//
-
-// Stack-allocable frontier with fixed capacity. Layout-compatible with
-// iree_async_frontier_t when cast: same {entry_count, reserved, entries[]}
-// field layout with a fixed-size array in place of the FAM.
-typedef struct iree_hal_amdgpu_fixed_frontier_t {
-  // Number of valid entries in |entries|.
-  uint8_t entry_count;
-  // Padding matching the reserved bytes in iree_async_frontier_t.
-  uint8_t reserved[7];
-  // Fixed-capacity frontier entries sorted by ascending axis.
-  iree_async_frontier_entry_t entries[IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY];
-} iree_hal_amdgpu_fixed_frontier_t;
-
-static_assert(offsetof(iree_hal_amdgpu_fixed_frontier_t, entries) ==
-                  sizeof(iree_async_frontier_t),
-              "fixed frontier entries must align with frontier_t FAM offset");
+// Stack-allocable frontier storage sized to the host queue frontier capacity.
+typedef iree_hal_amdgpu_host_queue_frontier_t iree_hal_amdgpu_fixed_frontier_t;
 
 static inline iree_async_frontier_t* iree_hal_amdgpu_fixed_frontier_as_frontier(
     iree_hal_amdgpu_fixed_frontier_t* storage) {
-  return (iree_async_frontier_t*)storage;
+  return iree_async_fixed_frontier_as_frontier(storage);
 }
 
 //===----------------------------------------------------------------------===//

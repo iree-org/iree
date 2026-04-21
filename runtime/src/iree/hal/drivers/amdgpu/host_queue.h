@@ -109,6 +109,9 @@ struct iree_hal_amdgpu_host_queue_post_drain_action_t {
 #define IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY \
   IREE_HAL_AMDGPU_MAX_FRONTIER_SNAPSHOT_ENTRY_COUNT
 
+IREE_ASYNC_FIXED_FRONTIER_TYPE(iree_hal_amdgpu_host_queue_frontier_t,
+                               IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY);
+
 // Maximum number of direct buffer bindings accepted by queue_dispatch.
 //
 // Command buffers support large binding tables through their own lifetime
@@ -479,20 +482,8 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //   - Frontier snapshot recording: snapshotted to the notification ring's
   //     frontier byte ring at semaphore transitions.
   //
-  // Inline storage sized for IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY entries.
-  // Layout-compatible with iree_async_frontier_t when accessed via
-  // iree_hal_amdgpu_host_queue_frontier(). The struct fields duplicate
-  // iree_async_frontier_t's layout with a fixed-size entries array in place
-  // of the FAM.
-  struct {
-    // Number of valid entries in |entries|.
-    uint8_t entry_count;
-    // Reserved bytes matching iree_async_frontier_t's fixed header layout.
-    uint8_t reserved[7];
-    // Inline frontier entries storing the queue's accumulated dependencies.
-    iree_async_frontier_entry_t
-        entries[IREE_HAL_AMDGPU_QUEUE_FRONTIER_CAPACITY];
-  } frontier;
+  // Fixed-capacity storage for the accumulated frontier.
+  iree_hal_amdgpu_host_queue_frontier_t frontier;
 } iree_hal_amdgpu_host_queue_t;
 
 // Returns a pointer to the queue's accumulated frontier. The returned pointer
@@ -500,14 +491,14 @@ typedef struct iree_hal_amdgpu_host_queue_t {
 // APIs (compare, merge, etc.). Valid for the lifetime of the queue.
 static inline iree_async_frontier_t* iree_hal_amdgpu_host_queue_frontier(
     iree_hal_amdgpu_host_queue_t* queue) {
-  return (iree_async_frontier_t*)&queue->frontier;
+  return iree_async_fixed_frontier_as_frontier(&queue->frontier);
 }
 
 // Returns a const pointer to the queue's accumulated frontier.
 static inline const iree_async_frontier_t*
 iree_hal_amdgpu_host_queue_const_frontier(
     const iree_hal_amdgpu_host_queue_t* queue) {
-  return (const iree_async_frontier_t*)&queue->frontier;
+  return iree_async_fixed_frontier_as_const_frontier(&queue->frontier);
 }
 
 // Submits a buffer-copy payload through the queue with the requested queue

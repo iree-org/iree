@@ -8,14 +8,6 @@
 
 #include "iree/base/api.h"
 
-// iree_async_single_frontier_t duplicates the layout of iree_async_frontier_t
-// with a fixed entries[1] array in place of the FAM. Verify the entries field
-// lands at the same offset so the cast in
-// iree_async_single_frontier_as_frontier is layout-compatible.
-static_assert(offsetof(iree_async_single_frontier_t, entries) ==
-                  sizeof(iree_async_frontier_t),
-              "single_frontier_t entries must alias frontier_t FAM offset");
-
 iree_status_t iree_async_frontier_validate(
     const iree_async_frontier_t* frontier) {
   // Check strict ascending axis order (implies no duplicates).
