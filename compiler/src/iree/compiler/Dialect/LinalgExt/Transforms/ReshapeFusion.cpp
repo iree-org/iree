@@ -354,8 +354,9 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   return success();
 }
 
+template <typename AttentionOpTy>
 static SmallVector<ReshapeOperandInfo>
-getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+getAttentionLikeReshapeInfo(AttentionOpTy attentionOp) {
   return llvm::map_to_vector(
       attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
         ReshapeOperandInfo operandInfo;
@@ -379,27 +380,13 @@ getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
 }
 
 static SmallVector<ReshapeOperandInfo>
-getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
-  return llvm::map_to_vector(
-      attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
-        ReshapeOperandInfo operandInfo;
-        auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
-        if (!operandType) {
-          assert(
-              attentionOp.getMatchingIndexingMap(&opOperand).getNumResults() ==
-                  0 &&
-              "expected non-shaped type to have no results in indexing map");
-          return operandInfo;
-        }
+getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+  return getAttentionLikeReshapeInfo(attentionOp);
+}
 
-        operandInfo.originalShape = getDimSizes(opOperand.get());
-        for (auto result :
-             attentionOp.getMatchingIndexingMap(&opOperand).getResults()) {
-          operandInfo.operandToIterationSpace.push_back(
-              cast<AffineDimExpr>(result).getPosition());
-        }
-        return operandInfo;
-      });
+static SmallVector<ReshapeOperandInfo>
+getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
+  return getAttentionLikeReshapeInfo(attentionOp);
 }
 
 static SmallVector<ReshapeOperandInfo>
