@@ -2249,7 +2249,7 @@ createSubgroupScan(PatternRewriter &rewriter, Location loc, Value value,
                    int64_t clusterSize, int64_t clusterStride) {
   auto scanOp = IREE::GPU::SubgroupScanOp::create(
       rewriter, loc, value.getType(), value.getType(), value, identity,
-      rewriter.getI32IntegerAttr(clusterSize),
+      /*inclusive=*/nullptr, rewriter.getI32IntegerAttr(clusterSize),
       rewriter.getI32IntegerAttr(clusterStride));
 
   // Build combiner region.
