@@ -29,6 +29,7 @@
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/base/threading/futex.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -256,6 +257,9 @@ struct iree_task_process_t {
   // claims. Slot release is not allowed while this is non-zero.
   iree_atomic_int32_t warm_retainers;
 
+  // Number of warm retainers sleeping on retention_epoch.
+  iree_atomic_int32_t retention_sleepers;
+
   //--- Cache line 3: list intrusion ----------------------------------------
 
   iree_alignas(iree_hardware_destructive_interference_size)
@@ -281,7 +285,11 @@ static_assert(offsetof(iree_task_process_t, warm_retainers) -
                       offsetof(iree_task_process_t, wake_budget) <
                   iree_hardware_destructive_interference_size,
               "warm-retainer count must stay on the scheduling cache line");
-static_assert(offsetof(iree_task_process_t, warm_retainers) +
+static_assert(offsetof(iree_task_process_t, retention_sleepers) -
+                      offsetof(iree_task_process_t, wake_budget) <
+                  iree_hardware_destructive_interference_size,
+              "retention sleeper count must stay on the scheduling cache line");
+static_assert(offsetof(iree_task_process_t, retention_sleepers) +
                       sizeof(iree_atomic_int32_t) -
                       offsetof(iree_task_process_t, wake_budget) <=
                   iree_hardware_destructive_interference_size,
@@ -416,9 +424,16 @@ static inline int32_t iree_task_process_warm_retainer_count(
 // Advances the process-local warm-retention epoch and returns the new value.
 static inline int32_t iree_task_process_advance_retention_epoch(
     iree_task_process_t* process) {
-  return iree_atomic_fetch_add(&process->retention_epoch, 1,
-                               iree_memory_order_acq_rel) +
-         1;
+  const int32_t new_epoch = iree_atomic_fetch_add(&process->retention_epoch, 1,
+                                                  iree_memory_order_acq_rel) +
+                            1;
+#if defined(IREE_RUNTIME_USE_FUTEX)
+  if (iree_atomic_load(&process->retention_sleepers,
+                       iree_memory_order_acquire) > 0) {
+    iree_futex_wake((void*)&process->retention_epoch, IREE_ALL_WAITERS);
+  }
+#endif  // IREE_RUNTIME_USE_FUTEX
+  return new_epoch;
 }
 
 #ifdef __cplusplus

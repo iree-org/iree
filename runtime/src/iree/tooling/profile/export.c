@@ -14,7 +14,7 @@
 #include "iree/tooling/profile/model.h"
 #include "iree/tooling/profile/reader.h"
 
-#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 12
+#define IREE_PROFILE_EXPORT_SCHEMA_VERSION 15
 
 static void iree_profile_export_print_prefix(FILE* file,
                                              const char* record_type,
@@ -753,6 +753,122 @@ static iree_status_t iree_profile_export_process_host_execution_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_export_process_command_region_event_records(
+    const iree_profile_model_t* model,
+    const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
+    FILE* file) {
+  (void)model;
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_command_region_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_command_region_event_t region_event;
+    memcpy(&region_event, typed_record.contents.data, sizeof(region_event));
+    const bool is_valid = region_event.command_region.start_host_time_ns >= 0 &&
+                          region_event.command_region.end_host_time_ns >=
+                              region_event.command_region.start_host_time_ns;
+    const int64_t duration_ns =
+        is_valid ? region_event.command_region.end_host_time_ns -
+                       region_event.command_region.start_host_time_ns
+                 : 0;
+    iree_profile_export_print_prefix(file, "command_region_event",
+                                     record_index);
+    fprintf(
+        file,
+        ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
+        ",\"stream_id\":%" PRIu64 ",\"event_id\":%" PRIu64
+        ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
+        ",\"block_sequence\":%u,\"region_epoch\":%u"
+        ",\"region_index\":%d,\"next_region_index\":%d"
+        ",\"flags\":%u,\"host_time_domain\":\"iree_host_time_ns\""
+        ",\"start_host_time_ns\":%" PRId64 ",\"end_host_time_ns\":%" PRId64
+        ",\"duration_ns\":%" PRId64
+        ",\"valid\":%s"
+        ",\"region_dispatch_count\":%u,\"region_tile_count\":%u"
+        ",\"region_width_bucket\":%u"
+        ",\"region_lookahead_width_bucket\":%u"
+        ",\"next_region_tile_count\":%u"
+        ",\"next_region_width_bucket\":%u"
+        ",\"next_region_lookahead_width_bucket\":%u"
+        ",\"worker_count\":%u,\"old_wake_budget\":%d"
+        ",\"new_wake_budget\":%d,\"wake_delta\":%d"
+        ",\"useful_drain_count\":%u"
+        ",\"no_work_drain_count\":%u"
+        ",\"first_useful_drain_start_host_time_ns\":%" PRId64
+        ",\"last_useful_drain_end_host_time_ns\":%" PRId64
+        ",\"tail_no_work\":{\"count\":%u"
+        ",\"remaining_tiles\":{\"min\":%u,\"max\":%u"
+        ",\"bucket_counts\":[%u,%u,%u,%u,%u,%u,%u,%u]}"
+        ",\"first_start_host_time_ns\":%" PRId64
+        ",\"last_end_host_time_ns\":%" PRId64
+        ",\"time_sums\":{\"start_offset_ns\":%" PRId64
+        ",\"drain_duration_ns\":%" PRId64
+        "}"
+        "}"
+        ",\"retention_keep_active_count\":%u"
+        ",\"retention_publish_keep_active_count\":%u"
+        ",\"retention_keep_warm_count\":%u}\n",
+        region_event.queue.physical_device_ordinal,
+        region_event.queue.queue_ordinal, region_event.stream_id,
+        region_event.event_id, region_event.submission_id,
+        region_event.command_buffer_id,
+        region_event.command_region.block_sequence,
+        region_event.command_region.epoch, region_event.command_region.index,
+        region_event.next_command_region.index, region_event.flags,
+        region_event.command_region.start_host_time_ns,
+        region_event.command_region.end_host_time_ns, duration_ns,
+        is_valid ? "true" : "false", region_event.command_region.dispatch_count,
+        region_event.command_region.tile_count,
+        region_event.command_region.width_bucket,
+        region_event.command_region.lookahead_width_bucket,
+        region_event.next_command_region.tile_count,
+        region_event.next_command_region.width_bucket,
+        region_event.next_command_region.lookahead_width_bucket,
+        region_event.scheduler.worker_count,
+        region_event.scheduler.old_wake_budget,
+        region_event.scheduler.new_wake_budget,
+        region_event.scheduler.wake_delta,
+        region_event.command_region.useful_drain_count,
+        region_event.command_region.no_work_drain_count,
+        region_event.command_region.first_useful_drain_start_host_time_ns,
+        region_event.command_region.last_useful_drain_end_host_time_ns,
+        region_event.command_region.tail_no_work.count,
+        region_event.command_region.tail_no_work.remaining_tiles.min,
+        region_event.command_region.tail_no_work.remaining_tiles.max,
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[0],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[1],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[2],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[3],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[4],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[5],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[6],
+        region_event.command_region.tail_no_work.remaining_tiles
+            .bucket_counts[7],
+        region_event.command_region.tail_no_work.first_start_host_time_ns,
+        region_event.command_region.tail_no_work.last_end_host_time_ns,
+        region_event.command_region.tail_no_work.time_sums.start_offset_ns,
+        region_event.command_region.tail_no_work.time_sums.drain_duration_ns,
+        region_event.retention.keep_active_count,
+        region_event.retention.publish_keep_active_count,
+        region_event.retention.keep_warm_count);
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_export_process_queue_event_records(
     const iree_profile_model_t* model,
     const iree_hal_profile_file_record_t* record, iree_host_size_t record_index,
@@ -1444,6 +1560,8 @@ static iree_status_t iree_profile_export_process_chunk_record(
        iree_profile_export_process_queue_device_event_records},
       {IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
        iree_profile_export_process_host_execution_event_records},
+      {IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_REGION_EVENTS,
+       iree_profile_export_process_command_region_event_records},
       {IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
        iree_profile_export_process_memory_event_records},
       {IREE_HAL_PROFILE_CONTENT_TYPE_EVENT_RELATIONSHIPS,

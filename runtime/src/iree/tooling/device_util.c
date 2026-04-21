@@ -449,10 +449,11 @@ IREE_FLAG(
     string, device_profiling_mode, "",
     "HAL device profiling data families as a comma-separated list drawn from\n"
     "['queue-events', 'host-execution', 'device-queue-events',\n"
-    "'dispatch-events', 'memory-events', 'device-metrics', 'counters',\n"
-    "'executable-metadata', 'executable-traces'] or empty to disable\n"
-    "profiling. HAL implementations may require additional flags in order to\n"
-    "configure profiling support on their devices.");
+    "'dispatch-events', 'memory-events', 'device-metrics',\n"
+    "'command-region-events', 'counters', 'executable-metadata',\n"
+    "'executable-traces'] or empty to disable profiling. HAL implementations\n"
+    "may require additional flags in order to configure profiling support on\n"
+    "their devices.");
 IREE_FLAG(
     string, device_profiling_output, "",
     "Path for a raw IREE HAL profiling bundle. Required when\n"
@@ -651,6 +652,10 @@ static iree_status_t iree_hal_device_profiling_data_families_from_flags(
       *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
     } else if (iree_string_view_equal(family_part, IREE_SV("device-metrics"))) {
       *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_METRICS;
+    } else if (iree_string_view_equal(family_part,
+                                      IREE_SV("command-region-events"))) {
+      *out_data_families |=
+          IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS;
     } else if (iree_string_view_equal(family_part, IREE_SV("counters"))) {
       *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES;
     } else if (iree_string_view_equal(family_part,

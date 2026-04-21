@@ -140,6 +140,9 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // currently claimable.
   iree_atomic_int32_t* retention_epoch_ptr;
 
+  // Warm task workers sleeping on retention_epoch_ptr.
+  iree_atomic_int32_t* retention_sleepers_ptr;
+
   struct {
     // Optional recorder receiving command-buffer dispatch execution records.
     iree_hal_local_profile_recorder_t* recorder;
@@ -158,6 +161,73 @@ typedef struct iree_hal_cmd_block_processor_context_t {
 
     // Number of entries in |dispatches|.
     iree_host_size_t dispatch_capacity;
+
+    // Command-buffer region event capture state.
+    struct {
+      // True when command-buffer region events should be emitted.
+      bool events_enabled;
+
+      // Host timestamp when the active region became claimable.
+      iree_atomic_int64_t start_host_time_ns;
+
+      // Initial tile count observed when the active region became claimable.
+      iree_atomic_int32_t tile_count;
+
+      // Number of active-region drains that executed one or more tiles.
+      iree_atomic_int32_t useful_drain_count;
+
+      // Number of active-region drains that found no claimable tiles.
+      iree_atomic_int32_t no_work_drain_count;
+
+      // Tail no-work observations collected after tile claiming.
+      struct {
+        // Unfinished tile counts observed by tail no-work drains.
+        struct {
+          // Minimum unfinished tile count observed.
+          iree_atomic_int32_t min;
+
+          // Maximum unfinished tile count observed.
+          iree_atomic_int32_t max;
+
+          // Power-of-two unfinished tile count histogram.
+          iree_atomic_int32_t bucket_counts
+              [IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT];
+        } remaining_tiles;
+
+        // Host timestamp when the first drain began.
+        iree_atomic_int64_t first_start_host_time_ns;
+
+        // Host timestamp when the last drain ended.
+        iree_atomic_int64_t last_end_host_time_ns;
+
+        // Accumulated region-relative time values for tail no-work drains.
+        struct {
+          // Sum of no-work drain start offsets from the region start.
+          iree_atomic_int64_t start_offset_ns;
+
+          // Sum of no-work drain durations.
+          iree_atomic_int64_t drain_duration_ns;
+        } time_sums;
+      } tail_no_work;
+
+      // Host timestamp when the first useful active-region drain began.
+      iree_atomic_int64_t first_useful_drain_start_host_time_ns;
+
+      // Host timestamp when the last useful active-region drain ended.
+      iree_atomic_int64_t last_useful_drain_end_host_time_ns;
+
+      // No-work drain retention behavior counts for the active region.
+      struct {
+        // No-work drains that kept the process active after advancement.
+        iree_atomic_int32_t keep_active_count;
+
+        // No-work drains that explicitly republished process activity.
+        iree_atomic_int32_t publish_keep_active_count;
+
+        // No-work drains that waited warm on the process retention epoch.
+        iree_atomic_int32_t keep_warm_count;
+      } retention;
+    } command_region;
   } profile;
 } iree_hal_cmd_block_processor_context_t;
 
@@ -277,6 +347,11 @@ void iree_hal_cmd_block_processor_context_set_profile_recorder(
 // contexts report 1.
 int32_t iree_hal_cmd_block_processor_context_wake_budget(
     const iree_hal_cmd_block_processor_context_t* context);
+
+// Records task-process retention behavior observed after a no-work drain.
+void iree_hal_cmd_block_processor_context_profile_record_retention(
+    iree_hal_cmd_block_processor_context_t* context, bool keep_active,
+    bool publish_keep_active, bool keep_warm);
 
 // Allocates an execution context for processing a block recording.
 //

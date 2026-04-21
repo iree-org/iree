@@ -119,6 +119,9 @@ struct iree_hal_local_profile_recorder_t {
   // Ring of memory lifecycle event records.
   iree_hal_local_profile_event_ring_t memory_event_ring;
 
+  // Ring of command-buffer region event records.
+  iree_hal_local_profile_event_ring_t command_region_event_ring;
+
   // Metadata ids already emitted to the session sink.
   struct {
     // Executable ids whose metadata was emitted.
@@ -156,6 +159,12 @@ iree_hal_local_profile_recorder_resolve_profiling_options(
   if (iree_hal_device_profiling_options_requests_data(
           &resolved_options,
           IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
+    resolved_options.data_families |=
+        IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
+  }
+  if (iree_hal_device_profiling_options_requests_data(
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS)) {
     resolved_options.data_families |=
         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
   }
@@ -289,6 +298,7 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
   iree_host_size_t queue_event_capacity = 0;
   iree_host_size_t host_execution_event_capacity = 0;
   iree_host_size_t memory_event_capacity = 0;
+  iree_host_size_t command_region_event_capacity = 0;
   if (iree_hal_local_profile_recorder_requests_data(
           recorder, IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
     IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_normalize_capacity(
@@ -305,10 +315,17 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
     IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_normalize_capacity(
         recorder_options->memory_event_capacity, &memory_event_capacity));
   }
+  if (iree_hal_local_profile_recorder_requests_data(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS)) {
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_normalize_capacity(
+        recorder_options->command_region_event_capacity,
+        &command_region_event_capacity));
+  }
 
   iree_host_size_t queue_events_offset = 0;
   iree_host_size_t host_execution_events_offset = 0;
   iree_host_size_t memory_events_offset = 0;
+  iree_host_size_t command_region_events_offset = 0;
   iree_host_size_t total_size = 0;
   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
       0, &total_size,
@@ -320,10 +337,14 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
           iree_hal_profile_host_execution_event_t,
           iree_alignof(iree_hal_profile_host_execution_event_t),
           &host_execution_events_offset),
-      IREE_STRUCT_FIELD_ALIGNED(memory_event_capacity,
-                                iree_hal_profile_memory_event_t,
-                                iree_alignof(iree_hal_profile_memory_event_t),
-                                &memory_events_offset)));
+      IREE_STRUCT_FIELD_ALIGNED(
+          memory_event_capacity, iree_hal_profile_memory_event_t,
+          iree_alignof(iree_hal_profile_memory_event_t), &memory_events_offset),
+      IREE_STRUCT_FIELD_ALIGNED(
+          command_region_event_capacity,
+          iree_hal_profile_command_region_event_t,
+          iree_alignof(iree_hal_profile_command_region_event_t),
+          &command_region_events_offset)));
   if (total_size == 0) return iree_ok_status();
 
   void* event_storage = NULL;
@@ -349,6 +370,12 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
         (uint8_t*)event_storage + memory_events_offset,
         sizeof(iree_hal_profile_memory_event_t), memory_event_capacity,
         &recorder->memory_event_ring);
+  }
+  if (command_region_event_capacity != 0) {
+    iree_hal_local_profile_event_ring_initialize(
+        (uint8_t*)event_storage + command_region_events_offset,
+        sizeof(iree_hal_profile_command_region_event_t),
+        command_region_event_capacity, &recorder->command_region_event_ring);
   }
   return iree_ok_status();
 }
@@ -850,6 +877,14 @@ static iree_hal_profile_memory_event_t* iree_hal_local_profile_memory_event_at(
   return &records[position & ring->mask];
 }
 
+static iree_hal_profile_command_region_event_t*
+iree_hal_local_profile_command_region_event_at(
+    const iree_hal_local_profile_event_ring_t* ring, uint64_t position) {
+  iree_hal_profile_command_region_event_t* records =
+      (iree_hal_profile_command_region_event_t*)ring->records;
+  return &records[position & ring->mask];
+}
+
 void iree_hal_local_profile_recorder_append_queue_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_queue_event_info_t* event_info,
@@ -962,6 +997,111 @@ void iree_hal_local_profile_recorder_append_host_execution_event(
   event->tile_count = event_info->tile_count;
   event->tile_duration_sum_ns = event_info->tile_duration_sum_ns;
   event->operation_count = event_info->operation_count;
+  ++ring->write_position;
+  if (out_event_id) *out_event_id = event_id;
+  iree_slim_mutex_unlock(&recorder->mutex);
+}
+
+void iree_hal_local_profile_recorder_append_command_region_event(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_command_region_event_info_t* event_info,
+    uint64_t* out_event_id) {
+  IREE_ASSERT_ARGUMENT(event_info);
+  if (out_event_id) *out_event_id = 0;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS)) {
+    return;
+  }
+  const bool is_valid =
+      iree_hal_local_profile_queue_scope_is_valid(&event_info->scope) &&
+      event_info->command_buffer_id != 0 &&
+      event_info->command_region.index >= 0;
+  IREE_ASSERT(is_valid);
+  if (IREE_UNLIKELY(!is_valid)) return;
+
+  iree_time_t start_time_ns = event_info->command_region.start_host_time_ns;
+  iree_time_t end_time_ns = event_info->command_region.end_host_time_ns;
+  if (start_time_ns == 0) start_time_ns = iree_time_now();
+  if (end_time_ns == 0) end_time_ns = iree_time_now();
+  const bool has_valid_range = end_time_ns >= start_time_ns;
+  IREE_ASSERT(has_valid_range);
+  if (IREE_UNLIKELY(!has_valid_range)) end_time_ns = start_time_ns;
+
+  iree_hal_local_profile_event_ring_t* ring =
+      &recorder->command_region_event_ring;
+  iree_slim_mutex_lock(&recorder->mutex);
+  if (ring->write_position - ring->read_position >= ring->capacity) {
+    ++ring->dropped_record_count;
+    iree_slim_mutex_unlock(&recorder->mutex);
+    return;
+  }
+
+  const uint64_t event_id = ring->next_event_id++;
+  iree_hal_profile_command_region_event_t* event =
+      iree_hal_local_profile_command_region_event_at(ring,
+                                                     ring->write_position);
+  *event = iree_hal_profile_command_region_event_default();
+  event->flags = event_info->flags;
+  event->event_id = event_id;
+  event->submission_id = event_info->submission_id;
+  event->command_buffer_id = event_info->command_buffer_id;
+  event->stream_id = event_info->scope.stream_id;
+  event->queue.physical_device_ordinal =
+      event_info->scope.physical_device_ordinal;
+  event->queue.queue_ordinal = event_info->scope.queue_ordinal;
+  event->command_region.block_sequence =
+      event_info->command_region.block_sequence;
+  event->command_region.epoch = event_info->command_region.epoch;
+  event->command_region.index = event_info->command_region.index;
+  event->command_region.dispatch_count =
+      event_info->command_region.dispatch_count;
+  event->command_region.tile_count = event_info->command_region.tile_count;
+  event->command_region.width_bucket = event_info->command_region.width_bucket;
+  event->command_region.lookahead_width_bucket =
+      event_info->command_region.lookahead_width_bucket;
+  event->command_region.useful_drain_count =
+      event_info->command_region.useful_drain_count;
+  event->command_region.no_work_drain_count =
+      event_info->command_region.no_work_drain_count;
+  event->command_region.tail_no_work.count =
+      event_info->command_region.tail_no_work.count;
+  event->command_region.tail_no_work.remaining_tiles.min =
+      event_info->command_region.tail_no_work.remaining_tiles.min;
+  event->command_region.tail_no_work.remaining_tiles.max =
+      event_info->command_region.tail_no_work.remaining_tiles.max;
+  memcpy(
+      event->command_region.tail_no_work.remaining_tiles.bucket_counts,
+      event_info->command_region.tail_no_work.remaining_tiles.bucket_counts,
+      sizeof(event->command_region.tail_no_work.remaining_tiles.bucket_counts));
+  event->command_region.first_useful_drain_start_host_time_ns =
+      event_info->command_region.first_useful_drain_start_host_time_ns;
+  event->command_region.last_useful_drain_end_host_time_ns =
+      event_info->command_region.last_useful_drain_end_host_time_ns;
+  event->command_region.tail_no_work.first_start_host_time_ns =
+      event_info->command_region.tail_no_work.first_start_host_time_ns;
+  event->command_region.tail_no_work.last_end_host_time_ns =
+      event_info->command_region.tail_no_work.last_end_host_time_ns;
+  event->command_region.tail_no_work.time_sums.start_offset_ns =
+      event_info->command_region.tail_no_work.time_sums.start_offset_ns;
+  event->command_region.tail_no_work.time_sums.drain_duration_ns =
+      event_info->command_region.tail_no_work.time_sums.drain_duration_ns;
+  event->command_region.start_host_time_ns = start_time_ns;
+  event->command_region.end_host_time_ns = end_time_ns;
+  event->next_command_region.index = event_info->next_command_region.index;
+  event->next_command_region.tile_count =
+      event_info->next_command_region.tile_count;
+  event->next_command_region.width_bucket =
+      event_info->next_command_region.width_bucket;
+  event->next_command_region.lookahead_width_bucket =
+      event_info->next_command_region.lookahead_width_bucket;
+  event->scheduler.worker_count = event_info->scheduler.worker_count;
+  event->scheduler.old_wake_budget = event_info->scheduler.old_wake_budget;
+  event->scheduler.new_wake_budget = event_info->scheduler.new_wake_budget;
+  event->scheduler.wake_delta = event_info->scheduler.wake_delta;
+  event->retention.keep_active_count = event_info->retention.keep_active_count;
+  event->retention.publish_keep_active_count =
+      event_info->retention.publish_keep_active_count;
+  event->retention.keep_warm_count = event_info->retention.keep_warm_count;
   ++ring->write_position;
   if (out_event_id) *out_event_id = event_id;
   iree_slim_mutex_unlock(&recorder->mutex);
@@ -1109,6 +1249,11 @@ static iree_status_t iree_hal_local_profile_recorder_flush_records(
     status = iree_hal_local_profile_recorder_write_event_ring(
         recorder, IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
         &recorder->host_execution_event_ring);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_profile_recorder_write_event_ring(
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_REGION_EVENTS,
+        &recorder->command_region_event_ring);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_local_profile_recorder_write_event_ring(

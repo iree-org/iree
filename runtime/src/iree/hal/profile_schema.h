@@ -76,6 +76,10 @@ extern "C" {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.host-execution-events")
 
+// Content type for an array of iree_hal_profile_command_region_event_t.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_REGION_EVENTS \
+  IREE_SV("application/vnd.iree.hal.profile.command-region-events")
+
 // Content type for an array of iree_hal_profile_memory_event_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS \
   IREE_SV("application/vnd.iree.hal.profile.memory-events")
@@ -942,6 +946,162 @@ iree_hal_profile_host_execution_event_default(void) {
   return record;
 }
 
+// Bitfield specifying properties of one command-buffer execution region.
+typedef uint32_t iree_hal_profile_command_region_event_flags_t;
+enum iree_hal_profile_command_region_event_flag_bits_t {
+  IREE_HAL_PROFILE_COMMAND_REGION_EVENT_FLAG_NONE = 0u,
+
+  // Region execution was produced by a reusable command buffer.
+  IREE_HAL_PROFILE_COMMAND_REGION_EVENT_FLAG_COMMAND_BUFFER = 1u << 0,
+
+  // Region completion transitioned to a different command-buffer block.
+  IREE_HAL_PROFILE_COMMAND_REGION_EVENT_FLAG_BLOCK_TRANSITION = 1u << 1,
+
+  // Region completion reached a terminal command-buffer state.
+  IREE_HAL_PROFILE_COMMAND_REGION_EVENT_FLAG_TERMINAL = 1u << 2,
+
+  // |next_command_region| describes a following region.
+  IREE_HAL_PROFILE_COMMAND_REGION_EVENT_FLAG_HAS_NEXT_REGION = 1u << 3,
+};
+
+// Number of power-of-two remaining-tile buckets in command-region events.
+// Buckets are: 0, 1, 2, 3-4, 5-8, 9-16, 17-32, and 33+.
+#define IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT 8
+
+// Host-timestamped command-buffer execution region.
+//
+// Command region events describe producer-defined scheduler regions, not
+// individual dispatches. A local CPU producer may use these for barrier-
+// delimited cooperative execution regions; another producer may use them for a
+// command-buffer stage that owns a scheduling decision. Consumers should join
+// detailed dispatch or host-execution records by command-buffer id and timing
+// when they need per-kernel attribution.
+typedef struct iree_hal_profile_command_region_event_t {
+  // Size of this record in bytes for forward-compatible parsing.
+  uint32_t record_length;
+  // Flags describing region transition properties.
+  iree_hal_profile_command_region_event_flags_t flags;
+  // Producer-defined event identifier unique within the region event stream.
+  uint64_t event_id;
+  // Queue submission epoch containing this region, or 0 when absent.
+  uint64_t submission_id;
+  // Session-local command-buffer identifier.
+  uint64_t command_buffer_id;
+  // Producer-defined stream identifier matching the queue metadata record.
+  uint64_t stream_id;
+  // Queue location that produced the region event.
+  struct {
+    // Session-local physical device ordinal associated with this region.
+    uint32_t physical_device_ordinal;
+    // Session-local queue ordinal associated with this region, or UINT32_MAX.
+    uint32_t queue_ordinal;
+  } queue;
+
+  // Scheduler-visible command-buffer region that completed.
+  struct {
+    // Producer-defined block sequence containing |index|.
+    uint32_t block_sequence;
+    // Producer-defined execution epoch active while this region was claimable.
+    uint32_t epoch;
+    // Producer-defined region index within |block_sequence|.
+    int32_t index;
+    // Number of encoded work commands in this region.
+    uint32_t dispatch_count;
+    // Initial execution tile count observed when this region was published.
+    uint32_t tile_count;
+    // Producer-defined worker-width bucket for this region.
+    uint32_t width_bucket;
+    // Producer-defined lookahead worker-width bucket for following regions.
+    uint32_t lookahead_width_bucket;
+    // Number of region drain attempts that executed one or more tiles.
+    uint32_t useful_drain_count;
+    // Number of region drain attempts that found no claimable tiles.
+    uint32_t no_work_drain_count;
+    // Tail no-work observations collected after checking region work commands.
+    struct {
+      // Number of active-region drains that found no claimable tile.
+      uint32_t count;
+      // Unfinished tile counts observed by tail no-work drains.
+      struct {
+        // Minimum unfinished tile count observed, or 0 when absent.
+        uint32_t min;
+        // Maximum unfinished tile count observed, or 0 when absent.
+        uint32_t max;
+        // Power-of-two bucket counts. See
+        // IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT.
+        uint32_t bucket_counts
+            [IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT];
+      } remaining_tiles;
+      // IREE monotonic host timestamp when the first drain began, or 0.
+      int64_t first_start_host_time_ns;
+      // IREE monotonic host timestamp when the last drain ended, or 0.
+      int64_t last_end_host_time_ns;
+      // Accumulated region-relative time values for tail no-work drains.
+      struct {
+        // Sum of no-work drain start offsets from the region start.
+        int64_t start_offset_ns;
+        // Sum of no-work drain durations.
+        int64_t drain_duration_ns;
+      } time_sums;
+    } tail_no_work;
+    // IREE monotonic host timestamp when the first useful drain began, or 0.
+    int64_t first_useful_drain_start_host_time_ns;
+    // IREE monotonic host timestamp when the last useful drain ended, or 0.
+    int64_t last_useful_drain_end_host_time_ns;
+    // IREE monotonic host timestamp when the region became claimable.
+    int64_t start_host_time_ns;
+    // IREE monotonic host timestamp when the region completed.
+    int64_t end_host_time_ns;
+  } command_region;
+
+  // Scheduler-visible command-buffer region published by this transition.
+  struct {
+    // Following region index, or -1 when the transition is terminal.
+    int32_t index;
+    // Initial execution tile count observed for the following region.
+    uint32_t tile_count;
+    // Producer-defined worker-width bucket for the following region.
+    uint32_t width_bucket;
+    // Producer-defined lookahead worker-width bucket for following regions.
+    uint32_t lookahead_width_bucket;
+  } next_command_region;
+
+  // Scheduler wake state associated with the transition.
+  struct {
+    // Number of workers available to the producer's region scheduler.
+    uint32_t worker_count;
+    // Wake budget active before the transition, or 0 when unavailable.
+    int32_t old_wake_budget;
+    // Wake budget selected for the following region, or 0 when unavailable.
+    int32_t new_wake_budget;
+    // Additional wake credits published for the following region.
+    int32_t wake_delta;
+  } scheduler;
+
+  // Warm-worker retention behavior observed while this region was active.
+  struct {
+    // No-work drains that kept the process active after observing advancement.
+    uint32_t keep_active_count;
+    // No-work drains that explicitly republished process activity.
+    uint32_t publish_keep_active_count;
+    // No-work drains that waited warm on the process retention epoch.
+    uint32_t keep_warm_count;
+  } retention;
+} iree_hal_profile_command_region_event_t;
+
+// Returns a default host-timestamped command region event record.
+static inline iree_hal_profile_command_region_event_t
+iree_hal_profile_command_region_event_default(void) {
+  iree_hal_profile_command_region_event_t record;
+  memset(&record, 0, sizeof(record));
+  record.record_length = sizeof(record);
+  record.queue.physical_device_ordinal = UINT32_MAX;
+  record.queue.queue_ordinal = UINT32_MAX;
+  record.command_region.index = -1;
+  record.next_command_region.index = -1;
+  return record;
+}
+
 // Type of memory lifecycle event recorded by a HAL producer.
 typedef uint32_t iree_hal_profile_memory_event_type_t;
 enum iree_hal_profile_memory_event_type_e {
@@ -1795,6 +1955,8 @@ IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_queue_device_event_t,
                                       96);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_host_execution_event_t,
                                       152);
+IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_command_region_event_t,
+                                      248);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_memory_event_t, 160);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
     iree_hal_profile_event_relationship_record_t, 72);

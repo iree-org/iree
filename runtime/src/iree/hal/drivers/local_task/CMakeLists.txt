@@ -113,6 +113,7 @@ iree_cc_library(
     ::block_isa
     iree::async
     iree::base
+    iree::base::threading
     iree::hal::local::executable_loader
     iree::hal::local::profile
   PUBLIC

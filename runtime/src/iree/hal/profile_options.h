@@ -75,6 +75,12 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // power, memory occupancy, utilization, and bandwidth. Producers should emit
   // source and descriptor metadata so profile bundles remain self-describing.
   IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_METRICS = 1ull << 8,
+
+  // Host-timestamped command-buffer execution regions such as cooperative CPU
+  // scheduler barrier regions. These describe scheduler-visible structure
+  // around groups of command operations; dispatch/kernel execution details stay
+  // in dispatch or host-execution event families.
+  IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS = 1ull << 9,
 };
 
 // Bitfield selecting producer-side profiling behavior that is not itself a

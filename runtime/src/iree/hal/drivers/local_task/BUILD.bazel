@@ -124,6 +124,7 @@ iree_runtime_cc_library(
         ":block_isa",
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/hal/local:profile",
     ],

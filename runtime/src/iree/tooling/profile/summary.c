@@ -625,6 +625,42 @@ static iree_status_t iree_profile_summary_process_host_execution_event_records(
   return status;
 }
 
+static iree_status_t iree_profile_summary_process_command_region_event_records(
+    iree_profile_summary_t* summary,
+    const iree_hal_profile_file_record_t* record) {
+  iree_profile_typed_record_iterator_t iterator;
+  iree_profile_typed_record_iterator_initialize(
+      record, sizeof(iree_hal_profile_command_region_event_t), &iterator);
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status)) {
+    iree_profile_typed_record_t typed_record;
+    bool has_record = false;
+    status = iree_profile_typed_record_iterator_next(&iterator, &typed_record,
+                                                     &has_record);
+    if (!iree_status_is_ok(status) || !has_record) break;
+
+    iree_hal_profile_command_region_event_t event;
+    memcpy(&event, typed_record.contents.data, sizeof(event));
+    ++summary->command_region_event_record_count;
+    if (event.command_region.start_host_time_ns < 0 ||
+        event.command_region.end_host_time_ns <
+            event.command_region.start_host_time_ns) {
+      ++summary->invalid_command_region_event_record_count;
+      continue;
+    }
+    const uint64_t duration_ns =
+        (uint64_t)(event.command_region.end_host_time_ns -
+                   event.command_region.start_host_time_ns);
+    if (duration_ns > UINT64_MAX - summary->total_command_region_duration_ns) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "profile command region duration counter overflowed");
+    }
+    summary->total_command_region_duration_ns += duration_ns;
+  }
+  return status;
+}
+
 static iree_status_t iree_profile_summary_process_event_relationship_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
@@ -714,6 +750,10 @@ static iree_status_t iree_profile_summary_process_chunk_record(
               IREE_HAL_PROFILE_CONTENT_TYPE_HOST_EXECUTION_EVENTS,
               host_execution_event_chunk_count,
               iree_profile_summary_process_host_execution_event_records),
+          IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
+              IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_REGION_EVENTS,
+              command_region_event_chunk_count,
+              iree_profile_summary_process_command_region_event_records),
           IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
               IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS,
               memory_event_chunk_count,
@@ -949,9 +989,9 @@ static void iree_profile_print_summary_text_chunks(
       " command_buffers=%" PRIu64 " command_operations=%" PRIu64
       " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
       " queue_events=%" PRIu64 " queue_device_events=%" PRIu64
-      " host_execution_events=%" PRIu64 " memory_events=%" PRIu64
-      " event_relationships=%" PRIu64 " counter_sets=%" PRIu64
-      " counters=%" PRIu64 " counter_samples=%" PRIu64
+      " host_execution_events=%" PRIu64 " command_region_events=%" PRIu64
+      " memory_events=%" PRIu64 " event_relationships=%" PRIu64
+      " counter_sets=%" PRIu64 " counters=%" PRIu64 " counter_samples=%" PRIu64
       " device_metric_sources=%" PRIu64 " device_metric_descriptors=%" PRIu64
       " device_metric_samples=%" PRIu64 " executable_traces=%" PRIu64
       " unknown=%" PRIu64 " truncated=%" PRIu64 " dropped_records=%" PRIu64
@@ -967,6 +1007,7 @@ static void iree_profile_print_summary_text_chunks(
       summary->dispatch_event_chunk_count, summary->queue_event_chunk_count,
       summary->queue_device_event_chunk_count,
       summary->host_execution_event_chunk_count,
+      summary->command_region_event_chunk_count,
       summary->memory_event_chunk_count,
       summary->event_relationship_chunk_count, summary->counter_set_chunk_count,
       summary->counter_chunk_count, summary->counter_sample_chunk_count,
@@ -1000,14 +1041,19 @@ static void iree_profile_print_summary_text_event_records(
           " host_execution_events=%" PRIu64
           " invalid_host_execution_events=%" PRIu64
           " host_execution_duration_ns=%" PRIu64 " memory_events=%" PRIu64
-          " event_relationships=%" PRIu64 " counter_samples=%" PRIu64
-          " executable_traces=%" PRIu64 "\n",
+          " command_region_events=%" PRIu64
+          " invalid_command_region_events=%" PRIu64
+          " command_region_duration_ns=%" PRIu64 " event_relationships=%" PRIu64
+          " counter_samples=%" PRIu64 " executable_traces=%" PRIu64 "\n",
           summary->queue_event_record_count,
           summary->queue_device_event_record_count,
           summary->host_execution_event_record_count,
           summary->invalid_host_execution_event_record_count,
           summary->total_host_execution_duration_ns,
           summary->memory_event_record_count,
+          summary->command_region_event_record_count,
+          summary->invalid_command_region_event_record_count,
+          summary->total_command_region_duration_ns,
           summary->event_relationship_record_count,
           summary->counter_sample_record_count,
           summary->executable_trace_record_count);
@@ -1214,6 +1260,10 @@ static void iree_profile_print_summary_jsonl_execution_fields(
           ",\"host_execution_event_records\":%" PRIu64
           ",\"invalid_host_execution_event_records\":%" PRIu64
           ",\"total_host_execution_duration_ns\":%" PRIu64
+          ",\"command_region_event_chunks\":%" PRIu64
+          ",\"command_region_event_records\":%" PRIu64
+          ",\"invalid_command_region_event_records\":%" PRIu64
+          ",\"total_command_region_duration_ns\":%" PRIu64
           ",\"memory_event_chunks\":%" PRIu64
           ",\"memory_event_records\":%" PRIu64
           ",\"event_relationship_chunks\":%" PRIu64
@@ -1226,6 +1276,10 @@ static void iree_profile_print_summary_jsonl_execution_fields(
           summary->host_execution_event_record_count,
           summary->invalid_host_execution_event_record_count,
           summary->total_host_execution_duration_ns,
+          summary->command_region_event_chunk_count,
+          summary->command_region_event_record_count,
+          summary->invalid_command_region_event_record_count,
+          summary->total_command_region_duration_ns,
           summary->memory_event_chunk_count, summary->memory_event_record_count,
           summary->event_relationship_chunk_count,
           summary->event_relationship_record_count);

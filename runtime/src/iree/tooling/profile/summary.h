@@ -159,6 +159,14 @@ typedef struct iree_profile_summary_t {
   uint64_t invalid_host_execution_event_record_count;
   // Sum of valid host execution durations in nanoseconds.
   uint64_t total_host_execution_duration_ns;
+  // Command region event chunks parsed.
+  uint64_t command_region_event_chunk_count;
+  // Command region event records parsed.
+  uint64_t command_region_event_record_count;
+  // Command region records with unusable or reversed timestamps.
+  uint64_t invalid_command_region_event_record_count;
+  // Sum of valid command region durations in nanoseconds.
+  uint64_t total_command_region_duration_ns;
   // Profile event relationship chunks parsed.
   uint64_t event_relationship_chunk_count;
   // Profile event relationship records parsed.

@@ -11,6 +11,7 @@
 
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/threading/futex.h"
 #include "iree/base/threading/processor.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/process.h"
@@ -481,6 +482,15 @@ static bool iree_task_worker_try_release_compute_process(
 static bool iree_task_worker_wait_warm_compute_process(
     iree_task_worker_t* worker, iree_task_process_t* process,
     int32_t keep_warm_epoch) {
+#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+  const iree_time_t spin_start_ns = iree_time_now();
+  iree_time_t spin_deadline_ns =
+      spin_start_ns + (iree_duration_t)IREE_TASK_WARM_WAIT_SPIN_NS;
+  if (spin_deadline_ns < spin_start_ns) {
+    spin_deadline_ns = IREE_TIME_INFINITE_FUTURE;
+  }
+#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+
   while (true) {
     if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
         IREE_TASK_WORKER_STATE_EXITING) {
@@ -492,8 +502,54 @@ static bool iree_task_worker_wait_warm_compute_process(
     if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
       return true;
     }
+#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+    if (iree_time_now() >= spin_deadline_ns) break;
+#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
     iree_processor_yield();
   }
+
+#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
+  while (true) {
+    if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
+        IREE_TASK_WORKER_STATE_EXITING) {
+      return false;
+    }
+    if (iree_task_process_is_terminal(process)) {
+      return false;
+    }
+
+    int32_t current_epoch = iree_task_process_retention_epoch(process);
+    if (current_epoch != keep_warm_epoch) {
+      return true;
+    }
+
+    iree_atomic_fetch_add(&process->retention_sleepers, 1,
+                          iree_memory_order_acq_rel);
+    current_epoch = iree_task_process_retention_epoch(process);
+    if (current_epoch != keep_warm_epoch) {
+      iree_atomic_fetch_sub(&process->retention_sleepers, 1,
+                            iree_memory_order_acq_rel);
+      return true;
+    }
+
+    const iree_time_t sleep_start_ns = iree_time_now();
+    iree_time_t sleep_deadline_ns =
+        sleep_start_ns + (iree_duration_t)IREE_TASK_WARM_WAIT_SLEEP_NS;
+    if (sleep_deadline_ns < sleep_start_ns) {
+      sleep_deadline_ns = IREE_TIME_INFINITE_FUTURE;
+    }
+    iree_status_code_t wait_status =
+        iree_futex_wait((void*)&process->retention_epoch,
+                        (uint32_t)current_epoch, sleep_deadline_ns);
+    iree_atomic_fetch_sub(&process->retention_sleepers, 1,
+                          iree_memory_order_acq_rel);
+    if (wait_status != IREE_STATUS_OK &&
+        wait_status != IREE_STATUS_DEADLINE_EXCEEDED &&
+        wait_status != IREE_STATUS_UNAVAILABLE) {
+      return true;
+    }
+  }
+#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 }
 
 // Scans executor compute slots for wake_budget > 1 processes and drains bounded
@@ -875,7 +931,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
 
 // Thread entry point for each worker.
 static int iree_task_worker_main(iree_task_worker_t* worker) {
-  IREE_TRACE_ZONE_BEGIN(thread_zone);
+  IREE_TRACE_ZONE_BEGIN_NAMED(thread_zone_entry, "iree_task_worker_main_entry");
 
   // We cannot rely on the global process settings for FPU state.
   // Be explicit here on what we need.
@@ -892,17 +948,23 @@ static int iree_task_worker_main(iree_task_worker_t* worker) {
       iree_atomic_exchange(&worker->state, IREE_TASK_WORKER_STATE_RUNNING,
                            iree_memory_order_acq_rel) !=
       IREE_TASK_WORKER_STATE_EXITING;
+
+  IREE_TRACE_ZONE_END(thread_zone_entry);
+
   if (IREE_LIKELY(should_run)) {
     // << work happens here >>
     iree_task_worker_pump_until_exit(worker);
   }
 
+  IREE_TRACE_ZONE_BEGIN_NAMED(thread_zone_exit, "iree_task_worker_main_exit");
+
   // Indicate idle immediately before exit.
   iree_task_worker_mark_idle(worker);
 
-  IREE_TRACE_ZONE_END(thread_zone);
   iree_atomic_store(&worker->state, IREE_TASK_WORKER_STATE_ZOMBIE,
                     iree_memory_order_release);
   iree_notification_post(&worker->state_notification, IREE_ALL_WAITERS);
+
+  IREE_TRACE_ZONE_END(thread_zone_exit);
   return 0;
 }

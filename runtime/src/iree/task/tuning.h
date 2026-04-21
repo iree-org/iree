@@ -48,6 +48,22 @@ extern "C" {
 // FANOUT=1 is a conservative default that avoids CAS contention.
 #define IREE_TASK_WAKE_FANOUT (1)
 
+// Time a warm-retained worker spins near a compute process before sleeping on
+// the process-local retention epoch. This keeps short inter-region gaps out of
+// the kernel while bounding wasted CPU on long tails. Define to -1 to force the
+// legacy busy-yield behavior on platforms where futex waits are not desired.
+#ifndef IREE_TASK_WARM_WAIT_SPIN_NS
+#define IREE_TASK_WARM_WAIT_SPIN_NS (10 * 1000)
+#endif  // IREE_TASK_WARM_WAIT_SPIN_NS
+
+// Maximum time a warm-retained worker sleeps before polling for executor exit.
+// Normal work publication wakes sleepers immediately by advancing the retention
+// epoch; the timeout only bounds shutdown latency and recovers from missed
+// platform wakes.
+#ifndef IREE_TASK_WARM_WAIT_SLEEP_NS
+#define IREE_TASK_WARM_WAIT_SLEEP_NS (1000 * 1000)
+#endif  // IREE_TASK_WARM_WAIT_SLEEP_NS
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

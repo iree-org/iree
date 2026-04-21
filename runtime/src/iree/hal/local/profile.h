@@ -32,7 +32,8 @@ iree_hal_local_profile_recorder_supported_data_families(void) {
   return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS |
          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
-         IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
+         IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS;
 }
 
 // Metadata needed to begin a local CPU profiling session.
@@ -68,6 +69,10 @@ typedef struct iree_hal_local_profile_recorder_options_t {
 
   // Maximum memory events retained between flushes; 0 selects the default.
   iree_host_size_t memory_event_capacity;
+
+  // Maximum command region events retained between flushes; 0 selects the
+  // default.
+  iree_host_size_t command_region_event_capacity;
 } iree_hal_local_profile_recorder_options_t;
 
 // Queue identity shared by local profiling records.
@@ -216,6 +221,123 @@ iree_hal_local_profile_host_execution_event_info_default(void) {
   return info;
 }
 
+// Command-buffer region data used to append one command region event record.
+typedef struct iree_hal_local_profile_command_region_event_info_t {
+  // Flags describing command region transition properties.
+  iree_hal_profile_command_region_event_flags_t flags;
+
+  // Queue metadata identity shared by the appended record.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Queue submission epoch containing this region, or 0 when absent.
+  uint64_t submission_id;
+
+  // Session-local command-buffer identifier.
+  uint64_t command_buffer_id;
+
+  // Scheduler-visible command-buffer region that completed.
+  struct {
+    // Producer-defined block sequence containing |index|.
+    uint32_t block_sequence;
+    // Producer-defined execution epoch active while this region was claimable.
+    uint32_t epoch;
+    // Producer-defined region index within |block_sequence|.
+    int32_t index;
+    // Number of encoded work commands in this region.
+    uint32_t dispatch_count;
+    // Initial execution tile count observed when this region was published.
+    uint32_t tile_count;
+    // Producer-defined worker-width bucket for this region.
+    uint32_t width_bucket;
+    // Producer-defined lookahead worker-width bucket for following regions.
+    uint32_t lookahead_width_bucket;
+    // Number of region drain attempts that executed one or more tiles.
+    uint32_t useful_drain_count;
+    // Number of region drain attempts that found no claimable tiles.
+    uint32_t no_work_drain_count;
+    // Tail no-work observations collected after checking region work commands.
+    struct {
+      // Number of active-region drains that found no claimable tile.
+      uint32_t count;
+      // Unfinished tile counts observed by tail no-work drains.
+      struct {
+        // Minimum unfinished tile count observed, or 0 when absent.
+        uint32_t min;
+        // Maximum unfinished tile count observed, or 0 when absent.
+        uint32_t max;
+        // Power-of-two bucket counts. See
+        // IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT.
+        uint32_t bucket_counts
+            [IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT];
+      } remaining_tiles;
+      // IREE monotonic host timestamp when the first drain began, or 0.
+      iree_time_t first_start_host_time_ns;
+      // IREE monotonic host timestamp when the last drain ended, or 0.
+      iree_time_t last_end_host_time_ns;
+      // Accumulated region-relative time values for tail no-work drains.
+      struct {
+        // Sum of no-work drain start offsets from the region start.
+        iree_time_t start_offset_ns;
+        // Sum of no-work drain durations.
+        iree_time_t drain_duration_ns;
+      } time_sums;
+    } tail_no_work;
+    // IREE monotonic host timestamp when the first useful drain began, or 0.
+    iree_time_t first_useful_drain_start_host_time_ns;
+    // IREE monotonic host timestamp when the last useful drain ended, or 0.
+    iree_time_t last_useful_drain_end_host_time_ns;
+    // IREE monotonic host timestamp when the region became claimable.
+    iree_time_t start_host_time_ns;
+    // IREE monotonic host timestamp when the region completed.
+    iree_time_t end_host_time_ns;
+  } command_region;
+
+  // Scheduler-visible command-buffer region published by this transition.
+  struct {
+    // Following region index, or -1 when the transition is terminal.
+    int32_t index;
+    // Initial execution tile count observed for the following region.
+    uint32_t tile_count;
+    // Producer-defined worker-width bucket for the following region.
+    uint32_t width_bucket;
+    // Producer-defined lookahead worker-width bucket for following regions.
+    uint32_t lookahead_width_bucket;
+  } next_command_region;
+
+  // Scheduler wake state associated with the transition.
+  struct {
+    // Number of workers available to the producer's region scheduler.
+    uint32_t worker_count;
+    // Wake budget active before the transition, or 0 when unavailable.
+    int32_t old_wake_budget;
+    // Wake budget selected for the following region, or 0 when unavailable.
+    int32_t new_wake_budget;
+    // Additional wake credits published for the following region.
+    int32_t wake_delta;
+  } scheduler;
+
+  // Warm-worker retention behavior observed while this region was active.
+  struct {
+    // No-work drains that kept the process active after observing advancement.
+    uint32_t keep_active_count;
+    // No-work drains that explicitly republished process activity.
+    uint32_t publish_keep_active_count;
+    // No-work drains that waited warm on the process retention epoch.
+    uint32_t keep_warm_count;
+  } retention;
+} iree_hal_local_profile_command_region_event_info_t;
+
+// Returns default command region event append data.
+static inline iree_hal_local_profile_command_region_event_info_t
+iree_hal_local_profile_command_region_event_info_default(void) {
+  iree_hal_local_profile_command_region_event_info_t info;
+  memset(&info, 0, sizeof(info));
+  info.scope = iree_hal_local_profile_queue_scope_default();
+  info.command_region.index = -1;
+  info.next_command_region.index = -1;
+  return info;
+}
+
 // Begins a local CPU profiling session and returns its recorder.
 //
 // Returns OK with |out_recorder| set to NULL when
@@ -277,6 +399,16 @@ void iree_hal_local_profile_recorder_append_queue_event(
 void iree_hal_local_profile_recorder_append_host_execution_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_host_execution_event_info_t* event_info,
+    uint64_t* out_event_id);
+
+// Appends one host-timestamped command-buffer region event to |recorder|.
+//
+// |out_event_id| may be NULL. When provided it receives the assigned event id,
+// or 0 if command region events were not requested or the event ring was full.
+// Ring capacity pressure is reported later as truncated chunks during flush.
+void iree_hal_local_profile_recorder_append_command_region_event(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_command_region_event_info_t* event_info,
     uint64_t* out_event_id);
 
 // Appends one host-timestamped memory lifecycle event to |recorder|.
