@@ -117,6 +117,43 @@ public:
       return false;
     }
 
+    // If the root has no parallel loops (e.g. full reduction to scalar), fuse
+    // if the candidate is also scalar, or if it shares an input with the group.
+    // Only applied on the consumer-side fuse; the producer-side is already
+    // handled by the default mapping path.
+    bool isConsumerSideFuse = llvm::any_of(op->getOperands(), [&](Value v) {
+      return loopMaps.contains(v.getDefiningOp());
+    });
+    auto rootFusionOp =
+        dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+    if (isConsumerSideFuse && rootFusionOp &&
+        rootFusionOp.getNumParallelLoops() == 0) {
+      auto candidateFusionOp =
+          dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
+      if (!candidateFusionOp) {
+        return false;
+      }
+      if (candidateFusionOp.getNumParallelLoops() == 0) {
+        return true;
+      }
+      SetVector<Value> groupInputs;
+      for (auto &entry : loopMaps) {
+        if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(entry.first)) {
+          for (OpOperand *in : dpsOp.getDpsInputOperands()) {
+            groupInputs.insert(in->get());
+          }
+        }
+      }
+      if (auto dpsCand = dyn_cast<DestinationStyleOpInterface>(op)) {
+        for (OpOperand *in : dpsCand.getDpsInputOperands()) {
+          if (groupInputs.contains(in->get())) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     FailureOr<AffineMap> maybeMap = getRootParallelLoopToOpMap(op);
     if (failed(maybeMap)) {
       return false;
@@ -564,39 +601,6 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   // Check operand limit before allowing fusion
   if (tracker.getFusionGroup(producer).wouldExceedOperandLimit(consumer)) {
     return false;
-  }
-
-  // If the root is a full reduction (no parallel loops) and the
-  // consumer has parallel work, only fuse when they share an input
-  // tensor. Without a shared input, fusing has no payoff.
-  {
-    Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
-    auto rootFusionOp =
-        dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
-    if (rootFusionOp && rootFusionOp.getNumParallelLoops() == 0 &&
-        consumerFusionOp.getNumParallelLoops() > 0) {
-      SetVector<Value> fusionGroupInputs;
-      for (Operation *fusedOp :
-           tracker.getFusionGroup(producer).getFusedOperations()) {
-        if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(fusedOp)) {
-          for (OpOperand *in : dpsOp.getDpsInputOperands()) {
-            fusionGroupInputs.insert(in->get());
-          }
-        }
-      }
-      bool sharesInput = false;
-      if (auto dpsConsumer = dyn_cast<DestinationStyleOpInterface>(consumer)) {
-        for (OpOperand *in : dpsConsumer.getDpsInputOperands()) {
-          if (fusionGroupInputs.contains(in->get())) {
-            sharesInput = true;
-            break;
-          }
-        }
-      }
-      if (!sharesInput) {
-        return false;
-      }
-    }
   }
 
   // Check if the iteration spaces of the producer and consumer are same.

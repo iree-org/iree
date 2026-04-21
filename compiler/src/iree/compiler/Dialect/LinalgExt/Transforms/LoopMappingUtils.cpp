@@ -113,15 +113,10 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
       if (failed(composedMap) || (resultMap && composedMap != resultMap)) {
         return failure();
       }
-      // Reject mappings that are all zeros (e.g. `(d0) -> (0)`): they
-      // indicate the consumer has no dependence on the root's parallel
-      // loops. Exceptions:
-      //   - `() -> ()` (no results): trivial scalar-to-scalar mapping.
-      //   - Root has no parallel loops (e.g. full reduction to scalar):
-      //     any mapping from its empty iteration space is all-zero by
-      //     construction, so the check carries no information here.
-      bool rootHasNoParallelLoops = producerLoopMap.getNumDims() == 0;
-      if (!rootHasNoParallelLoops && composedMap->getNumResults() > 0 &&
+      // Reject mappings that are all zeros (e.g., affine_map<(d0) -> (0)>).
+      // A zero-dimensional map like affine_map<() -> ()> is a valid
+      // scalar-to-scalar mapping and should not be rejected.
+      if (composedMap->getNumResults() > 0 &&
           composedMap->getNumResults() == composedMap->getNumOfZeroResults()) {
         return failure();
       }
