@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
 
+#include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
@@ -44,6 +45,14 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                         mlir::FunctionOpInterface entryPoint, Operation *op,
                         bool useDirectLoad,
                         std::optional<uint64_t> prefetchNumStages);
+
+/// Computes an MMA schedule from a problem description and target, using
+/// architecture-specific seed-based heuristics (deduceMMASchedule).
+std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
+    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
+    bool transposedLhs, bool transposedRhs, bool isGemm, bool scaled,
+    bool useDirectLoad, int64_t prefetchNumStages, bool mustBeAligned = true,
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.
