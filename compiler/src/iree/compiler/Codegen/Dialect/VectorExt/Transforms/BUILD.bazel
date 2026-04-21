@@ -37,8 +37,8 @@ iree_compiler_cc_library(
     srcs = [
         "BufferizationInterfaces.cpp",
         "DistributionPatterns.cpp",
-        "LowerTransferGatherScatterToVector.cpp",
         "LowerTransferGatherScatterOps.cpp",
+        "LowerTransferGatherScatterToVector.cpp",
         "Passes.cpp",
         "VectorExtFoldUnitExtentDims.cpp",
     ],

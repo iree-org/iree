@@ -31,8 +31,8 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
     "DistributionPatterns.cpp"
-    "LowerTransferGatherScatterToVector.cpp"
     "LowerTransferGatherScatterOps.cpp"
+    "LowerTransferGatherScatterToVector.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
   DEPS
