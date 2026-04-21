@@ -7,7 +7,12 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_TRANSFORMS_H_
 
+#include "mlir/IR/PatternMatch.h"
+
 namespace mlir::iree_compiler::IREE::VectorExt {
+
+void populateVectorTransferGatherScatterLoweringPatterns(
+    RewritePatternSet &patterns);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 

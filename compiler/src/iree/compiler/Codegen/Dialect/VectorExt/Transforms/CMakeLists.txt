@@ -32,6 +32,7 @@ iree_cc_library(
     "BufferizationInterfaces.cpp"
     "DistributionPatterns.cpp"
     "LowerTransferGatherScatterToVector.cpp"
+    "LowerTransferGatherScatterOps.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
   DEPS
@@ -48,6 +49,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect

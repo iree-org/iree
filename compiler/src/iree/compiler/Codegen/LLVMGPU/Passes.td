@@ -58,7 +58,6 @@ def LLVMGPULegalizeNDVectorsPass :
   let summary = "Legalize n-D vectors to 1-D vectors using type conversion.";
   let dependentDialects = [
     "arith::ArithDialect",
-    "IREE::VectorExt::IREEVectorExtDialect",
     "nvgpu::NVGPUDialect",
     "scf::SCFDialect",
     "ub::UBDialect",
