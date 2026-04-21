@@ -60,7 +60,10 @@ static iree_async_axis_t Axis(uint8_t index) {
 
 // Callback tracking state.
 struct CallbackState {
+  // Number of times the callback fired.
   std::atomic<int> call_count{0};
+
+  // Status code captured from the most recent callback.
   iree_status_code_t last_status_code{IREE_STATUS_OK};
 
   void Reset() {
@@ -77,29 +80,33 @@ static void TrackingCallback(void* user_data, iree_status_t status) {
   iree_status_free(status);
 }
 
-// RAII wrapper for tracker initialization/deinitialization.
+// RAII wrapper for tracker create/release.
 class TrackerFixture {
  public:
-  explicit TrackerFixture(uint32_t axis_capacity = 16)
-      : axis_capacity_(axis_capacity),
-        entries_(new iree_async_axis_table_entry_t[axis_capacity]()) {
-    IREE_CHECK_OK(iree_async_frontier_tracker_initialize(
-        &tracker_, entries_.get(), axis_capacity_, iree_allocator_system()));
+  explicit TrackerFixture(uint32_t axis_capacity = 16) {
+    iree_async_frontier_tracker_options_t options =
+        iree_async_frontier_tracker_options_default();
+    options.axis_table_capacity = axis_capacity;
+    IREE_CHECK_OK(iree_async_frontier_tracker_create(
+        options, iree_allocator_system(), &tracker_));
   }
 
-  ~TrackerFixture() { iree_async_frontier_tracker_deinitialize(&tracker_); }
+  ~TrackerFixture() { iree_async_frontier_tracker_release(tracker_); }
 
-  iree_async_frontier_tracker_t* tracker() { return &tracker_; }
+  iree_async_frontier_tracker_t* tracker() { return tracker_; }
 
-  int32_t AddAxis(iree_async_axis_t axis,
-                  iree_async_semaphore_t* semaphore = nullptr) {
-    return iree_async_axis_table_add(&tracker_.axis_table, axis, semaphore);
+  void AddAxis(iree_async_axis_t axis,
+               iree_async_semaphore_t* semaphore = nullptr) {
+    IREE_CHECK_OK(RegisterAxis(axis, semaphore));
+  }
+
+  iree_status_t RegisterAxis(iree_async_axis_t axis,
+                             iree_async_semaphore_t* semaphore = nullptr) {
+    return iree_async_frontier_tracker_register_axis(tracker_, axis, semaphore);
   }
 
  private:
-  uint32_t axis_capacity_;
-  std::unique_ptr<iree_async_axis_table_entry_t[]> entries_;
-  iree_async_frontier_tracker_t tracker_;
+  iree_async_frontier_tracker_t* tracker_ = nullptr;
 };
 
 //===----------------------------------------------------------------------===//
@@ -108,19 +115,34 @@ class TrackerFixture {
 
 TEST(InitializeTest, BasicInitialization) {
   TrackerFixture fixture(16);
-  EXPECT_EQ(fixture.tracker()->axis_table.count, 0u);
-  EXPECT_EQ(fixture.tracker()->axis_table.capacity, 16u);
-  EXPECT_EQ(fixture.tracker()->waiters_head, nullptr);
+  fixture.AddAxis(Axis(0));
+  EXPECT_FALSE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 1));
+  iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 1);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 1));
 }
 
 TEST(InitializeTest, ZeroCapacity) {
-  std::vector<iree_async_axis_table_entry_t> entries;
-  iree_async_frontier_tracker_t tracker;
-  IREE_EXPECT_OK(iree_async_frontier_tracker_initialize(
-      &tracker, nullptr, 0, iree_allocator_system()));
-  EXPECT_EQ(tracker.axis_table.capacity, 0u);
-  EXPECT_EQ(tracker.axis_failure_statuses, nullptr);
-  iree_async_frontier_tracker_deinitialize(&tracker);
+  TrackerFixture fixture(0);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        fixture.RegisterAxis(Axis(0)));
+}
+
+TEST(RegisterAxisTest, DuplicateAxisFails) {
+  TrackerFixture fixture(4);
+  fixture.AddAxis(Axis(0));
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ALREADY_EXISTS,
+                        fixture.RegisterAxis(Axis(0)));
+}
+
+TEST(RegisterAxisTest, FullTableDuplicateReportsDuplicate) {
+  TrackerFixture fixture(1);
+  fixture.AddAxis(Axis(0));
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ALREADY_EXISTS,
+                        fixture.RegisterAxis(Axis(0)));
 }
 
 TEST(DeinitializeTest, NoWaiters) {
@@ -130,23 +152,25 @@ TEST(DeinitializeTest, NoWaiters) {
 }
 
 TEST(DeinitializeTest, PendingWaitersCancelled) {
-  std::vector<iree_async_axis_table_entry_t> entries(4);
-  iree_async_frontier_tracker_t tracker;
-  IREE_EXPECT_OK(iree_async_frontier_tracker_initialize(
-      &tracker, entries.data(), 4, iree_allocator_system()));
-
-  iree_async_axis_table_add(&tracker.axis_table, Axis(0), nullptr);
+  iree_async_frontier_tracker_options_t options =
+      iree_async_frontier_tracker_options_default();
+  options.axis_table_capacity = 4;
+  iree_async_frontier_tracker_t* tracker = nullptr;
+  IREE_ASSERT_OK(iree_async_frontier_tracker_create(
+      options, iree_allocator_system(), &tracker));
+  IREE_ASSERT_OK(
+      iree_async_frontier_tracker_register_axis(tracker, Axis(0), nullptr));
 
   // Create a waiter that won't be satisfied.
   MAKE_FRONTIER(f, 1, E(Axis(0), 100));
   iree_async_frontier_waiter_t waiter;
   CallbackState state;
-  IREE_EXPECT_OK(iree_async_frontier_tracker_wait(&tracker, f, TrackingCallback,
+  IREE_EXPECT_OK(iree_async_frontier_tracker_wait(tracker, f, TrackingCallback,
                                                   &state, &waiter));
   EXPECT_EQ(state.call_count, 0);  // Not yet satisfied.
 
-  // Deinitialize — should cancel the waiter.
-  iree_async_frontier_tracker_deinitialize(&tracker);
+  // Releasing the last reference should cancel the waiter.
+  iree_async_frontier_tracker_release(tracker);
   EXPECT_EQ(state.call_count, 1);
   EXPECT_EQ(state.last_status_code, IREE_STATUS_CANCELLED);
 }
@@ -164,10 +188,10 @@ TEST(AdvanceTest, SingleAxis) {
   EXPECT_EQ(dispatched, 0u);
 
   // Verify epoch was updated.
-  int64_t epoch =
-      iree_atomic_load(&fixture.tracker()->axis_table.entries[0].current_epoch,
-                       iree_memory_order_acquire);
-  EXPECT_EQ(epoch, 5);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 5));
+  EXPECT_FALSE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 6));
 }
 
 TEST(AdvanceTest, BelowCurrent) {
@@ -180,10 +204,10 @@ TEST(AdvanceTest, BelowCurrent) {
   EXPECT_EQ(dispatched, 0u);
 
   // Epoch should still be 10 (monotonic).
-  int64_t epoch =
-      iree_atomic_load(&fixture.tracker()->axis_table.entries[0].current_epoch,
-                       iree_memory_order_acquire);
-  EXPECT_EQ(epoch, 10);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 10));
+  EXPECT_FALSE(
+      iree_async_frontier_tracker_query_epoch(fixture.tracker(), Axis(0), 11));
 }
 
 TEST(AdvanceTest, EqualToCurrent) {
@@ -205,10 +229,8 @@ TEST(AdvanceTest, LargeValue) {
       iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), large);
   EXPECT_EQ(dispatched, 0u);
 
-  int64_t epoch =
-      iree_atomic_load(&fixture.tracker()->axis_table.entries[0].current_epoch,
-                       iree_memory_order_acquire);
-  EXPECT_EQ((uint64_t)epoch, large);
+  EXPECT_TRUE(iree_async_frontier_tracker_query_epoch(fixture.tracker(),
+                                                      Axis(0), large));
 }
 
 TEST(AdvanceTest, UnknownAxis) {
@@ -261,9 +283,6 @@ TEST(WaitTest, NotYetSatisfiedPends) {
   IREE_EXPECT_OK(iree_async_frontier_tracker_wait(
       fixture.tracker(), f, TrackingCallback, &state, &waiter));
   EXPECT_EQ(state.call_count, 0);  // Not yet.
-
-  // Waiter should be in the list.
-  EXPECT_EQ(fixture.tracker()->waiters_head, &waiter);
 
   // Advance to satisfy.
   iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 10);
@@ -385,14 +404,14 @@ TEST(AdvanceWaitTest, MultipleWaitersDifferentFrontiers) {
   IREE_EXPECT_OK(iree_async_frontier_tracker_wait(
       fixture.tracker(), f2, TrackingCallback, &state2, &waiter2));
 
-  // Advance Axis(0) — only waiter1 should fire.
+  // Advance Axis(0); only waiter1 should fire.
   iree_host_size_t dispatched =
       iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 5);
   EXPECT_EQ(dispatched, 1u);
   EXPECT_EQ(state1.call_count, 1);
   EXPECT_EQ(state2.call_count, 0);
 
-  // Advance Axis(1) — waiter2 fires.
+  // Advance Axis(1); waiter2 fires.
   dispatched =
       iree_async_frontier_tracker_advance(fixture.tracker(), Axis(1), 5);
   EXPECT_EQ(dispatched, 1u);
@@ -417,7 +436,7 @@ TEST(CancelTest, CancelPendingWaiter) {
   EXPECT_TRUE(
       iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
 
-  // Advance past the frontier — callback should NOT fire.
+  // Advance past the frontier; callback should NOT fire.
   iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 20);
   EXPECT_EQ(state.call_count, 0);
 }
@@ -434,7 +453,7 @@ TEST(CancelTest, CancelAlreadyDispatched) {
   iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 5);
   EXPECT_EQ(state.call_count, 1);
 
-  // Cancel after already dispatched — should be a no-op.
+  // Cancel after already dispatched; should be a no-op.
   EXPECT_FALSE(
       iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
   EXPECT_EQ(state.call_count, 1);  // Still 1, not re-invoked or anything weird.
@@ -533,7 +552,7 @@ TEST(FailAxisTest, FailOneAxisOfMulti) {
       fixture.tracker(), f, TrackingCallback, &state, &waiter));
   EXPECT_EQ(state.call_count, 0);
 
-  // Fail Axis(1) — waiter should fail even though Axis(0) is not satisfied.
+  // Fail Axis(1); waiter should fail even though Axis(0) is not satisfied.
   iree_async_frontier_tracker_fail_axis(
       fixture.tracker(), Axis(1),
       iree_make_status(IREE_STATUS_INTERNAL, "axis 1 failed"));
@@ -552,6 +571,43 @@ TEST(FailAxisTest, FailUnknownAxis) {
       iree_make_status(IREE_STATUS_INTERNAL, "unknown axis"));
 }
 
+TEST(RetireAxisTest, RetireWithPendingWaiter) {
+  TrackerFixture fixture(4);
+  fixture.AddAxis(Axis(0));
+
+  MAKE_FRONTIER(f, 1, E(Axis(0), 10));
+  iree_async_frontier_waiter_t waiter;
+  CallbackState state;
+  IREE_EXPECT_OK(iree_async_frontier_tracker_wait(
+      fixture.tracker(), f, TrackingCallback, &state, &waiter));
+  EXPECT_EQ(state.call_count, 0);
+
+  iree_async_frontier_tracker_retire_axis(
+      fixture.tracker(), Axis(0),
+      iree_make_status(IREE_STATUS_CANCELLED, "device teardown"));
+
+  EXPECT_EQ(state.call_count, 1);
+  EXPECT_EQ(state.last_status_code, IREE_STATUS_CANCELLED);
+}
+
+TEST(RetireAxisTest, RetireThenWait) {
+  TrackerFixture fixture(4);
+  fixture.AddAxis(Axis(0));
+
+  iree_async_frontier_tracker_retire_axis(
+      fixture.tracker(), Axis(0),
+      iree_make_status(IREE_STATUS_CANCELLED, "device teardown"));
+
+  MAKE_FRONTIER(f, 1, E(Axis(0), 5));
+  iree_async_frontier_waiter_t waiter;
+  CallbackState state;
+  IREE_EXPECT_OK(iree_async_frontier_tracker_wait(
+      fixture.tracker(), f, TrackingCallback, &state, &waiter));
+
+  EXPECT_EQ(state.call_count, 1);
+  EXPECT_EQ(state.last_status_code, IREE_STATUS_CANCELLED);
+}
+
 //===----------------------------------------------------------------------===//
 // Section 7: Semaphore bridging
 //===----------------------------------------------------------------------===//
@@ -564,7 +620,7 @@ TEST(SemaphoreBridgingTest, AdvanceWithoutSemaphore) {
   fixture.AddAxis(Axis(0));  // No semaphore.
 
   iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 5);
-  // No crash — that's the test.
+  // No crash; that's the test.
 }
 
 //===----------------------------------------------------------------------===//
@@ -579,10 +635,17 @@ TEST(ConcurrencyTest, ConcurrentAdvanceDifferentAxes) {
 
   // Create persistent frontiers and waiters for the threads.
   struct WaiterData {
+    // Waiter storage registered with the tracker.
     iree_async_frontier_waiter_t waiter;
+
+    // Callback state updated when the waiter dispatches.
     CallbackState state;
+
+    // Inline storage for a one-entry frontier.
     alignas(16) uint8_t frontier_storage[sizeof(iree_async_frontier_t) +
                                          sizeof(iree_async_frontier_entry_t)];
+
+    // Frontier view over |frontier_storage|.
     iree_async_frontier_t* frontier;
   };
   std::vector<WaiterData> waiter_data(8);

@@ -142,7 +142,9 @@ iree_status_t iree_hal_task_device_create(
   // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
+  device->frontier_tracker = create_params->frontier.base_axis != 0
+                                 ? create_params->frontier.tracker
+                                 : NULL;
 
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
@@ -185,10 +187,9 @@ iree_status_t iree_hal_task_device_create(
 
       // Register the queue's axis in the frontier tracker's axis table.
       if (device->frontier_tracker) {
-        int32_t table_index = iree_async_axis_table_add(
-            &device->frontier_tracker->axis_table, queue_axis,
-            /*semaphore=*/NULL);
-        (void)table_index;
+        status = iree_async_frontier_tracker_register_axis(
+            device->frontier_tracker, queue_axis, /*semaphore=*/NULL);
+        if (!iree_status_is_ok(status)) break;
       }
 
       iree_hal_task_queue_initialize(

@@ -209,6 +209,7 @@ iree_cc_binary_benchmark(
   DEPS
     ::async
     benchmark
+    iree::base::threading
     iree::testing::benchmark_main
   TESTONLY
 )
