@@ -83,7 +83,10 @@ static void iree_hal_cmd_block_processor_advance_retention_epoch(
     if (context->retention_sleepers_ptr &&
         iree_atomic_load(context->retention_sleepers_ptr,
                          iree_memory_order_acquire) > 0) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(
+          z_wake, "iree_hal_local_task_wake_retention_sleepers");
       iree_futex_wake((void*)context->retention_epoch_ptr, IREE_ALL_WAITERS);
+      IREE_TRACE_ZONE_END(z_wake);
     }
 #endif  // IREE_RUNTIME_USE_FUTEX
   }

@@ -92,7 +92,9 @@ void iree_task_worker_request_exit(iree_task_worker_t* worker) {
   }
 
   // Kick the worker in case it is waiting for work.
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_wake, "iree_task_worker_request_exit_wake");
   iree_notification_post(&worker->wake_notification, 1);
+  IREE_TRACE_ZONE_END(z_wake);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -924,6 +926,7 @@ static void iree_task_worker_relay_wake(iree_task_worker_t* worker) {
     // with the new value loaded into desired by CAS.
   }
   if (claimed <= 0) return;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_wake, "iree_task_worker_relay_wake_claim");
 
   // Wake |claimed| idle workers. Skip ourselves (already active).
   iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
@@ -933,12 +936,15 @@ static void iree_task_worker_relay_wake(iree_task_worker_t* worker) {
   while (claimed > 0) {
     int target = iree_task_affinity_set_find_first(idle_mask);
     if (target < 0 || target >= (int)executor->worker_count) break;
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_post, "iree_task_worker_relay_wake_worker");
     iree_notification_post(&executor->workers[target].wake_notification, 1);
+    IREE_TRACE_ZONE_END(z_post);
     iree_task_affinity_set_clear_index(&idle_mask, (iree_host_size_t)target);
     --claimed;
   }
   // Any remaining |claimed| is dropped — the corresponding workers are
   // already active and will drain without needing a wake.
+  IREE_TRACE_ZONE_END(z_wake);
 }
 
 // Updates the cached processor ID field in the worker.

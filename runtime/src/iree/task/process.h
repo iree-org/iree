@@ -432,7 +432,10 @@ static inline int32_t iree_task_process_advance_retention_epoch(
 #if defined(IREE_RUNTIME_USE_FUTEX)
   if (iree_atomic_load(&process->retention_sleepers,
                        iree_memory_order_acquire) > 0) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_wake,
+                                "iree_task_process_wake_retention_sleepers");
     iree_futex_wake((void*)&process->retention_epoch, IREE_ALL_WAITERS);
+    IREE_TRACE_ZONE_END(z_wake);
   }
 #endif  // IREE_RUNTIME_USE_FUTEX
   return new_epoch;

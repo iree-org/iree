@@ -247,6 +247,7 @@ iree_atomic_int32_t* iree_task_executor_desired_wake_ptr(
 void iree_task_executor_wake_workers(iree_task_executor_t* executor,
                                      int32_t count) {
   if (count <= 0) return;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_wake, "iree_task_executor_wake_workers");
 
   // Add to the desired wake counter. Workers claim from this in relay_wake.
   iree_atomic_fetch_add(&executor->desired_wake, count,
@@ -257,21 +258,26 @@ void iree_task_executor_wake_workers(iree_task_executor_t* executor,
       &executor->worker_idle_mask, iree_memory_order_relaxed);
   int idle_target = iree_task_affinity_set_find_first(idle_mask);
   if (idle_target >= 0 && idle_target < (int)executor->worker_count) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_post, "iree_task_executor_wake_idle_worker");
     iree_notification_post(&executor->workers[idle_target].wake_notification,
                            1);
-    return;
+    IREE_TRACE_ZONE_END(z_post);
+  } else {
+    // No idle workers found. Post to any live worker so it loops back and
+    // picks up desired_wake on its next iteration.
+    iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
+        &executor->worker_live_mask, iree_memory_order_relaxed);
+    int live_target = iree_task_affinity_set_find_first(live_mask);
+    if (live_target >= 0 && live_target < (int)executor->worker_count) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z_post,
+                                  "iree_task_executor_wake_live_worker");
+      iree_notification_post(&executor->workers[live_target].wake_notification,
+                             1);
+      IREE_TRACE_ZONE_END(z_post);
+    }
   }
 
-  // No idle workers found. Post to any live worker so it loops back and
-  // picks up desired_wake on its next iteration.
-  iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
-      &executor->worker_live_mask, iree_memory_order_relaxed);
-  int live_target = iree_task_affinity_set_find_first(live_mask);
-  if (live_target < 0) return;  // Shutdown.
-  if (live_target < (int)executor->worker_count) {
-    iree_notification_post(&executor->workers[live_target].wake_notification,
-                           1);
-  }
+  IREE_TRACE_ZONE_END(z_wake);
 }
 
 // Tries to place a process into the first available compute slot. Returns true
