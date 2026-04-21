@@ -1242,6 +1242,30 @@ ScanOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+ArrayAttr ScanOp::getIndexingMaps() {
+  Builder b(getContext());
+  return b.getAffineMapArrayAttr(getIndexingMapsArray());
+}
+
+SmallVector<AffineMap> ScanOp::getIndexingMapsArray() {
+  MLIRContext *ctx = getContext();
+  int64_t rank = getOperandRank();
+
+  AffineMap inputOutputMap = AffineMap::getMultiDimIdentityMap(rank, ctx);
+
+  SmallVector<AffineExpr> accumulatorResults;
+  accumulatorResults.reserve(rank - 1);
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    if (dim == getDimension()) {
+      continue;
+    }
+    accumulatorResults.push_back(getAffineDimExpr(dim, ctx));
+  }
+  AffineMap accumulatorMap = AffineMap::get(rank, 0, accumulatorResults, ctx);
+
+  return {inputOutputMap, inputOutputMap, accumulatorMap};
+}
+
 MutableOperandRange ScanOp::getDpsInitsMutable() {
   return MutableOperandRange(*this, /*numInputs=*/1, /*numInits=*/2);
 }
