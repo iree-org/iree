@@ -250,6 +250,17 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                        unsigned operandIdx) {
+  TileSwizzle swizzle = getSwizzleImpl(scaledMma, operandIdx);
+  if (scaledMma.isUnshuffledOperand(operandIdx)) {
+    auto &perm = swizzle.permutation();
+    std::iota(perm.begin(), perm.end(), 0);
+  }
+  return swizzle;
+}
+
+TileSwizzle
+getDistributionSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
+                       unsigned operandIdx) {
   return getSwizzleImpl(scaledMma, operandIdx);
 }
 

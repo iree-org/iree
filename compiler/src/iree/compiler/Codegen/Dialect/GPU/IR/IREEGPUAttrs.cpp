@@ -2809,9 +2809,22 @@ LogicalResult DataTiledScaledMMAAttr::populateOperandOffsetsSizesStrides(
     ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) const {
-  return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
-      .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
-                                          permutation, offsets, sizes, strides);
+  if (!isUnshuffledOperand(operandIndex)) {
+    return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+        .populateOperandOffsetsSizesStrides(
+            builder, loc, operandIndex, laneId, permutation, offsets, sizes,
+            strides);
+  }
+  // For unshuffled operands, getTileSwizzle returns an identity permutation,
+  // but populateSwizzleBasedOffsetsSizesStrides uses the swizzle's permutation
+  // to order the delinearization basis — it must reflect the MMA tstrides. Use
+  // the non-identity-reset swizzle for both the delinearization and the output
+  // reordering so the two cancel out, yielding source-order offsets that match
+  // the identity layout.
+  TileSwizzle dtSwizzle = getDistributionSwizzle(*this, operandIndex);
+  return populateSwizzleBasedOffsetsSizesStrides(
+      builder, loc, dtSwizzle, laneId, dtSwizzle.permutation(), offsets, sizes,
+      strides);
 }
 
 int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
@@ -2837,6 +2850,16 @@ DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
           {utils::IteratorType::parallel, utils::IteratorType::reduction},
           {utils::IteratorType::reduction, utils::IteratorType::parallel},
           {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
+bool DataTiledScaledMMAAttr::isUnshuffledOperand(unsigned idx) const {
+  auto attr = getUnshuffledOperands();
+  return attr && llvm::is_contained(attr.asArrayRef(), idx);
+}
+
+bool DataTiledScaledMMAAttr::hasUnshuffledOperands() const {
+  auto attr = getUnshuffledOperands();
+  return attr && !attr.empty();
 }
 
 //===----------------------------------------------------------------------===//

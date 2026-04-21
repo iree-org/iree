@@ -441,3 +441,25 @@ module {
 //  CHECK-SAME:   matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>
 //  CHECK-SAME:   subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>
 //  CHECK-SAME:   winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>
+
+// -----
+
+module {
+  func.func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unshuffled_defaults() attributes {
+      mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, unshuffled_operands = [0, 1]>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unshuffled_defaults
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, unshuffled_operands = [0, 1]>
+
+// -----
+
+module {
+  func.func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unshuffled_multi() attributes {
+      mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [2, 3], unshuffled_operands = [0, 1]>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unshuffled_multi
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [2, 3], unshuffled_operands = [0, 1]>
