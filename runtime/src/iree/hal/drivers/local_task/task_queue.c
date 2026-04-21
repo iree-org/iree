@@ -2481,6 +2481,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     iree_hal_task_queue_compute_item_leave(queue, item, registered_generation);
     IREE_TRACE_ZONE_END(z_drain);
 
+    if (!processor_result.completed && processor_result.tiles_executed == 0) {
+      iree_processor_yield();
+    }
     out_result->did_work = true;
     out_result->completed = false;
     return iree_ok_status();
