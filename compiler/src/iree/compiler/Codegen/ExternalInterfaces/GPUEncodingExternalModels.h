@@ -15,6 +15,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 void registerGPUEncodingExternalModels(DialectRegistry &registry);
 
+/// Returns true when the flag
+/// --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma is set.
+bool noHoistScaledMmaDataOperands();
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_GPUENCODINGEXTERNALMODELS_H_

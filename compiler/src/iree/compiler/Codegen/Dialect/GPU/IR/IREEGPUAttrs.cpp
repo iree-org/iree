@@ -2690,6 +2690,10 @@ static Value createScaledMmaOp(OpBuilder &builder, Location loc,
 LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
+  // This operates on already-distributed data (slices extracted via
+  // populateOperandOffsetsSizesStrides), so it is agnostic to the
+  // data/distribution swizzle split used by unshuffled operands.
+  //
   // Validation. Similar to MMAAttr::buildMmaOperation.
   if (inputs.size() != 4) {
     return failure();
