@@ -36,6 +36,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "profile_events",
+    srcs = ["profile_events.c"],
+    hdrs = ["profile_events.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "amdgpu",
     srcs = [
         "allocator.c",
@@ -116,6 +127,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":access_policy",
+        ":profile_events",
         ":queue_affinity",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
@@ -190,6 +202,7 @@ iree_runtime_cc_library(
         "profile_aqlprofile.h",
         "profile_counters.h",
         "profile_device_metrics.h",
+        "profile_events.h",
         "profile_metadata.h",
         "profile_traces.h",
         "semaphore.h",
@@ -199,6 +212,7 @@ iree_runtime_cc_library(
         "virtual_queue.h",
     ],
     deps = [
+        ":profile_events",
         ":queue_affinity",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
@@ -416,6 +430,19 @@ iree_runtime_cc_test(
     deps = [
         ":amdgpu",
         ":headers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "profile_events_test",
+    srcs = ["profile_events_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    deps = [
+        ":profile_events",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",

@@ -41,6 +41,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_events
+  HDRS
+    "profile_events.h"
+  SRCS
+    "profile_events.c"
+  DEPS
+    iree::base
+    iree::base::threading
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     amdgpu
   HDRS
     "api.h"
@@ -119,6 +133,7 @@ iree_cc_library(
     "virtual_queue.h"
   DEPS
     ::access_policy
+    ::profile_events
     ::queue_affinity
     iree::async
     iree::async::util::proactor_pool
@@ -192,6 +207,7 @@ iree_cc_library(
     "profile_aqlprofile.h"
     "profile_counters.h"
     "profile_device_metrics.h"
+    "profile_events.h"
     "profile_metadata.h"
     "profile_traces.h"
     "semaphore.h"
@@ -200,6 +216,7 @@ iree_cc_library(
     "transient_buffer.h"
     "virtual_queue.h"
   DEPS
+    ::profile_events
     ::queue_affinity
     iree::base
     iree::base::internal
@@ -429,6 +446,21 @@ iree_cc_test(
   DEPS
     ::amdgpu
     ::headers
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    profile_events_test
+  SRCS
+    "profile_events_test.cc"
+  DEPS
+    ::profile_events
     iree::base
     iree::hal
     iree::testing::gtest

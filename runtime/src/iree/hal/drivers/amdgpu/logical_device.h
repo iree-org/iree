@@ -10,9 +10,9 @@
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/profile_events.h"
 #include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
@@ -138,41 +138,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
     iree_hal_amdgpu_profile_trace_session_t* trace_session;
     // Device metrics session sampled on profiling flush/end, or NULL.
     iree_hal_amdgpu_profile_device_metrics_session_t* device_metrics_session;
-    // Host-side memory lifecycle event stream protected by
-    // |memory_event_mutex|.
-    iree_hal_profile_memory_event_t* memory_events;
-    // Mutex protecting memory event stream positions and dropped counts.
-    iree_slim_mutex_t memory_event_mutex;
-    // Allocated memory event ring capacity, always a power of two when nonzero.
-    iree_host_size_t memory_event_capacity;
-    // Mask used to wrap memory event stream positions.
-    iree_host_size_t memory_event_mask;
-    // Absolute memory event stream read position.
-    uint64_t memory_event_read_position;
-    // Absolute memory event stream write position.
-    uint64_t memory_event_write_position;
-    // Memory events dropped because the stream was full.
-    uint64_t memory_event_dropped_count;
-    // Next nonzero memory event id assigned by this stream.
-    uint64_t next_memory_event_id;
-    // Next nonzero memory allocation id assigned to profiled buffers.
-    uint64_t next_memory_allocation_id;
-    // Host-side queue operation event stream protected by |queue_event_mutex|.
-    iree_hal_profile_queue_event_t* queue_events;
-    // Mutex protecting queue event stream positions and dropped counts.
-    iree_slim_mutex_t queue_event_mutex;
-    // Allocated queue event ring capacity, always a power of two when nonzero.
-    iree_host_size_t queue_event_capacity;
-    // Mask used to wrap queue event stream positions.
-    iree_host_size_t queue_event_mask;
-    // Absolute queue event stream read position.
-    uint64_t queue_event_read_position;
-    // Absolute queue event stream write position.
-    uint64_t queue_event_write_position;
-    // Queue events dropped because the stream was full.
-    uint64_t queue_event_dropped_count;
-    // Next nonzero queue event id assigned by this stream.
-    uint64_t next_queue_event_id;
+    // Host-side memory and queue profiling event streams.
+    iree_hal_amdgpu_profile_event_streams_t event_streams;
   } profiling;
 
   // Topology metadata assigned by the device group after construction.
