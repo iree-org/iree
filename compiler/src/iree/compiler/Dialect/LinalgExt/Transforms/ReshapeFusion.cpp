@@ -1253,8 +1253,7 @@ static Operation *createCollapsedOp(AttentionOpTy origOp,
 }
 
 template <typename AttentionOpTy>
-static FailureOr<CollapseResult>
-collapseAttentionLikeOpIterationDims(
+static FailureOr<CollapseResult> collapseAttentionLikeOpIterationDims(
     AttentionOpTy op, ArrayRef<ReassociationIndices> foldedIterationDims,
     RewriterBase &rewriter) {
   if (op.getNumLoops() <= 1 || foldedIterationDims.empty() ||

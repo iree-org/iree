@@ -2114,8 +2114,7 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
 
 void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange results, ValueRange inputOperands,
-                              ValueRange initOperands,
-                              ArrayAttr indexingMaps) {
+                              ValueRange initOperands, ArrayAttr indexingMaps) {
   assert(inputOperands.size() < 6);
   assert(initOperands.size() == 3);
   Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
