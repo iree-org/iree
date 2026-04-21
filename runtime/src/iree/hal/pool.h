@@ -281,10 +281,7 @@ typedef struct iree_hal_pool_epoch_query_t {
 
 // Returns a null epoch query callback.
 static inline iree_hal_pool_epoch_query_t iree_hal_pool_epoch_query_null(void) {
-  iree_hal_pool_epoch_query_t query = {
-      .fn = NULL,
-      .user_data = NULL,
-  };
+  iree_hal_pool_epoch_query_t query = {NULL, NULL};
   return query;
 }
 
