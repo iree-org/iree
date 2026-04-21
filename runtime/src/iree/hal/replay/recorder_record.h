@@ -24,6 +24,7 @@ typedef struct iree_hal_replay_pending_record_t {
   iree_hal_replay_file_record_metadata_t metadata;
 } iree_hal_replay_pending_record_t;
 
+// Records |status| as the recorder's terminal failure and frees it.
 void iree_hal_replay_recorder_fail(iree_hal_replay_recorder_t* recorder,
                                    iree_status_t status);
 

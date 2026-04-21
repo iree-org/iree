@@ -1425,11 +1425,7 @@ static iree_status_t iree_hal_replay_executor_replay_buffer_range_data(
         iree_hal_buffer_mapping_flush_range(&mapping, 0, payload.data_length);
   }
   iree_status_t unmap_status = iree_hal_buffer_unmap_range(&mapping);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(unmap_status);
-    return status;
-  }
-  return unmap_status;
+  return iree_status_join(status, unmap_status);
 }
 
 static iree_status_t iree_hal_replay_executor_queue_alloca(

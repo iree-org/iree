@@ -136,7 +136,6 @@ static iree_host_size_t iree_hal_replay_recorder_executable_export_count(
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_replay_recorder_fail(executable->recorder, status);
-    iree_status_ignore(status);
   }
   return count;
 }
@@ -393,9 +392,8 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
     }
   }
   if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
     iree_allocator_free(host_allocator, export_infos);
-    return iree_ok_status();
+    return status;
   }
 
   iree_hal_executable_export_parameter_t* parameters = NULL;
@@ -428,10 +426,9 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
     parameter_index += export_parameter_count;
   }
   if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
     iree_allocator_free(host_allocator, parameters);
     iree_allocator_free(host_allocator, export_infos);
-    return iree_ok_status();
+    return status;
   }
 
   iree_host_size_t metadata_size = 0;

@@ -115,9 +115,14 @@ static void iree_hal_replay_recorder_fail_locked(
 void iree_hal_replay_recorder_fail(iree_hal_replay_recorder_t* recorder,
                                    iree_status_t status) {
   IREE_ASSERT_ARGUMENT(recorder);
+  if (iree_status_is_ok(status)) return;
+  iree_status_code_t status_code = iree_status_code(status);
   iree_slim_mutex_lock(&recorder->mutex);
-  iree_hal_replay_recorder_fail_locked(recorder, status);
+  if (recorder->terminal_status_code == IREE_STATUS_OK) {
+    recorder->terminal_status_code = status_code;
+  }
   iree_slim_mutex_unlock(&recorder->mutex);
+  iree_status_free(status);
 }
 
 static iree_status_t iree_hal_replay_recorder_append_record_locked(
@@ -348,11 +353,7 @@ iree_status_t iree_hal_replay_recorder_end_operation_with_payload(
       recorder->writer, &pending_record->metadata, iovec_count, iovecs, NULL);
   iree_hal_replay_recorder_fail_locked(recorder, record_status);
   iree_slim_mutex_unlock(&recorder->mutex);
-  if (!iree_status_is_ok(record_status)) {
-    iree_status_ignore(operation_status);
-    return record_status;
-  }
-  return operation_status;
+  return iree_status_join(record_status, operation_status);
 }
 
 iree_status_t iree_hal_replay_recorder_end_operation(
@@ -385,11 +386,7 @@ iree_status_t iree_hal_replay_recorder_end_creation_operation(
   }
   iree_hal_replay_recorder_fail_locked(recorder, record_status);
   iree_slim_mutex_unlock(&recorder->mutex);
-  if (!iree_status_is_ok(record_status)) {
-    iree_status_ignore(operation_status);
-    return record_status;
-  }
-  return operation_status;
+  return iree_status_join(record_status, operation_status);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_create(
@@ -622,7 +619,6 @@ static void iree_hal_replay_replace_device_allocator(
       device->host_allocator, &new_replay_allocator);
   if (!iree_status_is_ok(status)) {
     iree_hal_replay_recorder_fail(device->recorder, status);
-    iree_status_ignore(status);
     return;
   }
   iree_hal_device_replace_allocator(device->base_device, new_allocator);
@@ -903,6 +899,7 @@ static iree_status_t iree_hal_replay_device_import_file(
   char reference_storage[IREE_MAX_PATH];
   iree_byte_span_t allocated_reference_storage = iree_byte_span_empty();
   iree_hal_replay_file_object_payload_t payload;
+  memset(&payload, 0, sizeof(payload));
   iree_string_view_t reference = iree_string_view_empty();
   iree_status_t payload_status =
       iree_hal_replay_recorder_file_make_object_payload(
@@ -913,11 +910,7 @@ static iree_status_t iree_hal_replay_device_import_file(
           iree_make_byte_span((uint8_t*)reference_storage,
                               sizeof(reference_storage)),
           &allocated_reference_storage, &payload, &reference);
-  if (iree_status_is_ok(status)) {
-    status = payload_status;
-  } else {
-    iree_status_ignore(payload_status);
-  }
+  status = iree_status_join(status, payload_status);
   iree_const_byte_span_t payload_iovecs[2] = {
       iree_make_const_byte_span(&payload, sizeof(payload)),
       iree_make_const_byte_span(reference.data, reference.size),
