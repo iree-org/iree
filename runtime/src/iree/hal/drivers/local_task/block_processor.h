@@ -89,6 +89,11 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // Total workers cooperating on this recording.
   uint32_t worker_count;
 
+  // Wake demand for the current active region, clamped to [1, worker_count].
+  // This seeds the task process wake_budget when a recording is published and
+  // is updated by region/block completers. It is not an admission limit.
+  int32_t current_wake_budget;
+
   // Set to 1 when RETURN is reached or an error occurs. Workers check this
   // on each drain() entry and exit immediately when set.
   iree_alignas(iree_hardware_destructive_interference_size)
@@ -123,9 +128,9 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   int32_t next_epoch;
 
   // Wake hint tracking for dynamic wake_budget updates at region transitions.
-  // The completer stores min(next_region_tiles, worker_count) into
-  // wake_budget_ptr and adds ramp-up delta to desired_wake_ptr. Workers
-  // claim wake credits via relay_wake on their next pump iteration.
+  // The completer stores current_wake_budget into wake_budget_ptr and adds
+  // ramp-up delta to desired_wake_ptr. Workers claim wake credits via
+  // relay_wake on their next pump iteration.
   iree_atomic_int32_t* wake_budget_ptr;
   iree_atomic_int32_t* desired_wake_ptr;
 
@@ -239,6 +244,13 @@ void iree_hal_cmd_block_processor_context_set_profile_recorder(
     uint64_t command_buffer_id,
     iree_hal_cmd_block_processor_profile_dispatch_t* dispatches,
     iree_host_size_t dispatch_capacity);
+
+// Returns the current wake demand hint for |context|. The value is always at
+// least 1 and at most the number of cooperating workers, and is intended to
+// seed the owning task process before scheduling a recording. NULL/no-block
+// contexts report 1.
+int32_t iree_hal_cmd_block_processor_context_wake_budget(
+    const iree_hal_cmd_block_processor_context_t* context);
 
 // Allocates an execution context for processing a block recording.
 //

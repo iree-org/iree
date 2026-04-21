@@ -214,14 +214,20 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
   iree_status_t execute(const iree_hal_cmd_block_recording_t* recording,
                         const iree_hal_cmd_binding_entry_t* binding_table,
                         iree_host_size_t binding_table_length,
-                        uint64_t* out_total_tiles_executed = nullptr) {
+                        uint64_t* out_total_tiles_executed = nullptr,
+                        int32_t* out_initial_wake_budget = nullptr) {
     if (out_total_tiles_executed) *out_total_tiles_executed = 0;
+    if (out_initial_wake_budget) *out_initial_wake_budget = 1;
 
     iree_hal_cmd_block_processor_context_t* context = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_cmd_block_processor_context_allocate(
         recording, binding_table, binding_table_length, worker_count(),
         iree_allocator_system(), &context));
     if (!context) return iree_ok_status();
+    if (out_initial_wake_budget) {
+      *out_initial_wake_budget =
+          iree_hal_cmd_block_processor_context_wake_budget(context);
+    }
 
     iree_atomic_int64_t total_tiles_executed = IREE_ATOMIC_VAR_INIT(0);
     if (worker_count() > 1) {
@@ -1257,10 +1263,14 @@ TEST_P(BlockProcessorTest, NarrowToWideTransition) {
   iree_hal_cmd_block_recording_t recording;
   IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
 
-  IREE_ASSERT_OK(execute(&recording, table, IREE_ARRAYSIZE(table)));
+  int32_t initial_wake_budget = 0;
+  IREE_ASSERT_OK(execute(&recording, table, IREE_ARRAYSIZE(table),
+                         /*out_total_tiles_executed=*/nullptr,
+                         &initial_wake_budget));
 
   // Total: 1 + 128 = 129.
   EXPECT_EQ(iree_atomic_load(&counter, iree_memory_order_relaxed), 129);
+  EXPECT_EQ(initial_wake_budget, 1);
 
   iree_hal_cmd_block_recording_release(&recording);
   iree_hal_cmd_block_builder_deinitialize(&builder);

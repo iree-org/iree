@@ -1540,6 +1540,13 @@ static iree_status_t iree_hal_task_queue_drain_recording(
     }
   }
 
+  // Seed scheduling with the first active region before publishing the item so
+  // the schedule_process call below wakes the right number of workers.
+  iree_atomic_store(
+      &queue->compute_process.wake_budget,
+      iree_hal_cmd_block_processor_context_wake_budget(processor_context),
+      iree_memory_order_relaxed);
+
   // Fill the recording item.
   item->processor_context = processor_context;
   item->worker_count = worker_count;

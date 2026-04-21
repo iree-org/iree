@@ -901,6 +901,15 @@ static const iree_hal_cmd_header_t* iree_hal_cmd_find_terminator(
   return NULL;
 }
 
+static int32_t iree_hal_cmd_block_processor_calculate_wake_budget(
+    const iree_hal_cmd_block_processor_context_t* context,
+    uint32_t remaining_tiles) {
+  uint32_t wake_budget = remaining_tiles;
+  if (wake_budget == 0) wake_budget = 1;
+  if (wake_budget > context->worker_count) wake_budget = context->worker_count;
+  return (int32_t)wake_budget;
+}
+
 // Initializes .data for a new block. All counters are zero-initialized via
 // memset; only binding pointers, active_region_index, tile_index epochs,
 // and remaining_tiles require non-zero initialization.
@@ -978,9 +987,13 @@ static void iree_hal_cmd_block_processor_init_block(
   if (first_active < block->region_count) {
     iree_atomic_store(&context->state->cached_barrier, (intptr_t)first_barrier,
                       iree_memory_order_relaxed);
+    context->current_wake_budget =
+        iree_hal_cmd_block_processor_calculate_wake_budget(
+            context, first_remaining_tiles);
   } else {
     iree_atomic_store(&context->state->cached_barrier, 0,
                       iree_memory_order_relaxed);
+    context->current_wake_budget = 1;
   }
 }
 
@@ -1215,11 +1228,10 @@ iree_hal_cmd_block_processor_update_budget(
     iree_hal_cmd_block_processor_context_t* context,
     uint32_t next_remaining_tiles) {
   iree_hal_cmd_block_processor_budget_update_t update = {0, 0, 0};
+  int32_t new_budget = iree_hal_cmd_block_processor_calculate_wake_budget(
+      context, next_remaining_tiles);
+  context->current_wake_budget = new_budget;
   if (!context->wake_budget_ptr) return update;
-  int32_t new_budget = (int32_t)next_remaining_tiles;
-  if (new_budget > (int32_t)context->worker_count) {
-    new_budget = (int32_t)context->worker_count;
-  }
   int32_t old_budget = iree_atomic_exchange(
       context->wake_budget_ptr, new_budget, iree_memory_order_relaxed);
   update.old_budget = old_budget;
@@ -1680,6 +1692,7 @@ void iree_hal_cmd_block_processor_context_initialize(
   out_context->state = state;
   out_context->state_size = state_size;
   out_context->worker_count = 1;
+  out_context->current_wake_budget = 1;
   out_context->max_region_dispatch_count = recording->max_region_dispatch_count;
   out_context->max_total_binding_count = recording->max_total_binding_count;
   if (recording->first_block) {
@@ -1704,6 +1717,11 @@ void iree_hal_cmd_block_processor_context_set_profile_recorder(
   context->profile.dispatches = dispatches;
   context->profile.dispatch_capacity = dispatch_capacity;
   iree_hal_cmd_block_processor_profile_reset_dispatches(context);
+}
+
+int32_t iree_hal_cmd_block_processor_context_wake_budget(
+    const iree_hal_cmd_block_processor_context_t* context) {
+  return context ? context->current_wake_budget : 1;
 }
 
 iree_status_t iree_hal_cmd_block_processor_context_allocate(
