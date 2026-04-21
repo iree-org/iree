@@ -271,8 +271,8 @@ void iree_task_process_complete(iree_task_process_t* process,
                                 iree_task_process_t** out_activated_tail);
 
 // Records the first error encountered during drain(). Thread-safe via CAS.
-// If another thread already recorded an error, this error is dropped
-// (iree_status_ignore'd). If the process is RUNNABLE, transitions to
+// If another thread already recorded an error, this error is freed. If the
+// process is RUNNABLE, transitions to
 // COMPLETED so that future drain() calls bail immediately via is_terminal().
 // Must only be called on a RUNNABLE process (i.e., during drain). To fail
 // a SUSPENDED process, use iree_task_process_cancel.

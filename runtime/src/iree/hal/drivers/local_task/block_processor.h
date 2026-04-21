@@ -159,6 +159,34 @@ typedef struct iree_hal_cmd_block_processor_worker_state_t {
   int32_t block_sequence;
 } iree_hal_cmd_block_processor_worker_state_t;
 
+// Diagnostic reason used by trace-only drain metadata.
+typedef enum iree_hal_cmd_block_processor_drain_reason_e {
+  // No specific reason was assigned.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_UNKNOWN = 0,
+  // The caller provided a NULL processor context.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NULL_CONTEXT,
+  // The single-worker synchronous fast path ran.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_SINGLE_WORKER,
+  // The recording had already reached a terminal state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETED,
+  // A block transition was in progress.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_BLOCK_TRANSITION,
+  // The active block had no remaining runnable regions.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_COMPLETE,
+  // The block sequence changed while the worker was sampling state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_STALE_BLOCK_SEQUENCE,
+  // A worker-visible error had already been reported.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_ERROR,
+  // The active region did not have a cached barrier pointer.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_MISSING_BARRIER,
+  // The worker claimed no tiles from the active region.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NO_TILES,
+  // The worker claimed one or more tiles.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_WORK,
+  // The worker completed the region and advanced processor state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETER,
+} iree_hal_cmd_block_processor_drain_reason_t;
+
 // Result of a single drain() call.
 typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // Number of tiles executed by this worker during this drain() call.
@@ -170,6 +198,18 @@ typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // RETURN reached) or an error has been reported. Once true, all
   // subsequent drain() calls also return completed=true.
   bool completed;
+
+  // Trace-only diagnostic reason describing why this drain call returned.
+  IREE_TRACE(iree_hal_cmd_block_processor_drain_reason_t reason;)
+
+  // Trace-only active region index observed by this drain, or -1 if absent.
+  IREE_TRACE(int32_t active_region;)
+
+  // Trace-only region epoch observed by this drain, or 0 if absent.
+  IREE_TRACE(int32_t region_epoch;)
+
+  // Trace-only remaining tile count observed after the drain decision.
+  IREE_TRACE(uint32_t remaining_tiles;)
 } iree_hal_cmd_block_processor_drain_result_t;
 
 // Initializes a caller-owned context for single-worker synchronous execution.

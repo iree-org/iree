@@ -813,8 +813,8 @@ static void iree_hal_task_queue_wait_resolved(
     if (!iree_atomic_compare_exchange_strong(
             &operation->error_status, &expected, (intptr_t)status,
             iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-      // Another wait already recorded an error; drop ours.
-      iree_status_ignore(status);
+      // Another wait already recorded an error; free ours.
+      iree_status_free(status);
     }
   }
 
@@ -928,7 +928,7 @@ static iree_status_t iree_hal_task_queue_enqueue_waits(
       if (!iree_atomic_compare_exchange_strong(
               &operation->error_status, &expected, (intptr_t)status,
               iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-        iree_status_ignore(status);
+        iree_status_free(status);
       }
       // Subtract count for this entry and all remaining unregistered ones.
       int32_t unregistered = (int32_t)(wait_semaphores.count - i);
@@ -1306,6 +1306,119 @@ static bool iree_hal_task_queue_promote_pending_to_compute_current(
   }
   return has_current;
 }
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+typedef enum iree_hal_task_queue_compute_drain_reason_e {
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROCESSOR = 0,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_SHUTDOWN,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PUBLICATION_UPDATING,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_STALE_ITEM,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_ITEM_REPLACED,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROMOTED_PENDING,
+  IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_IDLE,
+} iree_hal_task_queue_compute_drain_reason_t;
+
+static const char* iree_hal_task_queue_compute_drain_reason_string(
+    iree_hal_task_queue_compute_drain_reason_t reason) {
+  switch (reason) {
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROCESSOR:
+      return "queue:processor";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_SHUTDOWN:
+      return "queue:shutdown";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PUBLICATION_UPDATING:
+      return "queue:publication_updating";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_STALE_ITEM:
+      return "queue:stale_item";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_ITEM_REPLACED:
+      return "queue:item_replaced";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROMOTED_PENDING:
+      return "queue:promoted_pending";
+    case IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_IDLE:
+      return "queue:idle";
+  }
+  return "queue:unknown";
+}
+
+static const char* iree_hal_task_queue_processor_drain_reason_string(
+    iree_hal_cmd_block_processor_drain_reason_t reason) {
+  switch (reason) {
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_UNKNOWN:
+      return "processor:unknown";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NULL_CONTEXT:
+      return "processor:null_context";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_SINGLE_WORKER:
+      return "processor:single_worker";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETED:
+      return "processor:completed";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_BLOCK_TRANSITION:
+      return "processor:block_transition";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_COMPLETE:
+      return "processor:region_complete";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_STALE_BLOCK_SEQUENCE:
+      return "processor:stale_block_sequence";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_ERROR:
+      return "processor:error";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_MISSING_BARRIER:
+      return "processor:missing_barrier";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NO_TILES:
+      return "processor:no_tiles";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_WORK:
+      return "processor:work";
+    case IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETER:
+      return "processor:completer";
+  }
+  return "processor:unknown";
+}
+
+static void iree_hal_task_queue_trace_compute_drain_append(
+    iree_zone_id_t zone_id, iree_hal_task_queue_t* queue,
+    iree_hal_task_queue_compute_item_t* item, uint32_t worker_index,
+    iree_hal_task_queue_compute_drain_reason_t queue_reason,
+    const iree_hal_cmd_block_processor_drain_result_t* processor_result) {
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      zone_id, iree_hal_task_queue_compute_drain_reason_string(queue_reason));
+  if (processor_result) {
+    IREE_TRACE_ZONE_APPEND_TEXT(
+        zone_id, iree_hal_task_queue_processor_drain_reason_string(
+                     processor_result->reason));
+  }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(zone_id, (int64_t)worker_index);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id,
+      processor_result ? (int64_t)processor_result->tiles_executed : 0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id, processor_result && processor_result->completed ? 1 : 0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id,
+      processor_result ? (int64_t)processor_result->active_region : -1);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id, processor_result ? (int64_t)processor_result->region_epoch : 0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id,
+      processor_result ? (int64_t)processor_result->remaining_tiles : 0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
+      zone_id,
+      (int64_t)iree_task_process_worker_budget(&queue->compute_process));
+  int32_t desired_wake = 0;
+  if (item && item->processor_context &&
+      item->processor_context->desired_wake_ptr) {
+    desired_wake = iree_atomic_load(item->processor_context->desired_wake_ptr,
+                                    iree_memory_order_relaxed);
+  }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(zone_id, (int64_t)desired_wake);
+}
+
+static void iree_hal_task_queue_trace_compute_drain_event(
+    iree_hal_task_queue_t* queue, iree_hal_task_queue_compute_item_t* item,
+    uint32_t worker_index,
+    iree_hal_task_queue_compute_drain_reason_t queue_reason,
+    const iree_hal_cmd_block_processor_drain_result_t* processor_result) {
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_drain, "iree_hal_local_task_compute_drain");
+  iree_hal_task_queue_trace_compute_drain_append(
+      z_drain, queue, item, worker_index, queue_reason, processor_result);
+  IREE_TRACE_ZONE_END(z_drain);
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // Allocates a new compute recording item from the queue's arena with a
 // trailing worker_states FAM sized to compute_worker_count. The item is NOT
@@ -2252,6 +2365,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
 
   // Check for shutdown.
   if (iree_atomic_load(&queue->shutting_down, iree_memory_order_acquire)) {
+    IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+        queue, NULL, worker_index,
+        IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_SHUTDOWN, NULL));
     out_result->did_work = false;
     out_result->completed = true;
     return iree_ok_status();
@@ -2268,6 +2384,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     // Returning did_work=false lets non-owner workers quiesce; if the writer
     // publishes a new item it will schedule the compute process through the
     // normal wake path, and if it publishes NULL there is no work to preserve.
+    IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+        queue, NULL, worker_index,
+        IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PUBLICATION_UPDATING, NULL));
     out_result->did_work = false;
     out_result->completed = false;
     return iree_ok_status();
@@ -2296,6 +2415,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     if (IREE_UNLIKELY((prev_drainers & ~(int64_t)UINT32_MAX) !=
                           item_generation ||
                       (int32_t)prev_drainers < 0)) {
+      IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+          queue, item, worker_index,
+          IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_STALE_ITEM, NULL));
       iree_hal_task_queue_compute_item_leave(queue, item,
                                              registered_generation);
       out_result->did_work = true;
@@ -2310,6 +2432,9 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
                          iree_memory_order_acquire) != current_revision ||
         (iree_hal_task_queue_compute_item_t*)iree_atomic_load(
             &queue->compute_current, iree_memory_order_acquire) != item) {
+      IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+          queue, item, worker_index,
+          IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_ITEM_REPLACED, NULL));
       iree_hal_task_queue_compute_item_leave(queue, item,
                                              registered_generation);
       out_result->did_work = true;
@@ -2317,6 +2442,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
       return iree_ok_status();
     }
 
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_drain, "iree_hal_local_task_compute_drain");
     if (IREE_UNLIKELY(queue->profile_recorder)) {
       iree_hal_task_queue_profile_start_host_execution(item->operation);
     }
@@ -2324,13 +2450,8 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         &item->worker_states[worker_index % item->worker_count];
     iree_hal_cmd_block_processor_drain_result_t processor_result;
     memset(&processor_result, 0, sizeof(processor_result));
-    IREE_TRACE_ZONE_BEGIN_NAMED(z_drain, "iree_hal_local_task_compute_drain");
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_drain, (int64_t)worker_index);
     iree_hal_cmd_block_processor_drain(item->processor_context, worker_index,
                                        worker_state, &processor_result);
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_drain,
-                                     (int64_t)processor_result.tiles_executed);
-    IREE_TRACE_ZONE_END(z_drain);
 
     // Handle per-recording completion via CLOSED flag. The first worker to set
     // CLOSED only publishes the next recording; the last drainer consumes the
@@ -2345,9 +2466,14 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
       }
     }
 
+    IREE_TRACE(iree_hal_task_queue_trace_compute_drain_append(
+        z_drain, queue, item, worker_index,
+        IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROCESSOR, &processor_result));
+
     // Release our drainer claim. If we were the last drainer after close,
     // fire final cleanup.
     iree_hal_task_queue_compute_item_leave(queue, item, registered_generation);
+    IREE_TRACE_ZONE_END(z_drain);
 
     out_result->did_work = true;
     out_result->completed = false;
@@ -2357,12 +2483,18 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
   // No current item. Try to promote one pending recording under the
   // compute_current publication lock.
   if (iree_hal_task_queue_promote_pending_to_compute_current(queue)) {
+    IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+        queue, NULL, worker_index,
+        IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_PROMOTED_PENDING, NULL));
     out_result->did_work = true;
     out_result->completed = false;
     return iree_ok_status();
   }
 
   // Nothing available. Workers will park via the sleeping protocol.
+  IREE_TRACE(iree_hal_task_queue_trace_compute_drain_event(
+      queue, NULL, worker_index, IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_IDLE,
+      NULL));
   out_result->did_work = false;
   out_result->completed = false;
   return iree_ok_status();
@@ -2409,7 +2541,7 @@ static void iree_hal_task_queue_compute_item_cleanup(
     }
     iree_hal_task_queue_op_destroy(operation, operation_status);
   } else {
-    iree_status_ignore(processor_status);
+    iree_status_free(processor_status);
   }
 }
 
@@ -2784,7 +2916,7 @@ static iree_status_t iree_hal_task_queue_drain_write(
 // while the owning worker still has a live stack frame for the embedded
 // process.
 //
-// completion_fn is intentionally unset — the base process code ignores the
+// completion_fn is intentionally unset — the base process code consumes the
 // terminal status for us when no callback is installed.
 static void iree_hal_task_queue_process_release(iree_task_process_t* process) {
   iree_hal_task_queue_t* queue = (iree_hal_task_queue_t*)process->user_data;
@@ -3003,7 +3135,7 @@ iree_status_t iree_hal_task_queue_initialize(
                                /*suspend_count=*/0, /*worker_budget=*/1,
                                &out_queue->process);
   out_queue->process.user_data = out_queue;
-  // completion_fn is intentionally NULL — process.c ignores the terminal
+  // completion_fn is intentionally NULL — process.c consumes the terminal
   // status when no completion callback is installed. scope_end is deferred to
   // release_fn so it fires after the owning worker has exited the drain stack.
   out_queue->process.release_fn = iree_hal_task_queue_process_release;
@@ -3109,8 +3241,11 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   // Each submitted operation has its own scope_begin/end pair. scope_wait_idle
   // returns only when all of these have resolved — meaning every worker has
   // finished touching queue/device resources.
-  iree_status_ignore(
-      iree_task_scope_wait_idle(&queue->scope, IREE_TIME_INFINITE_FUTURE));
+  iree_status_t idle_status =
+      iree_task_scope_wait_idle(&queue->scope, IREE_TIME_INFINITE_FUTURE);
+  IREE_ASSERT(iree_status_is_ok(idle_status),
+              "scope idle wait must not fail with an infinite deadline");
+  iree_status_free(idle_status);
 
   // Drain and destroy any remaining operations in the ready list.
   // These are operations that were queued but never drained (e.g.,

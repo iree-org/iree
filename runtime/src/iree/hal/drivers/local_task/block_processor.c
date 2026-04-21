@@ -82,7 +82,7 @@ static void iree_hal_cmd_block_processor_report_error(
   if (!iree_atomic_compare_exchange_strong(
           &context->error_status, &expected, (intptr_t)status,
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    iree_status_ignore(status);
+    iree_status_free(status);
   }
   iree_atomic_store(&context->completed, 1, iree_memory_order_release);
 }
@@ -792,6 +792,8 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
     const iree_hal_cmd_header_t** out_next_cmd) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z_region, "iree_hal_local_task_process_region");
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z_region, (int64_t)barrier->dispatch_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z_region, (int64_t)worker_index);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z_region, (int64_t)region_epoch);
 
   uint32_t tiles_completed = 0;
   iree_hal_cmd_block_state_t* state = context->state;
@@ -1193,25 +1195,59 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
 //       reading state. All init_block writes are bracketed by the even/odd
 //       increments (release semantics), ensuring visibility.
 
+typedef struct iree_hal_cmd_block_processor_budget_update_t {
+  // Previous worker budget observed before the transition.
+  int32_t old_budget;
+
+  // Worker budget selected for the next active region.
+  int32_t new_budget;
+
+  // Additional wake credits published for the executor wake tree.
+  int32_t wake_delta;
+} iree_hal_cmd_block_processor_budget_update_t;
+
 // Updates the worker budget for a new region. Called by the completer at
 // region/block transitions. If the new region needs more workers than are
 // currently budgeted, adds wake credits so the relay mechanism brings up
 // additional workers.
-static void iree_hal_cmd_block_processor_update_budget(
+static iree_hal_cmd_block_processor_budget_update_t
+iree_hal_cmd_block_processor_update_budget(
     iree_hal_cmd_block_processor_context_t* context,
     uint32_t next_remaining_tiles) {
-  if (!context->worker_budget_ptr) return;
+  iree_hal_cmd_block_processor_budget_update_t update = {0, 0, 0};
+  if (!context->worker_budget_ptr) return update;
   int32_t new_budget = (int32_t)next_remaining_tiles;
   if (new_budget > (int32_t)context->worker_count) {
     new_budget = (int32_t)context->worker_count;
   }
   int32_t old_budget = iree_atomic_exchange(
       context->worker_budget_ptr, new_budget, iree_memory_order_relaxed);
+  update.old_budget = old_budget;
+  update.new_budget = new_budget;
   if (new_budget > old_budget && context->desired_wake_ptr) {
-    iree_atomic_fetch_add(context->desired_wake_ptr, new_budget - old_budget,
+    update.wake_delta = new_budget - old_budget;
+    iree_atomic_fetch_add(context->desired_wake_ptr, update.wake_delta,
                           iree_memory_order_release);
   }
+  return update;
 }
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+static void iree_hal_cmd_block_processor_trace_region_transition(
+    int32_t completed_region_index, uint32_t completed_dispatch_count,
+    int32_t next_region_index, uint32_t next_remaining_tiles,
+    iree_hal_cmd_block_processor_budget_update_t budget_update) {
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_local_task_region_transition");
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)completed_region_index);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)completed_dispatch_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)next_region_index);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)next_remaining_tiles);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)budget_update.old_budget);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)budget_update.new_budget);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)budget_update.wake_delta);
+  IREE_TRACE_ZONE_END(z0);
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // Handles a completed region: advances to the next non-empty region or
 // processes the block terminator (BRANCH/RETURN).
@@ -1271,7 +1307,13 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
     iree_hal_cmd_block_processor_init_region(
         state, context->max_region_dispatch_count, region_epoch,
         next_remaining_tiles);
-    iree_hal_cmd_block_processor_update_budget(context, next_remaining_tiles);
+    iree_hal_cmd_block_processor_budget_update_t budget_update =
+        iree_hal_cmd_block_processor_update_budget(context,
+                                                   next_remaining_tiles);
+    IREE_TRACE(iree_hal_cmd_block_processor_trace_region_transition(
+        completed_region_index, completed_barrier->dispatch_count, next_region,
+        next_remaining_tiles, budget_update));
+    (void)budget_update;
     iree_hal_cmd_block_processor_profile_append_region_events(
         context, profile_events, profile_event_count);
     return;
@@ -1290,6 +1332,11 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
   }
 
   if (terminator->opcode == IREE_HAL_CMD_RETURN) {
+    iree_hal_cmd_block_processor_budget_update_t budget_update = {0, 0, 0};
+    IREE_TRACE(iree_hal_cmd_block_processor_trace_region_transition(
+        completed_region_index, completed_barrier->dispatch_count, -1, 0,
+        budget_update));
+    (void)budget_update;
     iree_atomic_store(&context->completed, 1, iree_memory_order_release);
     out_result->completed = true;
     iree_hal_cmd_block_processor_profile_append_region_events(
@@ -1323,8 +1370,14 @@ static void iree_hal_cmd_block_processor_handle_region_completion(
         // Block has work. Update budget and signal ready (even → odd).
         const int64_t remaining_tiles = iree_atomic_load(
             &state->remaining_tiles, iree_memory_order_relaxed);
-        iree_hal_cmd_block_processor_update_budget(
-            context, (uint32_t)(remaining_tiles & 0xFFFFFFFFu));
+        iree_hal_cmd_block_processor_budget_update_t budget_update =
+            iree_hal_cmd_block_processor_update_budget(
+                context, (uint32_t)(remaining_tiles & 0xFFFFFFFFu));
+        IREE_TRACE(iree_hal_cmd_block_processor_trace_region_transition(
+            completed_region_index, completed_barrier->dispatch_count,
+            first_active, (uint32_t)(remaining_tiles & 0xFFFFFFFFu),
+            budget_update));
+        (void)budget_update;
         iree_atomic_fetch_add(&context->block_sequence, 1,
                               iree_memory_order_release);
         iree_hal_cmd_block_processor_profile_append_region_events(
@@ -1388,6 +1441,8 @@ drain_start:
   // Check for completion (error or RETURN reached).
   if (iree_atomic_load(&context->completed, iree_memory_order_acquire)) {
     out_result->completed = true;
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETED);
     return;
   }
 
@@ -1400,6 +1455,8 @@ drain_start:
       iree_atomic_load(&context->block_sequence, iree_memory_order_acquire);
   if ((block_sequence & 1) == 0) {
     // Block transition in progress. Bail and retry on next drain().
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_BLOCK_TRANSITION);
     return;
   }
   if (block_sequence != worker_state->block_sequence) {
@@ -1430,6 +1487,10 @@ drain_start:
       iree_atomic_load(&state->region_epoch, iree_memory_order_acquire);
   int32_t active_region =
       iree_atomic_load(&state->active_region_index, iree_memory_order_relaxed);
+  IREE_TRACE({
+    out_result->active_region = active_region;
+    out_result->region_epoch = region_epoch;
+  });
 
   // All regions in this block are done. The completer is handling the
   // block terminator (or has already set completed).
@@ -1437,6 +1498,8 @@ drain_start:
     if (iree_atomic_load(&context->completed, iree_memory_order_acquire)) {
       out_result->completed = true;
     }
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_COMPLETE);
     return;
   }
 
@@ -1447,12 +1510,17 @@ drain_start:
   int32_t block_sequence_recheck =
       iree_atomic_load(&context->block_sequence, iree_memory_order_acquire);
   if (block_sequence_recheck != block_sequence) {
+    IREE_TRACE(
+        out_result->reason =
+            IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_STALE_BLOCK_SEQUENCE);
     return;
   }
 
   // Check for errors before starting work.
   if (iree_hal_cmd_block_processor_has_error(context)) {
     out_result->completed = true;
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_ERROR);
     return;
   }
 
@@ -1469,6 +1537,8 @@ drain_start:
         iree_make_status(IREE_STATUS_INTERNAL,
                          "no cached barrier for region %d", active_region));
     out_result->completed = true;
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_MISSING_BARRIER);
     return;
   }
 
@@ -1477,6 +1547,10 @@ drain_start:
   uint32_t my_tiles = iree_hal_cmd_block_processor_process_region(
       barrier, region_epoch, worker_index, context, &next_cmd);
   out_result->tiles_executed += my_tiles;
+  IREE_TRACE(out_result->reason =
+                 my_tiles == 0
+                     ? IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NO_TILES
+                     : IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_WORK);
   // Completer election via epoch-tagged remaining_tiles CAS.
   //
   // Workers with 0 tiles skip the election to avoid false positives.
@@ -1499,6 +1573,8 @@ drain_start:
       int32_t count = (int32_t)(current & 0xFFFFFFFF);
       int32_t new_count = count - (int32_t)my_tiles;
       int64_t desired = epoch_mask | (int64_t)(uint32_t)new_count;
+      IREE_TRACE(out_result->remaining_tiles =
+                     new_count > 0 ? (uint32_t)new_count : 0u);
 
       if (iree_atomic_compare_exchange_weak(&state->remaining_tiles, &current,
                                             desired, iree_memory_order_acq_rel,
@@ -1512,6 +1588,8 @@ drain_start:
   }
 
   if (!is_completer) return;
+  IREE_TRACE(out_result->reason =
+                 IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETER);
 
   // === COMPLETER ===
   // No arrival wait needed: the epoch tag on each tile_index CAS ensures
@@ -1680,9 +1758,17 @@ void iree_hal_cmd_block_processor_drain(
     iree_hal_cmd_block_processor_drain_result_t* out_result) {
   out_result->tiles_executed = 0;
   out_result->completed = false;
+  IREE_TRACE({
+    out_result->reason = IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_UNKNOWN;
+    out_result->active_region = -1;
+    out_result->region_epoch = 0;
+    out_result->remaining_tiles = 0;
+  });
 
   if (!context) {
     out_result->completed = true;
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NULL_CONTEXT);
     return;
   }
 
@@ -1694,6 +1780,8 @@ void iree_hal_cmd_block_processor_drain(
       iree_hal_cmd_block_processor_report_error(context, status);
     }
     out_result->completed = true;
+    IREE_TRACE(out_result->reason =
+                   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_SINGLE_WORKER);
     return;
   }
 

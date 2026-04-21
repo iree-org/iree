@@ -21,11 +21,11 @@ static iree_status_t CreateLocalTaskDevice(
     const iree_hal_device_create_params_t* create_params,
     iree_hal_driver_t** out_driver, iree_hal_device_t** out_device) {
   // Register the driver module with the global registry. Subsequent calls
-  // return ALREADY_EXISTS which we ignore — only true errors propagate.
+  // return ALREADY_EXISTS; only true errors propagate.
   iree_status_t status = iree_hal_local_task_driver_module_register(
       iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
-    iree_status_ignore(status);
+    iree_status_free(status);
     status = iree_ok_status();
   }
 

@@ -101,7 +101,7 @@ static void iree_task_process_resolve(
   // processes, a late report_error from a concurrent worker could CAS-succeed
   // if we cleared error_status to zero here, stranding a status that nobody
   // would ever consume. Leaving the old value in place means the CAS in
-  // report_error sees non-zero and properly ignores the late error.
+  // report_error sees non-zero and frees the late error.
   //
   // After this load, the status pointer in error_status may become dangling
   // (the completion callback frees the storage). This is safe because nothing
@@ -118,9 +118,9 @@ static void iree_task_process_resolve(
     // No completion callback — we must consume the status ourselves. The
     // load (not exchange) above intentionally leaves the non-zero value in
     // error_status: report_error uses CAS(expected=0), so the stale non-zero
-    // value causes late reports to fail the CAS and properly ignore their
-    // error rather than stranding a status that nobody would ever consume.
-    iree_status_ignore(status);
+    // value causes late reports to fail the CAS and free their error rather
+    // than stranding a status that nobody would ever consume.
+    iree_status_free(status);
   }
 
   // Resolve dependents: wake each one, building a singly-linked list of
@@ -186,9 +186,9 @@ void iree_task_process_report_error(iree_task_process_t* process,
   if (!iree_atomic_compare_exchange_strong(
           &process->error_status, &expected, (intptr_t)status,
           iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-    // Another error was already recorded. Drop ours.
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "(dropped, prior error exists)");
-    iree_status_ignore(status);
+    // Another error was already recorded. Free ours.
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "(freed, prior error exists)");
+    iree_status_free(status);
   }
 
   // Transition RUNNABLE -> COMPLETED so future drain() calls bail via
@@ -220,7 +220,7 @@ void iree_task_process_cancel(iree_task_process_t* process,
     // An error was already recorded. The cancellation piggybacks on that —
     // the process will complete with the original error.
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "prior error exists");
-    iree_status_ignore(status);
+    iree_status_free(status);
   }
 
   // Transition to CANCELLED from any non-terminal state.
