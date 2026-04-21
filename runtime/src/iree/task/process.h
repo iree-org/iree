@@ -56,6 +56,12 @@ typedef struct iree_task_process_drain_result_t {
   // processes use this to express warm-retention and handoff policy. Unlike
   // did_work, this does not publish a shared cross-drainer progress signal.
   bool keep_active;
+
+  // True if keep_active must be visible to peer drainers. Use this when a
+  // cooperative process may make mixed keep/release decisions across workers;
+  // the last drainer consumes the shared publication before releasing the
+  // process. This has no effect unless keep_active is also true.
+  bool publish_keep_active;
 } iree_task_process_drain_result_t;
 
 // Called by workers to do bounded work on a process. Multiple workers may call
@@ -137,8 +143,8 @@ typedef enum iree_task_process_schedule_state_e {
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
-//   Line 2: scheduling (wake_budget). Written by drain function at region
-//           transitions. Read by the executor's wake scheduler.
+//   Line 2: scheduling (wake_budget, retain_drain). Written by drain functions
+//           and read by the executor's wake/release scheduler.
 //   Line 3: slist intrusion + dependent list. The slist_next field is used
 //           by the immediate list; dependents are resolved at completion.
 struct iree_task_process_t {
@@ -219,6 +225,11 @@ struct iree_task_process_t {
   // to close the race between "drain returned no work" and "new work arrived
   // while we were draining." See the worker drain loop in worker.c.
   iree_atomic_int32_t needs_drain;
+
+  // Set by drainers that need a keep_active decision to be visible to peer
+  // drainers. The last compute-slot drainer consumes this before deciding to
+  // release a non-terminal process.
+  iree_atomic_int32_t retain_drain;
 
   //--- Cache line 3: list intrusion ----------------------------------------
 

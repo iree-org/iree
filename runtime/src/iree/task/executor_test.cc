@@ -631,6 +631,44 @@ static void repeated_compute_wake_completion(iree_task_process_t* process,
   iree_status_ignore(status);
 }
 
+// Context for a compute process that first publishes a shared keep-active
+// decision, then returns no-work from the next drain, then completes. With a
+// single executor worker this deterministically exercises the last-drainer
+// release path: the no-work drain must observe the earlier shared retain
+// publication and keep the compute slot live long enough to reach completion.
+struct SharedKeepActiveContext {
+  std::atomic<int32_t> drain_count{0};
+  std::atomic<bool> completed{false};
+};
+
+static iree_status_t shared_keep_active_drain(
+    iree_task_process_t* process, uint32_t worker_index,
+    iree_task_process_drain_result_t* result) {
+  (void)worker_index;
+  auto* context =
+      reinterpret_cast<SharedKeepActiveContext*>(process->user_data);
+  int32_t count = context->drain_count.fetch_add(1, std::memory_order_relaxed);
+  if (count == 0) {
+    result->keep_active = true;
+    result->publish_keep_active = true;
+    return iree_ok_status();
+  } else if (count == 1) {
+    return iree_ok_status();
+  }
+  result->did_work = true;
+  result->completed = true;
+  return iree_ok_status();
+}
+
+static void shared_keep_active_completion(iree_task_process_t* process,
+                                          iree_status_t status) {
+  auto* context =
+      reinterpret_cast<SharedKeepActiveContext*>(process->user_data);
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_OK);
+  iree_status_free(status);
+  context->completed.store(true, std::memory_order_release);
+}
+
 TEST(ExecutorProcessTest, ComputeSlotSingleProcess) {
   iree_task_executor_t* executor = CreateExecutor(4);
 
@@ -834,6 +872,27 @@ TEST(ExecutorProcessTest, ComputeSlotRepeatedSleepWakeCycles) {
     return context.completed.load(std::memory_order_acquire);
   })) << "process did not complete after shutdown";
   EXPECT_EQ(context.processed_work.load(std::memory_order_acquire), kCycles);
+
+  iree_task_executor_release(executor);
+}
+
+TEST(ExecutorProcessTest, ComputeSlotSharedKeepActiveKeepsSlotLive) {
+  iree_task_executor_t* executor = CreateExecutor(1);
+
+  SharedKeepActiveContext context;
+  iree_task_process_t process;
+  iree_task_process_initialize(shared_keep_active_drain,
+                               /*suspend_count=*/0, /*wake_budget=*/2,
+                               &process);
+  process.completion_fn = shared_keep_active_completion;
+  process.user_data = &context;
+
+  iree_task_executor_schedule_process(executor, &process);
+
+  ASSERT_TRUE(SpinUntil([&] {
+    return context.completed.load(std::memory_order_acquire);
+  })) << "shared keep-active process did not complete";
+  EXPECT_GE(context.drain_count.load(std::memory_order_acquire), 3);
 
   iree_task_executor_release(executor);
 }

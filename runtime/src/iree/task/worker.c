@@ -508,6 +508,7 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
     bool is_terminal = iree_task_process_is_terminal(process);
     bool drained_process_work = false;
     bool drained_process_keep_active = false;
+    bool drained_process_publish_keep_active = false;
 
     if (!is_terminal) {
       // Drain bounded work from this process.
@@ -522,6 +523,8 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
       is_terminal = result.completed || iree_task_process_is_terminal(process);
       drained_process_work = result.did_work;
       drained_process_keep_active = result.keep_active;
+      drained_process_publish_keep_active =
+          result.keep_active && result.publish_keep_active;
       if (drained_process_work) {
         // Sticky self-rerun signal for cross-drainer coordination. Any
         // drainer that observes forward progress publishes needs_drain=1 so
@@ -541,6 +544,12 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
         // no useful work was performed and there is no cross-drainer progress
         // to publish to needs_drain.
         did_work = true;
+      }
+      if (IREE_UNLIKELY(drained_process_publish_keep_active && !is_terminal)) {
+        // Cross-drainer retention signal for mixed keep/release policies. This
+        // is separate from needs_drain so warm retention does not masquerade
+        // as useful process progress.
+        iree_atomic_store(&process->retain_drain, 1, iree_memory_order_release);
       }
     }
 
@@ -578,14 +587,16 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
       // non-last path could strand the work against the true last drainer's
       // release decision.
       //
-      // The last drainer combines three signals into its sleep decision:
+      // The last drainer combines four signals into its sleep decision:
       //   1. drained_process_work — our own local did-useful-work result,
       //      which no global flag carries across drainers but is the most
       //      precise signal we have about "did this worker just see work".
       //   2. drained_process_keep_active — our own local retry-soon hint for
       //      a bounded cooperative handoff. This is intentionally not shared
       //      through needs_drain because it is not useful work.
-      //   3. global needs_drain — the shared publication from peer drainers
+      //   3. global retain_drain — the shared publication from peer drainers
+      //      that elected to stay active without useful work.
+      //   4. global needs_drain — the shared publication from peer drainers
       //      (via the sticky store above) and from external
       //      schedule_process callers. We consume this with an exchange so
       //      future activations start from a clean slate.
@@ -599,6 +610,10 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
       if (!is_terminal) {
         if (!needs_drain) {
           needs_drain = iree_atomic_exchange(&process->needs_drain, 0,
+                                             iree_memory_order_acq_rel) != 0;
+        }
+        if (!needs_drain) {
+          needs_drain = iree_atomic_exchange(&process->retain_drain, 0,
                                              iree_memory_order_acq_rel) != 0;
         }
         if (needs_drain) {
