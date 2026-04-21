@@ -318,8 +318,15 @@ static bool hasDMACompatiblePadding(tensor::PadOp pad) {
   return true;
 }
 
-/// Check if a tensor.pad source has DWORD-aligned innermost rows.
-static bool hasDWORDAlignedRows(tensor::PadOp pad) {
+/// Check if a tensor.pad source has DWORD-aligned innermost rows, accepting
+/// sub-DWORD rows when the whole copy fits in a single DMA segment.
+///
+/// DWORD alignment matters because CDNA OOB clamping is per-DWORD: when
+/// multiple DMA segments are issued, a partial-DWORD row causes overlap/
+/// corruption between segments. For single-segment transfers (small copies
+/// like scale operands), partial-DWORD OOB only affects trailing padding, so
+/// the sub-DWORD row is safe.
+static bool hasDWORDAlignedRows(tensor::PadOp pad, FunctionOpInterface funcOp) {
   auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
   int64_t innermostDim = sourceType.getShape().back();
   if (ShapedType::isDynamic(innermostDim)) {
@@ -327,13 +334,23 @@ static bool hasDWORDAlignedRows(tensor::PadOp pad) {
   }
   Type elemType = sourceType.getElementType();
   int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
-  return rowBytes % 4 == 0;
+  if (rowBytes % 4 == 0) {
+    return true;
+  }
+  // Single-segment exemption.
+  auto minAligned = getMinDMAAlignedElements(funcOp, elemType);
+  if (!minAligned.has_value() || !sourceType.hasStaticShape()) {
+    return false;
+  }
+  int64_t totalSrcElements = ShapedType::getNumElements(sourceType.getShape());
+  return totalSrcElements <= *minAligned;
 }
 
 /// Check if a tensor.pad is valid for DMA conversion.
-/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
-static bool isValidPadForDMA(tensor::PadOp pad) {
-  return hasDMACompatiblePadding(pad) && hasDWORDAlignedRows(pad);
+/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows
+/// (with the single-segment exemption documented on hasDWORDAlignedRows).
+static bool isValidPadForDMA(tensor::PadOp pad, FunctionOpInterface funcOp) {
+  return hasDMACompatiblePadding(pad) && hasDWORDAlignedRows(pad, funcOp);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
@@ -359,7 +376,7 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   }
 
   tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
-  if (pad && !isValidPadForDMA(pad)) {
+  if (pad && !isValidPadForDMA(pad, funcOp)) {
     return false;
   }
 
@@ -596,36 +613,14 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     // After tiling, the input is typically:
     //   tensor.extract_slice %padded[...] [...] [1, 1]
     // We need to trace through extract_slice to find if source is tensor.pad.
+    // Eligibility (including the DWORD / single-segment check) was already
+    // vetted by isCopyDMAConvertible in the pre-check, so isValidPadForDMA
+    // here is a consistency guard rather than a fresh decision.
     tensor::PadOp pad = traceToTensorPad(input);
-    if (pad && hasDMACompatiblePadding(pad)) {
+    auto parentFuncOp =
+        innerOp->template getParentOfType<FunctionOpInterface>();
+    if (pad && isValidPadForDMA(pad, parentFuncOp)) {
       source = pad.getSource();
-
-      // Check DWORD alignment with single-segment exemption. DWORD alignment
-      // is only required when multiple DMA segments are issued. For
-      // single-segment transfers (small copies like scale operands),
-      // partial-DWORD OOB only affects trailing padding.
-      auto sourceType = cast<RankedTensorType>(source.getType());
-      int64_t innermostDim = sourceType.getShape().back();
-      if (!ShapedType::isDynamic(innermostDim)) {
-        Type elemType = sourceType.getElementType();
-        int64_t elemBytes = elemType.getIntOrFloatBitWidth() / 8;
-        int64_t rowBytes = innermostDim * elemBytes;
-        auto parentFuncOp =
-            innerOp->template getParentOfType<FunctionOpInterface>();
-        auto minAligned = getMinDMAAlignedElements(parentFuncOp, elemType);
-        bool singleSegment = false;
-        if (minAligned.has_value() && sourceType.hasStaticShape()) {
-          int64_t totalSrcElements =
-              ShapedType::getNumElements(sourceType.getShape());
-          singleSegment = totalSrcElements <= *minAligned;
-        }
-        if (rowBytes % 4 != 0 && !singleSegment) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping DMA: row size " << rowBytes
-                     << " bytes not DWORD-aligned (slow path)\n");
-          return failure();
-        }
-      }
 
       // Compute in_bounds based on whether padding was added per dimension.
       for (auto [low, high] :
@@ -1365,19 +1360,20 @@ private:
       int64_t perWarpAvailable = innermostDim;
       bool outputTracesEmpty = false;
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-        outputTracesEmpty =
-            tracesToTensorEmpty(copyOp.getOutputs()[0]) &&
-            llvm::none_of(shape, ShapedType::isDynamic);
+        outputTracesEmpty = tracesToTensorEmpty(copyOp.getOutputs()[0]) &&
+                            llvm::none_of(shape, ShapedType::isDynamic);
       }
       if (outputTracesEmpty) {
         perWarpAvailable = 1;
         for (auto [ts, dim] : llvm::zip(warpTileSizes, shape)) {
           int64_t tileVal =
               getConstantIntValue(ts).value_or(ShapedType::kDynamic);
-          if (ShapedType::isDynamic(tileVal))
+          if (ShapedType::isDynamic(tileVal)) {
             perWarpAvailable = ShapedType::kDynamic;
-          if (ShapedType::isDynamic(perWarpAvailable))
+          }
+          if (ShapedType::isDynamic(perWarpAvailable)) {
             break;
+          }
           perWarpAvailable *= tileVal;
         }
       }
