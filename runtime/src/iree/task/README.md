@@ -60,10 +60,10 @@ A process has:
   External events (semaphore signals, upstream process completion) decrement
   the count. The thread that drives it to zero activates the process.
 
-- A **worker budget**: how many concurrent workers this process benefits from.
-  Updated dynamically by the drain function (e.g., a block processor updates
-  budget at each region transition based on dispatch count). The executor uses
-  this for worker distribution.
+- A **wake budget**: how many workers the executor should try to wake for this
+  process. Updated dynamically by the drain function (e.g., a block processor
+  updates the budget at each region transition based on available tiles). This
+  is a wake fan-out hint, not an admission limit on active drainers.
 
 - A **dependent list**: processes to activate when this process completes.
   Completion decrements each dependent's suspend count. This replaces BARRIER
@@ -202,10 +202,10 @@ activated, sized by `process.worker_state_size`.
 
 ## Scheduling
 
-### Worker budget and distribution
+### Wake budget and distribution
 
-Each process declares a worker budget — how many concurrent drainers it
-benefits from. The executor maintains an aggregate budget (sum across all
+Each process declares a wake budget — how many concurrent drainers it benefits
+from waking. The executor maintains an aggregate budget (sum across all
 runnable processes) and uses it for worker management:
 
 - **Aggregate budget > active workers**: wake parked workers to meet demand.
@@ -271,7 +271,7 @@ serially: one futex wake per worker, ~5μs each, ~160μs total for 32 workers.
 
 Wake trees distribute the wake cost:
 
-1. The activating thread sets `desired_wake = worker_budget` and wakes one
+1. The activating thread sets `desired_wake = wake_budget` and wakes one
    parked worker.
 2. Each waking worker claims a share of `desired_wake` (fetch_sub) and wakes
    that many additional workers before starting to drain.
@@ -292,8 +292,8 @@ buffer (block ISA) and executes it cooperatively:
 - **drain()**: claims tiles from the current region via epoch-tagged CAS,
   executes kernels, participates in completer election. Returns after one
   region pass.
-- **worker_budget**: set from the current region's dispatch count and tile
-  counts. Updated at each region transition.
+- **wake_budget**: set from the current region's tile count. Updated at each
+  region transition.
 - **worker_state**: cached block_sequence for detecting block transitions.
 - **Activation**: pushed to compute list when the queue process issues it.
 - **Completion**: signals the submission's signal semaphores, frees the
@@ -314,7 +314,7 @@ A HAL queue is a persistent process that manages submissions:
 - **drain()**: pops a ready submission, allocates a block processor context,
   wraps it as a compute process, pushes it to the compute list. Returns after
   issuing one submission.
-- **worker_budget**: 1. Queue management is sequential.
+- **wake_budget**: 1. Queue management is sequential.
 - **Sleeping**: when no submissions are ready, the queue process sleeps.
   Woken by: semaphore signal satisfying a wait, or new submission arriving.
 - **Lifetime**: created at device startup, lives for the device's lifetime.
@@ -385,7 +385,7 @@ fills, and copies submitted directly to a queue. The queue accumulates
 operations in a ringbuffer, and workers drain them directly.
 
 - **drain()**: pops operations from the ringbuffer, executes them.
-- **worker_budget**: depends on operation mix. Single fills/copies → budget=1.
+- **wake_budget**: depends on operation mix. Single fills/copies → budget=1.
   Multi-tile dispatches → budget=N.
 - **Useful when**: many small independent operations where command buffer
   recording overhead isn't worthwhile.
@@ -410,7 +410,7 @@ Cache line 1 (activation/completion — written by signaling threads):
     suspend_count, cancelled flag, state
 
 Cache line 2 (scheduling — written by drain function):
-    worker_budget, sleeping flag, last_did_work
+    wake_budget, sleeping flag, last_did_work
 
 Cache line 3+ (process-specific mutable state):
     Block processor: active_region_index, region_epoch, remaining_tiles, ...
@@ -527,7 +527,7 @@ scheduling overhead is 0.01%. For a 1μs kernel, it's 1.3%.
 5. Workers call drain() concurrently:
    a. Epoch-tagged CAS claims tiles from current region.
    b. Execute kernels.
-   c. Completer advances region, updates worker_budget.
+   c. Completer advances region, updates wake_budget.
    d. Repeat until RETURN reached.
 6. Last worker's drain() returns completed=true.
 7. process_complete():
