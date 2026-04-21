@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -54,7 +55,8 @@ static iree_status_t write_profile_chunk(iree_hal_profile_sink_t* sink,
   return write_profile_chunk_iovecs(sink, content_type, name, 1, &payload);
 }
 
-static iree_status_t write_smoke_profile(iree_string_view_t path) {
+static iree_status_t write_smoke_profile(iree_string_view_t path,
+                                         bool include_dispatch_events) {
   iree_io_file_handle_t* file_handle = NULL;
   IREE_RETURN_IF_ERROR(iree_io_file_handle_create(
       IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE, path,
@@ -185,7 +187,7 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
         iree_make_const_byte_span(clock_samples, sizeof(clock_samples)));
   }
 
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && include_dispatch_events) {
     iree_hal_profile_dispatch_event_t dispatch =
         iree_hal_profile_dispatch_event_default();
     dispatch.flags = IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
@@ -468,12 +470,20 @@ static iree_status_t write_smoke_profile(iree_string_view_t path) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    fprintf(stderr, "usage: %s OUTPUT.ireeprof\n", argv[0]);
+  bool include_dispatch_events = true;
+  int output_path_argument = 1;
+  if (argc == 3 && strcmp(argv[1], "--omit-dispatch-events") == 0) {
+    include_dispatch_events = false;
+    output_path_argument = 2;
+  } else if (argc != 2) {
+    fprintf(stderr, "usage: %s [--omit-dispatch-events] OUTPUT.ireeprof\n",
+            argv[0]);
     return EXIT_FAILURE;
   }
 
-  iree_status_t status = write_smoke_profile(iree_make_cstring_view(argv[1]));
+  iree_status_t status =
+      write_smoke_profile(iree_make_cstring_view(argv[output_path_argument]),
+                          include_dispatch_events);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);

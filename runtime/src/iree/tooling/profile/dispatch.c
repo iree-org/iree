@@ -726,6 +726,42 @@ static void iree_profile_dispatch_record_top_event(
   top_event->event = *event;
 }
 
+static void iree_profile_dispatch_record_top_host_event(
+    iree_profile_dispatch_context_t* context,
+    const iree_hal_profile_host_execution_event_t* event) {
+  if (event->start_host_time_ns < 0 ||
+      event->end_host_time_ns < event->start_host_time_ns) {
+    return;
+  }
+
+  const int64_t duration_ns =
+      event->end_host_time_ns - event->start_host_time_ns;
+  iree_host_size_t target_index = context->top_host_dispatch_count;
+  if (context->top_host_dispatch_count <
+      IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT) {
+    ++context->top_host_dispatch_count;
+  } else {
+    target_index = 0;
+    for (iree_host_size_t i = 1; i < context->top_host_dispatch_count; ++i) {
+      if (context->top_host_dispatches[i].duration_ns <
+          context->top_host_dispatches[target_index].duration_ns) {
+        target_index = i;
+      }
+    }
+    if (duration_ns <= context->top_host_dispatches[target_index].duration_ns) {
+      return;
+    }
+  }
+
+  iree_profile_host_dispatch_top_event_t* top_event =
+      &context->top_host_dispatches[target_index];
+  top_event->physical_device_ordinal = event->physical_device_ordinal;
+  top_event->queue_ordinal = event->queue_ordinal;
+  top_event->stream_id = event->stream_id;
+  top_event->duration_ns = duration_ns;
+  top_event->event = *event;
+}
+
 static iree_status_t iree_profile_dispatch_process_event_records(
     iree_profile_dispatch_context_t* context,
     const iree_hal_profile_file_record_t* record, iree_string_view_t filter,
@@ -890,6 +926,7 @@ static iree_status_t iree_profile_dispatch_process_host_execution_records(
                             event.end_host_time_ns >= event.start_host_time_ns;
       if (is_valid) {
         ++context->valid_host_dispatch_count;
+        iree_profile_dispatch_record_top_host_event(context, &event);
       } else {
         ++context->invalid_host_dispatch_count;
       }

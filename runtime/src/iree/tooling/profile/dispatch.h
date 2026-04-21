@@ -188,6 +188,19 @@ typedef struct iree_profile_dispatch_top_event_t {
   iree_hal_profile_dispatch_event_t event;
 } iree_profile_dispatch_top_event_t;
 
+typedef struct iree_profile_host_dispatch_top_event_t {
+  // Session-local physical device ordinal for this host dispatch span.
+  uint32_t physical_device_ordinal;
+  // Session-local queue ordinal for this host dispatch span.
+  uint32_t queue_ordinal;
+  // Producer-defined stream identifier for this host dispatch span.
+  uint64_t stream_id;
+  // Host execution duration in nanoseconds.
+  int64_t duration_ns;
+  // Host execution event record copied from the profile bundle.
+  iree_hal_profile_host_execution_event_t event;
+} iree_profile_host_dispatch_top_event_t;
+
 typedef struct iree_profile_dispatch_event_row_t {
   // Profile chunk containing |event| and valid only for the callback duration.
   const iree_hal_profile_file_record_t* file_record;
@@ -276,6 +289,12 @@ typedef struct iree_profile_dispatch_context_t {
       top_dispatches[IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT];
   // Number of valid entries in |top_dispatches|.
   iree_host_size_t top_dispatch_count;
+  // Largest valid host dispatch spans observed while applying the active
+  // filter.
+  iree_profile_host_dispatch_top_event_t
+      top_host_dispatches[IREE_PROFILE_DISPATCH_TOP_EVENT_COUNT];
+  // Number of valid entries in |top_host_dispatches|.
+  iree_host_size_t top_host_dispatch_count;
   // Total dispatch records parsed before filtering.
   uint64_t total_dispatch_count;
   // Dispatch records matched by the active filter.

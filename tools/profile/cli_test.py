@@ -94,10 +94,10 @@ class IreeProfileCliTest(unittest.TestCase):
             else _runfile_path("tools/iree-profile")
         )
 
-    def _create_profile(self, directory):
+    def _create_profile(self, directory, *fixture_flags):
         profile_path = os.path.join(directory, "smoke.ireeprof")
         _run_checked(
-            [self.fixture_generator, profile_path],
+            [self.fixture_generator, *fixture_flags, profile_path],
         )
         return profile_path
 
@@ -217,6 +217,25 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertEqual(
             host_dispatch_event["duration_time_domain"], "iree_host_duration_ns"
         )
+
+    def test_explain_uses_host_dispatch_spans_without_device_dispatches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile_path = self._create_profile(directory, "--omit-dispatch-events")
+            rows = self._profile_jsonl(profile_path, "explain")
+
+        summary = _find_row(rows, "explain_summary")
+        self.assertEqual(summary["valid_dispatches"], 0)
+        self.assertGreater(summary["valid_host_dispatches"], 0)
+
+        top_export = _find_row(rows, "explain_top_export")
+        self.assertEqual(top_export["timing_source"], "host_execution_event")
+        self.assertGreater(top_export["total_ns"], 0)
+        self.assertGreater(top_export["total_tile_count"], 0)
+
+        top_dispatch = _find_row(rows, "explain_top_dispatch")
+        self.assertEqual(top_dispatch["timing_source"], "host_execution_event")
+        self.assertGreater(top_dispatch["duration_ns"], 0)
+        self.assertGreater(top_dispatch["tile_count"], 0)
 
     def test_export_ireeperf_jsonl_decodes_record_families(self):
         with tempfile.TemporaryDirectory() as directory:
