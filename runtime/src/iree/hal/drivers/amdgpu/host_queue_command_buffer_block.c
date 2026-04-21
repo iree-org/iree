@@ -1155,16 +1155,17 @@ iree_hal_amdgpu_host_queue_replay_dispatch_completion_signal(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_profile_dispatch_event_reservation_t profile_events,
     uint32_t profile_event_index, bool profile_dispatch_packet,
-    bool is_final_packet) {
+    bool signals_queue_completion) {
   if (profile_dispatch_packet) {
     const uint64_t profile_event_position =
         profile_events.first_event_position + profile_event_index;
     return iree_hal_amdgpu_host_queue_profiling_completion_signal(
         queue, profile_event_position);
   }
-  return is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
-                               &queue->notification_ring)
-                         : iree_hsa_signal_null();
+  return signals_queue_completion
+             ? iree_hal_amdgpu_notification_ring_epoch_signal(
+                   &queue->notification_ring)
+             : iree_hsa_signal_null();
 }
 
 typedef struct iree_hal_amdgpu_host_queue_replay_emit_context_t {
@@ -1231,7 +1232,7 @@ typedef struct iree_hal_amdgpu_host_queue_replay_dispatch_profile_t {
   bool has_trace_packets;
   // True when this dispatch consumes the final recorded packet in the block.
   bool is_block_final_packet;
-  // True when this dispatch must signal the queue-visible completion epoch.
+  // True when this dispatch is the final replayed payload packet in the block.
   bool is_final_packet;
   // Event-ring position for this dispatch when |profile_dispatch_packet| is
   // true.
@@ -1269,10 +1270,10 @@ static iree_hsa_signal_t
 iree_hal_amdgpu_host_queue_replay_emit_completion_signal(
     const iree_hal_amdgpu_host_queue_replay_emit_context_t* context,
     const iree_hal_amdgpu_host_queue_replay_emit_state_t* state,
-    bool profile_dispatch_packet, bool is_final_packet) {
+    bool profile_dispatch_packet, bool signals_queue_completion) {
   return iree_hal_amdgpu_host_queue_replay_dispatch_completion_signal(
       context->queue, context->profile_events, state->profile_event_index,
-      profile_dispatch_packet, is_final_packet);
+      profile_dispatch_packet, signals_queue_completion);
 }
 
 static void iree_hal_amdgpu_host_queue_replay_emit_profile_source(
@@ -1404,10 +1405,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_emit_direct_dispatch(
   iree_hal_amdgpu_aql_packet_t* packet =
       iree_hal_amdgpu_host_queue_replay_emit_packet(context,
                                                     dispatch_packet_index);
+  // Queue completion is owned by a packet after the replayed payload span.
+  // Payload dispatches only use completion signals for per-dispatch profiling.
   const iree_hsa_signal_t completion_signal =
       iree_hal_amdgpu_host_queue_replay_emit_completion_signal(
           context, state, profile.profile_dispatch_packet,
-          profile.is_final_packet);
+          /*signals_queue_completion=*/false);
   uint8_t* kernarg_data = NULL;
   if (iree_hal_amdgpu_host_queue_dispatch_uses_queue_kernargs(
           dispatch_command)) {
@@ -1474,10 +1477,12 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_emit_indirect_dispatch(
   iree_hal_amdgpu_aql_packet_t* dispatch_packet =
       iree_hal_amdgpu_host_queue_replay_emit_packet(context,
                                                     dispatch_packet_index);
+  // Queue completion is owned by a packet after the replayed payload span.
+  // Payload dispatches only use completion signals for per-dispatch profiling.
   const iree_hsa_signal_t completion_signal =
       iree_hal_amdgpu_host_queue_replay_emit_completion_signal(
           context, state, profile.profile_dispatch_packet,
-          profile.is_final_packet);
+          /*signals_queue_completion=*/false);
   const uint16_t dispatch_header = iree_hal_amdgpu_aql_make_header(
       IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
       iree_hal_amdgpu_host_queue_replay_emit_packet_control(
@@ -1556,10 +1561,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_replay_emit_transfer(
                                !context->profile_queue_device_event;
   iree_hal_amdgpu_aql_packet_t* packet =
       iree_hal_amdgpu_host_queue_replay_emit_packet(context, packet_index);
-  const iree_hsa_signal_t completion_signal =
-      is_final_packet ? iree_hal_amdgpu_notification_ring_epoch_signal(
-                            &context->queue->notification_ring)
-                      : iree_hsa_signal_null();
+  // Queue completion is owned by a packet after the replayed payload span.
+  const iree_hsa_signal_t completion_signal = iree_hsa_signal_null();
 
   iree_status_t status = iree_ok_status();
   if (command->opcode == IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_FILL) {
@@ -1749,7 +1752,32 @@ typedef struct iree_hal_amdgpu_host_queue_command_buffer_profile_submission_t {
   iree_hal_amdgpu_aql_packet_t* harvest_packet;
   // Setup bits for |harvest_packet| when present.
   uint16_t harvest_setup;
+  // True when the non-profiling path needs a trailing barrier packet to own
+  // queue completion.
+  bool has_trailing_completion_packet;
 } iree_hal_amdgpu_host_queue_command_buffer_profile_submission_t;
+
+// Publishes the non-profiling terminal barrier packet for a replayed
+// command-buffer block. Payload packets keep their recorded final-payload
+// barriers, but queue completion is signaled from this trailing packet so
+// software observes block completion only after the CP reaches the end of the
+// replay span.
+static void iree_hal_amdgpu_host_queue_commit_command_buffer_completion_packet(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list, uint64_t packet_id,
+    uint32_t packet_index) {
+  iree_hal_amdgpu_aql_packet_t* packet =
+      iree_hal_amdgpu_aql_ring_packet(&queue->aql_ring, packet_id);
+  const uint16_t header = iree_hal_amdgpu_aql_emit_nop(
+      &packet->barrier_and,
+      iree_hal_amdgpu_host_queue_command_buffer_packet_control(
+          queue, resolution, signal_semaphore_list, packet_index,
+          /*has_execution_barrier=*/false, /*is_final_packet=*/true),
+      iree_hal_amdgpu_notification_ring_epoch_signal(
+          &queue->notification_ring));
+  iree_hal_amdgpu_aql_ring_commit(packet, header, /*setup=*/0);
+}
 
 static uint64_t iree_hal_amdgpu_host_queue_finish_command_buffer_block(
     iree_hal_amdgpu_host_queue_t* queue,
@@ -1837,6 +1865,19 @@ static uint64_t iree_hal_amdgpu_host_queue_finish_command_buffer_block(
     iree_hal_amdgpu_aql_ring_commit(profile->harvest_packet,
                                     profile_harvest_header,
                                     profile->harvest_setup);
+  }
+  if (profile->has_trailing_completion_packet) {
+    const uint32_t profile_harvest_packet_count =
+        profile->dispatch_events.event_count != 0 ? 1u : 0u;
+    const uint64_t completion_packet_id = first_payload_packet_id +
+                                          emitted_packet_count +
+                                          profile_harvest_packet_count;
+    const uint32_t completion_packet_index =
+        profile_queue_device_prefix_packet_count + emitted_packet_count +
+        profile_harvest_packet_count;
+    iree_hal_amdgpu_host_queue_commit_command_buffer_completion_packet(
+        queue, resolution, signal_semaphore_list, completion_packet_id,
+        completion_packet_index);
   }
   if (queue_device_event) {
     const uint64_t end_packet_id =
@@ -1933,10 +1974,17 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
       profile_dispatch_packets ? 1u : 0u;
   const uint32_t profile_queue_device_packet_count =
       profile_queue_device_events.event_count != 0 ? 2u : 0u;
+  const bool has_trailing_completion_packet =
+      !profile_dispatch_packets && profile_queue_device_packet_count == 0;
+  const uint32_t trailing_completion_packet_count =
+      has_trailing_completion_packet ? 1u : 0u;
   if (IREE_UNLIKELY(emitted_packet_count >
                         UINT32_MAX - profile_harvest_packet_count ||
                     emitted_packet_count + profile_harvest_packet_count >
-                        UINT32_MAX - profile_queue_device_packet_count)) {
+                        UINT32_MAX - profile_queue_device_packet_count ||
+                    emitted_packet_count + profile_harvest_packet_count +
+                            profile_queue_device_packet_count >
+                        UINT32_MAX - trailing_completion_packet_count)) {
     iree_hal_amdgpu_host_queue_cancel_profile_dispatch_events(queue,
                                                               profile_events);
     iree_hal_amdgpu_host_queue_cancel_profile_queue_device_events(
@@ -1945,9 +1993,9 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
         IREE_STATUS_OUT_OF_RANGE,
         "profiled command-buffer block packet count overflow");
   }
-  const uint32_t payload_packet_count = emitted_packet_count +
-                                        profile_harvest_packet_count +
-                                        profile_queue_device_packet_count;
+  const uint32_t payload_packet_count =
+      emitted_packet_count + profile_harvest_packet_count +
+      profile_queue_device_packet_count + trailing_completion_packet_count;
   const uint32_t profile_harvest_kernarg_block_count =
       profile_dispatch_packets
           ? (uint32_t)iree_host_size_ceil_div(
@@ -2047,6 +2095,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer_block(
                   },
               .harvest_packet = profile_harvest_packet,
               .harvest_setup = profile_harvest_setup,
+              .has_trailing_completion_packet = has_trailing_completion_packet,
           };
       iree_hal_amdgpu_host_queue_finish_command_buffer_block(
           queue, resolution, signal_semaphore_list, emitted_packet_count,
