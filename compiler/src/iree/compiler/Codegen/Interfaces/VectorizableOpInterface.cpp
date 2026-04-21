@@ -629,9 +629,69 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
 
   rewriter.setInsertionPointAfter(linalgOp);
 
-  // Build the preExtract linalg.generic and vectorize it.
+  // Build the preExtract linalg.generic.
   linalg::GenericOp preOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, preExtract, tensorMap);
+
+  // Vectorize preOp before building the transfer_gather so the gather can
+  // consume preOp's vector results directly instead of reading them back
+  // through its tensor outputs.
+  SmallVector<Value> origPreResults(preOp.getResults());
+  FailureOr<SmallVector<Value>> preResult =
+      vectorizeGatherLikeGenericToTransferGather(
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(preResult)) {
+    return failure();
+  }
+
+  // Redirect tensorMap entries that referenced preOp's (now-erased) results
+  // to the vectorized replacements, so postOp — built below — picks up
+  // valid tensor inputs.
+  rewriter.replaceOp(preOp, *preResult);
+  for (auto &kv : tensorMap) {
+    Value &tensor = kv.second.first;
+    auto *it = llvm::find(origPreResults, tensor);
+    if (it != origPreResults.end()) {
+      tensor = (*preResult)[std::distance(origPreResults.begin(), it)];
+    }
+  }
+
+  // Map each replacement tensor to the vector SSA value written into it.
+  // The linalg vectorizer may wrap the writing op in vector.mask when
+  // masking is enabled; handle both forms. If a replacement is not a
+  // transfer_write (or a vector.mask wrapping one), skip it — the
+  // gather-construction loop below will fall back to a transfer_read of
+  // the replacement tensor, which is semantically equivalent (just less
+  // efficient).
+  //
+  // The captured vector is the *unmasked* operand of transfer_write —
+  // i.e., out-of-bounds lanes hold whatever the vector computation
+  // produced, not the init value of tensor.empty that would be read back
+  // from the tensor. This is safe because the gather op built below is
+  // unmasked and the outer transfer_write of the gather result is masked,
+  // so OOB-lane indices are never observed. Masking the gather itself
+  // (see TODO below) must preserve this invariant.
+  DenseMap<Value, Value> preTensorToVector;
+  for (Value repl : *preResult) {
+    vector::TransferWriteOp writeOp;
+    if (auto maskOp = repl.getDefiningOp<vector::MaskOp>()) {
+      writeOp = dyn_cast<vector::TransferWriteOp>(maskOp.getMaskableOp());
+    } else {
+      writeOp = repl.getDefiningOp<vector::TransferWriteOp>();
+    }
+    if (writeOp) {
+      preTensorToVector[repl] = writeOp.getVector();
+    }
+  }
+
+  // The recursive vectorize call may have moved the rewriter's insertion
+  // point. Pin it past the last vectorized op so the gather and postOp land
+  // in the correct place.
+  if (!preResult->empty()) {
+    if (Operation *lastDef = preResult->back().getDefiningOp()) {
+      rewriter.setInsertionPointAfter(lastDef);
+    }
+  }
 
   // Build the iree_vector_ext.transfer_gather operation.
   SmallVector<Value> baseOffsets;
@@ -656,28 +716,32 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
 
     auto [tensor, map] = tensorMap[index];
 
-    Type elemType = getElementTypeOrSelf(index);
-    AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
-    VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
-
-    SmallVector<Value> operandIndices(map.getNumResults(), zero);
-
-    // TODO: Mask the operation here. It's really hard to do that here though
-    // because we don't have access to the vectorization infra, but maybe there
-    // are easier ways to do it here.
-    auto read = vector::TransferReadOp::create(
-        rewriter, loc, readType, tensor, operandIndices,
-        /*padding=*/std::nullopt, readMap);
+    // Prefer the vector SSA value produced by the vectorized preOp; fall
+    // back to a transfer_read for tensors not produced by preOp (e.g.,
+    // original linalgOp operands directly referenced by the extract).
+    Value indexVec;
+    if (preTensorToVector.contains(tensor)) {
+      indexVec = preTensorToVector[tensor];
+    } else {
+      Type elemType = getElementTypeOrSelf(index);
+      AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
+      VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
+      SmallVector<Value> operandIndices(map.getNumResults(), zero);
+      auto read = vector::TransferReadOp::create(
+          rewriter, loc, readType, tensor, operandIndices,
+          /*padding=*/std::nullopt, readMap);
+      indexVec = read.getResult();
+    }
 
     baseOffsets.push_back(zero);
     // This source dim is gathered: use a symbol.
     int64_t symIdx = numSymbols++;
     sourceMapExprs.push_back(getAffineSymbolExpr(symIdx, ctx));
-    // The index vec map: the read result has shape canonicalVectorSizes, so
+    // The index vec map: the value has shape canonicalVectorSizes, so
     // it's indexed by all vector dims (identity map).
     indexVecMaps.push_back(
         rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size()));
-    indexVecs.push_back(read.getResult());
+    indexVecs.push_back(indexVec);
   }
 
   auto sourceMap = AffineMap::get(
@@ -696,6 +760,11 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
   Value padding = ub::PoisonOp::create(rewriter, loc, extractOp.getType());
 
+  // TODO: Mask the transfer_gather. OOB lanes of the index vectors harvested
+  // from preOp's vectorized body can be arbitrary values (see the comment on
+  // `preTensorToVector` above); today the outer transfer_write of the gather
+  // result is masked, which hides this, but masking the gather directly would
+  // make the invariant local.
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
       rewriter, loc, gatherTy, extractOp.getTensor(), baseOffsets, indexVecs,
       rewriter.getAffineMapArrayAttr(indexingMaps), padding,
@@ -716,16 +785,6 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   // Build the postExtract linalg.generic.
   linalg::GenericOp postOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, postExtract, tensorMap);
-
-  FailureOr<SmallVector<Value>> preResult =
-      vectorizeGatherLikeGenericToTransferGather(
-          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
-  if (failed(preResult)) {
-    return failure();
-  }
-  // Replace preOp so its users (e.g., postOp inputs) see the vectorized
-  // results.
-  rewriter.replaceOp(preOp, *preResult);
 
   auto postResult = vectorizeGatherLikeGenericToTransferGather(
       rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
