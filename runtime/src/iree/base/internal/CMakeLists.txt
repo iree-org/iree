@@ -499,6 +499,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    sysfs_test
+  SRCS
+    "sysfs_test.cc"
+  DEPS
+    ::sysfs
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     time
