@@ -63,6 +63,8 @@ static llvm::cl::opt<bool> clAlternateDataTilingHeuristic(
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+bool noHoistScaledMmaDataOperands() { return clNoHoistDataOperandsScaledMMA; }
+
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileMxNxKxKb;
 
