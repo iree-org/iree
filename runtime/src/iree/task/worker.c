@@ -217,7 +217,7 @@ static bool iree_task_worker_drain_process(iree_task_worker_t* worker) {
       iree_task_process_t* activated_tail = NULL;
       iree_task_process_complete(process, &activated_head, &activated_tail);
 
-      // For budget-1 processes there is exactly one drainer (us), so
+      // For wake_budget == 1 processes there is exactly one drainer (us), so
       // release is safe immediately after completion.
       if (release_fn) {
         release_fn(process);
@@ -358,7 +358,7 @@ static void iree_task_worker_release_compute_process(
     expected_sentinel = tagged_sentinel;
   }
 
-  // Promote from the compute overflow list into this slot. If budget>1
+  // Promote from the compute overflow list into this slot. If wake_budget > 1
   // processes were scheduled while all slots were occupied, they are waiting
   // in compute_overflow. Now that this slot is clean (process=0,
   // active_drainers=(gen+1)|0), try to promote one. The CAS handles the race
@@ -395,7 +395,7 @@ static void iree_task_worker_release_compute_process(
       iree_atomic_load(&slot->process, iree_memory_order_acquire);
   if (new_process) {
     iree_task_process_t* p = (iree_task_process_t*)new_process;
-    int32_t budget = iree_task_process_worker_budget(p);
+    int32_t budget = iree_task_process_wake_budget(p);
     iree_task_executor_wake_workers(executor, budget);
   }
 
@@ -406,7 +406,7 @@ static void iree_task_worker_release_compute_process(
   // completion and double release.
   if (!process_is_terminal) {
     // Matches schedule_process's seq-cst store/CAS pair in the same
-    // Dekker-style handoff used by the budget-1 path.
+    // Dekker-style handoff used by the wake_budget == 1 path.
     iree_atomic_store(&process->schedule_state,
                       (int32_t)IREE_TASK_PROCESS_SCHEDULE_IDLE,
                       iree_memory_order_seq_cst);
@@ -423,8 +423,8 @@ static void iree_task_worker_release_compute_process(
         if (!iree_task_executor_try_place_in_compute_slot(executor, process)) {
           iree_task_process_slist_push(&executor->compute_overflow, process);
         }
-        iree_task_executor_wake_workers(
-            executor, iree_task_process_worker_budget(process));
+        iree_task_executor_wake_workers(executor,
+                                        iree_task_process_wake_budget(process));
       }
     }
   }
@@ -444,8 +444,8 @@ static void iree_task_worker_release_compute_process(
   }
 }
 
-// Scans executor compute slots for budget>1 processes and drains bounded work
-// from one of them. Workers scan round-robin starting from
+// Scans executor compute slots for wake_budget > 1 processes and drains bounded
+// work from one of them. Workers scan round-robin starting from
 // compute_slot_scan_start to distribute load evenly across slots.
 //
 // Two-phase active-drainer protocol:
@@ -457,7 +457,7 @@ static void iree_task_worker_release_compute_process(
 //
 // Returns true if any useful work was performed. The caller should loop back
 // to check the immediate list before scanning again, ensuring responsive
-// handling of budget-1 processes between compute work.
+// handling of wake_budget == 1 processes between compute work.
 static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
   iree_task_executor_t* executor = worker->executor;
   bool did_work = false;
@@ -726,11 +726,11 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       break;
     }
 
-    // Scan compute slots first (budget>1 cooperative drain). If compute work
-    // was found, skip the immediate list — workers doing tile execution
+    // Scan compute slots first (wake_budget > 1 cooperative drain). If compute
+    // work was found, skip the immediate list — workers doing tile execution
     // shouldn't contend on the immediate list's mutex. Only check the
     // immediate list when no compute work is available, so exactly one idle
-    // worker picks up the budget-1 control process.
+    // worker picks up the wake_budget == 1 control process.
     bool did_work = false;
     if (iree_task_worker_drain_compute_slots(worker)) {
       did_work = true;

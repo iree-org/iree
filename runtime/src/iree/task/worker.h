@@ -47,8 +47,10 @@ typedef enum iree_task_worker_state_e {
 // A worker within the executor pool.
 //
 // Workers drain processes from two sources:
-//   - Budget-1 immediate list: popped exclusively, drained to completion/sleep.
-//   - Budget>1 compute slots: scanned round-robin, cooperatively drained.
+//   - wake_budget == 1 immediate list: popped exclusively and drained to
+//     completion or sleep.
+//   - wake_budget > 1 compute slots: scanned round-robin and cooperatively
+//     drained.
 //
 // Cache line layout:
 //   Line 0 (cross-thread written): state, wake_notification,

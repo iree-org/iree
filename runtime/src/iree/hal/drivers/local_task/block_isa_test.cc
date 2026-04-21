@@ -69,7 +69,7 @@ TEST(BlockISATest, CommandStreamWalk) {
               sizeof(iree_hal_cmd_barrier_t));
   barrier->dispatch_count = 0;
   barrier->reserved = 0;
-  barrier->worker_budget = 0;
+  barrier->wake_budget = 0;
   cursor += sizeof(iree_hal_cmd_barrier_t);
 
   // Command 3: COPY (32 bytes).

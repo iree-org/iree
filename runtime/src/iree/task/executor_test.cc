@@ -141,7 +141,7 @@ TEST(ExecutorProcessTest, SingleProcessCompletesImmediately) {
 
   iree_task_process_t process;
   iree_task_process_initialize(counting_drain, /*suspend_count=*/0,
-                               /*worker_budget=*/1, &process);
+                               /*wake_budget=*/1, &process);
   process.completion_fn = counting_completion;
   process.user_data = &context;
 
@@ -517,7 +517,7 @@ TEST(ExecutorProcessTest, DependencyChainWithMultipleDrains) {
 }
 
 //===----------------------------------------------------------------------===//
-// Compute slot tests (budget > 1)
+// Compute slot tests (wake_budget > 1)
 //===----------------------------------------------------------------------===//
 
 // Context for a compute process that simulates parallel tile work.
@@ -579,10 +579,10 @@ static void compute_completion(iree_task_process_t* process,
   iree_status_ignore(status);
 }
 
-// Context for a persistent budget>1 process that repeatedly goes idle and is
-// rescheduled with one more unit of work. This mirrors the executor contract
-// local-task relies on for its long-lived compute process without involving any
-// HAL queue state.
+// Context for a persistent wake_budget > 1 process that repeatedly goes idle
+// and is rescheduled with one more unit of work. This mirrors the executor
+// contract local-task relies on for its long-lived compute process without
+// involving any HAL queue state.
 struct RepeatedComputeWakeContext {
   std::atomic<int32_t> pending_work{0};
   std::atomic<int32_t> processed_work{0};
@@ -639,7 +639,7 @@ TEST(ExecutorProcessTest, ComputeSlotSingleProcess) {
 
   iree_task_process_t process;
   iree_task_process_initialize(compute_drain, /*suspend_count=*/0,
-                               /*worker_budget=*/4, &process);
+                               /*wake_budget=*/4, &process);
   process.completion_fn = compute_completion;
   process.user_data = &context;
 
@@ -661,7 +661,7 @@ TEST(ExecutorProcessTest, ComputeSlotMultipleWorkerParticipation) {
   context.tiles_remaining.store(10000);
 
   iree_task_process_t process;
-  iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/4, &process);
+  iree_task_process_initialize(compute_drain, 0, /*wake_budget=*/4, &process);
   process.completion_fn = compute_completion;
   process.user_data = &context;
 
@@ -694,7 +694,7 @@ TEST(ExecutorProcessTest, ComputeSlotMultipleConcurrentProcesses) {
 
   for (int i = 0; i < kProcessCount; ++i) {
     contexts[i].tiles_remaining.store(50);
-    iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/2,
+    iree_task_process_initialize(compute_drain, 0, /*wake_budget=*/2,
                                  &processes[i]);
     processes[i].completion_fn = compute_completion;
     processes[i].user_data = &contexts[i];
@@ -730,9 +730,9 @@ TEST(ExecutorProcessTest, ComputeSlotWithDependencyChain) {
   context_c.drains_until_complete = 1;
 
   iree_task_process_t a, b, c;
-  iree_task_process_initialize(compute_drain, 0, /*worker_budget=*/4, &a);
-  iree_task_process_initialize(compute_drain, 1, /*worker_budget=*/2, &b);
-  iree_task_process_initialize(counting_drain, 1, /*worker_budget=*/1, &c);
+  iree_task_process_initialize(compute_drain, 0, /*wake_budget=*/4, &a);
+  iree_task_process_initialize(compute_drain, 1, /*wake_budget=*/2, &b);
+  iree_task_process_initialize(counting_drain, 1, /*wake_budget=*/1, &c);
 
   a.completion_fn = compute_completion;
   a.user_data = &context_a;
@@ -770,7 +770,7 @@ TEST(ExecutorProcessTest, ComputeSlotErrorPropagation) {
   (void)context;
 
   iree_task_process_t process;
-  iree_task_process_initialize(failing_drain, 0, /*worker_budget=*/4, &process);
+  iree_task_process_initialize(failing_drain, 0, /*wake_budget=*/4, &process);
   process.completion_fn = compute_completion;
   process.user_data = &context;
 
@@ -784,18 +784,19 @@ TEST(ExecutorProcessTest, ComputeSlotErrorPropagation) {
 }
 
 TEST(ExecutorProcessTest, ComputeSlotRepeatedSleepWakeCycles) {
-  // Exercises a non-terminal budget>1 process that repeatedly goes idle and is
-  // rescheduled with one unit of new work. This is the generic process-level
-  // contract local-task's persistent compute process depends on. Unlike the
-  // budget-1 path, a budget>1 process may transition to IDLE after a final
-  // did_work=true drain when no additional drain was requested, so this test
-  // waits on schedule_state rather than expecting a final did_work=false drain.
+  // Exercises a non-terminal wake_budget > 1 process that repeatedly goes idle
+  // and is rescheduled with one unit of new work. This is the generic
+  // process-level contract local-task's persistent compute process depends on.
+  // Unlike the wake_budget == 1 path, a wake_budget > 1 process may transition
+  // to IDLE after a final did_work=true drain when no additional drain was
+  // requested, so this test waits on schedule_state rather than expecting a
+  // final did_work=false drain.
   iree_task_executor_t* executor = CreateExecutor(4);
 
   RepeatedComputeWakeContext context;
   iree_task_process_t process;
   iree_task_process_initialize(repeated_compute_wake_drain,
-                               /*suspend_count=*/0, /*worker_budget=*/4,
+                               /*suspend_count=*/0, /*wake_budget=*/4,
                                &process);
   process.completion_fn = repeated_compute_wake_completion;
   process.user_data = &context;
@@ -838,7 +839,7 @@ TEST(ExecutorProcessTest, ComputeSlotRepeatedSleepWakeCycles) {
 }
 
 TEST(ExecutorProcessTest, ComputeSlotConcurrentScheduleWhileDraining) {
-  // External schedule_process calls can race a budget>1 process's final
+  // External schedule_process calls can race a wake_budget > 1 process's final
   // drainer as it decides whether to release the compute slot and transition
   // the process to IDLE. Stress that handoff by repeatedly publishing one unit
   // of process-local work from a producer thread while worker threads are
@@ -848,7 +849,7 @@ TEST(ExecutorProcessTest, ComputeSlotConcurrentScheduleWhileDraining) {
   RepeatedComputeWakeContext context;
   iree_task_process_t process;
   iree_task_process_initialize(repeated_compute_wake_drain,
-                               /*suspend_count=*/0, /*worker_budget=*/4,
+                               /*suspend_count=*/0, /*wake_budget=*/4,
                                &process);
   process.completion_fn = repeated_compute_wake_completion;
   process.user_data = &context;

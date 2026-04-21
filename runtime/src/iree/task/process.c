@@ -15,14 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
-                                  int32_t suspend_count, int32_t worker_budget,
+                                  int32_t suspend_count, int32_t wake_budget,
                                   iree_task_process_t* out_process) {
   IREE_ASSERT(drain_fn, "drain function must not be NULL");
-  IREE_ASSERT(worker_budget >= 1, "worker budget must be at least 1");
+  IREE_ASSERT(wake_budget >= 1, "wake budget must be at least 1");
 
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)suspend_count);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)worker_budget);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)wake_budget);
 
   // Zero non-atomic fields via memset so we don't risk forgetting one when new
   // fields are added. The subsequent assignments overwrite the fields that need
@@ -45,7 +45,7 @@ void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
                                       : IREE_TASK_PROCESS_STATE_RUNNABLE,
                     iree_memory_order_relaxed);
   iree_atomic_store(&out_process->error_status, 0, iree_memory_order_relaxed);
-  iree_atomic_store(&out_process->worker_budget, worker_budget,
+  iree_atomic_store(&out_process->wake_budget, wake_budget,
                     iree_memory_order_relaxed);
   iree_atomic_store(&out_process->schedule_state, 0, iree_memory_order_relaxed);
   iree_atomic_store(&out_process->needs_drain, 0, iree_memory_order_relaxed);
@@ -97,7 +97,7 @@ static void iree_task_process_resolve(
   iree_task_process_t** dependents = process->dependents;
 
   // Load (not exchange) the accumulated error status. The field retains its
-  // non-zero value after this load, which is intentional: for budget>1
+  // non-zero value after this load, which is intentional: for wake_budget > 1
   // processes, a late report_error from a concurrent worker could CAS-succeed
   // if we cleared error_status to zero here, stranding a status that nobody
   // would ever consume. Leaving the old value in place means the CAS in

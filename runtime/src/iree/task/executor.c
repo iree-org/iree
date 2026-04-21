@@ -309,7 +309,7 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
               "cannot schedule a completed or cancelled process");
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  int32_t budget = iree_task_process_worker_budget(process);
+  int32_t budget = iree_task_process_wake_budget(process);
 
   // Signal that new work is available. The draining worker checks this
   // before transitioning to idle, closing the sleep/wake race.

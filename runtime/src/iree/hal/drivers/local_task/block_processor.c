@@ -22,7 +22,7 @@
 // next region. The caller's pump loop runs (checking for immediate processes,
 // relaying wake, etc.) before re-entering drain(). This adds ~30-50ns per
 // barrier crossing but keeps cooperative scheduling responsive to concurrent
-// submissions and budget-1 queue management operations.
+// submissions and wake_budget == 1 queue management operations.
 //
 // When 1: the completer loops back to process the next region immediately,
 // skipping the caller's pump loop. This reduces barrier-crossing latency to
@@ -1196,17 +1196,17 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
 //       increments (release semantics), ensuring visibility.
 
 typedef struct iree_hal_cmd_block_processor_budget_update_t {
-  // Previous worker budget observed before the transition.
+  // Previous wake budget observed before the transition.
   int32_t old_budget;
 
-  // Worker budget selected for the next active region.
+  // Wake budget selected for the next active region.
   int32_t new_budget;
 
   // Additional wake credits published for the executor wake tree.
   int32_t wake_delta;
 } iree_hal_cmd_block_processor_budget_update_t;
 
-// Updates the worker budget for a new region. Called by the completer at
+// Updates the wake budget for a new region. Called by the completer at
 // region/block transitions. If the new region needs more workers than are
 // currently budgeted, adds wake credits so the relay mechanism brings up
 // additional workers.
@@ -1215,13 +1215,13 @@ iree_hal_cmd_block_processor_update_budget(
     iree_hal_cmd_block_processor_context_t* context,
     uint32_t next_remaining_tiles) {
   iree_hal_cmd_block_processor_budget_update_t update = {0, 0, 0};
-  if (!context->worker_budget_ptr) return update;
+  if (!context->wake_budget_ptr) return update;
   int32_t new_budget = (int32_t)next_remaining_tiles;
   if (new_budget > (int32_t)context->worker_count) {
     new_budget = (int32_t)context->worker_count;
   }
   int32_t old_budget = iree_atomic_exchange(
-      context->worker_budget_ptr, new_budget, iree_memory_order_relaxed);
+      context->wake_budget_ptr, new_budget, iree_memory_order_relaxed);
   update.old_budget = old_budget;
   update.new_budget = new_budget;
   if (new_budget > old_budget && context->desired_wake_ptr) {

@@ -141,12 +141,12 @@ struct iree_task_executor_t {
   // Desired wake count for the wake tree protocol. Set via fetch_add by
   // schedule_process callers (any thread), claimed via CAS by waking workers.
   //
-  // When a process is scheduled with budget>1, the activating thread adds
-  // the budget to this counter and wakes one idle worker (the seed). Each
-  // waking worker claims min(desired_wake, IREE_TASK_WAKE_FANOUT) and wakes
-  // that many additional idle workers before starting to drain. This forms a
-  // tree that fills in log2(N) rounds, rather than N serial
-  // futex posts from the activating thread.
+  // When a process is scheduled with wake_budget > 1, the activating thread
+  // adds the wake budget to this counter and wakes one idle worker (the seed).
+  // Each waking worker claims min(desired_wake, IREE_TASK_WAKE_FANOUT) and
+  // wakes that many additional idle workers before starting to drain. This
+  // forms a tree that fills in log2(N) rounds, rather than N serial futex posts
+  // from the activating thread.
   //
   // Concurrent activations (multiple calls to schedule_process) merge
   // naturally: both add to the same counter, and workers claim from the
@@ -171,7 +171,7 @@ struct iree_task_executor_t {
   // Process scheduling
   //===--------------------------------------------------------------------===//
 
-  // Lock-free MPSC list for budget-1 processes (queue management, host
+  // Lock-free MPSC list for wake_budget == 1 processes (queue management, host
   // callbacks, retire/signal). Workers try_pop from this before scanning
   // for tasks. A failed pop on an empty list costs one atomic load (~1ns).
   //
@@ -181,7 +181,7 @@ struct iree_task_executor_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_slist_t immediate_list;
 
-  // Fixed-size array of compute process slots for budget>1 processes.
+  // Fixed-size array of compute process slots for wake_budget > 1 processes.
   // Each slot holds a process pointer, an active drainer count, and a
   // completion-claimed flag. Workers scan these round-robin after draining
   // the immediate list, calling drain() on each occupied slot to
@@ -200,20 +200,20 @@ struct iree_task_executor_t {
   // when work finishes (zero latency on downstream signaling) while the
   // processor context stays alive until every worker has exited drain().
   //
-  // 16 slots supports up to 16 concurrent budget>1 processes. In practice
-  // this is far more than needed — the local_task driver typically has 1-3
-  // active command buffer processes at a time.
+  // 16 slots supports up to 16 concurrent wake_budget > 1 processes. In
+  // practice this is far more than needed — the local_task driver typically has
+  // 1-3 active command buffer processes at a time.
   //
   // Each slot is cache-line aligned (via iree_task_compute_slot_t's alignas)
   // to prevent false sharing between workers draining different slots.
   iree_task_compute_slot_t compute_slots[IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS];
 
-  // Overflow list for budget>1 processes that could not be placed in a compute
-  // slot because all slots were occupied. Processes in this list have
+  // Overflow list for wake_budget > 1 processes that could not be placed in a
+  // compute slot because all slots were occupied. Processes in this list have
   // schedule_state=DRAINING but are not yet in a slot — they wait for a slot
   // to be released. The releasing worker promotes from this list into the
   // newly freed slot. In practice this list is almost always empty (16
-  // concurrent budget>1 processes is far beyond typical usage), but it
+  // concurrent wake_budget > 1 processes is far beyond typical usage), but it
   // eliminates the hard slot limit and prevents silent process drops.
   iree_task_process_slist_t compute_overflow;
 };

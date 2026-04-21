@@ -4,16 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Task queue: two persistent processes — a budget-1 control process and a
-// budget-N compute process — that cooperatively execute queue operations.
+// Task queue: two persistent processes, a wake_budget == 1 control process and
+// a wake_budget > 1 compute process, that cooperatively execute queue
+// operations.
 //
-// Submissions flow through semaphore waits into the ready list. The budget-1
-// control process pops operations and handles them by type: barriers, host
-// calls, and allocations are handled inline; command buffers are filled into
-// recording items and pushed to the compute process's pending list.
+// Submissions flow through semaphore waits into the ready list. The
+// wake_budget == 1 control process pops operations and handles them by type:
+// barriers, host calls, and allocations are handled inline; command buffers are
+// filled into recording items and pushed to the compute process's pending list.
 //
-// The budget-N compute process drains recording items cooperatively across
-// all workers via the block processor. It occupies a single compute slot
+// The wake_budget > 1 compute process drains recording items cooperatively
+// across all workers via the block processor. It occupies a single compute slot
 // for the queue's lifetime. Per-recording two-phase completion ensures
 // semaphores are signaled eagerly while resources stay alive until all
 // workers have exited drain.
@@ -265,8 +266,8 @@ typedef struct iree_hal_task_queue_compute_item_t
 
 // A single recording being drained by the compute process. Arena-allocated
 // with a trailing worker_states[] FAM. Items cycle through:
-//   free_pool → (budget-1 fills) → pending → (compute installs) → current
-//   → (completion + release) → free_pool
+//   free_pool → (wake_budget == 1 fills) → pending → (compute installs) →
+//   current → (completion + release) → free_pool
 //
 // Each item holds the block processor context and per-worker drain state for
 // one command buffer recording. The low-bit drainer count in item->drainers is
@@ -454,11 +455,11 @@ struct iree_hal_task_queue_t {
   // and scope_end via the release callback.
   iree_atomic_int32_t shutting_down;
 
-  // The queue's persistent control process. Budget-1: drains operations from
-  // the ready list sequentially. When the ready list is empty, the process
-  // returns did_work=false and the executor's sleeping protocol parks it.
-  // New submissions wake it via schedule_process. Completes when
-  // shutting_down is set (during deinitialize).
+  // The queue's persistent control process. Uses wake_budget == 1 and drains
+  // operations from the ready list sequentially. When the ready list is empty,
+  // the process returns did_work=false and the executor's sleeping protocol
+  // parks it. New submissions wake it via schedule_process. Completes when
+  // shutting_down is set during deinitialize.
   //
   // For COMMANDS operations, this process fills a recording item and pushes
   // it to compute_pending (delegating actual execution to the compute
@@ -472,12 +473,12 @@ struct iree_hal_task_queue_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_t process;
 
-  // Persistent budget-N compute process for executing command buffer
+  // Persistent wake_budget > 1 compute process for executing command buffer
   // recordings. Placed in a compute slot on first recording; stays there
   // for the queue's lifetime. Workers cooperatively drain recordings from
   // this process via the block processor.
   //
-  // The budget-1 control process (above) is the control plane: it pops
+  // The wake_budget == 1 control process above is the control plane: it pops
   // operations from the ready list, fills recording items, and pushes them
   // to compute_pending. This compute process is the data plane: its drain
   // function loads the current recording item and delegates to
@@ -493,13 +494,13 @@ struct iree_hal_task_queue_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_task_process_t compute_process;
 
-  // MPSC list of filled recording items ready to drain. The budget-1
+  // MPSC list of filled recording items ready to drain. The wake_budget == 1
   // process pushes items after filling; the compute drain function's
   // completer pops the next item when the current recording finishes.
   iree_hal_task_queue_compute_item_slist_t compute_pending;
 
   // Free pool of recording items. All items start here at initialization.
-  // Budget-1 process pops to acquire; final release pushes to return.
+  // wake_budget == 1 process pops to acquire; final release pushes to return.
   iree_hal_task_queue_compute_item_slist_t compute_free_pool;
 
   // Current recording being drained by workers. Pointer to the active item,

@@ -59,7 +59,7 @@ typedef struct iree_task_process_drain_result_t {
 //
 // |worker_index| identifies the calling worker (0..worker_count-1).
 // Per-worker state (if needed) is managed by the drain function itself via
-// process->user_data and worker_index — the executor does not manage it.
+// process->user_data and worker_index; the executor does not manage it.
 typedef iree_status_t (*iree_task_process_drain_fn_t)(
     iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* out_result);
@@ -67,10 +67,10 @@ typedef iree_status_t (*iree_task_process_drain_fn_t)(
 // Called exactly once when a process completes (after the last drain() returns
 // completed=true). Handles cleanup, semaphore signaling, arena deallocation,
 // etc. The callback runs on the worker that observed completion — it should
-// be fast (no blocking, no heavy allocation).
+// be fast with no blocking or heavy allocation.
 //
-// For budget>1 processes, this fires eagerly as soon as the first worker
-// observes completion. Other workers may still be inside drain() — the
+// For wake_budget > 1 processes, this fires eagerly as soon as the first worker
+// observes completion. Other workers may still be inside drain(), so the
 // callback must NOT free resources accessed during drain (processor context,
 // worker state, etc.). Use release_fn for deferred resource cleanup.
 //
@@ -79,10 +79,11 @@ typedef iree_status_t (*iree_task_process_drain_fn_t)(
 typedef void (*iree_task_process_completion_fn_t)(iree_task_process_t* process,
                                                   iree_status_t status);
 
-// Called when it is safe to free resources accessed by drain(). For budget>1
-// processes with cooperative multi-worker draining, this may fire after
-// completion_fn — when the last active drainer exits. For budget-1 processes
-// (single exclusive drainer), this fires immediately after completion_fn.
+// Called when it is safe to free resources accessed by drain(). For
+// wake_budget > 1 processes with cooperative multi-worker draining, this may
+// fire after completion_fn when the last active drainer exits. For
+// wake_budget == 1 processes with a single exclusive drainer, this fires
+// immediately after completion_fn.
 //
 // Typical use: freeing the processor context, issue context wrapper, and
 // other allocations that workers touch during drain().
@@ -129,8 +130,8 @@ typedef enum iree_task_process_schedule_state_e {
 //   Line 1: activation/completion (suspend_count, state, error_status).
 //           Written by signaling threads (semaphore callbacks, completing
 //           workers, cancellation). Read by workers at scan time.
-//   Line 2: scheduling (worker_budget). Written by drain function at region
-//           transitions. Read by the executor's worker scheduler.
+//   Line 2: scheduling (wake_budget). Written by drain function at region
+//           transitions. Read by the executor's wake scheduler.
 //   Line 3: slist intrusion + dependent list. The slist_next field is used
 //           by the immediate list; dependents are resolved at completion.
 struct iree_task_process_t {
@@ -145,10 +146,11 @@ struct iree_task_process_t {
   // completion work is needed.
   iree_task_process_completion_fn_t completion_fn;
 
-  // Called when it is safe to free drain-accessed resources. For budget>1
-  // processes, this fires when the last active drainer exits (after
-  // completion_fn). For budget-1 processes, fires immediately after
-  // completion_fn. May be NULL if no deferred release is needed.
+  // Called when it is safe to free drain-accessed resources. For
+  // wake_budget > 1 processes, this fires when the last active drainer exits
+  // after completion_fn. For wake_budget == 1 processes, this fires
+  // immediately after completion_fn. May be NULL if no deferred release is
+  // needed.
   iree_task_process_release_fn_t release_fn;
 
   // Opaque user data for the drain, completion, and release functions.
@@ -182,23 +184,22 @@ struct iree_task_process_t {
   // Current process state. Transitions are monotonic (see state enum comment).
   iree_atomic_int32_t state;
 
-  // First error encountered during drain(). Set via CAS — only the first
-  // error wins. Stored as intptr_t because iree_status_t is pointer-tagged.
+  // First error encountered during drain(). Set via CAS; only the first error
+  // wins. Stored as intptr_t because iree_status_t is pointer-tagged.
   iree_atomic_intptr_t error_status;
 
   //--- Cache line 2: scheduling state --------------------------------------
 
   iree_alignas(iree_hardware_destructive_interference_size)
 
-      // How many concurrent workers this process benefits from. Updated
-      // dynamically by the drain function (e.g., block processor updates
-      // at region transitions based on dispatch count). The executor's
-      // worker scheduler reads this to decide how many workers to keep active.
+      // Wake demand hint. A value of 1 uses the sequential immediate-list
+      // path. Values greater than 1 use compute slots and seed the executor
+      // wake tree with this many desired workers. This is not an admission
+      // limit: already-active workers may still enter drain().
       //
-      // Budget of 1 means the process is sequential (queue management, host
-      // callbacks). Budget of N means N workers can productively drain
-      // concurrently (block processor, streaming dispatch).
-      iree_atomic_int32_t worker_budget;
+      // Drain functions may update the hint at region transitions when the
+      // amount of useful parallel work changes.
+      iree_atomic_int32_t wake_budget;
 
   // Executor-managed scheduling state (iree_task_process_schedule_state_t).
   // Tracks whether this process is idle, queued on a run list, or being
@@ -237,7 +238,7 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_task_process, iree_task_process_t,
 // All pointer fields (completion_fn, user_data, dependents) may be set
 // after initialization but before the process is activated.
 void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
-                                  int32_t suspend_count, int32_t worker_budget,
+                                  int32_t suspend_count, int32_t wake_budget,
                                   iree_task_process_t* out_process);
 
 // Decrements the process's suspend count by one. If the count reaches zero,
@@ -324,11 +325,11 @@ static inline bool iree_task_process_is_terminal(
          state == IREE_TASK_PROCESS_STATE_CANCELLED;
 }
 
-// Returns the current worker budget. May change at any time (drain() updates
-// it at region transitions).
-static inline int32_t iree_task_process_worker_budget(
+// Returns the current wake demand hint. May change at any time when drain()
+// reaches a region transition.
+static inline int32_t iree_task_process_wake_budget(
     const iree_task_process_t* process) {
-  return iree_atomic_load(&process->worker_budget, iree_memory_order_relaxed);
+  return iree_atomic_load(&process->wake_budget, iree_memory_order_relaxed);
 }
 
 #ifdef __cplusplus

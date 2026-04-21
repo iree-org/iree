@@ -161,9 +161,9 @@ static void iree_hal_cmd_block_builder_finalize_region(
   // Patch the barrier with the actual dispatch count for this region.
   builder->current_barrier->dispatch_count =
       (uint8_t)builder->region_dispatch_count;
-  // Worker budget: 0 means the processor determines it dynamically based
+  // Wake budget: 0 means the processor determines it dynamically based
   // on tile counts and available workers.
-  builder->current_barrier->worker_budget = 0;
+  builder->current_barrier->wake_budget = 0;
 
   // Save tile count for this region. The scratch array is indexed by
   // region_count - 1 (the current region is the last one).

@@ -117,8 +117,9 @@ static void iree_hal_task_queue_debug_record_destroy(
 //  +--------------------+
 //    |
 //    v
-//  +--------------------+    Queue process (budget-1) pops operations and
-//  |   queue drain()    |    handles them by type: command buffers are issued
+//  +--------------------+    Queue process (wake_budget == 1) pops operations
+//  and |   queue drain()    |    handles them by type: command buffers are
+//  issued
 //  +--------------------+    as separate compute processes; barriers and host
 //    |                       calls are handled inline.
 //    v
@@ -1397,8 +1398,7 @@ static void iree_hal_task_queue_trace_compute_drain_append(
       zone_id,
       processor_result ? (int64_t)processor_result->remaining_tiles : 0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
-      zone_id,
-      (int64_t)iree_task_process_worker_budget(&queue->compute_process));
+      zone_id, (int64_t)iree_task_process_wake_budget(&queue->compute_process));
   int32_t desired_wake = 0;
   if (item && item->processor_context &&
       item->processor_context->desired_wake_ptr) {
@@ -1524,12 +1524,11 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   }
 
   // Set budget tracking pointers so the block processor can update
-  // worker_budget at region transitions and wake additional workers. A
+  // wake_budget at region transitions and wake additional workers. A
   // no-block recording has no processor context and completes immediately via
   // the null-safe block processor drain path.
   if (processor_context) {
-    processor_context->worker_budget_ptr =
-        &queue->compute_process.worker_budget;
+    processor_context->wake_budget_ptr = &queue->compute_process.wake_budget;
     processor_context->desired_wake_ptr =
         iree_task_executor_desired_wake_ptr(queue->executor);
     if (profile_operation) {
@@ -2601,9 +2600,9 @@ static void iree_hal_task_queue_compute_process_release(
   iree_atomic_store(&queue->compute_current_revision, 0,
                     iree_memory_order_relaxed);
 
-  // Discard the pending list. Items here were filled by the budget-1 process
-  // but never installed as compute_current. They were already cleaned up
-  // in the pool scan above; just clear the slist head.
+  // Discard the pending list. Items here were filled by the wake_budget == 1
+  // process but never installed as compute_current. They were already cleaned
+  // up in the pool scan above; just clear the slist head.
   iree_hal_task_queue_compute_item_slist_discard(&queue->compute_pending);
 
   // End the scope for the compute process (paired with scope_begin at init).
@@ -2904,11 +2903,11 @@ static iree_status_t iree_hal_task_queue_drain_write(
 }
 
 //===----------------------------------------------------------------------===//
-// Control process (budget-1 queue drain)
+// Control process (wake_budget == 1 queue drain)
 //===----------------------------------------------------------------------===//
 
-// Queue process release callback. The queue process is budget-1, so exactly
-// one worker drains it; release fires on that worker immediately after
+// Queue process release callback. The queue process is wake_budget == 1, so
+// exactly one worker drains it; release fires on that worker immediately after
 // iree_task_process_complete returns, and worker.c makes no further access to
 // |process| after this callback. Ending the scope reference here (rather than
 // in a completion_fn) keeps scope_wait_idle a true lifetime barrier for queue
@@ -3128,11 +3127,11 @@ iree_status_t iree_hal_task_queue_initialize(
   // Initialize the ready list.
   iree_hal_task_queue_op_slist_initialize(&out_queue->ready_list);
 
-  // Initialize the queue process. Budget-1 (sequential), starts suspended
-  // with suspend_count=0 (immediately runnable but not scheduled until the
-  // first submission arrives).
+  // Initialize the queue process. It uses wake_budget == 1 and starts
+  // suspended with suspend_count=0 (immediately runnable but not scheduled
+  // until the first submission arrives).
   iree_task_process_initialize(iree_hal_task_queue_process_drain,
-                               /*suspend_count=*/0, /*worker_budget=*/1,
+                               /*suspend_count=*/0, /*wake_budget=*/1,
                                &out_queue->process);
   out_queue->process.user_data = out_queue;
   // completion_fn is intentionally NULL — process.c consumes the terminal
@@ -3146,27 +3145,27 @@ iree_status_t iree_hal_task_queue_initialize(
   // after the owning worker has exited the drain stack.
   iree_task_scope_begin(&out_queue->scope);
 
-  // Initialize the compute process. Budget-N where N is the worker count.
-  // Not scheduled until the first recording is pushed to compute_pending
-  // by drain_commands. The first schedule_process call places it in a
-  // compute slot; subsequent calls just wake workers.
+  // Initialize the compute process. It uses wake_budget > 1 with N equal to
+  // the worker count. Not scheduled until the first recording is pushed to
+  // compute_pending by drain_commands. The first schedule_process call places
+  // it in a compute slot; subsequent calls just wake workers.
   //
   // The matching scope_end fires in the RELEASE callback (not the completion
-  // callback). For budget>1 processes, completion fires eagerly while other
-  // workers may still be draining — scope_end there would allow the main
-  // thread to free the queue prematurely. The release callback fires only
-  // after the last drainer exits, making it safe to unblock scope_wait_idle.
+  // callback). For wake_budget > 1 processes, completion fires eagerly while
+  // other workers may still be draining; scope_end there would allow the main
+  // thread to free the queue prematurely. The release callback fires only after
+  // the last drainer exits, making it safe to unblock scope_wait_idle.
   iree_task_process_initialize(
       iree_hal_task_queue_compute_process_drain,
       /*suspend_count=*/0,
-      /*worker_budget=*/(int32_t)iree_task_executor_worker_count(executor),
+      /*wake_budget=*/(int32_t)iree_task_executor_worker_count(executor),
       &out_queue->compute_process);
   out_queue->compute_process.user_data = out_queue;
-  // completion_fn is intentionally NULL. For budget>1 processes completion
-  // fires eagerly on the first worker that observes termination, while other
-  // workers may still be inside drain; doing any queue teardown there would
-  // race them. All teardown (item cleanup + scope_end) lives in release_fn,
-  // which fires only after the last slot drainer exits.
+  // completion_fn is intentionally NULL. For wake_budget > 1 processes,
+  // completion fires eagerly on the first worker that observes termination
+  // while other workers may still be inside drain; doing any queue teardown
+  // there would race them. All teardown (item cleanup + scope_end) lives in
+  // release_fn, which fires only after the last slot drainer exits.
   out_queue->compute_process.release_fn =
       iree_hal_task_queue_compute_process_release;
   iree_task_scope_begin(&out_queue->scope);
@@ -3235,7 +3234,7 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   iree_task_executor_schedule_process(queue->executor, &queue->compute_process);
 
   // Wait for all outstanding operations and both processes to complete.
-  // The budget-1 process's scope_end fires in its release callback.
+  // The wake_budget == 1 process's scope_end fires in its release callback.
   // The compute process's scope_end fires in its release callback (after
   // the last drainer exits), which also cleans up any in-flight items.
   // Each submitted operation has its own scope_begin/end pair. scope_wait_idle

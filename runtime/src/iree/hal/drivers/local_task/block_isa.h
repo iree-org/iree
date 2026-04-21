@@ -355,7 +355,7 @@ typedef struct iree_hal_cmd_dispatch_t {
       uint16_t reserved;
       // Byte offset to iree_hal_dispatch_params_t within the buffer.
       uint32_t params_offset;
-      // Scheduling hint: expected total tile count for worker budget
+      // Scheduling hint: expected total tile count for wake budget
       // computation. Overwritten at execution time with the actual value.
       uint32_t tile_count_hint;
     } indirect;
@@ -468,19 +468,19 @@ static_assert(sizeof(iree_hal_cmd_update_t) == 24,
 // region must complete before the next region begins.
 //
 // Every block starts with an entry barrier, and every user-inserted barrier
-// produces one of these. The dispatch_count and worker_budget describe the
+// produces one of these. The dispatch_count and wake_budget describe the
 // region FOLLOWING this barrier (up to the next barrier/branch/return).
 // The processor uses dispatch_count to size tile_index zeroing and
-// worker_budget to decide how many workers to engage.
+// wake_budget to seed or ramp the executor wake tree.
 typedef struct iree_hal_cmd_barrier_t {
   iree_hal_cmd_header_t header;  // opcode=BARRIER, size_qwords=1
   // Number of work commands in the following region. Used by the processor to
   // zero exactly this many tile_index entries at region entry.
   uint8_t dispatch_count;
   uint8_t reserved;
-  // Hint for how many workers should process this region. 0 means the
-  // processor decides dynamically based on tile counts and available workers.
-  uint16_t worker_budget;
+  // Wake demand hint for the following region. 0 means the processor decides
+  // dynamically based on tile counts and available workers.
+  uint16_t wake_budget;
 } iree_hal_cmd_barrier_t;
 
 static_assert(sizeof(iree_hal_cmd_barrier_t) == 8,

@@ -81,21 +81,21 @@ static void completion_record(iree_task_process_t* process,
 TEST(ProcessTest, InitializeSuspended) {
   iree_task_process_t process;
   iree_task_process_initialize(drain_immediate, /*suspend_count=*/1,
-                               /*worker_budget=*/1, &process);
+                               /*wake_budget=*/1, &process);
   EXPECT_EQ(iree_task_process_state(&process),
             IREE_TASK_PROCESS_STATE_SUSPENDED);
   EXPECT_FALSE(iree_task_process_is_terminal(&process));
   EXPECT_FALSE(iree_task_process_has_error(&process));
-  EXPECT_EQ(iree_task_process_worker_budget(&process), 1);
+  EXPECT_EQ(iree_task_process_wake_budget(&process), 1);
 }
 
 TEST(ProcessTest, InitializeRunnable) {
   iree_task_process_t process;
   iree_task_process_initialize(drain_immediate, /*suspend_count=*/0,
-                               /*worker_budget=*/4, &process);
+                               /*wake_budget=*/4, &process);
   EXPECT_EQ(iree_task_process_state(&process),
             IREE_TASK_PROCESS_STATE_RUNNABLE);
-  EXPECT_EQ(iree_task_process_worker_budget(&process), 4);
+  EXPECT_EQ(iree_task_process_wake_budget(&process), 4);
 }
 
 //===----------------------------------------------------------------------===//

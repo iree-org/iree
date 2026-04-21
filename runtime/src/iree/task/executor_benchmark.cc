@@ -9,8 +9,9 @@
 // These measure the end-to-end latency of scheduling processes and having
 // workers pick them up, which is the critical path for dispatch latency.
 // Key scenarios:
-//   - Budget-1 wake: single worker wakes to drain an immediate process.
-//   - Budget-N wake: N workers wake to cooperatively drain a compute process.
+//   - wake_budget == 1 wake: single worker wakes to drain an immediate process.
+//   - wake_budget > 1 wake: N workers wake to cooperatively drain a compute
+//   process.
 //   - Concurrent activation: multiple processes activate simultaneously.
 
 #include <atomic>
@@ -52,7 +53,7 @@ static iree_task_executor_t* CreateExecutor(iree_host_size_t worker_count) {
   return executor;
 }
 
-// Drain function for budget-1 benchmarks: completes on first call.
+// Drain function for wake_budget == 1 benchmarks: completes on first call.
 // Does not signal the main thread — release_fn handles that (the worker
 // still accesses process fields after drain() returns).
 static iree_status_t instant_drain(iree_task_process_t* process,
@@ -63,7 +64,7 @@ static iree_status_t instant_drain(iree_task_process_t* process,
   return iree_ok_status();
 }
 
-// Release callback for budget-1 benchmarks. After this fires, no worker
+// Release callback for wake_budget == 1 benchmarks. After this fires, no worker
 // accesses the process again — safe to reinitialize for the next iteration.
 // user_data points to std::atomic<bool>.
 static void budget1_bench_release(iree_task_process_t* process) {
@@ -71,7 +72,8 @@ static void budget1_bench_release(iree_task_process_t* process) {
   released->store(true, std::memory_order_release);
 }
 
-// Context for budget-N benchmarks with cooperative multi-worker draining.
+// Context for wake_budget > 1 benchmarks with cooperative multi-worker
+// draining.
 struct ComputeBenchmarkContext {
   std::atomic<int32_t> tiles_remaining;
   // Signaled by completion_fn (eager — may precede full release).
@@ -80,7 +82,8 @@ struct ComputeBenchmarkContext {
   std::atomic<bool> released{false};
 };
 
-// Drain function for budget-N benchmarks: each worker claims tiles atomically.
+// Drain function for wake_budget > 1 benchmarks: each worker claims tiles
+// atomically.
 static iree_status_t compute_bench_drain(
     iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* result) {
@@ -104,7 +107,7 @@ static iree_status_t compute_bench_drain(
 }
 
 // Completion callback: fires eagerly when the first worker observes completion.
-// For budget>1, other workers may still be inside drain() — do NOT free
+// For wake_budget > 1, other workers may still be inside drain() — do NOT free
 // resources here that drain() accesses. Use release_fn for that.
 static void compute_bench_completion(iree_task_process_t* process,
                                      iree_status_t status) {
@@ -131,12 +134,12 @@ static void SpinUntil(Fn&& condition) {
 }
 
 //===----------------------------------------------------------------------===//
-// Budget-1 wake benchmarks
+// wake_budget == 1 wake benchmarks
 //===----------------------------------------------------------------------===//
 
-// Measures the round-trip latency of scheduling a budget-1 process and having
-// a single worker wake up, drain it, and complete it. This is the fast path
-// for queue management, host callbacks, and retire/signal operations.
+// Measures the round-trip latency of scheduling a wake_budget == 1 process and
+// having a single worker wake up, drain it, and complete it. This is the fast
+// path for queue management, host callbacks, and retire/signal operations.
 void BM_WakeSingleWorker(benchmark::State& state) {
   iree_task_executor_t* executor = CreateExecutor(1);
 
@@ -149,7 +152,7 @@ void BM_WakeSingleWorker(benchmark::State& state) {
   for (auto _ : state) {
     released.store(false, std::memory_order_relaxed);
     iree_task_process_initialize(instant_drain, /*suspend_count=*/0,
-                                 /*worker_budget=*/1, &process);
+                                 /*wake_budget=*/1, &process);
     process.release_fn = budget1_bench_release;
     process.user_data = &released;
     iree_task_executor_schedule_process(executor, &process);
@@ -161,13 +164,13 @@ void BM_WakeSingleWorker(benchmark::State& state) {
 BENCHMARK(BM_WakeSingleWorker)->UseRealTime();
 
 //===----------------------------------------------------------------------===//
-// Budget-N wake benchmarks (wake tree)
+// wake_budget > 1 wake benchmarks (wake tree)
 //===----------------------------------------------------------------------===//
 
-// Measures round-trip latency for a cold-start budget-N process: schedule,
-// wake N workers, cooperatively drain all tiles, complete, and release.
-// Workers start idle (sleeping) at the beginning of each iteration, so this
-// captures the full cost including futex wake.
+// Measures round-trip latency for a cold-start wake_budget > 1 process:
+// schedule, wake N workers, cooperatively drain all tiles, complete, and
+// release. Workers start idle (sleeping) at the beginning of each iteration, so
+// this captures the full cost including futex wake.
 //
 // Parameter: number of workers (and budget).
 void BM_WakeAllWorkers(benchmark::State& state) {
@@ -187,14 +190,14 @@ void BM_WakeAllWorkers(benchmark::State& state) {
     context.released.store(false);
 
     iree_task_process_initialize(compute_bench_drain, /*suspend_count=*/0,
-                                 /*worker_budget=*/worker_count, &process);
+                                 /*wake_budget=*/worker_count, &process);
     process.completion_fn = compute_bench_completion;
     process.release_fn = compute_bench_release;
     process.user_data = &context;
 
     iree_task_executor_schedule_process(executor, &process);
 
-    // Wait for full release before reusing process memory. For budget>1,
+    // Wait for full release before reusing process memory. For wake_budget > 1,
     // this waits for all active drainers to exit the compute slot.
     SpinUntil([&] { return context.released.load(std::memory_order_acquire); });
   }
@@ -233,7 +236,7 @@ void BM_WakeWarmWorkers(benchmark::State& state) {
     context.released.store(false);
 
     iree_task_process_initialize(compute_bench_drain, /*suspend_count=*/0,
-                                 /*worker_budget=*/worker_count, &process);
+                                 /*wake_budget=*/worker_count, &process);
     process.completion_fn = compute_bench_completion;
     process.release_fn = compute_bench_release;
     process.user_data = &context;
@@ -325,12 +328,12 @@ BENCHMARK(BM_ConcurrentActivation)
     ->UseRealTime();
 
 //===----------------------------------------------------------------------===//
-// Budget-1 throughput benchmark
+// wake_budget == 1 throughput benchmark
 //===----------------------------------------------------------------------===//
 
-// Measures the throughput of scheduling and completing many budget-1 processes
-// sequentially (one at a time). This is the steady-state path for queue
-// management operations in the local_task driver.
+// Measures the throughput of scheduling and completing many wake_budget == 1
+// processes sequentially (one at a time). This is the steady-state path for
+// queue management operations in the local_task driver.
 void BM_SequentialProcessThroughput(benchmark::State& state) {
   iree_task_executor_t* executor = CreateExecutor(1);
 
