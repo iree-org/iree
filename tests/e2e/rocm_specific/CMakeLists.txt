@@ -27,3 +27,27 @@ if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1[12]")
       "requires-gpu-rdna3"
   )
 endif()
+
+# Regression test for the padded-im2col DMA (gather_to_lds) path on CDNA4.
+# Exercises the OOB-sentinel emission added for same-padding convs: the
+# fat_raw_buffer OOB-to-zero hardware bound check replaces tensor.pad at
+# runtime, so padded window cells must read as 0 while in-bounds cells
+# contribute normally. Requires gfx950+ and the direct-load DMA path.
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
+  iree_check_single_backend_test_suite(
+    NAME
+      check_rocm_hip_im2col_dma_conv_padded
+    SRCS
+      "im2col_dma_conv_padded.mlir"
+    TARGET_BACKEND
+      "rocm"
+    DRIVER
+      "hip"
+    COMPILER_FLAGS
+      "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
+      "--iree-codegen-llvmgpu-use-igemm=true"
+      "--iree-llvmgpu-use-direct-load=true"
+    LABELS
+      "requires-gpu-cdna4"
+  )
+endif()

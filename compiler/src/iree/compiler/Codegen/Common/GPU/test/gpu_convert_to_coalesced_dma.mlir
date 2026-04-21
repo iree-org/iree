@@ -1000,9 +1000,10 @@ func.func @im2col_bad_perm_no_dma(%input: tensor<1x16x16x512xf16>, %output: tens
 
 // -----
 
-// Negative test: padded im2col. Im2colOp::decomposeOperation rejects
-// padding in both modes, so canDecomposeAsyncCopy's hasPadding() check
-// ensures the DMA pass downgrades without attempting decomposition.
+// Positive test: padded im2col with zero pad_value. OOB spatial positions
+// are resolved to a sentinel flat index past the collapsed source extent;
+// the DMA lowering forwards that through fat_raw_buffer whose OOB-to-zero
+// behavior stands in for the zero pad_value. No tensor.pad is emitted.
 
 #gpu_target_im2col_padded = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -1014,8 +1015,8 @@ func.func @im2col_bad_perm_no_dma(%input: tensor<1x16x16x512xf16>, %output: tens
 #exec_target_im2col_padded = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_padded}>
 #translation_im2col_padded = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
 
-// CHECK-LABEL: func.func @im2col_padded_no_dma
-func.func @im2col_padded_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+// CHECK-LABEL: func.func @im2col_padded_zero_dma
+func.func @im2col_padded_zero_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
   attributes {hal.executable.target = #exec_target_im2col_padded, translation_info = #translation_im2col_padded} {
   %cst = arith.constant 0.000000e+00 : f16
   %result = iree_linalg_ext.im2col
@@ -1030,12 +1031,226 @@ func.func @im2col_padded_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor
     ins(%input : tensor<1x16x16x512xf16>)
     outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
 
+  // CHECK-NOT:   tensor.pad
+  // CHECK:       tensor.collapse_shape {{.*}} tensor<1x16x16x512xf16> into tensor<256x512xf16>
+  // CHECK:       linalg.generic
+  // CHECK:         arith.cmpi uge
+  // CHECK:         arith.cmpi uge
+  // CHECK:         arith.ori
+  // CHECK:         arith.select {{.*}}, %c256, %{{.+}} : index
+  // CHECK:       scf.forall
+  // CHECK:         iree_gpu.coalesced_gather_dma
+  // CHECK-NOT:   iree_linalg_ext.im2col
+  return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Negative test: padded im2col with non-zero pad_value. The DMA path only
+// supports zero pad_value (hardware OOB-to-zero matches). Any other value
+// would need a post-load select, which isn't wired up yet — the pre-check
+// downgrades this op.
+
+#gpu_target_im2col_padded_nz = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_padded_nz = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_padded_nz}>
+#translation_im2col_padded_nz = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_padded_nonzero_no_dma
+func.func @im2col_padded_nonzero_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_padded_nz, translation_info = #translation_im2col_padded_nz} {
+  %cst = arith.constant 1.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
   // CHECK: iree_linalg_ext.im2col
   // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
-  // CHECK-NOT: decompose_mode
   // CHECK-NOT: iree_linalg_ext.gather
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
   return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Positive test: im2col with output padding (GEMM-alignment tail) and
+// pad_value = 0. Padded output rows route to the same flat-OOB sentinel
+// that input-pad OOB uses; fat_raw_buffer's 1D OOB-to-zero bound check
+// fills them with zero at runtime, matching pad_value.
+
+#gpu_target_im2col_out_pad = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_out_pad = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_out_pad}>
+#translation_im2col_out_pad = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_output_padded_zero_dma
+func.func @im2col_output_padded_zero_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_out_pad, translation_info = #translation_im2col_out_pad} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
+    output_pad_low = [0, 0, 0] output_pad_high = [0, 12, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+
+  // CHECK:       tensor.collapse_shape {{.*}} tensor<1x16x16x512xf16> into tensor<256x512xf16>
+  // CHECK:       linalg.generic
+  // CHECK-DAG:     arith.cmpi uge
+  // CHECK-DAG:     arith.cmpi uge
+  // CHECK-DAG:     arith.cmpi uge
+  // CHECK:         arith.ori
+  // CHECK:         arith.select {{.*}}, %c256, %{{.+}} : index
+  // CHECK:       iree_gpu.coalesced_gather_dma
+  // CHECK-NOT:   iree_linalg_ext.im2col
+  return %result : tensor<1x208x512xf16>
+}
+
+// -----
+
+// Negative test: output-padded im2col with non-zero pad_value. Zero pad
+// is served by the fat_raw_buffer OOB-to-zero mechanism, but non-zero
+// pad would need a post-load select that isn't wired up yet — same
+// gap as non-zero input pad (issue #23365). Precheck rejects.
+
+#gpu_target_im2col_out_pad_nz = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_out_pad_nz = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_out_pad_nz}>
+#translation_im2col_out_pad_nz = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_output_padded_nonzero_no_dma
+func.func @im2col_output_padded_nonzero_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_out_pad_nz, translation_info = #translation_im2col_out_pad_nz} {
+  %cst = arith.constant 1.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    output_pad_low = [0, 0, 0] output_pad_high = [0, 12, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: iree_linalg_ext.gather
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  return %result : tensor<1x208x512xf16>
+}
+
+// -----
+
+// Positive test: im2col with output_pad_low on the M dim. Exercises the
+// `isBelow` (coord < pad_low) branch in emitOutputRowOOB; the pad_high
+// branch is covered by @im2col_output_padded_zero_dma above.
+
+#gpu_target_im2col_out_pad_low = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_out_pad_low = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_out_pad_low}>
+#translation_im2col_out_pad_low = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_output_pad_low_dma
+func.func @im2col_output_pad_low_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x200x512xf16>) -> tensor<1x200x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_out_pad_low, translation_info = #translation_im2col_out_pad_low} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    output_pad_low = [0, 4, 0] output_pad_high = [0, 0, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x200x512xf16>) -> tensor<1x200x512xf16>
+
+  // CHECK:       linalg.generic
+  // CHECK:         arith.cmpi ult
+  // CHECK:         arith.select {{.*}}, %c256, %{{.+}} : index
+  // CHECK:       iree_gpu.coalesced_gather_dma
+  // CHECK-NOT:   iree_linalg_ext.im2col
+  return %result : tensor<1x200x512xf16>
+}
+
+// -----
+
+// Positive test: im2col with both output_pad_low AND output_pad_high on
+// the same M dim. Exercises the intra-dim OR of `isBelow` and `isAbove`
+// inside emitOutputRowOOB (the combined `coord < pad_low || coord >= dim
+// - pad_high` branch that per-dim tests cover only one half of).
+
+#gpu_target_im2col_out_pad_both = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_out_pad_both = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_out_pad_both}>
+#translation_im2col_out_pad_both = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_output_pad_low_and_high_dma
+func.func @im2col_output_pad_low_and_high_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_out_pad_both, translation_info = #translation_im2col_out_pad_both} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    output_pad_low = [0, 4, 0] output_pad_high = [0, 8, 0]
+    pad_value(%cst : f16)
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x208x512xf16>) -> tensor<1x208x512xf16>
+
+  // CHECK:       linalg.generic
+  // CHECK-DAG:     arith.cmpi ult
+  // CHECK-DAG:     arith.cmpi uge
+  // CHECK:         arith.ori
+  // CHECK:         arith.select {{.*}}, %c256, %{{.+}} : index
+  // CHECK:       iree_gpu.coalesced_gather_dma
+  // CHECK-NOT:   iree_linalg_ext.im2col
+  return %result : tensor<1x208x512xf16>
 }
 
 // -----
