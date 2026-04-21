@@ -28,10 +28,7 @@ iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
 
   char buffer[256];
   iree_host_size_t length = 0;
-  iree_status_t status =
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
+  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
     // Fallback: assume single NUMA node if sysfs file doesn't exist.
     return 1;
   }
@@ -78,24 +75,22 @@ iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
   return (iree_host_size_t)(max_node_id + 1);
 }
 
-iree_status_t iree_hal_platform_query_numa_distance_impl(
-    uint8_t node_a, uint8_t node_b, uint8_t* out_distance) {
+bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
+                                                    uint8_t node_b,
+                                                    uint8_t* out_distance) {
   IREE_ASSERT_ARGUMENT(out_distance);
   *out_distance = 10;  // Default: same node.
 
   // Validate node IDs.
   iree_host_size_t node_count = iree_hal_platform_query_numa_node_count_impl();
   if (node_a >= node_count || node_b >= node_count) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "NUMA node out of range (node_a=%u, node_b=%u, "
-                            "node_count=%zu)",
-                            node_a, node_b, node_count);
+    return false;
   }
 
   // Same node: distance is 10 (standard NUMA distance for local node).
   if (node_a == node_b) {
     *out_distance = 10;
-    return iree_ok_status();
+    return true;
   }
 
   // Read distance from /sys/devices/system/node/node<A>/distance.
@@ -107,13 +102,10 @@ iree_status_t iree_hal_platform_query_numa_distance_impl(
 
   char buffer[1024];
   iree_host_size_t length = 0;
-  iree_status_t status =
-      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
-  if (!iree_status_is_ok(status)) {
+  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
     // Distance file doesn't exist: assume default cross-node distance.
-    iree_status_ignore(status);
     *out_distance = 20;  // Default: one hop away.
-    return iree_ok_status();
+    return true;
   }
 
   // Parse space-separated list of distances.
@@ -147,11 +139,11 @@ iree_status_t iree_hal_platform_query_numa_distance_impl(
       if (iree_string_view_atoi_uint32(number_str, &distance_value)) {
         // Clamp to uint8_t range.
         *out_distance = (uint8_t)iree_min(distance_value, 255u);
-        return iree_ok_status();
+        return true;
       } else {
         // Parse error: use default.
         *out_distance = 20;
-        return iree_ok_status();
+        return true;
       }
     }
 
@@ -160,6 +152,21 @@ iree_status_t iree_hal_platform_query_numa_distance_impl(
 
   // Didn't find node_b in the distance list: use default.
   *out_distance = 20;
+  return true;
+}
+
+iree_status_t iree_hal_platform_query_numa_distance_impl(
+    uint8_t node_a, uint8_t node_b, uint8_t* out_distance) {
+  IREE_ASSERT_ARGUMENT(out_distance);
+  if (!iree_hal_platform_try_query_numa_distance_impl(node_a, node_b,
+                                                      out_distance)) {
+    iree_host_size_t node_count =
+        iree_hal_platform_query_numa_node_count_impl();
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "NUMA node out of range (node_a=%u, node_b=%u, "
+                            "node_count=%zu)",
+                            node_a, node_b, node_count);
+  }
   return iree_ok_status();
 }
 
@@ -169,7 +176,7 @@ iree_status_t iree_hal_platform_query_numa_distance_impl(
 
 // Queries the PCIe root port for a given BDF by following symbolic links.
 // Returns a hash of the root port path for same-root comparison.
-static iree_status_t iree_hal_platform_query_pcie_root_hash(
+static void iree_hal_platform_query_pcie_root_hash(
     iree_hal_platform_pcie_bdf_t bdf, uint64_t* out_hash) {
   IREE_ASSERT_ARGUMENT(out_hash);
   *out_hash = 0;
@@ -193,8 +200,6 @@ static iree_status_t iree_hal_platform_query_pcie_root_hash(
   // This is a heuristic: true root detection requires traversing PCI hierarchy.
   *out_hash = ((uint64_t)iree_hal_platform_pcie_bdf_domain(bdf) << 32) |
               (uint64_t)iree_hal_platform_pcie_bdf_bus(bdf);
-
-  return iree_ok_status();
 }
 
 bool iree_hal_platform_query_pcie_same_root_impl(
@@ -206,18 +211,8 @@ bool iree_hal_platform_query_pcie_same_root_impl(
 
   uint64_t hash_a = 0;
   uint64_t hash_b = 0;
-
-  iree_status_t status_a =
-      iree_hal_platform_query_pcie_root_hash(bdf_a, &hash_a);
-  iree_status_t status_b =
-      iree_hal_platform_query_pcie_root_hash(bdf_b, &hash_b);
-
-  if (!iree_status_is_ok(status_a) || !iree_status_is_ok(status_b)) {
-    iree_status_ignore(status_a);
-    iree_status_ignore(status_b);
-    // Fallback: assume same root if we can't determine.
-    return true;
-  }
+  iree_hal_platform_query_pcie_root_hash(bdf_a, &hash_a);
+  iree_hal_platform_query_pcie_root_hash(bdf_b, &hash_b);
 
   // Same bus implies same root (heuristic).
   return hash_a == hash_b;
