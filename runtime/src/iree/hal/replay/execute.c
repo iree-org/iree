@@ -870,14 +870,38 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
       (iree_host_size_t)payload.executable_data_length);
   params.constant_count = (iree_host_size_t)payload.constant_count;
   params.constants = (const uint32_t*)(record->payload.data + constants_offset);
-  params.caching_mode = payload.caching_mode;
+  params.caching_mode = payload.caching_mode &
+                        ~IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
   iree_const_byte_span_t executable_metadata = iree_make_const_byte_span(
       record->payload.data + metadata_offset,
       (iree_host_size_t)payload.executable_metadata_length);
 
+  uint8_t* executable_data_storage = NULL;
+  uint32_t* constants_storage = NULL;
   iree_hal_executable_t* executable = NULL;
   iree_status_t status = iree_ok_status();
-  if (executor->options->executable_substitution_callback.fn) {
+  if (payload.executable_data_length != 0) {
+    status = iree_allocator_malloc(executor->host_allocator,
+                                   params.executable_data.data_length,
+                                   (void**)&executable_data_storage);
+    if (iree_status_is_ok(status)) {
+      memcpy(executable_data_storage, params.executable_data.data,
+             params.executable_data.data_length);
+      params.executable_data = iree_make_const_byte_span(
+          executable_data_storage, params.executable_data.data_length);
+    }
+  }
+  if (iree_status_is_ok(status) && constant_bytes != 0) {
+    status = iree_allocator_malloc(executor->host_allocator, constant_bytes,
+                                   (void**)&constants_storage);
+    if (iree_status_is_ok(status)) {
+      memcpy(constants_storage, record->payload.data + constants_offset,
+             constant_bytes);
+      params.constants = constants_storage;
+    }
+  }
+  if (iree_status_is_ok(status) &&
+      executor->options->executable_substitution_callback.fn) {
     iree_hal_replay_executable_substitution_request_t request = {
         .sequence_ordinal = record->header.sequence_ordinal,
         .device_id = record->header.device_id,
@@ -934,11 +958,17 @@ static iree_status_t iree_hal_replay_executor_prepare_executable(
     status = iree_hal_replay_executor_prepare_captured_executable(
         cache_entry->value.executable_cache, &params, &executable);
   }
-  IREE_RETURN_IF_ERROR(status);
-  iree_hal_replay_object_entry_t entry = {.value.executable = executable};
-  return iree_hal_replay_executor_store(
-      executor, record->header.related_object_id,
-      IREE_HAL_REPLAY_OBJECT_TYPE_EXECUTABLE, entry);
+  if (iree_status_is_ok(status)) {
+    iree_hal_replay_object_entry_t entry = {.value.executable = executable};
+    status = iree_hal_replay_executor_store(
+        executor, record->header.related_object_id,
+        IREE_HAL_REPLAY_OBJECT_TYPE_EXECUTABLE, entry);
+  } else {
+    iree_hal_executable_release(executable);
+  }
+  iree_allocator_free(executor->host_allocator, constants_storage);
+  iree_allocator_free(executor->host_allocator, executable_data_storage);
+  return status;
 }
 
 static iree_status_t iree_hal_replay_executor_create_executable_cache(
@@ -2621,9 +2651,10 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
   if (IREE_UNLIKELY(record->header.status_code != IREE_STATUS_OK)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "replaying captured failing HAL operations is not implemented");
+    // Failed calls produced no replay object and are preserved only to explain
+    // host fallback branches. Replay follows the later successful calls the
+    // original host issued after observing the failure.
+    return iree_ok_status();
   }
   switch (record->header.operation_code) {
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_TRIM:

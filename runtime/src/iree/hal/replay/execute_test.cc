@@ -1192,6 +1192,35 @@ TEST(ReplayExecuteTest, ExecutesHostAllocationImportedBufferRecord) {
   iree_hal_replay_recorder_release(recorder);
 }
 
+TEST(ReplayExecuteTest, SkipsFailedOperationRecords) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  iree_hal_device_t* wrapped_device =
+      iree_hal_device_group_device_at(wrapped_group, 0);
+  int64_t value = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_NOT_FOUND,
+      iree_hal_device_query_i64(wrapped_device, IREE_SV("hal.replay.missing"),
+                                IREE_SV("probe"), &value));
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, nullptr,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_recorder_release(recorder);
+}
+
 TEST(ReplayExecuteTest, SkipsFailedUnsupportedImportedBufferRecord) {
   std::vector<uint8_t> storage(32768, 0);
   iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
