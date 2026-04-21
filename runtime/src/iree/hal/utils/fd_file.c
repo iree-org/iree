@@ -65,6 +65,10 @@ static iree_status_t iree_hal_platform_fd_pread(
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
 
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT32_MAX) count = INT32_MAX;
+
   DWORD bytes_read = 0;
   OVERLAPPED overlapped = {0};
   overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
@@ -90,6 +94,10 @@ static iree_status_t iree_hal_platform_fd_pwrite(
         IREE_STATUS_INVALID_ARGUMENT,
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
+
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_written = 0;
   OVERLAPPED overlapped = {0};
@@ -134,6 +142,9 @@ static iree_status_t iree_hal_platform_fd_pread(
     iree_host_size_t* out_bytes_read) {
   IREE_ASSERT_ARGUMENT(out_bytes_read);
   *out_bytes_read = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_read = pread(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_read > 0) {
     *out_bytes_read = (iree_host_size_t)bytes_read;
@@ -152,6 +163,9 @@ static iree_status_t iree_hal_platform_fd_pwrite(
     iree_host_size_t* out_bytes_written) {
   IREE_ASSERT_ARGUMENT(out_bytes_written);
   *out_bytes_written = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_written = pwrite(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_written > 0) {
     *out_bytes_written = (iree_host_size_t)bytes_written;
@@ -166,6 +180,22 @@ static iree_status_t iree_hal_platform_fd_pwrite(
 }
 
 #endif  // IREE_PLATFORM_WINDOWS
+
+#if defined(IREE_ASYNC_HAVE_FD)
+// Attempts to duplicate |fd| for optional async I/O ownership transfer.
+static bool iree_hal_platform_fd_try_dup_for_async(
+    int fd, iree_async_primitive_t* out_primitive) {
+  *out_primitive = iree_async_primitive_none();
+#if defined(IREE_PLATFORM_WINDOWS)
+  int dup_fd = _dup(fd);
+#else
+  int dup_fd = dup(fd);
+#endif  // IREE_PLATFORM_WINDOWS
+  if (dup_fd == -1) return false;
+  *out_primitive = iree_async_primitive_from_fd(dup_fd);
+  return true;
+}
+#endif  // IREE_ASYNC_HAVE_FD
 
 #endif  // IREE_FILE_IO_ENABLE
 
@@ -256,21 +286,19 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   file->fd = fd;
   file->length = length;
 
-  // If a proactor is provided, duplicate the fd and import it for async I/O.
-  // The duplicate is owned by the proactor-managed async file and closed when
-  // the async file is released.
-  //
-  // Currently only supported on platforms with native fd async primitives
-  // (POSIX). Windows IOCP requires HANDLE-based import with ReOpenFile to
-  // obtain a FILE_FLAG_OVERLAPPED handle, which needs the original share mode
-  // and access rights threaded through the import API.
   iree_status_t status = iree_ok_status();
+
 #if defined(IREE_ASYNC_HAVE_FD)
   if (proactor) {
-    iree_async_primitive_t async_primitive = iree_async_primitive_from_fd(fd);
+    // If a proactor is provided, attempt to duplicate the fd and import it for
+    // async I/O. The duplicate is owned by the proactor-managed async file and
+    // closed when the async file is released.
+    //
+    // Duplication is an optional fast-path probe: if the OS cannot produce a
+    // duplicate fd then the file remains synchronous-only. Once duplication
+    // succeeds, import failures are real construction failures and propagate.
     iree_async_primitive_t dup_primitive;
-    status = iree_async_primitive_dup(async_primitive, &dup_primitive);
-    if (iree_status_is_ok(status)) {
+    if (iree_hal_platform_fd_try_dup_for_async(fd, &dup_primitive)) {
       status =
           iree_async_file_import(proactor, dup_primitive, &file->async_file);
       if (!iree_status_is_ok(status)) {
