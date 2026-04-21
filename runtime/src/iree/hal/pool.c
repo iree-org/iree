@@ -133,7 +133,7 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_allocate_buffer(
               IREE_HAL_POOL_MATERIALIZE_FLAG_TRANSFER_RESERVATION_OWNERSHIP,
               out_buffer);
           if (!iree_status_is_ok(status)) {
-            // Wrapping failed - release the reservation to avoid leaking the
+            // Wrapping failed; release the reservation to avoid leaking the
             // offset back to the pool.
             iree_hal_pool_release_reservation(pool, &reservation, NULL);
           }

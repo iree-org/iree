@@ -64,14 +64,14 @@ extern "C" {
 // ### Deallocation
 //
 // 1. Clear the block's bit with atomic_fetch_and. Ownership transfers
-//    immediately - the block is available for reallocation.
+//    immediately; the block is available for reallocation.
 //
 // ### Death frontiers
 //
 // Each block carries an inline death frontier (`iree_async_frontier_t`) with
 // a configurable maximum entry capacity. Unlike TLSF, blocks never coalesce,
 // so frontiers are never merged. The frontier records the causal position at
-// which the block was freed - when the block is reallocated, the caller can
+// which the block was freed; when the block is reallocated, the caller can
 // check whether its own frontier dominates the death frontier for zero-sync
 // reuse.
 //
@@ -110,7 +110,7 @@ extern "C" {
 
 // Default death frontier capacity per block. Covers single-queue and moderate
 // multi-queue workloads. Since blocks never coalesce, frontiers don't grow
-// through merging - the capacity only needs to cover the number of distinct
+// through merging; the capacity only needs to cover the number of distinct
 // axes a single block's user touches.
 #define IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_DEFAULT_FRONTIER_CAPACITY 4
 
@@ -144,7 +144,7 @@ typedef struct iree_hal_memory_fixed_block_allocator_block_t {
 typedef struct iree_hal_memory_fixed_block_allocator_options_t {
   // Size of each block in bytes. Must be > 0. All allocations return offsets
   // aligned to this size (offset = block_index * block_size). The allocator
-  // does not impose alignment constraints - the caller is responsible for
+  // does not impose alignment constraints; the caller is responsible for
   // choosing a block_size that meets their alignment requirements.
   iree_device_size_t block_size;
 
@@ -189,7 +189,7 @@ enum iree_hal_memory_fixed_block_allocator_acquire_result_e {
 };
 
 // Running statistics for a fixed-block allocator. All values are atomic
-// snapshots - they may be momentarily inconsistent under concurrent
+// snapshots; they may be momentarily inconsistent under concurrent
 // modifications.
 typedef struct iree_hal_memory_fixed_block_allocator_stats_t {
   // Total blocks in the allocator (immutable after init).
@@ -237,14 +237,14 @@ typedef struct iree_hal_memory_fixed_block_allocator_t {
   // --- Contended atomics (each on its own cache line) ---------------------
 
   // Roving allocation hint: the word index where the last successful
-  // allocation was found. Relaxed atomic - concurrent writes may produce
+  // allocation was found. Relaxed atomic; concurrent writes may produce
   // stale values, which is harmless (the allocator scans all words if the
   // hint misses). Reduces scan overhead under steady-state patterns.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_int32_t alloc_hint_word;
 
   // Number of currently allocated blocks. Updated on every alloc (add) and
-  // free (sub) with relaxed ordering - pure bookkeeping for stats queries.
+  // free (sub) with relaxed ordering; pure bookkeeping for stats queries.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_uint32_t allocation_count;
 
@@ -253,7 +253,7 @@ typedef struct iree_hal_memory_fixed_block_allocator_t {
   // Atomic bitmap: bit set = allocated, bit clear = free.
   // Trailing invalid bits in the last word (when block_count is not a multiple
   // of 64) are set to 1 during initialization so they are never allocated.
-  // Adjacent words share cache lines by design - the bitmap is meant to be
+  // Adjacent words share cache lines by design; the bitmap is meant to be
   // scanned sequentially.
   iree_alignas(iree_hardware_destructive_interference_size) iree_atomic_uint64_t
       bitmap[IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BITMAP_WORDS];

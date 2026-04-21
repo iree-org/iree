@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <atomic>
+#include <cstdio>
 #include <thread>
 #include <vector>
 
@@ -52,14 +53,23 @@ static void BM_AcquireBurst(benchmark::State& state) {
   std::vector<uint32_t> indices(block_count);
   for (auto _ : state) {
     // Acquire all.
+    int acquired_count = 0;
     for (int i = 0; i < block_count; ++i) {
       iree_hal_memory_fixed_block_allocator_allocation_t alloc;
-      IREE_CHECK_OK(
-          iree_hal_memory_fixed_block_allocator_acquire(pool, &alloc));
-      indices[i] = alloc.block_index;
+      iree_status_t status =
+          iree_hal_memory_fixed_block_allocator_acquire(pool, &alloc);
+      if (iree_status_is_ok(status)) {
+        indices[i] = alloc.block_index;
+        ++acquired_count;
+      } else {
+        iree_status_fprint(stderr, status);
+        iree_status_free(status);
+        state.SkipWithError("unexpected exhaustion");
+        break;
+      }
     }
     // Release all.
-    for (int i = 0; i < block_count; ++i) {
+    for (int i = 0; i < acquired_count; ++i) {
       iree_hal_memory_fixed_block_allocator_release(pool, indices[i], NULL);
     }
   }

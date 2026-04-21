@@ -6,40 +6,38 @@
 
 #include "iree/hal/memory/slab_provider.h"
 
-IREE_API_EXPORT void iree_hal_slab_provider_initialize(
+void iree_hal_slab_provider_initialize(
     const iree_hal_slab_provider_vtable_t* vtable,
     iree_hal_slab_provider_t* provider) {
   iree_atomic_ref_count_init(&provider->ref_count);
   provider->vtable = vtable;
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_retain(
-    iree_hal_slab_provider_t* provider) {
+void iree_hal_slab_provider_retain(iree_hal_slab_provider_t* provider) {
   if (IREE_LIKELY(provider)) {
     iree_atomic_ref_count_inc(&provider->ref_count);
   }
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_release(
-    iree_hal_slab_provider_t* provider) {
+void iree_hal_slab_provider_release(iree_hal_slab_provider_t* provider) {
   if (IREE_LIKELY(provider) &&
       iree_atomic_ref_count_dec(&provider->ref_count) == 1) {
     provider->vtable->destroy(provider);
   }
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_slab_provider_acquire_slab(
+iree_status_t iree_hal_slab_provider_acquire_slab(
     iree_hal_slab_provider_t* provider, iree_device_size_t min_length,
     iree_hal_slab_t* out_slab) {
   return provider->vtable->acquire_slab(provider, min_length, out_slab);
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_release_slab(
-    iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab) {
+void iree_hal_slab_provider_release_slab(iree_hal_slab_provider_t* provider,
+                                         const iree_hal_slab_t* slab) {
   provider->vtable->release_slab(provider, slab);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_slab_provider_wrap_buffer(
+iree_status_t iree_hal_slab_provider_wrap_buffer(
     iree_hal_slab_provider_t* provider, const iree_hal_slab_t* slab,
     iree_device_size_t slab_offset, iree_device_size_t allocation_size,
     iree_hal_buffer_params_t params,
@@ -63,25 +61,24 @@ IREE_API_EXPORT iree_status_t iree_hal_slab_provider_wrap_buffer(
                                        release_callback, out_buffer);
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_prefault(
-    iree_hal_slab_provider_t* provider, iree_hal_slab_t* slab) {
+void iree_hal_slab_provider_prefault(iree_hal_slab_provider_t* provider,
+                                     iree_hal_slab_t* slab) {
   provider->vtable->prefault(provider, slab);
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_trim(
-    iree_hal_slab_provider_t* provider,
-    iree_hal_slab_provider_trim_flags_t flags) {
+void iree_hal_slab_provider_trim(iree_hal_slab_provider_t* provider,
+                                 iree_hal_slab_provider_trim_flags_t flags) {
   provider->vtable->trim(provider, flags);
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_query_stats(
+void iree_hal_slab_provider_query_stats(
     const iree_hal_slab_provider_t* provider,
     iree_hal_slab_provider_visited_set_t* visited,
     iree_hal_slab_provider_stats_t* out_stats) {
   provider->vtable->query_stats(provider, visited, out_stats);
 }
 
-IREE_API_EXPORT void iree_hal_slab_provider_query_properties(
+void iree_hal_slab_provider_query_properties(
     const iree_hal_slab_provider_t* provider,
     iree_hal_memory_type_t* out_memory_type,
     iree_hal_buffer_usage_t* out_supported_usage) {
@@ -89,7 +86,7 @@ IREE_API_EXPORT void iree_hal_slab_provider_query_properties(
                                      out_supported_usage);
 }
 
-IREE_API_EXPORT bool iree_hal_slab_provider_visited(
+bool iree_hal_slab_provider_visited(
     iree_hal_slab_provider_visited_set_t* visited,
     const iree_hal_slab_provider_t* provider) {
   for (iree_host_size_t i = 0; i < visited->count; ++i) {

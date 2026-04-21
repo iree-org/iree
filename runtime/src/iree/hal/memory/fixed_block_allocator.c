@@ -212,7 +212,7 @@ iree_status_t iree_hal_memory_fixed_block_allocator_try_acquire(
                                           iree_memory_order_acq_rel);
 
       if (!(old & bit_mask)) {
-        // We won the race - the bit was clear and we set it.
+        // We won the race; the bit was clear and we set it.
         uint32_t block_index = (uint32_t)word_index * 64 + bit;
 
         // Update the roving hint (best-effort, relaxed ordering).
@@ -241,7 +241,7 @@ iree_status_t iree_hal_memory_fixed_block_allocator_try_acquire(
         return iree_ok_status();
       }
 
-      // Lost the race - another thread claimed this bit. Reload the word
+      // Lost the race; another thread claimed this bit. Reload the word
       // and try the next free bit in the same word.
       word = old | bit_mask;
     }
@@ -283,7 +283,7 @@ void iree_hal_memory_fixed_block_allocator_release(
   iree_async_frontier_t* block_frontier =
       iree_hal_memory_fixed_block_allocator_block_frontier_at(pool, block);
 
-  // Clear taint - fresh frontier from this release.
+  // Clear taint; fresh frontier from this release.
   block->flags = IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BLOCK_FLAG_NONE;
 
   if (death_frontier && death_frontier->entry_count > 0) {
@@ -298,7 +298,7 @@ void iree_hal_memory_fixed_block_allocator_release(
                        sizeof(iree_async_frontier_entry_t));
       }
     } else {
-      // Death frontier exceeds inline capacity - mark tainted.
+      // Death frontier exceeds inline capacity; mark tainted.
       iree_async_frontier_initialize(block_frontier, 0);
       block->flags |= IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BLOCK_FLAG_TAINTED;
     }

@@ -21,7 +21,7 @@ extern "C" {
 
 // A lightweight routing utility that maps buffer parameters to pools.
 //
-// Pool sets are NOT HAL resources - they are initialize/deinitialize structs
+// Pool sets are NOT HAL resources; they are initialize/deinitialize structs
 // with no ref counting. They hold retained references to pools but do not own
 // them exclusively. A pool can be registered in multiple pool sets. When all
 // pool sets (and all buffers) release their refs to a pool, the pool is
@@ -40,7 +40,7 @@ extern "C" {
 //              ┌─────────────────┐
 //              │ pool set router │
 //              └────────┬────────┘
-//                       │ capability + size match, highest priority wins
+//                       │ capability + size match
 //        ┌──────────────┼──────────────┐
 //        ▼              ▼              ▼
 // ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
@@ -49,7 +49,9 @@ extern "C" {
 // └─────────────┘ └─────────────┘ └─────────────┘
 //
 // Selection algorithm:
-//   1. For each registered pool (in registration order for stability):
+//   1. Pools are stored by descending priority, preserving registration order
+//      among pools with the same priority.
+//   2. For each registered pool:
 //      a. Check memory type compatibility: pool provides at least the
 //         required type bits.
 //      b. Check usage compatibility: pool supports at least the required
@@ -57,36 +59,36 @@ extern "C" {
 //      c. Check size: allocation_size is within the pool's min/max range.
 //         This is how fixed-size/slab-size pools decline oversized requests
 //         and let lower-priority direct pools serve them.
-//   2. Among compatible pools, return the one with the highest priority.
-//   3. If no pool matches, return NULL.
+//   3. Return the first compatible pool.
+//   4. If no pool matches, return NULL.
 //
-// This is O(N) where N is the number of registered pools - typically 3-8,
-// faster than a hash lookup.
+// This is O(N) where N is the number of registered pools. Pool sets are
+// expected to stay tiny (typically 3-8 entries) and are only used to route
+// allocation requests across memory classes and size tiers.
 typedef struct iree_hal_pool_set_t {
-  // Number of initialized entries in |entries|.
+  // Number of registered entries in |entries|.
   iree_host_size_t entry_count;
 
   // Allocated capacity of |entries|.
   iree_host_size_t entry_capacity;
 
-  // Retained pool entries ordered by registration time.
+  // Registered pool entries, sorted by descending priority.
   struct iree_hal_pool_set_entry_t* entries;
 
-  // Host allocator used for the entry array.
+  // Host allocator used for |entries|.
   iree_allocator_t host_allocator;
 } iree_hal_pool_set_t;
 
 // Initializes a pool set. Must be paired with iree_hal_pool_set_deinitialize().
 // |initial_capacity| is the number of entries to pre-allocate (grows on
 // demand). 8 is a reasonable default for most configurations.
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_initialize(
-    iree_host_size_t initial_capacity, iree_allocator_t host_allocator,
-    iree_hal_pool_set_t* out_pool_set);
+iree_status_t iree_hal_pool_set_initialize(iree_host_size_t initial_capacity,
+                                           iree_allocator_t host_allocator,
+                                           iree_hal_pool_set_t* out_pool_set);
 
 // Deinitializes a pool set, releasing all retained pool references and freeing
 // the entry array.
-IREE_API_EXPORT void iree_hal_pool_set_deinitialize(
-    iree_hal_pool_set_t* pool_set);
+void iree_hal_pool_set_deinitialize(iree_hal_pool_set_t* pool_set);
 
 // Registers a pool with the pool set. The pool is retained.
 //
@@ -97,25 +99,24 @@ IREE_API_EXPORT void iree_hal_pool_set_deinitialize(
 //
 // The pool's capabilities are queried and cached at registration time via
 // iree_hal_pool_query_capabilities().
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_register(
-    iree_hal_pool_set_t* pool_set, int32_t priority, iree_hal_pool_t* pool);
+iree_status_t iree_hal_pool_set_register(iree_hal_pool_set_t* pool_set,
+                                         int32_t priority,
+                                         iree_hal_pool_t* pool);
 
 // Selects the best pool for the given buffer parameters and allocation size.
 //
 // Returns the highest-priority pool whose capabilities are compatible with
 // |params| and |allocation_size|. Returns NULL if no registered pool can
 // satisfy the request.
-IREE_API_EXPORT iree_hal_pool_t* iree_hal_pool_set_select(
-    const iree_hal_pool_set_t* pool_set, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size);
+iree_hal_pool_t* iree_hal_pool_set_select(const iree_hal_pool_set_t* pool_set,
+                                          iree_hal_buffer_params_t params,
+                                          iree_device_size_t allocation_size);
 
 // Selects a pool and allocates a buffer from it.
 //
 // Equivalent to iree_hal_pool_set_select() + iree_hal_pool_allocate_buffer().
-// Returns IREE_STATUS_NOT_FOUND if no pool matches the parameters (with a
-// diagnostic message listing the requested params and all registered pools'
-// capabilities).
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_allocate_buffer(
+// Returns IREE_STATUS_NOT_FOUND if no pool matches the parameters.
+iree_status_t iree_hal_pool_set_allocate_buffer(
     iree_hal_pool_set_t* pool_set, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     const iree_async_frontier_t* requester_frontier, iree_timeout_t timeout,

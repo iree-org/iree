@@ -19,9 +19,9 @@ typedef struct iree_hal_pool_set_entry_t {
   iree_hal_pool_capabilities_t capabilities;
 } iree_hal_pool_set_entry_t;
 
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_initialize(
-    iree_host_size_t initial_capacity, iree_allocator_t host_allocator,
-    iree_hal_pool_set_t* out_pool_set) {
+iree_status_t iree_hal_pool_set_initialize(iree_host_size_t initial_capacity,
+                                           iree_allocator_t host_allocator,
+                                           iree_hal_pool_set_t* out_pool_set) {
   IREE_ASSERT_ARGUMENT(out_pool_set);
   memset(out_pool_set, 0, sizeof(*out_pool_set));
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -43,8 +43,7 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_set_initialize(
   return status;
 }
 
-IREE_API_EXPORT void iree_hal_pool_set_deinitialize(
-    iree_hal_pool_set_t* pool_set) {
+void iree_hal_pool_set_deinitialize(iree_hal_pool_set_t* pool_set) {
   if (!pool_set) {
     return;
   }
@@ -59,8 +58,9 @@ IREE_API_EXPORT void iree_hal_pool_set_deinitialize(
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_register(
-    iree_hal_pool_set_t* pool_set, int32_t priority, iree_hal_pool_t* pool) {
+iree_status_t iree_hal_pool_set_register(iree_hal_pool_set_t* pool_set,
+                                         int32_t priority,
+                                         iree_hal_pool_t* pool) {
   IREE_ASSERT_ARGUMENT(pool_set);
   IREE_ASSERT_ARGUMENT(pool);
 
@@ -76,7 +76,19 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_set_register(
     IREE_RETURN_IF_ERROR(status);
   }
 
-  iree_hal_pool_set_entry_t* entry = &pool_set->entries[pool_set->entry_count];
+  iree_host_size_t insert_index = 0;
+  while (insert_index < pool_set->entry_count &&
+         pool_set->entries[insert_index].priority >= priority) {
+    ++insert_index;
+  }
+  if (insert_index < pool_set->entry_count) {
+    memmove(&pool_set->entries[insert_index + 1],
+            &pool_set->entries[insert_index],
+            (pool_set->entry_count - insert_index) *
+                sizeof(iree_hal_pool_set_entry_t));
+  }
+
+  iree_hal_pool_set_entry_t* entry = &pool_set->entries[insert_index];
   iree_hal_pool_retain(pool);
   entry->pool = pool;
   entry->priority = priority;
@@ -85,14 +97,11 @@ IREE_API_EXPORT iree_status_t iree_hal_pool_set_register(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_hal_pool_t* iree_hal_pool_set_select(
-    const iree_hal_pool_set_t* pool_set, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size) {
+iree_hal_pool_t* iree_hal_pool_set_select(const iree_hal_pool_set_t* pool_set,
+                                          iree_hal_buffer_params_t params,
+                                          iree_device_size_t allocation_size) {
   IREE_ASSERT_ARGUMENT(pool_set);
   iree_hal_buffer_params_canonicalize(&params);
-
-  iree_hal_pool_t* best_pool = NULL;
-  int32_t best_priority = INT32_MIN;
 
   for (iree_host_size_t i = 0; i < pool_set->entry_count; ++i) {
     const iree_hal_pool_set_entry_t* entry = &pool_set->entries[i];
@@ -118,17 +127,13 @@ IREE_API_EXPORT iree_hal_pool_t* iree_hal_pool_set_select(
       continue;
     }
 
-    // Compatible - check priority.
-    if (entry->priority > best_priority) {
-      best_pool = entry->pool;
-      best_priority = entry->priority;
-    }
+    return entry->pool;
   }
 
-  return best_pool;
+  return NULL;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_pool_set_allocate_buffer(
+iree_status_t iree_hal_pool_set_allocate_buffer(
     iree_hal_pool_set_t* pool_set, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     const iree_async_frontier_t* requester_frontier, iree_timeout_t timeout,

@@ -29,7 +29,7 @@ typedef struct iree_hal_passthrough_pool_options_t {
 // release_reservation() frees it. No suballocation, no offset management, and
 // no death-frontier tracking.
 //
-// This is the simplest possible pool - it exists to provide the default device
+// This is the simplest possible pool; it exists to provide the default device
 // pool with the same behavior as direct allocation through the current
 // iree_hal_allocator_t. It proves the pool vtable dispatch chain works and
 // serves as a baseline for benchmarking suballocating pool types.
@@ -38,7 +38,7 @@ typedef struct iree_hal_passthrough_pool_options_t {
 // |notification| is retained for the lifetime of the pool, published on
 // release_reservation(), and skips wake work when no waiter is observing it.
 // |host_allocator| is used for the pool struct and per-buffer release state.
-IREE_API_EXPORT iree_status_t iree_hal_passthrough_pool_create(
+iree_status_t iree_hal_passthrough_pool_create(
     iree_hal_passthrough_pool_options_t options,
     iree_hal_slab_provider_t* slab_provider,
     iree_async_notification_t* notification, iree_allocator_t host_allocator,

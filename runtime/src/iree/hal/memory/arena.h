@@ -25,9 +25,9 @@ extern "C" {
 //
 // ## Why an arena
 //
-// For allocation patterns where all items share a lifetime - allocated
+// For allocation patterns where all items share a lifetime; allocated
 // incrementally during one batch and freed all at once when the batch
-// completes - an arena is simpler and faster than TLSF or a block pool:
+// completes; an arena is simpler and faster than TLSF or a block pool:
 //
 //   - O(1) acquire: align and advance a pointer
 //   - O(1) release: decrement a counter, JOIN a frontier
@@ -74,7 +74,7 @@ extern "C" {
 
 // Default death frontier capacity. Since the arena JOINs across all releases
 // in a batch, the capacity needs to cover the total number of distinct axes
-// across all releases - not just one allocation's axes. 16 provides headroom
+// across all releases; not just one allocation's axes. 16 provides headroom
 // for multi-queue, multi-device workloads without taint.
 #define IREE_HAL_MEMORY_ARENA_DEFAULT_FRONTIER_CAPACITY 16
 
@@ -124,7 +124,7 @@ typedef struct iree_hal_memory_arena_allocation_t {
   iree_hal_memory_arena_flags_t flags;
 } iree_hal_memory_arena_allocation_t;
 
-// Running statistics for an arena. O(1) to query - all values are maintained
+// Running statistics for an arena. O(1) to query; all values are maintained
 // incrementally.
 typedef struct iree_hal_memory_arena_stats_t {
   // Total arena capacity in bytes.
