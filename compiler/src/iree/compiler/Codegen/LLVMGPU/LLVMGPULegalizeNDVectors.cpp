@@ -145,6 +145,8 @@ struct ConvertVectorExtract final
       return failure();
     }
     if (op.hasDynamicPosition()) {
+      op.emitRemark()
+          << "dynamic positions on extract are intentionally disabled";
       return failure();
     }
 
