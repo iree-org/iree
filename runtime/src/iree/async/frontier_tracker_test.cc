@@ -326,7 +326,8 @@ TEST(AdvanceWaitTest, MultiEntryAdvanceOne) {
   EXPECT_EQ(state.call_count, 0);  // Still waiting for Axis(1).
 
   // Cancel before fixture destruction to avoid use-after-scope.
-  iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
 }
 
 TEST(AdvanceWaitTest, MultiEntryAdvanceAll) {
@@ -413,7 +414,8 @@ TEST(CancelTest, CancelPendingWaiter) {
       fixture.tracker(), f, TrackingCallback, &state, &waiter));
   EXPECT_EQ(state.call_count, 0);
 
-  iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
 
   // Advance past the frontier — callback should NOT fire.
   iree_async_frontier_tracker_advance(fixture.tracker(), Axis(0), 20);
@@ -433,7 +435,8 @@ TEST(CancelTest, CancelAlreadyDispatched) {
   EXPECT_EQ(state.call_count, 1);
 
   // Cancel after already dispatched — should be a no-op.
-  iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter);
+  EXPECT_FALSE(
+      iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
   EXPECT_EQ(state.call_count, 1);  // Still 1, not re-invoked or anything weird.
 }
 
@@ -447,9 +450,11 @@ TEST(CancelTest, DoubleCancel) {
   IREE_EXPECT_OK(iree_async_frontier_tracker_wait(
       fixture.tracker(), f, TrackingCallback, &state, &waiter));
 
-  iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter);
+  EXPECT_TRUE(
+      iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
   // Second cancel should be safe.
-  iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter);
+  EXPECT_FALSE(
+      iree_async_frontier_tracker_cancel_wait(fixture.tracker(), &waiter));
   EXPECT_EQ(state.call_count, 0);
 }
 

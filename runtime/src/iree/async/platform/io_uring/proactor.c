@@ -846,10 +846,9 @@ static iree_status_t iree_async_proactor_io_uring_cqe_to_status(
     return iree_ok_status();
   }
 
-  // NOTIFICATION_WAIT (event mode): -EAGAIN means another waiter drained the
-  // eventfd before us (the linked READ got nothing). Treat as success: the
-  // epoch may or may not have advanced, and the caller will re-check or
-  // re-wait as appropriate.
+  // NOTIFICATION_WAIT: -EAGAIN is a satisfied wait in futex mode (the epoch
+  // already changed) or another waiter drained the eventfd before us in event
+  // mode. Treat as success: the caller will re-check or re-wait as appropriate.
   if (cqe->res == -EAGAIN &&
       operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
     return iree_ok_status();

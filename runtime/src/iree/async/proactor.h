@@ -610,7 +610,7 @@ typedef struct iree_async_proactor_vtable_t {
                               int32_t wake_count);
   bool (*notification_wait)(iree_async_proactor_t* proactor,
                             iree_async_notification_t* notification,
-                            iree_timeout_t timeout);
+                            uint32_t wait_token, iree_timeout_t timeout);
 
   iree_status_t (*register_relay)(
       iree_async_proactor_t* proactor, iree_async_relay_source_t source,
