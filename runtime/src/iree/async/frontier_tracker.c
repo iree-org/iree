@@ -347,7 +347,7 @@ iree_status_t iree_async_frontier_tracker_wait(
   return iree_ok_status();
 }
 
-void iree_async_frontier_tracker_cancel_wait(
+bool iree_async_frontier_tracker_cancel_wait(
     iree_async_frontier_tracker_t* tracker,
     iree_async_frontier_waiter_t* waiter) {
   iree_slim_mutex_lock(&tracker->waiters_mutex);
@@ -361,7 +361,7 @@ void iree_async_frontier_tracker_cancel_wait(
       // Found — unlink and we're done. Callback will never fire.
       *prev_ptr = current->next;
       iree_slim_mutex_unlock(&tracker->waiters_mutex);
-      return;
+      return true;
     }
     prev_ptr = &current->next;
     current = current->next;
@@ -370,6 +370,7 @@ void iree_async_frontier_tracker_cancel_wait(
   // Not found — waiter was already dispatched (callback completed or
   // in-flight). This is a no-op.
   iree_slim_mutex_unlock(&tracker->waiters_mutex);
+  return false;
 }
 
 void iree_async_frontier_tracker_fail_axis(

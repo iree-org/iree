@@ -203,12 +203,9 @@ void iree_async_io_uring_notification_signal(
 
 bool iree_async_io_uring_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-
-  // Capture current epoch before waiting.
-  uint32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
 
 #if defined(IREE_RUNTIME_USE_FUTEX)
   if (notification->mode == IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
@@ -217,19 +214,19 @@ bool iree_async_io_uring_notification_wait(
     while (iree_time_now() < deadline_ns) {
       uint32_t current_epoch =
           iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-      if (current_epoch != wait_epoch) return true;
+      if (current_epoch != wait_token) return true;
 
       iree_status_code_t status_code =
           is_shared ? iree_futex_wait_shared(notification->epoch_ptr,
-                                             wait_epoch, deadline_ns)
-                    : iree_futex_wait(notification->epoch_ptr, wait_epoch,
+                                             wait_token, deadline_ns)
+                    : iree_futex_wait(notification->epoch_ptr, wait_token,
                                       deadline_ns);
       if (status_code == IREE_STATUS_DEADLINE_EXCEEDED) return false;
     }
 
     uint32_t final_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-    return final_epoch != wait_epoch;
+    return final_epoch != wait_token;
   }
 #endif  // IREE_RUNTIME_USE_FUTEX
 
@@ -239,7 +236,7 @@ bool iree_async_io_uring_notification_wait(
   while (iree_time_now() < deadline_ns) {
     uint32_t current_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-    if (current_epoch != wait_epoch) return true;
+    if (current_epoch != wait_token) return true;
 
     iree_duration_t remaining_ns = deadline_ns - iree_time_now();
     if (remaining_ns <= 0) break;
@@ -265,5 +262,5 @@ bool iree_async_io_uring_notification_wait(
 
   uint32_t final_epoch =
       iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
-  return final_epoch != wait_epoch;
+  return final_epoch != wait_token;
 }
