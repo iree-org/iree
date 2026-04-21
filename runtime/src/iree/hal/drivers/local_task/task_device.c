@@ -127,7 +127,9 @@ iree_status_t iree_hal_task_device_create(
                              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
                                                        &identifier_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&device));
+      z0, iree_allocator_malloc_aligned(host_allocator, total_size,
+                                        iree_alignof(iree_hal_task_device_t),
+                                        /*offset=*/0, (void**)&device));
   memset(device, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_task_device_vtable, &device->resource);
   iree_string_view_append_to_buffer(identifier, &device->identifier,
@@ -226,7 +228,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
 
-  iree_allocator_free(host_allocator, device);
+  iree_allocator_free_aligned(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
 }
