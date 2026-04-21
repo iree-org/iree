@@ -479,3 +479,114 @@ func.func @transfer_write_tensor(%vec: vector<3x4xf32>, %dest: tensor<?x?xf32>, 
 //       CHECK:   %[[W1:.+]] = vector.transfer_write %[[V1]], %[[W0]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
 //       CHECK:   %[[W2:.+]] = vector.transfer_write %[[V2]], %[[W1]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
 //       CHECK:   return %[[W2]] : tensor<?x?xf32>
+
+// -----
+
+// transfer_read with all dims in-bounds: no bounds check, inner in_bounds is [true].
+func.func @transfer_read_all_in_bounds(%A: memref<?x?xf32>, %i: index, %j: index, %pad: f32) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%i, %j], %pad {in_bounds = [true, true]} : memref<?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_all_in_bounds
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32)
+//   CHECK-NOT:   scf.if
+//   CHECK-NOT:   memref.dim
+//       CHECK:   vector.transfer_read %[[A]]{{.*}} {in_bounds = [true]} : memref<?x?xf32>, vector<4xf32>
+//       CHECK:   vector.transfer_read %[[A]]{{.*}} {in_bounds = [true]} : memref<?x?xf32>, vector<4xf32>
+//       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 3-D result: unrolled into 2*3=6 rank-1 reads.
+func.func @transfer_read_3d(%A: memref<?x?x?x?xf32>, %a: index, %b: index, %c: index, %d: index, %pad: f32) -> vector<2x3x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c, %d], %pad {in_bounds = [true, true, true]} : memref<?x?x?x?xf32>, vector<2x3x4xf32>
+  return %vec : vector<2x3x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_3d
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
+//   CHECK-NOT:   scf.if
+//  CHECK-COUNT-6: vector.transfer_read {{.*}} : memref<?x?x?x?xf32>, vector<4xf32>
+//       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+// Rank-1 transfer_read is left untouched by the pattern.
+func.func @negative_transfer_read_1d(%A: memref<?xf32>, %i: index, %pad: f32) -> vector<4xf32> {
+  %vec = vector.transfer_read %A[%i], %pad {in_bounds = [true]} : memref<?xf32>, vector<4xf32>
+  return %vec : vector<4xf32>
+}
+// CHECK-LABEL: func.func @negative_transfer_read_1d
+//  CHECK-SAME:   (%[[A:.+]]: memref<?xf32>, %[[I:.+]]: index, %[[PAD:.+]]: f32) -> vector<4xf32>
+//       CHECK:   %[[V:.+]] = vector.transfer_read %[[A]][%[[I]]], %[[PAD]] {in_bounds = [true]} : memref<?xf32>, vector<4xf32>
+//       CHECK:   return %[[V]] : vector<4xf32>
+
+// -----
+
+// Rank-1 transfer_write is left untouched by the pattern.
+func.func @negative_transfer_write_1d(%vec: vector<4xf32>, %A: memref<?xf32>, %i: index) {
+  vector.transfer_write %vec, %A[%i] {in_bounds = [true]} : vector<4xf32>, memref<?xf32>
+  return
+}
+// CHECK-LABEL: func.func @negative_transfer_write_1d
+//  CHECK-SAME:   (%[[V:.+]]: vector<4xf32>, %[[A:.+]]: memref<?xf32>, %[[I:.+]]: index)
+//       CHECK:   vector.transfer_write %[[V]], %[[A]][%[[I]]] {in_bounds = [true]} : vector<4xf32>, memref<?xf32>
+//       CHECK:   return
+
+// -----
+
+// transfer_read with OOB outer dim and a mask: the scf.if guard wraps the
+// masked read, and the else branch yields the padding vector.
+func.func @transfer_read_oob_masked(%A: memref<?x?xf32>, %i: index, %j: index, %pad: f32, %mask: vector<2x4xi1>) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%i, %j], %pad, %mask {in_bounds = [false, true]} : memref<?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_oob_masked
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//       CHECK:   %[[PADVEC:.+]] = vector.broadcast %[[PAD]] : f32 to vector<4xf32>
+//       CHECK:   %[[DIM:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %{{.+}}, %[[DIM]] : index
+//       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]]{{.*}}, %[[PAD]], %[[M0]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %{{.+}}, %{{.+}} : index
+//       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]]{{.*}}, %[[PAD]], %[[M1]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   return %[[R0]], %[[R1]]
+
+// -----
+
+// transfer_write on tensor with OOB outer dim: generates scf.if that yields
+// the updated tensor or the original when the index is out of bounds.
+func.func @transfer_write_tensor_oob(%vec: vector<2x4xf32>, %dest: tensor<?x?xf32>, %i: index, %j: index) -> tensor<?x?xf32> {
+  %res = vector.transfer_write %vec, %dest[%i, %j] {in_bounds = [false, true]} : vector<2x4xf32>, tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @transfer_write_tensor_oob
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[DEST:.+]]: tensor<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//  CHECK-SAME:   -> tensor<?x?xf32>
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[DIM0:.+]] = tensor.dim %[[DEST]], %{{.+}} : tensor<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
+//       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (tensor<?x?xf32>) {
+//       CHECK:     %[[W0:.+]] = vector.transfer_write %[[V0]], %[[DEST]][{{.*}}] {in_bounds = [true]}
+//       CHECK:     scf.yield %[[W0]] : tensor<?x?xf32>
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[DEST]] : tensor<?x?xf32>
+//       CHECK:   }
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[DIM1:.+]] = tensor.dim %[[DEST]], %{{.+}} : tensor<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
+//       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (tensor<?x?xf32>) {
+//       CHECK:     %[[W1:.+]] = vector.transfer_write %[[V1]], %[[R0]][{{.*}}] {in_bounds = [true]}
+//       CHECK:     scf.yield %[[W1]] : tensor<?x?xf32>
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[R0]] : tensor<?x?xf32>
+//       CHECK:   }
+//       CHECK:   return %[[R1]] : tensor<?x?xf32>
