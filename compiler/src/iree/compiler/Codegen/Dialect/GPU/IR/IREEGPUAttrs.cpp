@@ -1349,6 +1349,16 @@ int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 
 int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
 
+LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+      .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
+                                          permutation, offsets, sizes, strides);
+}
+
 LogicalResult
 DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
@@ -2793,6 +2803,16 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
 int64_t DataTiledScaledMMAAttr::getExpectedNumInputs() const { return 4; }
 
 int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
+LogicalResult DataTiledScaledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+      .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
+                                          permutation, offsets, sizes, strides);
+}
 
 int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());

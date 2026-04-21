@@ -19,6 +19,18 @@
 namespace mlir::iree_compiler::IREE::GPU {
 Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr);
+
+/// Computes offsets/sizes/strides for a single operand tile from a swizzle
+/// description and a thread ID. This is the shared implementation behind
+/// DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides and can be
+/// called directly when a custom swizzle is needed (e.g., PDT data operands).
+LogicalResult populateSwizzleBasedOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, const Codegen::TileSwizzle &swizzle,
+    Value threadId, ArrayRef<int64_t> permutation,
+    SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off
