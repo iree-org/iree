@@ -77,6 +77,15 @@ OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                                                {a, b, c});
 }
 
+Value createSafeDivide(OpBuilder &builder, Location loc, Value x, Value y) {
+  auto ty = cast<FloatType>(y.getType());
+  APFloat eps = APFloat::getSmallestNormalized(ty.getFloatSemantics());
+  Value epsVal =
+      arith::ConstantOp::create(builder, loc, builder.getFloatAttr(ty, eps));
+  Value safeY = arith::AddFOp::create(builder, loc, y, epsVal);
+  return arith::DivFOp::create(builder, loc, x, safeY);
+}
+
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = cast<ShapedType>(v.getType());
   if (!type.isDynamicDim(dim)) {
