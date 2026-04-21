@@ -73,8 +73,8 @@ static void iree_hal_cmd_fill_pattern(uint8_t* target,
 }
 
 // Records the first error encountered by any worker. Thread-safe via CAS.
-// If another worker already recorded an error, this error is dropped.
-// Also sets the completed flag so that all workers exit on their next
+// If another worker already recorded an error, the losing reporter frees its
+// status. Also sets the completed flag so that all workers exit on their next
 // drain() call.
 static void iree_hal_cmd_block_processor_report_error(
     iree_hal_cmd_block_processor_context_t* context, iree_status_t status) {

@@ -100,9 +100,9 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_int32_t block_sequence;
 
-  // First error encountered by any worker. Set via CAS — only the first
-  // error wins, subsequent errors are dropped. Stored as an intptr_t
-  // because iree_status_t is a pointer-tagged value.
+  // First error encountered by any worker. Set via CAS; only the first error
+  // wins and subsequent errors are freed by the losing reporter. Stored as an
+  // intptr_t because iree_status_t is a pointer-tagged value.
   iree_alignas(iree_hardware_destructive_interference_size)
       iree_atomic_intptr_t error_status;
 

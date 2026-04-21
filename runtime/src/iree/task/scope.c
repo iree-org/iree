@@ -51,7 +51,7 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope) {
   // In most cases the status will have been consumed by the scope owner.
   iree_status_t status = (iree_status_t)iree_atomic_exchange(
       &scope->permanent_status, (intptr_t)NULL, iree_memory_order_acquire);
-  IREE_IGNORE_ERROR(status);
+  iree_status_free(status);
 
   while (iree_atomic_load(&scope->pending_idle_notification_posts,
                           iree_memory_order_acquire)) {
@@ -111,8 +111,8 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
           &scope->permanent_status, (intptr_t*)&old_status,
           (intptr_t)new_status, iree_memory_order_acq_rel,
           iree_memory_order_relaxed /* old_status is unused */)) {
-    // Previous status was not OK; drop our new status.
-    IREE_IGNORE_ERROR(new_status);
+    // Previous status was not OK; first error wins.
+    iree_status_free(new_status);
   }
 
   IREE_TRACE_ZONE_END(z0);
