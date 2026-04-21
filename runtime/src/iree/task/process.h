@@ -63,9 +63,10 @@ typedef struct iree_task_process_drain_result_t {
 // quickly — the scheduler relies on drain() returning to check for higher-
 // priority work between calls.
 //
-// |worker_index| identifies the calling worker (0..worker_count-1).
-// Per-worker state (if needed) is managed by the drain function itself via
-// process->user_data and worker_index; the executor does not manage it.
+// |worker_index| identifies the calling worker. It is stable for the worker
+// lifetime and may include an executor-specific base offset. Drain functions
+// that need dense per-executor storage should map this value into their own
+// worker capacity; the executor does not manage per-process worker state.
 typedef iree_status_t (*iree_task_process_drain_fn_t)(
     iree_task_process_t* process, uint32_t worker_index,
     iree_task_process_drain_result_t* out_result);
