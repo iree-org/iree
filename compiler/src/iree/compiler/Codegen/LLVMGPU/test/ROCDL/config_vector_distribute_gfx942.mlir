@@ -338,8 +338,8 @@ func.func @attention_20x4096x64x4096x64_f8() {
 // CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:            MFMA_F32_16x16x32_F8E4M3FNUZ
 // CHECK-SAME{LITERAL}:   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]
-// CHECK-SAME: reduction =  [0, 0, 0, 64, 0]
-// CHECK-SAME: workgroup =  [1, 64, 0, 0, 16]
+// CHECK-SAME: reduction =  [0, 0, 0, 128, 0]
+// CHECK-SAME: workgroup =  [1, 64, 0, 0, 64]
 
 // -----
 

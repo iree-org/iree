@@ -1207,8 +1207,8 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     int64_t intrinsicAK = intrinsicA.kSizes[0];
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       // The output of the QK matmul must be a valid LHS of the PV matmul.
-      // The total PV LHS tile (M x K) must be a multiple of the intrinsic
-      // output tile (M x N) of the QK matmul.
+      // The total LHS tile (M x K) of the PV matmul must be a multiple of
+      // the output tile (M x N) of the intrinsic used for the QK matmul.
       int64_t pvMTile = schedule.getTotalMTileSize() *
                         schedule.getTotalMSize() *
                         schedule.getTotalMSubgroupCount();
@@ -1217,9 +1217,10 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
         return false;
       }
 
-      // Derive the QK schedule from the PV schedule. The QK and PV matmuls
-      // share M and K2 dimensions:
-      //   QK.M = PV.M, QK.N = PV.K (= K2), QK.K = head_dim
+      // Create a mma schedule for qkMatmul in attention.
+      // qkMatmul.M = pvMatmul.M
+      // qkMatmul.N = pvMatmul.K
+      // qkMatmul.K = problem.K1
       int64_t qkNTiles = pvKTile / intrinsicAN;
       SmallVector<int64_t, 2> qkKSizes = qkMatmul.kSizes;
       qkKSizes.back() = qkMatmul.kSizes.back() / intrinsicAK;
@@ -1273,7 +1274,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     // Create a mma schedule for qkMatmul in attention.
     // qkMatmul.M = pvMatmul.M
     // qkMatmul.N = pvMatmul.K
-    // qkMatmul.K = problem.K
+    // qkMatmul.K = problem.K1
     int64_t pvKTile =
         pvSchedule->getTotalKTileSize() * pvSchedule->getTotalKSize();
     int64_t qkNTiles = pvKTile / intrinsicAN;

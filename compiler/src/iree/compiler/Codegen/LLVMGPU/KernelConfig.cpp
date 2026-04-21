@@ -867,9 +867,12 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type kElementType = getElementTypeOrSelf(kMatrix);
   Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
+  // qkMatmul: Q [M, K1] x K [K2, K1]^T -> S [M, K2]
+  // So the QK matmul's N dimension is K2 (the KV sequence length), which is
+  // shared with PV matmul's K dimension.
   GPUMatmulShapeType qkMatmul{
       /*m=*/getDimBounds(mDims),
-      /*n=*/getDimBounds(nDims),
+      /*n=*/getDimBounds(k2Dims),
       /*k=*/getDimBounds(k1Dims),
       /*batch=*/getDimBounds(batchDims),
       /*a=*/qElementType,
