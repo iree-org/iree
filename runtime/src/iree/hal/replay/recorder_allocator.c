@@ -239,12 +239,41 @@ static iree_status_t iree_hal_replay_recorder_allocator_import_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_reserve_object_id(
       allocator->recorder, &buffer_id));
 
+  iree_hal_replay_allocator_import_buffer_payload_t operation_payload;
+  iree_const_byte_span_t operation_iovecs[2];
+  iree_host_size_t operation_iovec_count = 0;
+  iree_hal_replay_payload_type_t operation_payload_type =
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE;
+  const bool capture_host_allocation =
+      external_buffer->type == IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION &&
+      external_buffer->size <= IREE_HOST_SIZE_MAX &&
+      (external_buffer->size == 0 ||
+       external_buffer->handle.host_allocation.ptr != NULL);
+  if (capture_host_allocation) {
+    iree_hal_replay_recorder_allocator_make_allocate_buffer_payload(
+        params, external_buffer->size, &operation_payload.allocation);
+    operation_payload.external_type = external_buffer->type;
+    operation_payload.external_flags = external_buffer->flags;
+    operation_payload.data_length = external_buffer->size;
+    operation_iovecs[operation_iovec_count++] = iree_make_const_byte_span(
+        (const uint8_t*)&operation_payload, sizeof(operation_payload));
+    if (external_buffer->size != 0) {
+      operation_iovecs[operation_iovec_count++] = iree_make_const_byte_span(
+          (const uint8_t*)external_buffer->handle.host_allocation.ptr,
+          (iree_host_size_t)external_buffer->size);
+    }
+    operation_payload_type =
+        IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER;
+  }
+
   iree_hal_replay_pending_record_t pending_record;
   IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_allocator_begin_operation(
       allocator, buffer_id,
       IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER,
-      IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
-  iree_hal_replay_recorder_mark_unsupported(&pending_record);
+      operation_payload_type, &pending_record));
+  if (!capture_host_allocation) {
+    iree_hal_replay_recorder_mark_unsupported(&pending_record);
+  }
 
   iree_hal_buffer_t* base_buffer = NULL;
   iree_hal_buffer_t* replay_buffer = NULL;
@@ -269,8 +298,9 @@ static iree_status_t iree_hal_replay_recorder_allocator_import_buffer(
   iree_const_byte_span_t object_iovec = iree_make_const_byte_span(
       (const uint8_t*)&object_payload, sizeof(object_payload));
   status = iree_hal_replay_recorder_end_creation_operation(
-      &pending_record, status, 0, NULL, IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER,
-      buffer_id, IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_OBJECT, 1, &object_iovec);
+      &pending_record, status, operation_iovec_count, operation_iovecs,
+      IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER, buffer_id,
+      IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_OBJECT, 1, &object_iovec);
 
   if (iree_status_is_ok(status)) {
     *out_buffer = replay_buffer;

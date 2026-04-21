@@ -1121,7 +1121,7 @@ TEST(ReplayExecuteTest, RejectsUnsupportedHostCallRecord) {
   iree_hal_replay_recorder_release(recorder);
 }
 
-TEST(ReplayExecuteTest, RejectsUnsupportedImportedBufferRecord) {
+TEST(ReplayExecuteTest, ExecutesHostAllocationImportedBufferRecord) {
   std::vector<uint8_t> storage(32768, 0);
   iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
 
@@ -1135,7 +1135,10 @@ TEST(ReplayExecuteTest, RejectsUnsupportedImportedBufferRecord) {
   iree_hal_allocator_t* allocator = iree_hal_device_allocator(wrapped_device);
   ASSERT_NE(nullptr, allocator);
 
-  uint8_t imported_storage[16] = {0};
+  uint8_t imported_storage[16] = {
+      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+      0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+  };
   iree_hal_external_buffer_t external_buffer = {};
   external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
   external_buffer.size = sizeof(imported_storage);
@@ -1144,11 +1147,37 @@ TEST(ReplayExecuteTest, RejectsUnsupportedImportedBufferRecord) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* imported_buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_allocator_import_buffer(
       allocator, params, &external_buffer,
       iree_hal_buffer_release_callback_null(), &imported_buffer));
+
+  iree_hal_buffer_t* target_buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      allocator, params, sizeof(imported_storage), &target_buffer));
+
+  iree_hal_semaphore_t* semaphore = nullptr;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY, /*initial_value=*/0,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
+  iree_hal_semaphore_t* semaphores[] = {semaphore};
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_list_t signal_list = {
+      IREE_ARRAYSIZE(semaphores),
+      semaphores,
+      &signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_copy(
+      wrapped_device, IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), signal_list, imported_buffer,
+      /*source_offset=*/0, target_buffer, /*target_offset=*/0,
+      sizeof(imported_storage), IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      signal_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_semaphore_release(semaphore);
+  iree_hal_buffer_release(target_buffer);
   iree_hal_buffer_release(imported_buffer);
 
   IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
@@ -1156,15 +1185,9 @@ TEST(ReplayExecuteTest, RejectsUnsupportedImportedBufferRecord) {
   iree_hal_device_group_release(source_group);
 
   iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
-  iree_status_t status = iree_hal_replay_execute_file(
-      GetCapturedFileContents(storage), replay_group, nullptr,
-      iree_allocator_system());
-  auto owned_status = ::iree::internal::ConsumeForTest(status);
-  EXPECT_THAT(owned_status,
-              ::iree::testing::status::StatusIs(
-                  static_cast<::iree::StatusCode>(IREE_STATUS_UNIMPLEMENTED)));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("allocator.import_buffer"));
-
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, nullptr,
+                                              iree_allocator_system()));
   iree_hal_device_group_release(replay_group);
   iree_hal_replay_recorder_release(recorder);
 }

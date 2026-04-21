@@ -240,6 +240,36 @@ static iree_status_t iree_hal_replay_executor_make_buffer_params(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_replay_executor_write_buffer_data(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_memory_access_t memory_access,
+    iree_const_byte_span_t data) {
+  if (data.data_length == 0) {
+    return iree_ok_status();
+  }
+  if (IREE_UNLIKELY(data.data_length > byte_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay buffer data overflows target range");
+  }
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED, memory_access, byte_offset,
+      byte_length, &mapping));
+  iree_status_t status = iree_ok_status();
+  iree_byte_span_t target_span;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_buffer_mapping_subspan(&mapping, IREE_HAL_MEMORY_ACCESS_WRITE,
+                                        0, data.data_length, &target_span);
+  }
+  if (iree_status_is_ok(status)) {
+    memcpy(target_span.data, data.data, data.data_length);
+    status = iree_hal_buffer_mapping_flush_range(&mapping, 0, data.data_length);
+  }
+  iree_status_t unmap_status = iree_hal_buffer_unmap_range(&mapping);
+  return iree_status_join(status, unmap_status);
+}
+
 static iree_status_t iree_hal_replay_executor_make_buffer_ref(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_buffer_ref_payload_t* payload,
@@ -1389,6 +1419,66 @@ static iree_status_t iree_hal_replay_executor_allocate_buffer(
       IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER, entry);
 }
 
+static iree_status_t iree_hal_replay_executor_import_buffer(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER,
+      sizeof(iree_hal_replay_allocator_import_buffer_payload_t)));
+  iree_hal_replay_allocator_import_buffer_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+  if (IREE_UNLIKELY(payload.external_type !=
+                    IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "replay import buffer external type %" PRIu32
+                            " is not supported",
+                            payload.external_type);
+  }
+  if (IREE_UNLIKELY(payload.data_length > IREE_HOST_SIZE_MAX ||
+                    sizeof(payload) + (iree_host_size_t)payload.data_length !=
+                        record->payload.data_length)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay import buffer payload length mismatch");
+  }
+  if (IREE_UNLIKELY(payload.data_length > payload.allocation.allocation_size)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay import buffer data overflows allocation");
+  }
+  iree_hal_replay_object_entry_t* allocator_entry = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
+      executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_ALLOCATOR,
+      &allocator_entry));
+
+  iree_hal_buffer_params_t params;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_make_buffer_params(
+      &payload.allocation, &params));
+  params.type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.access |= IREE_HAL_MEMORY_ACCESS_WRITE;
+  params.usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
+
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      allocator_entry->value.allocator, params,
+      payload.allocation.allocation_size, &buffer);
+  iree_const_byte_span_t data =
+      iree_make_const_byte_span(record->payload.data + sizeof(payload),
+                                (iree_host_size_t)payload.data_length);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_executor_write_buffer_data(
+        buffer, /*byte_offset=*/0, payload.allocation.allocation_size,
+        IREE_HAL_MEMORY_ACCESS_WRITE, data);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_replay_object_entry_t entry = {.value.buffer = buffer};
+    status = iree_hal_replay_executor_store(
+        executor, record->header.related_object_id,
+        IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER, entry);
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_replay_executor_replay_buffer_range_data(
     iree_hal_replay_executor_t* executor,
     const iree_hal_replay_file_record_t* record) {
@@ -1406,26 +1496,12 @@ static iree_status_t iree_hal_replay_executor_replay_buffer_range_data(
   IREE_RETURN_IF_ERROR(iree_hal_replay_executor_lookup(
       executor, record->header.object_id, IREE_HAL_REPLAY_OBJECT_TYPE_BUFFER,
       &buffer_entry));
-  iree_hal_buffer_mapping_t mapping;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      buffer_entry->value.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-      payload.memory_access, payload.byte_offset, payload.byte_length,
-      &mapping));
-  iree_status_t status = iree_ok_status();
-  iree_byte_span_t target_span;
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_mapping_subspan(&mapping, IREE_HAL_MEMORY_ACCESS_WRITE,
-                                        0, payload.data_length, &target_span);
-  }
-  if (iree_status_is_ok(status)) {
-    memcpy(target_span.data, record->payload.data + sizeof(payload),
-           (iree_host_size_t)payload.data_length);
-    status =
-        iree_hal_buffer_mapping_flush_range(&mapping, 0, payload.data_length);
-  }
-  iree_status_t unmap_status = iree_hal_buffer_unmap_range(&mapping);
-  return iree_status_join(status, unmap_status);
+  iree_const_byte_span_t data =
+      iree_make_const_byte_span(record->payload.data + sizeof(payload),
+                                (iree_host_size_t)payload.data_length);
+  return iree_hal_replay_executor_write_buffer_data(
+      buffer_entry->value.buffer, payload.byte_offset, payload.byte_length,
+      payload.memory_access, data);
 }
 
 static iree_status_t iree_hal_replay_executor_queue_alloca(
@@ -2586,6 +2662,8 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
       return iree_hal_replay_executor_create_semaphore(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER:
       return iree_hal_replay_executor_allocate_buffer(executor, record);
+    case IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER:
+      return iree_hal_replay_executor_import_buffer(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_ALLOCA:
       return iree_hal_replay_executor_queue_alloca(executor, record);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_DEALLOCA:

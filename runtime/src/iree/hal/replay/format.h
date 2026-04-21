@@ -184,6 +184,7 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_FILE_OBJECT = 23u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ = 24u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE = 25u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER = 26u,
 };
 
 // Type of external file reference captured for a HAL file object.
@@ -265,6 +266,18 @@ typedef struct iree_hal_replay_allocator_allocate_buffer_payload_t {
   // Reserved for future allocation request metadata; must be zero.
   uint32_t reserved1;
 } iree_hal_replay_allocator_allocate_buffer_payload_t;
+
+// Payload describing an imported host allocation followed by captured bytes.
+typedef struct iree_hal_replay_allocator_import_buffer_payload_t {
+  // Allocation parameters used to materialize the imported buffer on replay.
+  iree_hal_replay_allocator_allocate_buffer_payload_t allocation;
+  // External buffer type captured from the import request.
+  uint32_t external_type;
+  // External buffer flags captured from the import request.
+  uint32_t external_flags;
+  // Captured byte length following this payload header.
+  uint64_t data_length;
+} iree_hal_replay_allocator_import_buffer_payload_t;
 
 // Payload describing a buffer byte range operation.
 typedef struct iree_hal_replay_buffer_range_payload_t {

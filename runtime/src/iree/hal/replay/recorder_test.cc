@@ -177,6 +177,7 @@ struct ReplayRecordSummary {
   iree_host_size_t assign_topology_record_count = 0;
   iree_host_size_t query_capabilities_record_count = 0;
   iree_host_size_t allocate_buffer_record_count = 0;
+  iree_host_size_t import_buffer_record_count = 0;
   iree_host_size_t buffer_map_range_record_count = 0;
   iree_host_size_t buffer_flush_range_record_count = 0;
   iree_host_size_t buffer_unmap_range_record_count = 0;
@@ -185,6 +186,8 @@ struct ReplayRecordSummary {
   iree_host_size_t unsupported_export_buffer_record_count = 0;
   iree_host_size_t unsupported_host_call_record_count = 0;
   iree_host_size_t buffer_range_data_payload_count = 0;
+  iree_host_size_t import_buffer_payload_count = 0;
+  uint64_t import_buffer_captured_data_length = 0;
   iree_host_size_t device_queue_execute_payload_count = 0;
   iree_host_size_t semaphore_object_payload_count = 0;
 };
@@ -267,6 +270,9 @@ static ReplayRecordSummary ParseReplayRecordSummary(
                    IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER) {
           ++summary.allocate_buffer_record_count;
         } else if (record.header.operation_code ==
+                   IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_IMPORT_BUFFER) {
+          ++summary.import_buffer_record_count;
+        } else if (record.header.operation_code ==
                    IREE_HAL_REPLAY_OPERATION_CODE_BUFFER_MAP_RANGE) {
           ++summary.buffer_map_range_record_count;
         } else if (record.header.operation_code ==
@@ -282,6 +288,17 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         if (record.header.payload_type ==
             IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA) {
           ++summary.buffer_range_data_payload_count;
+        } else if (record.header.payload_type ==
+                   IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER) {
+          ++summary.import_buffer_payload_count;
+          iree_hal_replay_allocator_import_buffer_payload_t import_payload;
+          if (record.payload.data_length < sizeof(import_payload)) {
+            ADD_FAILURE() << "import buffer payload is short";
+            return summary;
+          }
+          memcpy(&import_payload, record.payload.data, sizeof(import_payload));
+          summary.import_buffer_captured_data_length +=
+              import_payload.data_length;
         } else if (record.header.payload_type ==
                    IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_EXECUTE) {
           ++summary.device_queue_execute_payload_count;
@@ -377,7 +394,8 @@ TEST(ReplayRecorderTest, WrappedDeviceRecordsHostCallAsUnsupported) {
   EXPECT_EQ(1u, summary.unsupported_host_call_record_count);
 }
 
-TEST(ReplayRecorderTest, WrappedAllocatorRecordsExternalBuffersAsUnsupported) {
+TEST(ReplayRecorderTest,
+     WrappedAllocatorSnapshotsHostAllocationImportsAndMarksExportsUnsupported) {
   std::vector<uint8_t> storage(32768, 0);
   iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
 
@@ -427,7 +445,11 @@ TEST(ReplayRecorderTest, WrappedAllocatorRecordsExternalBuffersAsUnsupported) {
   iree_hal_device_group_release(source_group);
 
   ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
-  EXPECT_EQ(1u, summary.unsupported_import_buffer_record_count);
+  EXPECT_EQ(1u, summary.import_buffer_record_count);
+  EXPECT_EQ(1u, summary.import_buffer_payload_count);
+  EXPECT_EQ(sizeof(imported_storage),
+            summary.import_buffer_captured_data_length);
+  EXPECT_EQ(0u, summary.unsupported_import_buffer_record_count);
   EXPECT_EQ(1u, summary.unsupported_export_buffer_record_count);
   EXPECT_EQ(2u, summary.buffer_object_record_count);
 }

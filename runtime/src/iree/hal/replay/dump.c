@@ -838,6 +838,37 @@ static iree_status_t iree_hal_replay_dump_append_text_payload(
           payload.allocation_size, payload.queue_affinity,
           payload.min_alignment, payload.usage, payload.type, payload.access);
     }
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER: {
+      if (record->payload.data_length <
+          sizeof(iree_hal_replay_allocator_import_buffer_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay import buffer payload is short");
+      }
+      iree_hal_replay_allocator_import_buffer_payload_t payload;
+      memcpy(&payload, record->payload.data, sizeof(payload));
+      if (payload.data_length >
+          record->payload.data_length -
+              sizeof(iree_hal_replay_allocator_import_buffer_payload_t)) {
+        return iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "replay import buffer data extends past record");
+      }
+      const uint64_t data_offset =
+          payload_range->offset +
+          (uint64_t)sizeof(iree_hal_replay_allocator_import_buffer_payload_t);
+      return iree_string_builder_append_format(
+          builder,
+          " allocation_size=%" PRIu64 " queue_affinity=%" PRIu64
+          " min_alignment=%" PRIu64 " usage=0x%08" PRIx32 " type=0x%08" PRIx32
+          " access=0x%04" PRIx16 " external_type=%" PRIu32
+          " external_flags=0x%08" PRIx32 " data_range=[%" PRIu64 ", +%" PRIu64
+          "]",
+          payload.allocation.allocation_size, payload.allocation.queue_affinity,
+          payload.allocation.min_alignment, payload.allocation.usage,
+          payload.allocation.type, payload.allocation.access,
+          payload.external_type, payload.external_flags, data_offset,
+          payload.data_length);
+    }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE: {
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_payload_length_check(
           record, sizeof(iree_hal_replay_buffer_range_payload_t)));
@@ -1482,6 +1513,44 @@ static iree_status_t iree_hal_replay_dump_append_json_payload(
           ",\"usage\":%" PRIu32 ",\"type\":%" PRIu32 ",\"access\":%" PRIu16 "}",
           payload.allocation_size, payload.queue_affinity,
           payload.min_alignment, payload.usage, payload.type, payload.access);
+    }
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER: {
+      if (record->payload.data_length <
+          sizeof(iree_hal_replay_allocator_import_buffer_payload_t)) {
+        return iree_make_status(IREE_STATUS_DATA_LOSS,
+                                "replay import buffer payload is short");
+      }
+      iree_hal_replay_allocator_import_buffer_payload_t payload;
+      memcpy(&payload, record->payload.data, sizeof(payload));
+      if (payload.data_length >
+          record->payload.data_length -
+              sizeof(iree_hal_replay_allocator_import_buffer_payload_t)) {
+        return iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "replay import buffer data extends past record");
+      }
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          builder,
+          ",\"payload\":{\"allocation_size\":%" PRIu64
+          ",\"queue_affinity\":%" PRIu64 ",\"min_alignment\":%" PRIu64
+          ",\"usage\":%" PRIu32 ",\"type\":%" PRIu32 ",\"access\":%" PRIu16
+          ",\"external_type\":%" PRIu32 ",\"external_flags\":%" PRIu32,
+          payload.allocation.allocation_size, payload.allocation.queue_affinity,
+          payload.allocation.min_alignment, payload.allocation.usage,
+          payload.allocation.type, payload.allocation.access,
+          payload.external_type, payload.external_flags));
+      iree_hal_replay_file_range_t data_range =
+          iree_hal_replay_file_range_empty();
+      data_range.offset =
+          payload_range->offset +
+          (uint64_t)sizeof(iree_hal_replay_allocator_import_buffer_payload_t);
+      data_range.length = payload.data_length;
+      data_range.uncompressed_length = payload.data_length;
+      data_range.compression_type = IREE_HAL_REPLAY_COMPRESSION_TYPE_NONE;
+      data_range.digest_type = IREE_HAL_REPLAY_DIGEST_TYPE_NONE;
+      IREE_RETURN_IF_ERROR(iree_hal_replay_dump_append_json_file_range(
+          builder, "data_range", &data_range));
+      return iree_string_builder_append_cstring(builder, "}");
     }
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE: {
       IREE_RETURN_IF_ERROR(iree_hal_replay_dump_payload_length_check(
