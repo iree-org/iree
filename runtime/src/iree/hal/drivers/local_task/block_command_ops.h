@@ -49,6 +49,9 @@ typedef struct iree_hal_cmd_build_token_t {
   // Number of command-stream bytes appended.
   iree_host_size_t cmd_bytes;
 
+  // Command flags passed to the builder.
+  iree_hal_cmd_flags_t flags;
+
   // Number of fixup records appended.
   uint16_t fixup_count;
 

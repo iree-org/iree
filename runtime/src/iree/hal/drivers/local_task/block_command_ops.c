@@ -17,7 +17,7 @@
 
 void iree_hal_cmd_build_rollback(iree_hal_cmd_block_builder_t* builder,
                                  iree_hal_cmd_build_token_t token) {
-  iree_hal_cmd_block_builder_pop_cmd(builder, token.cmd_bytes,
+  iree_hal_cmd_block_builder_pop_cmd(builder, token.cmd_bytes, token.flags,
                                      token.fixup_count, token.binding_count,
                                      token.tile_count);
 }
@@ -48,6 +48,7 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->command = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_fill_t);
+  out_token->flags = IREE_HAL_CMD_FLAG_NONE;
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
   out_token->tile_count = tile_count;
@@ -95,6 +96,7 @@ iree_status_t iree_hal_cmd_build_copy(iree_hal_cmd_block_builder_t* builder,
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->command = NULL;
   out_token->cmd_bytes = sizeof(iree_hal_cmd_copy_t);
+  out_token->flags = IREE_HAL_CMD_FLAG_NONE;
   out_token->fixup_count = 2;
   out_token->binding_count = 2;
   out_token->tile_count = tile_count;
@@ -149,6 +151,7 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
   iree_hal_cmd_fixup_t* fixups = NULL;
   out_token->command = NULL;
   out_token->cmd_bytes = cmd_bytes;
+  out_token->flags = IREE_HAL_CMD_FLAG_NONE;
   out_token->fixup_count = 1;
   out_token->binding_count = 1;
   out_token->tile_count = tile_count;
@@ -262,17 +265,18 @@ iree_status_t iree_hal_cmd_build_dispatch(
   // Append the command and reserve fixup storage for all bindings.
   iree_hal_cmd_dispatch_t* cmd = NULL;
   iree_hal_cmd_fixup_t* fixups = NULL;
+  const iree_hal_cmd_flags_t cmd_flags = uses_indirect_parameters
+                                             ? IREE_HAL_CMD_FLAG_INDIRECT
+                                             : IREE_HAL_CMD_FLAG_NONE;
   out_token->command = NULL;
   out_token->cmd_bytes = cmd_bytes;
+  out_token->flags = cmd_flags;
   out_token->fixup_count = total_binding_count;
   out_token->binding_count = total_binding_count;
   out_token->tile_count = tile_count;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
-      builder, IREE_HAL_CMD_DISPATCH,
-      uses_indirect_parameters ? IREE_HAL_CMD_FLAG_INDIRECT
-                               : IREE_HAL_CMD_FLAG_NONE,
-      cmd_bytes, total_binding_count, total_binding_count, tile_count,
-      (void**)&cmd, &fixups));
+      builder, IREE_HAL_CMD_DISPATCH, cmd_flags, cmd_bytes, total_binding_count,
+      total_binding_count, tile_count, (void**)&cmd, &fixups));
 
   const uint16_t binding_data_base =
       (uint16_t)(builder->total_binding_count - total_binding_count);

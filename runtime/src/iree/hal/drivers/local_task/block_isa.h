@@ -239,7 +239,8 @@ static_assert(sizeof(iree_hal_cmd_fixup_t) == 32, "fixup entries are 4 qwords");
 
 // Precedes the command stream in each block pool block. The block layout
 // is designed for dual-cursor recording: commands grow forward from the
-// header, fixups grow backward from the end. No memmove is ever needed.
+// header, and fixups grow backward from the end. Finalization compacts the
+// fixups once to reserve the immutable region metadata tail.
 //
 // Block layout within a block pool block (block_size bytes total):
 //
@@ -247,16 +248,17 @@ static_assert(sizeof(iree_hal_cmd_fixup_t) == 32, "fixup entries are 4 qwords");
 //   [command stream: 8-byte-aligned commands, used_bytes total]
 //   ... (unused gap, if any) ...
 //   [fixup_count × iree_hal_cmd_fixup_t, packed toward the end]
+//   [region summaries: region_count × iree_hal_cmd_region_summary_t]
 //   [initial_remaining_tiles: region_count × uint32_t, at the very end]
 //
 // During recording, the builder maintains two cursors:
 //   cmd_cursor:   starts at sizeof(header), grows forward
-//   fixup_cursor: starts at block_end - tail_metadata, grows backward
+//   fixup_cursor: starts at block_end, grows backward
 // When cmd_cursor + safety_margin >= fixup_cursor, the block is split.
 //
 // At block finalization, the header fields are written (all counts now
-// known) and initial_remaining_tiles is written at the end of the block
-// (the only data copied at finalization — everything else is in place).
+// known), the fixup table is shifted once to reserve the metadata tail, and
+// region metadata is written at the end of the block.
 //
 // The builder owns the full block pool block allocation. The
 // iree_arena_block_pool_t acquire/release API gives us raw memory; the
@@ -280,13 +282,64 @@ typedef struct iree_hal_cmd_block_header_t {
   // Total dispatch commands across all regions (for validation).
   uint16_t total_dispatch_count;
   // Total size of this block pool block in bytes. Required to locate
-  // fixups and initial_remaining_tiles at the end of the block.
+  // fixups and region metadata at the end of the block.
   uint16_t block_size;
-  uint16_t reserved;
+  // Byte offset from this block header to the BRANCH/RETURN terminator.
+  uint16_t terminator_offset;
 } iree_hal_cmd_block_header_t;
 
 static_assert(sizeof(iree_hal_cmd_block_header_t) == 24,
               "block header is 3 qwords (no flexible array member)");
+
+//===----------------------------------------------------------------------===//
+// Region summaries
+//===----------------------------------------------------------------------===//
+
+// Sentinel used when no later potentially active region exists in the block.
+#define IREE_HAL_CMD_REGION_INDEX_NONE UINT16_MAX
+
+// Number of following regions summarized in each region's bounded lookahead
+// width bucket.
+#define IREE_HAL_CMD_REGION_LOOKAHEAD_COUNT 4
+
+// Construction-time facts about a barrier-delimited region. This is immutable
+// block metadata used by the processor and future retention policy to navigate
+// regions without scanning command bytes on region transitions.
+typedef struct iree_hal_cmd_region_summary_t {
+  // Byte offset from the block header to this region's BARRIER command.
+  uint16_t barrier_offset;
+  // Region index of the next potentially active region, or
+  // IREE_HAL_CMD_REGION_INDEX_NONE if none remains in this block.
+  uint16_t next_candidate_region;
+  // Recording-time tile count hint for this region. Direct commands are exact;
+  // indirect commands contribute their scheduling hint and are re-evaluated
+  // at execution time after bindings are resolved.
+  uint32_t tile_count_hint;
+  // Number of work commands in this region. Mirrors the barrier's 8-bit
+  // dispatch_count in a naturally aligned summary field for policy code.
+  uint16_t dispatch_count;
+  // Power-of-two worker-width bucket derived from tile_count_hint and capped
+  // at 64. A value of 0 means the region is definitely empty at issue time.
+  uint8_t width_bucket;
+  // Maximum width_bucket among the next
+  // IREE_HAL_CMD_REGION_LOOKAHEAD_COUNT region indices.
+  uint8_t lookahead_width_bucket;
+  // Reserved for future summary fields; must be zero.
+  uint32_t reserved;
+} iree_hal_cmd_region_summary_t;
+
+static_assert(sizeof(iree_hal_cmd_region_summary_t) == 16,
+              "region summary is 2 qwords");
+
+// Returns the power-of-two worker-width bucket for |tile_count|. This is a
+// construction-time scheduling hint, not a hard execution limit.
+static inline uint8_t iree_hal_cmd_region_width_bucket_from_tile_count(
+    uint32_t tile_count) {
+  if (tile_count == 0) return 0;
+  uint8_t bucket = 1;
+  while (bucket < 64 && bucket < tile_count) bucket <<= 1;
+  return bucket;
+}
 
 //===----------------------------------------------------------------------===//
 // DISPATCH command
@@ -536,9 +589,9 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 //     - active_region_index     [cache line 0: mostly-read by all workers]
 //     - remaining_tiles         [cache line 1: written on tile completion]
 //   tile_index[0..max-1]        [per-dispatch work-stealing, 64-bit
-//   epoch-tagged] void*    binding_ptrs[total_binding_count]   [cold: written
-//   once at fixup] size_t   binding_lengths[total_binding_count] [cold: written
-//   once at fixup]
+//   epoch-tagged]
+//   void*    binding_ptrs[total_binding_count]   [cold: written once at fixup]
+//   size_t   binding_lengths[total_binding_count] [cold: written once at fixup]
 //
 // Each tile_index is a 64-bit atomic: upper 32 bits = epoch (region_index),
 // lower 32 bits = tile counter. Workers claim tiles via CAS, atomically
@@ -689,15 +742,28 @@ static inline const iree_hal_cmd_header_t* iree_hal_cmd_block_commands(
   return (const iree_hal_cmd_header_t*)(header + 1);
 }
 
-// Returns the reservation size for the initial_remaining_tiles array at the
-// end of a block, rounded up to fixup alignment so that the fixup table
-// (packed immediately before) always starts at a properly aligned address.
-// The actual tile data occupies the last region_count * 4 bytes of the block;
-// any padding between fixups and tiles is unused.
-static inline iree_host_size_t iree_hal_cmd_block_tile_reservation_size(
+// Returns the packed size of the initial_remaining_tiles array at the end of
+// a block.
+static inline iree_host_size_t iree_hal_cmd_block_remaining_tiles_size(
     uint16_t region_count) {
-  return iree_host_align((iree_host_size_t)region_count * sizeof(uint32_t),
-                         iree_alignof(iree_hal_cmd_fixup_t));
+  return (iree_host_size_t)region_count * sizeof(uint32_t);
+}
+
+// Returns the packed size of the region summary table.
+static inline iree_host_size_t iree_hal_cmd_block_region_summaries_size(
+    uint16_t region_count) {
+  return (iree_host_size_t)region_count * sizeof(iree_hal_cmd_region_summary_t);
+}
+
+// Returns the reservation size for all region metadata at the end of a block,
+// rounded up to fixup alignment so that the fixup table packed immediately
+// before it always starts at a properly aligned address.
+static inline iree_host_size_t
+iree_hal_cmd_block_region_metadata_reservation_size(uint16_t region_count) {
+  return iree_host_align(
+      iree_hal_cmd_block_region_summaries_size(region_count) +
+          iree_hal_cmd_block_remaining_tiles_size(region_count),
+      iree_alignof(iree_hal_cmd_fixup_t));
 }
 
 // Returns a pointer to the initial_remaining_tiles array at the very end
@@ -708,22 +774,53 @@ static inline const uint32_t* iree_hal_cmd_block_initial_remaining_tiles(
     const iree_hal_cmd_block_header_t* header) {
   const uint8_t* block_end =
       (const uint8_t*)header + (iree_host_size_t)header->block_size;
-  return (const uint32_t*)(block_end - (iree_host_size_t)header->region_count *
-                                           sizeof(uint32_t));
+  return (const uint32_t*)(block_end - iree_hal_cmd_block_remaining_tiles_size(
+                                           header->region_count));
+}
+
+// Returns a pointer to the immutable region summary table packed immediately
+// before initial_remaining_tiles.
+static inline const iree_hal_cmd_region_summary_t*
+iree_hal_cmd_block_region_summaries(const iree_hal_cmd_block_header_t* header) {
+  const uint8_t* block_end =
+      (const uint8_t*)header + (iree_host_size_t)header->block_size;
+  return (
+      const iree_hal_cmd_region_summary_t*)(block_end -
+                                            iree_hal_cmd_block_remaining_tiles_size(
+                                                header->region_count) -
+                                            iree_hal_cmd_block_region_summaries_size(
+                                                header->region_count));
+}
+
+// Returns the barrier command for a summarized region.
+static inline const iree_hal_cmd_barrier_t* iree_hal_cmd_block_region_barrier(
+    const iree_hal_cmd_block_header_t* header, uint16_t region_index) {
+  const iree_hal_cmd_region_summary_t* summaries =
+      iree_hal_cmd_block_region_summaries(header);
+  return (
+      const iree_hal_cmd_barrier_t*)((const uint8_t*)header +
+                                     summaries[region_index].barrier_offset);
+}
+
+// Returns the block terminator command (BRANCH or RETURN).
+static inline const iree_hal_cmd_header_t* iree_hal_cmd_block_terminator(
+    const iree_hal_cmd_block_header_t* header) {
+  return (const iree_hal_cmd_header_t*)((const uint8_t*)header +
+                                        header->terminator_offset);
 }
 
 // Returns a pointer to the fixup table entries, which are packed between
-// the command stream and initial_remaining_tiles. The tile reservation is
-// rounded up to fixup alignment so fixups always start at a properly aligned
-// address. Fixups grow backward from before the reservation during recording,
-// so the first fixup entry (lowest address) is the last one recorded.
+// the command stream and region metadata. The metadata reservation is rounded
+// up to fixup alignment so fixups always start at a properly aligned address.
+// Fixups grow backward from before the reservation during recording, so the
+// first fixup entry (lowest address) is the last one recorded.
 static inline const iree_hal_cmd_fixup_t* iree_hal_cmd_block_fixups(
     const iree_hal_cmd_block_header_t* header) {
   const uint8_t* block_end =
       (const uint8_t*)header + (iree_host_size_t)header->block_size;
   const uint8_t* fixup_end =
       block_end -
-      iree_hal_cmd_block_tile_reservation_size(header->region_count);
+      iree_hal_cmd_block_region_metadata_reservation_size(header->region_count);
   return (const iree_hal_cmd_fixup_t*)(fixup_end -
                                        (iree_host_size_t)header->fixup_count *
                                            sizeof(iree_hal_cmd_fixup_t));

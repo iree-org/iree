@@ -151,11 +151,11 @@ TEST(BlockISATest, DispatchWithConstants) {
 //===----------------------------------------------------------------------===//
 
 // Verify the dual-cursor block layout: commands at the front (after header),
-// fixups and initial_remaining_tiles at the end.
+// fixups and region metadata at the end.
 TEST(BlockISATest, BlockHeaderNavigation) {
   // Simulate a 512-byte block pool block with:
   //   - 3 regions
-  //   - 5 fixup entries (5 × 24 = 120 bytes)
+  //   - 5 fixup entries
   //   - 8 bytes of commands (just a RETURN)
   const uint16_t block_size = 512;
   const uint16_t region_count = 3;
@@ -164,13 +164,17 @@ TEST(BlockISATest, BlockHeaderNavigation) {
 
   // Layout from end of block:
   //   initial_remaining_tiles: 3 × 4 = 12 bytes at [500..512)
-  //   tile reservation: rounded up to fixup alignment = 16 bytes
-  //   fixups: 5 × 24 = 120 bytes at [376..496)
+  //   region summaries: 3 × 16 = 48 bytes at [452..500)
+  //   metadata reservation: rounded up to fixup alignment = 64 bytes
+  //   fixups: 5 × 32 = 160 bytes at [288..448)
   // Commands start at sizeof(header) = 24.
-  const size_t tiles_offset = block_size - region_count * sizeof(uint32_t);
-  const size_t tile_reservation =
-      iree_hal_cmd_block_tile_reservation_size(region_count);
-  const size_t fixups_offset = block_size - tile_reservation -
+  const size_t tiles_offset =
+      block_size - iree_hal_cmd_block_remaining_tiles_size(region_count);
+  const size_t summaries_offset =
+      tiles_offset - iree_hal_cmd_block_region_summaries_size(region_count);
+  const size_t metadata_reservation =
+      iree_hal_cmd_block_region_metadata_reservation_size(region_count);
+  const size_t fixups_offset = block_size - metadata_reservation -
                                fixup_count * sizeof(iree_hal_cmd_fixup_t);
   const size_t commands_offset = sizeof(iree_hal_cmd_block_header_t);
 
@@ -186,6 +190,29 @@ TEST(BlockISATest, BlockHeaderNavigation) {
   header->fixup_count = fixup_count;
   header->total_dispatch_count = 5;
   header->block_size = block_size;
+  header->terminator_offset = commands_offset;
+
+  // Write region summaries immediately before initial_remaining_tiles.
+  auto* summaries = reinterpret_cast<iree_hal_cmd_region_summary_t*>(
+      buffer + summaries_offset);
+  summaries[0].barrier_offset = commands_offset;
+  summaries[0].next_candidate_region = 1;
+  summaries[0].tile_count_hint = 100;
+  summaries[0].dispatch_count = 2;
+  summaries[0].width_bucket = 64;
+  summaries[0].lookahead_width_bucket = 64;
+  summaries[1].barrier_offset = commands_offset + 16;
+  summaries[1].next_candidate_region = 2;
+  summaries[1].tile_count_hint = 200;
+  summaries[1].dispatch_count = 2;
+  summaries[1].width_bucket = 64;
+  summaries[1].lookahead_width_bucket = 64;
+  summaries[2].barrier_offset = commands_offset + 32;
+  summaries[2].next_candidate_region = IREE_HAL_CMD_REGION_INDEX_NONE;
+  summaries[2].tile_count_hint = 50;
+  summaries[2].dispatch_count = 1;
+  summaries[2].width_bucket = 64;
+  summaries[2].lookahead_width_bucket = 0;
 
   // Write initial_remaining_tiles at the end.
   auto* tiles = reinterpret_cast<uint32_t*>(buffer + tiles_offset);
@@ -205,6 +232,14 @@ TEST(BlockISATest, BlockHeaderNavigation) {
   EXPECT_EQ(nav_tiles[1], 200u);
   EXPECT_EQ(nav_tiles[2], 50u);
 
+  // Verify region summary navigation.
+  const auto* nav_summaries = iree_hal_cmd_block_region_summaries(header);
+  EXPECT_EQ(reinterpret_cast<const uint8_t*>(nav_summaries),
+            buffer + summaries_offset);
+  EXPECT_EQ(nav_summaries[0].next_candidate_region, 1);
+  EXPECT_EQ(nav_summaries[2].next_candidate_region,
+            IREE_HAL_CMD_REGION_INDEX_NONE);
+
   // Verify fixup navigation.
   const auto* fixups = iree_hal_cmd_block_fixups(header);
   EXPECT_EQ(reinterpret_cast<const uint8_t*>(fixups), buffer + fixups_offset);
@@ -219,6 +254,7 @@ TEST(BlockISATest, BlockHeaderNavigation) {
       reinterpret_cast<iree_hal_cmd_header_t*>(buffer + commands_offset);
   init_header(ret, IREE_HAL_CMD_RETURN, 8);
   EXPECT_EQ(commands->opcode, IREE_HAL_CMD_RETURN);
+  EXPECT_EQ(iree_hal_cmd_block_terminator(header), commands);
 }
 
 // Edge case: block with 0 regions and 0 fixups.
@@ -243,10 +279,15 @@ TEST(BlockISATest, BlockHeaderEmpty) {
   const auto* nav_tiles = iree_hal_cmd_block_initial_remaining_tiles(header);
   EXPECT_EQ(reinterpret_cast<const uint8_t*>(nav_tiles), buffer + block_size);
 
-  // With 0 fixups: fixup pointer equals tiles pointer (empty).
+  // With 0 regions: summaries are at block_end (empty).
+  const auto* nav_summaries = iree_hal_cmd_block_region_summaries(header);
+  EXPECT_EQ(reinterpret_cast<const uint8_t*>(nav_summaries),
+            buffer + block_size);
+
+  // With 0 fixups: fixup pointer equals metadata pointer (empty).
   const auto* fixups = iree_hal_cmd_block_fixups(header);
   EXPECT_EQ(reinterpret_cast<const uint8_t*>(fixups),
-            reinterpret_cast<const uint8_t*>(nav_tiles));
+            reinterpret_cast<const uint8_t*>(nav_summaries));
 }
 
 //===----------------------------------------------------------------------===//
@@ -541,8 +582,8 @@ TEST(BlockISATest, BranchTarget) {
 //===----------------------------------------------------------------------===//
 
 TEST(BlockISATest, InitialRemainingTilesAtEnd) {
-  // Verify initial_remaining_tiles is located at the end of the block,
-  // accessed via the navigation helper.
+  // Verify initial_remaining_tiles is located at the end of the block and
+  // summaries are packed immediately before it.
   const uint16_t block_size = 256;
   alignas(8) uint8_t buffer[256];
   memset(buffer, 0, sizeof(buffer));
@@ -551,6 +592,14 @@ TEST(BlockISATest, InitialRemainingTilesAtEnd) {
   header->region_count = 4;
   header->fixup_count = 0;
   header->block_size = block_size;
+
+  auto* summaries = reinterpret_cast<iree_hal_cmd_region_summary_t*>(
+      buffer + block_size - 4 * sizeof(uint32_t) -
+      4 * sizeof(iree_hal_cmd_region_summary_t));
+  summaries[0].tile_count_hint = 10;
+  summaries[1].tile_count_hint = 50;
+  summaries[2].tile_count_hint = 1;
+  summaries[3].tile_count_hint = 200;
 
   // Write tiles at the end of the block.
   auto* tiles =
@@ -570,6 +619,13 @@ TEST(BlockISATest, InitialRemainingTilesAtEnd) {
   // Verify the tiles are at the expected absolute position.
   EXPECT_EQ(reinterpret_cast<const uint8_t*>(nav_tiles),
             buffer + block_size - 4 * sizeof(uint32_t));
+
+  const auto* nav_summaries = iree_hal_cmd_block_region_summaries(header);
+  EXPECT_EQ(nav_summaries[0].tile_count_hint, 10u);
+  EXPECT_EQ(nav_summaries[3].tile_count_hint, 200u);
+  EXPECT_EQ(reinterpret_cast<const uint8_t*>(nav_summaries),
+            buffer + block_size - 4 * sizeof(uint32_t) -
+                4 * sizeof(iree_hal_cmd_region_summary_t));
 }
 
 }  // namespace

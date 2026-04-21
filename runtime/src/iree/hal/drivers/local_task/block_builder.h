@@ -12,13 +12,14 @@
 // by BRANCH commands, with sizing metadata for .data allocation at issue time.
 //
 // The builder uses a dual-cursor design within each block pool block:
-// commands grow forward from the header, fixup entries and region metadata
-// grow backward from the end. Block splitting is automatic when the cursors
-// would collide — the builder inserts a BRANCH, finalizes the current block,
-// acquires a new one, and continues transparently.
+// commands grow forward from the header, fixup entries grow backward from the
+// end, and immutable region metadata is compacted into the block tail at
+// finalization. Block splitting is automatic when the cursors would collide —
+// the builder inserts a BRANCH, finalizes the current block, acquires a new
+// one, and continues transparently.
 //
 // All memory comes from the block pool. The builder itself is stack-allocable
-// (~550 bytes including scratch buffers). No system allocator usage during
+// (~1.6KB including scratch buffers). No system allocator usage during
 // recording.
 
 #ifndef IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_BUILDER_H_
@@ -38,7 +39,7 @@ extern "C" {
 
 // Maximum barrier-delimited regions within a single block pool block.
 // The builder splits the block if this limit is reached. Sizes the per-block
-// scratch buffer for initial_remaining_tiles accumulation (64 × 4 = 256 bytes).
+// scratch buffers for region summary and initial_remaining_tiles accumulation.
 //
 // In practice, blocks have 1-10 regions. The pathological case (every command
 // followed by a barrier) reaches 64 in roughly 1KB of command stream.
@@ -106,8 +107,8 @@ typedef struct iree_hal_cmd_block_builder_t {
 
   //=== Current block =========================================================
 
-  // Block header at byte 0 of the current block pool block.
-  // NULL when not actively recording (before begin or after end).
+  // Block header at byte 0 of the current block pool block. NULL when not
+  // actively recording (before begin or after end).
   iree_hal_cmd_block_header_t* current_header;
   // Forward cursor: next byte to write a command.
   // Starts at (uint8_t*)current_header + sizeof(iree_hal_cmd_block_header_t).
@@ -118,6 +119,9 @@ typedef struct iree_hal_cmd_block_builder_t {
   uint8_t* fixup_cursor;
   // End of the usable block area. Cached from pool->usable_block_size.
   uint8_t* block_end;
+  // Byte offset from current_header to the block terminator command. Set when
+  // BRANCH or RETURN is emitted immediately before finalizing the block.
+  uint16_t current_terminator_offset;
 
   //=== Current region tracking ================================================
 
@@ -132,6 +136,10 @@ typedef struct iree_hal_cmd_block_builder_t {
   // Total tiles accumulated in the current region. Written to
   // region_tiles_scratch at region finalization.
   uint32_t current_region_tiles;
+  // Number of commands in the current region that may produce tiles at issue
+  // time. Indirect/predicated commands may have a zero recording-time tile
+  // hint but still need dynamic evaluation after bindings are resolved.
+  uint16_t current_region_potential_work_count;
 
   //=== Per-block accounting ===================================================
 
@@ -146,14 +154,18 @@ typedef struct iree_hal_cmd_block_builder_t {
   // Number of fixup entries written backward from the end of the current block.
   uint16_t fixup_count;
 
+  // Per-region immutable summaries. Accumulated during recording and memcpy'd
+  // to the end of the block at finalization.
+  iree_hal_cmd_region_summary_t
+      region_summaries_scratch[IREE_HAL_CMD_MAX_REGIONS_PER_BLOCK];
+
   // Per-region initial_remaining_tiles. Accumulated during recording and
-  // memcpy'd to the end of the block at finalization. This is the only
-  // data movement at finalization — commands and fixups are in place.
+  // memcpy'd to the end of the block at finalization.
   //
   // At finalization, fixups occupying [fixup_cursor, block_end) are shifted
-  // down by region_count * sizeof(uint32_t) to make room for the tiles at
-  // the very end of the block. The shift is small (fixup data is typically
-  // <1KB, shift distance is <256 bytes) and happens once per block.
+  // down by the padded region metadata size to make room for summaries and
+  // tiles at the very end of the block. The shift is small and happens once
+  // per block.
   uint32_t region_tiles_scratch[IREE_HAL_CMD_MAX_REGIONS_PER_BLOCK];
 
   //=== Global highwater marks =================================================
@@ -257,11 +269,15 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
 // the builder can restore its internal counters. The parameters must match
 // exactly — mismatches corrupt builder state.
 //
+// |flags| must be the command flags passed to append_cmd; it preserves the
+// potentially-active region summary state for indirect and predicated commands.
+//
 // If append_cmd triggered a block split before writing the command, the split
 // is permanent (the previous block was already finalized). Only the command
 // in the current block is rolled back.
 void iree_hal_cmd_block_builder_pop_cmd(iree_hal_cmd_block_builder_t* builder,
                                         iree_host_size_t cmd_bytes,
+                                        iree_hal_cmd_flags_t flags,
                                         uint16_t fixup_count,
                                         uint16_t binding_count,
                                         uint32_t tile_count);

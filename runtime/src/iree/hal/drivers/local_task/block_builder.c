@@ -119,6 +119,7 @@ static iree_status_t iree_hal_cmd_block_builder_begin_block(
   builder->block_end =
       (uint8_t*)header + builder->block_pool->usable_block_size;
   builder->fixup_cursor = builder->block_end;
+  builder->current_terminator_offset = 0;
 
   // Reset per-block accounting.
   builder->region_count = 0;
@@ -130,6 +131,7 @@ static iree_status_t iree_hal_cmd_block_builder_begin_block(
   // Reset region-local tracking.
   builder->region_dispatch_count = 0;
   builder->current_region_tiles = 0;
+  builder->current_region_potential_work_count = 0;
   builder->current_barrier = NULL;
 
   ++builder->block_count;
@@ -150,13 +152,15 @@ static iree_status_t iree_hal_cmd_block_builder_begin_block(
 }
 
 // Finalizes the current region: patches the barrier's dispatch_count and
-// saves the tile count to the scratch buffer.
+// saves construction-time metadata to the scratch buffers.
 static void iree_hal_cmd_block_builder_finalize_region(
     iree_hal_cmd_block_builder_t* builder) {
   IREE_ASSERT(builder->current_barrier);
   IREE_ASSERT(builder->region_count > 0);
   IREE_ASSERT(builder->region_count <= IREE_HAL_CMD_MAX_REGIONS_PER_BLOCK);
   IREE_ASSERT(builder->region_dispatch_count <= UINT8_MAX);
+  IREE_ASSERT((uintptr_t)((uint8_t*)builder->current_barrier -
+                          (uint8_t*)builder->current_header) <= UINT16_MAX);
 
   // Patch the barrier with the actual dispatch count for this region.
   builder->current_barrier->dispatch_count =
@@ -165,10 +169,28 @@ static void iree_hal_cmd_block_builder_finalize_region(
   // on tile counts and available workers.
   builder->current_barrier->wake_budget = 0;
 
-  // Save tile count for this region. The scratch array is indexed by
-  // region_count - 1 (the current region is the last one).
-  builder->region_tiles_scratch[builder->region_count - 1] =
-      builder->current_region_tiles;
+  // Save region metadata. The scratch arrays are indexed by region_count - 1
+  // because the current region is the last region in the current block.
+  const uint16_t region_index = builder->region_count - 1;
+  iree_hal_cmd_region_summary_t* summary =
+      &builder->region_summaries_scratch[region_index];
+  summary->barrier_offset = (uint16_t)((uint8_t*)builder->current_barrier -
+                                       (uint8_t*)builder->current_header);
+  summary->next_candidate_region = IREE_HAL_CMD_REGION_INDEX_NONE;
+  summary->tile_count_hint = builder->current_region_tiles;
+  summary->dispatch_count = builder->region_dispatch_count;
+  summary->width_bucket =
+      builder->current_region_potential_work_count == 0
+          ? 0
+          : iree_hal_cmd_region_width_bucket_from_tile_count(
+                builder->current_region_tiles);
+  if (summary->width_bucket == 0 &&
+      builder->current_region_potential_work_count != 0) {
+    summary->width_bucket = 1;
+  }
+  summary->lookahead_width_bucket = 0;
+  summary->reserved = 0;
+  builder->region_tiles_scratch[region_index] = builder->current_region_tiles;
 
   // Update per-block highwater mark.
   if (builder->region_dispatch_count > builder->max_region_dispatch_count) {
@@ -178,12 +200,45 @@ static void iree_hal_cmd_block_builder_finalize_region(
   builder->current_barrier = NULL;
 }
 
+// Finalizes next-region and bounded-lookahead metadata for all recorded
+// regions in the current block. This is construction-time work; the processor
+// consumes the resulting table with indexed loads on region transitions.
+static void iree_hal_cmd_block_builder_finalize_region_summaries(
+    iree_hal_cmd_block_builder_t* builder) {
+  uint16_t next_candidate_region = IREE_HAL_CMD_REGION_INDEX_NONE;
+  for (uint16_t i = builder->region_count; i > 0; --i) {
+    const uint16_t region_index = i - 1;
+    iree_hal_cmd_region_summary_t* summary =
+        &builder->region_summaries_scratch[region_index];
+    summary->next_candidate_region = next_candidate_region;
+
+    uint8_t lookahead_width_bucket = 0;
+    uint16_t lookahead_end =
+        (uint16_t)(region_index + IREE_HAL_CMD_REGION_LOOKAHEAD_COUNT + 1);
+    if (lookahead_end > builder->region_count) {
+      lookahead_end = builder->region_count;
+    }
+    for (uint16_t j = region_index + 1; j < lookahead_end; ++j) {
+      const uint8_t width_bucket =
+          builder->region_summaries_scratch[j].width_bucket;
+      if (width_bucket > lookahead_width_bucket) {
+        lookahead_width_bucket = width_bucket;
+      }
+    }
+    summary->lookahead_width_bucket = lookahead_width_bucket;
+
+    if (summary->width_bucket != 0) {
+      next_candidate_region = region_index;
+    }
+  }
+}
+
 // Finalizes the current block: patches the block header, writes the
-// initial_remaining_tiles at the end, and adds the block to the chain.
+// region metadata at the end, and adds the block to the chain.
 //
 // The fixup entries currently occupy [fixup_cursor, block_end). They need
-// to shift down by region_count * sizeof(uint32_t) to make room for the
-// initial_remaining_tiles at the very end of the block.
+// to shift down by the padded metadata reservation to make room for region
+// summaries and initial_remaining_tiles at the very end of the block.
 static void iree_hal_cmd_block_builder_finalize_block(
     iree_hal_cmd_block_builder_t* builder) {
   IREE_ASSERT(builder->current_header);
@@ -191,8 +246,10 @@ static void iree_hal_cmd_block_builder_finalize_block(
   // The region should already be finalized by the caller (barrier/end/split
   // all call finalize_region before finalize_block).
   IREE_ASSERT(!builder->current_barrier);
+  IREE_ASSERT(builder->current_terminator_offset != 0);
 
   iree_hal_cmd_block_header_t* header = builder->current_header;
+  iree_hal_cmd_block_builder_finalize_region_summaries(builder);
 
   // Write the block header.
   header->used_bytes = (uint16_t)(builder->cmd_cursor - (uint8_t*)(header + 1));
@@ -201,23 +258,35 @@ static void iree_hal_cmd_block_builder_finalize_block(
   header->total_binding_count = builder->total_binding_count;
   header->fixup_count = builder->fixup_count;
   header->total_dispatch_count = builder->total_dispatch_count;
+  header->terminator_offset = builder->current_terminator_offset;
   // block_size was set at block acquisition.
 
-  // Shift fixups down to make room for initial_remaining_tiles at the end.
-  // The tile reservation is rounded up to fixup alignment so the fixup table
-  // always starts at a properly aligned address.
-  const iree_host_size_t tile_reservation =
-      iree_hal_cmd_block_tile_reservation_size(builder->region_count);
+  // Shift fixups down to make room for region metadata at the end. The
+  // reservation is rounded up to fixup alignment so the fixup table always
+  // starts at a properly aligned address.
+  const iree_host_size_t metadata_reservation =
+      iree_hal_cmd_block_region_metadata_reservation_size(
+          builder->region_count);
   const iree_host_size_t fixup_bytes =
       (iree_host_size_t)builder->fixup_count * sizeof(iree_hal_cmd_fixup_t);
-  if (fixup_bytes > 0 && tile_reservation > 0) {
-    memmove(builder->fixup_cursor - tile_reservation, builder->fixup_cursor,
+  if (fixup_bytes > 0 && metadata_reservation > 0) {
+    memmove(builder->fixup_cursor - metadata_reservation, builder->fixup_cursor,
             fixup_bytes);
   }
 
+  // Write region summaries immediately before initial_remaining_tiles.
+  const iree_host_size_t summary_bytes =
+      iree_hal_cmd_block_region_summaries_size(builder->region_count);
+  iree_hal_cmd_region_summary_t* summaries =
+      (iree_hal_cmd_region_summary_t*)(builder->block_end -
+                                       iree_hal_cmd_block_remaining_tiles_size(
+                                           builder->region_count) -
+                                       summary_bytes);
+  memcpy(summaries, builder->region_summaries_scratch, summary_bytes);
+
   // Write initial_remaining_tiles packed at the very end of the block.
   const iree_host_size_t tile_bytes =
-      (iree_host_size_t)builder->region_count * sizeof(uint32_t);
+      iree_hal_cmd_block_remaining_tiles_size(builder->region_count);
   uint32_t* tiles = (uint32_t*)(builder->block_end - tile_bytes);
   memcpy(tiles, builder->region_tiles_scratch, tile_bytes);
 
@@ -244,22 +313,24 @@ static void iree_hal_cmd_block_builder_finalize_block(
   builder->cmd_cursor = NULL;
   builder->fixup_cursor = NULL;
   builder->block_end = NULL;
+  builder->current_terminator_offset = 0;
 }
 
 // Returns the number of usable bytes remaining between the forward and
 // backward cursors, accounting for reserved space at the end for the
-// initial_remaining_tiles that will be written at finalization.
+// region metadata that will be written at finalization.
 static iree_host_size_t iree_hal_cmd_block_builder_remaining(
     const iree_hal_cmd_block_builder_t* builder) {
-  // Reserve space for tiles at the end of the block, +1 for a potential new
-  // region from a barrier/split. Uses the padded reservation to ensure
-  // fixup alignment.
-  const iree_host_size_t tile_reservation =
-      iree_hal_cmd_block_tile_reservation_size(builder->region_count + 1);
+  // Reserve space for region metadata at the end of the block, +1 for a
+  // potential new region from a barrier/split. Uses the padded reservation to
+  // ensure fixup alignment.
+  const iree_host_size_t metadata_reservation =
+      iree_hal_cmd_block_region_metadata_reservation_size(
+          builder->region_count + 1);
   iree_host_size_t backward =
       (iree_host_size_t)(builder->fixup_cursor - builder->cmd_cursor);
-  if (backward < tile_reservation) return 0;
-  return backward - tile_reservation;
+  if (backward < metadata_reservation) return 0;
+  return backward - metadata_reservation;
 }
 
 // Splits the current block by inserting a BRANCH to a new block.
@@ -281,6 +352,8 @@ static iree_status_t iree_hal_cmd_block_builder_split_block(
   branch->header.flags = IREE_HAL_CMD_FLAG_NONE;
   branch->header.size_qwords = sizeof(iree_hal_cmd_branch_t) / 8;
   branch->header.dispatch_index = 0;
+  builder->current_terminator_offset =
+      (uint16_t)((uint8_t*)branch - (uint8_t*)builder->current_header);
   builder->cmd_cursor += sizeof(iree_hal_cmd_branch_t);
 
   // Finalize and chain the current block.
@@ -329,6 +402,8 @@ iree_status_t iree_hal_cmd_block_builder_end(
   ret->flags = IREE_HAL_CMD_FLAG_NONE;
   ret->size_qwords = 1;  // 8 bytes (padded from 4-byte header).
   ret->dispatch_index = 0;
+  builder->current_terminator_offset =
+      (uint16_t)((uint8_t*)ret - (uint8_t*)builder->current_header);
   builder->cmd_cursor += 8;
 
   // Finalize and chain the last block.
@@ -455,6 +530,11 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
   // Update per-block accounting.
   builder->total_binding_count += binding_count;
   builder->current_region_tiles += tile_count;
+  if (tile_count != 0 ||
+      iree_any_bit_set(
+          flags, IREE_HAL_CMD_FLAG_INDIRECT | IREE_HAL_CMD_FLAG_PREDICATED)) {
+    builder->current_region_potential_work_count++;
+  }
 
   *out_cmd = header;
   return iree_ok_status();
@@ -462,6 +542,7 @@ iree_status_t iree_hal_cmd_block_builder_append_cmd(
 
 void iree_hal_cmd_block_builder_pop_cmd(iree_hal_cmd_block_builder_t* builder,
                                         iree_host_size_t cmd_bytes,
+                                        iree_hal_cmd_flags_t flags,
                                         uint16_t fixup_count,
                                         uint16_t binding_count,
                                         uint32_t tile_count) {
@@ -485,6 +566,11 @@ void iree_hal_cmd_block_builder_pop_cmd(iree_hal_cmd_block_builder_t* builder,
   builder->region_dispatch_count--;
   builder->total_dispatch_count--;
   builder->current_region_tiles -= tile_count;
+  if (tile_count != 0 ||
+      iree_any_bit_set(
+          flags, IREE_HAL_CMD_FLAG_INDIRECT | IREE_HAL_CMD_FLAG_PREDICATED)) {
+    builder->current_region_potential_work_count--;
+  }
 }
 
 iree_status_t iree_hal_cmd_block_builder_barrier(
@@ -531,6 +617,7 @@ iree_status_t iree_hal_cmd_block_builder_barrier(
   // Reset region-local counters.
   builder->region_dispatch_count = 0;
   builder->current_region_tiles = 0;
+  builder->current_region_potential_work_count = 0;
 
   return iree_ok_status();
 }

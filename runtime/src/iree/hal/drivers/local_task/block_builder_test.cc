@@ -324,6 +324,17 @@ TEST_F(BlockBuilderTest, BarrierCreatesRegions) {
   EXPECT_EQ(tiles[1], 1u);   // Region 1: 1 fill = 1 tile.
   EXPECT_EQ(tiles[2], 15u);  // Region 2: 3 dispatches × 5 tiles.
 
+  const iree_hal_cmd_region_summary_t* summaries =
+      iree_hal_cmd_block_region_summaries(block);
+  EXPECT_EQ(summaries[0].tile_count_hint, 20u);
+  EXPECT_EQ(summaries[0].next_candidate_region, 1);
+  EXPECT_EQ(summaries[0].width_bucket, 32);
+  EXPECT_EQ(summaries[0].lookahead_width_bucket, 16);
+  EXPECT_EQ(summaries[1].tile_count_hint, 1u);
+  EXPECT_EQ(summaries[1].next_candidate_region, 2);
+  EXPECT_EQ(summaries[2].tile_count_hint, 15u);
+  EXPECT_EQ(summaries[2].next_candidate_region, IREE_HAL_CMD_REGION_INDEX_NONE);
+
   // Walk the command stream and verify dispatch_index assignment.
   // Layout: BARRIER(2) dispatch dispatch BARRIER(1) fill BARRIER(3) dispatch×3
   // RETURN
@@ -333,6 +344,7 @@ TEST_F(BlockBuilderTest, BarrierCreatesRegions) {
   const auto* b0 = reinterpret_cast<const iree_hal_cmd_barrier_t*>(stream);
   EXPECT_EQ(b0->header.opcode, IREE_HAL_CMD_BARRIER);
   EXPECT_EQ(b0->dispatch_count, 2);
+  EXPECT_EQ(iree_hal_cmd_block_region_barrier(block, 0), b0);
   stream += sizeof(iree_hal_cmd_barrier_t);
 
   // Region 0: dispatch 0, dispatch 1.
@@ -347,6 +359,7 @@ TEST_F(BlockBuilderTest, BarrierCreatesRegions) {
   const auto* b1 = reinterpret_cast<const iree_hal_cmd_barrier_t*>(stream);
   EXPECT_EQ(b1->header.opcode, IREE_HAL_CMD_BARRIER);
   EXPECT_EQ(b1->dispatch_count, 1);
+  EXPECT_EQ(iree_hal_cmd_block_region_barrier(block, 1), b1);
   stream += sizeof(iree_hal_cmd_barrier_t);
 
   // Region 1: fill (gets dispatch_index 0 — all work commands get indices).
@@ -359,6 +372,7 @@ TEST_F(BlockBuilderTest, BarrierCreatesRegions) {
   const auto* b2 = reinterpret_cast<const iree_hal_cmd_barrier_t*>(stream);
   EXPECT_EQ(b2->header.opcode, IREE_HAL_CMD_BARRIER);
   EXPECT_EQ(b2->dispatch_count, 3);
+  EXPECT_EQ(iree_hal_cmd_block_region_barrier(block, 2), b2);
   stream += sizeof(iree_hal_cmd_barrier_t);
 
   // Region 2: dispatch 0, 1, 2 (region-local indices reset after barrier).
@@ -372,6 +386,7 @@ TEST_F(BlockBuilderTest, BarrierCreatesRegions) {
   const auto* return_cmd =
       reinterpret_cast<const iree_hal_cmd_header_t*>(stream);
   EXPECT_EQ(return_cmd->opcode, IREE_HAL_CMD_RETURN);
+  EXPECT_EQ(iree_hal_cmd_block_terminator(block), return_cmd);
 
   iree_hal_cmd_block_recording_release(&recording);
   iree_hal_cmd_block_builder_deinitialize(&builder);
