@@ -52,8 +52,7 @@ extern "C" {
 // process-local retention epoch. Workers share a process-local deadline so
 // late-arriving retainers do not each get a fresh private spin window. This
 // keeps short inter-region gaps out of the kernel while bounding wasted CPU on
-// long tails. Define to -1 to force the legacy busy-yield behavior on platforms
-// where futex waits are not desired.
+// long tails. Define to 0 to skip the warm spin window and sleep immediately.
 #ifndef IREE_TASK_WARM_WAIT_SPIN_NS
 #define IREE_TASK_WARM_WAIT_SPIN_NS (10 * 1000)
 #endif  // IREE_TASK_WARM_WAIT_SPIN_NS

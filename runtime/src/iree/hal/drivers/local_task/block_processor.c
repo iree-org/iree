@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/threading/futex.h"
+#include "iree/base/threading/wait_address.h"
 #include "iree/hal/local/local_executable.h"
 
 //===----------------------------------------------------------------------===//
@@ -79,20 +79,17 @@ static void iree_hal_cmd_block_processor_advance_retention_epoch(
   if (context->retention_epoch_ptr) {
     iree_atomic_fetch_add(context->retention_epoch_ptr, 1,
                           iree_memory_order_release);
-#if defined(IREE_RUNTIME_USE_FUTEX)
     if (context->retention_sleepers_ptr &&
         iree_atomic_load(context->retention_sleepers_ptr,
                          iree_memory_order_acquire) > 0) {
       IREE_TRACE_ZONE_BEGIN_NAMED(
           z_wake, "iree_hal_local_task_wake_retention_sleepers");
-      iree_futex_wake((void*)context->retention_epoch_ptr, IREE_ALL_WAITERS);
+      iree_wait_address_wake_all(context->retention_epoch_ptr);
       IREE_TRACE_ZONE_END(z_wake);
     }
-#endif  // IREE_RUNTIME_USE_FUTEX
   }
 }
 
-#if defined(IREE_RUNTIME_USE_FUTEX)
 static iree_time_t iree_hal_cmd_block_processor_retention_deadline_after(
     iree_time_t now, iree_duration_t duration) {
   if (duration <= IREE_DURATION_ZERO) return now;
@@ -113,21 +110,16 @@ static void iree_hal_cmd_block_processor_extend_retention_deadline(
     }
   }
 }
-#endif  // IREE_RUNTIME_USE_FUTEX
 
 // Keeps warm task workers alive across region-transition bookkeeping.
 static void iree_hal_cmd_block_processor_begin_retention_transition(
     iree_hal_cmd_block_processor_context_t* context) {
-#if defined(IREE_RUNTIME_USE_FUTEX)
   if (context->retention_transition_spin_ns <= IREE_DURATION_ZERO) return;
   if (!context->retention_spin_deadline_ns_ptr) return;
   const iree_time_t now = iree_time_now();
   iree_hal_cmd_block_processor_extend_retention_deadline(
       context, iree_hal_cmd_block_processor_retention_deadline_after(
                    now, context->retention_transition_spin_ns));
-#else
-  (void)context;
-#endif  // IREE_RUNTIME_USE_FUTEX
 }
 
 // Marks the processor completed and releases any warm task workers.

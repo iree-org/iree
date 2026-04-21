@@ -29,7 +29,7 @@
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/base/threading/futex.h"
+#include "iree/base/threading/wait_address.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -429,15 +429,13 @@ static inline int32_t iree_task_process_advance_retention_epoch(
   const int32_t new_epoch = iree_atomic_fetch_add(&process->retention_epoch, 1,
                                                   iree_memory_order_acq_rel) +
                             1;
-#if defined(IREE_RUNTIME_USE_FUTEX)
   if (iree_atomic_load(&process->retention_sleepers,
                        iree_memory_order_acquire) > 0) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z_wake,
                                 "iree_task_process_wake_retention_sleepers");
-    iree_futex_wake((void*)&process->retention_epoch, IREE_ALL_WAITERS);
+    iree_wait_address_wake_all(&process->retention_epoch);
     IREE_TRACE_ZONE_END(z_wake);
   }
-#endif  // IREE_RUNTIME_USE_FUTEX
   return new_epoch;
 }
 

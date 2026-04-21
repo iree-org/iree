@@ -11,8 +11,8 @@
 
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/threading/futex.h"
 #include "iree/base/threading/processor.h"
+#include "iree/base/threading/wait_address.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/process.h"
 #include "iree/task/tuning.h"
@@ -477,7 +477,6 @@ static bool iree_task_worker_try_release_compute_process(
   return false;
 }
 
-#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 static iree_time_t iree_task_worker_deadline_after(iree_time_t now,
                                                    iree_duration_t duration) {
   if (duration <= IREE_DURATION_ZERO) return now;
@@ -503,7 +502,6 @@ static iree_time_t iree_task_worker_seed_warm_spin_deadline(
   }
   return current_deadline;
 }
-#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 
 // Waits as a warm retainer until the process changes retention epoch, reaches a
 // terminal state, or this worker is asked to exit. While waiting the worker
@@ -512,7 +510,6 @@ static iree_time_t iree_task_worker_seed_warm_spin_deadline(
 static bool iree_task_worker_wait_warm_compute_process(
     iree_task_worker_t* worker, iree_task_process_t* process,
     int32_t keep_warm_epoch, bool allow_initial_spin) {
-#if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
   // Workers that reached warm wait while other drainers are still active are
   // in an intra-region tail: any remaining work has already been claimed by
   // those drainers. Parking them avoids a pool-wide spin herd while still
@@ -609,9 +606,8 @@ static bool iree_task_worker_wait_warm_compute_process(
     if (sleep_deadline_ns < sleep_start_ns) {
       sleep_deadline_ns = IREE_TIME_INFINITE_FUTURE;
     }
-    iree_status_code_t wait_status =
-        iree_futex_wait((void*)&process->retention_epoch,
-                        (uint32_t)current_epoch, sleep_deadline_ns);
+    iree_status_code_t wait_status = iree_wait_address_wait_int32(
+        &process->retention_epoch, current_epoch, sleep_deadline_ns);
     iree_atomic_fetch_sub(&process->retention_sleepers, 1,
                           iree_memory_order_acq_rel);
 
@@ -624,27 +620,6 @@ static bool iree_task_worker_wait_warm_compute_process(
       return true;
     }
   }
-#else
-  (void)allow_initial_spin;
-  IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
-                              "iree_task_worker_wait_warm_compute_spin");
-  while (true) {
-    if (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
-        IREE_TASK_WORKER_STATE_EXITING) {
-      IREE_TRACE_ZONE_END(z_warm_spin);
-      return false;
-    }
-    if (iree_task_process_is_terminal(process)) {
-      IREE_TRACE_ZONE_END(z_warm_spin);
-      return false;
-    }
-    if (iree_task_process_retention_epoch(process) != keep_warm_epoch) {
-      IREE_TRACE_ZONE_END(z_warm_spin);
-      return true;
-    }
-    iree_processor_yield();
-  }
-#endif  // IREE_RUNTIME_USE_FUTEX && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
 }
 
 // Scans executor compute slots for wake_budget > 1 processes and drains bounded
