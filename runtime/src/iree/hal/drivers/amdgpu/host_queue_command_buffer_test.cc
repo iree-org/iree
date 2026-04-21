@@ -3514,6 +3514,97 @@ TEST_F(HostQueueCommandBufferTest,
 }
 
 TEST_F(HostQueueCommandBufferTest,
+       OneShotStaticTransientBindingRecordsBeforeAllocaCommit) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleTransferBuffer(
+      test_device.allocator(), sizeof(uint32_t), output_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  Ref<iree_hal_semaphore_t> alloca_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), alloca_signal.out()));
+  uint64_t alloca_signal_value = 1;
+  iree_hal_semaphore_t* alloca_signal_ptr = alloca_signal.get();
+  iree_hal_semaphore_list_t alloca_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&alloca_signal_ptr,
+      /*payload_values=*/&alloca_signal_value,
+  };
+  iree_hal_buffer_t* transient_raw = NULL;
+  IREE_ASSERT_OK(QueueTransientTransferBuffer(
+      test_device.base_device(), alloca_signal_list, sizeof(uint32_t),
+      &transient_raw));
+  Ref<iree_hal_buffer_t> transient_buffer(transient_raw);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  const uint32_t expected = 0xBD3A0003u;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer,
+      iree_hal_make_buffer_ref(transient_buffer.get(), /*offset=*/0,
+                               sizeof(expected)),
+      &expected, sizeof(expected), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer,
+      iree_hal_make_buffer_ref(transient_buffer.get(), /*offset=*/0,
+                               sizeof(expected)),
+      iree_hal_make_buffer_ref(output_buffer.get(), /*offset=*/0,
+                               sizeof(expected)),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      alloca_signal_list, command_buffer_signal_list, command_buffer,
+      iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
+
+  Ref<iree_hal_semaphore_t> dealloca_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), dealloca_signal.out()));
+  uint64_t dealloca_signal_value = 1;
+  iree_hal_semaphore_t* dealloca_signal_ptr = dealloca_signal.get();
+  iree_hal_semaphore_list_t dealloca_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&dealloca_signal_ptr,
+      /*payload_values=*/&dealloca_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      command_buffer_signal_list, dealloca_signal_list, transient_buffer,
+      IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(dealloca_signal, dealloca_signal_value,
+                                         iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint32_t actual = 0;
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(output_buffer, /*offset=*/0, &actual,
+                                          sizeof(actual)));
+  EXPECT_EQ(actual, expected);
+}
+
+TEST_F(HostQueueCommandBufferTest,
        LargeCommandBufferParksAndResumesUnderNotificationPressure) {
   static constexpr uint32_t kFillCount = 2048;
   static constexpr uint32_t kAqlCapacity = 64;

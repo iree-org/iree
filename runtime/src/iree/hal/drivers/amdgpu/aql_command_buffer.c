@@ -912,18 +912,42 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_wait_events(
 // Buffer Reference Recording
 //===----------------------------------------------------------------------===//
 
+static bool
+iree_hal_amdgpu_aql_command_buffer_allows_staged_transient_buffer_refs(
+    const iree_hal_amdgpu_aql_command_buffer_t* command_buffer) {
+  // One-shot command buffers are recorded for a single queued execution and may
+  // capture transient backing staged by a preceding queue_alloca before the
+  // user-visible alloca signal is published. Reusable command buffers require
+  // committed backing because the captured pointer can be replayed later.
+  return iree_all_bits_set(command_buffer->base.mode,
+                           IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT);
+}
+
 static iree_status_t
 iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
+    const iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
     const iree_hal_buffer_ref_t* buffer_ref, uint64_t* out_device_pointer) {
   *out_device_pointer = 0;
   iree_hal_buffer_t* allocated_buffer =
       iree_hal_buffer_allocated_buffer(buffer_ref->buffer);
   if (iree_hal_amdgpu_transient_buffer_isa(allocated_buffer)) {
-    iree_hal_buffer_t* committed_backing = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_amdgpu_transient_buffer_resolve_committed_backing(
-            allocated_buffer, &committed_backing));
-    allocated_buffer = iree_hal_buffer_allocated_buffer(committed_backing);
+    iree_hal_buffer_t* backing_buffer = NULL;
+    if (iree_hal_amdgpu_aql_command_buffer_allows_staged_transient_buffer_refs(
+            command_buffer)) {
+      backing_buffer =
+          iree_hal_amdgpu_transient_buffer_backing_buffer(allocated_buffer);
+      if (IREE_UNLIKELY(!backing_buffer)) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "one-shot command-buffer buffer reference has no staged AMDGPU "
+            "backing");
+      }
+    } else {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_amdgpu_transient_buffer_resolve_committed_backing(
+              allocated_buffer, &backing_buffer));
+    }
+    allocated_buffer = iree_hal_buffer_allocated_buffer(backing_buffer);
   }
   void* device_ptr = iree_hal_amdgpu_buffer_device_pointer(allocated_buffer);
   if (IREE_UNLIKELY(!device_ptr)) {
@@ -988,7 +1012,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_buffer_ref(
   uint64_t unused_device_pointer = 0;
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
-          &buffer_ref, &unused_device_pointer));
+          command_buffer, &buffer_ref, &unused_device_pointer));
 
   uint32_t ordinal = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_aql_command_buffer_record_static_buffer(
@@ -1134,7 +1158,7 @@ iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_binding_sources(
 
     uint64_t unused_device_pointer = 0;
     status = iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
-        binding, &unused_device_pointer);
+        command_buffer, binding, &unused_device_pointer);
     if (iree_status_is_ok(status) && command_buffer->resource_set) {
       status = iree_hal_resource_set_insert(command_buffer->resource_set,
                                             /*count=*/1, &binding->buffer);
@@ -1151,6 +1175,7 @@ iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_binding_sources(
 
 static iree_status_t
 iree_hal_amdgpu_aql_command_buffer_write_dispatch_binding_sources(
+    iree_hal_amdgpu_aql_command_buffer_t* command_buffer,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_amdgpu_command_buffer_binding_source_t* binding_sources) {
   iree_status_t status = iree_ok_status();
@@ -1168,7 +1193,7 @@ iree_hal_amdgpu_aql_command_buffer_write_dispatch_binding_sources(
     }
 
     status = iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
-        binding, &binding_source->offset_or_pointer);
+        command_buffer, binding, &binding_source->offset_or_pointer);
     if (iree_status_is_ok(status)) {
       binding_source->slot = 0;
       binding_source->flags =
@@ -1244,7 +1269,7 @@ iree_hal_amdgpu_aql_command_buffer_write_indirect_parameter_source(
 
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
-          &buffer_ref, &binding_source->offset_or_pointer));
+          command_buffer, &buffer_ref, &binding_source->offset_or_pointer));
   binding_source->slot = 0;
   binding_source->flags =
       IREE_HAL_AMDGPU_COMMAND_BUFFER_BINDING_SOURCE_FLAG_INDIRECT_PARAMETERS;
@@ -1360,7 +1385,7 @@ iree_hal_amdgpu_aql_command_buffer_record_prepublished_dispatch_kernargs(
       for (iree_host_size_t i = 0; i < bindings.count; ++i) {
         IREE_RETURN_IF_ERROR(
             iree_hal_amdgpu_aql_command_buffer_resolve_static_buffer_ref(
-                &bindings.values[i], &binding_dst[i]));
+                command_buffer, &bindings.values[i], &binding_dst[i]));
       }
       const iree_host_size_t binding_bytes =
           (iree_host_size_t)kernel_args->binding_count * sizeof(uint64_t);
@@ -1813,7 +1838,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
   if (binding_sources && !uses_custom_direct_arguments) {
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_aql_command_buffer_write_dispatch_binding_sources(
-            bindings, binding_sources));
+            command_buffer, bindings, binding_sources));
   }
   if (uses_indirect_parameters) {
     iree_hal_amdgpu_command_buffer_binding_source_t* parameter_source =

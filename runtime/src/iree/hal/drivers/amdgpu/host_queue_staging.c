@@ -1113,6 +1113,17 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_start(
     iree_hal_amdgpu_staging_transfer_t* transfer) {
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_staging_transfer_clone_queue_error(transfer));
+  // The transfer buffer may be a queue_alloca result whose backing is only
+  // staged when the operation is submitted. Validate the device pointer here,
+  // after the host action's wait set has been satisfied.
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(transfer->buffer);
+  if (IREE_UNLIKELY(!iree_hal_amdgpu_buffer_device_pointer(allocated_buffer))) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "staged AMDGPU file transfer buffer was not backed by an AMDGPU "
+        "allocation after queue waits completed");
+  }
   // The host action's reclaim entry owns |transfer| only until this callback
   // returns. Keep a transfer-owned self reference across the async file/GPU
   // copy pipeline; the terminal completion path releases it.
@@ -1156,15 +1167,6 @@ static iree_status_t iree_hal_amdgpu_staging_transfer_validate_buffer(
       kind == IREE_HAL_AMDGPU_STAGING_TRANSFER_READ
           ? IREE_HAL_MEMORY_ACCESS_WRITE
           : IREE_HAL_MEMORY_ACCESS_READ));
-
-  iree_hal_buffer_t* allocated_buffer =
-      iree_hal_buffer_allocated_buffer(buffer);
-  if (IREE_UNLIKELY(!iree_hal_amdgpu_buffer_device_pointer(allocated_buffer))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "staged AMDGPU file transfer buffer must be backed by an AMDGPU "
-        "allocation");
-  }
   return iree_ok_status();
 }
 
