@@ -50,6 +50,12 @@ typedef struct iree_task_process_drain_result_t {
   // The executor uses this to deprioritize processes that repeatedly return
   // did_work=false (sleeping processes).
   bool did_work;
+
+  // True if this drain() call did not perform useful work but the process
+  // should remain on an active worker and be retried soon. Cooperative
+  // processes use this to express warm-retention and handoff policy. Unlike
+  // did_work, this does not publish a shared cross-drainer progress signal.
+  bool keep_active;
 } iree_task_process_drain_result_t;
 
 // Called by workers to do bounded work on a process. Multiple workers may call

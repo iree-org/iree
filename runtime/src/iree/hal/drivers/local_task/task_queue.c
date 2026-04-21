@@ -2410,11 +2410,10 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     // Items have stable addresses (arena-allocated, never freed during
     // operation), so the pointer is always valid.
     // If the CLOSED flag is set (bit 31 of the low 32 bits), the recording
-    // is completing. Bail — but report did_work=true so the worker loops back
-    // instead of sleeping. The closer has already installed the next pending
-    // recording into compute_current (or null if none). On the next pump
-    // iteration the worker will find the new item or properly sleep from the
-    // null path.
+    // is completing. Bail, but ask the worker to stay active and retry instead
+    // of sleeping. The closer has already installed the next pending recording
+    // into compute_current (or null if none). On the next pump iteration the
+    // worker will find the new item or properly sleep from the null path.
     int64_t prev_drainers =
         iree_atomic_fetch_add(&item->drainers, 1, iree_memory_order_acq_rel);
     int64_t registered_generation = prev_drainers & ~(int64_t)UINT32_MAX;
@@ -2426,7 +2425,8 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
           IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_STALE_ITEM, NULL));
       iree_hal_task_queue_compute_item_leave(queue, item,
                                              registered_generation);
-      out_result->did_work = true;
+      out_result->did_work = false;
+      out_result->keep_active = true;
       out_result->completed = false;
       return iree_ok_status();
     }
@@ -2443,7 +2443,8 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
           IREE_HAL_TASK_QUEUE_COMPUTE_DRAIN_REASON_ITEM_REPLACED, NULL));
       iree_hal_task_queue_compute_item_leave(queue, item,
                                              registered_generation);
-      out_result->did_work = true;
+      out_result->did_work = false;
+      out_result->keep_active = true;
       out_result->completed = false;
       return iree_ok_status();
     }
@@ -2481,10 +2482,13 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     iree_hal_task_queue_compute_item_leave(queue, item, registered_generation);
     IREE_TRACE_ZONE_END(z_drain);
 
-    if (!processor_result.completed && processor_result.tiles_executed == 0) {
+    bool processor_keep_active =
+        !processor_result.completed && processor_result.tiles_executed == 0;
+    if (processor_keep_active) {
       iree_processor_yield();
     }
-    out_result->did_work = true;
+    out_result->did_work = !processor_keep_active;
+    out_result->keep_active = processor_keep_active;
     out_result->completed = false;
     return iree_ok_status();
   }
