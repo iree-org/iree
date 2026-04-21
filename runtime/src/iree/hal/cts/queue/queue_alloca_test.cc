@@ -404,10 +404,10 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolCrossQueueWaitFrontier) {
                                               IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
-// Reuses a one-block explicit pool across two queues while the releasing
-// dealloca is still in flight. This exercises queue-owned memory readiness
-// instead of relying on a host wait to make the pool death frontier immediately
-// satisfied before the second alloca is submitted.
+// Reuses a one-block explicit pool across two queues without a host wait
+// between the releasing dealloca and the next alloca. Depending on scheduling,
+// the dealloca may still be in flight or may have already published its death
+// frontier; both cases must leave the second allocation usable.
 TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolPendingDeallocaWaitFrontier) {
   IREE_TRACE_SCOPE();
 
@@ -449,10 +449,6 @@ TEST_P(QueueAllocaTest, ExplicitFixedBlockPoolPendingDeallocaWaitFrontier) {
       queue1_params, allocation_size,
       IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER, queue1_buffer.out()));
   ASSERT_NE(queue1_buffer.get(), nullptr);
-
-  iree_hal_pool_stats_t stats;
-  iree_hal_pool_query_stats(pool.get(), &stats);
-  EXPECT_EQ(stats.wait_count, 1u);
 
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(queue1_alloca_signal,
                                               iree_infinite_timeout(),
