@@ -58,6 +58,15 @@ extern "C" {
 #define IREE_TASK_WARM_WAIT_SPIN_NS (10 * 1000)
 #endif  // IREE_TASK_WARM_WAIT_SPIN_NS
 
+// Maximum number of remaining active drainers where a no-work warm retainer is
+// allowed to enter the shared spin window. Larger tails mean some workers are
+// still executing already-claimed work and extra retainers would only herd-spin
+// before parking. Keeping the final few drainers warm lets them bridge short
+// region-transition gaps without waking the whole worker pool.
+#ifndef IREE_TASK_WARM_WAIT_TAIL_SPIN_DRAINER_LIMIT
+#define IREE_TASK_WARM_WAIT_TAIL_SPIN_DRAINER_LIMIT (8)
+#endif  // IREE_TASK_WARM_WAIT_TAIL_SPIN_DRAINER_LIMIT
+
 // Time warm-retained workers spin after the last tile in a region completes
 // and before the next region becomes claimable. The completer publishes this
 // shared deadline before running region-transition bookkeeping so workers

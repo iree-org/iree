@@ -509,9 +509,18 @@ static iree_time_t iree_task_worker_seed_warm_spin_deadline(
 // drain state protected by active_drainers.
 static bool iree_task_worker_wait_warm_compute_process(
     iree_task_worker_t* worker, iree_task_process_t* process,
-    int32_t keep_warm_epoch) {
+    int32_t keep_warm_epoch, bool allow_initial_spin) {
 #if defined(IREE_RUNTIME_USE_FUTEX) && IREE_TASK_WARM_WAIT_SPIN_NS >= 0
-  bool seed_spin_deadline = true;
+  // Workers that reached warm wait while other drainers are still active are
+  // in an intra-region tail: any remaining work has already been claimed by
+  // those drainers. Parking them avoids a pool-wide spin herd while still
+  // letting them catch a newer transition deadline published before sleep.
+  const iree_time_t ignored_spin_deadline_ns =
+      allow_initial_spin
+          ? 0
+          : iree_atomic_load(&process->retention_spin_deadline_ns,
+                             iree_memory_order_acquire);
+  bool seed_spin_deadline = allow_initial_spin;
   while (true) {
     iree_time_t now = iree_time_now();
     iree_time_t spin_deadline_ns =
@@ -520,6 +529,9 @@ static bool iree_task_worker_wait_warm_compute_process(
             : iree_atomic_load(&process->retention_spin_deadline_ns,
                                iree_memory_order_acquire);
     seed_spin_deadline = false;
+    if (spin_deadline_ns <= ignored_spin_deadline_ns) {
+      spin_deadline_ns = 0;
+    }
     if (spin_deadline_ns > now) {
       bool spin_wait_resolved = false;
       bool spin_wait_result = false;
@@ -582,7 +594,8 @@ static bool iree_task_worker_wait_warm_compute_process(
     const iree_time_t transition_deadline_ns = iree_atomic_load(
         &process->retention_spin_deadline_ns, iree_memory_order_acquire);
     now = iree_time_now();
-    if (transition_deadline_ns > now) {
+    if (transition_deadline_ns > now &&
+        transition_deadline_ns > ignored_spin_deadline_ns) {
       iree_atomic_fetch_sub(&process->retention_sleepers, 1,
                             iree_memory_order_acq_rel);
       continue;
@@ -610,6 +623,7 @@ static bool iree_task_worker_wait_warm_compute_process(
     }
   }
 #else
+  (void)allow_initial_spin;
   IREE_TRACE_ZONE_BEGIN_NAMED(z_warm_spin,
                               "iree_task_worker_wait_warm_compute_spin");
   while (true) {
@@ -843,9 +857,17 @@ static bool iree_task_worker_drain_compute_slots(iree_task_worker_t* worker) {
     }
 
     if (entered_warm) {
+      // If many drainers remain active, they are responsible for either
+      // completing already-claimed tiles or publishing the next retention
+      // epoch. Spinning this worker now only burns CPU in the tail. The final
+      // few drainers stay warm to bridge short region-transition gaps without
+      // waking the whole worker pool.
+      const bool allow_initial_warm_spin =
+          remaining <= IREE_TASK_WARM_WAIT_TAIL_SPIN_DRAINER_LIMIT;
       bool rejoin_process =
           rejoin_warm || iree_task_worker_wait_warm_compute_process(
-                             worker, process, drained_process_keep_warm_epoch);
+                             worker, process, drained_process_keep_warm_epoch,
+                             allow_initial_warm_spin);
       int32_t prior_warm_retainers = iree_atomic_fetch_sub(
           &process->warm_retainers, 1, iree_memory_order_acq_rel);
       IREE_ASSERT(prior_warm_retainers > 0, "warm retainer count underflow");
