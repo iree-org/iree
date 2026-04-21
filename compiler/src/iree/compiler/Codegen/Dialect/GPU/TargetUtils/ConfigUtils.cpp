@@ -790,8 +790,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (useDirectLoad &&
       shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
                                 transposedLhs, transposedRhs)) {
-    mlir::emitWarning(loc) << "overriding direct load DMA, falling back to "
-                              "stream copies";
+    LDBG() << "overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
 
