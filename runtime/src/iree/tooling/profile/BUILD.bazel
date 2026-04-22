@@ -1,0 +1,354 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_python//python:defs.bzl", "py_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "common",
+    srcs = ["common.c"],
+    hdrs = ["common.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/utils:profile_file",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "reader",
+    srcs = ["reader.c"],
+    hdrs = ["reader.h"],
+    deps = [
+        ":common",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "model",
+    srcs = ["model.c"],
+    hdrs = ["model.h"],
+    deps = [
+        ":common",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "queue_query",
+    srcs = ["queue_query.c"],
+    hdrs = ["queue_query.h"],
+    deps = [
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dispatch",
+    srcs = ["dispatch.c"],
+    hdrs = ["dispatch.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":queue_query",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "counter",
+    srcs = ["counter.c"],
+    hdrs = ["counter.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "memory",
+    srcs = ["memory.c"],
+    hdrs = ["memory.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "summary",
+    srcs = ["summary.c"],
+    hdrs = ["summary.h"],
+    deps = [
+        ":common",
+        ":model",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "statistics",
+    srcs = ["statistics.c"],
+    hdrs = ["statistics.h"],
+    deps = [
+        ":common",
+        ":reader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:statistics_sink",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "cat",
+    srcs = ["cat.c"],
+    hdrs = ["cat.h"],
+    deps = [
+        ":common",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "projection",
+    srcs = ["projection.c"],
+    hdrs = ["projection.h"],
+    deps = [
+        ":dispatch",
+        ":reader",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "export",
+    srcs = ["export.c"],
+    hdrs = ["export.h"],
+    deps = [
+        ":common",
+        ":memory",
+        ":model",
+        ":reader",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "explain",
+    srcs = ["explain.c"],
+    hdrs = ["explain.h"],
+    deps = [
+        ":common",
+        ":dispatch",
+        ":memory",
+        ":reader",
+        ":summary",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "help",
+    srcs = ["help.c"],
+    hdrs = ["help.h"],
+    deps = ["//runtime/src/iree/base"],
+)
+
+iree_runtime_cc_library(
+    name = "commands",
+    srcs = ["commands.c"],
+    hdrs = ["commands.h"],
+    deps = [
+        ":cat",
+        ":counter",
+        ":explain",
+        ":export",
+        ":memory",
+        ":projection",
+        ":statistics",
+        ":summary",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "profile",
+    deps = [
+        ":cat",
+        ":commands",
+        ":common",
+        ":counter",
+        ":dispatch",
+        ":explain",
+        ":export",
+        ":help",
+        ":memory",
+        ":model",
+        ":projection",
+        ":queue_query",
+        ":reader",
+        ":statistics",
+        ":summary",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "common_test",
+    srcs = ["common_test.cc"],
+    deps = [
+        ":common",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "reader_test",
+    srcs = ["reader_test.cc"],
+    deps = [
+        ":reader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "model_test",
+    srcs = ["model_test.cc"],
+    deps = [
+        ":model",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_query_test",
+    srcs = ["queue_query_test.cc"],
+    deps = [
+        ":model",
+        ":queue_query",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "summary_test",
+    srcs = ["summary_test.cc"],
+    deps = [
+        ":summary",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "counter_test",
+    srcs = ["counter_test.cc"],
+    deps = [
+        ":counter",
+        ":model",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "memory_test",
+    srcs = ["memory_test.cc"],
+    deps = [
+        ":memory",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "commands_test",
+    srcs = ["commands_test.cc"],
+    deps = [
+        ":commands",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "test_fixture_generator",
+    testonly = True,
+    srcs = ["test_fixture_generator.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:profile_file",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+py_test(
+    name = "render_test",
+    srcs = [
+        "render/__init__.py",
+        "render/backends.py",
+        "render/common.py",
+        "render/perfetto.py",
+        "render_test.py",
+    ],
+    imports = ["."],
+    main = "render_test.py",
+)
+
+py_test(
+    name = "cli_test",
+    srcs = ["cli_test.py"],
+    data = [
+        ":test_fixture_generator",
+        "//tools:iree-profile",
+    ],
+    main = "cli_test.py",
+)
+
+iree_cmake_extra_content(
+    content = """
+iree_local_py_test(
+  NAME
+    render_test
+  SRC
+    "render_test.py"
+  PACKAGE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+iree_local_py_test(
+  NAME
+    cli_test
+  SRC
+    "cli_test.py"
+  ARGS
+    "--fixture-generator=$<TARGET_FILE:iree_tooling_profile_test_fixture_generator>"
+    "--iree-profile=$<TARGET_FILE:iree-profile>"
+  PACKAGE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+""",
+    inline = True,
+)
