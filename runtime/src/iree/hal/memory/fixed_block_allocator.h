@@ -87,7 +87,7 @@ extern "C" {
 // ### Capacity
 //
 // The bitmap is stored inline in the allocator structure: up to
-// IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BITMAP_WORDS words × 64 bits =
+// IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BITMAP_WORDS words * 64 bits =
 // IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_MAX_BLOCKS blocks. This is sufficient
 // for most fixed-block allocation use cases (KV-cache slabs, MoE expert slots,
 // signal ring entries). If larger allocators are needed, shard across multiple
@@ -105,7 +105,7 @@ extern "C" {
 
 // Maximum number of blocks in a single allocator instance. Limited by the
 // inline bitmap array size (IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_BITMAP_WORDS
-// words × 64 bits).
+// words * 64 bits).
 #define IREE_HAL_MEMORY_FIXED_BLOCK_ALLOCATOR_MAX_BLOCKS 4096
 
 // Default death frontier capacity per block. Covers single-queue and moderate
