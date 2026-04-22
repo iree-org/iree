@@ -7,6 +7,7 @@
 #include "iree/hal/device.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
@@ -102,7 +103,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(topology_info);
   return _VTABLE_DISPATCH(device, assign_topology_info)(device, topology_info);
 }
 
@@ -113,6 +113,24 @@ iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
   IREE_ASSERT_ARGUMENT(semaphore);
   return _VTABLE_DISPATCH(device, query_semaphore_compatibility)(device,
                                                                  semaphore);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_backend);
+  memset(out_backend, 0, sizeof(*out_backend));
+  const iree_hal_device_topology_info_t* topology_info =
+      iree_hal_device_topology_info(device);
+  if (!topology_info->topology || !topology_info->frontier.tracker) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "device queue pool backends are unavailable before the device is "
+        "assigned to a device group");
+  }
+  return _VTABLE_DISPATCH(device, query_queue_pool_backend)(
+      device, queue_affinity, out_backend);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(

@@ -19,6 +19,7 @@
 #include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/status.h"
@@ -105,6 +106,28 @@ class PyBufferReleaser {
 
  private:
   Py_buffer& b_;
+};
+
+class FrontierTrackerReleaser {
+ public:
+  explicit FrontierTrackerReleaser(iree_async_frontier_tracker_t* tracker)
+      : tracker_(tracker) {}
+  ~FrontierTrackerReleaser() { iree_async_frontier_tracker_release(tracker_); }
+
+ private:
+  iree_async_frontier_tracker_t* tracker_;
+};
+
+class DeviceGroupBuilderReleaser {
+ public:
+  explicit DeviceGroupBuilderReleaser(iree_hal_device_group_builder_t* builder)
+      : builder_(builder) {}
+  ~DeviceGroupBuilderReleaser() {
+    iree_hal_device_group_builder_deinitialize(builder_);
+  }
+
+ private:
+  iree_hal_device_group_builder_t* builder_;
 };
 
 static std::string ToHexString(const uint8_t* data, size_t length) {
@@ -456,7 +479,7 @@ HalBuffer HalDevice::QueueAlloca(uint64_t allocation_size,
   }
 
   iree_hal_buffer_t* out_buffer;
-  // TODO: Accept params for queue affinity.
+  // TODO: Accept params for queue affinity and pool.
   CheckApiStatus(iree_hal_device_queue_alloca(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
                      signal_list, /*pool=*/NULL, params, allocation_size,
@@ -1029,6 +1052,40 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
   return iree_ok_status();
 }
 
+static iree_status_t CreateSingleDeviceGroup(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_device_group_t** out_group) {
+  *out_group = nullptr;
+  iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+  iree_status_t status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_create_from_device(
+        device, frontier_tracker, host_allocator, out_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
+  return status;
+}
+
+static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
+                                       std::optional<py::list> allocators) {
+  iree_hal_device_group_t* device_group = nullptr;
+  iree_status_t status = ConfigureDevice(device, allocators);
+  if (iree_status_is_ok(status)) {
+    status =
+        CreateSingleDeviceGroup(device, iree_allocator_system(), &device_group);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_device_group_release(device_group);
+    iree_hal_device_release(device);
+    CheckApiStatus(
+        status,
+        "Error configuring the device and assigning its frontier tracker");
+  }
+  return HalDevice::StealFromRawPtrAndDeviceGroup(device, device_group);
+}
+
 HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
   iree_async_proactor_pool_t* proactor_pool = nullptr;
   CheckApiStatus(iree_async_proactor_pool_create(
@@ -1044,9 +1101,7 @@ HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
       raw_ptr(), &create_params, iree_allocator_system(), &device);
   iree_async_proactor_pool_release(proactor_pool);
   CheckApiStatus(status, "Error creating default device");
-  CheckApiStatus(ConfigureDevice(device, allocators),
-                 "Error configuring the device");
-  return HalDevice::StealFromRawPtr(device);
+  return StealConfiguredDevice(device, allocators);
 }
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
@@ -1107,9 +1162,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
       &create_params, iree_allocator_system(), &device);
   iree_async_proactor_pool_release(proactor_pool);
   CheckApiStatus(status, "Error creating device by id");
-  CheckApiStatus(ConfigureDevice(device, allocators),
-                 "Error configuring the device");
-  return HalDevice::StealFromRawPtr(device);
+  return StealConfiguredDevice(device, allocators);
 }
 
 HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
@@ -1131,9 +1184,7 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
       &device);
   iree_async_proactor_pool_release(proactor_pool);
   CheckApiStatus(status, "Error creating device");
-  CheckApiStatus(ConfigureDevice(device, allocators),
-                 "Error configuring the device");
-  return HalDevice::StealFromRawPtr(device);
+  return StealConfiguredDevice(device, allocators);
 }
 
 //------------------------------------------------------------------------------
@@ -1145,18 +1196,30 @@ VmModule CreateHalModule(
     std::optional<py::list> devices,
     std::optional<py::ref<HalModuleDebugSink>> debug_sink) {
   if (device && devices) {
-    PyErr_SetString(
-        PyExc_ValueError,
+    throw RaiseValueError(
         "\"device\" and \"devices\" are mutually exclusive arguments.");
   }
-  // Build a device group from the provided device(s).
-  iree_hal_device_group_builder_t group_builder;
-  iree_hal_device_group_builder_initialize(&group_builder);
+  if (!device && !devices) {
+    throw RaiseValueError("one of \"device\" or \"devices\" is required.");
+  }
+  iree_hal_device_group_t* device_group = nullptr;
+  bool owns_device_group = false;
   if (device) {
-    CheckApiStatus(iree_hal_device_group_builder_add_device(
-                       &group_builder, device.value()->raw_ptr()),
-                   "Error adding device to group builder");
+    device_group = device.value()->device_group();
+  } else if (devices && py::len(*devices) == 1) {
+    HalDevice* single_device = py::cast<HalDevice*>((*devices)[0]);
+    device_group = single_device->device_group();
   } else {
+    // Build a device group from the provided device(s).
+    iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+    CheckApiStatus(iree_async_frontier_tracker_create(
+                       iree_async_frontier_tracker_options_default(),
+                       iree_allocator_system(), &frontier_tracker),
+                   "Error creating frontier tracker");
+    FrontierTrackerReleaser frontier_tracker_releaser(frontier_tracker);
+    iree_hal_device_group_builder_t group_builder;
+    iree_hal_device_group_builder_initialize(&group_builder, frontier_tracker);
+    DeviceGroupBuilderReleaser group_builder_releaser(&group_builder);
     for (auto devicesIt = devices->begin(); devicesIt != devices->end();
          ++devicesIt) {
       CheckApiStatus(
@@ -1164,11 +1227,11 @@ VmModule CreateHalModule(
               &group_builder, py::cast<HalDevice*>(*devicesIt)->raw_ptr()),
           "Error adding device to group builder");
     }
+    CheckApiStatus(iree_hal_device_group_builder_finalize(
+                       &group_builder, iree_allocator_system(), &device_group),
+                   "Error creating device group");
+    owns_device_group = true;
   }
-  iree_hal_device_group_t* device_group = nullptr;
-  CheckApiStatus(iree_hal_device_group_builder_finalize(
-                     &group_builder, iree_allocator_system(), &device_group),
-                 "Error creating device group");
 
   iree_hal_module_debug_sink_t iree_hal_module_debug_sink =
       iree_hal_module_debug_sink_stdio(stderr);
@@ -1181,7 +1244,9 @@ VmModule CreateHalModule(
       instance->raw_ptr(), iree_hal_module_device_policy_default(),
       device_group, IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink,
       iree_allocator_system(), &module);
-  iree_hal_device_group_release(device_group);
+  if (owns_device_group) {
+    iree_hal_device_group_release(device_group);
+  }
   CheckApiStatus(status, "Error creating hal module");
   VmModule vm_module = VmModule::StealFromRawPtr(module);
   if (debug_sink) {

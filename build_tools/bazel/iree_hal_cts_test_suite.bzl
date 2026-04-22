@@ -202,6 +202,7 @@ def iree_hal_cts_test_suite(
         flag_values = {},
         name = "",
         args = [],
+        resource_group = None,
         tags = [],
         testonly = True,
         **kwargs):
@@ -241,6 +242,8 @@ def iree_hal_cts_test_suite(
             targets are prefixed (stream_core_tests, graph_buffer_tests, etc.).
             Use a prefix for multi-variant drivers (e.g., CUDA graph/stream).
         args: Runtime arguments passed to all test binaries.
+        resource_group: Optional shared resource group for generated tests.
+            Tests sharing the same resource group will not run concurrently.
         tags: Additional tags for test targets.
         testonly: Defaults to True.
         **kwargs: Forwarded to underlying rules (e.g., target_compatible_with).
@@ -296,6 +299,7 @@ def iree_hal_cts_test_suite(
             srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
             args = args,
             deps = common_deps + [test_lib],
+            resource_group = resource_group,
             tags = tags,
             **all_test_kwargs
         )
@@ -308,6 +312,7 @@ def iree_hal_cts_test_suite(
                 srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
                 args = args,
                 deps = common_deps + _testdata_libs + [test_lib],
+                resource_group = resource_group,
                 tags = tags,
                 **all_test_kwargs
             )

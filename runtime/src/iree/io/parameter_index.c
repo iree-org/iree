@@ -185,9 +185,13 @@ iree_io_parameter_index_add(iree_io_parameter_index_t* index,
         iree_io_file_handle_retain(cloned_entry->storage.file.handle);
         break;
     }
-    memcpy((void*)cloned_entry->key.data, entry->key.data, entry->key.size);
-    memcpy((void*)cloned_entry->metadata.data, entry->metadata.data,
-           entry->metadata.data_length);
+    if (entry->key.size > 0) {
+      memcpy((void*)cloned_entry->key.data, entry->key.data, entry->key.size);
+    }
+    if (entry->metadata.data_length > 0) {
+      memcpy((void*)cloned_entry->metadata.data, entry->metadata.data,
+             entry->metadata.data_length);
+    }
 
     // Append the entry to the file index.
     index->entries[index->entry_count++] = cloned_entry;

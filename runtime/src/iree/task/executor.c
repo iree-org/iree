@@ -14,11 +14,6 @@
 #include "iree/base/internal/math.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor_impl.h"
-#include "iree/task/list.h"
-#include "iree/task/pool.h"
-#include "iree/task/post_batch.h"
-#include "iree/task/queue.h"
-#include "iree/task/task_impl.h"
 #include "iree/task/tuning.h"
 #include "iree/task/worker.h"
 
@@ -55,16 +50,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "requested %" PRIhsz
-                            " workers but a maximum of %d is allowed",
+                            " workers but must be in [1, %d)",
                             worker_count, IREE_TASK_EXECUTOR_MAX_WORKER_COUNT);
-  }
-
-  // TODO(benvanik): support a threadless mode where we have one dummy worker
-  // that just holds the lists but is pumped from donate_caller.
-  if (worker_count == 0) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "threadless donate-only executor mode not yet implemented");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -100,8 +87,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   executor->node_id = topology->node_id;
   executor->scheduling_mode = options.scheduling_mode;
   executor->worker_spin_ns = options.worker_spin_ns;
-  iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
-  iree_slim_mutex_initialize(&executor->coordinator_mutex);
+  iree_task_process_slist_initialize(&executor->immediate_list);
+  iree_task_process_slist_initialize(&executor->compute_overflow);
 
   IREE_TRACE({
     static iree_atomic_int32_t executor_id = IREE_ATOMIC_VAR_INIT(0);
@@ -128,21 +115,8 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   iree_prng_splitmix64_state_t seed_prng;
   iree_prng_splitmix64_initialize(/*seed=*/(uint64_t)(out_executor),
                                   &seed_prng);
-  iree_prng_minilcg128_initialize(iree_prng_splitmix64_next(&seed_prng),
-                                  &executor->donation_theft_prng);
 
   iree_status_t status = iree_ok_status();
-
-  // Pool used for all fanout tasks. These only live within the executor and
-  // since we know the precise lifetime of them we can keep them entirely within
-  // the system here.
-  if (iree_status_is_ok(status)) {
-    status = iree_task_pool_initialize(
-        allocator,
-        iree_max(sizeof(iree_task_fence_t), sizeof(iree_task_dispatch_shard_t)),
-        worker_count * IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
-        &executor->transient_task_pool);
-  }
 
   // Bring up the workers; the threads will be created here but be suspended
   // (if the platform supports it) awaiting the first tasks getting scheduled.
@@ -156,6 +130,18 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
     iree_task_affinity_set_t worker_mask =
         iree_task_affinity_set_ones(worker_count);
+    // Initialize the shared worker liveness/idle state before launching any
+    // threads. Workers mark themselves active on entry by decrementing these
+    // counters from the full-population snapshot; the invariant is that the
+    // counters must carry (worker_count, worker_mask) before any worker
+    // thread can run, otherwise the first decrement can land against a zero
+    // counter and desync active/idle accounting permanently.
+    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
+                                        worker_mask, iree_memory_order_release);
+    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
+                                        worker_mask, iree_memory_order_release);
+    iree_atomic_store(&executor->worker_idle_count, (int32_t)worker_count,
+                      iree_memory_order_release);
 
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
       const iree_task_topology_group_t* group =
@@ -170,11 +156,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-
-    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
-                                        worker_mask, iree_memory_order_release);
-    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_mask, iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -217,9 +198,8 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_deinitialize(worker);
   }
 
-  iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
-  iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
-  iree_task_pool_deinitialize(&executor->transient_task_pool);
+  iree_task_process_slist_deinitialize(&executor->immediate_list);
+  iree_task_process_slist_deinitialize(&executor->compute_overflow);
   iree_allocator_free_aligned(executor->allocator, executor);
 
   IREE_TRACE_ZONE_END(z0);
@@ -243,12 +223,7 @@ iree_task_topology_node_id_t iree_task_executor_node_id(
 }
 
 void iree_task_executor_trim(iree_task_executor_t* executor) {
-  // TODO(benvanik): figure out a good way to do this; the pools require that
-  // no tasks are in-flight to trim but our caller can't reliably make that
-  // guarantee. We'd need some global executor lock that we did here and
-  // on submit - or rework pools to not have this limitation.
-  // iree_task_pool_trim(&executor->fence_task_pool);
-  // iree_task_pool_trim(&executor->transient_task_pool);
+  // Placeholder for future cache/memory trimming.
 }
 
 iree_host_size_t iree_task_executor_worker_count(
@@ -256,349 +231,205 @@ iree_host_size_t iree_task_executor_worker_count(
   return executor->worker_count;
 }
 
-iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
-                                               iree_task_scope_t* scope,
-                                               iree_task_fence_t** out_fence) {
-  *out_fence = NULL;
+void iree_task_executor_wake_workers(iree_task_executor_t* executor,
+                                     int32_t count) {
+  if (count <= 0) return;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z_wake, "iree_task_executor_wake_workers");
 
-  iree_task_fence_t* fence = NULL;
-  IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
-                                              (iree_task_t**)&fence));
-  iree_task_fence_initialize(scope, fence);
-  fence->header.pool = &executor->transient_task_pool;
+  int32_t remaining_count = count;
 
-  *out_fence = fence;
-  return iree_ok_status();
-}
+  // Wake currently-idle workers directly. Compute work is usually a short burst
+  // of narrow regions; trickling the first wave through the relay tree lets
+  // regions finish before enough workers arrive.
+  iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_idle_mask, iree_memory_order_relaxed);
+  while (remaining_count > 0) {
+    int idle_target = iree_task_affinity_set_find_first(idle_mask);
+    if (idle_target < 0 || idle_target >= (int)executor->worker_count) break;
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_post, "iree_task_executor_wake_idle_worker");
+    iree_notification_post(&executor->workers[idle_target].wake_notification,
+                           1);
+    IREE_TRACE_ZONE_END(z_post);
+    iree_task_affinity_set_clear_index(&idle_mask,
+                                       (iree_host_size_t)idle_target);
+    --remaining_count;
+  }
 
-// Schedules a generic task to a worker matching its affinity.
-// The task will be posted to the worker mailbox and available for the worker to
-// begin processing as soon as the |post_batch| is submitted.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-static void iree_task_executor_relay_to_worker(
-    iree_task_executor_t* executor, iree_task_post_batch_t* post_batch,
-    iree_task_t* task) {
-  iree_host_size_t worker_index =
-      iree_task_post_batch_select_worker(post_batch, task->affinity_set);
-  iree_task_post_batch_enqueue(post_batch, worker_index, task);
-}
-
-// Schedules all ready tasks in the |pending_submission| list.
-// Task may enqueue zero or more new tasks (or newly-ready/waiting tasks) to
-// |pending_submission| or queue work for posting to workers via the
-// |post_batch|.
-//
-// NOTE: the pending submission list we walk here is in FIFO order and the
-// post batch we are building is in LIFO; this means that as we pop off the
-// least recently added tasks from the submission (nice in-order traversal) we
-// are pushing them as what will become the least recent tasks in the batch.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-//
-// INVARIANT: CALL tasks must be routed to workers via the post batch, never
-// executed inline during coordination. CALL tasks include HAL queue retire
-// callbacks that signal semaphores, so executing them inline would create
-// unbounded recursion on the signal path (signal → dispatch → callback →
-// submit+flush → coordinate → inline CALL → signal → ...). Routing to
-// workers bounds the coordination work and keeps the signal path responsive.
-void iree_task_executor_schedule_ready_tasks(
-    iree_task_executor_t* executor, iree_task_submission_t* pending_submission,
-    iree_task_post_batch_t* post_batch) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_task_t* task = NULL;
-  while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
-    // If the scope has been marked as failing then we abort the task.
-    // This needs to happen as a poll here because one or more of the tasks we
-    // are joining may have failed.
-    if (IREE_UNLIKELY(!task->scope ||
-                      iree_task_scope_has_failed(task->scope))) {
-      iree_task_list_t discard_worklist;
-      iree_task_list_initialize(&discard_worklist);
-      iree_task_discard(task, &discard_worklist);
-      iree_task_list_discard(&discard_worklist);
-      continue;
-    }
-
-    switch (task->type) {
-      case IREE_TASK_TYPE_NOP:
-        // Doesn't do anything; just retire and continue on to any dependents.
-        iree_task_nop_retire((iree_task_nop_t*)task, pending_submission);
-        break;
-      case IREE_TASK_TYPE_CALL: {
-        // Generic routing to workers for tasks that should always run there.
-        iree_task_executor_relay_to_worker(executor, post_batch, task);
-        break;
-      }
-      case IREE_TASK_TYPE_BARRIER: {
-        // Retire the barrier to (possibly) ready up all dependent tasks.
-        // This acts as a fan-out in cases where the dependent task count >1.
-        iree_task_barrier_retire((iree_task_barrier_t*)task,
-                                 pending_submission);
-        break;
-      }
-      case IREE_TASK_TYPE_FENCE: {
-        // Scope fence hit; notifies the scope so that anyone waiting on the
-        // fence can be notified without us having to do so explicitly.
-        iree_task_fence_retire((iree_task_fence_t*)task, pending_submission);
-        break;
-      }
-      case IREE_TASK_TYPE_DISPATCH: {
-        // Dispatches may need to be issued (fanning out the tiles to workers)
-        // or retired (after all tiles have completed).
-        if (task->flags & IREE_TASK_FLAG_DISPATCH_RETIRE) {
-          iree_task_dispatch_retire((iree_task_dispatch_t*)task,
-                                    pending_submission);
-        } else {
-          iree_task_dispatch_issue((iree_task_dispatch_t*)task,
-                                   &executor->transient_task_pool,
-                                   pending_submission, post_batch);
-        }
-        break;
+  // Active workers are already looping and can pick up the remaining demand via
+  // relay_wake. If nobody was idle, post to one live worker so it interrupts a
+  // pending wait and observes desired_wake.
+  if (remaining_count > 0) {
+    iree_atomic_fetch_add(&executor->desired_wake, remaining_count,
+                          iree_memory_order_release);
+    if (remaining_count == count) {
+      // No idle workers found. Post to any live worker so it loops back and
+      // picks up desired_wake on its next iteration.
+      iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
+          &executor->worker_live_mask, iree_memory_order_relaxed);
+      int live_target = iree_task_affinity_set_find_first(live_mask);
+      if (live_target >= 0 && live_target < (int)executor->worker_count) {
+        IREE_TRACE_ZONE_BEGIN_NAMED(z_post,
+                                    "iree_task_executor_wake_live_worker");
+        iree_notification_post(
+            &executor->workers[live_target].wake_notification, 1);
+        IREE_TRACE_ZONE_END(z_post);
       }
     }
   }
-  IREE_TRACE_ZONE_END(z0);
+
+  IREE_TRACE_ZONE_END(z_wake);
 }
 
-void iree_task_executor_merge_submission(iree_task_executor_t* executor,
-                                         iree_task_submission_t* submission) {
-  // Concatenate all of the incoming tasks into the submission list.
-  // Note that the submission stores tasks in LIFO order such that when they are
-  // put into the LIFO atomic slist they match the order across all concats
-  // (earlier concats are later in the LIFO list).
-  iree_atomic_task_slist_concat(&executor->incoming_ready_slist,
-                                submission->ready_list.head,
-                                submission->ready_list.tail);
-
-  // NOTE: after concatenating the intrusive next_task pointers may immediately
-  // be modified by other threads. We can no longer assume anything about the
-  // submission lists and can only discard them.
-  iree_task_submission_reset(submission);
-}
-
-void iree_task_executor_submit(iree_task_executor_t* executor,
-                               iree_task_submission_t* submission) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Concatenate the submitted tasks onto our primary LIFO incoming lists.
-  iree_task_executor_merge_submission(executor, submission);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-void iree_task_executor_flush(iree_task_executor_t* executor) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Mostly a no-op today as we aren't deferring submission with the scheduling
-  // mode. Instead, we'll just run the coordinator inline to ensure all tasks
-  // are pushed to workers. This will not wait - but may block.
-  iree_task_executor_coordinate(executor, /*current_worker=*/NULL);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Dispatches tasks in the global submission queue to workers.
-// This is called by users upon submission of new tasks or by workers when they
-// run out of tasks to process. If |current_worker| is provided then tasks will
-// prefer to be routed back to it for immediate processing.
-//
-// If a coordination run ends up with no ready tasks and |current_worker| is
-// provided the calling thread will enter a wait until the worker has more tasks
-// posted to it.
-void iree_task_executor_coordinate(iree_task_executor_t* executor,
-                                   iree_task_worker_t* current_worker) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // We may be adding tasks on each pass through coordination — to ensure we
-  // completely drain the incoming queues we loop until there's nothing left to
-  // coordinate.
-  bool schedule_dirty = true;
-  do {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_task_executor_coordinate_try");
-    // TODO(#10212): remove this lock or do something more clever to avoid
-    // contention when many workers try to coordinate at the same time. This can
-    // create very long serialized lock chains that slow down worker wakes.
-    iree_slim_mutex_lock(&executor->coordinator_mutex);
-
-    // Check for incoming submissions and move their posted tasks into our
-    // local lists. All tasks here are ready to execute immediately and should
-    // be distributed to workers without delay.
-    //
-    // Note that we only do this once per coordination; that's so we don't
-    // starve if submissions come in faster than we can schedule them.
-    // Coordination will run again when workers become idle and will pick up
-    // any changes then.
-    //
-    // As we schedule tasks we may spawn new ones (like a dispatch -> many
-    // dispatch shards) and we keep track of those here. By doing a pass through
-    // all ready tasks and only then merging in the new submission we get
-    // breadth-first traversal of task graphs even if they originate from
-    // various places and have no relation - hopefully leading to better average
-    // latency.
-    iree_task_submission_t pending_submission;
-    iree_task_submission_initialize_from_lifo_slist(
-        &executor->incoming_ready_slist, &pending_submission);
-    if (iree_task_list_is_empty(&pending_submission.ready_list)) {
-      iree_slim_mutex_unlock(&executor->coordinator_mutex);
-      IREE_TRACE_ZONE_END(z1);
-      break;
+// Tries to place a process into the first available compute slot. Returns true
+// if placed, false if all slots are occupied.
+bool iree_task_executor_try_place_in_compute_slot(
+    iree_task_executor_t* executor, iree_task_process_t* process) {
+  for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
+    iree_task_compute_slot_t* slot = &executor->compute_slots[i];
+    intptr_t expected = 0;
+    if (iree_atomic_compare_exchange_strong(
+            &slot->process, &expected, IREE_TASK_COMPUTE_SLOT_RESERVED,
+            iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
+      iree_atomic_store(&slot->wake_budget,
+                        iree_task_process_wake_budget(process),
+                        iree_memory_order_release);
+      iree_atomic_store(&process->admission_budget_ptr,
+                        (intptr_t)&slot->wake_budget,
+                        iree_memory_order_release);
+      int32_t placement_epoch =
+          iree_task_process_advance_placement_epoch(process);
+      iree_atomic_store(&slot->placement_epoch, placement_epoch,
+                        iree_memory_order_release);
+      iree_atomic_store(&slot->process, (intptr_t)process,
+                        iree_memory_order_release);
+      return true;
     }
-
-    // Scratch coordinator submission batch used during scheduling to batch up
-    // all tasks that will be posted to each worker. We could stash this on the
-    // executor but given that which thread is playing the role of the
-    // coordinator is random it's better to ensure that these bytes never incur
-    // a cache miss by making them live here in the stack of the chosen thread.
-    iree_task_post_batch_t* post_batch =
-        iree_alloca(sizeof(iree_task_post_batch_t) +
-                    executor->worker_count * sizeof(iree_task_list_t));
-    iree_task_post_batch_initialize(executor, current_worker, post_batch);
-
-    // Schedule all ready tasks in this batch. Some may complete inline (such
-    // as ready barriers with all their dependencies resolved) while others may
-    // be scheduled on workers via the post batch.
-    iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
-                                            post_batch);
-
-    iree_slim_mutex_unlock(&executor->coordinator_mutex);
-    IREE_TRACE_ZONE_END(z1);
-
-    // Post all new work to workers; they may wake and begin executing
-    // immediately. Returns whether this worker has new tasks for it to work on.
-    schedule_dirty = iree_task_post_batch_submit(post_batch);
-  } while (schedule_dirty);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-static iree_task_t* iree_task_executor_try_steal_task_from_affinity_set(
-    iree_task_executor_t* executor, iree_task_affinity_set_t victim_mask,
-    uint32_t max_theft_attempts, int rotation_offset,
-    iree_task_queue_t* local_task_queue) {
-  if (!victim_mask) return NULL;
-  max_theft_attempts = iree_min(max_theft_attempts,
-                                iree_task_affinity_set_count_ones(victim_mask));
-  victim_mask = iree_task_affinity_set_rotr(victim_mask, rotation_offset);
-
-  int worker_index = rotation_offset;
-  iree_task_affinity_set_t mask =
-      iree_task_affinity_set_rotr(victim_mask, worker_index);
-  for (uint32_t i = 0; i < max_theft_attempts; ++i) {
-    // Find the last set bit and skip to it. This avoids the need for doing
-    // a full O(n) scan and instead gets us at O(popcnt) * O(ctz).
-    //
-    // Example: sharing mask = 0b01010101
-    //          mask_rotation = 3 (randomly selected)
-    //          mask = 0b01010101 rotr 3 = 0b10101010
-    //          for (i = 0; i < 4; ++i)
-    //            offset = ctz(0b10101010) = 1
-    //            mask_rotation += 1 = 4
-    //            mask >>= 1 = 0b01010101
-    //            victim_index = 4 % 64 = 4
-    int offset = iree_task_affinity_set_count_trailing_zeros(mask);
-    int victim_index = (worker_index + offset) % executor->worker_count;
-    worker_index += offset + 1;
-    mask = iree_shr(mask, offset + 1);
-    iree_task_worker_t* victim_worker = &executor->workers[victim_index];
-    if (iree_atomic_load(&victim_worker->state, iree_memory_order_acquire) !=
-        IREE_TASK_WORKER_STATE_RUNNING) {
-      return NULL;
-    }
-
-    // Policy: steal a chunk of tasks at the tail of the victim queue.
-    // This will steal multiple tasks from the victim up to the specified max
-    // and move the them into our local task queue. Not all tasks will be stolen
-    // and the assumption is that over a large-enough random distribution of
-    // thievery taking ~half of the tasks each time (across all queues) will
-    // lead to a relatively even distribution.
-    iree_task_t* task = iree_task_worker_try_steal_task(
-        victim_worker, local_task_queue,
-        /*max_tasks=*/IREE_TASK_EXECUTOR_MAX_THEFT_TASK_COUNT);
-    if (task) return task;
   }
-
-  // No tasks found in victim_mask.
-  return NULL;
+  return false;
 }
 
-// Tries to steal an entire task from a sibling worker (based on topology).
-// Returns a task that is available (has not yet begun processing at all).
-// May steal multiple tasks and add them to the |local_task_queue|.
-//
-// We do a scan through ideal victims indicated by the
-// |constructive_sharing_mask|; these are the workers most likely to have some
-// cache benefits to taking their work as they share some level of the cache
-// hierarchy and should be better to steal from than any random worker.
-//
-// To prevent biasing any particular victim we use a fast prng function to
-// select where in the set of potential victims defined by the topology
-// group we steal. We (probably) don't need anything super complex here so
-// instead of bouncing around at random we just select the starting point in
-// our search and then go in-order.
-iree_task_t* iree_task_executor_try_steal_task(
-    iree_task_executor_t* executor,
-    iree_task_affinity_set_t constructive_sharing_mask,
-    uint32_t max_theft_attempts, iree_prng_minilcg128_state_t* theft_prng,
-    iree_task_queue_t* local_task_queue) {
+// Places a process into a compute slot, or pushes it to the overflow list if
+// all slots are occupied. Overflow processes are promoted into slots as slots
+// are released by workers (see release_compute_process in worker.c).
+static void iree_task_executor_place_in_compute_slot(
+    iree_task_executor_t* executor, iree_task_process_t* process) {
+  if (IREE_LIKELY(
+          iree_task_executor_try_place_in_compute_slot(executor, process))) {
+    return;
+  }
+  // All slots occupied. Push to overflow list — a releasing worker will
+  // promote this process into a slot when one becomes available.
+  iree_task_process_slist_push(&executor->compute_overflow, process);
+}
+
+void iree_task_executor_schedule_process(iree_task_executor_t* executor,
+                                         iree_task_process_t* process) {
+  if (IREE_UNLIKELY(iree_task_process_is_terminal(process))) {
+    // A scheduler can race process completion through external readiness
+    // callbacks. Terminal processes keep schedule_state non-idle, so a stale
+    // wake has no work to preserve.
+    return;
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // The masks are accessed with 'relaxed' order because they are just hints.
-  iree_task_affinity_set_t worker_live_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
-                                         iree_memory_order_relaxed);
-  iree_task_affinity_set_t worker_idle_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
-                                         iree_memory_order_relaxed);
-  // Limit the workers we will steal from to the ones that are currently live
-  // and not idle.
-  iree_task_affinity_set_t victim_mask = worker_live_mask & ~worker_idle_mask;
+  int32_t budget = iree_task_process_wake_budget(process);
 
-  // TODO(benvanik): it may be possible to rework this such that we better
-  // use the prng; for example, instead of all this rotating stuff we could just
-  // generate an 8-bit number (or even split it into two 4-bit numbers) per
-  // theft attempt. The current rotation strategy is biased toward the same try
-  // ordering vs. what we may really want with an unbiased random selection.
-  int rotation_offset = iree_prng_minilcg128_next_uint8(theft_prng) &
-                        (8 * sizeof(iree_task_affinity_set_t) - 1);
+  // Signal that new work is available. The draining worker checks this
+  // before transitioning to idle, closing the sleep/wake race.
+  //
+  // This is one half of a Dekker-style sleep/wake protocol with
+  // iree_task_worker_drain_process and
+  // iree_task_worker_release_compute_process:
+  //   Scheduler: store_seq_cst(needs_drain=1)
+  //              then CAS_seq_cst(schedule_state)
+  //   Worker:    store_seq_cst(schedule_state=IDLE)
+  //              then load_seq_cst(needs_drain)
+  // Both threads store one location and read the other. Release/acquire on
+  // different locations is not enough to prevent the forbidden "each side
+  // misses the other's store" outcome; the scheduler's CAS read of
+  // schedule_state and the worker's final needs_drain load must participate in
+  // the same seq-cst order as the stores.
+  iree_atomic_store(&process->needs_drain, 1, iree_memory_order_seq_cst);
+  // Wake any workers retained near this process without active drainer claims.
+  // The epoch is separate from needs_drain: a warm worker only needs to know
+  // that process-local state changed and that it should rejoin scheduling.
+  iree_task_process_advance_retention_epoch(process);
 
-  // Try first with the workers we may have some caches shared with. This
-  // helps to prevent cache invalidations/availability updates as it's likely
-  // that we won't need to go back to main memory (or higher cache tiers) in the
-  // event that the thief and victim are running close to each other in time.
-  iree_task_t* task = iree_task_executor_try_steal_task_from_affinity_set(
-      executor, victim_mask & constructive_sharing_mask, max_theft_attempts,
-      rotation_offset, local_task_queue);
-  if (task) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "local");
+  const bool use_compute_slots =
+      budget > 1 || iree_task_process_uses_compute_slots(process);
+  if (!use_compute_slots) {
+    // Sequential process: immediate list with Dekker sleeping protocol.
+    // Try to enqueue if idle. If already QUEUED or DRAINING, the worker
+    // will see our needs_drain signal before going idle.
+    int32_t expected = IREE_TASK_PROCESS_SCHEDULE_IDLE;
+    if (iree_atomic_compare_exchange_strong(
+            &process->schedule_state, &expected,
+            (int32_t)IREE_TASK_PROCESS_SCHEDULE_QUEUED,
+            iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+      iree_task_process_slist_push(&executor->immediate_list, process);
+      iree_task_executor_wake_workers(executor, 1);
+    }
   } else {
-    task = iree_task_executor_try_steal_task_from_affinity_set(
-        executor, victim_mask & ~constructive_sharing_mask, max_theft_attempts,
-        rotation_offset, local_task_queue);
-    if (task) {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "non-local");
+    // Compute process: place in a compute slot on first activation.
+    // Workers scan these slots round-robin and drain cooperatively.
+    int32_t expected = IREE_TASK_PROCESS_SCHEDULE_IDLE;
+    if (iree_atomic_compare_exchange_strong(
+            &process->schedule_state, &expected,
+            (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
+            iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+      iree_task_executor_place_in_compute_slot(executor, process);
     }
+    // Wake workers up to the budget (whether first activation or re-wake).
+    iree_task_executor_wake_workers(executor, budget);
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return task;
 }
 
-iree_status_t iree_task_executor_donate_caller(iree_task_executor_t* executor,
-                                               iree_wait_source_t wait_source,
-                                               iree_timeout_t timeout) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+void iree_task_executor_dump_wake_state(iree_task_executor_t* executor,
+                                        FILE* file) {
+  fprintf(file, "\n=== EXECUTOR WAKE STATE ===\n");
+  fprintf(file, "desired_wake: %d\n",
+          iree_atomic_load(&executor->desired_wake, iree_memory_order_relaxed));
+  iree_task_affinity_set_t idle_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_idle_mask, iree_memory_order_relaxed);
+  iree_task_affinity_set_t live_mask = iree_atomic_task_affinity_set_load(
+      &executor->worker_live_mask, iree_memory_order_relaxed);
+  fprintf(file, "idle_count: %d  idle_mask:",
+          iree_atomic_load(&executor->worker_idle_count,
+                           iree_memory_order_relaxed));
+  for (iree_host_size_t i = 0; i < IREE_TASK_AFFINITY_SET_WORD_COUNT; ++i) {
+    fprintf(file, " 0x%016llx", (unsigned long long)idle_mask.words[i]);
+  }
+  fprintf(file, "  live_mask:");
+  for (iree_host_size_t i = 0; i < IREE_TASK_AFFINITY_SET_WORD_COUNT; ++i) {
+    fprintf(file, " 0x%016llx", (unsigned long long)live_mask.words[i]);
+  }
+  fprintf(file, "\n");
 
-  // Perform an immediate flush/coordination (in case the caller queued).
-  iree_task_executor_flush(executor);
+  for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
+    iree_task_worker_t* worker = &executor->workers[i];
+    int32_t state = iree_atomic_load(&worker->state, iree_memory_order_relaxed);
+    bool is_idle = iree_task_affinity_set_test(idle_mask, worker->worker_bit);
+    fprintf(file, "  worker[%zu]: state=%d  idle=%d\n", i, state, (int)is_idle);
+  }
 
-  // Wait until completed.
-  // TODO(benvanik): make this steal tasks until wait_handle resolves?
-  // Somewhat dangerous as we don't know what kind of thread we are running on;
-  // it may have a smaller stack than we are expecting or have some weird thread
-  // local state (FPU rounding modes/etc).
-  iree_status_t status = iree_wait_source_wait_one(wait_source, timeout);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  fprintf(file, "compute_slots:\n");
+  for (iree_host_size_t i = 0; i < IREE_TASK_EXECUTOR_MAX_COMPUTE_SLOTS; ++i) {
+    intptr_t process = iree_atomic_load(&executor->compute_slots[i].process,
+                                        iree_memory_order_relaxed);
+    if (!process || process == IREE_TASK_COMPUTE_SLOT_RESERVED) continue;
+    int64_t active_drainers = iree_atomic_load(
+        &executor->compute_slots[i].active_drainers, iree_memory_order_relaxed);
+    int32_t completion_claimed =
+        iree_atomic_load(&executor->compute_slots[i].completion_claimed,
+                         iree_memory_order_relaxed);
+    fprintf(file,
+            "  slot[%zu]: process=%p  active_drainers=gen:%d|count:%d  "
+            "completion_claimed=%d\n",
+            i, (void*)process, (int32_t)(active_drainers >> 32),
+            (int32_t)active_drainers, completion_claimed);
+  }
+  fprintf(file, "=== END EXECUTOR WAKE STATE ===\n\n");
+  fflush(file);
 }

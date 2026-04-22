@@ -25,6 +25,18 @@ typedef struct iree_hal_task_device_params_t {
   iree_host_size_t arena_block_size;
   // Default flags for the iree_task_scope_t used for each queue.
   iree_task_scope_flags_t queue_scope_flags;
+  // Length (in bytes) at which queue-level fill/copy operations route through
+  // the block processor framework instead of executing as a direct memcpy in
+  // the queue drain thread. Transfers strictly smaller than this threshold are
+  // handled inline because the block processor setup cost (cmd builder,
+  // processor context, fixup resolution) dominates the memcpy itself for small
+  // work. Queue-level updates are always direct regardless of this threshold:
+  // ordered execution already requires capturing the host source data, and a
+  // single map/write in the drain thread avoids another command processor
+  // layer. Set to 0 to force the framework path for all fill/copy transfers
+  // (useful for testing the recording machinery); set to IREE_DEVICE_SIZE_MAX
+  // to force direct memcpy always.
+  iree_device_size_t inline_transfer_threshold;
 } iree_hal_task_device_params_t;
 
 // Initializes |out_params| to default values.

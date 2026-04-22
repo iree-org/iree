@@ -73,6 +73,21 @@ iree_hal_hip_graph_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
   return (iree_hal_hip_graph_command_buffer_t*)base_value;
 }
 
+static iree_status_t
+iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+    iree_hal_buffer_t* buffer, hipDeviceptr_t* out_device_pointer) {
+  iree_status_t status = iree_hal_hip_buffer_query_available_device_pointer(
+      iree_hal_buffer_allocated_buffer(buffer), out_device_pointer);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    return iree_status_annotate(
+        status, iree_make_cstring_view(
+                    "HIP graph command buffers capture device pointers during "
+                    "recording and cannot use uncommitted async transient "
+                    "buffers"));
+  }
+  return status;
+}
+
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 static void iree_hip_graph_command_buffer_trace_zone_begin_external(
@@ -538,8 +553,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &target_ref.buffer));
 
-  hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+  hipDeviceptr_t target_device_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+              target_ref.buffer, &target_device_buffer));
   iree_device_size_t target_offset =
       iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
   uint32_t pattern_4byte = iree_hal_hip_splat_pattern(pattern, pattern_length);
@@ -608,8 +625,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &target_ref.buffer));
 
-  hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+  hipDeviceptr_t target_device_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+              target_ref.buffer, &target_device_buffer));
 
   HIP_MEMCPY3D params = {
       .srcMemoryType = hipMemoryTypeHost,
@@ -667,12 +686,16 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
       z0,
       iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
 
-  hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(target_ref.buffer));
+  hipDeviceptr_t target_device_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+              target_ref.buffer, &target_device_buffer));
   iree_device_size_t target_offset =
       iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
-  hipDeviceptr_t source_device_buffer = iree_hal_hip_buffer_device_pointer(
-      iree_hal_buffer_allocated_buffer(source_ref.buffer));
+  hipDeviceptr_t source_device_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+              source_ref.buffer, &source_device_buffer));
   iree_device_size_t source_offset =
       iree_hal_buffer_byte_offset(source_ref.buffer) + source_ref.offset;
 
@@ -804,8 +827,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                            &binding->buffer));
-      hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
-          iree_hal_buffer_allocated_buffer(binding->buffer));
+      hipDeviceptr_t device_buffer = NULL;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_hip_graph_command_buffer_query_allocated_buffer_pointer(
+                  binding->buffer, &device_buffer));
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
       device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
     }

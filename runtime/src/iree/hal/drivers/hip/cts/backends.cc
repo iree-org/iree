@@ -6,16 +6,15 @@
 
 // CTS backend registration for the HIP HAL driver.
 
-#include "iree/async/util/proactor_pool.h"
-#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/hip/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
-static iree_status_t CreateHipDevice(iree_hal_driver_t** out_driver,
-                                     iree_hal_device_t** out_device) {
+static iree_status_t CreateHipDevice(
+    const iree_hal_device_create_params_t* create_params,
+    iree_hal_driver_t** out_driver, iree_hal_device_t** out_device) {
   iree_status_t status =
       iree_hal_hip_driver_module_register(iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
@@ -30,24 +29,11 @@ static iree_status_t CreateHipDevice(iree_hal_driver_t** out_driver,
         iree_allocator_system(), &driver);
   }
 
-  iree_async_proactor_pool_t* proactor_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool);
-  }
-
   iree_hal_device_t* device = nullptr;
   if (iree_status_is_ok(status)) {
-    iree_hal_device_create_params_t create_params =
-        iree_hal_device_create_params_default();
-    create_params.proactor_pool = proactor_pool;
     status = iree_hal_driver_create_default_device(
-        driver, &create_params, iree_allocator_system(), &device);
+        driver, create_params, iree_allocator_system(), &device);
   }
-
-  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     *out_driver = driver;
@@ -69,9 +55,53 @@ static bool hip_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"QueueAllocaTest.AllocaWithWaitSemaphores",
+               "HIP queue_alloca waits synchronously for host-visible buffers"},
+              {"QueueAllocaTest.ExplicitPassthroughPoolAllocaDealloca",
+               "iree_hal_hip_device_queue_alloca rejects any non-NULL pool "
+               "argument with UNIMPLEMENTED; the existing path routes only "
+               "through iree_hal_hip_device_prepare_async_alloc against the "
+               "device's HIP memory pool. Caller-supplied pools require a "
+               "transient-buffer wrapper that bridges "
+               "pool_acquire_reservation/release_reservation through the "
+               "async-alloc path."},
+              {"QueueAllocaTest.ExplicitTLSFPoolTransferAllocaDealloca",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest."
+               "ExplicitFixedBlockPoolPendingDeallocaWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolRequiresWaitFrontierFlag",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueWaitFrontier",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
+              {"QueueAllocaTest.ExplicitTLSFPoolCrossQueueStaleBlockGrows",
+               "Blocked by the same iree_hal_hip_device_query_queue_pool_"
+               "backend UNIMPLEMENTED path as "
+               "ExplicitTLSFPoolCrossQueueWaitFrontier."},
+              {"QueueAllocaTest.ExplicitFixedBlockPoolNotificationRetry",
+               "Blocked by the same iree_hal_hip_device_queue_alloca "
+               "non-NULL pool rejection as "
+               "ExplicitPassthroughPoolAllocaDealloca."},
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},
+              {"QueueDispatchIndirectParametersTest.*",
+               "HIP queue_dispatch is implemented via one-shot command "
+               "buffer emulation, and HIP stream/graph command buffers "
+               "require host-provided launch dimensions rather than "
+               "device-resident indirect workgroup counts."},
               {"BufferMappingTest.*",
                "HIP graph command buffers lack memcpy node support"},
               {"CommandBufferCopyBufferTest.*",
@@ -94,6 +124,41 @@ static bool hip_registered_ =
               {"DispatchConstantsBindingsTest.*",
                "HIP CTS dispatch tests crash on GPU memory reservation "
                "failures"},
+              {"DispatchIndirectParametersTest.*",
+               "HIP stream/graph command buffers explicitly reject indirect "
+               "workgroup count parameters; supporting them requires a "
+               "device-side launch or packet-patching mechanism."},
+          },
+          /*expected_failures=*/
+          {
+              {"TransientBufferTest.FillTransientBufferSubrange",
+               "HIP stream command buffers can hang when a transient buffer "
+               "subspan is filled after stream-ordered queue_alloca; this "
+               "requires a HIP transient-buffer sequencing fix."},
+              {"QueueAllocaTest.AllocaDeallocaCycle",
+               "HIP async queue_dealloca does not yet reliably advance "
+               "stream-ordered dealloca dependencies for transient buffers."},
+              {"QueueAllocaTest.BufferMetadata",
+               "The metadata assertions are valid after queue-affinity "
+               "normalization, but the test still performs queue_dealloca "
+               "cleanup and hits the same HIP async dealloca gap as "
+               "AllocaDeallocaCycle."},
+              {"QueueAllocaTest.DeallocaReleasesMemory",
+               "HIP async queue_dealloca does not yet report the "
+               "failed-precondition post-use behavior required for "
+               "decommitted transient buffers."},
+              {"QueueAllocaTest.FailedDeallocaWaitDoesNotDealloca",
+               "HIP queue_dealloca does not yet propagate failed wait "
+               "dependencies before preserving the transient allocation."},
+              {"QueueAllocaTest.ChainedAllocaDealloca",
+               "HIP async queue_dealloca does not yet reliably advance "
+               "when chained directly behind queue_alloca."},
+              {"QueueAllocaTest.DefaultPoolRepeatedChainedAllocaDealloca",
+               "Blocked by the same HIP queue_alloca -> queue_dealloca "
+               "dependency issue as ChainedAllocaDealloca."},
+              {"QueueAllocaTest.DeallocaPrefersOriginPlacement",
+               "HIP queue_dealloca origin routing still depends on the same "
+               "async dealloca sequencing path as ChainedAllocaDealloca."},
           }},
          {"async_queue"},
      }),

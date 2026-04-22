@@ -27,6 +27,7 @@ iree_runtime_cc_library(
         "numa_impl.h",
         "numa_linux.c",
         "numa_win32.c",
+        "wait_address.c",
     ],
     hdrs = [
         "affinity.h",
@@ -37,6 +38,7 @@ iree_runtime_cc_library(
         "notification.h",
         "numa.h",
         "processor.h",
+        "wait_address.h",
     ],
     deps = [
         "//build_tools:pthreads",
@@ -133,6 +135,18 @@ iree_runtime_cc_test(
         ":thread",
         ":threading",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "wait_address_test",
+    srcs = ["wait_address_test.cc"],
+    deps = [
+        ":thread",
+        ":threading",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

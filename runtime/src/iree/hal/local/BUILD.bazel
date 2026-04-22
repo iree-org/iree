@@ -34,6 +34,7 @@ iree_runtime_cc_library(
     hdrs = ["executable_format.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/utils:elf_format",
     ],
 )
 
@@ -127,6 +128,41 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "inline_dispatch",
+    srcs = ["inline_dispatch.c"],
+    hdrs = ["inline_dispatch.h"],
+    deps = [
+        ":local",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "profile",
+    srcs = ["profile.c"],
+    hdrs = ["profile.h"],
+    deps = [
+        ":executable_loader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "profile_test",
+    srcs = ["profile_test.cc"],
+    deps = [
+        ":executable_loader",
+        ":profile",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "local",
     srcs = [
         "inline_command_buffer.c",
@@ -141,10 +177,23 @@ iree_runtime_cc_library(
     deps = [
         ":executable_environment",
         ":executable_library",
+        ":profile",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:fpu_state",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "transient_buffer",
+    srcs = ["transient_buffer.c"],
+    hdrs = ["transient_buffer.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
     ],
 )

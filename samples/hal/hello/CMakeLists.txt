@@ -16,6 +16,7 @@ iree_cc_binary(
   SRCS
     "hello.c"
   DEPS
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::threading

@@ -305,14 +305,34 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
   // If not already reached and spinning is enabled then we'll try that first.
   if (result == IREE_NOTIFICATION_RESULT_UNRESOLVED &&
       spin_ns != IREE_DURATION_ZERO) {
-    const iree_time_t spin_deadline_ns = iree_time_now() + spin_ns;
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_notification_commit_wait_spin");
-    do {
-      iree_processor_yield();
-      result = iree_notification_test_wait_condition(notification, wait_token);
-    } while (result == IREE_NOTIFICATION_RESULT_UNRESOLVED &&
-             iree_time_now() < spin_deadline_ns);
+    if (spin_ns == IREE_DURATION_INFINITE &&
+        deadline_ns == IREE_TIME_INFINITE_FUTURE) {
+      while (result == IREE_NOTIFICATION_RESULT_UNRESOLVED) {
+        iree_processor_yield();
+        result =
+            iree_notification_test_wait_condition(notification, wait_token);
+      }
+    } else {
+      const iree_time_t now_ns = iree_time_now();
+      iree_time_t spin_deadline_ns = now_ns + spin_ns;
+      if (spin_deadline_ns < now_ns) {
+        spin_deadline_ns = IREE_TIME_INFINITE_FUTURE;
+      }
+      spin_deadline_ns = iree_min(spin_deadline_ns, deadline_ns);
+      do {
+        iree_processor_yield();
+        result =
+            iree_notification_test_wait_condition(notification, wait_token);
+      } while (result == IREE_NOTIFICATION_RESULT_UNRESOLVED &&
+               iree_time_now() < spin_deadline_ns);
+    }
     IREE_TRACE_ZONE_END(z0);
+  }
+
+  if (spin_ns == IREE_DURATION_INFINITE &&
+      result == IREE_NOTIFICATION_RESULT_UNRESOLVED) {
+    result = IREE_NOTIFICATION_RESULT_REJECTED;
   }
 
   // If spinning failed let the kernel do what it does ... okish at.

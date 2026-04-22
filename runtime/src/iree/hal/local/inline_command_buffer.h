@@ -9,14 +9,16 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/local/profile.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Returns the size, in bytes, of an inline command buffer.
-// This can be used for arena/stack allocations along with
-// iree_hal_inline_command_buffer_initialize/iree_hal_inline_command_buffer_deinitialize.
+// Returns the size, in bytes, of inline command buffer storage. The returned
+// size includes internal alignment padding required by
+// iree_hal_inline_command_buffer_initialize and can be used for arena/stack
+// allocations.
 iree_host_size_t iree_hal_inline_command_buffer_size(
     iree_hal_command_buffer_mode_t mode, iree_host_size_t binding_capacity);
 
@@ -39,6 +41,14 @@ iree_status_t iree_hal_inline_command_buffer_initialize(
 // iree_hal_inline_command_buffer_initialize.
 void iree_hal_inline_command_buffer_deinitialize(
     iree_hal_command_buffer_t* command_buffer);
+
+// Attaches an optional local profiling recorder used while replaying deferred
+// command buffers into this inline command buffer.
+void iree_hal_inline_command_buffer_set_profile_recorder(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id);
 
 // Creates an inline synchronous one-shot single-threaded command "buffer".
 // This is designed for ultra-low latency situations where we know the command

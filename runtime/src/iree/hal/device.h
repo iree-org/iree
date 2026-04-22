@@ -20,6 +20,7 @@
 #include "iree/hal/executable_cache.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/file.h"
+#include "iree/hal/pool.h"
 #include "iree/hal/profile_options.h"
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
@@ -83,7 +84,8 @@ typedef struct iree_hal_device_info_t {
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
-typedef struct iree_hal_pool_t iree_hal_pool_t;
+typedef struct iree_async_notification_t iree_async_notification_t;
+typedef struct iree_hal_slab_provider_t iree_hal_slab_provider_t;
 
 // Parameters for device creation that apply across all HAL drivers.
 //
@@ -108,26 +110,6 @@ typedef struct iree_hal_device_create_params_t {
   // Callers must always provide a valid pool.
   iree_async_proactor_pool_t* proactor_pool;
 
-  // Frontier tracking for cross-device causal ordering.
-  //
-  // The tracker is shared across all devices in a session. Devices register
-  // their queue axes during creation and use the tracker for fast-path
-  // domination checks on submission (avoiding proactor-driven waits when all
-  // predecessors are already enqueued).
-  //
-  // The base_axis encodes the session_epoch, machine_index, and device_index
-  // for this device. The queue_index bits (31:24) are zero and will be filled
-  // in per-queue during device creation. Drivers derive per-queue axes by
-  // OR-ing the queue index into the base_axis.
-  //
-  // Both NULL tracker and zero base_axis disable frontier optimizations
-  // (submissions fall back to proactor-driven semaphore waits).
-  //
-  // Borrowed pointer — the tracker must outlive all devices created with it.
-  struct {
-    iree_async_frontier_tracker_t* tracker;
-    iree_async_axis_t base_axis;
-  } frontier;
 } iree_hal_device_create_params_t;
 
 // Returns default device creation parameters (all zeros).
@@ -176,6 +158,13 @@ enum iree_hal_alloca_flag_bits_t {
   // buffer deallocation will happen synchronously when the last remaining
   // reference to the buffer is released.
   IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME = 1ull << 0,
+
+  // Allows the queue to satisfy the allocation from recycled pool memory whose
+  // death frontier is not dominated by the requester's current queue frontier
+  // by inserting an internal dependency on that death frontier before the
+  // buffer's bytes are used. Without this flag, pools must return only
+  // immediately-usable reservations to queue_alloca.
+  IREE_HAL_ALLOCA_FLAG_ALLOW_POOL_WAIT_FRONTIER = 1ull << 1,
 };
 
 // Bitfield specifying flags controlling an async deallocation operation.
@@ -278,6 +267,24 @@ typedef struct iree_hal_host_call_t {
   void* user_data;
 } iree_hal_host_call_t;
 
+// Backend-native ingredients required to create queue-allocation pools for a
+// device memory domain.
+//
+// |slab_provider| and |notification| are borrowed from the device. Pool
+// constructors retain those objects, but the objects themselves and
+// |epoch_query| may still read backend-owned state. The device must therefore
+// outlive all pools created from this bundle.
+//
+// |notification| may be shared by multiple pools in the same physical-memory
+// domain and can wake callers whose own pool state did not change. Callers
+// should always retry reservations after wakeup instead of assuming precise
+// notification routing.
+typedef struct iree_hal_queue_pool_backend_t {
+  iree_hal_slab_provider_t* slab_provider;
+  iree_async_notification_t* notification;
+  iree_hal_pool_epoch_query_t epoch_query;
+} iree_hal_queue_pool_backend_t;
+
 // Returns a host call bound to the given function pointer and user data.
 static inline iree_hal_host_call_t iree_hal_make_host_call(
     iree_hal_host_call_fn_t fn, void* user_data) {
@@ -289,6 +296,13 @@ static inline iree_hal_host_call_t iree_hal_make_host_call(
 typedef uint64_t iree_hal_execute_flags_t;
 enum iree_hal_execute_flag_bits_t {
   IREE_HAL_EXECUTE_FLAG_NONE = 0,
+  // Allows the implementation to borrow binding table buffer lifetimes instead
+  // of retaining them until the submitted work completes. Callers using this
+  // flag must keep all buffers referenced by the binding table live and backed
+  // by stable storage until the submission's signal semaphores indicate
+  // completion. The binding table entries themselves are still captured during
+  // the queue_execute call and need not remain live after it returns.
+  IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME = 1ull << 0,
 };
 
 // Device capability flags bitfield.
@@ -374,8 +388,9 @@ typedef struct iree_hal_device_capabilities_t {
 // compatible devices), the topology pointer gives access to the full edge
 // matrix with cost metrics, latency classes, and handle type negotiation.
 //
-// Populated during device creation. The topology pointer is non-NULL only
-// when the device is part of a multi-device topology group.
+// Populated during device group creation via
+// iree_hal_device_assign_topology_info. Devices are not topology-complete until
+// they have been assigned to a group.
 typedef struct iree_hal_device_topology_info_t {
   // Scheduling word from the device's self-edge (edge[i][i].lo).
   iree_hal_topology_edge_scheduling_word_t self_edge;
@@ -388,12 +403,26 @@ typedef struct iree_hal_device_topology_info_t {
   // all devices in the group).
   const iree_hal_topology_t* topology;
 
-  // Boolean compatibility bitmaps for O(1) "can I interact?" checks.
-  // Bit i is set if this device can interact with device i in the topology.
+  // Bitmap of peer devices whose semaphores this device can wait on.
   iree_hal_topology_device_bitmap_t can_wait_from;
+
+  // Bitmap of peer devices that can observe semaphores signaled by this device.
   iree_hal_topology_device_bitmap_t can_signal_to;
+
+  // Bitmap of peer devices this device can import buffers from.
   iree_hal_topology_device_bitmap_t can_import_from;
+
+  // Bitmap of peer devices this device can directly access or P2P-copy with.
   iree_hal_topology_device_bitmap_t can_p2p_with;
+
+  // Frontier identity assigned to this device by its causal domain.
+  struct {
+    // Shared tracker used to publish/query queue progress for this device.
+    iree_async_frontier_tracker_t* tracker;
+
+    // QUEUE-domain base axis for this device with queue_index bits set to 0.
+    iree_async_axis_t base_axis;
+  } frontier;
 } iree_hal_device_topology_info_t;
 
 // Queries the full 128-bit edge between two devices using their topology info.
@@ -523,11 +552,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
     iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
     iree_hal_topology_edge_t* edge);
 
-// Assigns topology information to |device| after device group construction.
-// Called exactly once during device group creation. The |topology_info|
-// struct is copied into the device's internal storage. The topology pointer
-// within |topology_info| must remain valid for the lifetime of the device
-// (ensured by the device group retaining all its devices).
+// Assigns topology information to |device| during device group construction.
+// The |topology_info| struct is copied into the device's internal storage. The
+// topology pointer within |topology_info| must remain valid for the lifetime of
+// the device (ensured by the device group retaining all its devices).
+//
+// If |topology_info| is NULL, aborts a prior assignment on a device whose
+// containing device group was never returned to the caller. NULL is only valid
+// during construction failure unwinding and must not be used once a device
+// group has escaped or once any work may have been scheduled.
 IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info);
@@ -537,6 +570,19 @@ IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
                                               iree_hal_semaphore_t* semaphore);
 
+// Queries the slab provider, notification, and epoch-query callback to use when
+// constructing custom pools for |queue_affinity|.
+//
+// Implementations may collapse a multi-bit |queue_affinity| to one physical
+// memory domain using the same queue-selection policy they use for submission.
+// The returned pointers are borrowed from |device| and remain valid until the
+// device is destroyed.
+//
+// Requires that |device| has been assigned to a device group.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend);
+
 // Reserves and returns a device-local queue-ordered transient buffer.
 // The allocation will not be committed until the entire |wait_semaphore_list|
 // has been reached. Once the storage is available for use the
@@ -544,16 +590,14 @@ iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
 // undefined until signaled even if all waits have been resolved and callers
 // must always wait for the signal.
 //
+// |pool| is a borrowed allocation pool selector. NULL selects the device's
+// default pool. Any non-NULL pool must outlive all queue submissions,
+// reservations, and materialized buffers that use it.
+//
 // For optimal performance and minimal memory consumption the returned buffer
 // should be deallocated using iree_hal_device_queue_dealloca as soon as
 // possible. It's still safe to synchronously release the buffer but the
 // lifetime will then be controlled by all potential retainers.
-//
-// |pool| optionally selects the queue allocation pool used for storage. NULL
-// uses the device's default queue allocation behavior. Non-NULL pools are a
-// requested execution contract; drivers that cannot honor the pool fail before
-// enqueueing work. The pool is borrowed for the duration of the call and
-// implementations retain it if the queue request may outlive the call.
 //
 // Usage:
 //   iree_hal_device_queue_alloca(wait(0), signal(1), &buffer);
@@ -762,10 +806,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dispatch(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
-// A optional binding table must be provided if the command buffer has indirect
+// An optional binding table must be provided if the command buffer has indirect
 // bindings and may otherwise be `iree_hal_buffer_binding_table_empty()`. The
 // binding table contents will be captured during the call and need not persist
-// after the call returns.
+// after the call returns. By default, buffers referenced by the binding table
+// are retained until the submitted work completes. Callers that already
+// guarantee buffer lifetimes may pass
+// IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME to allow implementations
+// to skip that tracking on hot paths.
 //
 // The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
@@ -984,6 +1032,10 @@ typedef struct iree_hal_device_vtable_t {
       IREE_API_PTR* query_semaphore_compatibility)(
       iree_hal_device_t* device, iree_hal_semaphore_t* semaphore);
 
+  iree_status_t(IREE_API_PTR* query_queue_pool_backend)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_queue_pool_backend_t* out_backend);
+
   iree_status_t(IREE_API_PTR* queue_alloca)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -1071,6 +1123,7 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_device_profiling_options_t* options);
   iree_status_t(IREE_API_PTR* profiling_flush)(iree_hal_device_t* device);
   iree_status_t(IREE_API_PTR* profiling_end)(iree_hal_device_t* device);
+
   iree_status_t(IREE_API_PTR* external_capture_begin)(
       iree_hal_device_t* device,
       const iree_hal_device_external_capture_options_t* options);

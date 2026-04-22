@@ -193,6 +193,30 @@ hipDeviceptr_t iree_hal_hip_buffer_device_pointer(
   return buffer->device_ptr;
 }
 
+iree_status_t iree_hal_hip_buffer_query_available_device_pointer(
+    iree_hal_buffer_t* base_buffer, hipDeviceptr_t* out_device_pointer) {
+  IREE_ASSERT_ARGUMENT(base_buffer);
+  IREE_ASSERT_ARGUMENT(out_device_pointer);
+  *out_device_pointer = NULL;
+
+  iree_hal_hip_buffer_t* buffer = iree_hal_hip_buffer_cast(base_buffer);
+  iree_slim_mutex_lock(&buffer->device_ptr_lock);
+  const hipDeviceptr_t device_pointer = buffer->device_ptr;
+  const bool empty = buffer->empty;
+  iree_slim_mutex_unlock(&buffer->device_ptr_lock);
+
+  if (device_pointer) {
+    *out_device_pointer = device_pointer;
+    return iree_ok_status();
+  }
+  if (empty) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "HIP buffer allocation is empty");
+  }
+  return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                          "HIP buffer device pointer is not available yet");
+}
+
 void* iree_hal_hip_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
   const iree_hal_hip_buffer_t* buffer =
       iree_hal_hip_buffer_const_cast(base_buffer);

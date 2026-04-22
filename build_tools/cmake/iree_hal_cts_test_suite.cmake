@@ -156,11 +156,13 @@ endfunction()
 #   NAME: Optional prefix for test binary names (e.g., "graph", "stream").
 #   ARGS: Runtime arguments passed to all test binaries.
 #   LABELS: Test labels for filtering.
+#   RESOURCE_GROUP: Optional shared resource group. Tests sharing the same
+#     resource group do not run concurrently under CTest.
 function(iree_hal_cts_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "BACKENDS_LIB;NAME"
+    "BACKENDS_LIB;NAME;RESOURCE_GROUP"
     "TESTDATA_LIBS;ARGS;LABELS"
     ${ARGN}
   )
@@ -201,6 +203,11 @@ function(iree_hal_cts_test_suite)
     set(_LABELS_BLOCK LABELS ${_RULE_LABELS})
   endif()
 
+  set(_RESOURCE_GROUP_BLOCK "")
+  if(_RULE_RESOURCE_GROUP)
+    set(_RESOURCE_GROUP_BLOCK RESOURCE_GROUP "${_RULE_RESOURCE_GROUP}")
+  endif()
+
   # Non-executable test categories.
   foreach(_CATEGORY buffer command_buffer core file queue)
     iree_cc_test(
@@ -211,6 +218,7 @@ function(iree_hal_cts_test_suite)
         "iree::hal::cts::${_CATEGORY}::all_tests"
       ${_ARGS_BLOCK}
       ${_LABELS_BLOCK}
+      ${_RESOURCE_GROUP_BLOCK}
     )
   endforeach()
 
@@ -247,6 +255,7 @@ function(iree_hal_cts_test_suite)
           ${_TEST_LIB}
         ${_ARGS_BLOCK}
         ${_LABELS_BLOCK}
+        ${_RESOURCE_GROUP_BLOCK}
       )
     endforeach()
   endif()

@@ -26,6 +26,7 @@
 //       ],
 //   )
 
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/testing/gtest.h"
@@ -46,6 +47,12 @@ int main(int argc, char** argv) {
     setrlimit(RLIMIT_NOFILE, &rl);
   }
 #endif  // IREE_PLATFORM_APPLE
+
+  // Pass IREE flags through before instantiating registered backends so backend
+  // selection flags affect the generated gtest instances.
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
+                               IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
+                           &argc, &argv);
 
   // Instantiate all test suites for all registered backends BEFORE gtest init.
   // This must happen before InitGoogleTest() because gtest caches test

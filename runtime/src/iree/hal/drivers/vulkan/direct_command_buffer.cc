@@ -29,6 +29,8 @@ using namespace iree::hal::vulkan;
 // indirection.
 typedef struct iree_hal_vulkan_direct_command_buffer_t {
   iree_hal_command_buffer_t base;
+  // Retained device allocator used for command-buffer-private staging buffers.
+  iree_hal_allocator_t* device_allocator;
   VkDeviceHandle* logical_device;
   iree_hal_vulkan_tracing_context_t* tracing_context;
   iree_arena_block_pool_t* block_pool;
@@ -116,6 +118,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
         device_allocator, mode, command_categories, queue_affinity,
         binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
+    command_buffer->device_allocator = NULL;
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;
     command_buffer->block_pool = block_pool;
@@ -128,6 +131,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     new (&command_buffer->descriptor_set_group) DescriptorSetGroup();
 
     command_buffer->builtin_executables = builtin_executables;
+    command_buffer->resource_set = NULL;
     if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
       status = iree_hal_resource_set_allocate(block_pool,
                                               &command_buffer->resource_set);
@@ -135,8 +139,16 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
   }
 
   if (iree_status_is_ok(status)) {
+    iree_hal_allocator_retain(device_allocator);
+    command_buffer->device_allocator = device_allocator;
     *out_command_buffer = &command_buffer->base;
   } else {
+    if (command_buffer) {
+      command_buffer->descriptor_set_group.~DescriptorSetGroup();
+      command_buffer->descriptor_set_arena.~DescriptorSetArena();
+      iree_hal_resource_set_free(command_buffer->resource_set);
+      iree_allocator_free(logical_device->host_allocator(), command_buffer);
+    }
     command_pool->Free(handle);
   }
 
@@ -165,6 +177,9 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
   command_buffer->descriptor_set_arena.~DescriptorSetArena();
 
   iree_hal_resource_set_free(command_buffer->resource_set);
+  if (command_buffer->device_allocator) {
+    iree_hal_allocator_release(command_buffer->device_allocator);
+  }
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -593,6 +608,85 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_direct_command_buffer_insert_resources(
+    iree_hal_vulkan_direct_command_buffer_t* command_buffer,
+    iree_host_size_t count, const void* resources) {
+  if (iree_all_bits_set(command_buffer->base.mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    return iree_ok_status();
+  }
+  return iree_hal_resource_set_insert(command_buffer->resource_set, count,
+                                      resources);
+}
+
+static iree_status_t
+iree_hal_vulkan_direct_command_buffer_insert_internal_resources(
+    iree_hal_vulkan_direct_command_buffer_t* command_buffer,
+    iree_host_size_t count, const void* resources) {
+  if (!command_buffer->resource_set) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_allocate(
+        command_buffer->block_pool, &command_buffer->resource_set));
+  }
+  return iree_hal_resource_set_insert(command_buffer->resource_set, count,
+                                      resources);
+}
+
+static void iree_hal_vulkan_direct_command_buffer_record_copy_buffer(
+    iree_hal_vulkan_direct_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
+  VkBuffer source_device_buffer =
+      iree_hal_vulkan_buffer_handle(source_ref.buffer);
+  VkBuffer target_device_buffer =
+      iree_hal_vulkan_buffer_handle(target_ref.buffer);
+
+  VkBufferCopy region;
+  region.srcOffset =
+      iree_hal_buffer_byte_offset(source_ref.buffer) + source_ref.offset;
+  region.dstOffset =
+      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
+  region.size = target_ref.length;
+  command_buffer->syms->vkCmdCopyBuffer(command_buffer->handle,
+                                        source_device_buffer,
+                                        target_device_buffer, 1, &region);
+}
+
+static iree_status_t
+iree_hal_vulkan_direct_command_buffer_update_buffer_via_copy(
+    iree_hal_vulkan_direct_command_buffer_t* command_buffer,
+    const void* source_buffer, iree_host_size_t source_offset,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_buffer_params_t staging_params = {0};
+  staging_params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  staging_params.access = IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE;
+  staging_params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING;
+
+  iree_hal_buffer_t* staging_buffer = NULL;
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      command_buffer->device_allocator, staging_params, target_ref.length,
+      &staging_buffer);
+  const uint8_t* source_buffer_ptr =
+      static_cast<const uint8_t*>(source_buffer) + source_offset;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_write(staging_buffer, /*target_offset=*/0,
+                                       source_buffer_ptr, target_ref.length);
+  }
+  if (iree_status_is_ok(status)) {
+    const iree_hal_buffer_t* buffers[1] = {staging_buffer};
+    status = iree_hal_vulkan_direct_command_buffer_insert_internal_resources(
+        command_buffer, 1, buffers);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_ref_t source_ref = iree_hal_make_buffer_ref(
+        staging_buffer, /*offset=*/0, target_ref.length);
+    iree_hal_vulkan_direct_command_buffer_record_copy_buffer(
+        command_buffer, source_ref, target_ref);
+  }
+  iree_hal_buffer_release(staging_buffer);
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
@@ -605,8 +699,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
   IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
                                command_buffer->handle);
 
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &target_ref.buffer));
+  const iree_hal_buffer_t* target_buffers[1] = {target_ref.buffer};
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_direct_command_buffer_insert_resources(
+      command_buffer, 1, target_buffers));
 
   // Vulkan only allows updates of <= 65536 because you really, really, really
   // shouldn't do large updates like this (as it wastes command buffer space and
@@ -617,6 +712,19 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
       static_cast<const uint8_t*>(source_buffer) + source_offset;
   iree_device_size_t target_offset =
       iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
+  if (!iree_host_size_has_alignment(
+          (iree_host_size_t)(uintptr_t)source_buffer_ptr,
+          /*alignment=*/4) ||
+      !iree_device_size_has_alignment(target_offset, /*alignment=*/4) ||
+      !iree_device_size_has_alignment(target_ref.length, /*alignment=*/4)) {
+    iree_status_t status =
+        iree_hal_vulkan_direct_command_buffer_update_buffer_via_copy(
+            command_buffer, source_buffer, source_offset, target_ref);
+    IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                               command_buffer->handle);
+    return status;
+  }
+
   iree_device_size_t length = target_ref.length;
   while (length > 0) {
     iree_device_size_t chunk_length =
@@ -641,27 +749,16 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
     iree_hal_copy_flags_t flags) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer source_device_buffer =
-      iree_hal_vulkan_buffer_handle(source_ref.buffer);
-  VkBuffer target_device_buffer =
-      iree_hal_vulkan_buffer_handle(target_ref.buffer);
 
   IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
                                command_buffer->handle);
 
   const iree_hal_buffer_t* buffers[2] = {source_ref.buffer, target_ref.buffer};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_direct_command_buffer_insert_resources(
+      command_buffer, 2, buffers));
 
-  VkBufferCopy region;
-  region.srcOffset =
-      iree_hal_buffer_byte_offset(source_ref.buffer) + source_ref.offset;
-  region.dstOffset =
-      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
-  region.size = target_ref.length;
-  command_buffer->syms->vkCmdCopyBuffer(command_buffer->handle,
-                                        source_device_buffer,
-                                        target_device_buffer, 1, &region);
+  iree_hal_vulkan_direct_command_buffer_record_copy_buffer(
+      command_buffer, source_ref, target_ref);
 
   IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
                              command_buffer->handle);

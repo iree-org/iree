@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <thread>
+#include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
 
@@ -93,6 +94,64 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);
   iree_hal_semaphore_release(signal_semaphore);
+}
+
+TEST_P(SemaphoreSubmissionTest,
+       IndirectCommandBufferBindingTableRetainedUntilSignal) {
+  constexpr iree_device_size_t kBufferSize = 256;
+  std::vector<uint8_t> source_data(kBufferSize);
+  for (iree_host_size_t i = 0; i < source_data.size(); ++i) {
+    source_data[i] = (uint8_t)(i ^ 0x5A);
+  }
+
+  iree_hal_buffer_t* source_buffer = NULL;
+  CreateDeviceBufferWithData(source_data.data(), kBufferSize, &source_buffer);
+  iree_hal_buffer_t* target_buffer = NULL;
+  CreateZeroedDeviceBuffer(kBufferSize, &target_buffer);
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/2, &command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*binding=*/0, /*offset=*/0,
+                                        kBufferSize),
+      iree_hal_make_indirect_buffer_ref(/*binding=*/1, /*offset=*/0,
+                                        kBufferSize),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList wait(device_, {0}, {1});
+  SemaphoreList signal(device_, {0}, {1});
+  iree_hal_buffer_binding_t bindings[] = {
+      {source_buffer, 0, IREE_HAL_WHOLE_BUFFER},
+      {target_buffer, 0, IREE_HAL_WHOLE_BUFFER},
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait, signal, command_buffer,
+      iree_hal_buffer_binding_table_t{IREE_ARRAYSIZE(bindings), bindings},
+      IREE_HAL_EXECUTE_FLAG_NONE));
+
+  // queue_execute must capture the binding table entries and keep referenced
+  // buffers live until signal completion even if the work is still waiting.
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(source_buffer);
+  bindings[0] = {NULL, 0, 0};
+  bindings[1] = {NULL, 0, 0};
+
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_signal(wait.semaphores[0], 1, /*frontier=*/NULL));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<uint8_t> actual_data =
+      ReadBufferBytes(target_buffer, /*offset=*/0, kBufferSize);
+  EXPECT_EQ(actual_data, source_data);
+
+  iree_hal_buffer_release(target_buffer);
 }
 
 TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
