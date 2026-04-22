@@ -91,14 +91,13 @@ class DeviceHalTest(unittest.TestCase):
         self.device.end_profiling()
         # Just running is sufficient.
 
-    def testProfilingOptions(self):
-        self.device.begin_profiling(mode="queue", file_path="foo.rdc")
-        self.device.end_profiling()
-        # Just running is sufficient.
+    def testProfilingRequiresSink(self):
+        with self.assertRaisesRegex(ValueError, "profile sink"):
+            self.device.begin_profiling(mode="queue-events")
 
-    def testProfilingInvalidOptions(self):
-        with self.assertRaisesRegex(ValueError, "unrecognized profiling mode"):
-            self.device.begin_profiling(mode="SOMETHING THAT DOESN'T EXIST")
+    def testExternalCaptureUnsupported(self):
+        with self.assertRaisesRegex(RuntimeError, "UNIMPLEMENTED"):
+            self.device.begin_external_capture("renderdoc")
 
     def testStatistics(self):
         stats_dict = self.allocator.statistics
