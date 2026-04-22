@@ -317,7 +317,14 @@ static bool hasDWORDAlignedRows(tensor::PadOp pad, FunctionOpInterface funcOp) {
   if (rowBytes % 4 == 0) {
     return true;
   }
-  // Single-segment exemption.
+  // Single-segment exemption: safe only when the innermost dimension has no
+  // padding. When the inner dim is padded, output row width != source row
+  // width, so linearized DMA reads wrong source elements for padded positions
+  // instead of returning zeros.
+  SmallVector<OpFoldResult> highPad = pad.getMixedHighPad();
+  if (highPad.empty() || !isConstantIntValue(highPad.back(), 0)) {
+    return false;
+  }
   auto minAligned = getMinDMAAlignedElements(funcOp, elemType);
   if (!minAligned.has_value() || !sourceType.hasStaticShape()) {
     return false;
