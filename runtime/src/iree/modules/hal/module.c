@@ -836,6 +836,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_command_buffer_mode_t modes =
       (iree_hal_command_buffer_mode_t)args->i1;
+  if (iree_all_bits_set(
+          state->flags,
+          IREE_HAL_MODULE_FLAG_RETAIN_COMMAND_BUFFER_PROFILE_METADATA)) {
+    modes |= IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA;
+  }
   iree_hal_command_category_t command_categories =
       (iree_hal_command_category_t)args->i2;
   iree_hal_queue_affinity_t queue_affinity =

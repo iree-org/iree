@@ -1133,14 +1133,8 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_flush(
 static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  iree_hal_amdgpu_logical_device_t* logical_device =
-      iree_hal_amdgpu_logical_device_cast(base_device);
-
-  // TODO(benvanik): figure out if there's any AMD tooling calls we can make.
-  (void)logical_device;
-  iree_status_t status = iree_ok_status();
-
-  return status;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "AMDGPU HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_profiling_flush(
@@ -1165,6 +1159,21 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   iree_status_t status = iree_ok_status();
 
   return status;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "AMDGPU external capture provider '%.*s' is not implemented",
+      (int)options->provider.size, options->provider.data);
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "AMDGPU external capture is not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
@@ -1202,4 +1211,7 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .profiling_begin = iree_hal_amdgpu_logical_device_profiling_begin,
     .profiling_flush = iree_hal_amdgpu_logical_device_profiling_flush,
     .profiling_end = iree_hal_amdgpu_logical_device_profiling_end,
+    .external_capture_begin =
+        iree_hal_amdgpu_logical_device_external_capture_begin,
+    .external_capture_end = iree_hal_amdgpu_logical_device_external_capture_end,
 };

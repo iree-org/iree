@@ -15,6 +15,8 @@ iree_cc_library(
     hal
   HDRS
     "api.h"
+  TEXTUAL_HDRS
+    "profile_metrics.inc"
   SRCS
     "allocator.c"
     "allocator.h"
@@ -60,6 +62,13 @@ iree_cc_library(
     "pool.h"
     "pool_set.c"
     "pool_set.h"
+    "profile_metrics.c"
+    "profile_metrics.h"
+    "profile_options.c"
+    "profile_options.h"
+    "profile_schema.h"
+    "profile_sink.c"
+    "profile_sink.h"
     "queue.h"
     "resource.h"
     "semaphore.c"
@@ -79,6 +88,18 @@ iree_cc_library(
     iree::hal::utils::platform_topology
     iree::io::file_handle
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    profile_metrics_test
+  SRCS
+    "profile_metrics_test.cc"
+  DEPS
+    ::hal
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

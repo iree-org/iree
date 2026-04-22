@@ -1185,9 +1185,8 @@ static iree_status_t iree_hal_cuda_device_queue_flush(
 static iree_status_t iree_hal_cuda_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  // Unimplemented (and that's ok).
-  // We could hook in to CUPTI here or use the much simpler cuProfilerStart API.
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "CUDA HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_cuda_device_profiling_flush(
@@ -1200,6 +1199,21 @@ static iree_status_t iree_hal_cuda_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "CUDA external capture provider '%.*s' is not implemented",
+      (int)options->provider.size, options->provider.data);
+}
+
+static iree_status_t iree_hal_cuda_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "CUDA external capture is not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
@@ -1237,6 +1251,8 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .profiling_begin = iree_hal_cuda_device_profiling_begin,
     .profiling_flush = iree_hal_cuda_device_profiling_flush,
     .profiling_end = iree_hal_cuda_device_profiling_end,
+    .external_capture_begin = iree_hal_cuda_device_external_capture_begin,
+    .external_capture_end = iree_hal_cuda_device_external_capture_end,
 };
 
 static const iree_hal_deferred_work_queue_device_interface_vtable_t
