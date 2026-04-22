@@ -18,15 +18,16 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
 
-struct FuseTransposeWithAttentionOp final
-    : OpRewritePattern<LinalgExt::AttentionOp> {
-  FuseTransposeWithAttentionOp(MLIRContext *context,
-                               linalg::ControlFusionFn controlFn,
-                               PatternBenefit benefit = 1)
-      : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
+template <typename AttentionOpType>
+struct FuseTransposeWithAttentionLikeOp final
+    : OpRewritePattern<AttentionOpType> {
+  FuseTransposeWithAttentionLikeOp(MLIRContext *context,
+                                   linalg::ControlFusionFn controlFn,
+                                   PatternBenefit benefit = 1)
+      : OpRewritePattern<AttentionOpType>(context, benefit),
         controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
+  LogicalResult matchAndRewrite(AttentionOpType attentionOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = nullptr;
     linalg::LinalgOp producer;
@@ -79,15 +80,15 @@ private:
 
 // Bubbles transpose-V out of attention to expose the more performant
 // attention-transposeV.
-struct BubbleTransposeVFromAttentionOp
-    : OpRewritePattern<LinalgExt::AttentionOp> {
-  BubbleTransposeVFromAttentionOp(MLIRContext *context,
-                                  linalg::ControlFusionFn controlFn,
-                                  PatternBenefit benefit = 1)
-      : OpRewritePattern<LinalgExt::AttentionOp>(context, benefit),
+template <typename AttentionOpType>
+struct BubbleTransposeVFromAttentionLikeOp : OpRewritePattern<AttentionOpType> {
+  BubbleTransposeVFromAttentionLikeOp(MLIRContext *context,
+                                      linalg::ControlFusionFn controlFn,
+                                      PatternBenefit benefit = 1)
+      : OpRewritePattern<AttentionOpType>(context, benefit),
         controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(LinalgExt::AttentionOp attentionOp,
+  LogicalResult matchAndRewrite(AttentionOpType attentionOp,
                                 PatternRewriter &rewriter) const override {
     // Only checking for V because we are only bubbling transpose-V.
     OpOperand *valueOpOperand = &attentionOp.getValueMutable();
@@ -178,15 +179,17 @@ private:
 void populateFuseLinalgExtOpsWithTransposes(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFusionFn) {
-  patterns.add<FuseTransposeWithAttentionOp>(patterns.getContext(),
-                                             controlFusionFn);
+  patterns.add<FuseTransposeWithAttentionLikeOp<AttentionOp>,
+               FuseTransposeWithAttentionLikeOp<OnlineAttentionOp>>(
+      patterns.getContext(), controlFusionFn);
 }
 
 void populateBubbleTransposeFromLinalgExtOps(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFusionFn) {
-  patterns.add<BubbleTransposeVFromAttentionOp>(patterns.getContext(),
-                                                controlFusionFn);
+  patterns.add<BubbleTransposeVFromAttentionLikeOp<AttentionOp>,
+               BubbleTransposeVFromAttentionLikeOp<OnlineAttentionOp>>(
+      patterns.getContext(), controlFusionFn);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
