@@ -2854,3 +2854,102 @@ util.func public @multi_result_conflict_no_fusion(%x: tensor<16x16xf32>) -> tens
 //            DEFAULT:   flow.dispatch.region
 //            DEFAULT:     linalg.matmul ins(%[[P]]#0, %[[P]]#1
 //            DEFAULT:     flow.return
+
+// -----
+
+// Single-result producer whose only result feeds a single consumer via two
+// operand slots. The old count_if(non-DimOp uses) != 1 check bailed because
+// there are two uses; counting distinct consumers instead lets this fuse.
+
+util.func public @single_result_two_uses_same_consumer_default(
+    %a : tensor<?x?xf32>, %b : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %b, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %b, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %m = linalg.matmul ins(%a, %b : tensor<?x?xf32>, tensor<?x?xf32>)
+                    outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %r = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%m, %m : tensor<?x?xf32>, tensor<?x?xf32>)
+    outs(%empty : tensor<?x?xf32>) {
+  ^bb0(%b0 : f32, %b1 : f32, %out : f32):
+    %s = arith.addf %b0, %b1 : f32
+    linalg.yield %s : f32
+  } -> tensor<?x?xf32>
+  util.return %r : tensor<?x?xf32>
+}
+
+//      DEFAULT-LABEL: @single_result_two_uses_same_consumer_default
+//            DEFAULT:   %[[D:.+]] = flow.dispatch.region
+//            DEFAULT:     %[[M:.+]] = linalg.matmul
+//            DEFAULT:     %[[G:.+]] = linalg.generic
+//       DEFAULT-SAME:       ins(%[[M]], %[[M]]
+//            DEFAULT:     flow.return %[[G]]
+//            DEFAULT:   util.return %[[D]]
+
+// -----
+
+// Two distinct producers absorbed into the same fusion group feed a single
+// consumer; the two composed loop maps differ on broadcast-zero positions,
+// so mergeComposedMaps merges rather than bit-comparing.
+
+util.func public @multi_producer_consumer_fusion(
+    %x: tensor<16x16xf32>, %y: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %eA = tensor.empty() : tensor<16x16xf32>
+  %eB = tensor.empty() : tensor<16x16xf32>
+  %eOut = tensor.empty() : tensor<16x16xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%eOut : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %pA = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%x : tensor<16x16xf32>) outs(%eA : tensor<16x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %s = arith.addf %in, %cst : f32
+    linalg.yield %s : f32
+  } -> tensor<16x16xf32>
+  %pB = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%y : tensor<16x16xf32>) outs(%eB : tensor<16x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %s = arith.addf %in, %cst : f32
+    linalg.yield %s : f32
+  } -> tensor<16x16xf32>
+  %m = linalg.matmul ins(%pA, %pB : tensor<16x16xf32>, tensor<16x16xf32>)
+                    outs(%fill : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %r = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%m, %pA : tensor<16x16xf32>, tensor<16x16xf32>)
+    outs(%eOut : tensor<16x16xf32>) {
+  ^bb0(%a: f32, %b: f32, %out: f32):
+    %s = arith.addf %a, %b : f32
+    linalg.yield %s : f32
+  } -> tensor<16x16xf32>
+  util.return %r : tensor<16x16xf32>
+}
+
+// Aggressive-fusion absorbs %pA into the matmul's group, so the consumer
+// generic at the end sees two operands from two different in-group
+// producers (%m and %pA). mergeComposedMaps must succeed on the two
+// composed maps for the fusion to proceed.
+//      CHECK-LABEL: @multi_producer_consumer_fusion
+//            CHECK:   flow.dispatch.region
+//            CHECK:     %[[PA:.+]] = linalg.generic
+//            CHECK:     %[[M:.+]] = linalg.matmul
+//       CHECK-SAME:       ins(%[[PA]], %{{.+}}
+//            CHECK:     %[[R:.+]] = linalg.generic
+//       CHECK-SAME:       ins(%[[M]], %[[PA]]
+//            CHECK:     flow.return %[[R]]
