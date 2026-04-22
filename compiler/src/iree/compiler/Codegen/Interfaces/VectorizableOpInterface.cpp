@@ -1463,12 +1463,10 @@ struct ScanOpVectorizationModel
     auto accumVecTy = VectorType::get(accumVecShape, elemType);
 
     // Determine if masking is needed (dynamic shapes or vector > tensor).
-    bool needsInputMasking =
-        !inputTy.hasStaticShape() ||
-        (llvm::to_vector(inputTy.getShape()) != inputVecShape);
-    bool needsAccumMasking =
-        !accumTy.hasStaticShape() ||
-        (llvm::to_vector(accumTy.getShape()) != accumVecShape);
+    bool needsInputMasking = !inputTy.hasStaticShape() ||
+                             !llvm::equal(inputTy.getShape(), inputVecShape);
+    bool needsAccumMasking = !accumTy.hasStaticShape() ||
+                             !llvm::equal(accumTy.getShape(), accumVecShape);
 
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> inputIndices(inputRank, zero);
