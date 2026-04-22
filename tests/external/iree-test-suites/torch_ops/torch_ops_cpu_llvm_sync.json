@@ -7,9 +7,7 @@
   ],
   "iree_run_module_flags": [],
   "skip_compile_tests": [
-    "InterestingShapesBiasAdd/997x997xi8_NN_bias"
-  ],
-  "skip_run_tests": [
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias",
     "AB/128x128xf32_bench",
     "AB/256x256xf32_bench",
     "AB/512x512xf32_bench",
@@ -18,6 +16,7 @@
     "AB/4096x4096xf32_bench",
     "AB/8192x8192xf32_bench"
   ],
+  "skip_run_tests": [],
   "expected_compile_failures": [],
   "expected_run_failures": []
 }
