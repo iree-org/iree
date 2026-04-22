@@ -29,6 +29,7 @@ iree_cc_library(
     iree::base::internal::path
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::modules::hal
     iree::tooling::context_util
     iree::tooling::device_util

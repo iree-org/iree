@@ -1,0 +1,190 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "format",
+    srcs = ["format.c"],
+    hdrs = ["format.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "digest",
+    srcs = ["digest.c"],
+    hdrs = ["digest.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "file_writer",
+    srcs = ["file_writer.c"],
+    hdrs = ["file_writer.h"],
+    deps = [
+        ":digest",
+        ":format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/io:stream",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "file_reader",
+    srcs = ["file_reader.c"],
+    hdrs = ["file_reader.h"],
+    deps = [
+        ":digest",
+        ":format",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "file",
+    hdrs = ["file.h"],
+    deps = [
+        ":file_reader",
+        ":file_writer",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "help",
+    srcs = ["help.c"],
+    hdrs = ["help.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dump",
+    srcs = ["dump.c"],
+    hdrs = ["dump.h"],
+    deps = [
+        ":digest",
+        ":file_reader",
+        ":format",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "execute",
+    srcs = ["execute.c"],
+    hdrs = ["execute.h"],
+    deps = [
+        ":digest",
+        ":file_reader",
+        ":format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "recorder",
+    srcs = [
+        "recorder.c",
+        "recorder_allocator.c",
+        "recorder_allocator.h",
+        "recorder_buffer.c",
+        "recorder_buffer.h",
+        "recorder_command_buffer.c",
+        "recorder_command_buffer.h",
+        "recorder_event.c",
+        "recorder_event.h",
+        "recorder_executable.c",
+        "recorder_executable.h",
+        "recorder_file.c",
+        "recorder_file.h",
+        "recorder_record.h",
+    ],
+    hdrs = ["recorder.h"],
+    deps = [
+        ":digest",
+        ":file_writer",
+        ":format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dump_test",
+    srcs = ["dump_test.cc"],
+    deps = [
+        ":dump",
+        ":file_writer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "execute_test",
+    srcs = ["execute_test.cc"],
+    deps = [
+        ":execute",
+        ":file_reader",
+        ":recorder",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
+        "//runtime/src/iree/hal/testing:mock_device",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_test",
+    srcs = ["file_test.cc"],
+    deps = [
+        ":file",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "recorder_test",
+    srcs = ["recorder_test.cc"],
+    deps = [
+        ":file_reader",
+        ":recorder",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_sync:sync_driver",
+        "//runtime/src/iree/hal/testing:mock_device",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

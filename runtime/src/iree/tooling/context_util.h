@@ -15,6 +15,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_replay_recorder_t iree_hal_replay_recorder_t;
+
 //===----------------------------------------------------------------------===//
 // Module management
 //===----------------------------------------------------------------------===//
@@ -57,6 +59,9 @@ iree_vm_module_t* iree_tooling_module_list_back(
 // |out_device| will contain the lead device if using the full HAL.
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
+// |out_replay_recorder| will contain a recorder that must be closed after all
+// HAL work is complete when --device_replay_output= is specified. Pass NULL
+// only when no replay capture flag is expected.
 //
 // If multiple devices are created the one returned (and its corresponding
 // allocator) are considered the 'lead' device for bookkeeping purposes.
@@ -64,8 +69,8 @@ iree_status_t iree_tooling_resolve_modules(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_tooling_module_list_t* resolved_list,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator);
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder);
 
 // Loads modules in the order specified by the --module= flag.
 // Appends the modules to the |list|.
@@ -95,6 +100,9 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 // |out_device| will contain the lead device if using the full HAL.
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
+// |out_replay_recorder| will contain a recorder that must be closed after all
+// HAL work is complete when --device_replay_output= is specified. Pass NULL
+// only when no replay capture flag is expected.
 //
 // If multiple devices are created the one returned (and its corresponding
 // allocator) are considered the 'lead' device for bookkeeping purposes.
@@ -102,8 +110,8 @@ iree_status_t iree_tooling_create_context_from_flags(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_vm_context_t** out_context,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator);
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder);
 
 #ifdef __cplusplus
 }  // extern "C"
