@@ -86,6 +86,15 @@ struct StageClassification {
 };
 } // namespace
 
+/// Returns true if the given operation contains gather_to_lds ops nested
+/// inside its regions. This is used to detect region-bearing ops (e.g.,
+/// scf.if) that wrap async DMA loads for warp predication.
+static bool containsNestedGatherToLDS(Operation *op) {
+  bool found = false;
+  op->walk([&](amdgpu::GatherToLDSOp) { found = true; });
+  return found;
+}
+
 /// Checks if a loop contains gather_to_lds operations directly in the loop
 /// body (immediate children of the for loop's body block).
 static bool hasDirectGatherToLDS(scf::ForOp forOp) {
@@ -389,16 +398,12 @@ static LogicalResult identifyRootOperations(
       } else if (isa<scf::YieldOp>(op)) {
         computeRoots.push_back(&op);
         LDBG() << "  Compute root: " << op;
-      } else if (op.getNumRegions() > 0) {
+      } else if (op.getNumRegions() > 0 && containsNestedGatherToLDS(&op)) {
         // Region-bearing ops (e.g., scf.if, scf.for) may wrap gather_to_lds.
         // Treat the enclosing op as a load root so it gets scheduled in the
         // load stage as a single unit.
-        bool hasNestedGather = false;
-        op.walk([&](amdgpu::GatherToLDSOp) { hasNestedGather = true; });
-        if (hasNestedGather) {
-          loadRoots.push_back(&op);
-          LDBG() << "  Load root (nested gather_to_lds): " << op;
-        }
+        loadRoots.push_back(&op);
+        LDBG() << "  Load root (nested gather_to_lds): " << op;
       }
     } else {
       // Stream copy mode: transfer_read, transfer_write, scf.yield
@@ -1063,12 +1068,8 @@ static Operation *findLastGatherToLDS(Block::iterator begin,
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
       return &*it;
     }
-    if (it->getNumRegions() > 0) {
-      bool hasNested = false;
-      it->walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
-      if (hasNested) {
-        return &*it;
-      }
+    if (it->getNumRegions() > 0 && containsNestedGatherToLDS(&*it)) {
+      return &*it;
     }
   }
   return nullptr;
@@ -1094,12 +1095,8 @@ static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
   for (auto it = parentBlock->begin(); it != loopStart; ++it) {
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
       prologueGathers.push_back(&*it);
-    } else if (it->getNumRegions() > 0) {
-      bool hasNested = false;
-      it->walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
-      if (hasNested) {
-        prologueGathers.push_back(&*it);
-      }
+    } else if (it->getNumRegions() > 0 && containsNestedGatherToLDS(&*it)) {
+      prologueGathers.push_back(&*it);
     }
   }
 
