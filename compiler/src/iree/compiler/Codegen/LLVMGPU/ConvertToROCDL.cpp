@@ -298,6 +298,7 @@ struct ConvertToROCDLPass final
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
 
+      vector::populateVectorFromElementsUnrollPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // Use 64-bit indices for mask materialization to match the index
