@@ -112,9 +112,6 @@ struct ConvertToNVVMPass final
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
       populateVectorToSCFConversionPatterns(
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
