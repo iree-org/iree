@@ -42,29 +42,24 @@ iree_status_t iree_async_io_uring_notification_create(
   notification->epoch_ptr = &notification->epoch;
   notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_NONE;
 
-  // Select mode based on proactor capabilities.
+  // Use eventfd-backed notifications for now. io_uring FUTEX_WAIT has no
+  // userspace-visible "wait is armed" edge, so a signal racing immediately
+  // after relay registration can miss the in-kernel waiter. eventfd is
+  // level-triggered and preserves that register-before-signal contract.
   iree_status_t status = iree_ok_status();
-#if defined(IREE_RUNTIME_USE_FUTEX)
-  if (iree_any_bit_set(proactor->capabilities,
-                       IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
-    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
-  } else
-#endif  // IREE_RUNTIME_USE_FUTEX
-  {
-    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
-    // EFD_SEMAPHORE makes read() decrement by 1 instead of draining the
-    // counter. This allows wake_count to control how many waiters are woken.
-    int eventfd_result = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
-    if (eventfd_result >= 0) {
-      iree_async_primitive_t event_primitive =
-          iree_async_primitive_from_fd(eventfd_result);
-      notification->platform.io_uring.primitive = event_primitive;
-      notification->platform.io_uring.signal_primitive = event_primitive;
-      notification->platform.io_uring.drain_buffer = 0;
-    } else {
-      status = iree_make_status(iree_status_code_from_errno(errno),
-                                "eventfd creation failed (%d)", errno);
-    }
+  notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
+  // EFD_SEMAPHORE makes read() decrement by 1 instead of draining the
+  // counter. This allows wake_count to control how many waiters are woken.
+  int eventfd_result = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
+  if (eventfd_result >= 0) {
+    iree_async_primitive_t event_primitive =
+        iree_async_primitive_from_fd(eventfd_result);
+    notification->platform.io_uring.primitive = event_primitive;
+    notification->platform.io_uring.signal_primitive = event_primitive;
+    notification->platform.io_uring.drain_buffer = 0;
+  } else {
+    status = iree_make_status(iree_status_code_from_errno(errno),
+                              "eventfd creation failed (%d)", errno);
   }
 
   if (iree_status_is_ok(status)) {
@@ -99,34 +94,17 @@ iree_status_t iree_async_io_uring_notification_create_shared(
   notification->epoch_ptr = options->epoch_address;
   notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_SHARED;
 
-  // Select mode based on proactor capabilities (same logic as local create).
-  iree_status_t status = iree_ok_status();
-#if defined(IREE_RUNTIME_USE_FUTEX)
-  if (iree_any_bit_set(proactor->capabilities,
-                       IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
-    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
-    // No wake fd needed — futex_wake on the shared address wakes remote
-    // FUTEX_WAIT SQEs (they share the physical page hash bucket).
-  } else
-#endif  // IREE_RUNTIME_USE_FUTEX
-  {
-    notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
-    // Use caller-provided primitives instead of creating our own eventfd.
-    // For proxy notifications (peer wake): wake_primitive may be NONE (not
-    // polled locally) while signal_primitive is the peer's eventfd.
-    notification->platform.io_uring.primitive = options->wake_primitive;
-    notification->platform.io_uring.signal_primitive =
-        options->signal_primitive;
-    notification->platform.io_uring.drain_buffer = 0;
-  }
+  notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EVENT;
+  // Use caller-provided primitives instead of creating our own eventfd.
+  // For proxy notifications (peer wake): wake_primitive may be NONE (not
+  // polled locally) while signal_primitive is the peer's eventfd.
+  notification->platform.io_uring.primitive = options->wake_primitive;
+  notification->platform.io_uring.signal_primitive = options->signal_primitive;
+  notification->platform.io_uring.drain_buffer = 0;
 
-  if (iree_status_is_ok(status)) {
-    *out_notification = notification;
-  } else {
-    iree_allocator_free(allocator, notification);
-  }
+  *out_notification = notification;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 void iree_async_io_uring_notification_destroy(
