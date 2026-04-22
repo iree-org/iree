@@ -12,6 +12,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Parser/Parser.h"
 
@@ -1342,6 +1343,19 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
       assert(false && "unhandled HAL attribute kind");
     }
   });
+}
+
+//===----------------------------------------------------------------------===//
+// Dialect hooks
+//===----------------------------------------------------------------------===//
+
+Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                           Type type, Location loc) {
+  if (!isa<IndexType>(type)) {
+    return nullptr;
+  }
+  return mlir::arith::ConstantIndexOp::create(
+      builder, loc, cast<IntegerAttr>(value).getValue().getSExtValue());
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
