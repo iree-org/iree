@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "compile_flags.mlir",
             "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
+            "debug_break.mlir",
             "executable_benchmarks.mlir",
             "executable_configurations.mlir",
             "executable_sources.mlir",
@@ -69,6 +70,7 @@ iree_lit_test_suite(
             "*.txt",
         ],
         exclude = [
+            "debug_break_patch.mlir",
             "iree-link-anonymous.mlir",
             "iree-link-globals-a.mlir",
             "iree-link-globals-b.mlir",
@@ -81,6 +83,7 @@ iree_lit_test_suite(
     ),
     cfg = "//tools:lit.cfg.py",
     data = [
+        "debug_break_patch.mlir",
         "echo_npy.py",
         "iree-link-anonymous.mlir",
         "iree-tokenize.json",

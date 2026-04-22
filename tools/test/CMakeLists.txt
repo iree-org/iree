@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "compile_pipelines.mlir"
     "compile_to_continuation.mlir"
     "compile_to_phase.mlir"
+    "debug_break.mlir"
     "executable_benchmarks.mlir"
     "executable_configurations.mlir"
     "executable_sources.mlir"
@@ -71,6 +72,7 @@ iree_lit_test_suite(
     not
   DATA
     MLIROpBaseTdFiles
+    debug_break_patch.mlir
     echo_npy.py
     iree-link-anonymous.mlir
     iree-link-executable-source-module-d.mlir
