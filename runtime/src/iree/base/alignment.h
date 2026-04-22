@@ -108,6 +108,13 @@ static inline bool iree_host_size_has_alignment(iree_host_size_t value,
   return iree_host_align(value, alignment) == value;
 }
 
+// Returns true if |ptr| meets the given minimum |alignment|.
+static inline bool iree_host_ptr_has_alignment(const void* ptr,
+                                               iree_host_size_t alignment) {
+  return iree_host_size_has_alignment((iree_host_size_t)(uintptr_t)ptr,
+                                      alignment);
+}
+
 // Returns the smallest power of two >= |value|.
 // Returns 1 for |value| of 0 or 1.
 // Saturates to maximum representable value on overflow.

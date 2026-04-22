@@ -447,6 +447,15 @@ IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
 IREE_API_EXPORT void iree_async_semaphore_fail(
     iree_async_semaphore_t* semaphore, iree_status_t status);
 
+// Returns the status code of the semaphore's failure, or IREE_STATUS_OK if
+// the semaphore has not failed. Thread-safe with acquire semantics.
+static inline iree_status_code_t iree_async_semaphore_query_status(
+    iree_async_semaphore_t* semaphore) {
+  iree_status_t status = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  return iree_status_code(status);
+}
+
 // Registers a timepoint that fires when the semaphore reaches |minimum_value|.
 // The |timepoint| is caller-owned storage that must remain valid and at a
 // stable address until the callback fires or cancel_timepoint completes.
@@ -561,6 +570,17 @@ IREE_API_EXPORT void iree_async_semaphore_mark_tainted_above(
 IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier);
+
+// Merges |frontier| into the semaphore's accumulated frontier without
+// advancing the timeline or dispatching timepoints. Used by HAL submission
+// paths to record causal context at submission time so same-queue wait elision
+// can take effect before device completion.
+//
+// Returns true if the merge succeeded. On capacity overflow, returns false and
+// leaves the frontier unchanged, which is a valid lower bound that only
+// degrades wait elision.
+IREE_API_EXPORT bool iree_async_semaphore_merge_frontier(
+    iree_async_semaphore_t* semaphore, const iree_async_frontier_t* frontier);
 
 // Returns the current untainted watermark value.
 // Values <= this are guaranteed to have been signaled by witnessed work.
