@@ -175,7 +175,7 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
   %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_result_it> -> tensor<?x?xf32>{%d0, %d1}
   return %5 : tensor<?x?xf32>
 }
-//   CHECK-DAG: #[[$MAP_N:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//   CHECK-DAG: #[[$MAP_INNER:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
 // CHECK-LABEL: func @pack_gemm_fill_dynamic_inner_tiled_avx512(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -183,15 +183,16 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_N]]()[%[[D1]]]
+//   CHECK-DAG:   %[[OUT_D0:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D0]]]
+//   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D1]]]
 //   CHECK-DAG:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}%[[ARG0]]
 //       CHECK:   %[[PACK_RHS:.+]] = linalg.pack
 //  CHECK-SAME:     %[[ARG1]]
-//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[OUT_D1]]) : tensor<?x?x1x16xf32>
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[OUT_D0]], %[[OUT_D1]]) : tensor<?x?x16x16xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[PACK_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
-//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32>, semantics = #iree_cpu.mma_semantics<>
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>, semantics = #iree_cpu.mma_semantics<>
 //       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INNER]]
 //       CHECK:   return %[[UNPACK]]
 
@@ -223,9 +224,10 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 }
 // CHECK-LABEL: func @set_encoding_matmul_LHS_inner_tiled_avx512(
 //  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<127x255xf32>
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<127x255x1x1xf32>
-//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<127x255x1x1xf32>
-//       CHECK:   return %[[PACK]] : tensor<127x255x1x1xf32>
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.0
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<8x255x16x1xf32>
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] padding_value(%[[CST]] : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<8x255x16x1xf32>
+//       CHECK:   return %[[PACK]] : tensor<8x255x16x1xf32>
 // CHECK-LABEL: func @set_encoding_matmul_RHS_inner_tiled_avx512(
 //  CHECK-SAME:   %[[INPUT_R:[a-zA-Z0-9]+]]: tensor<127x255xf32>
 //   CHECK-DAG:   %[[CST_R:.+]] = arith.constant 0.0
@@ -233,9 +235,9 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 //       CHECK:   %[[PACK_R:.+]] = linalg.pack %[[INPUT_R]] padding_value(%[[CST_R]] : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %[[EMPTY_R]] : tensor<127x255xf32> -> tensor<16x127x16x1xf32>
 //       CHECK:   return %[[PACK_R]] : tensor<16x127x16x1xf32>
 // CHECK-LABEL: func @unset_encoding_matmul_RESULT_inner_tiled_avx512(
-//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<127x16x1x16xf32>
+//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<8x16x16x16xf32>
 //       CHECK:   %[[EMPTY_U:.+]] = tensor.empty() : tensor<127x255xf32>
-//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[PACKED]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 16] into %[[EMPTY_U]] : tensor<127x16x1x16xf32> -> tensor<127x255xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[PACKED]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_U]] : tensor<8x16x16x16xf32> -> tensor<127x255xf32>
 //       CHECK:   return %[[UNPACK]]
 
 // -----
