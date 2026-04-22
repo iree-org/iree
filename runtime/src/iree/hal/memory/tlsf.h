@@ -169,6 +169,12 @@ extern "C" {
 // collective workloads without taint. Multi-GPU training may need higher.
 #define IREE_HAL_MEMORY_TLSF_DEFAULT_FRONTIER_CAPACITY 8
 
+// Default initial block metadata capacity. TLSF slabs usually start as a
+// single free block and only need more nodes as real fragmentation appears.
+// Keeping the initial node pool small avoids scaling host metadata overhead
+// with the theoretical maximum number of aligned blocks in a large slab.
+#define IREE_HAL_MEMORY_TLSF_DEFAULT_INITIAL_BLOCK_CAPACITY 64
+
 // Minimum alignment for all allocations. Ensures that the FL/SL decomposition
 // has meaningful sub-bins at the lowest levels (FL_MIN >= 4 gives 32 sub-bins
 // within the [16, 32) range).
@@ -265,8 +271,8 @@ typedef struct iree_hal_memory_tlsf_options_t {
 
   // Initial capacity of the block node pool (number of block metadata
   // entries to pre-allocate). The pool grows dynamically when exhausted,
-  // doubling in capacity. Set to 0 to use a default derived from
-  // range_length / alignment (clamped to [64, 4096]).
+  // doubling in capacity. Set to 0 to use
+  // IREE_HAL_MEMORY_TLSF_DEFAULT_INITIAL_BLOCK_CAPACITY (64).
   //
   // Each block node costs approximately (40 + 8 + 16 * frontier_capacity)
   // bytes of host memory.

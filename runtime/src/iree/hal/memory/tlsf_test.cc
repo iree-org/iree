@@ -176,6 +176,22 @@ TEST(TLSFTest, InitializeDefaultFrontierCapacity) {
   iree_hal_memory_tlsf_deinitialize(&tlsf);
 }
 
+TEST(TLSFTest, InitializeDefaultBlockCapacityIsRangeIndependent) {
+  iree_hal_memory_tlsf_t tlsf;
+  auto options = DefaultOptions();
+  options.range_length = 64 * 1024 * 1024;
+  options.alignment = 256;
+  options.initial_block_capacity = 0;
+  IREE_ASSERT_OK(
+      iree_hal_memory_tlsf_initialize(options, iree_allocator_system(), &tlsf));
+
+  EXPECT_EQ(tlsf.block_capacity,
+            IREE_HAL_MEMORY_TLSF_DEFAULT_INITIAL_BLOCK_CAPACITY);
+  EXPECT_LE(tlsf.block_capacity * tlsf.block_stride, 64 * 1024u);
+
+  iree_hal_memory_tlsf_deinitialize(&tlsf);
+}
+
 TEST(TLSFTest, InitializeRangeRoundedDownToAlignment) {
   iree_hal_memory_tlsf_t tlsf;
   auto options = DefaultOptions();

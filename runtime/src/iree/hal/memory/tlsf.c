@@ -302,11 +302,7 @@ iree_status_t iree_hal_memory_tlsf_initialize(
   // Determine initial block pool capacity.
   iree_host_size_t initial_capacity = options.initial_block_capacity;
   if (initial_capacity == 0) {
-    // Heuristic: start with enough nodes for a moderately fragmented pool.
-    iree_device_size_t max_blocks = options.range_length / options.alignment;
-    if (max_blocks > 4096) max_blocks = 4096;
-    if (max_blocks < 64) max_blocks = 64;
-    initial_capacity = (iree_host_size_t)max_blocks;
+    initial_capacity = IREE_HAL_MEMORY_TLSF_DEFAULT_INITIAL_BLOCK_CAPACITY;
   }
 
   // Allocate block storage (overflow-checked array allocation).
