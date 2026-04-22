@@ -2763,10 +2763,6 @@ util.func public @scatter_chain_dispatch_ordering(
 // result 0 has a non-identity indexing map while result 1 has an identity
 // map, so the pack-identity per-operand check fails on the source operand
 // but passes on the dest operand. Fusion must be rejected.
-//
-// Without the group-by-consumer fix in fuseRootsWithConsumers, the first
-// operand's failure is silently dropped: the loop moves on, the dest
-// operand passes, and pack is incorrectly appended to the fusion group.
 
 util.func public @pack_per_operand_rejection(
     %a: tensor<1x1xf32>, %b: tensor<1x1xf32>) -> tensor<1x1x1x1xf32> {
