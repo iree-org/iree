@@ -308,21 +308,11 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   logical_device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
-  logical_device->frontier_tracker = create_params->frontier.base_axis != 0
-                                         ? create_params->frontier.tracker
-                                         : NULL;
-  logical_device->axis = create_params->frontier.base_axis;
+  logical_device->frontier_tracker = NULL;
+  logical_device->axis = 0;
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
-  iree_status_t status = iree_ok_status();
-  if (logical_device->frontier_tracker) {
-    status = iree_async_frontier_tracker_register_axis(
-        logical_device->frontier_tracker, logical_device->axis,
-        /*semaphore=*/NULL);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_get(logical_device->proactor_pool, 0,
-                                          &logical_device->proactor);
-  }
+  iree_status_t status = iree_async_proactor_pool_get(
+      logical_device->proactor_pool, 0, &logical_device->proactor);
 
   // Setup physical device table.
   // This extra indirection is unfortunate but allows us to have dynamic queue
@@ -715,7 +705,29 @@ static iree_status_t iree_hal_amdgpu_logical_device_assign_topology_info(
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
+  if (logical_device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        logical_device->frontier_tracker, logical_device->axis,
+        iree_make_status(IREE_STATUS_CANCELLED,
+                         "AMDGPU logical device topology assignment reset"));
+    logical_device->frontier_tracker = NULL;
+    logical_device->axis = 0;
+  }
+  memset(&logical_device->topology_info, 0,
+         sizeof(logical_device->topology_info));
+  if (!topology_info) return iree_ok_status();
+
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  const iree_async_axis_t axis = topology_info->frontier.base_axis;
+  if (frontier_tracker && axis != 0) {
+    IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+        frontier_tracker, axis, /*semaphore=*/NULL));
+  }
   logical_device->topology_info = *topology_info;
+  logical_device->frontier_tracker = frontier_tracker;
+  logical_device->axis = axis;
+  iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
   return iree_ok_status();
 }
 
@@ -887,6 +899,17 @@ iree_hal_amdgpu_logical_device_query_semaphore_compatibility(
     compatibility = IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE;
   }
   return compatibility;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  (void)base_device;
+  (void)queue_affinity;
+  (void)out_backend;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "AMDGPU queue pool backends are not implemented in "
+                          "this landing slice");
 }
 
 // Resolves a queue affinity to a particular device queue.
@@ -1199,6 +1222,8 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .create_semaphore = iree_hal_amdgpu_logical_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_amdgpu_logical_device_query_semaphore_compatibility,
+    .query_queue_pool_backend =
+        iree_hal_amdgpu_logical_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_amdgpu_logical_device_queue_alloca,
     .queue_dealloca = iree_hal_amdgpu_logical_device_queue_dealloca,
     .queue_fill = iree_hal_amdgpu_logical_device_queue_fill,

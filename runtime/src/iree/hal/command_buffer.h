@@ -799,6 +799,15 @@ IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
+// Returns the queue affinity selected for the command buffer.
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer);
+
+// Returns the process-local nonzero profiling identifier for |command_buffer|.
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
+    const iree_hal_command_buffer_t* command_buffer);
+
 // Begins recording into the command buffer.
 // The command buffer must not have been recorded already; this is only valid to
 // call once after creation and must be paired with iree_hal_command_buffer_end.
@@ -1130,6 +1139,10 @@ struct iree_hal_command_buffer_t {
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
+
+  // Process-local nonzero command-buffer identifier used by profiling sessions.
+  uint64_t profile_id;
+
   uint32_t binding_capacity;
   uint32_t binding_count;
   void* validation_state;

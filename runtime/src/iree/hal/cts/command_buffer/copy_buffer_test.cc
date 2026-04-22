@@ -16,8 +16,8 @@ using ::testing::ContainerEq;
 
 namespace {
 constexpr iree_device_size_t kDefaultAllocationSize = 1024;
-constexpr iree_host_size_t kHostBufferSlot = 0;
-constexpr iree_host_size_t kDeviceBufferSlot = 1;
+constexpr iree_host_size_t kSourceBufferSlot = 0;
+constexpr iree_host_size_t kTargetBufferSlot = 1;
 constexpr iree_host_size_t kBindingSlotCount = 2;
 }  // namespace
 
@@ -40,18 +40,57 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
   }
 
   iree_status_t SubmitWithBindings(iree_hal_command_buffer_t* command_buffer,
-                                   iree_hal_buffer_t* host_buffer,
-                                   iree_hal_buffer_t* device_buffer) {
+                                   iree_hal_buffer_t* source_buffer,
+                                   iree_hal_buffer_t* target_buffer) {
     if (recording_mode() == RecordingMode::kIndirect) {
       const iree_hal_buffer_binding_t bindings[] = {
-          /*kHostBufferSlot=*/{host_buffer, 0, IREE_HAL_WHOLE_BUFFER},
-          /*kDeviceBufferSlot=*/{device_buffer, 0, IREE_HAL_WHOLE_BUFFER},
+          /*kSourceBufferSlot=*/{source_buffer, 0, IREE_HAL_WHOLE_BUFFER},
+          /*kTargetBufferSlot=*/{target_buffer, 0, IREE_HAL_WHOLE_BUFFER},
       };
       return SubmitCommandBufferAndWait(
           command_buffer,
           iree_hal_buffer_binding_table_t{IREE_ARRAYSIZE(bindings), bindings});
     }
     return SubmitCommandBufferAndWait(command_buffer);
+  }
+
+  void RunCopyBufferTest(iree_device_size_t source_offset,
+                         iree_device_size_t target_offset,
+                         iree_device_size_t length) {
+    iree_device_size_t buffer_size = source_offset + length;
+    if (target_offset + length > buffer_size) {
+      buffer_size = target_offset + length;
+    }
+    buffer_size += 16;
+
+    std::vector<uint8_t> source_data = MakeDeterministicBytes(buffer_size);
+    Ref<iree_hal_buffer_t> source_buffer;
+    CreateDeviceBufferWithData(source_data.data(), buffer_size,
+                               source_buffer.out());
+    Ref<iree_hal_buffer_t> target_buffer;
+    CreateZeroedDeviceBuffer(buffer_size, target_buffer.out());
+
+    Ref<iree_hal_command_buffer_t> command_buffer;
+    IREE_ASSERT_OK(iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+        binding_capacity(), command_buffer.out()));
+    IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+    IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+        command_buffer,
+        MakeRef(source_buffer, kSourceBufferSlot, source_offset, length),
+        MakeRef(target_buffer, kTargetBufferSlot, target_offset, length),
+        IREE_HAL_COPY_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+    IREE_ASSERT_OK(
+        SubmitWithBindings(command_buffer, source_buffer, target_buffer));
+
+    std::vector<uint8_t> expected(buffer_size, 0);
+    std::memcpy(expected.data() + target_offset,
+                source_data.data() + source_offset, length);
+    auto actual_data = ReadBufferBytes(target_buffer, 0, buffer_size);
+    EXPECT_THAT(actual_data, ContainerEq(expected));
   }
 };
 
@@ -94,8 +133,8 @@ TEST_P(CommandBufferCopyBufferTest, CopyWholeBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
       command_buffer,
-      MakeRef(host_buffer, kHostBufferSlot, 0, kDefaultAllocationSize),
-      MakeRef(device_buffer, kDeviceBufferSlot, 0, kDefaultAllocationSize),
+      MakeRef(host_buffer, kSourceBufferSlot, 0, kDefaultAllocationSize),
+      MakeRef(device_buffer, kTargetBufferSlot, 0, kDefaultAllocationSize),
       IREE_HAL_COPY_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
@@ -159,18 +198,18 @@ TEST_P(CommandBufferCopyBufferTest, CopySubBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer,
-      MakeRef(device_buffer, kDeviceBufferSlot, /*offset=*/0, /*length=*/8),
+      MakeRef(device_buffer, kTargetBufferSlot, /*offset=*/0, /*length=*/8),
       &zero_val, /*pattern_length=*/sizeof(zero_val), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
       command_buffer,
-      MakeRef(host_buffer, kHostBufferSlot, /*offset=*/4,
+      MakeRef(host_buffer, kSourceBufferSlot, /*offset=*/4,
               /*length=*/kDefaultAllocationSize / 2 - 4),
-      MakeRef(device_buffer, kDeviceBufferSlot, /*offset=*/8,
+      MakeRef(device_buffer, kTargetBufferSlot, /*offset=*/8,
               /*length=*/kDefaultAllocationSize / 2 - 4),
       IREE_HAL_COPY_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer,
-      MakeRef(device_buffer, kDeviceBufferSlot,
+      MakeRef(device_buffer, kTargetBufferSlot,
               /*offset=*/8 + kDefaultAllocationSize / 2 - 4,
               /*length=*/kDefaultAllocationSize -
                   (8 + kDefaultAllocationSize / 2 - 4)),
@@ -191,6 +230,38 @@ TEST_P(CommandBufferCopyBufferTest, CopySubBuffer) {
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(device_buffer);
   iree_hal_buffer_release(host_buffer);
+}
+
+TEST_P(CommandBufferCopyBufferTest, CopySizeAndAlignmentClasses) {
+  struct AlignmentCase {
+    const char* name = nullptr;
+    iree_device_size_t source_offset = 0;
+    iree_device_size_t target_offset = 0;
+  };
+  const AlignmentCase alignment_cases[] = {
+      {/*.name=*/"aligned16", /*.source_offset=*/0, /*.target_offset=*/0},
+      {/*.name=*/"aligned8_not16", /*.source_offset=*/8, /*.target_offset=*/8},
+      {/*.name=*/"aligned4_not8", /*.source_offset=*/4, /*.target_offset=*/4},
+      {/*.name=*/"byte_misaligned", /*.source_offset=*/1, /*.target_offset=*/2},
+  };
+  const iree_device_size_t common_sizes[] = {
+      4, 8, 16, 31, 32, 33, 64, 128, 256, 1024, 4 * 1024, 16 * 1024, 64 * 1024,
+  };
+
+  for (iree_device_size_t length : common_sizes) {
+    for (const AlignmentCase& alignment_case : alignment_cases) {
+      SCOPED_TRACE(::testing::Message()
+                   << alignment_case.name
+                   << " source_offset=" << alignment_case.source_offset
+                   << " target_offset=" << alignment_case.target_offset
+                   << " length=" << length);
+      RunCopyBufferTest(alignment_case.source_offset,
+                        alignment_case.target_offset, length);
+    }
+  }
+
+  SCOPED_TRACE("aligned16_mib");
+  RunCopyBufferTest(/*source_offset=*/0, /*target_offset=*/0, 1024 * 1024);
 }
 
 CTS_REGISTER_COMMAND_BUFFER_TEST_SUITE(CommandBufferCopyBufferTest);

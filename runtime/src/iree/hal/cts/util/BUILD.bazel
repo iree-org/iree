@@ -38,15 +38,32 @@ iree_runtime_cc_library(
     ],
 )
 
-# Header-only test base library: CtsTestBase fixture and helper utilities.
+# Reusable profile sink helpers for CTS coverage of HAL profiling behavior.
+iree_runtime_cc_library(
+    name = "profile_test_util",
+    testonly = True,
+    srcs = ["profile_test_util.cc"],
+    hdrs = ["profile_test_util.h"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+# CtsTestBase fixture and helper utilities.
 iree_runtime_cc_library(
     name = "test_base",
     testonly = True,
+    srcs = ["test_base.cc"],
     hdrs = ["test_base.h"],
     deps = [
         ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/testing:gtest",
     ],
 )

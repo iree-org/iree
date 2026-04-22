@@ -219,8 +219,8 @@ iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
   // TODO: more pools and better selection; this is coarsely deciding between
   // only device local (variables, constants, transients) and other (staging,
   // external) but could use more buffer properties (including usage/export
-  // flags) to better isolate the different usage patterns and keep the pools
-  // operating with reasonable limits. We should be using the |pool| arg.
+  // flags) to better isolate the different usage patterns and keep the default
+  // backend pools operating with reasonable limits.
   hipMemPool_t memory_pool =
       iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
@@ -241,10 +241,18 @@ iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
 
 iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
-    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+
+  if (IREE_UNLIKELY(pool != NULL)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "HIP custom queue alloca pools not implemented");
+  }
+
   iree_hal_buffer_params_canonicalize(&params);
 
   // NOTE: we don't provide a device allocator because we didn't allocate from

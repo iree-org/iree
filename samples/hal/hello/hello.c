@@ -26,6 +26,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
@@ -153,6 +154,8 @@ static iree_status_t run_sample(void) {
 
   // All NULL-initialized so cleanup is unconditional.
   iree_async_proactor_pool_t* proactor_pool = NULL;
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  iree_hal_device_group_t* device_group = NULL;
   iree_hal_device_t* device = NULL;
   iree_hal_buffer_t* source_buffer = NULL;
   iree_hal_buffer_t* destination_buffer = NULL;
@@ -187,6 +190,20 @@ static iree_status_t run_sample(void) {
                                     &create_params, host_allocator, &device);
   }
   iree_async_proactor_pool_release(proactor_pool);
+
+  // Queue operations require devices to be assigned to a causal frontier. A
+  // single-device group gives direct HAL users the same production contract the
+  // VM HAL module uses for queue ordering and transient-memory reuse.
+  if (iree_status_is_ok(status)) {
+    status = iree_async_frontier_tracker_create(
+        iree_async_frontier_tracker_options_default(), host_allocator,
+        &frontier_tracker);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_create_from_device(
+        device, frontier_tracker, host_allocator, &device_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
 
   if (iree_status_is_ok(status)) {
     iree_string_view_t device_id = iree_hal_device_id(device);
@@ -256,13 +273,14 @@ static iree_status_t run_sample(void) {
     fprintf(stdout, "HAL hello sample completed successfully.\n");
   }
 
-  //--- Cleanup (all NULL-safe, reverse order) ---------------------------------
+  //--- Cleanup (all NULL-safe) ------------------------------------------------
 
   iree_hal_semaphore_release(semaphore);
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(destination_buffer);
   iree_hal_buffer_release(source_buffer);
   iree_hal_device_release(device);
+  iree_hal_device_group_release(device_group);
   return status;
 }
 
