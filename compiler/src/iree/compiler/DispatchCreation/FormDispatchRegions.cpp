@@ -658,11 +658,7 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       }
 
       // Group operands by owning consumer so the per-operand checks inside
-      // `isFusableWithConsumer` (e.g. pack-identity, insert_slice source
-      // single-use) are evaluated for every operand of a consumer, not just
-      // the first. Without the grouping, the first operand's verdict would
-      // mark the consumer fused and subsequent operands would be skipped via
-      // `isFusedOp`.
+      // `isFusableWithConsumer` are evaluated for every operand of a consumer.
       llvm::MapVector<Operation *, SmallVector<OpOperand *>> usesByConsumer;
       for (OpOperand *use : fusableUses) {
         usesByConsumer[use->getOwner()].push_back(use);
@@ -680,8 +676,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
           continue;
         }
 
-        // All operands of this consumer that come from the current producer
-        // must pass the per-operand fusibility check.
         if (!llvm::all_of(operands, [&](OpOperand *use) {
               return isFusableWithConsumer(*use, tracker, options);
             })) {
