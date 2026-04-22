@@ -95,6 +95,8 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::help
+    iree::hal::replay::recorder
     iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
@@ -113,6 +115,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::modules::check
     iree::testing::gtest
     iree::tooling::context_util
@@ -225,6 +228,60 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-dump-replay
+  SRCS
+    "iree-dump-replay-main.c"
+  DEPS
+    iree::base
+    iree::base::tooling::flags
+    iree::hal::replay::dump
+    iree::hal::replay::help
+    iree::io::file_handle
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
+    iree-run-replay
+  SRCS
+    "iree-run-replay-main.c"
+  DEPS
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::replay::execute
+    iree::hal::replay::help
+    iree::io::file_handle
+    iree::tooling::device_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
+    iree-benchmark-replay
+  SRCS
+    "iree-benchmark-replay-main.cc"
+  DEPS
+    benchmark
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::replay::execute
+    iree::hal::replay::help
+    iree::io::file_handle
+    iree::tooling::device_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-encode-parameters
   SRCS
     "iree-encode-parameters-main.c"
@@ -232,6 +289,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::io::file_handle
     iree::io::formats::irpa
     iree::io::parameter_index
@@ -317,6 +375,7 @@ iree_cc_binary(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::help
     iree::tooling::context_util
     iree::tooling::run_module
     iree::vm

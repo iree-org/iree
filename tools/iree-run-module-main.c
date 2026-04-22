@@ -6,23 +6,29 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
+#include "iree/hal/replay/help.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/run_module.h"
 #include "iree/vm/api.h"
+
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Parse command line flags.
-  iree_flags_set_usage(
-      "iree-run-module",
-      "Runs a function within a compiled IREE module and handles I/O parsing\n"
-      "and optional expected value verification/output processing. Modules\n"
-      "can be provided by file path (`--module=file.vmfb`) or read from stdin\n"
-      "(`--module=-`) and the function to execute matches the original name\n"
-      "provided to the compiler (`--function=foo` for `func.func @foo`).\n");
+  iree_flags_set_usage("iree-run-module", iree_hal_replay_capture_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
+    return EXIT_SUCCESS;
+  }
 
   // Hosting applications can provide their own allocators to pool resources or
   // track allocation statistics related to IREE code.

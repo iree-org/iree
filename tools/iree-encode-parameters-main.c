@@ -9,6 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/io/file_handle.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/io/parameter_index.h"
@@ -337,11 +338,13 @@ static iree_status_t iree_encode_call_indices(
 
   iree_vm_context_t* context = NULL;
   iree_hal_device_t* device = NULL;
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_tooling_create_context_from_flags(
-              instance, module_list->count, module_list->values,
-              /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-              &context, &device, /*out_device_allocator=*/NULL));
+      z0,
+      iree_tooling_create_context_from_flags(
+          instance, module_list->count, module_list->values,
+          /*default_device_uri=*/iree_string_view_empty(), host_allocator,
+          &context, &device, /*out_device_allocator=*/NULL, &replay_recorder));
 
   // Invoke indices function.
   iree_vm_list_t* outputs = NULL;
@@ -366,8 +369,15 @@ static iree_status_t iree_encode_call_indices(
   }
 
   iree_vm_list_release(outputs);
-  iree_hal_device_release(device);
   iree_vm_context_release(context);
+  if (replay_recorder) {
+    status = iree_status_join(
+        status,
+        iree_status_annotate_f(iree_hal_replay_recorder_close(replay_recorder),
+                               "closing HAL replay capture"));
+    iree_hal_replay_recorder_release(replay_recorder);
+  }
+  iree_hal_device_release(device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -714,7 +724,14 @@ static iree_status_t iree_encode_create_encoding_context(
     iree_vm_instance_t* instance, iree_tooling_module_list_t* module_list,
     iree_output_archive_t* archives, iree_host_size_t archive_count,
     iree_allocator_t host_allocator, iree_vm_context_t** out_context,
-    iree_hal_device_t** out_device) {
+    iree_hal_device_t** out_device,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
+  IREE_ASSERT_ARGUMENT(out_context);
+  IREE_ASSERT_ARGUMENT(out_device);
+  IREE_ASSERT_ARGUMENT(out_replay_recorder);
+  *out_context = NULL;
+  *out_device = NULL;
+  *out_replay_recorder = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Collect output providers.
@@ -748,17 +765,37 @@ static iree_status_t iree_encode_create_encoding_context(
 
   // Resolve dependencies (adds HAL, etc.).
   if (iree_status_is_ok(status)) {
+    iree_hal_device_t* device = NULL;
+    iree_hal_replay_recorder_t* replay_recorder = NULL;
     status = iree_tooling_resolve_modules(
         instance, module_list->count, module_list->values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &resolved_list, out_device, /*out_device_allocator=*/NULL);
-  }
+        &resolved_list, &device, /*out_device_allocator=*/NULL,
+        &replay_recorder);
 
-  // Create context.
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_context_create_with_modules(
-        instance, IREE_VM_CONTEXT_FLAG_NONE, resolved_list.count,
-        resolved_list.values, host_allocator, out_context);
+    // Create context.
+    iree_vm_context_t* context = NULL;
+    if (iree_status_is_ok(status)) {
+      status = iree_vm_context_create_with_modules(
+          instance, IREE_VM_CONTEXT_FLAG_NONE, resolved_list.count,
+          resolved_list.values, host_allocator, &context);
+    }
+
+    if (iree_status_is_ok(status)) {
+      *out_context = context;
+      *out_device = device;
+      *out_replay_recorder = replay_recorder;
+    } else {
+      iree_vm_context_release(context);
+      if (replay_recorder) {
+        status = iree_status_join(
+            status, iree_status_annotate_f(
+                        iree_hal_replay_recorder_close(replay_recorder),
+                        "closing HAL replay capture"));
+        iree_hal_replay_recorder_release(replay_recorder);
+      }
+      iree_hal_device_release(device);
+    }
   }
 
   iree_tooling_module_list_reset(&resolved_list);
@@ -993,10 +1030,11 @@ static iree_status_t iree_tooling_encode_parameters(
   // Create encoding context with output providers.
   iree_vm_context_t* context = NULL;
   iree_hal_device_t* device = NULL;
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_encode_create_encoding_context(
         instance, &module_list, archives, output_list.count, host_allocator,
-        &context, &device);
+        &context, &device, &replay_recorder);
   }
 
   // Call steps function.
@@ -1027,8 +1065,15 @@ static iree_status_t iree_tooling_encode_parameters(
     }
     iree_allocator_free(host_allocator, archives);
   }
-  iree_hal_device_release(device);
   iree_vm_context_release(context);
+  if (replay_recorder) {
+    status = iree_status_join(
+        status,
+        iree_status_annotate_f(iree_hal_replay_recorder_close(replay_recorder),
+                               "closing HAL replay capture"));
+    iree_hal_replay_recorder_release(replay_recorder);
+  }
+  iree_hal_device_release(device);
   iree_output_scope_list_deinitialize(&output_list);
   iree_encode_target_set_deinitialize(&target_set);
   iree_tooling_module_list_reset(&module_list);
