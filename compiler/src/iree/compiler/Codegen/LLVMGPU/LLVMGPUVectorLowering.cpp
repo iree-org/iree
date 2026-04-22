@@ -171,7 +171,7 @@ struct TransposeContractOperands final
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.isMasked()) {
+    if (op.isMasked() || op.getKind() != vector::CombiningKind::ADD) {
       return failure();
     }
 
