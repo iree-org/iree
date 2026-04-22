@@ -598,14 +598,13 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
     tensor.yield %cst : f16
   } : tensor<?x121xf16> to tensor<4x124xf16>
 
-  // Copy from padded tensor.
-  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+  // Copy from padded tensor. ConfigUtils rejects DMA because source row size
+  // (121 * 2 = 242 bytes) is not DWORD-aligned, so derived_thread_config is
+  // used instead.
+  %result = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
     ins(%padded : tensor<4x124xf16>)
     outs(%init : tensor<4x124xf16>) -> tensor<4x124xf16>
 
-  // Source row size (121 * 2 = 242 bytes) is not DWORD-aligned.
-  // Coalesced DMA bails out to avoid partial OOB in per-DWORD range checking.
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
   // CHECK: tensor.pad
   // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
@@ -644,12 +643,12 @@ func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %
     tensor.yield %cst : i8
   } : tensor<?x?xi8> to tensor<4x256xi8>
 
-  // Copy from padded tensor.
-  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+  // Copy from padded tensor. ConfigUtils rejects DMA because source innermost
+  // dimension is dynamic, so derived_thread_config is used instead.
+  %result = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
     ins(%padded : tensor<4x256xi8>)
     outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
 
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
   // CHECK: tensor.pad
   // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
   // CHECK-NOT: iree_gpu.coalesced_gather_dma

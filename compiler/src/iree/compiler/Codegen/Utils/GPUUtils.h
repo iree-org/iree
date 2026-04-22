@@ -19,6 +19,10 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
+namespace mlir {
+class DataFlowSolver;
+} // namespace mlir
+
 namespace mlir::iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;
@@ -310,6 +314,32 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Check if the target architecture supports global load DMA.
 /// Returns true only for CDNA4+ (gfx950+) architectures.
 bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
+
+/// Returns the subgroup size if the total elements of |shape| are aligned to
+/// DMA transfer sizes, std::nullopt otherwise. When |shape| contains dynamic
+/// dimensions, falls back to checking only the innermost (last) dimension.
+std::optional<int64_t> getDMAAlignedSubgroupSize(IREE::GPU::TargetAttr target,
+                                                 int64_t subgroupSize,
+                                                 Type elementType,
+                                                 ArrayRef<int64_t> shape);
+
+/// Returns true if a row of |dimSize| elements of |elementType| is DWORD
+/// (4-byte) aligned. On AMD CDNA, partial out-of-bounds DWORDs return zero,
+/// so DMA copies require DWORD-aligned source rows. Returns false for dynamic
+/// dimensions.
+bool isDWORDAligned(int64_t dimSize, Type elementType);
+
+/// Check if the total buffer size for the given shaped type fits within
+/// INT32_MAX bytes, which is required for fat_raw_buffer addressing on AMDGPU.
+/// For types with dynamic dimensions, |dynamicDims| and a DataFlowSolver are
+/// needed to compute upper bounds. Returns false conservatively when bounds
+/// cannot be determined. |scaleFactor| multiplies the computed size to account
+/// for split-reduction where the dispatch operand is a fraction of the full
+/// buffer.
+bool canUseFatRawBuffer(ShapedType type,
+                        std::optional<ValueRange> dynamicDims = std::nullopt,
+                        const DataFlowSolver *solver = nullptr,
+                        int64_t scaleFactor = 0);
 
 // Methods to retrieve information association with `configuration` field
 // of `hal.executable.target` attribute used commonly in GPU codegen pipelines.

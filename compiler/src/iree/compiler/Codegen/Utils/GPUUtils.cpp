@@ -12,11 +12,13 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -29,6 +31,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
@@ -1316,6 +1319,103 @@ bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
     return false;
   }
   return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
+}
+
+std::optional<int64_t> getDMAAlignedSubgroupSize(IREE::GPU::TargetAttr target,
+                                                 int64_t subgroupSize,
+                                                 Type elementType,
+                                                 ArrayRef<int64_t> shape) {
+  if (!target || shape.empty()) {
+    return std::nullopt;
+  }
+
+  // If any dimension is dynamic, fall back to just the innermost dimension.
+  int64_t availableElements;
+  if (llvm::any_of(shape, ShapedType::isDynamic)) {
+    int64_t innermostDim = shape.back();
+    if (ShapedType::isDynamic(innermostDim)) {
+      return std::nullopt;
+    }
+    availableElements = innermostDim;
+  } else {
+    availableElements = ShapedType::getNumElements(shape);
+  }
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+      availableElements % minElementsPerTransfer != 0) {
+    return std::nullopt;
+  }
+
+  return subgroupSize;
+}
+
+bool isDWORDAligned(int64_t dimSize, Type elementType) {
+  if (ShapedType::isDynamic(dimSize)) {
+    return false;
+  }
+  int64_t rowBytes = dimSize * (elementType.getIntOrFloatBitWidth() / 8);
+  return rowBytes % 4 == 0;
+}
+
+bool canUseFatRawBuffer(ShapedType type, std::optional<ValueRange> dynamicDims,
+                        const DataFlowSolver *solver, int64_t scaleFactor) {
+  if (!type || !type.hasRank()) {
+    return false;
+  }
+  int64_t maxNumElems = 1;
+  // Handle dynamic dimensions.
+  for (Value dynArg : dynamicDims.value_or(ValueRange{})) {
+    if (!solver) {
+      return false;
+    }
+    FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, *solver);
+    if (failed(dimMax)) {
+      return false;
+    }
+    if (llvm::MulOverflow(maxNumElems, *dimMax, maxNumElems)) {
+      return false;
+    }
+  }
+  // Handle static dimensions.
+  for (int64_t dim : type.getShape()) {
+    if (ShapedType::isDynamic(dim)) {
+      if (!dynamicDims) {
+        return false;
+      }
+      continue;
+    }
+    if (llvm::MulOverflow(maxNumElems, dim, maxNumElems)) {
+      return false;
+    }
+  }
+  int64_t elementBits = IREE::Util::getTypeBitWidth(type.getElementType());
+  if (llvm::MulOverflow(maxNumElems, elementBits, maxNumElems)) {
+    return false;
+  }
+  int64_t totalBytes = maxNumElems / 8;
+  if (scaleFactor > 1) {
+    if (llvm::MulOverflow(totalBytes, scaleFactor, totalBytes)) {
+      return false;
+    }
+  }
+  return totalBytes < static_cast<int64_t>(std::numeric_limits<int32_t>::max());
 }
 
 void addConfigGPUTarget(MLIRContext *context,
