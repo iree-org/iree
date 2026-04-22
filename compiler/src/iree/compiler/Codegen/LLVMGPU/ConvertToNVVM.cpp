@@ -121,23 +121,14 @@ struct ConvertToNVVMPass final
       populateConvertSharedMemoryAllocOps(patterns);
       populateLowerGlobalSubgroupBarrierPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-      vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
-      vector::populateVectorFromElementsUnrollPatterns(patterns);
-      vector::populateVectorToElementsUnrollPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
       vector::populateVectorMaskMaterializationPatterns(
           patterns, /*force32BitVectorIndices=*/false);
-      vector::populateVectorShapeCastLoweringPatterns(patterns);
-      // TODO: doubtful that the "default" does what one want here, it is likely
-      // better to use something else.
-      vector::populateVectorTransposeLoweringPatterns(
-          patterns, options.vectorTransposeLowering);
-      vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();

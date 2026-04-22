@@ -293,26 +293,17 @@ struct ConvertToROCDLPass final
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
-      vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorInterleaveLoweringPatterns(patterns);
       vector::populateVectorInterleaveToShufflePatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
 
-      vector::populateVectorFromElementsUnrollPatterns(patterns);
-      vector::populateVectorToElementsUnrollPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // Use 64-bit indices for mask materialization to match the index
       // bitwidth.
       vector::populateVectorMaskMaterializationPatterns(
           patterns, /*force32BitVectorIndices=*/false);
-      vector::populateVectorShapeCastLoweringPatterns(patterns);
-      // TODO: doubtful that the "default" does what one want here, it is likely
-      // better to use something else.
-      vector::populateVectorTransposeLoweringPatterns(
-          patterns, options.vectorTransposeLowering);
-      vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
