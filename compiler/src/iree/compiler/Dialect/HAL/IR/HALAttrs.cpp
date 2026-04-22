@@ -1351,11 +1351,13 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
 
 Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                            Type type, Location loc) {
-  if (!isa<IndexType>(type)) {
-    return nullptr;
+  if (isa<IndexType>(type)) {
+    // Some folders materialize raw index types, which just become std
+    // constants.
+    return mlir::arith::ConstantIndexOp::create(
+        builder, loc, cast<IntegerAttr>(value).getValue().getSExtValue());
   }
-  return mlir::arith::ConstantIndexOp::create(
-      builder, loc, cast<IntegerAttr>(value).getValue().getSExtValue());
+  return nullptr;
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
