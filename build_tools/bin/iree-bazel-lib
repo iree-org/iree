@@ -74,6 +74,8 @@ configuration, provide better defaults, and work from any subdirectory.
 - `iree-bazel-build <target> [bazel-args]` - Build targets
 - `iree-bazel-test <target> [bazel-args]` - Run tests
 - `iree-bazel-run <target> [bazel-args] [-- program-args]` - Build and run binary
+  - Add `--trace` to capture the run with Tracy using `--config=perf --config=tracy`
+  - Add `--trace_name=<name>` to override the `.tracy/<timestamp>-<name>.tracy` artifact name
 - `iree-bazel-try [options] -e 'code' [-- program-args]` - Quick C/C++ experiments
 
 **Additional tools:** `iree-bazel-query`, `iree-bazel-cquery`, `iree-bazel-fuzz` (see `--help`)
@@ -81,8 +83,11 @@ configuration, provide better defaults, and work from any subdirectory.
 **Examples:**
 ```shell
 iree-bazel-build //tools:iree-compile
+iree-bazel-build //tools:iree-benchmark-module --config=perf --config=tracy
 iree-bazel-test //runtime/src/iree/base:status_test
 iree-bazel-run //tools:iree-compile -- --help
+iree-bazel-run --trace //tools:iree-run-module -- --module=model.vmfb --device=local-task
+iree-bazel-run --trace --trace_name=run-module-sample //tools:iree-run-module -- --module=model.vmfb --device=local-task
 iree-bazel-try -e 'int main() { return 0; }'
 ```
 

@@ -40,6 +40,7 @@ check_tool("iree-create-parameters", ["--help"], "IREE: iree-create-parameters")
 check_tool("iree-convert-parameters", ["--help"], "IREE: iree-convert-parameters")
 check_tool("iree-dump-module", ["--help"], "IREE: iree-dump-module")
 check_tool("iree-dump-parameters", ["--help"], "IREE: iree-dump-parameters")
+check_tool("iree-profile", ["--help"], "IREE: iree-profile")
 check_tool("iree-cpuinfo", [])
 
 print("***** All done *****")

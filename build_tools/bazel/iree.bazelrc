@@ -213,6 +213,27 @@ build:generic_gcc_release --linkopt=-Wl,--strip-all
 build:msvc_release --compilation_mode=opt
 
 ###############################################################################
+# Options for performance-oriented local runs and captures.
+###############################################################################
+
+# Uses an optimized local CPU-oriented build shape. This intentionally does not
+# enable tracing so it can be used with `perf` and other profiling tools;
+# compose it with --config=tracy when a profiled build is needed.
+build:perf --compilation_mode=opt
+build:perf --copt=-DNDEBUG
+build:perf --features=thin_lto
+build:perf --copt=-O3
+build:perf --cxxopt=-O3
+build:perf --host_copt=-O3
+build:perf --host_cxxopt=-O3
+build:perf --copt=-march=native
+build:perf --cxxopt=-march=native
+build:perf --host_copt=-march=native
+build:perf --host_cxxopt=-march=native
+
+build:tracy --iree_enable_runtime_tracing=tracy
+
+###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################

@@ -135,6 +135,7 @@ iree_py_library(
     "iree/_runtime/scripts/iree_dump_module/__main__.py"
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
     "iree/_runtime/scripts/iree_flatcc_cli/__main__.py"
+    "iree/_runtime/scripts/iree_profile/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
@@ -193,6 +194,12 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-flatcc-cli
   TO_EXE_NAME iree/_runtime_libs/iree-flatcc-cli
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-profile
+  TO_EXE_NAME iree/_runtime_libs/iree-profile
 )
 
 iree_symlink_tool(
