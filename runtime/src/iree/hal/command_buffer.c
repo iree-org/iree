@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
@@ -33,6 +34,9 @@
 
 #define _VTABLE_DISPATCH(command_buffer, method_name) \
   IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)
+
+static iree_atomic_int64_t iree_hal_command_buffer_next_profile_id =
+    IREE_ATOMIC_VAR_INIT(1);
 
 //===----------------------------------------------------------------------===//
 // String utils
@@ -206,6 +210,8 @@ IREE_API_EXPORT void iree_hal_command_buffer_initialize(
   command_buffer->mode = mode;
   command_buffer->allowed_categories = command_categories;
   command_buffer->queue_affinity = queue_affinity;
+  command_buffer->profile_id = (uint64_t)iree_atomic_fetch_add(
+      &iree_hal_command_buffer_next_profile_id, 1, iree_memory_order_relaxed);
   command_buffer->binding_capacity = binding_capacity;
   command_buffer->binding_count = 0;
   command_buffer->validation_state = validation_state;
@@ -259,6 +265,19 @@ iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   return command_buffer->allowed_categories;
+}
+
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  return command_buffer->queue_affinity;
+}
+
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
+    const iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  return command_buffer->profile_id;
 }
 
 IREE_API_EXPORT iree_status_t

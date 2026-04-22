@@ -75,6 +75,7 @@ iree_runtime_cc_library(
     deps = [
         ":device_util",
         ":parameter_util",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:path",

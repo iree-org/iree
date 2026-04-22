@@ -116,23 +116,22 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
-    name = "profile_metrics_test",
-    srcs = ["profile_metrics_test.cc"],
+    name = "device_test",
+    srcs = ["device_test.cc"],
     deps = [
         ":hal",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/testing:mock_device",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "pool_test",
-    srcs = ["pool_test.cc"],
+    name = "profile_metrics_test",
+    srcs = ["profile_metrics_test.cc"],
     deps = [
         ":hal",
-        "//runtime/src/iree/async",
-        "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -146,6 +145,19 @@ iree_runtime_cc_test(
         ":hal",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "pool_test",
+    srcs = ["pool_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -178,6 +190,7 @@ iree_runtime_cc_test(
     srcs = ["device_group_test.cc"],
     deps = [
         ":hal",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal/testing:mock_device",
         "//runtime/src/iree/testing:gtest",

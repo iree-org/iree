@@ -56,6 +56,11 @@ namespace iree::hal::cts {
 
 // Factory function that creates a HAL driver and device pair.
 //
+// The shared CTS fixture owns |create_params| storage and keeps all borrowed
+// resources in it alive for the lifetime of the returned device. Factories must
+// pass it through to driver device creation unchanged unless the backend has a
+// documented driver-specific extension chain to add.
+//
 // Returns:
 //   iree_ok_status(): Success. Both out params populated with retained refs.
 //   IREE_STATUS_UNAVAILABLE: Backend not present on this system. Tests skip.
@@ -63,6 +68,7 @@ namespace iree::hal::cts {
 //
 // The caller takes ownership of both returned objects and must release them.
 using DeviceFactory = std::function<iree_status_t(
+    const iree_hal_device_create_params_t* create_params,
     iree_hal_driver_t** out_driver, iree_hal_device_t** out_device)>;
 
 // Function that returns pre-compiled executable data for a given file name.

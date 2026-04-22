@@ -26,13 +26,33 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_test_util
+  HDRS
+    "profile_test_util.h"
+  SRCS
+    "profile_test_util.cc"
+  DEPS
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     test_base
   HDRS
     "test_base.h"
+  SRCS
+    "test_base.cc"
   DEPS
     ::registry
+    iree::async
+    iree::async::util::proactor_pool
     iree::base
+    iree::base::threading
     iree::hal
+    iree::io::file_handle
     iree::testing::gtest
   TESTONLY
   PUBLIC

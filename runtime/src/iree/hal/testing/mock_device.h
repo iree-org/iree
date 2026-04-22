@@ -9,8 +9,10 @@
 //
 // The mock device implements the topology-related vtable methods (id,
 // query_capabilities, topology_info, refine_topology_edge,
-// assign_topology_info) with configurable behavior. All other vtable methods
-// return IREE_STATUS_UNIMPLEMENTED or zero/NULL as appropriate.
+// assign_topology_info) with configurable behavior. It can optionally expose a
+// tiny metadata-only executable cache for tests that need executable objects
+// without real compiled kernels. All other vtable methods return
+// IREE_STATUS_UNIMPLEMENTED or zero/NULL as appropriate.
 //
 // This is intended for testing code that coordinates devices (device groups,
 // topology construction, multi-device scheduling) rather than code that
@@ -35,6 +37,13 @@ typedef struct iree_hal_mock_device_options_t {
   // Capabilities returned by iree_hal_device_query_capabilities().
   // Zero-initialized is valid (no special capabilities).
   iree_hal_device_capabilities_t capabilities;
+
+  // Optional status returned by assign_topology_info. IREE_STATUS_OK means the
+  // mock accepts the assignment normally.
+  iree_status_code_t assign_topology_info_status_code;
+
+  // Enables create_executable_cache for metadata-only mock executables.
+  bool executable_cache_enabled;
 } iree_hal_mock_device_options_t;
 
 // Initializes |out_options| with safe defaults (empty identifier, zeroed

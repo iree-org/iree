@@ -6,20 +6,19 @@
 
 // CTS backend registration for the AMDGPU HAL driver.
 
-#include "iree/async/util/proactor_pool.h"
-#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
-static iree_status_t CreateAmdgpuDevice(iree_hal_driver_t** out_driver,
-                                        iree_hal_device_t** out_device) {
+static iree_status_t CreateAmdgpuDevice(
+    const iree_hal_device_create_params_t* create_params,
+    iree_hal_driver_t** out_driver, iree_hal_device_t** out_device) {
   iree_status_t status = iree_hal_amdgpu_driver_module_register(
       iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
-    iree_status_ignore(status);
+    (void)iree_status_consume_code(status);
     status = iree_ok_status();
   }
 
@@ -30,24 +29,11 @@ static iree_status_t CreateAmdgpuDevice(iree_hal_driver_t** out_driver,
         iree_allocator_system(), &driver);
   }
 
-  iree_async_proactor_pool_t* proactor_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool);
-  }
-
   iree_hal_device_t* device = nullptr;
   if (iree_status_is_ok(status)) {
-    iree_hal_device_create_params_t create_params =
-        iree_hal_device_create_params_default();
-    create_params.proactor_pool = proactor_pool;
     status = iree_hal_driver_create_default_device(
-        driver, &create_params, iree_allocator_system(), &device);
+        driver, create_params, iree_allocator_system(), &device);
   }
-
-  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     *out_driver = driver;
@@ -69,34 +55,8 @@ static bool amdgpu_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
-              {"AllocatorTest.*",
-               "AMDGPU driver does not yet implement allocator CTS tests"},
-              {"BufferMappingTest.*",
-               "AMDGPU driver does not yet implement buffer mapping"},
-              {"CommandBufferTest.*",
-               "AMDGPU driver does not yet implement command buffer CTS "
-               "tests"},
-              {"CommandBufferCopyBufferTest.*",
-               "AMDGPU driver does not yet implement buffer copy"},
-              {"CommandBufferFillBufferTest.*",
-               "AMDGPU driver does not yet implement buffer fill"},
-              {"CommandBufferUpdateBufferTest.*",
-               "AMDGPU driver does not yet implement buffer update"},
-              {"DispatchTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
-              {"DispatchMultiEntrypointTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
-              {"DispatchMultiWorkgroupTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
-              {"DispatchConstantsTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
-              {"DispatchConstantsBindingsTest.*",
-               "AMDGPU driver does not yet implement dispatch CTS tests"},
+              // Features and API surface not currently implemented.
               {"EventTest.*", "AMDGPU does not implement HAL events"},
-              {"ExecutableTest.*",
-               "AMDGPU does not implement executable reflection"},
-              {"FileTest.*",
-               "AMDGPU driver does not yet implement file CTS tests"},
           }},
          {"async_queue"},
      }),

@@ -7,7 +7,7 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,41 +16,176 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "block_builder",
+    srcs = [
+        "block_builder.c",
+    ],
+    hdrs = [
+        "block_builder.h",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_builder_test",
+    srcs = [
+        "block_builder_test.cc",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_command_ops",
+        ":block_isa",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_command_buffer",
+    srcs = [
+        "block_command_buffer.c",
+    ],
+    hdrs = [
+        "block_command_buffer.h",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_command_ops",
+        ":block_isa",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
+        "//runtime/src/iree/hal/local:executable_loader",
+        "//runtime/src/iree/hal/local:transient_buffer",
+        "//runtime/src/iree/hal/utils:resource_set",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_command_ops",
+    srcs = [
+        "block_command_ops.c",
+    ],
+    hdrs = [
+        "block_command_ops.h",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_isa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_library",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_isa",
+    hdrs = [
+        "block_isa.h",
+    ],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/local:executable_library",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_isa_test",
+    srcs = [
+        "block_isa_test.cc",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "block_processor",
+    srcs = [
+        "block_processor.c",
+    ],
+    hdrs = [
+        "block_processor.h",
+    ],
+    deps = [
+        ":block_isa",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal/local:executable_loader",
+        "//runtime/src/iree/hal/local:profile",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "block_processor_test",
+    srcs = [
+        "block_processor_test.cc",
+    ],
+    deps = [
+        ":block_builder",
+        ":block_isa",
+        ":block_processor",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/hal/local:executable_loader",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "task_driver",
     srcs = [
-        "task_command_buffer.c",
         "task_device.c",
         "task_driver.c",
         "task_event.c",
         "task_queue.c",
-        "task_queue_state.c",
         "task_semaphore.c",
     ],
     hdrs = [
-        "task_command_buffer.h",
         "task_device.h",
         "task_driver.h",
         "task_event.h",
         "task_queue.h",
-        "task_queue_state.h",
         "task_semaphore.h",
     ],
     deps = [
+        ":block_builder",
+        ":block_command_buffer",
+        ":block_command_ops",
+        ":block_processor",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:atomic_slist",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
-        "//runtime/src/iree/hal/utils:deferred_command_buffer",
-        "//runtime/src/iree/hal/utils:file_transfer",
+        "//runtime/src/iree/hal/local:profile",
+        "//runtime/src/iree/hal/local:transient_buffer",
+        "//runtime/src/iree/hal/memory:cpu_slab_provider",
+        "//runtime/src/iree/hal/memory:passthrough_pool",
+        "//runtime/src/iree/hal/memory:tlsf_pool",
         "//runtime/src/iree/hal/utils:files",
-        "//runtime/src/iree/hal/utils:queue_emulation",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/task",
     ],

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ConstEval/Runtime.h"
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
@@ -479,11 +480,18 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   iree_hal_driver_release(driver);
 
   // Create device group and hal module.
+  iree_async_frontier_tracker_t *frontierTracker = nullptr;
+  if (iree_status_is_ok(status)) {
+    status = iree_async_frontier_tracker_create(
+        iree_async_frontier_tracker_options_default(), iree_allocator_system(),
+        &frontierTracker);
+  }
   iree_hal_device_group_t *deviceGroup = nullptr;
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_group_create_from_device(
-        device.get(), iree_allocator_system(), &deviceGroup);
+        device.get(), frontierTracker, iree_allocator_system(), &deviceGroup);
   }
+  iree_async_frontier_tracker_release(frontierTracker);
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(runtime.instance.get(),
                                     iree_hal_module_device_policy_default(),

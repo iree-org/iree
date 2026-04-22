@@ -165,9 +165,13 @@ iree_hal_topology_edge_t iree_hal_topology_edge_make_self(void) {
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
   lo = iree_hal_topology_edge_set_signal_mode(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  lo = iree_hal_topology_edge_set_buffer_read_mode(
+  lo = iree_hal_topology_edge_set_buffer_read_mode_noncoherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  lo = iree_hal_topology_edge_set_buffer_write_mode(
+  lo = iree_hal_topology_edge_set_buffer_write_mode_noncoherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_buffer_read_mode_coherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_buffer_write_mode_coherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
 
   // Set link class to same die.
@@ -217,9 +221,13 @@ iree_hal_topology_edge_t iree_hal_topology_edge_make_cross_driver(void) {
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
   lo = iree_hal_topology_edge_set_signal_mode(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  lo = iree_hal_topology_edge_set_buffer_read_mode(
+  lo = iree_hal_topology_edge_set_buffer_read_mode_noncoherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  lo = iree_hal_topology_edge_set_buffer_write_mode(
+  lo = iree_hal_topology_edge_set_buffer_write_mode_noncoherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  lo = iree_hal_topology_edge_set_buffer_read_mode_coherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  lo = iree_hal_topology_edge_set_buffer_write_mode_coherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 
   // Assume PCIe link by default.
@@ -320,43 +328,73 @@ iree_hal_topology_edge_from_capabilities(
   lo = iree_hal_topology_edge_set_wait_mode(lo, wait_mode);
   lo = iree_hal_topology_edge_set_signal_mode(lo, signal_mode);
 
-  // Buffer modes.
+  // Buffer modes (non-coherent and coherent).
   //
-  // NATIVE: memory is load/store addressable across the link (unified memory,
-  //   large BAR P2P). Scheduler can reference the buffer directly in
-  //   dispatches.
-  // IMPORT: buffer handle can be imported. Scheduler imports then uses
-  // directly. COPY: a transfer command is required (P2P DMA or host-staged).
-  // Scheduler
-  //   must allocate on dst and issue a copy. Cost distinguishes P2P from host.
+  // Each device pair has two sets of buffer modes reflecting the two memory
+  // types available in heterogeneous systems:
   //
-  // P2P_COPY alone means the DMA engine can move data directly between devices,
-  // but shader/host load/store may fault on the remote memory. Only when
-  // PEER_ADDRESSABLE is also set can we safely use NATIVE mode.
+  //   Non-coherent: device-local memory optimized for compute bandwidth.
+  //     Requires explicit DMA or host staging for cross-device access.
+  //     Determined by PEER_ADDRESSABLE (large BAR mapping) and P2P_COPY.
+  //
+  //   Coherent: memory with hardware-maintained coherency (fine-grained, SVM).
+  //     Often more accessible — SVM provides direct load/store across devices.
+  //     Determined by UNIFIED_MEMORY (SVM) or PEER_COHERENT + PEER_ADDRESSABLE.
+  //
+  // NATIVE: load/store addressable — scheduler references the buffer directly.
+  // IMPORT: buffer handle import — one-time setup, then directly usable.
+  // COPY: transfer command required (P2P DMA or host-staged; see copy_cost).
+  //
+  // These are base defaults. refine_topology_edge queries actual per-pool
+  // access modes from the driver and may upgrade or downgrade either set.
   bool peer_addressable =
       (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE) &&
       (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE);
   bool p2p_copy = (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY) &&
                   (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY);
+  bool unified_memory =
+      (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY) &&
+      (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY);
 
-  iree_hal_topology_interop_mode_t buffer_read_mode, buffer_write_mode;
+  // Non-coherent buffer modes (device-local, coarse-grained).
+  iree_hal_topology_interop_mode_t nc_buffer_read_mode, nc_buffer_write_mode;
   if (peer_addressable && same_driver) {
-    // Load/store addressable: scheduler can reference the buffer directly.
-    buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
-    buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
+    nc_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
+    nc_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
   } else if (buffer_import_types != 0) {
-    // Can import buffer handles for sharing.
-    buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
-    buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
+    nc_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
+    nc_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
   } else {
-    // Must issue a transfer command (P2P DMA if p2p_copy, otherwise
-    // host-staged). The copy_cost and link_class encode the actual cost.
-    buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
-    buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
+    nc_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
+    nc_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
   }
 
-  lo = iree_hal_topology_edge_set_buffer_read_mode(lo, buffer_read_mode);
-  lo = iree_hal_topology_edge_set_buffer_write_mode(lo, buffer_write_mode);
+  lo = iree_hal_topology_edge_set_buffer_read_mode_noncoherent(
+      lo, nc_buffer_read_mode);
+  lo = iree_hal_topology_edge_set_buffer_write_mode_noncoherent(
+      lo, nc_buffer_write_mode);
+
+  // Coherent buffer modes (host-coherent, fine-grained, SVM).
+  // Coherent memory is often more accessible than non-coherent because SVM
+  // provides direct addressing without explicit grants. Unlike non-coherent
+  // mode, UNIFIED_MEMORY alone is sufficient for NATIVE — SVM guarantees
+  // pointer equivalence across drivers (e.g., CPU local-task + GPU amdgpu).
+  iree_hal_topology_interop_mode_t c_buffer_read_mode, c_buffer_write_mode;
+  if (unified_memory || (peer_addressable && same_driver)) {
+    c_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
+    c_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
+  } else if (buffer_import_types != 0) {
+    c_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
+    c_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
+  } else {
+    c_buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
+    c_buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
+  }
+
+  lo = iree_hal_topology_edge_set_buffer_read_mode_coherent(lo,
+                                                            c_buffer_read_mode);
+  lo = iree_hal_topology_edge_set_buffer_write_mode_coherent(
+      lo, c_buffer_write_mode);
 
   // Capability flags (bitwise AND of device flags).
   iree_hal_topology_capability_t caps = 0;

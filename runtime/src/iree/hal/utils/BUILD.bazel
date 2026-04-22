@@ -92,6 +92,26 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "elf_format",
+    srcs = ["elf_format.c"],
+    hdrs = ["elf_format.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "elf_format_test",
+    srcs = ["elf_format_test.cc"],
+    deps = [
+        ":elf_format",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "file_cache",
     srcs = ["file_cache.c"],
     hdrs = ["file_cache.h"],
@@ -199,6 +219,28 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "statistics_sink",
+    srcs = ["statistics_sink.c"],
+    hdrs = ["statistics_sink.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "statistics_sink_test",
+    srcs = ["statistics_sink_test.cc"],
+    deps = [
+        ":statistics_sink",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "profile_file_test",
     srcs = ["profile_file_test.cc"],
@@ -232,28 +274,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "statistics_sink",
-    srcs = ["statistics_sink.c"],
-    hdrs = ["statistics_sink.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "statistics_sink_test",
-    srcs = ["statistics_sink_test.cc"],
-    deps = [
-        ":statistics_sink",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

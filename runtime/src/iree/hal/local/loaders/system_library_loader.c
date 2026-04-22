@@ -201,6 +201,8 @@ static iree_status_t iree_hal_system_executable_query_library(
   executable->identifier = iree_make_cstring_view(header->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
   executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
+  executable->base.export_count = executable->library.v0->exports.count;
+  executable->base.export_names = executable->library.v0->exports.names;
   return iree_ok_status();
 }
 

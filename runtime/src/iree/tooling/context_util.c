@@ -9,6 +9,7 @@
 #include <memory.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/threading/numa.h"
@@ -16,6 +17,7 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/io/file_contents.h"
+#include "iree/io/file_handle.h"
 #include "iree/modules/hal/inline/module.h"
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
@@ -192,14 +194,41 @@ static iree_status_t iree_hal_module_device_allocator_select_specific(
   return iree_ok_status();
 }
 
-static iree_hal_module_device_policy_t iree_hal_module_device_policy_from_flags(
-    const iree_hal_device_list_t* device_list) {
-  iree_hal_module_device_policy_t policy =
-      iree_hal_module_device_policy_default();
-  policy.allocator_select.fn = iree_hal_module_device_allocator_select_specific;
-  policy.allocator_select.user_data =
-      device_list->devices[FLAG_device_lead_allocator];
-  return policy;
+static iree_status_t iree_tooling_device_lead_allocator_index_from_flags(
+    iree_hal_device_group_t* device_group, iree_host_size_t* out_index) {
+  IREE_ASSERT_ARGUMENT(device_group);
+  IREE_ASSERT_ARGUMENT(out_index);
+
+  const iree_host_size_t device_count =
+      iree_hal_device_group_device_count(device_group);
+  if (FLAG_device_lead_allocator < 0 ||
+      (iree_host_size_t)FLAG_device_lead_allocator >= device_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "--device_lead_allocator=%d outside the device group range [0, %" PRIhsz
+        ")",
+        FLAG_device_lead_allocator, device_count);
+  }
+
+  *out_index = (iree_host_size_t)FLAG_device_lead_allocator;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_module_device_policy_from_flags(
+    iree_hal_device_group_t* device_group,
+    iree_hal_module_device_policy_t* out_policy) {
+  IREE_ASSERT_ARGUMENT(out_policy);
+
+  iree_host_size_t lead_index = 0;
+  IREE_RETURN_IF_ERROR(iree_tooling_device_lead_allocator_index_from_flags(
+      device_group, &lead_index));
+
+  *out_policy = iree_hal_module_device_policy_default();
+  out_policy->allocator_select.fn =
+      iree_hal_module_device_allocator_select_specific;
+  out_policy->allocator_select.user_data =
+      iree_hal_device_group_device_at(device_group, lead_index);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -237,6 +266,11 @@ static iree_status_t iree_tooling_load_hal_async_module(
               iree_async_proactor_pool_options_default(), host_allocator,
               &proactor_pool));
 
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  iree_status_t status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker);
+
   // Create the device(s) to use.
   if (iree_string_view_is_empty(default_device_uri)) {
     default_device_uri = iree_hal_default_device_uri();
@@ -245,28 +279,22 @@ static iree_status_t iree_tooling_load_hal_async_module(
       iree_hal_device_create_params_default();
   create_params.proactor_pool = proactor_pool;
   iree_hal_device_list_t* device_list = NULL;
-  iree_status_t pool_status = iree_hal_create_devices_from_flags(
-      iree_hal_available_driver_registry(), default_device_uri, &create_params,
-      host_allocator, &device_list);
-  iree_async_proactor_pool_release(proactor_pool);
-  if (!iree_status_is_ok(pool_status)) {
-    IREE_TRACE_ZONE_END(z0);
-    return pool_status;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_devices_from_flags(
+        iree_hal_available_driver_registry(), default_device_uri,
+        &create_params, host_allocator, &device_list);
   }
-
-  // Pick a lead device we'll use for bookkeeping.
-  iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
-  IREE_ASSERT(device, "require at least one device");
-  iree_hal_device_retain(device);
-
-  // Fetch the allocator from the device to pass back to the caller.
-  iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
-  iree_hal_allocator_retain(device_allocator);
+  iree_async_proactor_pool_release(proactor_pool);
+  if (!iree_status_is_ok(status)) {
+    iree_async_frontier_tracker_release(frontier_tracker);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   // Build a device group from all enumerated devices.
   iree_hal_device_group_builder_t group_builder;
-  iree_hal_device_group_builder_initialize(&group_builder);
-  iree_status_t status = iree_ok_status();
+  iree_hal_device_group_builder_initialize(&group_builder, frontier_tracker);
+  iree_async_frontier_tracker_release(frontier_tracker);
   for (iree_host_size_t i = 0;
        i < device_list->count && iree_status_is_ok(status); ++i) {
     status = iree_hal_device_group_builder_add_device(&group_builder,
@@ -276,16 +304,42 @@ static iree_status_t iree_tooling_load_hal_async_module(
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_group_builder_finalize(
         &group_builder, host_allocator, &device_group);
+  } else {
+    iree_hal_device_group_builder_deinitialize(&group_builder);
+  }
+
+  // Pick the lead device we'll use for bookkeeping.
+  iree_hal_device_t* device = NULL;
+  iree_hal_allocator_t* device_allocator = NULL;
+  iree_host_size_t lead_index = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_tooling_device_lead_allocator_index_from_flags(device_group,
+                                                                 &lead_index);
+  }
+  if (iree_status_is_ok(status)) {
+    device = iree_hal_device_group_device_at(device_group, lead_index);
+    iree_hal_device_retain(device);
+    device_allocator = iree_hal_device_allocator(device);
+    iree_hal_allocator_retain(device_allocator);
   }
 
   // Create HAL module wrapping the device group.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_module_create(
-        instance, iree_hal_module_device_policy_from_flags(device_list),
-        device_group, flags, iree_hal_module_debug_sink_stdio(stderr),
-        host_allocator, &module);
+    iree_hal_module_device_policy_t device_policy;
+    status =
+        iree_hal_module_device_policy_from_flags(device_group, &device_policy);
+    if (!iree_status_is_ok(status)) {
+      iree_hal_allocator_release(device_allocator);
+      device_allocator = NULL;
+      iree_hal_device_release(device);
+      device = NULL;
+    } else {
+      status = iree_hal_module_create(
+          instance, device_policy, device_group, flags,
+          iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
+    }
   }
   iree_hal_device_group_release(device_group);
 
@@ -469,11 +523,17 @@ iree_vm_module_t* iree_tooling_module_list_back(
 }
 
 typedef struct {
+  // VM instance used to register dependency modules.
   iree_vm_instance_t* instance;
+  // Host allocator used for transient and retained resolved objects.
   iree_allocator_t host_allocator;
+  // Resolved module list receiving discovered dependency modules.
   iree_tooling_module_list_t* resolved_list;
+  // Default device URI used when --device= was not specified.
   iree_string_view_t default_device_uri;
+  // Lead HAL device retained from the resolved HAL module, if any.
   iree_hal_device_t* device;
+  // Lead HAL allocator retained from the resolved HAL module, if any.
   iree_hal_allocator_t* device_allocator;
 } iree_tooling_resolve_state_t;
 static iree_status_t iree_tooling_resolve_module_dependency_callback(
@@ -676,10 +736,14 @@ iree_status_t iree_tooling_create_context_from_flags(
   iree_tooling_module_list_initialize(&resolved_list);
   iree_hal_device_t* device = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_tooling_resolve_modules(
-              instance, user_module_count, user_modules, default_device_uri,
-              host_allocator, &resolved_list, &device, &device_allocator));
+  iree_status_t status = iree_tooling_resolve_modules(
+      instance, user_module_count, user_modules, default_device_uri,
+      host_allocator, &resolved_list, &device, &device_allocator);
+  if (!iree_status_is_ok(status)) {
+    iree_tooling_module_list_reset(&resolved_list);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   iree_vm_context_flags_t flags = IREE_VM_CONTEXT_FLAG_NONE;
   if (FLAG_trace_execution) {
@@ -691,7 +755,7 @@ iree_status_t iree_tooling_create_context_from_flags(
   // Create the context with the full list of resolved modules.
   // The context retains the modules and we can release them afterward.
   iree_vm_context_t* context = NULL;
-  iree_status_t status = iree_vm_context_create_with_modules(
+  status = iree_vm_context_create_with_modules(
       instance, flags, resolved_list.count, resolved_list.values,
       host_allocator, &context);
   iree_tooling_module_list_reset(&resolved_list);
