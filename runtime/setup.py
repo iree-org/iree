@@ -664,6 +664,7 @@ setup(
                 "iree-dump-parameters*",
                 "iree-cpuinfo*",
                 "iree-flatcc-cli*",
+                "iree-profile*",
             ],
         },
         (
@@ -694,6 +695,7 @@ setup(
             "iree-dump-parameters = iree._runtime.scripts.iree_dump_parameters.__main__:main",
             "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
             "iree-flatcc-cli = iree._runtime.scripts.iree_flatcc_cli.__main__:main",
+            "iree-profile = iree._runtime.scripts.iree_profile.__main__:main",
         ]
         + (
             [

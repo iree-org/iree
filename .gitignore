@@ -46,8 +46,9 @@ version_info.json
 version_local.json
 CMakeUserPresets.json
 
-# Dear ImGui Ini files
+# Dear ImGui Ini files and Tracy artifacts
 imgui.ini
+.tracy/
 
 # Emacs autosaves
 *~
