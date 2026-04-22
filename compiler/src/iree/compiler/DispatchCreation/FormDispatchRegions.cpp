@@ -398,7 +398,7 @@ getFusableUses(MLIRContext *context, Operation *op,
   // so that a single consumer reading multiple results from a multi-result
   // producer (e.g. OnlineAttentionOp) still qualifies.
   if (!aggressiveFusion) {
-    SmallPtrSet<Operation *, 4> consumers;
+    llvm::SetVector<Operation *> consumers;
     for (Operation *user : op->getUsers()) {
       if (!isa<tensor::DimOp>(user)) {
         consumers.insert(user);
