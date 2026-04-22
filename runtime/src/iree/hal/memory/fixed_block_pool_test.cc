@@ -122,10 +122,9 @@ static iree_status_t iree_hal_test_opaque_slab_provider_wrap_buffer(
   iree_hal_test_opaque_slab_provider_t* provider =
       (iree_hal_test_opaque_slab_provider_t*)base_provider;
   iree_atomic_fetch_add(&provider->wrap_count, 1, iree_memory_order_relaxed);
-  iree_byte_span_t data = {
-      .data = (uint8_t*)(uintptr_t)slab->provider_handle + slab_offset,
-      .data_length = (iree_host_size_t)allocation_size,
-  };
+  iree_byte_span_t data = iree_make_byte_span(
+      (uint8_t*)(uintptr_t)slab->provider_handle + slab_offset,
+      (iree_host_size_t)allocation_size);
   return iree_hal_heap_buffer_wrap(iree_hal_buffer_placement_undefined(),
                                    params.type, params.access, params.usage,
                                    allocation_size, data, release_callback,
@@ -161,14 +160,15 @@ static void iree_hal_test_opaque_slab_provider_query_properties(
 
 const iree_hal_slab_provider_vtable_t
     iree_hal_test_opaque_slab_provider_vtable = {
-        .destroy = iree_hal_test_opaque_slab_provider_destroy,
-        .acquire_slab = iree_hal_test_opaque_slab_provider_acquire_slab,
-        .release_slab = iree_hal_test_opaque_slab_provider_release_slab,
-        .wrap_buffer = iree_hal_test_opaque_slab_provider_wrap_buffer,
-        .prefault = iree_hal_test_opaque_slab_provider_prefault,
-        .trim = iree_hal_test_opaque_slab_provider_trim,
-        .query_stats = iree_hal_test_opaque_slab_provider_query_stats,
-        .query_properties = iree_hal_test_opaque_slab_provider_query_properties,
+        /*.destroy=*/iree_hal_test_opaque_slab_provider_destroy,
+        /*.acquire_slab=*/iree_hal_test_opaque_slab_provider_acquire_slab,
+        /*.release_slab=*/iree_hal_test_opaque_slab_provider_release_slab,
+        /*.wrap_buffer=*/iree_hal_test_opaque_slab_provider_wrap_buffer,
+        /*.prefault=*/iree_hal_test_opaque_slab_provider_prefault,
+        /*.trim=*/iree_hal_test_opaque_slab_provider_trim,
+        /*.query_stats=*/iree_hal_test_opaque_slab_provider_query_stats,
+        /*.query_properties=*/
+        iree_hal_test_opaque_slab_provider_query_properties,
 };
 
 static iree_hal_fixed_block_pool_options_t DefaultOptions() {
