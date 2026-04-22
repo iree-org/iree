@@ -51,6 +51,63 @@ static bool getBoolOption(DictionaryAttr options, StringRef name,
   return defaultValue;
 }
 
+static std::optional<vector::CombiningKind> matchScanCombiner(Region &region) {
+  if (!region.hasOneBlock()) {
+    return std::nullopt;
+  }
+
+  Block &block = region.front();
+  if (block.getNumArguments() != 2) {
+    return std::nullopt;
+  }
+
+  auto &ops = block.getOperations();
+  if (ops.size() != 2) {
+    return std::nullopt;
+  }
+
+  Operation &firstOp = ops.front();
+  Operation &yieldOp = ops.back();
+  if (firstOp.getNumOperands() != 2 || firstOp.getNumResults() != 1) {
+    return std::nullopt;
+  }
+  if (yieldOp.getNumOperands() != 1 ||
+      yieldOp.getOperand(0) != firstOp.getResult(0)) {
+    return std::nullopt;
+  }
+
+  Value arg0 = block.getArgument(0);
+  Value arg1 = block.getArgument(1);
+  Value opArg0 = firstOp.getOperand(0);
+  Value opArg1 = firstOp.getOperand(1);
+  if (opArg0 != arg0 || opArg1 != arg1) {
+    return std::nullopt;
+  }
+
+  return llvm::TypeSwitch<Operation *, std::optional<vector::CombiningKind>>(
+             &firstOp)
+      .Case<arith::AddIOp, arith::AddFOp>(
+          [](auto) { return vector::CombiningKind::ADD; })
+      .Case<arith::MulIOp, arith::MulFOp>(
+          [](auto) { return vector::CombiningKind::MUL; })
+      .Case<arith::AndIOp>([](auto) { return vector::CombiningKind::AND; })
+      .Case<arith::OrIOp>([](auto) { return vector::CombiningKind::OR; })
+      .Case<arith::XOrIOp>([](auto) { return vector::CombiningKind::XOR; })
+      .Case<arith::MaxSIOp>([](auto) { return vector::CombiningKind::MAXSI; })
+      .Case<arith::MaxUIOp>([](auto) { return vector::CombiningKind::MAXUI; })
+      .Case<arith::MinSIOp>([](auto) { return vector::CombiningKind::MINSI; })
+      .Case<arith::MinUIOp>([](auto) { return vector::CombiningKind::MINUI; })
+      .Case<arith::MaximumFOp>(
+          [](auto) { return vector::CombiningKind::MAXIMUMF; })
+      .Case<arith::MinimumFOp>(
+          [](auto) { return vector::CombiningKind::MINIMUMF; })
+      .Case<arith::MaxNumFOp>(
+          [](auto) { return vector::CombiningKind::MAXNUMF; })
+      .Case<arith::MinNumFOp>(
+          [](auto) { return vector::CombiningKind::MINNUMF; })
+      .Default([](Operation *) { return std::nullopt; });
+}
+
 struct GatherOpVectorizationModel
     : VectorizableOpInterface::ExternalModel<GatherOpVectorizationModel,
                                              IREE::LinalgExt::GatherOp> {
@@ -1354,7 +1411,7 @@ struct ScanOpVectorizationModel
     auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
 
     // Must be able to match region to CombiningKind.
-    if (!IREE::LinalgExt::matchScanCombiner(scanOp.getRegion())) {
+    if (!matchScanCombiner(scanOp.getRegion())) {
       return false;
     }
 
@@ -1382,7 +1439,7 @@ struct ScanOpVectorizationModel
     rewriter.setInsertionPoint(scanOp);
 
     // Match combiner to CombiningKind.
-    auto kind = IREE::LinalgExt::matchScanCombiner(scanOp.getRegion());
+    auto kind = matchScanCombiner(scanOp.getRegion());
     if (!kind) {
       return failure();
     }
