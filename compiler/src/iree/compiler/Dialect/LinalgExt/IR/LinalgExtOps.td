@@ -602,7 +602,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [IndexingMapOpInterface,
+    [DeclareOpInterfaceMethods<IndexingMapOpInterface>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
@@ -641,9 +641,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     int64_t getOperandRank() {
       return getOperandType().getRank();
     }
-
-    ArrayAttr getIndexingMaps();
-    SmallVector<AffineMap> getIndexingMapsArray();
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

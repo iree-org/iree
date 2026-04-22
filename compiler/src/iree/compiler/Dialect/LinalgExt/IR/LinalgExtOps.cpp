@@ -1243,11 +1243,6 @@ ScanOp::reifyResultShapes(OpBuilder &b,
 }
 
 ArrayAttr ScanOp::getIndexingMaps() {
-  Builder b(getContext());
-  return b.getAffineMapArrayAttr(getIndexingMapsArray());
-}
-
-SmallVector<AffineMap> ScanOp::getIndexingMapsArray() {
   MLIRContext *ctx = getContext();
   int64_t rank = getOperandRank();
 
@@ -1263,7 +1258,9 @@ SmallVector<AffineMap> ScanOp::getIndexingMapsArray() {
   }
   AffineMap accumulatorMap = AffineMap::get(rank, 0, accumulatorResults, ctx);
 
-  return {inputOutputMap, inputOutputMap, accumulatorMap};
+  Builder b(ctx);
+  return b.getAffineMapArrayAttr(
+      {inputOutputMap, inputOutputMap, accumulatorMap});
 }
 
 MutableOperandRange ScanOp::getDpsInitsMutable() {
