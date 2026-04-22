@@ -121,10 +121,8 @@ struct ConvertToNVVMPass final
       populateConvertSharedMemoryAllocOps(patterns);
       populateLowerGlobalSubgroupBarrierPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(
-          patterns, options.vectorContractLowering);
-      vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
+      // We need to keep this one here in case of source materialization.
       vector::populateVectorFromElementsUnrollPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.

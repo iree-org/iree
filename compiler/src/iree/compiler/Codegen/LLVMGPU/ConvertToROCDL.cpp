@@ -266,9 +266,6 @@ struct ConvertToROCDLPass final
 
     {
       RewritePatternSet patterns(&getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
       WalkResult allTypesValid = m.walk([&](Operation *op) {
@@ -295,11 +292,7 @@ struct ConvertToROCDLPass final
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
       vector::populateVectorInterleaveLoweringPatterns(patterns);
       vector::populateVectorInterleaveToShufflePatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(
-          patterns, options.vectorContractLowering);
 
-      vector::populateVectorFromElementsUnrollPatterns(patterns);
-      vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // Use 64-bit indices for mask materialization to match the index
       // bitwidth.
