@@ -1190,9 +1190,20 @@ class BuildFileFunctions(object):
         backend_name_block = self._convert_string_arg_block(
             "BACKEND_NAME", backend_name
         )
-        # Bracket-quote the format string to preserve C expressions like
-        # "embedded-elf-" IREE_ARCH without CMake interpretation.
-        format_string_block = f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
+        # Bracket-quote C expressions like "embedded-elf-" IREE_ARCH so CMake
+        # leaves them alone. If placeholder substitution produced a CMake
+        # variable reference, use a normal quoted argument so the generated
+        # testdata registration contains the configured value instead of the
+        # literal ${...} token.
+        if "${" in format_string:
+            escaped_format_string = format_string.replace("\\", "\\\\").replace(
+                '"', '\\"'
+            )
+            format_string_block = (
+                f'  FORMAT_STRING\n    "{escaped_format_string}"\n'
+            )
+        else:
+            format_string_block = f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
         flags_block = self._convert_string_list_block("FLAGS", flags)
 
         # Convert Bazel label to CMake directory path.
