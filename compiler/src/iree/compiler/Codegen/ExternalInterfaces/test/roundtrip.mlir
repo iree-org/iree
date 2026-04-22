@@ -93,6 +93,16 @@ func.func @cpu_valid_2d_encoding(%arg0: tensor<32x64xf32, #cpu_encoding>) -> ten
 
 // -----
 
+// CPU resolver configuration can carry enable_inner_tiled (copied from executable target during specialization).
+#cpu_encoding_inner_tiled = #iree_cpu.cpu_encoding_resolver<configuration = {enable_inner_tiled = true, encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 1], outerDimsPerm = [0, 1]}, ukernels = "none"}>
+func.func @cpu_encoding_with_inner_tiled_flag(%arg0: tensor<?x?xf32, #cpu_encoding_inner_tiled>) -> tensor<?x?xf32, #cpu_encoding_inner_tiled> {
+  return %arg0 : tensor<?x?xf32, #cpu_encoding_inner_tiled>
+}
+// CHECK-LABEL: func.func @cpu_encoding_with_inner_tiled_flag
+// CHECK-SAME:    tensor<?x?xf32, #iree_cpu.cpu_encoding_resolver<configuration = {enable_inner_tiled = true, encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 1], outerDimsPerm = [0, 1]}, ukernels = "none"}>>
+
+// -----
+
 // VMVX encoding resolver tests.
 // Note: Most encoding verifier tests are done on gpu_encoding_resolver above.
 // This test just verifies that vmvx_encoding_resolver roundtrips correctly.

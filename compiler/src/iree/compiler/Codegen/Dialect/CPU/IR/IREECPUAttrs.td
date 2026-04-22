@@ -83,6 +83,12 @@ def IREECPU_DataTiledMMAAttr
     thread-distribution, no concept of subgroups and no interleaving of
     intrinsics' layout.
 
+    The `transposed_intrinsic` boolean toggles between the intrinsic's natural
+    orientation and an M↔N-swapped orientation (same hardware instruction with
+    LHS/RHS roles exchanged, accumulator laid out column-major). Orthogonal to
+    the intrinsic itself: any intrinsic may be used transposed, including
+    square ones where the effect is only the accumulator layout change.
+
     Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
     here but are unused.
   }];
@@ -99,7 +105,12 @@ def IREECPU_DataTiledMMAAttr
               "Intrinsic count along the N dimension.">:$intrinsics_n,
           DefaultValuedParameter<
               "int64_t", "1",
-              "Intrinsic count along the K dimension.">:$intrinsics_k);
+              "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "bool", "false",
+              "If true, the intrinsic is used in an M↔N-swapped orientation "
+              "(LHS/RHS roles exchanged, accumulator "
+              "column-major).">:$transposed_intrinsic);
 }
 
 //===----------------------------------------------------------------------===//

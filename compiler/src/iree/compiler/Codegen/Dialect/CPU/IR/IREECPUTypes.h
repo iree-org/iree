@@ -64,7 +64,11 @@ SmallVector<int> getTilingLevelsAsInts();
 StringRef getTilingLevelName(TilingLevel level);
 
 // Returns the TileSwizzle for the given intrinsic and operand index.
-Codegen::TileSwizzle getIntrinsicSwizzle(MMAIntrinsic mma, int operandIdx);
+// If `transposed` is true, the intrinsic is used in an M↔N-swapped
+// orientation: the physical tile layouts reflect LHS/RHS roles being
+// exchanged, and the accumulator is laid out column-major.
+Codegen::TileSwizzle getIntrinsicSwizzle(MMAIntrinsic mma, bool transposed,
+                                         int operandIdx);
 
 // Returns the TileSwizzle for the given MMA attr and operand index.
 Codegen::TileSwizzle getSwizzle(DataTiledMMAAttr mma, int operandIdx);

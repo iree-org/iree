@@ -332,6 +332,8 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   switch (intrinsic) {
   case MMAIntrinsic::None:
     return Tuple{0, 0, 0};
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+    return Tuple{1, 8, 1};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
     return Tuple{1, 8, 1};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
@@ -370,7 +372,7 @@ static Codegen::TileSwizzle fixupSwizzle(Codegen::TileSwizzle swizzle) {
 }
 
 Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
-                                         int operandIdx) {
+                                         bool transposed, int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
   using Dim = TileSwizzle::Dim;
 
@@ -394,6 +396,13 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     return TileSwizzle();
   }
   auto [mSize, nSize, kSize] = *maybeMnkTuple;
+  // In the transposed orientation, the intrinsic's hardware (M, N) roles are
+  // logically swapped: what the matmul code sees as M is driven by the
+  // intrinsic's N-dim, and vice versa. Swap the sizes up front so that the
+  // per-operand expansion code below can stay oblivious to orientation.
+  if (transposed) {
+    std::swap(mSize, nSize);
+  }
   TileSwizzle swizzle;
   swizzle.expandShape().resize(2);
   auto expandIfNonUnit = [](TileSwizzle &swizzle, int dim, int size) {
@@ -402,6 +411,13 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     }
   };
 
+  // For every operand, expandShape[0] is the outer physical dim and
+  // expandShape[1] is the inner physical dim, with identity permutation. For
+  // the ACC in particular, `transposed_intrinsic` flips the logical (M, N) to
+  // physical (N, M), which we encode by swapping which logical dim fills each
+  // expandShape group rather than by a non-identity permutation. That way all
+  // three operand swizzles can be read on equal footing, just like LHS (M, K)
+  // and RHS (N, K).
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;
     expandIfNonUnit(swizzle, K, kSize);
@@ -411,9 +427,10 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     expandIfNonUnit(swizzle, K, kSize);
     expandIfNonUnit(swizzle, N, nSize);
   } else {
-    constexpr int M = 0, N = 1;
-    expandIfNonUnit(swizzle, N, nSize);
-    expandIfNonUnit(swizzle, M, mSize);
+    int64_t accOuter = transposed ? nSize : mSize;
+    int64_t accInner = transposed ? mSize : nSize;
+    expandIfNonUnit(swizzle, 1, accInner);
+    expandIfNonUnit(swizzle, 0, accOuter);
   }
   return fixupSwizzle(std::move(swizzle));
 }
@@ -421,7 +438,8 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
 Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
                                 int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
-  TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
+  TileSwizzle swizzle = getIntrinsicSwizzle(
+      mma.getIntrinsic(), mma.getTransposedIntrinsic(), operandIdx);
   TileSwizzle::Dim intrinsicsM =
       TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
   TileSwizzle::Dim intrinsicsN =
@@ -430,8 +448,9 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
       TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
   // Each swizzle is built as (outer physical dim, inner physical dim) in
   // expandShape[0], expandShape[1]. LHS is (M, K), RHS is (N, K), ACC is
-  // (M, N). The expansion below injects the intrinsics_* cross-intrinsic
-  // factors into whichever group represents each logical dim.
+  // (M, N) normally and (N, M) when `transposed_intrinsic` is set. The
+  // expansion below injects the intrinsics_* cross-intrinsic factors into
+  // whichever group represents each logical dim.
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;
     if (intrinsicsK.size() > 1) {
@@ -449,12 +468,14 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
       Codegen::expand(swizzle, N, intrinsicsN);
     }
   } else {
-    constexpr int M = 0, N = 1;
-    if (intrinsicsN.size() > 1) {
-      Codegen::expand(swizzle, N, intrinsicsN);
+    bool transposed = mma.getTransposedIntrinsic();
+    TileSwizzle::Dim accOuterIntr = transposed ? intrinsicsN : intrinsicsM;
+    TileSwizzle::Dim accInnerIntr = transposed ? intrinsicsM : intrinsicsN;
+    if (accInnerIntr.size() > 1) {
+      Codegen::expand(swizzle, /*srcIdx=*/1, accInnerIntr);
     }
-    if (intrinsicsM.size() > 1) {
-      Codegen::expand(swizzle, M, intrinsicsM);
+    if (accOuterIntr.size() > 1) {
+      Codegen::expand(swizzle, /*srcIdx=*/0, accOuterIntr);
     }
   }
   return swizzle;
@@ -472,6 +493,8 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   switch (intrinsic) {
   case MMAIntrinsic::None:
     return {Type(), Type(), Type()};
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+    return {f32, f32, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
     return {f64, f64, f64};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
@@ -536,7 +559,10 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
   // inner physical dim) in expandShape[0], expandShape[1]. This mirrors GPU's
   // DataTiledMMA, where the tile types encode the layout directly and no
   // separate `permutations` attribute is needed on `inner_tiled`. LHS is
-  // (M, K), RHS is (N, K), ACC is (M, N).
+  // (M, K), RHS is (N, K), and ACC is (M, N) for non-transposed intrinsics
+  // and (N, M) for transposed ones; that transposition is baked into the ACC
+  // swizzle itself (see getIntrinsicSwizzle), so we can query all three
+  // operands uniformly here.
   auto tileType = [&](Codegen::TileSwizzle swizzle, Type elemType) {
     auto [outer, outerScalable] =
         getVectorAxisSizeAndScalability(swizzle.expandShape()[0]);

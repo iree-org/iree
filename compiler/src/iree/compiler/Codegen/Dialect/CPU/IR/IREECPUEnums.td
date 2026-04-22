@@ -96,6 +96,18 @@ class IREECPU_I32EnumAttr<string name, string summary,
 // * D enumerates intrinsics that share the same 0xABC* bits.
 //
 def IREECPU_MMA_None : I32EnumAttrCase<"None", 0>;
+
+// X86 AVX/AVX2 + FMA3 (256-bit YMM registers). FMA3 is a separate ISA extension
+// from AVX2 itself; these intrinsics lower to `vfmadd...`, so the name includes
+// `AVX2_FMA_` and `getMmaIntrinsicRequiredFeatures` requires both `+avx2` and
+// `+fma`.
+def MMA_X86_AVX2_FMA_1x8x1_F32_F32
+    : I32EnumAttrCase<"MMA_X86_AVX2_FMA_1x8x1_F32_F32", 0x1210>;
+
+// X86 AVX-512 (ZMM registers). Only the "natural" (canonical M<=N) orientation
+// of each intrinsic is listed here; the M/N-swapped ("transposed") variant is
+// expressed by the `transposed_intrinsic` boolean on DataTiledMMAAttr rather
+// than as a separate enum value.
 def MMA_X86_AVX512_1x8x1_F64_F64
     : I32EnumAttrCase<"MMA_X86_AVX512_1x8x1_F64_F64", 0x1300>;
 def MMA_X86_AVX512_1x16x1_F32_F32
@@ -124,6 +136,9 @@ def IREECPU_MMAIntrinsic
     : IREECPU_I32EnumAttr<
           "MMAIntrinsic", "Descriptor for different MMA intrinsics",
           [IREECPU_MMA_None,
+
+           // X86 AVX/AVX2 + FMA
+           MMA_X86_AVX2_FMA_1x8x1_F32_F32,
 
            // X86 AVX-512
            MMA_X86_AVX512_1x8x1_F64_F64, MMA_X86_AVX512_1x16x1_F32_F32,

@@ -148,6 +148,98 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
 
 // -----
 
+// With `enable_inner_tiled` and +avx512f (TileMxNxK 16x16x1), matmul lowers to
+// iree_codegen.inner_tiled instead of linalg.mmt4d.
+
+#map_it = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_it1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_it2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs_it = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it, #map_it1, #map_it2], iteration_sizes = [?, ?, ?]>
+#encoding_rhs_it = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it, #map_it1, #map_it2], iteration_sizes = [?, ?, ?]>
+#encoding_result_it = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it, #map_it1, #map_it2], iteration_sizes = [?, ?, ?]>
+func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs_it>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs_it>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #encoding_result_it>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #encoding_result_it>)
+      -> tensor<?x?xf32, #encoding_result_it>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #encoding_lhs_it>, tensor<?x?xf32, #encoding_rhs_it>)
+      outs(%3 : tensor<?x?xf32, #encoding_result_it>) -> tensor<?x?xf32, #encoding_result_it>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_result_it> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+//   CHECK-DAG: #[[$MAP_N:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+// CHECK-LABEL: func @pack_gemm_fill_dynamic_inner_tiled_avx512(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_N]]()[%[[D1]]]
+//   CHECK-DAG:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}%[[ARG0]]
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack
+//  CHECK-SAME:     %[[ARG1]]
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[OUT_D1]]) : tensor<?x?x1x16xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       outs(%[[EMPTY]] :
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[PACK_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32>, semantics = #iree_cpu.mma_semantics<>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INNER]]
+//       CHECK:   return %[[UNPACK]]
+
+// -----
+
+#map_it_se = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_it_se1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_it_se2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_it_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it_se, #map_it_se1, #map_it_se2], iteration_sizes = [127, 255, ?]>
+#encoding_it_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it_se, #map_it_se1, #map_it_se2], iteration_sizes = [127, 255, ?]>
+#encoding_it_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_it_se, #map_it_se1, #map_it_se2], iteration_sizes = [127, 255, ?]>
+func.func @set_encoding_matmul_LHS_inner_tiled_avx512(%arg0: tensor<127x255xf32>, %k: index) -> tensor<127x255xf32, #encoding_it_lhs> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32> -> tensor<127x255xf32, #encoding_it_lhs>
+  return %0 : tensor<127x255xf32, #encoding_it_lhs>
+}
+func.func @set_encoding_matmul_RHS_inner_tiled_avx512(%arg0: tensor<127x255xf32>, %k: index) -> tensor<127x255xf32, #encoding_it_rhs> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32> -> tensor<127x255xf32, #encoding_it_rhs>
+  return %0 : tensor<127x255xf32, #encoding_it_rhs>
+}
+func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255xf32, #encoding_it_res>, %k: index) -> tensor<127x255xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32, #encoding_it_res> -> tensor<127x255xf32>
+  return %0 : tensor<127x255xf32>
+}
+// CHECK-LABEL: func @set_encoding_matmul_LHS_inner_tiled_avx512(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<127x255xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<127x255x1x1xf32>
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<127x255x1x1xf32>
+//       CHECK:   return %[[PACK]] : tensor<127x255x1x1xf32>
+// CHECK-LABEL: func @set_encoding_matmul_RHS_inner_tiled_avx512(
+//  CHECK-SAME:   %[[INPUT_R:[a-zA-Z0-9]+]]: tensor<127x255xf32>
+//   CHECK-DAG:   %[[CST_R:.+]] = arith.constant 0.0
+//       CHECK:   %[[EMPTY_R:.+]] = tensor.empty() : tensor<16x127x16x1xf32>
+//       CHECK:   %[[PACK_R:.+]] = linalg.pack %[[INPUT_R]] padding_value(%[[CST_R]] : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %[[EMPTY_R]] : tensor<127x255xf32> -> tensor<16x127x16x1xf32>
+//       CHECK:   return %[[PACK_R]] : tensor<16x127x16x1xf32>
+// CHECK-LABEL: func @unset_encoding_matmul_RESULT_inner_tiled_avx512(
+//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<127x16x1x16xf32>
+//       CHECK:   %[[EMPTY_U:.+]] = tensor.empty() : tensor<127x255xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[PACKED]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 16] into %[[EMPTY_U]] : tensor<127x16x1x16xf32> -> tensor<127x255xf32>
+//       CHECK:   return %[[UNPACK]]
+
+// -----
+
 // It tests with bindings and checks that the reshape ops are folded into bindings.
 
 #executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
