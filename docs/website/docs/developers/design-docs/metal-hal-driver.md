@@ -117,13 +117,14 @@ translates to blocking wait and allocation.
 
 Collectives support is not yet implemented.
 
-#### Profiling
+#### External capture
 
-The Metal HAL driver supports profiling via `MTLCaptureManager`. We can either
-capture to a trace file or XCode.
+The Metal HAL driver supports external capture via `MTLCaptureManager`. We can
+either capture to a trace file or Xcode.
 
-To perform profiling in the command line, attach `--device_profiling_mode=queue
---device_profiling_file=/path/to/metal.gputrace` to IREE binaries.
+To capture from the command line, attach
+`--device_capture_tool=metal --device_capture_file=/path/to/metal.gputrace` to
+IREE binaries.
 
 ### Command buffer
 
