@@ -7,8 +7,8 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_DEVICE_KERNELS_H_
 #define IREE_HAL_DRIVERS_AMDGPU_DEVICE_KERNELS_H_
 
+#include "iree/hal/drivers/amdgpu/abi/kernel_args.h"
 #include "iree/hal/drivers/amdgpu/device/support/common.h"
-#include "iree/hal/drivers/amdgpu/device/support/kernel_args.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_device_kernels_t

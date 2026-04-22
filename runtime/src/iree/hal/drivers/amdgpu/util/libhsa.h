@@ -186,7 +186,9 @@ IREE_API_EXPORT iree_status_t iree_status_from_hsa_status(
                                                 symbol, decl, ...)            \
   iree_status_t iree_##symbol(                                                \
       const iree_hal_amdgpu_libhsa_t* IREE_RESTRICT libhsa, const char* file, \
-      const uint32_t line _COMMA_DECL(decl));
+      const uint32_t line _COMMA_DECL(decl));                                 \
+  hsa_status_t iree_##symbol##_raw(                                           \
+      const iree_hal_amdgpu_libhsa_t* IREE_RESTRICT libhsa _COMMA_DECL(decl));
 #define IREE_HAL_AMDGPU_LIBHSA_PFN_result(trace_category, result_type, symbol, \
                                           decl, ...)                           \
   result_type iree_##symbol(                                                   \
@@ -213,6 +215,12 @@ IREE_API_EXPORT iree_status_t iree_status_from_hsa_status(
 #undef IREE_HAL_AMDGPU_LIBHSA_PFN_uint32_t
 #undef IREE_HAL_AMDGPU_LIBHSA_PFN_uint64_t
 #undef IREE_HAL_AMDGPU_LIBHSA_PFN_hsa_signal_value_t
+
+static inline void iree_hal_amdgpu_hsa_cleanup_assert_success(
+    hsa_status_t status) {
+  IREE_ASSERT(status == HSA_STATUS_SUCCESS, "HSA cleanup failed: %d",
+              (int)status);
+}
 
 #ifdef __cplusplus
 }  // extern "C"

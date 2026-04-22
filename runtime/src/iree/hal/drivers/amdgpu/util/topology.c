@@ -6,9 +6,118 @@
 
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
+#include "iree/hal/api.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_topology_t
 //===----------------------------------------------------------------------===//
+
+static bool iree_hal_amdgpu_agent_list_contains(const hsa_agent_t* agents,
+                                                iree_host_size_t agent_count,
+                                                hsa_agent_t agent) {
+  for (iree_host_size_t i = 0; i < agent_count; ++i) {
+    if (agents[i].handle == agent.handle) return true;
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_amdgpu_topology_verify_storage_counts(
+    const iree_hal_amdgpu_topology_t* topology) {
+  if (topology->all_agent_count > IREE_ARRAYSIZE(topology->all_agents)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "all_agent_count=%" PRIhsz
+                            " exceeds topology storage capacity %" PRIhsz,
+                            topology->all_agent_count,
+                            IREE_ARRAYSIZE(topology->all_agents));
+  }
+  if (topology->cpu_agent_count > IREE_ARRAYSIZE(topology->cpu_agents)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cpu_agent_count=%" PRIhsz
+                            " exceeds topology storage capacity %" PRIhsz,
+                            topology->cpu_agent_count,
+                            IREE_ARRAYSIZE(topology->cpu_agents));
+  }
+  if (topology->gpu_agent_count > IREE_ARRAYSIZE(topology->gpu_agents)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "gpu_agent_count=%" PRIhsz
+                            " exceeds topology storage capacity %" PRIhsz,
+                            topology->gpu_agent_count,
+                            IREE_ARRAYSIZE(topology->gpu_agents));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_topology_verify_unique_agent_list(
+    const char* list_name, const hsa_agent_t* agents,
+    iree_host_size_t agent_count) {
+  for (iree_host_size_t i = 0; i < agent_count; ++i) {
+    for (iree_host_size_t j = i + 1; j < agent_count; ++j) {
+      if (agents[i].handle == agents[j].handle) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "topology %s contains duplicate agent handles at ordinals %" PRIhsz
+            " and %" PRIhsz,
+            list_name, i, j);
+      }
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_topology_verify_agent_sets(
+    const iree_hal_amdgpu_topology_t* topology) {
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_verify_unique_agent_list(
+      "all_agents", topology->all_agents, topology->all_agent_count));
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_verify_unique_agent_list(
+      "cpu_agents", topology->cpu_agents, topology->cpu_agent_count));
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_verify_unique_agent_list(
+      "gpu_agents", topology->gpu_agents, topology->gpu_agent_count));
+
+  for (iree_host_size_t i = 0; i < topology->cpu_agent_count; ++i) {
+    hsa_agent_t cpu_agent = topology->cpu_agents[i];
+    if (iree_hal_amdgpu_agent_list_contains(
+            topology->gpu_agents, topology->gpu_agent_count, cpu_agent)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "topology CPU agent ordinal %" PRIhsz
+                              " is also present in gpu_agents",
+                              i);
+    }
+    if (!iree_hal_amdgpu_agent_list_contains(
+            topology->all_agents, topology->all_agent_count, cpu_agent)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "topology CPU agent ordinal %" PRIhsz
+                              " is missing from all_agents",
+                              i);
+    }
+  }
+
+  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+    hsa_agent_t gpu_agent = topology->gpu_agents[i];
+    if (!iree_hal_amdgpu_agent_list_contains(
+            topology->all_agents, topology->all_agent_count, gpu_agent)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "topology GPU agent ordinal %" PRIhsz
+                              " is missing from all_agents",
+                              i);
+    }
+  }
+
+  for (iree_host_size_t i = 0; i < topology->all_agent_count; ++i) {
+    hsa_agent_t agent = topology->all_agents[i];
+    const bool is_cpu = iree_hal_amdgpu_agent_list_contains(
+        topology->cpu_agents, topology->cpu_agent_count, agent);
+    const bool is_gpu = iree_hal_amdgpu_agent_list_contains(
+        topology->gpu_agents, topology->gpu_agent_count, agent);
+    if (!is_cpu && !is_gpu) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "topology all_agents ordinal %" PRIhsz
+                              " is not present in cpu_agents or gpu_agents",
+                              i);
+    }
+  }
+
+  return iree_ok_status();
+}
 
 IREE_API_EXPORT void iree_hal_amdgpu_topology_initialize(
     iree_hal_amdgpu_topology_t* out_topology) {
@@ -17,7 +126,8 @@ IREE_API_EXPORT void iree_hal_amdgpu_topology_initialize(
 
   memset(out_topology, 0, sizeof(*out_topology));
 
-  out_topology->gpu_agent_queue_count = 1;
+  out_topology->gpu_agent_queue_count =
+      IREE_HAL_AMDGPU_DEFAULT_GPU_AGENT_QUEUE_COUNT;
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -40,6 +150,9 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_topology_insert_cpu_agent(
   IREE_ASSERT_ARGUMENT(libhsa);
   if (out_index) *out_index = 0;
 
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_topology_verify_storage_counts(topology));
+
   // Scan for the agent in the current topology.
   for (iree_host_size_t i = 0; i < topology->cpu_agent_count; ++i) {
     if (topology->cpu_agents[i].handle == cpu_agent.handle) {
@@ -49,10 +162,16 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_topology_insert_cpu_agent(
   }
 
   // Check capacity before mutating the topology.
-  if (topology->cpu_agent_count + 1 >= IREE_ARRAYSIZE(topology->cpu_agents)) {
+  if (topology->cpu_agent_count >= IREE_ARRAYSIZE(topology->cpu_agents)) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "max CPU agent count reached (limit %" PRIhsz ")",
                             IREE_ARRAYSIZE(topology->cpu_agents));
+  }
+  if (topology->all_agent_count >= IREE_ARRAYSIZE(topology->all_agents)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "max topology agent count reached (limit %" PRIhsz
+                            ")",
+                            IREE_ARRAYSIZE(topology->all_agents));
   }
 
   // Verify the agent is a supported CPU agent.
@@ -82,18 +201,31 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_topology_insert_gpu_agent(
   IREE_ASSERT_ARGUMENT(topology);
   IREE_ASSERT_ARGUMENT(libhsa);
 
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_topology_verify_storage_counts(topology));
+
   // Ignore if the GPU agent has already been added.
   for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
     if (topology->gpu_agents[i].handle == gpu_agent.handle) {
-      return iree_ok_status();  // already present
+      return iree_ok_status();
     }
   }
 
   // Check capacity before mutating the topology.
-  if (topology->gpu_agent_count + 1 >= IREE_ARRAYSIZE(topology->gpu_agents)) {
+  if (topology->gpu_agent_count >= IREE_ARRAYSIZE(topology->gpu_agents)) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "max GPU agent count reached (limit %" PRIhsz ")",
                             IREE_ARRAYSIZE(topology->gpu_agents));
+  }
+  const bool cpu_agent_present = iree_hal_amdgpu_agent_list_contains(
+      topology->cpu_agents, topology->cpu_agent_count, cpu_agent);
+  const iree_host_size_t required_all_agent_slots = cpu_agent_present ? 1 : 2;
+  if (topology->all_agent_count >
+      IREE_ARRAYSIZE(topology->all_agents) - required_all_agent_slots) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "max topology agent count reached (limit %" PRIhsz
+                            ")",
+                            IREE_ARRAYSIZE(topology->all_agents));
   }
 
   // Verify the agent is a supported GPU agent.
@@ -258,6 +390,9 @@ iree_hal_amdgpu_topology_verify(const iree_hal_amdgpu_topology_t* topology,
   IREE_ASSERT_ARGUMENT(topology);
   IREE_ASSERT_ARGUMENT(libhsa);
 
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_topology_verify_storage_counts(topology));
+
   // Must have at least one of each agent type in the topology.
   // This is just a guard for creating systems that don't have any GPUs so that
   // code in the implementation can assume that there's always _something_ to
@@ -272,6 +407,49 @@ iree_hal_amdgpu_topology_verify(const iree_hal_amdgpu_topology_t* topology,
         topology->cpu_agent_count, topology->gpu_agent_count,
         topology->gpu_agent_queue_count);
   }
+
+  const iree_host_size_t expected_all_agent_count =
+      topology->cpu_agent_count + topology->gpu_agent_count;
+  if (topology->all_agent_count != expected_all_agent_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "topology all_agent_count=%" PRIhsz
+                            " does not match cpu_agent_count + "
+                            "gpu_agent_count (%" PRIhsz ")",
+                            topology->all_agent_count,
+                            expected_all_agent_count);
+  }
+
+  if (topology->gpu_agent_queue_count > UINT8_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "gpu_agent_queue_count=%" PRIhsz
+                            " exceeds the queue-axis encoding limit (%u)",
+                            topology->gpu_agent_queue_count, UINT8_MAX);
+  }
+  iree_host_size_t total_queue_count = 0;
+  if (!iree_host_size_checked_mul(topology->gpu_agent_count,
+                                  topology->gpu_agent_queue_count,
+                                  &total_queue_count) ||
+      total_queue_count > IREE_HAL_MAX_QUEUES) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "topology queue space does not fit in iree_hal_queue_affinity_t "
+        "(gpu_agent_count=%" PRIhsz ", gpu_agent_queue_count=%" PRIhsz
+        ", max_total_queues=%" PRIhsz ")",
+        topology->gpu_agent_count, topology->gpu_agent_queue_count,
+        (iree_host_size_t)IREE_HAL_MAX_QUEUES);
+  }
+
+  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+    if (topology->gpu_cpu_map[i] >= topology->cpu_agent_count) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "topology gpu_cpu_map[%" PRIhsz
+                              "]=%u exceeds cpu_agent_count=%" PRIhsz,
+                              i, topology->gpu_cpu_map[i],
+                              topology->cpu_agent_count);
+    }
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_verify_agent_sets(topology));
 
   // Ensure all CPU agents are compatible with each other.
   for (iree_host_size_t i = 1; i < topology->cpu_agent_count; ++i) {
@@ -555,13 +733,25 @@ iree_hal_amdgpu_topology_initialize_from_gpu_agent_mask(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_query_available_agents(libhsa, &agents));
 
+  const iree_hal_amdgpu_gpu_agent_mask_t valid_gpu_agent_mask =
+      agents.gpu_agent_count >= 64 ? UINT64_MAX
+                                   : ((1ull << agents.gpu_agent_count) - 1ull);
+  if ((gpu_agent_mask & ~valid_gpu_agent_mask) != 0) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                             "GPU agent mask 0x%016" PRIx64
+                             " selects unavailable GPU ordinals; only %" PRIhsz
+                             " visible GPU agent(s) are available",
+                             gpu_agent_mask, agents.gpu_agent_count));
+  }
+
   // Initialize an empty topology.
   iree_hal_amdgpu_topology_initialize(out_topology);
 
   // Add each device to the topology.
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t gpu_ordinal = 0;
-       gpu_ordinal < IREE_ARRAYSIZE(agents.gpu_agents); ++gpu_ordinal) {
+  for (iree_host_size_t gpu_ordinal = 0; gpu_ordinal < agents.gpu_agent_count;
+       ++gpu_ordinal) {
     if ((gpu_agent_mask & (1ull << gpu_ordinal)) == 0) continue;
     status = iree_hal_amdgpu_topology_insert_gpu_agent_with_nearest_cpu_agent(
         out_topology, libhsa, agents.gpu_agents[gpu_ordinal]);

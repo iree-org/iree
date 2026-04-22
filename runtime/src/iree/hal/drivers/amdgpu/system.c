@@ -24,14 +24,16 @@
 // emit iree_status_t errors. Instead we iterate over all and then do things in
 // local for-loops.
 typedef struct iree_hal_amdgpu_hsa_memory_pool_list_t {
+  // Number of valid entries in |values|.
   iree_host_size_t count;
+  // Fixed-capacity memory-pool list populated by HSA iteration callbacks.
   hsa_amd_memory_pool_t values[32];
 } iree_hal_amdgpu_hsa_memory_pool_list_t;
 static hsa_status_t iree_hal_amdgpu_iterate_hsa_memory_pool(
     hsa_amd_memory_pool_t memory_pool, void* user_data) {
   iree_hal_amdgpu_hsa_memory_pool_list_t* pool_list =
       (iree_hal_amdgpu_hsa_memory_pool_list_t*)user_data;
-  if (pool_list->count + 1 >= IREE_ARRAYSIZE(pool_list->values)) {
+  if (pool_list->count >= IREE_ARRAYSIZE(pool_list->values)) {
     return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
   }
   pool_list->values[pool_list->count++] = memory_pool;
@@ -52,6 +54,7 @@ static iree_status_t iree_hal_amdgpu_system_populate_host_memory_pools(
               IREE_LIBHSA(libhsa), host_agent,
               iree_hal_amdgpu_iterate_hsa_memory_pool, &all_memory_pools));
 
+  bool fine_pool_is_kernarg = false;
   for (iree_host_size_t i = 0; i < all_memory_pools.count; ++i) {
     hsa_amd_memory_pool_t pool = all_memory_pools.values[i];
 
@@ -82,28 +85,53 @@ static iree_status_t iree_hal_amdgpu_system_populate_host_memory_pools(
             HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALLOWED, &alloc_allowed));
     if (!alloc_allowed) continue;
 
-    // Only want fine-grained so we can use atomics.
-    hsa_region_global_flag_t global_flag = 0;
+    // Coarse-grained pools are used for write-once/read-many data.
+    // Kernarg-init pools are used for dispatch argument storage. Fine-grained
+    // pools are used for host/device shared state that requires atomics.
+    uint32_t global_flag = 0;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hsa_amd_memory_pool_get_info(
                 IREE_LIBHSA(libhsa), pool,
                 HSA_AMD_MEMORY_POOL_INFO_GLOBAL_FLAGS, &global_flag));
-    if (global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED) {
-      if (!host_memory_pools->fine_pool.handle) {  // first only
-        host_memory_pools->fine_pool = pool;
-      }
+    const bool is_kernarg =
+        global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_KERNARG_INIT;
+    const bool is_fine =
+        global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED;
+    if ((global_flag & HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_COARSE_GRAINED) &&
+        !host_memory_pools->coarse_pool.handle) {
+      host_memory_pools->coarse_pool = pool;
+    }
+    if (is_kernarg && !host_memory_pools->kernarg_pool.handle) {
+      host_memory_pools->kernarg_pool = pool;
+    }
+    if (is_fine && (!host_memory_pools->fine_pool.handle ||
+                    (fine_pool_is_kernarg && !is_kernarg))) {
+      host_memory_pools->fine_pool = pool;
+      fine_pool_is_kernarg = is_kernarg;
     }
   }
 
-  iree_status_t status = iree_ok_status();
+  if (!host_memory_pools->coarse_pool.handle) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_NOT_FOUND,
+                             "no accessible-by-all + coarse-grained shared "
+                             "memory pool is available in the system"));
+  }
   if (!host_memory_pools->fine_pool.handle) {
-    status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "no accessible-by-all + fine-grained shared "
-                              "memory pool is available in the system");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_NOT_FOUND,
+                             "no accessible-by-all + fine-grained shared "
+                             "memory pool is available in the system"));
+  }
+  if (!host_memory_pools->kernarg_pool.handle) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_NOT_FOUND,
+                             "no accessible-by-all + kernarg-init shared "
+                             "memory pool is available in the system"));
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 // NOTE: we could do the filtering inline in the iteration callback but that
@@ -111,17 +139,19 @@ static iree_status_t iree_hal_amdgpu_system_populate_host_memory_pools(
 // emit iree_status_t errors. Instead we iterate over all and then do things in
 // local for-loops.
 typedef struct iree_hal_amdgpu_hsa_region_list_t {
+  // Number of valid entries in |values|.
   iree_host_size_t count;
+  // Fixed-capacity region list populated by HSA iteration callbacks.
   hsa_region_t values[32];
 } iree_hal_amdgpu_hsa_region_list_t;
 static hsa_status_t iree_hal_amdgpu_iterate_hsa_region(hsa_region_t region,
                                                        void* user_data) {
-  iree_hal_amdgpu_hsa_region_list_t* pool_list =
+  iree_hal_amdgpu_hsa_region_list_t* region_list =
       (iree_hal_amdgpu_hsa_region_list_t*)user_data;
-  if (pool_list->count + 1 >= IREE_ARRAYSIZE(pool_list->values)) {
+  if (region_list->count >= IREE_ARRAYSIZE(region_list->values)) {
     return HSA_STATUS_ERROR_OUT_OF_RESOURCES;
   }
-  pool_list->values[pool_list->count++] = region;
+  region_list->values[region_list->count++] = region;
   return HSA_STATUS_SUCCESS;
 }
 

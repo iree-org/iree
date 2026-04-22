@@ -28,6 +28,24 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    libaqlprofile
+  HDRS
+    "libaqlprofile.h"
+  SRCS
+    "libaqlprofile.c"
+  DEPS
+    ::libhsa
+    hsa_runtime::headers
+    iree::base
+    iree::base::internal
+    iree::base::internal::dynamic_library
+    iree::base::internal::path
+    iree::hal::drivers::amdgpu::abi
+  PUBLIC
+)
+
 iree_cc_test(
   NAME
     libhsa_test
@@ -35,6 +53,23 @@ iree_cc_test(
     "libhsa_test.cc"
   DEPS
     ::libhsa
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    libaqlprofile_test
+  SRCS
+    "libaqlprofile_test.cc"
+  DEPS
+    ::libaqlprofile
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -55,6 +90,7 @@ iree_cc_library(
   DEPS
     ::libhsa
     iree::base
+    iree::hal
   PUBLIC
 )
 
@@ -67,6 +103,7 @@ iree_cc_test(
     ::libhsa
     ::topology
     iree::base
+    iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
@@ -78,31 +115,232 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    util
+    hsaco_metadata
+  HDRS
+    "hsaco_metadata.h"
+  SRCS
+    "hsaco_metadata.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    hsaco_metadata_test
+  SRCS
+    "hsaco_metadata_test.cc"
+  DEPS
+    ::hsaco_metadata
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_fuzz(
+  NAME
+    hsaco_metadata_fuzz
+  SRCS
+    "hsaco_metadata_fuzz.cc"
+  DEPS
+    ::hsaco_metadata
+    iree::base
+)
+
+iree_cc_library(
+  NAME
+    affinity
   HDRS
     "affinity.h"
-    "block_pool.h"
-    "device_library.h"
-    "error_callback.h"
+  DEPS
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    packet
+  HDRS
+    "aql_emitter.h"
+    "pm4_capabilities.h"
+    "pm4_emitter.h"
+  DEPS
+    iree::base
+    iree::hal::drivers::amdgpu::abi
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    info
+  HDRS
     "info.h"
+  SRCS
+    "info.c"
+  DEPS
+    ::libhsa
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    kfd
+  HDRS
     "kfd.h"
+  SRCS
+    "kfd.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pm4_program
+  HDRS
+    "pm4_program.h"
+  SRCS
+    "pm4_program.c"
+  DEPS
+    ::libhsa
+    ::packet
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_primitives
+  HDRS
+    "aql_ring.h"
+    "epoch_signal_table.h"
+    "error_callback.h"
+    "kernarg_ring.h"
+    "notification_ring.h"
+    "signal_pool.h"
+  SRCS
+    "kernarg_ring.c"
+    "notification_ring.c"
+    "signal_pool.c"
+  DEPS
+    ::libhsa
+    iree::async
+    iree::base
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::threading
+    iree::hal
+    iree::hal::utils::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmem
+  HDRS
     "vmem.h"
   SRCS
-    "block_pool.c"
-    "device_library.c"
-    "info.c"
-    "kfd.c"
     "vmem.c"
   DEPS
     ::libhsa
     ::topology
     iree::base
-    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    block_pool
+  HDRS
+    "block_pool.h"
+  SRCS
+    "block_pool.c"
+  DEPS
+    ::libhsa
+    iree::base
     iree::base::threading
-    iree::base::threading::thread
-    iree::hal::drivers::amdgpu::device::binaries
+    iree::hal::memory::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    device_library
+  HDRS
+    "device_library.h"
+  SRCS
+    "device_library.c"
+  DEPS
+    ::libhsa
+    ::topology
+    iree::base
+    iree::base::internal
+    iree::hal::drivers::amdgpu::device::binaries::target_map
+    iree::hal::drivers::amdgpu::device::binaries::toc
     iree::hal::drivers::amdgpu::device::headers
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    util
+  DEPS
+    ::affinity
+    ::block_pool
+    ::device_library
+    ::info
+    ::kfd
+    ::packet
+    ::pm4_program
+    ::queue_primitives
+    ::vmem
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    benchmark_flags
+  HDRS
+    "benchmark_flags.h"
+  SRCS
+    "benchmark_flags.cc"
+  DEPS
+    benchmark
+    iree::async
+    iree::base
+    iree::base::tooling::flags
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    blit_benchmark
+  SRCS
+    "blit_benchmark.cc"
+  DEPS
+    ::benchmark_flags
+    benchmark
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::drivers::amdgpu::registration
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
 )
 
 iree_cc_test(
@@ -111,8 +349,9 @@ iree_cc_test(
   SRCS
     "block_pool_test.cc"
   DEPS
+    ::block_pool
     ::topology
-    ::util
+    ::vmem
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -129,10 +368,28 @@ iree_cc_test(
   SRCS
     "device_library_test.cc"
   DEPS
+    ::device_library
     ::topology
-    ::util
     iree::base
     iree::hal::drivers::amdgpu::device::headers
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    epoch_signal_table_test
+  SRCS
+    "epoch_signal_table_test.cc"
+  DEPS
+    ::queue_primitives
+    iree::async
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
@@ -148,9 +405,9 @@ iree_cc_test(
   SRCS
     "kfd_test.cc"
   DEPS
+    ::kfd
     ::libhsa
     ::topology
-    ::util
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -163,13 +420,180 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    notification_ring_test
+  SRCS
+    "notification_ring_test.cc"
+  DEPS
+    ::libhsa
+    ::queue_primitives
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::base::internal::arena
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    aql_emitter_test
+  SRCS
+    "aql_emitter_test.cc"
+  DEPS
+    ::packet
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    pm4_emitter_test
+  SRCS
+    "pm4_emitter_test.cc"
+  DEPS
+    ::packet
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    pm4_program_test
+  SRCS
+    "pm4_program_test.cc"
+  DEPS
+    ::packet
+    ::pm4_program
+    ::topology
+    ::vmem
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
+add_custom_command(OUTPUT queue_benchmark_testdata_srcs.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch queue_benchmark_testdata_srcs.stamp
+  DEPENDS
+    "queue_benchmark_testdata.mlir"
+)
+
+add_custom_target(queue_benchmark_testdata_srcs
+    DEPENDS queue_benchmark_testdata_srcs.stamp
+)
+
+iree_hal_cts_testdata(
+  FORMAT_NAME
+    amdgpu_queue_benchmark
+  TARGET_DEVICE
+    "amdgpu"
+  IDENTIFIER
+    "iree_queue_benchmark_testdata_amdgpu"
+  BACKEND_NAME
+    "amdgpu"
+  FORMAT_STRING
+    "\"amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}\""
+  TESTDATA_DIR
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/drivers/amdgpu/util"
+  FLAGS
+    "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    queue_benchmark
+  SRCS
+    "queue_benchmark.cc"
+  DEPS
+    ::benchmark_flags
+    ::testdata_amdgpu_queue_benchmark
+    benchmark
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::drivers::amdgpu
+    iree::hal::drivers::amdgpu::cts::testdata_amdgpu
+    iree::hal::drivers::amdgpu::device::dispatch
+    iree::hal::drivers::amdgpu::device::headers
+    iree::hal::drivers::amdgpu::headers
+    iree::hal::drivers::amdgpu::queue_affinity
+    iree::hal::drivers::amdgpu::registration
+    iree::io::file_handle
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
+)
+endif()
+iree_cc_test(
+  NAME
+    signal_pool_test
+  SRCS
+    "signal_pool_test.cc"
+  DEPS
+    ::libhsa
+    ::queue_primitives
+    ::topology
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    signal_pool_benchmark
+  SRCS
+    "signal_pool_benchmark.cc"
+  DEPS
+    ::libhsa
+    ::queue_primitives
+    ::topology
+    benchmark
+    iree::base
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
+)
+
+iree_cc_test(
+  NAME
     vmem_test
   SRCS
     "vmem_test.cc"
   DEPS
     ::libhsa
     ::topology
-    ::util
+    ::vmem
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

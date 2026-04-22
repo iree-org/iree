@@ -9,19 +9,45 @@
 
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/api.h"
-#include "iree/hal/drivers/amdgpu/buffer_pool.h"
-#include "iree/hal/drivers/amdgpu/command_buffer.h"
-#include "iree/hal/drivers/amdgpu/semaphore_pool.h"
+#include "iree/hal/drivers/amdgpu/profile_events.h"
+#include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 typedef struct iree_async_proactor_t iree_async_proactor_t;
 typedef struct iree_hal_amdgpu_physical_device_t
     iree_hal_amdgpu_physical_device_t;
+typedef struct iree_hal_amdgpu_epoch_signal_table_t
+    iree_hal_amdgpu_epoch_signal_table_t;
+typedef struct iree_hal_amdgpu_profile_counter_session_t
+    iree_hal_amdgpu_profile_counter_session_t;
+typedef struct iree_hal_amdgpu_profile_device_metrics_session_t
+    iree_hal_amdgpu_profile_device_metrics_session_t;
+typedef struct iree_hal_amdgpu_profile_trace_session_t
+    iree_hal_amdgpu_profile_trace_session_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// iree_hal_amdgpu_host_block_pools_t
+//===----------------------------------------------------------------------===//
+
+// Block pools for host memory blocks of various sizes.
+typedef struct iree_hal_amdgpu_host_block_pools_t {
+  // Used for small allocations of around 1-4KB.
+  iree_arena_block_pool_t small;
+  // Used for large page-sized allocations of 32-64kB.
+  iree_arena_block_pool_t large;
+  // Used for durable command-buffer recording blocks.
+  iree_arena_block_pool_t command_buffer;
+} iree_hal_amdgpu_host_block_pools_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_logical_device_t
@@ -36,7 +62,9 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 // implementation does not currently handle taking the minimum capabilities and
 // limits.
 typedef struct iree_hal_amdgpu_logical_device_t {
+  // HAL resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for logical-device-owned host allocations.
   iree_allocator_t host_allocator;
 
   // Proactor pool retained from create_params; provides async I/O proactors.
@@ -44,16 +72,24 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Proactor borrowed from the pool for this device's async operations.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during logical device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
-  // This device's axis and monotonic epoch counter for frontier tracking.
-  // AMDGPU currently has no submit path — these are plumbing-only.
+  // This device's topology-assigned base axis.
   iree_async_axis_t axis;
+
+  // Logical-device epoch counter for frontier tracking.
   iree_atomic_int64_t epoch;
 
+  // Next process-local profile session identifier allocated by this device.
+  uint64_t next_profile_session_id;
+
+  // Durable profiling metadata registered by cold executable/command-buffer
+  // construction paths.
+  iree_hal_amdgpu_profile_metadata_registry_t profile_metadata;
+
+  // Stable device identifier string stored inline after this struct.
   iree_string_view_t identifier;
 
   // Block pools for host memory blocks of various sizes.
@@ -64,6 +100,11 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // the agents available in HSA that are represented as physical devices.
   iree_hal_amdgpu_system_t* system;
 
+  // Shared epoch-signal table used by all host queues on this logical device
+  // for local cross-queue barrier emission. Owned by the logical device and
+  // deregistered by each host queue before this table is freed.
+  iree_hal_amdgpu_epoch_signal_table_t* host_queue_epoch_table;
+
   // Mask indicating which queue affinities are valid.
   iree_hal_queue_affinity_t queue_affinity_mask;
 
@@ -73,19 +114,35 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
-  // Growable pool of HAL semaphores and their matching device allocations.
-  // Semaphores can be used on any CPU and GPU agent in the system.
-  iree_hal_amdgpu_semaphore_pool_t semaphore_pool;
-
-  // Growable pool of transient buffers and their matching device handles.
-  // Allocation handles can be used on any CPU and GPU agent in the system.
-  iree_hal_amdgpu_buffer_pool_t buffer_pool;
-
   // Sticky logical device-global error flag.
   // Asynchronous errors from subsystems get routed back to this as our "device
   // loss" trigger.
   iree_atomic_intptr_t failure_status;
 
+  // Active profiling session state. Mutated only by the HAL profiling
+  // begin/end API while its idle-device precondition is held.
+  struct {
+    // Owned profiling options for the active session.
+    iree_hal_device_profiling_options_t options;
+    // Opaque storage backing borrowed pointers in |options|, or NULL.
+    iree_hal_device_profiling_options_storage_t* options_storage;
+    // Process-local profiling session identifier assigned at begin.
+    uint64_t session_id;
+    // Next session-local clock-correlation sample identifier.
+    uint64_t next_clock_correlation_sample_id;
+    // Cursor tracking metadata side-table chunks emitted in this session.
+    iree_hal_amdgpu_profile_metadata_cursor_t metadata_cursor;
+    // Hardware counter session active for selected dispatches, or NULL.
+    iree_hal_amdgpu_profile_counter_session_t* counter_session;
+    // Executable trace session active for selected dispatches, or NULL.
+    iree_hal_amdgpu_profile_trace_session_t* trace_session;
+    // Device metrics session sampled on profiling flush/end, or NULL.
+    iree_hal_amdgpu_profile_device_metrics_session_t* device_metrics_session;
+    // Host-side memory and queue profiling event streams.
+    iree_hal_amdgpu_profile_event_streams_t event_streams;
+  } profiling;
+
+  // Topology metadata assigned by the device group after construction.
   iree_hal_device_topology_info_t topology_info;
 
   // Count of physical devices.
@@ -115,5 +172,66 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+// Verifies option feature knobs that are independent of HSA/topology queries.
+// Driver creation calls this before loading HSA so unsupported default-device
+// options fail without touching ROCR process-global state. Full logical device
+// verification still happens after topology discovery.
+iree_status_t iree_hal_amdgpu_logical_device_options_verify_supported_features(
+    const iree_hal_amdgpu_logical_device_options_t* options);
+
+// Returns true when memory lifecycle profiling records would be retained.
+//
+// Producers may use this to avoid preparing profiling payloads on hot paths.
+// The answer is only meaningful while the device profiling begin/end idle
+// precondition is held by the caller.
+bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
+    iree_hal_device_t* base_device);
+
+// Returns true when the active profile capture should emit heavy dispatch
+// artifacts for the given executable export and queue location.
+bool iree_hal_amdgpu_logical_device_should_profile_dispatch(
+    iree_hal_amdgpu_logical_device_t* logical_device, uint64_t executable_id,
+    uint32_t export_ordinal, uint64_t command_buffer_id, uint32_t command_index,
+    uint32_t physical_device_ordinal, uint32_t queue_ordinal);
+
+// Returns a session-local allocation id, or 0 when memory profiling is off.
+//
+// |out_session_id| receives the active profiling session id owning the returned
+// allocation id. Callers that may release after a later profiling session
+// begins must pass the id back to the session-filtered record helper.
+uint64_t iree_hal_amdgpu_logical_device_allocate_profile_memory_allocation_id(
+    iree_hal_device_t* base_device, uint64_t* out_session_id);
+
+// Records one memory lifecycle event into the active profiling stream.
+//
+// This never calls the sink directly. Events are buffered in host memory and
+// emitted by profiling_flush/end, making this safe for submission and pool
+// paths that must not block on file or tool I/O. The stream is an aggregate
+// lossy signal: when its fixed ring is full the event is dropped and the next
+// emitted chunk reports TRUNCATED with a dropped-record count.
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event(
+    iree_hal_device_t* base_device,
+    const iree_hal_profile_memory_event_t* event);
+
+// Records one memory lifecycle event only if |session_id| is still active.
+bool iree_hal_amdgpu_logical_device_record_profile_memory_event_for_session(
+    iree_hal_device_t* base_device, uint64_t session_id,
+    const iree_hal_profile_memory_event_t* event);
+
+// Records one queue operation event into the active profiling stream.
+//
+// This never calls the sink directly. Events are buffered in host memory and
+// emitted by profiling_flush/end, making this safe for submission paths that
+// must not block on file or tool I/O. The stream is an aggregate lossy signal:
+// when its fixed ring is full the event is dropped and the next emitted chunk
+// reports TRUNCATED with a dropped-record count.
+void iree_hal_amdgpu_logical_device_record_profile_queue_event(
+    iree_hal_device_t* base_device,
+    const iree_hal_profile_queue_event_t* event);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_DRIVERS_AMDGPU_LOGICAL_DEVICE_H_

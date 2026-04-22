@@ -13,6 +13,9 @@
 static iree_status_t iree_hal_amdgpu_block_pool_grow(
     iree_hal_amdgpu_block_pool_t* block_pool);
 
+static const char* IREE_HAL_AMDGPU_BLOCK_POOL_TRACE_ID =
+    "iree-hal-amdgpu-block-pool";
+
 iree_status_t iree_hal_amdgpu_block_pool_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     iree_hal_amdgpu_block_pool_options_t options, hsa_agent_t agent,
@@ -37,6 +40,10 @@ iree_status_t iree_hal_amdgpu_block_pool_initialize(
   out_block_pool->agent = agent;
   out_block_pool->memory_pool = memory_pool;
   out_block_pool->block_size = options.block_size;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_memory_trace_initialize_pool(
+              options.trace_name, IREE_HAL_AMDGPU_BLOCK_POOL_TRACE_ID,
+              host_allocator, &out_block_pool->trace));
 
   // Query the memory pool for its allocation granularity.
   // This is not the minimum allocation size
@@ -104,6 +111,7 @@ void iree_hal_amdgpu_block_pool_deinitialize(
               "must have freed all blocks prior to deallocating the pool");
 
   iree_slim_mutex_deinitialize(&block_pool->mutex);
+  iree_hal_memory_trace_deinitialize(&block_pool->trace);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -141,6 +149,10 @@ static iree_status_t iree_hal_amdgpu_block_pool_grow(
     block_allocation->used_count = 0;
     block_pool->allocations_head = block_allocation;
 
+    iree_hal_memory_trace_alloc(
+        &block_pool->trace, base_ptr,
+        block_pool->blocks_per_allocation * block_pool->block_size);
+
     // Setup all blocks to point at their relevant memory.
     // We append to the block pool free list as we go.
     for (iree_host_size_t i = 0; i < block_pool->blocks_per_allocation; ++i) {
@@ -151,8 +163,9 @@ static iree_status_t iree_hal_amdgpu_block_pool_grow(
       block_pool->free_blocks_head = block;
     }
   } else {
-    IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-        IREE_LIBHSA(block_pool->libhsa), base_ptr));
+    status = iree_status_join(
+        status, iree_hsa_amd_memory_pool_free(IREE_LIBHSA(block_pool->libhsa),
+                                              base_ptr));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -202,8 +215,10 @@ void iree_hal_amdgpu_block_pool_trim(iree_hal_amdgpu_block_pool_t* block_pool) {
     iree_hal_amdgpu_block_allocation_t* next_allocation = allocation->next;
     if (allocation->used_count == 0) {
       // No blocks outstanding - can free and remove from the allocation list.
-      IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_free(
-          IREE_LIBHSA(block_pool->libhsa), allocation->base_ptr));
+      iree_hal_memory_trace_free(&block_pool->trace, allocation->base_ptr);
+      iree_hal_amdgpu_hsa_cleanup_assert_success(
+          iree_hsa_amd_memory_pool_free_raw(block_pool->libhsa,
+                                            allocation->base_ptr));
       if (allocation == block_pool->allocations_head) {
         IREE_ASSERT(!prev_allocation);
         block_pool->allocations_head = next_allocation;
@@ -235,24 +250,26 @@ iree_status_t iree_hal_amdgpu_block_pool_acquire(
 
   // If there are no free blocks available grow the pool by one block allocation
   // (which may allocate multiple blocks worth of memory).
+  iree_status_t status = iree_ok_status();
   if (!block_pool->free_blocks_head) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_amdgpu_block_pool_grow(block_pool));
+    status = iree_hal_amdgpu_block_pool_grow(block_pool);
   }
 
-  // Slice off the next free block.
-  iree_hal_amdgpu_block_t* block = block_pool->free_blocks_head;
-  block_pool->free_blocks_head = block->next;
-  block->next = NULL;  // user may use this
-  block->prev = NULL;
-  memset(block->user_data, 0, sizeof(block->user_data));
-  ++block->allocation->used_count;
+  if (iree_status_is_ok(status)) {
+    // Slice off the next free block.
+    iree_hal_amdgpu_block_t* block = block_pool->free_blocks_head;
+    block_pool->free_blocks_head = block->next;
+    block->next = NULL;  // user may use this
+    block->prev = NULL;
+    memset(block->user_data, 0, sizeof(block->user_data));
+    ++block->allocation->used_count;
+    *out_block = block;
+  }
 
   iree_slim_mutex_unlock(&block_pool->mutex);
 
-  *out_block = block;
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 void iree_hal_amdgpu_block_pool_release(

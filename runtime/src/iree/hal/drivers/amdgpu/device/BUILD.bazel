@@ -4,9 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
-load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
-load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -14,19 +12,35 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-#===------------------------------------------------------------------------===#
-# Common sources
-#===------------------------------------------------------------------------===#
+DEVICE_SRCS = [
+    "blit.c",
+    "dispatch.c",
+    "profiling.c",
+]
 
-BITCODE_SRCS = glob([
-    "*.c",
-    "support/*.c",
-])
+DEVICE_HDRS = [
+    "blit.h",
+    "dispatch.h",
+    "kernel_tables.h",
+    "kernels.h",
+    "profiling.h",
+    "support/common.h",
+    "support/kernel.h",
+    "support/queue.h",
+    "support/signal.h",
+]
 
-BITCODE_HDRS = glob([
-    "*.h",
-    "support/*.h",
-])
+filegroup(
+    name = "bitcode_srcs",
+    srcs = DEVICE_SRCS,
+    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+)
+
+filegroup(
+    name = "bitcode_hdrs",
+    srcs = DEVICE_HDRS,
+    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+)
 
 #===------------------------------------------------------------------------===#
 # Exported Headers
@@ -34,41 +48,73 @@ BITCODE_HDRS = glob([
 
 iree_runtime_cc_library(
     name = "headers",
-    hdrs = BITCODE_HDRS,
-)
-
-#===------------------------------------------------------------------------===#
-# Architecture-specific Binaries
-#===------------------------------------------------------------------------===#
-# NOTE: the naming here matches what HSA_ISA_INFO_NAME returns so that we can
-# match them at runtime without having to load and reflect each code object.
-
-# TODO(benvanik): when TheRock stabilizes its naming convention we'll want to
-# copy that and make it configurable. See:
-# https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake
-# Matching their family naming scheme would allow us to directly source from
-# their command line arguments. How best to map this to bazel I don't know, so
-# for now we include a hand-picked set that people using bazel request.
-
-iree_amdgpu_binary(
-    name = "amdgcn-amd-amdhsa--gfx1100",
-    srcs = BITCODE_SRCS,
-    arch = "gfx1100",
-    internal_hdrs = BITCODE_HDRS,
-    target = "amdgcn-amd-amdhsa",
-)
-
-#===------------------------------------------------------------------------===#
-# Embedded Binary Table
-#===------------------------------------------------------------------------===#
-
-iree_c_embed_data(
-    name = "binaries",
-    srcs = [
-        ":amdgcn-amd-amdhsa--gfx1100.so",
+    hdrs = DEVICE_HDRS,
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
     ],
-    c_file_output = "binaries.c",
-    flatten = True,
-    h_file_output = "binaries.h",
-    identifier = "iree_hal_amdgpu_device_binaries",
+)
+
+iree_runtime_cc_library(
+    name = "blit",
+    srcs = [
+        "blit.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dispatch",
+    srcs = [
+        "dispatch.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "profiling",
+    srcs = [
+        "profiling.c",
+    ],
+    deps = [
+        ":headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "blit_test",
+    srcs = ["blit_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":blit",
+        ":headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dispatch_test",
+    srcs = ["dispatch_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":dispatch",
+        ":headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
 )

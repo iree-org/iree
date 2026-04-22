@@ -24,24 +24,26 @@ static hsa_status_t iree_hal_amdgpu_find_global_memory_pool_iterator(
 
   // Filter to the global segment only.
   hsa_region_segment_t segment = 0;
-  IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_get_info(
-      IREE_LIBHSA(state->libhsa), memory_pool, HSA_AMD_MEMORY_POOL_INFO_SEGMENT,
-      &segment));
+  hsa_status_t hsa_status = iree_hsa_amd_memory_pool_get_info_raw(
+      state->libhsa, memory_pool, HSA_AMD_MEMORY_POOL_INFO_SEGMENT, &segment);
+  if (hsa_status != HSA_STATUS_SUCCESS) return hsa_status;
   if (segment != HSA_REGION_SEGMENT_GLOBAL) return HSA_STATUS_SUCCESS;
 
   // Must be able to allocate. This should be true for any pool we query that
   // matches the other flags. Workgroup-private pools won't have this set.
   bool alloc_allowed = false;
-  IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_get_info(
-      IREE_LIBHSA(state->libhsa), memory_pool,
-      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALLOWED, &alloc_allowed));
+  hsa_status = iree_hsa_amd_memory_pool_get_info_raw(
+      state->libhsa, memory_pool,
+      HSA_AMD_MEMORY_POOL_INFO_RUNTIME_ALLOC_ALLOWED, &alloc_allowed);
+  if (hsa_status != HSA_STATUS_SUCCESS) return hsa_status;
   if (!alloc_allowed) return HSA_STATUS_SUCCESS;
 
   // Match if flags are present.
   hsa_region_global_flag_t global_flag = 0;
-  IREE_IGNORE_ERROR(iree_hsa_amd_memory_pool_get_info(
-      IREE_LIBHSA(state->libhsa), memory_pool,
-      HSA_AMD_MEMORY_POOL_INFO_GLOBAL_FLAGS, &global_flag));
+  hsa_status = iree_hsa_amd_memory_pool_get_info_raw(
+      state->libhsa, memory_pool, HSA_AMD_MEMORY_POOL_INFO_GLOBAL_FLAGS,
+      &global_flag);
+  if (hsa_status != HSA_STATUS_SUCCESS) return hsa_status;
   if (global_flag & state->match_flags) {
     state->best_pool = memory_pool;
     return HSA_STATUS_INFO_BREAK;
@@ -97,14 +99,67 @@ iree_status_t iree_hal_amdgpu_find_fine_global_memory_pool(
       out_pool);
 }
 
+bool iree_hal_amdgpu_try_find_coarse_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool) {
+  memset(out_pool, 0, sizeof(*out_pool));
+  iree_hal_amdgpu_find_global_memory_pool_state_t find_state = {
+      .libhsa = libhsa,
+      .match_flags = HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_COARSE_GRAINED,
+      .best_pool = {0},
+  };
+  (void)iree_hsa_amd_agent_iterate_memory_pools_raw(
+      libhsa, agent, iree_hal_amdgpu_find_global_memory_pool_iterator,
+      &find_state);
+  *out_pool = find_state.best_pool;
+  return find_state.best_pool.handle != 0;
+}
+
+bool iree_hal_amdgpu_try_find_fine_global_memory_pool(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t agent,
+    hsa_amd_memory_pool_t* out_pool) {
+  memset(out_pool, 0, sizeof(*out_pool));
+  iree_hal_amdgpu_find_global_memory_pool_state_t find_state = {
+      .libhsa = libhsa,
+      .match_flags =
+          HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_FINE_GRAINED |
+          HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_EXTENDED_SCOPE_FINE_GRAINED,
+      .best_pool = {0},
+  };
+  (void)iree_hsa_amd_agent_iterate_memory_pools_raw(
+      libhsa, agent, iree_hal_amdgpu_find_global_memory_pool_iterator,
+      &find_state);
+  *out_pool = find_state.best_pool;
+  return find_state.best_pool.handle != 0;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_vmem_ringbuffer_t
 //===----------------------------------------------------------------------===//
 
+static iree_status_t iree_hal_amdgpu_vmem_translate_memory_type(
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    hsa_amd_memory_type_t* out_hsa_memory_type) {
+  IREE_ASSERT_ARGUMENT(out_hsa_memory_type);
+  switch (memory_type) {
+    case IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_DEFAULT:
+      *out_hsa_memory_type = MEMORY_TYPE_NONE;
+      return iree_ok_status();
+    case IREE_HAL_AMDGPU_VMEM_MEMORY_TYPE_PINNED_HOST:
+      *out_hsa_memory_type = MEMORY_TYPE_PINNED;
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported vmem memory type: %d",
+                              (int)memory_type);
+  }
+}
+
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    iree_host_size_t access_desc_count,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, iree_host_size_t access_desc_count,
     const hsa_amd_memory_access_desc_t* access_descs,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer) {
   IREE_ASSERT_ARGUMENT(libhsa);
@@ -112,6 +167,11 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, min_capacity);
   memset(out_ringbuffer, 0, sizeof(*out_ringbuffer));
+
+  hsa_amd_memory_type_t hsa_memory_type = MEMORY_TYPE_NONE;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_vmem_translate_memory_type(memory_type,
+                                                     &hsa_memory_type));
 
   // hsa_amd_vmem_handle_create wants values aligned to this value.
   size_t alloc_rec_granule = 0;
@@ -140,8 +200,8 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
 
   // Allocate the physical memory for backing the ringbuffer.
   iree_status_t status = iree_hsa_amd_vmem_handle_create(
-      IREE_LIBHSA(libhsa), memory_pool, capacity, MEMORY_TYPE_NONE,
-      /*flags=*/0, &out_ringbuffer->alloc_handle);
+      IREE_LIBHSA(libhsa), memory_pool, capacity, hsa_memory_type, /*flags=*/0,
+      &out_ringbuffer->alloc_handle);
 
   void* va_offsets[3] = {
       (uint8_t*)out_ringbuffer->va_base_ptr + 0 * capacity,
@@ -175,8 +235,9 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize(
 
 iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t local_agent,
-    hsa_amd_memory_pool_t memory_pool, iree_device_size_t min_capacity,
-    const iree_hal_amdgpu_topology_t* topology,
+    hsa_amd_memory_pool_t memory_pool,
+    iree_hal_amdgpu_vmem_memory_type_t memory_type,
+    iree_device_size_t min_capacity, const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_vmem_access_mode_t access_mode,
     iree_hal_amdgpu_vmem_ringbuffer_t* out_ringbuffer) {
   IREE_ASSERT_ARGUMENT(libhsa);
@@ -252,8 +313,8 @@ iree_status_t iree_hal_amdgpu_vmem_ringbuffer_initialize_with_topology(
 
   // Route to the explicit initializer.
   iree_status_t status = iree_hal_amdgpu_vmem_ringbuffer_initialize(
-      libhsa, local_agent, memory_pool, min_capacity, access_desc_count,
-      access_descs, out_ringbuffer);
+      libhsa, local_agent, memory_pool, memory_type, min_capacity,
+      access_desc_count, access_descs, out_ringbuffer);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -274,17 +335,17 @@ void iree_hal_amdgpu_vmem_ringbuffer_deinitialize(
         (uint8_t*)ringbuffer->va_base_ptr + 2 * ringbuffer->capacity,
     };
     for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(va_offsets); ++i) {
-      IREE_IGNORE_ERROR(iree_hsa_amd_vmem_unmap(
-          IREE_LIBHSA(libhsa), va_offsets[i], ringbuffer->capacity));
+      iree_hal_amdgpu_hsa_cleanup_assert_success(iree_hsa_amd_vmem_unmap_raw(
+          libhsa, va_offsets[i], ringbuffer->capacity));
     }
-    IREE_IGNORE_ERROR(iree_hsa_amd_vmem_handle_release(
-        IREE_LIBHSA(libhsa), ringbuffer->alloc_handle));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_vmem_handle_release_raw(libhsa, ringbuffer->alloc_handle));
   }
 
   if (ringbuffer->va_base_ptr) {
-    IREE_IGNORE_ERROR(iree_hsa_amd_vmem_address_free(IREE_LIBHSA(libhsa),
-                                                     ringbuffer->va_base_ptr,
-                                                     ringbuffer->capacity * 3));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_amd_vmem_address_free_raw(libhsa, ringbuffer->va_base_ptr,
+                                           ringbuffer->capacity * 3));
   }
 
   memset(ringbuffer, 0, sizeof(*ringbuffer));

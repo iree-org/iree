@@ -12,11 +12,20 @@ Configure CMake with the following options:
 -DIREE_BUILD_COMPILER=ON
 -DIREE_TARGET_BACKEND_ROCM=ON
 -DIREE_HAL_DRIVER_AMDGPU=ON
--DIREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS=gfx1100
+-DIREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS=all
 -DIREE_ROCM_TEST_TARGET_CHIP=gfx1100
 ```
 
 ### Bazel
+
+Build tools with the AMDGPU runtime driver registered and with device artifacts
+compiled for your local GPU architecture:
+
+```sh
+iree-bazel-build //tools:iree-compile //tools:iree-run-module \
+  --iree_drivers=amdgpu,cuda,hip,local-sync,local-task,vulkan \
+  --//build_tools/bazel:rocm_test_target=gfx1100
+```
 
 The ROCM chip target defaults to `gfx1100`. Override for your hardware:
 
@@ -24,7 +33,7 @@ The ROCM chip target defaults to `gfx1100`. Override for your hardware:
 iree-bazel-test --//build_tools/bazel:rocm_test_target=gfx942 //runtime/src/iree/hal/drivers/amdgpu/cts/...
 ```
 
-Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake#L44) for a list of common targets. Future changes will include family support matching that file.
+Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake) for the target and generic family vocabulary mirrored by the embedded device library build.
 
 Use `amdgpu` to specify devices at runtime:
 
@@ -49,6 +58,51 @@ Use `amdgpu` to specify the AMDGPU target when compiling programs:
 iree-compile --iree-hal-target-device=amdgpu ...
 ```
 
+For a direct Bazel-built smoke test, compile with the AMDGPU target device and
+run the resulting VMFB with the AMDGPU HAL driver:
+
+```sh
+bazel-bin/tools/iree-compile \
+  --iree-input-type=stablehlo \
+  --iree-hal-target-device=amdgpu \
+  --iree-rocm-target=gfx1100 \
+  --iree-rocm-bc-dir=bazel-bin/external/_main~iree_extension~amdgpu_device_libs/bitcode \
+  tests/e2e/stablehlo_models/mnist_fake_weights.mlir \
+  -o=/tmp/mnist_fake_amdgpu.vmfb
+
+bazel-bin/tools/iree-run-module \
+  --device=amdgpu \
+  --module=/tmp/mnist_fake_amdgpu.vmfb \
+  --function=predict \
+  --input=1x28x28x1xf32 \
+  --expected_output='1x10xf32=0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1'
+```
+
+Prefer this explicit two-step flow when debugging AMDGPU target-device behavior.
+`iree-run-mlir --device=amdgpu` currently relies on generic device-to-compiler
+flag inference and may select the legacy ROCm/HIP target path instead of the
+AMDGPU HAL target.
+
+To capture a Tracy trace of the same runtime path, use the Bazel trace wrapper.
+The wrapper requires a `tracy-capture` binary in `PATH`, or one supplied through
+`IREE_TRACY_CAPTURE`:
+
+```sh
+IREE_TRACY_CAPTURE=/path/to/tracy-capture \
+  build_tools/bin/iree-bazel-run \
+  --trace \
+  --trace_name=fake_mnist \
+  //tools:iree-run-module \
+  --iree_drivers=amdgpu,cuda,hip,local-sync,local-task,vulkan \
+  --//build_tools/bazel:rocm_test_target=gfx1100 \
+  -- \
+  --device=amdgpu \
+  --module=/tmp/mnist_fake_amdgpu.vmfb \
+  --function=predict \
+  --input=1x28x28x1xf32 \
+  --expected_output='1x10xf32=0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1'
+```
+
 ## Build Notes
 
 ### HSA/ROCR Dependency
@@ -71,4 +125,14 @@ Currently IREE's CMake configuration must have the compiler enabled in order to 
 
 The device library should be compiled automatically when building the AMDGPU HAL driver and gets embedded inside the runtime binary so that no additional files are required at runtime.
 
-The `IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS` CMake variable can be set to a list of target architectures to build the library for and bundle into the AMDGPU HAL library. Architectures not built into the library will fail to instantiate the driver at runtime.
+The `IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS` CMake variable defaults to `all`, which embeds LLVM generic ISA code objects covering every currently known AMDGPU device library target. Packagers can set it to a smaller list of exact target architectures, LLVM generic ISA targets, TheRock-style generic target families, or TheRock-style product bundles. Exact targets use the HSA ISA spelling, such as `gfx1100`. LLVM generic ISA targets use spellings such as `gfx11-generic`. Generic families use the TheRock family spelling, such as `gfx110X-all`, and product bundles use spellings such as `dgpu-all` or `igpu-all`. These selectors expand to the smallest known compatible code object set instead of one code object per exact GPU. Architectures not built into the library will fail to instantiate the driver at runtime.
+
+The Bazel build exposes the same selector vocabulary through `//runtime/src/iree/hal/drivers/amdgpu/device/binaries:targets`:
+
+```sh
+iree-bazel-build --//runtime/src/iree/hal/drivers/amdgpu/device/binaries:targets=igpu-all //runtime/src/iree/hal/drivers/amdgpu:amdgpu
+```
+
+See [`device/binaries/README.md`](device/binaries/README.md) for the target map
+update flow, the generated Bazel/CMake/runtime fragments, and the TheRock/LLVM
+sources that should be checked when adding support for a new architecture.
