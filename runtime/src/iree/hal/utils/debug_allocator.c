@@ -253,7 +253,10 @@ static iree_status_t iree_hal_debug_allocator_export_buffer(
 
 static bool iree_hal_debug_allocator_supports_virtual_memory(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
-  return false;
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_supports_virtual_memory(
+      allocator->device_allocator);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_query_granularity(
@@ -261,26 +264,30 @@ static iree_status_t iree_hal_debug_allocator_virtual_memory_query_granularity(
     iree_hal_buffer_params_t params,
     iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
     iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
-  *out_minimum_page_size = 0;
-  *out_recommended_page_size = 0;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_query_granularity(
+      allocator->device_allocator, params, out_minimum_page_size,
+      out_recommended_page_size);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_reserve(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
     iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
-  *out_virtual_buffer = NULL;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_reserve(
+      allocator->device_allocator, queue_affinity, size, out_virtual_buffer);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_release(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_release(allocator->device_allocator,
+                                                   virtual_buffer);
 }
 
 static iree_status_t iree_hal_debug_allocator_physical_memory_allocate(
@@ -288,16 +295,20 @@ static iree_status_t iree_hal_debug_allocator_physical_memory_allocate(
     iree_hal_buffer_params_t params, iree_device_size_t size,
     iree_allocator_t host_allocator,
     iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
-  *out_physical_memory = NULL;
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_physical_memory_allocate(
+      allocator->device_allocator, params, size, host_allocator,
+      out_physical_memory);
 }
 
 static iree_status_t iree_hal_debug_allocator_physical_memory_free(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_physical_memory_free(allocator->device_allocator,
+                                                 physical_memory);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_map(
@@ -306,16 +317,21 @@ static iree_status_t iree_hal_debug_allocator_virtual_memory_map(
     iree_device_size_t virtual_offset,
     iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
     iree_device_size_t physical_offset, iree_device_size_t size) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_map(
+      allocator->device_allocator, virtual_buffer, virtual_offset,
+      physical_memory, physical_offset, size);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_unmap(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_unmap(
+      allocator->device_allocator, virtual_buffer, virtual_offset, size);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_protect(
@@ -324,8 +340,11 @@ static iree_status_t iree_hal_debug_allocator_virtual_memory_protect(
     iree_device_size_t virtual_offset, iree_device_size_t size,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_protection_t protection) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_protect(
+      allocator->device_allocator, virtual_buffer, virtual_offset, size,
+      queue_affinity, protection);
 }
 
 static iree_status_t iree_hal_debug_allocator_virtual_memory_advise(
@@ -333,8 +352,11 @@ static iree_status_t iree_hal_debug_allocator_virtual_memory_advise(
     iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "debug allocator does not support virtual memory");
+  iree_hal_debug_allocator_t* allocator =
+      iree_hal_debug_allocator_cast(base_allocator);
+  return iree_hal_allocator_virtual_memory_advise(
+      allocator->device_allocator, virtual_buffer, virtual_offset, size,
+      queue_affinity, advice);
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_debug_allocator_vtable = {
