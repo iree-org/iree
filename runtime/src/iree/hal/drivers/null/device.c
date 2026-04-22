@@ -671,6 +671,31 @@ static iree_status_t iree_hal_null_device_profiling_end(
   return status;
 }
 
+static iree_status_t iree_hal_null_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
+
+  // TODO(null): start an implementation-defined external capture range.
+  (void)device;
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED, "device external capture not implemented");
+
+  return status;
+}
+
+static iree_status_t iree_hal_null_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
+
+  // TODO(null): end an implementation-defined external capture range.
+  (void)device;
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED, "device external capture not implemented");
+
+  return status;
+}
+
 static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .destroy = iree_hal_null_device_destroy,
     .id = iree_hal_null_device_id,
@@ -706,4 +731,6 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .profiling_begin = iree_hal_null_device_profiling_begin,
     .profiling_flush = iree_hal_null_device_profiling_flush,
     .profiling_end = iree_hal_null_device_profiling_end,
+    .external_capture_begin = iree_hal_null_device_external_capture_begin,
+    .external_capture_end = iree_hal_null_device_external_capture_end,
 };

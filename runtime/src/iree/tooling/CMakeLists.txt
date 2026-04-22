@@ -112,12 +112,17 @@ iree_cc_library(
     "device_util.c"
   DEPS
     iree::base
+    iree::base::internal
     iree::base::threading
+    iree::base::threading::thread
     iree::base::tooling::flags
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators
     iree::hal::utils::mpi_channel_provider
+    iree::hal::utils::profile_file
+    iree::hal::utils::statistics_sink
+    iree::io::file_handle
   PUBLIC
 )
 

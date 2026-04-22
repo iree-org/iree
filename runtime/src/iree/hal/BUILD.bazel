@@ -80,6 +80,13 @@ iree_runtime_cc_library(
         "pool.h",
         "pool_set.c",
         "pool_set.h",
+        "profile_metrics.c",
+        "profile_metrics.h",
+        "profile_options.c",
+        "profile_options.h",
+        "profile_schema.h",
+        "profile_sink.c",
+        "profile_sink.h",
         "queue.h",
         "resource.h",
         "semaphore.c",
@@ -94,6 +101,9 @@ iree_runtime_cc_library(
     hdrs = [
         "api.h",
     ],
+    textual_hdrs = [
+        "profile_metrics.inc",
+    ],
     deps = [
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
@@ -102,6 +112,17 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal/utils:platform_topology",
         "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "profile_metrics_test",
+    srcs = ["profile_metrics_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
