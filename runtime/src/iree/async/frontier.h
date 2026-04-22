@@ -168,8 +168,7 @@ typedef struct iree_async_frontier_entry_t {
 
 // Fixed-size frontier header. Useful for embedding a frontier header before
 // trailing entry storage in another variable-size record.
-typedef struct iree_alignas(iree_alignof(iree_async_frontier_entry_t))
-    iree_async_frontier_header_t {
+typedef struct iree_alignas(IREE_PTR_SIZE) iree_async_frontier_header_t {
   IREE_ASYNC_FRONTIER_HEADER_FIELDS;
 } iree_async_frontier_header_t;
 
@@ -293,6 +292,8 @@ typedef struct iree_async_frontier_t {
 static_assert(offsetof(iree_async_frontier_t, entries) ==
                   sizeof(iree_async_frontier_header_t),
               "frontier header must match frontier FAM offset");
+static_assert(IREE_PTR_SIZE == iree_alignof(iree_async_frontier_entry_t),
+              "frontier entry alignment must match pointer alignment");
 static_assert(iree_alignof(iree_async_frontier_header_t) ==
                   iree_alignof(iree_async_frontier_t),
               "frontier header must match frontier alignment");
