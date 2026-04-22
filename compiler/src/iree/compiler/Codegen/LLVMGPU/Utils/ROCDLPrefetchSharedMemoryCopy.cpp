@@ -97,22 +97,6 @@ static bool hasDirectGatherToLDS(scf::ForOp forOp) {
   return false;
 }
 
-/// Checks if a loop contains gather_to_lds operations nested inside regions
-/// (e.g., inside scf.if). Such conditional async copies can't be reliably
-/// pipelined.
-static bool hasNestedGatherToLDS(scf::ForOp forOp) {
-  for (Operation &op : forOp.getBody()->getOperations()) {
-    if (op.getNumRegions() > 0) {
-      bool hasNested = false;
-      op.walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
-      if (hasNested) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 /// Checks if a loop contains stream copy operations (global read + shared
 /// write). This is mutually exclusive with async copy mode.
 static bool hasStreamCopyOps(scf::ForOp forOp) {
@@ -386,10 +370,10 @@ static LogicalResult checkLoopIterations(scf::ForOp forOp) {
 
 // Step 1: Identify root operations for each stage.
 // Root operations are the anchors from which we compute backward slices.
-// This function looks inside scf.if blocks to find roots, so that backward
-// slice computation works naturally without special handling.
+// In async copy mode, any region-bearing op containing gather_to_lds is
+// treated as a load root. In stream copy mode, only scf.if is handled.
 // Returns failure if any scf.if has conflicting operations (both global reads
-// and shared writes).
+// and shared writes) in stream copy mode.
 static LogicalResult identifyRootOperations(
     scf::ForOp forOp, PipelineMode mode, SmallVector<Operation *> &loadRoots,
     SmallVector<Operation *> &readRoots, SmallVector<Operation *> &writeRoots,
@@ -399,13 +383,22 @@ static LogicalResult identifyRootOperations(
 
   for (Operation &op : forOp.getBody()->getOperations()) {
     if (mode == PipelineMode::AsyncCopy) {
-      // Async copy mode: gather_to_lds and scf.yield
       if (isa<amdgpu::GatherToLDSOp>(op)) {
         loadRoots.push_back(&op);
         LDBG() << "  Load root: " << op;
       } else if (isa<scf::YieldOp>(op)) {
         computeRoots.push_back(&op);
         LDBG() << "  Compute root: " << op;
+      } else if (op.getNumRegions() > 0) {
+        // Region-bearing ops (e.g., scf.if, scf.for) may wrap gather_to_lds.
+        // Treat the enclosing op as a load root so it gets scheduled in the
+        // load stage as a single unit.
+        bool hasNestedGather = false;
+        op.walk([&](amdgpu::GatherToLDSOp) { hasNestedGather = true; });
+        if (hasNestedGather) {
+          loadRoots.push_back(&op);
+          LDBG() << "  Load root (nested gather_to_lds): " << op;
+        }
       }
     } else {
       // Stream copy mode: transfer_read, transfer_write, scf.yield
@@ -473,37 +466,40 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
     slice.insert(root);
     slice.insert_range(rootSlice);
 
+    // If the root is a region-bearing op (e.g., scf.if wrapping gather_to_lds),
+    // capture backward slices of all nested operations to get their
+    // dependencies.
+    if (root->getNumRegions() > 0) {
+      root->walk([&](Operation *nestedOp) {
+        if (nestedOp != root) {
+          SetVector<Operation *> nestedSlice;
+          (void)getBackwardSlice(nestedOp, &nestedSlice, options);
+          slice.insert_range(nestedSlice);
+        }
+      });
+    }
+
     // Also add any parent scf.if operations that contain this root
     // This is necessary because roots inside scf.if need the if to be scheduled
     // We also need to compute backward slices of ALL operations inside the
     // scf.if to capture dependencies like memref.alloca that nested ops use
     Operation *parent = root->getParentOp();
     while (parent != forOp.getOperation()) {
-      if (auto ifOp = dyn_cast<scf::IfOp>(parent)) {
-        slice.insert(ifOp.getOperation());
+      if (parent->getNumRegions() > 0) {
+        slice.insert(parent);
 
-        // Compute backward slice OF the scf.if itself to capture its condition
-        SetVector<Operation *> ifSlice;
-        (void)getBackwardSlice(ifOp.getOperation(), &ifSlice, options);
-        slice.insert_range(ifSlice);
+        SetVector<Operation *> parentSlice;
+        (void)getBackwardSlice(parent, &parentSlice, options);
+        slice.insert_range(parentSlice);
 
-        // Compute backward slices of all nested operations to get dependencies
-        // This approach ensures correctness by capturing all transitive
-        // dependencies like memref.alloca that nested operations may use.
-        ifOp.getOperation()->walk([&](Operation *nestedOp) {
-          if (nestedOp != ifOp.getOperation()) {
+        parent->walk([&](Operation *nestedOp) {
+          if (nestedOp != parent) {
             SetVector<Operation *> nestedSlice;
             (void)getBackwardSlice(nestedOp, &nestedSlice, options);
             slice.insert_range(nestedSlice);
           }
         });
-      } else if (parent->getNumRegions() > 0) {
-        // If we encounter a region-bearing op that's not scf.if, fail
-        LDBG() << "  ERROR: Unsupported nested region-bearing operation: "
-               << parent->getName();
-        return failure();
       }
-      // else: Non-region-bearing intermediate operation, continue walking up
       parent = parent->getParentOp();
     }
   }
@@ -1067,6 +1063,13 @@ static Operation *findLastGatherToLDS(Block::iterator begin,
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
       return &*it;
     }
+    if (it->getNumRegions() > 0) {
+      bool hasNested = false;
+      it->walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
+      if (hasNested) {
+        return &*it;
+      }
+    }
   }
   return nullptr;
 }
@@ -1091,6 +1094,12 @@ static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
   for (auto it = parentBlock->begin(); it != loopStart; ++it) {
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
       prologueGathers.push_back(&*it);
+    } else if (it->getNumRegions() > 0) {
+      bool hasNested = false;
+      it->walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
+      if (hasNested) {
+        prologueGathers.push_back(&*it);
+      }
     }
   }
 
@@ -1225,14 +1234,6 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                unsigned numStages) {
   PipelineMode mode = hasGatherToLDS(forOp) ? PipelineMode::AsyncCopy
                                             : PipelineMode::StreamCopy;
-
-  // Check for nested gather_to_lds (e.g., inside scf.if) - this is unsupported
-  // because conditional async copies can't be reliably pipelined.
-  if (hasNestedGatherToLDS(forOp)) {
-    LDBG() << "Loop has gather_to_lds inside nested region (e.g., scf.if) - "
-           << "cannot pipeline";
-    return failure();
-  }
 
   // Check for mixed mode: both gather_to_lds and stream copy ops.
   // This is unsupported - bail out entirely without any pipelining.
