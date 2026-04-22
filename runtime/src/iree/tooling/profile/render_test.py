@@ -6,6 +6,7 @@ from __future__ import annotations
 import unittest
 
 from render import backends
+from render import cli
 from render import common
 from render import perfetto
 
@@ -72,6 +73,9 @@ class _FakeTraceProtoBuilder:
 
 
 class CommonTest(unittest.TestCase):
+
+    def test_cli_lists_registered_formats(self):
+        self.assertIn("perfetto", cli.format_descriptions())
 
     def test_validate_schema_rejects_old_version(self):
         with self.assertRaisesRegex(SystemExit, "schema version 2"):

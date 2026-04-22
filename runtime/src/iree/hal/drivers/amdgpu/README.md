@@ -103,6 +103,59 @@ IREE_TRACY_CAPTURE=/path/to/tracy-capture \
   --expected_output='1x10xf32=0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1'
 ```
 
+## Driver Shape
+
+The AMDGPU HAL driver is a native HSA/ROCR backend. It does not route through
+HIP or the legacy ROCm HAL driver. The major runtime objects are:
+
+* a driver that discovers HSA agents and creates logical devices;
+* one logical device spanning one or more physical GPU devices;
+* one physical-device object per HSA GPU agent, including queues, memory pools,
+  executable caches, profiling state, and device metrics;
+* host queues that translate HAL queue operations into AQL packet streams;
+* replayable command buffers that store backend command records and emit AQL
+  packets at submission time; and
+* device libraries embedded in the runtime and selected for the target GPU ISA
+  at device creation.
+
+Normal execution only depends on the HSA runtime and the embedded device
+library. Optional profiling modes dynamically load ROCm profiling libraries only
+when the selected mode needs them.
+
+## Profiling and Replay
+
+The AMDGPU driver is one of the primary producers for IREE's HAL-native
+profiling and replay tools:
+
+* `--device_profiling_mode=queue-events,device-queue-events,dispatch-events`
+  captures queue submissions, device-side queue timing, and per-dispatch timing
+  into a `.ireeprof` bundle.
+* `--device_profiling_mode=executable-metadata,counters` adds executable export
+  metadata and selected hardware/software counters.
+* `--device_profiling_mode=executable-traces` captures heavy ATT/SQTT artifacts
+  for filtered dispatches.
+* `--device_replay_output=/tmp/model.ireereplay` records a HAL-level replay
+  stream that can be run, benchmarked, and profiled independently of the
+  original application.
+
+Useful inspection commands:
+
+```sh
+iree-profile summary /tmp/model.ireeprof
+iree-profile dispatch --format=jsonl /tmp/model.ireeprof
+iree-profile export --format=ireeperf-jsonl \
+  --output=/tmp/model.ireeperf.jsonl /tmp/model.ireeprof
+uvx --with perfetto --with protobuf python "$(command -v iree-profile-render)" \
+  --format=perfetto \
+  /tmp/model.ireeperf.jsonl -o /tmp/model.pftrace
+iree-profile att --rocm_library_path=/opt/rocm/lib /tmp/model-att.ireeprof
+```
+
+See the website documentation for the full workflows:
+
+* [Device profiling](../../../../../../docs/website/docs/developers/performance/device-profiling.md)
+* [Device replay](../../../../../../docs/website/docs/developers/performance/device-replay.md)
+
 ## Build Notes
 
 ### HSA/ROCR Dependency
@@ -114,6 +167,23 @@ We require that at runtime a dynamic library with the name `libhsa-runtime64.so`
 It's recommended that developers check out a copy of the [ROCR-Runtime](https://github.com/ROCm/ROCR-Runtime) and build it locally in whatever configuration they are using (debug/release/ASAN/etc). This allows for easier debugging and profiling as symbols are present and may be required to get recent features not available in platform installs. Eventually IREE will ship its own copy of the library (directly or indirectly) as part of the install packages such that only a relatively recent AMDGPU driver is required.
 
 See [HSA/ROCR Library](#hsarocr-library) for more information on our usage.
+
+### ROCm Profiling Dependencies
+
+Counter and ATT/SQTT capture use ROCm's aqlprofile library through a small
+dynamic-loader shim. Normal execution, queue timing, dispatch timing, replay,
+statistics, and Perfetto export do not require this library.
+
+When `counters` or `executable-traces` profiling is requested, the driver looks
+for an aqlprofile-compatible library in this order:
+
+* `IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH`;
+* a library adjacent to the loaded HSA runtime; and
+* the platform dynamic-library search path.
+
+The `iree-profile att` decoder also needs ROCm decode libraries. Pass
+`--rocm_library_path=/opt/rocm/lib`, set `IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH`,
+or rely on the platform search path.
 
 ### Device Library Compilation
 

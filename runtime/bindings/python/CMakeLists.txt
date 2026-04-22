@@ -136,6 +136,7 @@ iree_py_library(
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
     "iree/_runtime/scripts/iree_flatcc_cli/__main__.py"
     "iree/_runtime/scripts/iree_profile/__main__.py"
+    "iree/_runtime/scripts/iree_profile_render/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
@@ -333,6 +334,13 @@ install(
   TARGETS iree_runtime_bindings_python_PyExtRt
   DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs"
   COMPONENT "${_INSTALL_COMPONENT}"
+)
+
+install(
+  DIRECTORY "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render"
+  DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs/share/iree/profile"
+  COMPONENT "${_INSTALL_COMPONENT}"
+  FILES_MATCHING PATTERN "*.py"
 )
 
 # Install tools into python_packages/iree_runtime/iree/runtime

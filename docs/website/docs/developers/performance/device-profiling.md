@@ -274,6 +274,38 @@ drilldown. `export --format=ireeperf-jsonl` emits a schema-versioned
 interchange stream keyed by `record_type`; use that for long-lived downstream
 adapters and telemetry imports.
 
+## Render external timelines
+
+`iree-profile-render` converts the durable `ireeperf-jsonl` interchange stream
+into formats used by external viewers. Today the primary renderer emits native
+Perfetto TrackEvent `.pftrace` files:
+
+```shell
+iree-profile export --format=ireeperf-jsonl \
+  --output=/tmp/model.ireeperf.jsonl /tmp/model.ireeprof
+
+uvx --with perfetto --with protobuf python "$(command -v iree-profile-render)" \
+  --format=perfetto /tmp/model.ireeperf.jsonl -o /tmp/model.pftrace
+```
+
+The renderer is a Python tool with optional format-specific dependencies. The
+command itself is shipped with IREE, but the Perfetto Python packages are not a
+runtime dependency. Use the `uvx --with ...` form above for a one-shot render,
+or install `perfetto` and `protobuf` into the active Python environment and run
+`iree-profile-render` directly.
+
+For pipelines, stream the exporter into the renderer:
+
+```shell
+iree-profile export --format=ireeperf-jsonl --output=- /tmp/model.ireeprof | \
+  uvx --with perfetto --with protobuf python "$(command -v iree-profile-render)" \
+    --format=perfetto - -o /tmp/model.pftrace
+```
+
+Open the resulting `.pftrace` in the Perfetto UI to inspect host queue events,
+device queue spans, dispatch lanes, host execution spans, memory events, device
+metrics, counters, and relationship flows when those records were captured.
+
 ## Compose with replay
 
 Device profiling and [device replay](./device-replay.md) are intentionally

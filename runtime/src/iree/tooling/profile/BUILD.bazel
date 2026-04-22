@@ -309,6 +309,7 @@ py_test(
     srcs = [
         "render/__init__.py",
         "render/backends.py",
+        "render/cli.py",
         "render/common.py",
         "render/perfetto.py",
         "render_test.py",
