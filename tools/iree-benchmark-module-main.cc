@@ -64,6 +64,8 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/help.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
@@ -82,6 +84,9 @@ IREE_FLAG(int32_t, batch_size, 1,
           "used during compilation.");
 IREE_FLAG(int32_t, batch_concurrency, 1,
           "Number of invocations within a batch that should run concurrently.");
+IREE_FLAG(bool, agents_md, false,
+          "Prints an agent-oriented Markdown guide for HAL replay capture and "
+          "tooling workflows and exits.");
 
 IREE_FLAG(string, function, "",
           "Name of a function contained in the module specified by --module= "
@@ -436,23 +441,36 @@ class IREEBenchmark {
 
   ~IREEBenchmark() {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::dtor");
+    IREE_CHECK_OK(Shutdown());
+  };
 
+  iree_status_t Shutdown() {
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
     context_.reset();
+    iree_status_t status = CloseReplayCapture();
     iree_tooling_module_list_reset(&module_list_);
     instance_.reset();
 
     // Tear down device last in order to get accurate statistics.
     if (device_allocator_ && FLAG_print_statistics) {
-      IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
-          stderr, device_allocator_.get()));
+      status = iree_status_join(status, iree_hal_allocator_statistics_fprint(
+                                            stderr, device_allocator_.get()));
     }
     device_allocator_.reset();
     device_.reset();
-  };
+    return status;
+  }
 
   iree_hal_device_t* device() const { return device_.get(); }
+
+  iree_status_t CloseReplayCapture() {
+    if (!replay_recorder_) return iree_ok_status();
+    iree_status_t status = iree_hal_replay_recorder_close(replay_recorder_);
+    iree_hal_replay_recorder_release(replay_recorder_);
+    replay_recorder_ = nullptr;
+    return status;
+  }
 
   iree_status_t Register() {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Register");
@@ -485,7 +503,7 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
         instance_.get(), module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context_, &device_, &device_allocator_));
+        &context_, &device_, &device_allocator_, &replay_recorder_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree_ok_status();
@@ -602,6 +620,7 @@ class IREEBenchmark {
   iree::vm::ref<iree_vm_context_t> context_;
   iree::vm::ref<iree_hal_device_t> device_;
   iree::vm::ref<iree_hal_allocator_t> device_allocator_;
+  iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
   iree_tooling_module_list_t module_list_;
   iree::vm::ref<iree_vm_list_t> inputs_;
 };
@@ -612,21 +631,23 @@ static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
-  iree_flags_set_usage(
-      "iree-benchmark-module",
-      "Benchmarks a function within a compiled IREE module and handles I/O\n"
-      "parsing. Modules can be provided by file path (`--module=file.vmfb`)\n"
-      "or read from stdin (`--module=-`) and the function to execute\n"
-      "matches the original name provided to the compiler\n"
-      "(`--function=foo` for `func.func @foo`).\n");
+  iree_flags_set_usage("iree-benchmark-module",
+                       iree_hal_replay_capture_usage_text());
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
+  if (FLAG_agents_md) {
+    iree_hal_replay_print_agent_markdown(stdout);
+    fflush(stdout);
+    IREE_TRACE_ZONE_END(z0);
+    return EXIT_SUCCESS;
+  }
   ::benchmark::Initialize(&argc, argv);
 
   iree::IREEBenchmark iree_benchmark;
   iree_status_t status = iree_benchmark.Register();
   if (!iree_status_is_ok(status)) {
+    status = iree_status_join(status, iree_benchmark.Shutdown());
     int exit_code = static_cast<int>(iree_status_code(status));
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     IREE_TRACE_ZONE_END(z0);
@@ -637,6 +658,7 @@ static int runMain(int argc, char** argv) {
   ::benchmark::RunSpecifiedBenchmarks();
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(g_profiling));
   g_profiling = nullptr;
+  IREE_CHECK_OK(iree_benchmark.Shutdown());
 
   IREE_TRACE_ZONE_END(z0);
   return EXIT_SUCCESS;
