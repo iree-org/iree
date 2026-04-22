@@ -97,6 +97,18 @@ TEST_F(ResourceSetTest, Empty) {
   iree_hal_resource_set_free(set);
 }
 
+TEST_F(ResourceSetTest, RejectsOversizedBlockPool) {
+  iree_arena_block_pool_t oversized_block_pool;
+  iree_arena_block_pool_initialize(128 * 1024, host_allocator,
+                                   &oversized_block_pool);
+  iree_hal_resource_set_t* set = NULL;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_resource_set_allocate(&oversized_block_pool, &set));
+  EXPECT_EQ(set, nullptr);
+  iree_arena_block_pool_deinitialize(&oversized_block_pool);
+}
+
 // Tests insertion of a single resource.
 TEST_F(ResourceSetTest, Insert1) {
   auto resource_set = make_resource_set(&block_pool);
