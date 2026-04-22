@@ -138,11 +138,11 @@ iree_async_event_source_callback_null(void) {
 // to check for work without kernel-mediated wakeups. The canonical use case is
 // SHM carrier SPSC ring polling: when traffic is active, a progress callback
 // checks the ring position with an acquire-load (~50ns) instead of waiting for
-// a notification signal through the kernel (~1-5µs).
+// a notification signal through the kernel (~1-5us).
 //
-// Registration/unregistration are poll-thread-only operations (no
-// synchronization needed — same thread that calls poll()). Callbacks fire
-// from within poll() before the blocking wait. If any callback returns > 0
+// Registration/unregistration are poll-thread-only operations: no
+// synchronization is needed because the same thread calls poll(). Callbacks
+// fire from within poll() before the blocking wait. If any callback returns > 0
 // completions, the backend forces a non-blocking poll (timeout=0) to avoid
 // blocking when user-space progress is available.
 //

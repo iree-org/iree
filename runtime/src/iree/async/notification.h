@@ -47,8 +47,8 @@ typedef struct iree_async_notification_wait_operation_t
 // Implementation mode for notification wait/wake primitives.
 typedef enum iree_async_notification_mode_e {
   // Futex word: wait/wake operate directly on the epoch atomic.
-  // Optimal (no fd overhead) but requires kernel futex support.
-  // Used by io_uring on Linux 6.7+ with FUTEX_OPERATIONS capability.
+  // Optimal (no fd overhead) but requires a backend-specific readiness
+  // contract for any kernel-side waiters.
   IREE_ASYNC_NOTIFICATION_MODE_FUTEX = 0,
 
   // Event fd: eventfd (Linux) or pipe (macOS/BSD) with poll-based waits.
