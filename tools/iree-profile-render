@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Renders IREE ireeperf-jsonl streams into external analysis formats.
+
+This script intentionally has no dependency on IREE Python bindings. It is a
+small adapter over the JSONL interchange stream emitted by:
+
+  iree-profile export --format=ireeperf-jsonl --output=run.ireeperf.jsonl \
+      run.ireeprof
+
+Format-specific imports are optional and delayed until render time so `--help`
+and dependency diagnostics work in a plain checkout.
+"""
+
+from __future__ import annotations
+
+import sys
+
+sys.dont_write_bytecode = True
+
+import argparse
+from pathlib import Path
+from typing import Any
+
+_SCRIPT_PATH = Path(__file__).resolve()
+_PROFILE_PACKAGE_PATHS = (
+    # Source checkout layout: repository root beside runtime/.
+    _SCRIPT_PATH.parent.parent / "runtime" / "src" / "iree" / "tooling" / "profile",
+    # CMake install layout: bin/iree-profile-render + share/iree/profile/render.
+    _SCRIPT_PATH.parent.parent / "share" / "iree" / "profile",
+)
+for profile_package_path in _PROFILE_PACKAGE_PATHS:
+    if (profile_package_path / "render").is_dir():
+        sys.path.insert(0, str(profile_package_path))
+        break
+
+from render import backends
+from render import common
+
+
+def format_descriptions() -> str:
+    lines = ["Formats:"]
+    for backend in backends.BACKENDS.values():
+        lines.append(f"  {backend.name:<10} {backend.description}")
+    return "\n".join(lines)
+
+
+def parse_arguments(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="iree-profile-render",
+        description=(
+            "Renders ireeperf-jsonl emitted by iree-profile into external "
+            "analysis formats."
+        ),
+        epilog=(
+            f"{format_descriptions()}\n\n"
+            "One-shot Perfetto dependency invocation:\n"
+            "  uvx --with perfetto --with protobuf python "
+            "$(command -v iree-profile-render) --format=perfetto "
+            "INPUT.ireeperf.jsonl -o OUTPUT.pftrace\n\n"
+            "Pipeline:\n"
+            "  iree-profile export --format=ireeperf-jsonl "
+            "--output=- run.ireeprof | \\\n"
+            "    uvx --with perfetto --with protobuf python "
+            "$(command -v iree-profile-render) --format=perfetto - -o run.pftrace"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        default="perfetto",
+        choices=tuple(backends.BACKENDS),
+        help="Render format. Default: perfetto.",
+    )
+    parser.add_argument(
+        "input",
+        help="Input ireeperf-jsonl file, or '-' to read from stdin.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Output path for the selected render format.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print the conversion summary.",
+    )
+    return parser.parse_args(argv)
+
+
+def render(args: argparse.Namespace) -> Any:
+    records = common.read_jsonl(args.input)
+    common.validate_schema(records)
+    return backends.BACKENDS[args.format].render(records, Path(args.output))
+
+
+def print_summary(
+    output_path: str,
+    render_format: str,
+    stats: Any,
+) -> None:
+    backend = backends.BACKENDS[render_format]
+    fields = ", ".join(
+        f"{name}={value}" for name, value in backend.summary_fields(stats)
+    )
+    print(
+        "wrote "
+        f"{output_path} ({stats.output_byte_count} bytes, "
+        f"format={render_format}, {fields})",
+        file=sys.stderr,
+    )
+
+
+def main(argv: list[str]) -> int:
+    args = parse_arguments(argv)
+    stats = render(args)
+    if not args.quiet:
+        print_summary(args.output, args.format, stats)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
