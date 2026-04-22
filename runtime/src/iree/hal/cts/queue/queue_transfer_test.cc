@@ -322,6 +322,29 @@ TEST_P(QueueTransferTest, UpdateWithSourceOffset) {
   EXPECT_THAT(readback, ContainerEq(expected));
 }
 
+TEST_P(QueueTransferTest, UpdateLargerThanCommandBufferLimit) {
+  const iree_host_size_t source_offset = 11;
+  const iree_device_size_t target_offset = 13;
+  const iree_device_size_t update_length =
+      IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE * 2 + 37;
+  const iree_host_size_t source_size =
+      source_offset + (iree_host_size_t)update_length + 5;
+  const iree_device_size_t buffer_size = target_offset + update_length + 7;
+
+  std::vector<uint8_t> source = MakeDeterministicBytes(source_size);
+  Ref<iree_hal_buffer_t> buffer;
+  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+
+  QueueUpdateAndWait(source.data(), source_offset, buffer, target_offset,
+                     update_length);
+
+  std::vector<uint8_t> expected(buffer_size, 0);
+  memcpy(expected.data() + target_offset, source.data() + source_offset,
+         update_length);
+  auto readback = ReadBufferBytes(buffer, 0, buffer_size);
+  EXPECT_THAT(readback, ContainerEq(expected));
+}
+
 TEST_P(QueueTransferTest, UpdateSizeAndAlignmentClasses) {
   struct UpdateCase {
     iree_host_size_t source_offset = 0;
