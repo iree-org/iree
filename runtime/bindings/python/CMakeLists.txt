@@ -355,6 +355,7 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-dump-module
     iree-dump-parameters
     iree-flatcc-cli
+    iree-profile
     iree-run-module
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"

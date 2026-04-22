@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 
+# The native iree-profile tool is installed beside the other runtime tools.
 from iree import _runtime_libs
 
 
