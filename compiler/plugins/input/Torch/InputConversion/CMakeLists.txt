@@ -44,8 +44,11 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRTensorDialect
