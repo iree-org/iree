@@ -58,6 +58,8 @@ static constexpr llvm::StringLiteral kUnrollAccDistribute =
     "unroll_acc_distribute";
 static constexpr llvm::StringLiteral kUnrollAccReassemble =
     "unroll_acc_reassemble";
+static constexpr llvm::StringLiteral kRedundantOnDistribute =
+    "iree_gpu.redundant_on_distribute";
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -258,7 +260,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // Collapse the consumer id modulo the subgroup size and shrink the
   // effective consumer worker pool so every subgroup issues the same work
   // (safe for DMAs that write identical data to shared memory).
-  bool broadcast = producer->hasAttr("iree_gpu.redundant_on_distribute");
+  bool broadcast = producer->hasAttr(kRedundantOnDistribute);
   OpFoldResult effectiveConsumerWorkerCount = consumerWorkerCount;
   Value effectiveConsumerIdVal = linearConsumerIdVal;
   if (broadcast) {
@@ -630,8 +632,8 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
   // Propagate opt-in hints (e.g. redundant_on_distribute) from the warp
   // forall onto the fused thread forall so downstream passes can still see
   // them.
-  if (auto marker = warpForallOp->getAttr("iree_gpu.redundant_on_distribute")) {
-    threadForallOp->setAttr("iree_gpu.redundant_on_distribute", marker);
+  if (auto marker = warpForallOp->getAttr(kRedundantOnDistribute)) {
+    threadForallOp->setAttr(kRedundantOnDistribute, marker);
   }
 
   bool hasCoalescedGatherDMA = isCoalescedGatherForallOp(laneForallOp);

@@ -21,6 +21,9 @@
 
 namespace mlir::iree_compiler {
 
+static constexpr llvm::StringLiteral kRedundantOnDistribute =
+    "iree_gpu.redundant_on_distribute";
+
 #define GEN_PASS_DEF_GPUDISTRIBUTEFORALLPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
@@ -86,8 +89,7 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   // Divide the thread ID by the subgroup size if this loop is mapped to
   // subgroups.
   assert(!(hasThreadMapping && hasWarpMapping));
-  bool redundantAcrossSubgroups =
-      forallOp->hasAttr("iree_gpu.redundant_on_distribute");
+  bool redundantAcrossSubgroups = forallOp->hasAttr(kRedundantOnDistribute);
   Value flatId = linearThreadId;
   if (hasWarpMapping) {
     if (flatWorkgroupSize % subgroupSize != 0) {

@@ -34,6 +34,9 @@
 
 namespace mlir::iree_compiler {
 
+static constexpr llvm::StringLiteral kRedundantOnDistribute =
+    "iree_gpu.redundant_on_distribute";
+
 #define GEN_PASS_DEF_GPUCONVERTTOCOALESCEDDMAPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
@@ -1230,10 +1233,9 @@ private:
                             llvm::none_of(shape, ShapedType::isDynamic);
       }
       if (outputTracesEmpty) {
-        int64_t totalWarps = 1;
-        for (int64_t n : numWarps) {
-          totalWarps *= std::max<int64_t>(n, 1);
-        }
+        auto positiveWarps =
+            llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+        int64_t totalWarps = llvm::product_of(positiveWarps);
         int64_t maxSegments = availableElements / *minAligned;
         if (maxSegments < totalWarps) {
           // Collapse onto a single dim; computeSubgroupTileSizes only uses
@@ -1287,8 +1289,7 @@ private:
     if (cappedWarps && succeeded(tilingResult)) {
       for (LoopLikeOpInterface loop : tilingResult->loops) {
         if (auto forall = dyn_cast<scf::ForallOp>(loop.getOperation())) {
-          forall->setAttr("iree_gpu.redundant_on_distribute",
-                          UnitAttr::get(context));
+          forall->setAttr(kRedundantOnDistribute, UnitAttr::get(context));
           break;
         }
       }
