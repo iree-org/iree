@@ -25,10 +25,10 @@ builtin.module {
   }
 }
 //   CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
+//    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    llvm.call @__ockl_get_local_size({{.*}}) : (i32) -> (i64
 //         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //         CHECK:    llvm.fadd
@@ -247,9 +247,9 @@ builtin.module {
   }
 }
 //   CHECK-LABEL: llvm.func @missing_ptr_dispatch_copy_idx_0
-//    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
-//    CHECK-SAME:  %[[arg1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone},
-//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
+//    CHECK-SAME:  %[[arg1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readnone},
+//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %[[arg3:.+]]: i32 {llvm.noundef})
 //         CHECK:   llvm.zext %[[arg3]] : i32 to i64
 //         CHECK:   llvm.insertvalue %[[arg0]]
