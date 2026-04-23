@@ -20,6 +20,11 @@
 
 namespace mlir::iree_compiler {
 
+using AssertOp = IREE::Codegen::AssertOp;
+using IntKnobAttr = IREE::Codegen::IntKnobAttr;
+using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
+using RootOpAttr = IREE::Codegen::RootOpAttr;
+
 // TODO(#23535): These constraints are VERY incomplete -- they only emit
 // workgroup tile divisibility. Full VectorDistribute constraints (MMA
 // alignment, subgroup counts, shared memory, load distribution, etc.)
@@ -32,12 +37,8 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   Value rem = smt::IntModOp::create(builder, loc, lhs, rhs);
   Value eq = smt::EqOp::create(builder, loc, rem, zero);
   std::string fmtMsg = (msg + " ({} % {} == 0)").str();
-  IREE::Codegen::AssertOp::create(builder, loc, eq, fmtMsg,
-                                  ValueRange{lhs, rhs});
+  AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
 }
-
-using IntKnobAttr = IREE::Codegen::IntKnobAttr;
-using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
 
 /// Helper to create an i64 IntegerAttr with a fixed value.
 static Attribute makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
@@ -46,7 +47,7 @@ static Attribute makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
 
 /// Helper to create an IntKnobAttr.
 static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
-  return IREE::Codegen::IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
+  return IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
 }
 
 /// Get unique compatible MMA attrs for matmul and conv ops.
@@ -226,8 +227,7 @@ emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
 /// Emit constraints for a single root op under the VectorDistribute pipeline.
 /// Only supports linalg contraction and convolution today.
 static LogicalResult
-emitVectorDistributeConstraintsForOp(Operation *rootOp,
-                                     IREE::Codegen::RootOpAttr rootOpAttr) {
+emitVectorDistributeConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr) {
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -272,6 +272,12 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
   if (rootOps.empty()) {
     return success();
   }
+  // Currently only labels one root op per set.
+  Operation *tunableOp = rootOps.front();
+  RootOpAttr opAttr = getRootOpInfo(tunableOp);
+  if (!opAttr) {
+    return success();
+  }
 
   auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
@@ -281,12 +287,6 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
     return success();
   }
 
-  // Currently only labels one root op per set.
-  Operation *tunableOp = rootOps.front();
-  if (!tunableOp) {
-    return success();
-  }
-  auto opAttr = tunableOp->getAttrOfType<IREE::Codegen::RootOpAttr>("root_op");
   return emitVectorDistributeConstraintsForOp(tunableOp, opAttr);
 }
 
