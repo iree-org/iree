@@ -200,85 +200,52 @@ func.func @coalesced_gather_dma_tensor_indices(%idx0: tensor<64xi32>, %source: t
 
 // -----
 
-#layout_2d = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
-
 func.func @async_dma_tensor(%src: tensor<20x64xf16>,
                              %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
                              %i: index, %j: index, %c0: index)
     -> tensor<1x64xf16, #gpu.address_space<workgroup>> {
-  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<1x64xf16>
       : tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>
       -> tensor<1x64xf16, #gpu.address_space<workgroup>>
   return %0 : tensor<1x64xf16, #gpu.address_space<workgroup>>
 }
 
-// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-LABEL: func @async_dma_tensor
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: tensor<20x64xf16>
 //  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<1x64xf16, #gpu.address_space<workgroup>>
-//       CHECK:   iree_gpu.async_dma %[[SRC]][%{{.+}}, %{{.+}}] to %[[DEST]][%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %[[SRC]][%{{.+}}, %{{.+}}] to %[[DEST]][%{{.+}}, %{{.+}}], vector<1x64xf16>
 //  CHECK-SAME:     : tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>
 //  CHECK-SAME:     -> tensor<1x64xf16, #gpu.address_space<workgroup>>
 
 // -----
 
-#layout_2d_memref = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
-
 func.func @async_dma_memref(%src: memref<20x64xf16>,
                              %dest: memref<1x64xf16, #gpu.address_space<workgroup>>,
                              %i: index, %j: index, %c0: index) {
-  iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d_memref
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<1x64xf16>
       : memref<20x64xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
   return
 }
 
-// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-LABEL: func @async_dma_memref
-//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], vector<1x64xf16>
 //  CHECK-SAME:     : memref<20x64xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 
 // -----
-
-#layout_2d_ib = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
 
 func.func @async_dma_in_bounds(%src: tensor<20x64xf16>,
                                 %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
                                 %i: index, %j: index, %c0: index)
     -> tensor<1x64xf16, #gpu.address_space<workgroup>> {
-  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d_ib
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<1x64xf16>
       in_bounds [true, false]
       : tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>
       -> tensor<1x64xf16, #gpu.address_space<workgroup>>
   return %0 : tensor<1x64xf16, #gpu.address_space<workgroup>>
 }
 
-// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-LABEL: func @async_dma_in_bounds
-//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], vector<1x64xf16>
 //  CHECK-SAME:     in_bounds [true, false]
 //  CHECK-SAME:     : tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>
 //  CHECK-SAME:     -> tensor<1x64xf16, #gpu.address_space<workgroup>>
@@ -286,30 +253,19 @@ func.func @async_dma_in_bounds(%src: tensor<20x64xf16>,
 // -----
 
 // Test async_dma with gather (vector) source indices.
-#layout_gather = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
-
 func.func @async_dma_gather(%src: tensor<1024x64xf16>,
                              %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
                              %indices: vector<1xindex>, %j: index, %c0: index)
     -> tensor<1x64xf16, #gpu.address_space<workgroup>> {
-  %0 = iree_gpu.async_dma %src[%indices, %j] to %dest[%c0, %c0], #layout_gather
+  %0 = iree_gpu.async_dma %src[%indices, %j] to %dest[%c0, %c0], vector<1x64xf16>
       : tensor<1024x64xf16> [vector<1xindex>, index],
         tensor<1x64xf16, #gpu.address_space<workgroup>>
       -> tensor<1x64xf16, #gpu.address_space<workgroup>>
   return %0 : tensor<1x64xf16, #gpu.address_space<workgroup>>
 }
 
-// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-LABEL: func @async_dma_gather
-//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], vector<1x64xf16>
 //  CHECK-SAME:     : tensor<1024x64xf16> [vector<1xindex>, index],
 //  CHECK-SAME:     tensor<1x64xf16, #gpu.address_space<workgroup>>
 //  CHECK-SAME:     -> tensor<1x64xf16, #gpu.address_space<workgroup>>
@@ -317,59 +273,37 @@ func.func @async_dma_gather(%src: tensor<1024x64xf16>,
 // -----
 
 // Test async_dma gather with memref form.
-#layout_gather_memref = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
-
 func.func @async_dma_gather_memref(%src: memref<1024x64xf16>,
                                     %dest: memref<1x64xf16, #gpu.address_space<workgroup>>,
                                     %indices: vector<1xindex>, %j: index, %c0: index) {
-  iree_gpu.async_dma %src[%indices, %j] to %dest[%c0, %c0], #layout_gather_memref
+  iree_gpu.async_dma %src[%indices, %j] to %dest[%c0, %c0], vector<1x64xf16>
       : memref<1024x64xf16> [vector<1xindex>, index],
         memref<1x64xf16, #gpu.address_space<workgroup>>
   return
 }
 
-// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-LABEL: func @async_dma_gather_memref
-//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], vector<1x64xf16>
 //  CHECK-SAME:     : memref<1024x64xf16> [vector<1xindex>, index],
 //  CHECK-SAME:     memref<1x64xf16, #gpu.address_space<workgroup>>
 
 // -----
 
 // Test async_dma with decoupled ranks and permutation_map.
-#layout_1d = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1],
-  batch_tile = [1],
-  outer_tile = [1],
-  thread_tile = [64],
-  element_tile = [1],
-  subgroup_strides = [0],
-  thread_strides = [1]
->
-
 func.func @async_dma_permutation_map(%src: tensor<20x64xf16>,
                                       %dest: tensor<64xf16, #gpu.address_space<workgroup>>,
                                       %i: index, %j: index, %c0: index)
     -> tensor<64xf16, #gpu.address_space<workgroup>> {
-  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0], #layout_1d
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0], vector<64xf16>
       permutation_map affine_map<(d0, d1) -> (d1)>
       : tensor<20x64xf16>, tensor<64xf16, #gpu.address_space<workgroup>>
       -> tensor<64xf16, #gpu.address_space<workgroup>>
   return %0 : tensor<64xf16, #gpu.address_space<workgroup>>
 }
 
-// CHECK-DAG: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1) -> (d1)>
 // CHECK-LABEL: func @async_dma_permutation_map
-//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}], #[[$LAYOUT]]
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}], vector<64xf16>
 //  CHECK-SAME:     permutation_map #[[$MAP]]
 //  CHECK-SAME:     : tensor<20x64xf16>, tensor<64xf16, #gpu.address_space<workgroup>>
 //  CHECK-SAME:     -> tensor<64xf16, #gpu.address_space<workgroup>>

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -414,7 +413,7 @@ void AsyncDMAOp::print(OpAsmPrinter &p) {
   llvm::interleaveComma(getSourceIndices(), p, [&](Value v) { p << v; });
   p << "] to " << getDest() << '[';
   llvm::interleaveComma(getDestIndices(), p, [&](Value v) { p << v; });
-  p << "], " << getLayoutAttr();
+  p << "], " << getTransferType();
 
   if (getPermutationMapAttr()) {
     p << " permutation_map ";
@@ -431,7 +430,7 @@ void AsyncDMAOp::print(OpAsmPrinter &p) {
 
   p.printOptionalAttrDict(
       (*this)->getAttrs(),
-      {"layout", "permutation_map", "in_bounds", "operandSegmentSizes"});
+      {"transfer_type", "permutation_map", "in_bounds", "operandSegmentSizes"});
 
   p << " : " << getSource().getType();
   if (hasGatherIndices()) {
@@ -476,12 +475,12 @@ ParseResult AsyncDMAOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   }
 
-  // Parse the layout attribute (VectorLayoutInterface).
-  Attribute layoutAttr;
-  if (parser.parseAttribute(layoutAttr)) {
+  // Parse the transfer type (VectorType).
+  Type transferType;
+  if (parser.parseType(transferType)) {
     return failure();
   }
-  result.addAttribute("layout", layoutAttr);
+  result.addAttribute("transfer_type", TypeAttr::get(transferType));
 
   // Optionally parse permutation_map.
   if (succeeded(parser.parseOptionalKeyword("permutation_map"))) {
@@ -631,14 +630,24 @@ LogicalResult AsyncDMAOp::verify() {
         "expected source and dest to have the same element type");
   }
 
-  // Layout rank must match dest rank.
-  if (getLayout().getRank() != destRank) {
-    return emitOpError("layout rank (")
-           << getLayout().getRank() << ") must match dest rank (" << destRank
-           << ")";
+  auto transferVectorType = dyn_cast<VectorType>(getTransferType());
+  if (!transferVectorType) {
+    return emitOpError("transfer_type must be a VectorType");
   }
 
-  // in_bounds size must match dest rank if present.
+  if (transferVectorType.getElementType() != sourceType.getElementType()) {
+    return emitOpError("transfer_type element type (")
+           << transferVectorType.getElementType()
+           << ") must match source/dest element type ("
+           << sourceType.getElementType() << ")";
+  }
+
+  if (transferVectorType.getRank() != destRank) {
+    return emitOpError("transfer_type rank (")
+           << transferVectorType.getRank() << ") must match dest rank ("
+           << destRank << ")";
+  }
+
   if (std::optional<ArrayAttr> inBoundsAttr = getInBounds()) {
     if (static_cast<int64_t>(inBoundsAttr->size()) != destRank) {
       return emitOpError("in_bounds array size (")
@@ -667,10 +676,10 @@ LogicalResult AsyncDMAOp::verify() {
            << sourceRank << ") differs from dest rank (" << destRank << ")";
   }
 
-  // Validate vector gather index sizes against layout dimensions.
+  // Validate vector gather index sizes against transfer_type dimensions.
   AffineMap map = getPermutationMap().value_or(
       AffineMap::getMultiDimIdentityMap(sourceRank, getContext()));
-  SmallVector<int64_t> layoutShape = getLayout().getUndistributedShape();
+  ArrayRef<int64_t> transferShape = transferVectorType.getShape();
   for (auto [i, idx] : llvm::enumerate(getSourceIndices())) {
     auto vecType = dyn_cast<VectorType>(idx.getType());
     if (!vecType) {
@@ -682,12 +691,12 @@ LogicalResult AsyncDMAOp::verify() {
       return emitOpError("source dimension ")
              << i << " has a gather index but is not mapped by permutation_map";
     }
-    int64_t expectedSize = layoutShape[*destDim];
+    int64_t expectedSize = transferShape[*destDim];
     int64_t actualSize = vecType.getDimSize(0);
     if (actualSize != expectedSize) {
       return emitOpError("gather index size (")
              << actualSize << ") for source dimension " << i
-             << " must match layout size (" << expectedSize
+             << " must match transfer_type size (" << expectedSize
              << ") in dest dimension " << *destDim;
     }
   }

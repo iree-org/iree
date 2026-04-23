@@ -10,7 +10,6 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
-include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.td"
 include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -375,14 +374,15 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
     Represents an asynchronous data movement from one memory to another without
     intermediate materialization of the values in registers.
 
-    The `layout` attribute describes the transfer shape and the layout that will
-    be used to read the data from destination memory after the transfer has
-    completed.
+    The `transfer_type` attribute is a `VectorType` describing the shape and
+    element type of the transfer. The shape is used to determine the transfer
+    tile and to validate gather indices.
 
     Each source index can be either a scalar `index` (contiguous read starting
     at that offset) or a `vector<Nxindex>` (gather: read N elements at the
     positions specified by the vector). When a source index is a vector, its
-    size must match the layout size in the corresponding destination dimension.
+    size must match the transfer_type size in the corresponding destination
+    dimension.
 
     Source and destination ranks may differ. When they do, a `permutation_map`
     must be provided to map source dimensions to destination/layout dimensions.
@@ -400,7 +400,7 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
     Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$source_indices,
     AnyRankedTensorOrMemRef:$dest,
     Variadic<Index>:$dest_indices,
-    VectorLayoutInterface:$layout,
+    TypeAttr:$transfer_type,
     OptionalAttr<AffineMapAttr>:$permutation_map,
     OptionalAttr<BoolArrayAttr>:$in_bounds
   );
