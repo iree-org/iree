@@ -11,10 +11,12 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -407,29 +409,210 @@ void AsyncDMAOp::getEffects(
   }
 }
 
+void AsyncDMAOp::print(OpAsmPrinter &p) {
+  p << ' ' << getSource() << '[';
+  llvm::interleaveComma(getSourceIndices(), p, [&](Value v) { p << v; });
+  p << "] to " << getDest() << '[';
+  llvm::interleaveComma(getDestIndices(), p, [&](Value v) { p << v; });
+  p << "], " << getLayoutAttr();
+
+  if (getPermutationMapAttr()) {
+    p << " permutation_map ";
+    p.printAttribute(getPermutationMapAttr());
+  }
+
+  if (std::optional<ArrayAttr> inBounds = getInBounds()) {
+    p << " in_bounds [";
+    llvm::interleaveComma(*inBounds, p, [&](Attribute a) {
+      p << (cast<BoolAttr>(a).getValue() ? "true" : "false");
+    });
+    p << ']';
+  }
+
+  p.printOptionalAttrDict(
+      (*this)->getAttrs(),
+      {"layout", "permutation_map", "in_bounds", "operandSegmentSizes"});
+
+  p << " : " << getSource().getType();
+  if (hasGatherIndices()) {
+    p << " [";
+    llvm::interleaveComma(getSourceIndices().getTypes(), p);
+    p << ']';
+  }
+  p << ", " << getDest().getType();
+  if (getResult()) {
+    p << " -> " << getResult().getType();
+  }
+}
+
+ParseResult AsyncDMAOp::parse(OpAsmParser &parser, OperationState &result) {
+  OpAsmParser::UnresolvedOperand source;
+  if (parser.parseOperand(source)) {
+    return failure();
+  }
+
+  SmallVector<OpAsmParser::UnresolvedOperand> sourceIndices;
+  if (parser.parseLSquare() || parser.parseOperandList(sourceIndices) ||
+      parser.parseRSquare()) {
+    return failure();
+  }
+
+  if (parser.parseKeyword("to")) {
+    return failure();
+  }
+
+  OpAsmParser::UnresolvedOperand dest;
+  if (parser.parseOperand(dest)) {
+    return failure();
+  }
+
+  SmallVector<OpAsmParser::UnresolvedOperand> destIndices;
+  if (parser.parseLSquare() || parser.parseOperandList(destIndices) ||
+      parser.parseRSquare()) {
+    return failure();
+  }
+
+  if (parser.parseComma()) {
+    return failure();
+  }
+
+  // Parse the layout attribute (VectorLayoutInterface).
+  Attribute layoutAttr;
+  if (parser.parseAttribute(layoutAttr)) {
+    return failure();
+  }
+  result.addAttribute("layout", layoutAttr);
+
+  // Optionally parse permutation_map.
+  if (succeeded(parser.parseOptionalKeyword("permutation_map"))) {
+    AffineMapAttr mapAttr;
+    if (parser.parseAttribute(mapAttr)) {
+      return failure();
+    }
+    result.addAttribute("permutation_map", mapAttr);
+  }
+
+  // Optionally parse in_bounds.
+  if (succeeded(parser.parseOptionalKeyword("in_bounds"))) {
+    SmallVector<bool> inBoundsVals;
+    if (parser.parseLSquare()) {
+      return failure();
+    }
+    auto parseOne = [&]() -> ParseResult {
+      bool val;
+      if (succeeded(parser.parseOptionalKeyword("true"))) {
+        val = true;
+      } else if (succeeded(parser.parseOptionalKeyword("false"))) {
+        val = false;
+      } else {
+        return parser.emitError(parser.getCurrentLocation(),
+                                "expected 'true' or 'false'");
+      }
+      inBoundsVals.push_back(val);
+      return success();
+    };
+    if (parser.parseCommaSeparatedList(parseOne) || parser.parseRSquare()) {
+      return failure();
+    }
+    SmallVector<Attribute> attrs;
+    for (bool b : inBoundsVals) {
+      attrs.push_back(parser.getBuilder().getBoolAttr(b));
+    }
+    result.addAttribute("in_bounds", parser.getBuilder().getArrayAttr(attrs));
+  }
+
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  if (parser.parseColon()) {
+    return failure();
+  }
+
+  // Parse source_type, optionally followed by [index_types].
+  Type sourceType;
+  if (parser.parseType(sourceType)) {
+    return failure();
+  }
+
+  SmallVector<Type> sourceIndexTypes;
+  if (succeeded(parser.parseOptionalLSquare())) {
+    if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare()) {
+      return failure();
+    }
+  } else {
+    sourceIndexTypes.assign(sourceIndices.size(),
+                            parser.getBuilder().getIndexType());
+  }
+
+  // Parse , dest_type.
+  Type destType;
+  if (parser.parseComma() || parser.parseType(destType)) {
+    return failure();
+  }
+
+  // Optionally parse -> result_type.
+  if (succeeded(parser.parseOptionalArrow())) {
+    Type resultType;
+    if (parser.parseType(resultType)) {
+      return failure();
+    }
+    result.addTypes(resultType);
+  }
+
+  // Resolve operands.
+  SmallVector<Type> destIndexTypes(destIndices.size(),
+                                   parser.getBuilder().getIndexType());
+  if (parser.resolveOperand(source, sourceType, result.operands) ||
+      parser.resolveOperands(sourceIndices, sourceIndexTypes,
+                             parser.getCurrentLocation(), result.operands) ||
+      parser.resolveOperand(dest, destType, result.operands) ||
+      parser.resolveOperands(destIndices, destIndexTypes,
+                             parser.getCurrentLocation(), result.operands)) {
+    return failure();
+  }
+
+  result.addAttribute("operandSegmentSizes",
+                      parser.getBuilder().getDenseI32ArrayAttr(
+                          {1, static_cast<int32_t>(sourceIndices.size()), 1,
+                           static_cast<int32_t>(destIndices.size())}));
+
+  return success();
+}
+
 LogicalResult AsyncDMAOp::verify() {
   auto sourceType = cast<ShapedType>(getSource().getType());
   auto destType = cast<ShapedType>(getDest().getType());
 
-  unsigned sourceRank = sourceType.getRank();
-  unsigned destRank = destType.getRank();
+  int64_t sourceRank = sourceType.getRank();
+  int64_t destRank = destType.getRank();
 
-  // source_indices count must match source rank.
   if (getSourceIndices().size() != sourceRank) {
     return emitOpError("expected ")
            << sourceRank << " source indices (source rank), got "
            << getSourceIndices().size();
   }
 
-  // SameVariadicOperandSize enforces source_indices and dest_indices have the
-  // same count, so dest_indices count == source rank too. Verify rank match.
-  if (sourceRank != destRank) {
-    return emitOpError("expected source and dest to have the same rank, got ")
-           << sourceRank << " and " << destRank;
+  if (getDestIndices().size() != destRank) {
+    return emitOpError("expected ")
+           << destRank << " dest indices (dest rank), got "
+           << getDestIndices().size();
   }
 
-  // If the op has tensor semantics, it must have a result of the right type. If
-  // it doesn't have tensor semantics, it shouldn't have a result.
+  // Each source index must be index or 1-D vector<Nxindex>.
+  for (auto [i, idx] : llvm::enumerate(getSourceIndices())) {
+    Type idxType = idx.getType();
+    if (isa<IndexType>(idxType)) {
+      continue;
+    }
+    auto vecType = dyn_cast<VectorType>(idxType);
+    if (!vecType || vecType.getRank() != 1 ||
+        !vecType.getElementType().isIndex()) {
+      return emitOpError("source index #")
+             << i << " must be index or vector<Nxindex>, got " << idxType;
+    }
+  }
+
   if (hasTensorSemantics()) {
     if (!getResult()) {
       return emitOpError("expected result for tensor operand");
@@ -443,26 +626,70 @@ LogicalResult AsyncDMAOp::verify() {
     }
   }
 
-  // Element types must match.
   if (sourceType.getElementType() != destType.getElementType()) {
     return emitOpError(
         "expected source and dest to have the same element type");
   }
 
-  // in_bounds size must match rank if present.
+  // Layout rank must match dest rank.
+  if (getLayout().getRank() != destRank) {
+    return emitOpError("layout rank (")
+           << getLayout().getRank() << ") must match dest rank (" << destRank
+           << ")";
+  }
+
+  // in_bounds size must match dest rank if present.
   if (std::optional<ArrayAttr> inBoundsAttr = getInBounds()) {
-    if (static_cast<unsigned>(inBoundsAttr->size()) != sourceRank) {
+    if (static_cast<int64_t>(inBoundsAttr->size()) != destRank) {
       return emitOpError("in_bounds array size (")
-             << inBoundsAttr->size() << ") must match operand rank ("
-             << sourceRank << ")";
+             << inBoundsAttr->size() << ") must match dest rank (" << destRank
+             << ")";
     }
   }
 
-  // Layout rank must match operand rank.
-  if (static_cast<unsigned>(getLayout().getRank()) != sourceRank) {
-    return emitOpError("layout rank (")
-           << getLayout().getRank() << ") must match operand rank ("
-           << sourceRank << ")";
+  // Permutation map validation.
+  if (std::optional<AffineMap> map = getPermutationMap()) {
+    if (map->getNumDims() != sourceRank) {
+      return emitOpError("permutation_map num dims (")
+             << map->getNumDims() << ") must match source rank (" << sourceRank
+             << ")";
+    }
+    if (map->getNumResults() != destRank) {
+      return emitOpError("permutation_map num results (")
+             << map->getNumResults() << ") must match dest rank (" << destRank
+             << ")";
+    }
+    if (!map->isProjectedPermutation()) {
+      return emitOpError("permutation_map must be a projected permutation");
+    }
+  } else if (sourceRank != destRank) {
+    return emitOpError("permutation_map is required when source rank (")
+           << sourceRank << ") differs from dest rank (" << destRank << ")";
+  }
+
+  // Validate vector gather index sizes against layout dimensions.
+  AffineMap map = getPermutationMap().value_or(
+      AffineMap::getMultiDimIdentityMap(sourceRank, getContext()));
+  SmallVector<int64_t> layoutShape = getLayout().getUndistributedShape();
+  for (auto [i, idx] : llvm::enumerate(getSourceIndices())) {
+    auto vecType = dyn_cast<VectorType>(idx.getType());
+    if (!vecType) {
+      continue;
+    }
+    std::optional<unsigned> destDim =
+        map.getResultPosition(getAffineDimExpr(i, getContext()));
+    if (!destDim) {
+      return emitOpError("source dimension ")
+             << i << " has a gather index but is not mapped by permutation_map";
+    }
+    int64_t expectedSize = layoutShape[*destDim];
+    int64_t actualSize = vecType.getDimSize(0);
+    if (actualSize != expectedSize) {
+      return emitOpError("gather index size (")
+             << actualSize << ") for source dimension " << i
+             << " must match layout size (" << expectedSize
+             << ") in dest dimension " << *destDim;
+    }
   }
 
   return success();

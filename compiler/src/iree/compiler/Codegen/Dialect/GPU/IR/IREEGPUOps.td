@@ -369,7 +369,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
     DestinationStyleOpInterface,
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-    SameVariadicOperandSize]> {
+    AttrSizedOperandSegments]> {
   let summary = "Asynchronous data movement";
   let description = [{
     Represents an asynchronous data movement from one memory to another without
@@ -378,6 +378,15 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
     The `layout` attribute describes the transfer shape and the layout that will
     be used to read the data from destination memory after the transfer has
     completed.
+
+    Each source index can be either a scalar `index` (contiguous read starting
+    at that offset) or a `vector<Nxindex>` (gather: read N elements at the
+    positions specified by the vector). When a source index is a vector, its
+    size must match the layout size in the corresponding destination dimension.
+
+    Source and destination ranks may differ. When they do, a `permutation_map`
+    must be provided to map source dimensions to destination/layout dimensions.
+    When omitted, identity mapping is assumed (requires equal ranks).
 
     This operation exists in two forms: tensor-based (value-semantic) and
     buffer-based (memref-semantic). In tensor form, the operation returns a
@@ -388,21 +397,17 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
 
   let arguments = (ins
     AnyRankedTensorOrMemRef:$source,
-    Variadic<Index>:$source_indices,
+    Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$source_indices,
     AnyRankedTensorOrMemRef:$dest,
     Variadic<Index>:$dest_indices,
     VectorLayoutInterface:$layout,
+    OptionalAttr<AffineMapAttr>:$permutation_map,
     OptionalAttr<BoolArrayAttr>:$in_bounds
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
-  let assemblyFormat = [{
-    $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
-    $layout (`in_bounds` $in_bounds^)?
-    attr-dict `:` `(` type($source) `,` type($dest) `)` (`->` type($result)^)?
-  }];
-
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
@@ -416,6 +421,18 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
 
     unsigned getDestRank() {
       return ::llvm::cast<ShapedType>(getDest().getType()).getRank();
+    }
+
+    bool hasGatherIndices() {
+      return ::llvm::any_of(getSourceIndices(), [](Value v) {
+        return ::llvm::isa<VectorType>(v.getType());
+      });
+    }
+
+    unsigned getNumGatherDims() {
+      return ::llvm::count_if(getSourceIndices(), [](Value v) {
+        return ::llvm::isa<VectorType>(v.getType());
+      });
     }
 
     // DestinationStyleOpInterface
