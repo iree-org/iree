@@ -10,6 +10,7 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
+include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.td"
 include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -357,6 +358,69 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     bool hasTensorSemantics() {
       return ::llvm::isa<RankedTensorType>(getInit().getType());
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// AsyncDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
+    DestinationStyleOpInterface,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    SameVariadicOperandSize]> {
+  let summary = "Asynchronous data movement";
+  let description = [{
+    Represents an asynchronous data movement from one memory to another without
+    intermediate materialization of the values in registers.
+
+    The `layout` attribute describes the transfer shape and the layout that will
+    be used to read the data from destination memory after the transfer has
+    completed.
+
+    This operation exists in two forms: tensor-based (value-semantic) and
+    buffer-based (memref-semantic). In tensor form, the operation returns a
+    result that aliases the `dest` operand and can be used in combination with
+    `iree_gpu.value_barrier` to synchronize with the data movement. In memref
+    form, the operation has no result and writes directly to the `dest` memref.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensorOrMemRef:$source,
+    Variadic<Index>:$source_indices,
+    AnyRankedTensorOrMemRef:$dest,
+    Variadic<Index>:$dest_indices,
+    VectorLayoutInterface:$layout,
+    OptionalAttr<BoolArrayAttr>:$in_bounds
+  );
+
+  let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
+
+  let assemblyFormat = [{
+    $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
+    $layout (`in_bounds` $in_bounds^)?
+    attr-dict `:` `(` type($source) `,` type($dest) `)` (`->` type($result)^)?
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool hasTensorSemantics() {
+      return ::llvm::isa<RankedTensorType>(getDest().getType());
+    }
+
+    unsigned getSourceRank() {
+      return ::llvm::cast<ShapedType>(getSource().getType()).getRank();
+    }
+
+    unsigned getDestRank() {
+      return ::llvm::cast<ShapedType>(getDest().getType()).getRank();
+    }
+
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getDestMutable();
     }
   }];
 }

@@ -189,3 +189,117 @@ func.func @vector_multi_mma_with_permutation_of_wrong_size(%lhs: vector<2x3x4xf1
   } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
   return %0 : vector<2x5x4xf32>
 }
+
+// -----
+
+// async_dma: wrong number of source indices.
+#layout_err_idx = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_wrong_index_count(%src: tensor<20x64xf16>,
+                                        %dest: tensor<1x64xf16>,
+                                        %i: index, %c0: index) {
+  // expected-error @+1 {{expected 2 source indices (source rank), got 1}}
+  %0 = iree_gpu.async_dma %src[%i] to %dest[%c0], #layout_err_idx
+      : (tensor<20x64xf16>, tensor<1x64xf16>) -> tensor<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: mismatched ranks (same index count to pass SameVariadicOperandSize).
+#layout_err_rank = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_rank_mismatch(%src: tensor<20x64xf16>,
+                                    %dest: tensor<64xf16>,
+                                    %i: index, %j: index, %c0: index) {
+  // expected-error @+1 {{expected source and dest to have the same rank, got 2 and 1}}
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_err_rank
+      : (tensor<20x64xf16>, tensor<64xf16>)
+  return
+}
+
+// -----
+
+// async_dma: mismatched element types.
+#layout_err_elt = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_element_type_mismatch(%src: tensor<20x64xf16>,
+                                            %dest: tensor<1x64xf32>,
+                                            %i: index, %j: index,
+                                            %c0: index) {
+  // expected-error @+1 {{expected source and dest to have the same element type}}
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_err_elt
+      : (tensor<20x64xf16>, tensor<1x64xf32>) -> tensor<1x64xf32>
+  return
+}
+
+// -----
+
+// async_dma: wrong in_bounds array size.
+#layout_err_ib = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_in_bounds_wrong_size(%src: tensor<20x64xf16>,
+                                           %dest: tensor<1x64xf16>,
+                                           %i: index, %j: index,
+                                           %c0: index) {
+  // expected-error @+1 {{in_bounds array size (1) must match operand rank (2)}}
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_err_ib
+      in_bounds [true]
+      : (tensor<20x64xf16>, tensor<1x64xf16>) -> tensor<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: layout rank mismatch.
+#layout_err_layout_rank = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [1],
+  subgroup_strides = [0],
+  thread_strides = [1]
+>
+
+func.func @async_dma_layout_rank_mismatch(%src: tensor<20x64xf16>,
+                                            %dest: tensor<1x64xf16>,
+                                            %i: index, %j: index,
+                                            %c0: index) {
+  // expected-error @+1 {{layout rank (1) must match operand rank (2)}}
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_err_layout_rank
+      : (tensor<20x64xf16>, tensor<1x64xf16>) -> tensor<1x64xf16>
+  return
+}

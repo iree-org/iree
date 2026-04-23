@@ -197,3 +197,88 @@ func.func @coalesced_gather_dma_tensor_indices(%idx0: tensor<64xi32>, %source: t
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, tensor<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+
+// -----
+
+#layout_2d = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_tensor(%src: tensor<20x64xf16>,
+                             %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
+                             %i: index, %j: index, %c0: index)
+    -> tensor<1x64xf16, #gpu.address_space<workgroup>> {
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d
+      : (tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>)
+      -> tensor<1x64xf16, #gpu.address_space<workgroup>>
+  return %0 : tensor<1x64xf16, #gpu.address_space<workgroup>>
+}
+
+// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-LABEL: func @async_dma_tensor
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: tensor<20x64xf16>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<1x64xf16, #gpu.address_space<workgroup>>
+//       CHECK:   iree_gpu.async_dma %[[SRC]][%{{.+}}, %{{.+}}] to %[[DEST]][%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//  CHECK-SAME:     : (tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>)
+//  CHECK-SAME:     -> tensor<1x64xf16, #gpu.address_space<workgroup>>
+
+// -----
+
+#layout_2d_memref = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_memref(%src: memref<20x64xf16>,
+                             %dest: memref<1x64xf16, #gpu.address_space<workgroup>>,
+                             %i: index, %j: index, %c0: index) {
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d_memref
+      : (memref<20x64xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>)
+  return
+}
+
+// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-LABEL: func @async_dma_memref
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//  CHECK-SAME:     : (memref<20x64xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>)
+
+// -----
+
+#layout_2d_ib = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @async_dma_in_bounds(%src: tensor<20x64xf16>,
+                                %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
+                                %i: index, %j: index, %c0: index)
+    -> tensor<1x64xf16, #gpu.address_space<workgroup>> {
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], #layout_2d_ib
+      in_bounds [true, false]
+      : (tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>)
+      -> tensor<1x64xf16, #gpu.address_space<workgroup>>
+  return %0 : tensor<1x64xf16, #gpu.address_space<workgroup>>
+}
+
+// CHECK: #[[$LAYOUT:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-LABEL: func @async_dma_in_bounds
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}, %{{.+}}], #[[$LAYOUT]]
+//  CHECK-SAME:     in_bounds [true, false]
+//  CHECK-SAME:     : (tensor<20x64xf16>, tensor<1x64xf16, #gpu.address_space<workgroup>>)
+//  CHECK-SAME:     -> tensor<1x64xf16, #gpu.address_space<workgroup>>

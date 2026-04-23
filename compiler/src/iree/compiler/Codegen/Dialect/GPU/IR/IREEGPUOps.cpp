@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -380,6 +381,88 @@ LogicalResult CoalescedGatherDMAOp::verify() {
              << inBoundsAttr->size() << ") must match init rank (" << initRank
              << ")";
     }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AsyncDMAOp
+//===----------------------------------------------------------------------===//
+
+void AsyncDMAOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  Value source = getSource();
+  Value dest = getDest();
+
+  if (isa<MemRefType>(source.getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+
+  if (isa<MemRefType>(dest.getType())) {
+    effects.emplace_back(MemoryEffects::Write::get(), &getDestMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+LogicalResult AsyncDMAOp::verify() {
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto destType = cast<ShapedType>(getDest().getType());
+
+  unsigned sourceRank = sourceType.getRank();
+  unsigned destRank = destType.getRank();
+
+  // source_indices count must match source rank.
+  if (getSourceIndices().size() != sourceRank) {
+    return emitOpError("expected ")
+           << sourceRank << " source indices (source rank), got "
+           << getSourceIndices().size();
+  }
+
+  // SameVariadicOperandSize enforces source_indices and dest_indices have the
+  // same count, so dest_indices count == source rank too. Verify rank match.
+  if (sourceRank != destRank) {
+    return emitOpError("expected source and dest to have the same rank, got ")
+           << sourceRank << " and " << destRank;
+  }
+
+  // If the op has tensor semantics, it must have a result of the right type. If
+  // it doesn't have tensor semantics, it shouldn't have a result.
+  if (hasTensorSemantics()) {
+    if (!getResult()) {
+      return emitOpError("expected result for tensor operand");
+    }
+    if (getResult().getType() != getDest().getType()) {
+      return emitOpError("result type must match dest type");
+    }
+  } else {
+    if (getResult()) {
+      return emitOpError("unexpected result for memref operand");
+    }
+  }
+
+  // Element types must match.
+  if (sourceType.getElementType() != destType.getElementType()) {
+    return emitOpError(
+        "expected source and dest to have the same element type");
+  }
+
+  // in_bounds size must match rank if present.
+  if (std::optional<ArrayAttr> inBoundsAttr = getInBounds()) {
+    if (static_cast<unsigned>(inBoundsAttr->size()) != sourceRank) {
+      return emitOpError("in_bounds array size (")
+             << inBoundsAttr->size() << ") must match operand rank ("
+             << sourceRank << ")";
+    }
+  }
+
+  // Layout rank must match operand rank.
+  if (static_cast<unsigned>(getLayout().getRank()) != sourceRank) {
+    return emitOpError("layout rank (")
+           << getLayout().getRank() << ") must match operand rank ("
+           << sourceRank << ")";
   }
 
   return success();
