@@ -2963,6 +2963,199 @@ setConvInterfaceRootConfig(mlir::FunctionOpInterface entryPointFn,
                            targetTileSizes, vectorSize, vecPreProcStrategy);
 }
 
+//===----------------------------------------------------------------------===//
+// Batchless convolution support
+//===----------------------------------------------------------------------===//
+
+enum class BatchlessConvKind { Regular, Depthwise, Pooling };
+
+/// Detects a batchless 2D convolution and returns its kind. Returns
+/// std::nullopt if the op is not a batchless 2D conv.
+static std::optional<BatchlessConvKind>
+getBatchless2DConvKind(linalg::LinalgOp op) {
+  if (!isBatchlessConv(op)) {
+    return std::nullopt;
+  }
+
+  auto maybeConvDims = linalg::inferConvolutionDims(op);
+  if (failed(maybeConvDims)) {
+    return std::nullopt;
+  }
+
+  if (maybeConvDims->outputImage.size() != 2 ||
+      maybeConvDims->filterLoop.size() != 2) {
+    return std::nullopt;
+  }
+
+  // Each kind requires an exact dimension structure so that our hardcoded tile
+  // size vectors cover every loop dimension without gaps.
+  if (!maybeConvDims->inputChannel.empty() &&
+      !maybeConvDims->outputChannel.empty() && maybeConvDims->depth.empty()) {
+    return BatchlessConvKind::Regular;
+  }
+  if (!maybeConvDims->depth.empty() && maybeConvDims->inputChannel.empty() &&
+      maybeConvDims->outputChannel.empty()) {
+    return BatchlessConvKind::Depthwise;
+  }
+  if (maybeConvDims->inputChannel.empty() &&
+      maybeConvDims->outputChannel.empty() && maybeConvDims->depth.empty()) {
+    return BatchlessConvKind::Pooling;
+  }
+
+  return std::nullopt;
+}
+
+/// Returns the vector tile sizes for a batchless 2D conv in "HWC" order
+/// (equivalent to the batched NHWC tile sizes with the leading N=1 removed).
+static SmallVector<int64_t>
+getBatchlessConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
+                            BatchlessConvKind kind, int64_t vectorSize) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+
+  if (targetAttr) {
+    DictionaryAttr config = targetAttr.getConfiguration();
+    if (isX86(config)) {
+      switch (kind) {
+      case BatchlessConvKind::Regular:
+        return {1, 8, vectorSize, 1, 1, 8};
+      case BatchlessConvKind::Depthwise:
+        return {1, 8, vectorSize, 1, 3};
+      case BatchlessConvKind::Pooling:
+        return {1, 8, vectorSize, 1, 8};
+      }
+    }
+    if (isRISCV(config)) {
+      switch (kind) {
+      case BatchlessConvKind::Regular:
+        return {1, 8, vectorSize * 2, 1, 1, 8};
+      case BatchlessConvKind::Depthwise:
+        return {1, 8, vectorSize, 1, 3};
+      case BatchlessConvKind::Pooling:
+        return {1, 8, vectorSize * 2, 1, 8};
+      }
+    }
+    if (isAArch64(config)) {
+      switch (kind) {
+      case BatchlessConvKind::Regular:
+        return {1, 32, 64, 1, 1, 16};
+      case BatchlessConvKind::Depthwise:
+        return {1, 4, 4, 1, 4};
+      case BatchlessConvKind::Pooling:
+        return {1, 32, 64, 1, 16};
+      }
+    }
+  }
+
+  switch (kind) {
+  case BatchlessConvKind::Regular:
+    return {1, vectorSize, vectorSize, 1, 1, vectorSize};
+  case BatchlessConvKind::Depthwise:
+    return {1, vectorSize, vectorSize, 1, vectorSize};
+  case BatchlessConvKind::Pooling:
+    return {1, vectorSize, vectorSize, 1, vectorSize};
+  }
+  llvm_unreachable("invalid conv kind");
+}
+
+/// Sets lowering configuration for batchless 2D conv ops. Uses the same
+/// ConvTileAndDecomposeExpert pipeline as batched convolutions.
+static LogicalResult
+setBatchlessConvInterfaceRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                    linalg::LinalgOp convOp) {
+  auto kind = getBatchless2DConvKind(convOp);
+  assert(kind.has_value());
+  assert(!getLoweringConfig(convOp) && "expected lowering_config is not set");
+
+  int64_t vectorSize = getVectorSize(
+      entryPointFn, cast<ShapedType>(convOp->getResultTypes()[0]));
+
+  auto maybeConvDims = linalg::inferConvolutionDims(convOp);
+  assert(succeeded(maybeConvDims));
+
+  SmallVector<int64_t> targetTileSizes =
+      getBatchlessConvVectorSizes(entryPointFn, *kind, vectorSize);
+
+  // Determine the channel dimension index.
+  unsigned channelDimIdx;
+  switch (*kind) {
+  case BatchlessConvKind::Regular:
+    channelDimIdx = maybeConvDims->outputChannel[0];
+    break;
+  case BatchlessConvKind::Depthwise:
+    channelDimIdx = maybeConvDims->depth[0];
+    break;
+  case BatchlessConvKind::Pooling:
+    channelDimIdx = maybeConvDims->batch[0];
+    break;
+  }
+
+  // Handle CHW-like layout by permuting tile sizes from HWC to CHW order.
+  if (channelDimIdx < maybeConvDims->outputImage[0]) {
+    SmallVector<int64_t> perm;
+    switch (*kind) {
+    case BatchlessConvKind::Regular:
+      // OH, OW, OC, KH, KW, IC → OC, OH, OW, IC, KH, KW
+      perm = {2, 0, 1, 5, 3, 4};
+      break;
+    case BatchlessConvKind::Pooling:
+      // OH, OW, C, KH, KW → C, OH, OW, KH, KW
+      perm = {2, 0, 1, 3, 4};
+      break;
+    case BatchlessConvKind::Depthwise:
+      llvm_unreachable("CHW depthwise not implemented yet");
+    }
+    applyPermutationToVector(targetTileSizes, perm);
+  }
+
+  // Set up distribution with vector size hint on the channel dimension.
+  unsigned numLoops = convOp.getNumLoops();
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints.append(numLoops, 1);
+  distConfig.vectorSizeHints[channelDimIdx] = vectorSize;
+
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(convOp, distConfig);
+
+  SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> vecTileSizes(targetTileSizes.begin(),
+                                    targetTileSizes.end());
+  for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
+    auto tileSize = distTileSizes[i] ? distTileSizes[i] : shapes[i];
+    if (vecTileSizes[i] != 1) {
+      vecTileSizes[i] =
+          getMaxVectorTileSize(tileSize, vecTileSizes[i], vectorSize);
+    }
+  }
+  limitVectorTileSizes(convOp, vecTileSizes);
+  setAlwaysVectorizeSizes(convOp, vecTileSizes);
+
+  int64_t numTilingDims = vecTileSizes.size();
+  SmallVector<bool> vecScalableFlags(numTilingDims, false);
+
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (targetAttr && isAArch64(targetAttr.getConfiguration()) &&
+      hasAnySVEFeature(targetAttr.getConfiguration()) &&
+      isScalableVectorizationEnabled() &&
+      *kind == BatchlessConvKind::Depthwise) {
+    vecScalableFlags[maybeConvDims->depth[0]] = true;
+  }
+
+  // Use VectorPreProcStrategy::None for convolutions (matching batched conv
+  // behavior, where isa<ConvolutionOpInterface> returns None).
+  DictionaryAttr pipelineConfig;
+
+  LoweringConfigGenerator generator(convOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, convOp, loweringConfig,
+      getCPUTranslationInfo(convOp.getContext(),
+                            CPUPipeline::ConvTileAndDecomposeExpert,
+                            pipelineConfig));
+}
+
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    tensor::PadOp padOp) {
   SmallVector<int64_t> lbs, ubs;
@@ -3050,6 +3243,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
     if (is2DConvOp(linalgOp) || is2DDepthConvOp(linalgOp) ||
         is2DPoolingOp(linalgOp)) {
       return setConvInterfaceRootConfig(entryPointFn, linalgOp);
+    }
+    if (getBatchless2DConvKind(linalgOp).has_value()) {
+      return setBatchlessConvInterfaceRootConfig(entryPointFn, linalgOp);
     }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {

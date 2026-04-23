@@ -42,6 +42,12 @@ private:
 // This also looks into the shape to filter out cases like matvec.
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp);
 
+/// Returns true if the given linalg op is a batch-less convolution (a
+/// convolution where the batch dimension N=1 was stripped by IREE's unit dim
+/// folding). Uses structural matching via `isaConvolutionOpInterface` and
+/// `inferConvolutionDims`.
+bool isBatchlessConv(linalg::LinalgOp op);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_

@@ -124,6 +124,35 @@ void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   dynamicTrait = computeDynamicInfo(linalgOp);
 }
 
+bool isBatchlessConv(linalg::LinalgOp op) {
+  if (!linalg::isaConvolutionOpInterface(op)) {
+    return false;
+  }
+
+  FailureOr<linalg::ConvolutionDimensions> maybeConvDims =
+      linalg::inferConvolutionDims(op);
+  if (failed(maybeConvDims)) {
+    return false;
+  }
+
+  bool isRegularConv = !maybeConvDims->inputChannel.empty() &&
+                       !maybeConvDims->outputChannel.empty();
+  bool isDepthwise = !maybeConvDims->depth.empty();
+  bool isPooling = maybeConvDims->inputChannel.empty() &&
+                   maybeConvDims->outputChannel.empty() &&
+                   maybeConvDims->depth.empty();
+
+  bool isBatchless = false;
+  if (isRegularConv || isDepthwise) {
+    isBatchless = maybeConvDims->batch.empty();
+  } else if (isPooling) {
+    // For pooling: batch contains [N, C], without N it's just [C].
+    isBatchless = (maybeConvDims->batch.size() == 1);
+  }
+
+  return isBatchless;
+}
+
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
   // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
   if (!linalg::isaContractionOpInterface(linalgOp) ||
