@@ -787,7 +787,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              rhsScaleType};
 
   Location loc = operands[0].getLoc();
-  if (useDirectLoad &&
+  // Scaled matmul enables DMA via the promotionArray path below (mxfp4 data
+  // operands), so the general rejection (which also filters non-f16/bf16) is
+  // skipped here.
+  if (useDirectLoad && !scaled &&
       shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
                                 transposedLhs, transposedRhs)) {
     LDBG() << "overriding direct load DMA, falling back to stream copies";
@@ -935,18 +938,53 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (scaled) {
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-    FailureOr<Attribute> lhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandLhs);
-    FailureOr<Attribute> rhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandRhs);
-    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray = {};
+    if (useDirectLoad) {
+      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+      // Check if per-workgroup scale shape is DMA-aligned. Scale operands
+      // have shape [M/N, Ko] where Ko = K-reduction-tile *
+      // koBlocksPerIntrinsic. reductionTileSizes[contractionK] counts MFMA
+      // invocations, not Ko elements; multiply by koBlocksPerIntrinsic to get
+      // the element count.
+      int64_t scaleMDim = workgroupTileSizes[contractionM.back()];
+      auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
+      int64_t koBlocksPerIntrinsic = std::get<2>(smmaKind.getScaledMNKShape());
+      int64_t scaleKoDim =
+          reductionTileSizes[contractionK.back()] * koBlocksPerIntrinsic;
+      int64_t scaleElements = scaleMDim * scaleKoDim;
+      int64_t scaleBits = 8; // f8E8M0FNU is 8-bit
+      ArrayRef<int64_t> dmaSizes;
+      if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+        dmaSizes = dmaSizesAttr.asArrayRef();
+      }
+      bool scaleAligned = false;
+      for (int64_t dmaSize : dmaSizes) {
+        if (dmaSize % scaleBits != 0) {
+          continue;
+        }
+        int64_t elementsPerTransfer =
+            targetSubgroupSize * (dmaSize / scaleBits);
+        if (scaleElements % elementsPerTransfer == 0) {
+          scaleAligned = true;
+          break;
+        }
+      }
+      Attribute scaleConfig =
+          scaleAligned ? useGlobalDma : (Attribute)defaultConfigAttr;
+      promotionArray = {useGlobalDma, useGlobalDma, scaleConfig, scaleConfig};
     } else {
-      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                        defaultConfigAttr};
+      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        promotionArray = {};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     }
   }
 

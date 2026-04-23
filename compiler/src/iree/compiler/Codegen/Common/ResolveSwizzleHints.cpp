@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -187,7 +188,8 @@ static void resolveHintOp(RewriterBase &rewriter,
     // Gather_to_lds destination-side swizzle is handled by
     // AMDGPULowerCoalescedDMAToGatherLDS, which applies the inverse swizzle
     // to source indices. Treat gather_to_lds and view-like ops as transparent
-    // users that pass through the swizzled allocation.
+    // users that pass through the swizzled allocation. ViewLikeOpInterface
+    // covers memref.subview, memref.expand_shape, and memref.collapse_shape.
     if (isa<amdgpu::GatherToLDSOp, ViewLikeOpInterface>(user)) {
       continue;
     }
