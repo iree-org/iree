@@ -212,5 +212,79 @@ TEST_F(HipAllocatorTest, ImportHostAllocationWithCallbackUnregistersOnDestroy) {
   iree_allocator_free_aligned(iree_allocator_system(), host_ptr);
 }
 
+// Verify that requesting MAPPING on DEVICE_LOCAL memory (without HOST_VISIBLE)
+// promotes to HOST_VISIBLE so the buffer is actually mappable. This is the
+// combination the Python bindings produce via asdevicearray().
+TEST_F(HipAllocatorTest, DeviceLocalMappingPromotesToHostVisible) {
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
+
+  // Request DEVICE_LOCAL + MAPPING without HOST_VISIBLE.
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_MAPPING;
+
+  constexpr iree_device_size_t kSize = 4096;
+  iree_hal_buffer_params_t compat_params = params;
+  iree_device_size_t compat_size = kSize;
+  iree_hal_buffer_compatibility_t compat =
+      iree_hal_allocator_query_buffer_compatibility(
+          allocator, params, kSize, &compat_params, &compat_size);
+  ASSERT_TRUE(
+      iree_all_bits_set(compat, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
+
+  // The allocator must have promoted to a type that supports mapping.
+  // On HIP this is either DEVICE_LOCAL+HOST_VISIBLE (managed) or
+  // HOST_LOCAL+DEVICE_VISIBLE (page-locked fallback).
+  EXPECT_TRUE(
+      iree_all_bits_set(compat_params.type,
+                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) ||
+      iree_all_bits_set(compat_params.type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL));
+
+  // Allocation must succeed (no "mappable buffers require host pointers").
+  iree_hal_buffer_t* buffer = nullptr;
+  iree_status_t status =
+      iree_hal_allocator_allocate_buffer(allocator, params, kSize, &buffer);
+  ASSERT_TRUE(iree_status_is_ok(status))
+      << "DEVICE_LOCAL + MAPPING allocation should succeed after promotion; "
+      << iree_status_code_string(iree_status_code(status));
+  ASSERT_NE(nullptr, buffer);
+
+  // The buffer must be mappable.
+  iree_hal_buffer_mapping_t mapping = {};
+  status = iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                     IREE_HAL_MEMORY_ACCESS_READ, 0, kSize,
+                                     &mapping);
+  EXPECT_TRUE(iree_status_is_ok(status))
+      << "Promoted buffer should be mappable";
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_unmap_range(&mapping);
+  }
+
+  iree_hal_buffer_release(buffer);
+}
+
+// Verify that DEVICE_LOCAL without MAPPING does NOT get HOST_VISIBLE
+// (remains device-only for optimal performance).
+TEST_F(HipAllocatorTest, DeviceLocalWithoutMappingStaysDeviceOnly) {
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
+
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+
+  constexpr iree_device_size_t kSize = 4096;
+  iree_hal_buffer_params_t compat_params = params;
+  iree_device_size_t compat_size = kSize;
+  iree_hal_allocator_query_buffer_compatibility(allocator, params, kSize,
+                                                &compat_params, &compat_size);
+
+  // Without MAPPING, the allocator should keep DEVICE_LOCAL without adding
+  // HOST_VISIBLE (no managed memory overhead).
+  EXPECT_TRUE(
+      iree_all_bits_set(compat_params.type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
+  EXPECT_FALSE(
+      iree_all_bits_set(compat_params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+}
+
 }  // namespace
 }  // namespace iree::hal::hip

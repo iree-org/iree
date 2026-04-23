@@ -227,6 +227,23 @@ TEST_P(AllocatorTest, ImportHostAllocationWithCallback) {
   iree_allocator_free_aligned(iree_allocator_system(), host_ptr);
 }
 
+// Requesting DEVICE_LOCAL + MAPPING (without HOST_VISIBLE) must succeed.
+// The allocator should promote the memory type so that the buffer is
+// mappable — the Python bindings produce this combination via
+// asdevicearray(allowed_usage=DEFAULT|MAPPING).
+TEST_P(AllocatorTest, DeviceLocalMappingAllocationSucceeds) {
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_MAPPING;
+
+  // Allocation must not fail with "mappable buffers require host pointers".
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                                    kAllocationSize, &buffer));
+  ASSERT_NE(nullptr, buffer);
+  iree_hal_buffer_release(buffer);
+}
+
 CTS_REGISTER_TEST_SUITE(AllocatorTest);
 
 }  // namespace iree::hal::cts
