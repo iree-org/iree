@@ -51,10 +51,21 @@ llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 /// Combines two composed iteration-space maps result-wise. A constant `0`
 /// is a broadcast placeholder and yields to a concrete expression; two
 /// different concrete expressions at the same position are a conflict. A
-/// null `a` acts as the identity.
-static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
-  if (!a || a == b) {
-    return b;
+/// null `accumulated` acts as the identity.
+///
+/// Example (merging results from two operands of the same consumer):
+///   accumulated = (d0, d1) -> (d0, 0)   // first operand only constrained d0
+///   incoming    = (d0, d1) -> (0, d1)   // second operand only constrained d1
+///   result      = (d0, d1) -> (d0, d1)  // concrete exprs override zeros
+///
+/// Conflict example:
+///   accumulated = (d0, d1) -> (d0, d1)
+///   incoming    = (d0, d1) -> (d1, d0)
+///   result      = failure  // d0 vs d1 at position 0 is a real disagreement
+static FailureOr<AffineMap> mergeComposedMaps(AffineMap accumulated,
+                                              AffineMap incoming) {
+  if (!accumulated || accumulated == incoming) {
+    return incoming;
   }
   auto isZero = [](AffineExpr e) {
     auto c = dyn_cast<AffineConstantExpr>(e);
@@ -62,18 +73,19 @@ static FailureOr<AffineMap> mergeComposedMaps(AffineMap a, AffineMap b) {
   };
 
   SmallVector<AffineExpr> merged;
-  merged.reserve(a.getNumResults());
-  for (auto [ea, eb] : llvm::zip_equal(a.getResults(), b.getResults())) {
-    if (ea == eb || isZero(eb)) {
-      merged.push_back(ea);
-    } else if (isZero(ea)) {
-      merged.push_back(eb);
+  merged.reserve(accumulated.getNumResults());
+  for (auto [accExpr, inExpr] :
+       llvm::zip_equal(accumulated.getResults(), incoming.getResults())) {
+    if (accExpr == inExpr || isZero(inExpr)) {
+      merged.push_back(accExpr);
+    } else if (isZero(accExpr)) {
+      merged.push_back(inExpr);
     } else {
       return failure();
     }
   }
-  return AffineMap::get(a.getNumDims(), a.getNumSymbols(), merged,
-                        a.getContext());
+  return AffineMap::get(accumulated.getNumDims(), accumulated.getNumSymbols(),
+                        merged, accumulated.getContext());
 }
 
 static FailureOr<AffineMap>
