@@ -554,10 +554,10 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
     Value newResult = newOp->getResult(i);
     if (isIdentityReassoc(originalReassoc)) {
       replacements.push_back(newResult);
-    }
-    else {
+    } else {
       replacements.push_back(tensor::CollapseShapeOp::create(
-          rewriter, loc, op.getResult(i).getType(), newResult, originalReassoc));
+          rewriter, loc, op.getResult(i).getType(), newResult,
+          originalReassoc));
     }
   }
   return replacements;
@@ -959,9 +959,8 @@ struct FoldWithConsumerReshapeByExpansion final
     }
 
     std::optional<SmallVector<Value>> replacementValues =
-        fuseWithReshapeByExpansion(op, expandOp,
-                                   op.getTiedOpOperand(producerResult),
-                                   rewriter);
+        fuseWithReshapeByExpansion(
+            op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
     if (!replacementValues) {
       return failure();
     }
@@ -1004,8 +1003,9 @@ getOperandReassociation(AffineMap indexingMap,
 }
 
 /// Get the new value to use for a given `OpOperand` in the collapsed operation.
-template <typename OpTy>
-static Value getCollapsedOpOperand(Location loc, OpTy op, OpOperand *opOperand,
+template <typename AttentionOpTy>
+static Value getCollapsedOpOperand(Location loc, AttentionOpTy op,
+                                   OpOperand *opOperand,
                                    const CollapsingInfo &collapsingInfo,
                                    OpBuilder &builder) {
   AffineMap indexingMap = op.getMatchingIndexingMap(opOperand);
@@ -1031,8 +1031,8 @@ static Value getCollapsedOpOperand(Location loc, OpTy op, OpOperand *opOperand,
       .getResult();
 }
 
-template <typename OpTy>
-static void collapseOperandsAndResults(OpTy op,
+template <typename AttentionOpTy>
+static void collapseOperandsAndResults(AttentionOpTy op,
                                        const CollapsingInfo &collapsingInfo,
                                        RewriterBase &rewriter,
                                        SmallVectorImpl<Value> &inputOperands,
