@@ -11,6 +11,19 @@
 
 namespace mlir::iree_compiler {
 
+// Bridge type for MLIR pass/pipeline options, which cannot store
+// llvm::OptimizationLevel directly because it is a final class.
+enum class CodegenPipelineOptLevel {
+  O0 = 0,
+  O1 = 1,
+  O2 = 2,
+  O3 = 3,
+};
+
+// Maps the pass/pipeline bridge enum to llvm::OptimizationLevel.
+llvm::OptimizationLevel
+mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel);
+
 // A base class that defines common codegen options that are shared across
 // different backends (e.g., CPU and GPU). Derived classes can add
 // backend-specific options as needed.
@@ -58,11 +71,27 @@ struct CPUCodegenOptions : CodegenOptions {
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
+
+  // Applies opt-level-dependent defaults to the current option set.
+  void setWithOptLevel(llvm::OptimizationLevel level);
+
+  // Returns a CPUCodegenOptions with all opt-level-dependent defaults derived
+  // from `level`. Uses a local OptionsBinder so the global flags are not
+  // touched.
+  static CPUCodegenOptions getWithOptLevel(llvm::OptimizationLevel level);
 };
 
 struct GPUCodegenOptions : CodegenOptions {
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GPUCodegenOptions>;
+
+  // Applies opt-level-dependent defaults to the current option set.
+  void setWithOptLevel(llvm::OptimizationLevel level);
+
+  // Returns a GPUCodegenOptions with all opt-level-dependent defaults derived
+  // from `level`. Uses a local OptionsBinder so the global flags are not
+  // touched.
+  static GPUCodegenOptions getWithOptLevel(llvm::OptimizationLevel level);
 };
 
 } // namespace mlir::iree_compiler

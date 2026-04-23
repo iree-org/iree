@@ -703,6 +703,16 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager,
 // Register LLVMCPU Passes
 //===---------------------------------------------------------------------===//
 
+template <typename PipelineOptionsT>
+static CPUCodegenOptions
+getCPUCodegenOptionsForTextualPipeline(const PipelineOptionsT &options) {
+  CPUCodegenOptions cpuOpts = CPUCodegenOptions::FromFlags::get();
+  if (options.optLevel.hasValue()) {
+    cpuOpts.setWithOptLevel(mapCodegenPipelineOptLevel(options.optLevel));
+  }
+  return cpuOpts;
+}
+
 /// CPU pipeline builder callback. Dispatches CPU::PipelineAttr to the
 /// appropriate pass pipeline construction function.
 static LogicalResult buildCPUPipeline(Attribute attr, OpPassManager &pm,
@@ -757,14 +767,32 @@ void registerCodegenLLVMCPUPasses() {
   // Generated.
   registerPasses();
 
-  static PassPipelineRegistration<> LLVMCPUConfigPipeline(
-      "iree-codegen-llvmcpu-configuration-pipeline",
-      "Runs the translation strategy configuration pipeline on Linalg for CPU",
-      [](OpPassManager &modulePassManager) {
-        const CPUCodegenOptions &cpuOpts = CPUCodegenOptions::FromFlags::get();
-        buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager,
-                                                         cpuOpts);
-      });
+  struct LLVMCPUConfigurationPipelineOptions final
+      : PassPipelineOptions<LLVMCPUConfigurationPipelineOptions> {
+    Option<CodegenPipelineOptLevel> optLevel{
+        *this, "opt-level",
+        llvm::cl::desc(
+            "Optimization level used to derive CPU codegen defaults."),
+        llvm::cl::values(
+            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
+        llvm::cl::init(CodegenPipelineOptLevel::O0)};
+  };
+
+  static PassPipelineRegistration<LLVMCPUConfigurationPipelineOptions>
+      LLVMCPUConfigPipeline(
+          "iree-codegen-llvmcpu-configuration-pipeline",
+          "Runs the translation strategy configuration pipeline on Linalg for "
+          "CPU",
+          [](OpPassManager &modulePassManager,
+             const LLVMCPUConfigurationPipelineOptions &options) {
+            CPUCodegenOptions cpuOpts =
+                getCPUCodegenOptionsForTextualPipeline(options);
+            buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager,
+                                                             cpuOpts);
+          });
 
   static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
       "iree-codegen-llvmcpu-bufferization-pipeline",
@@ -784,6 +812,16 @@ void registerCodegenLLVMCPUPasses() {
 
   struct LLVMCPULoweringPipelineOptions
       : PassPipelineOptions<LLVMCPULoweringPipelineOptions> {
+    Option<CodegenPipelineOptLevel> optLevel{
+        *this, "opt-level",
+        llvm::cl::desc(
+            "Optimization level used to derive CPU codegen defaults."),
+        llvm::cl::values(
+            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
+        llvm::cl::init(CodegenPipelineOptLevel::O0)};
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
@@ -799,9 +837,8 @@ void registerCodegenLLVMCPUPasses() {
           "Runs the LLVMCPU lowering pipeline",
           [](OpPassManager &modulePassManager,
              LLVMCPULoweringPipelineOptions const &options) {
-            // Use global codegen options for pipeline registration.
-            const CPUCodegenOptions &cpuOpts =
-                CPUCodegenOptions::FromFlags::get();
+            CPUCodegenOptions cpuOpts =
+                getCPUCodegenOptionsForTextualPipeline(options);
             buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
                                             options.enableArmSME,
                                             options.includeLLVMLowering);
