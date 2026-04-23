@@ -407,7 +407,17 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
+    $transfer_type
+    (`permutation_map` $permutation_map^)?
+    (`in_bounds` $in_bounds^)?
+    attr-dict `:` type($source)
+    ``
+    custom<AsyncDMASourceIndexTypes>(ref($source_indices), type($source_indices))
+    ``
+    type($dest) ( `->` type($result)^ )?
+  }];
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{

@@ -20,6 +20,37 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
+namespace mlir::iree_compiler::IREE::GPU {
+
+static void printAsyncDMASourceIndexTypes(OpAsmPrinter &p, Operation *op,
+                                          OperandRange sourceIndices,
+                                          TypeRange sourceIndexTypes) {
+  if (llvm::all_of(sourceIndexTypes, llvm::IsaPred<IndexType>)) {
+    p << ", ";
+    return;
+  }
+  p << " [";
+  llvm::interleaveComma(sourceIndexTypes, p);
+  p << "], ";
+}
+
+static ParseResult parseAsyncDMASourceIndexTypes(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> sourceIndices,
+    SmallVectorImpl<Type> &sourceIndexTypes) {
+  if (failed(parser.parseOptionalLSquare())) {
+    sourceIndexTypes.assign(sourceIndices.size(),
+                            parser.getBuilder().getIndexType());
+    return parser.parseComma();
+  }
+  if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare() ||
+      parser.parseComma()) {
+    return failure();
+  }
+  return success();
+}
+
+} // namespace mlir::iree_compiler::IREE::GPU
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.cpp.inc" // IWYU pragma: keep
@@ -406,177 +437,6 @@ void AsyncDMAOp::getEffects(
     effects.emplace_back(MemoryEffects::Write::get(), &getDestMutable(),
                          SideEffects::DefaultResource::get());
   }
-}
-
-void AsyncDMAOp::print(OpAsmPrinter &p) {
-  p << ' ' << getSource() << '[';
-  llvm::interleaveComma(getSourceIndices(), p, [&](Value v) { p << v; });
-  p << "] to " << getDest() << '[';
-  llvm::interleaveComma(getDestIndices(), p, [&](Value v) { p << v; });
-  p << "], " << getTransferType();
-
-  if (getPermutationMapAttr()) {
-    p << " permutation_map ";
-    p.printAttribute(getPermutationMapAttr());
-  }
-
-  if (std::optional<ArrayAttr> inBounds = getInBounds()) {
-    p << " in_bounds [";
-    llvm::interleaveComma(*inBounds, p, [&](Attribute a) {
-      p << (cast<BoolAttr>(a).getValue() ? "true" : "false");
-    });
-    p << ']';
-  }
-
-  p.printOptionalAttrDict(
-      (*this)->getAttrs(),
-      {"transfer_type", "permutation_map", "in_bounds", "operandSegmentSizes"});
-
-  p << " : " << getSource().getType();
-  if (hasGatherIndices()) {
-    p << " [";
-    llvm::interleaveComma(getSourceIndices().getTypes(), p);
-    p << ']';
-  }
-  p << ", " << getDest().getType();
-  if (getResult()) {
-    p << " -> " << getResult().getType();
-  }
-}
-
-ParseResult AsyncDMAOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand source;
-  if (parser.parseOperand(source)) {
-    return failure();
-  }
-
-  SmallVector<OpAsmParser::UnresolvedOperand> sourceIndices;
-  if (parser.parseLSquare() || parser.parseOperandList(sourceIndices) ||
-      parser.parseRSquare()) {
-    return failure();
-  }
-
-  if (parser.parseKeyword("to")) {
-    return failure();
-  }
-
-  OpAsmParser::UnresolvedOperand dest;
-  if (parser.parseOperand(dest)) {
-    return failure();
-  }
-
-  SmallVector<OpAsmParser::UnresolvedOperand> destIndices;
-  if (parser.parseLSquare() || parser.parseOperandList(destIndices) ||
-      parser.parseRSquare()) {
-    return failure();
-  }
-
-  if (parser.parseComma()) {
-    return failure();
-  }
-
-  // Parse the transfer type (VectorType).
-  Type transferType;
-  if (parser.parseType(transferType)) {
-    return failure();
-  }
-  result.addAttribute("transfer_type", TypeAttr::get(transferType));
-
-  // Optionally parse permutation_map.
-  if (succeeded(parser.parseOptionalKeyword("permutation_map"))) {
-    AffineMapAttr mapAttr;
-    if (parser.parseAttribute(mapAttr)) {
-      return failure();
-    }
-    result.addAttribute("permutation_map", mapAttr);
-  }
-
-  // Optionally parse in_bounds.
-  if (succeeded(parser.parseOptionalKeyword("in_bounds"))) {
-    SmallVector<bool> inBoundsVals;
-    if (parser.parseLSquare()) {
-      return failure();
-    }
-    auto parseOne = [&]() -> ParseResult {
-      bool val;
-      if (succeeded(parser.parseOptionalKeyword("true"))) {
-        val = true;
-      } else if (succeeded(parser.parseOptionalKeyword("false"))) {
-        val = false;
-      } else {
-        return parser.emitError(parser.getCurrentLocation(),
-                                "expected 'true' or 'false'");
-      }
-      inBoundsVals.push_back(val);
-      return success();
-    };
-    if (parser.parseCommaSeparatedList(parseOne) || parser.parseRSquare()) {
-      return failure();
-    }
-    SmallVector<Attribute> attrs;
-    for (bool b : inBoundsVals) {
-      attrs.push_back(parser.getBuilder().getBoolAttr(b));
-    }
-    result.addAttribute("in_bounds", parser.getBuilder().getArrayAttr(attrs));
-  }
-
-  if (parser.parseOptionalAttrDict(result.attributes)) {
-    return failure();
-  }
-
-  if (parser.parseColon()) {
-    return failure();
-  }
-
-  // Parse source_type, optionally followed by [index_types].
-  Type sourceType;
-  if (parser.parseType(sourceType)) {
-    return failure();
-  }
-
-  SmallVector<Type> sourceIndexTypes;
-  if (succeeded(parser.parseOptionalLSquare())) {
-    if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare()) {
-      return failure();
-    }
-  } else {
-    sourceIndexTypes.assign(sourceIndices.size(),
-                            parser.getBuilder().getIndexType());
-  }
-
-  // Parse , dest_type.
-  Type destType;
-  if (parser.parseComma() || parser.parseType(destType)) {
-    return failure();
-  }
-
-  // Optionally parse -> result_type.
-  if (succeeded(parser.parseOptionalArrow())) {
-    Type resultType;
-    if (parser.parseType(resultType)) {
-      return failure();
-    }
-    result.addTypes(resultType);
-  }
-
-  // Resolve operands.
-  SmallVector<Type> destIndexTypes(destIndices.size(),
-                                   parser.getBuilder().getIndexType());
-  if (parser.resolveOperand(source, sourceType, result.operands) ||
-      parser.resolveOperands(sourceIndices, sourceIndexTypes,
-                             parser.getCurrentLocation(), result.operands) ||
-      parser.resolveOperand(dest, destType, result.operands) ||
-      parser.resolveOperands(destIndices, destIndexTypes,
-                             parser.getCurrentLocation(), result.operands)) {
-    return failure();
-  }
-
-  result.addAttribute("operandSegmentSizes",
-                      parser.getBuilder().getDenseI32ArrayAttr(
-                          {1, static_cast<int32_t>(sourceIndices.size()), 1,
-                           static_cast<int32_t>(destIndices.size())}));
-
-  return success();
 }
 
 LogicalResult AsyncDMAOp::verify() {
