@@ -803,3 +803,39 @@ util.func public @sink_unset_encoding_with_encoding_dims(%arg0: tensor<?x4096xf3
 // CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] encoding_dims{%[[M]]} : tensor<?x4096xbf16, #[[$ENCODING_SINK]]> -> tensor<?x4096xbf16>
 // CHECK:           flow.return %[[UNSET_ENCODING]] : tensor<?x4096xbf16>
 // CHECK:         }
+
+// -----
+
+// Regression test for issue #24160: the consumer's indexing map for the
+// unset_encoding operand is a strictly projected (non-bijective) permutation
+// -- a broadcast from 2D to 3D. Propagating the encoding here would require
+// inverting a non-invertible map; the pass must decline to sink in this case
+// instead of crashing.
+
+#map_lhs = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_rhs = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map_res = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map_bcast_in  = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map_bcast_out = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#encoding_bcast = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_lhs, #map_rhs, #map_res], iteration_sizes = [2, 2, 2]>
+util.func public @no_sink_unset_encoding_through_broadcast(%arg0: tensor<2x2xf32, #encoding_bcast>) -> tensor<2x2x2xf32> {
+  %0 = flow.dispatch.region -> (tensor<2x2x2xf32>) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<2x2xf32, #encoding_bcast> -> tensor<2x2xf32>
+    %empty = tensor.empty() : tensor<2x2x2xf32>
+    %2 = linalg.generic {
+        indexing_maps = [#map_bcast_in, #map_bcast_out],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%1 : tensor<2x2xf32>) outs(%empty : tensor<2x2x2xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<2x2x2xf32>
+    flow.return %2 : tensor<2x2x2xf32>
+  }
+  util.return %0 : tensor<2x2x2xf32>
+}
+// CHECK-LABEL: @no_sink_unset_encoding_through_broadcast
+// CHECK:         flow.dispatch.region
+// CHECK:           %[[UNSET:.+]] = iree_encoding.unset_encoding
+// CHECK:           %[[BCAST:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[UNSET]]
+// CHECK:           flow.return %[[BCAST]]

@@ -667,24 +667,32 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      // Analyse the use to see if it is fusable.
-      for (OpOperand *fusableUse : fusableUses) {
-        Operation *consumerOp = fusableUse->getOwner();
+      // Group operands by owning consumer so the per-operand checks inside
+      // `isFusableWithConsumer` are evaluated for every operand of a consumer.
+      llvm::MapVector<Operation *, SmallVector<OpOperand *>> usesByConsumer;
+      for (OpOperand *use : fusableUses) {
+        usesByConsumer[use->getOwner()].push_back(use);
+      }
+
+      for (auto &[consumerOp, operands] : usesByConsumer) {
         if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
           continue;
         }
 
         // Ensure that fusing the consumer would not cause use-def violations.
         if (tracker.getFusionGroup(currRoot)
-                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner(),
+                .hasTransitiveDependencyOnFusionGroup(consumerOp,
                                                       dominanceInfo)) {
           continue;
         }
 
-        if (isFusableWithConsumer(*fusableUse, tracker, options)) {
-          tracker.appendToFusionGroup(consumerOp, fusionGroup);
-          workList.push_back(consumerOp);
+        if (!llvm::all_of(operands, [&](OpOperand *use) {
+              return isFusableWithConsumer(*use, tracker, options);
+            })) {
+          continue;
         }
+        tracker.appendToFusionGroup(consumerOp, fusionGroup);
+        workList.push_back(consumerOp);
       }
     }
   }

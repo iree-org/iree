@@ -35,6 +35,7 @@ iree_lit_test_suite(
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
     "pipeline_disable_distribution_tests.mlir"
+    "pipeline_full_smoketests.mlir"
     "pipeline_pack_unpack_tests.mlir"
     "pipeline_pad_conv_tests.mlir"
     "pipeline_pad_tests.mlir"

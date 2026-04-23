@@ -144,3 +144,32 @@ func.func @attention_2(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>
 // CHECK-NOT:   translation_info =
 // CHECK-NOT:   lowering_config =
 // CHECK-NOT:   decomposition_config =
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+#config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
+func.func @online_attention(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, %arg2 : tensor<2x10x4x4xf16>, %arg3 : f16) -> (tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
+  %acc = tensor.empty() : tensor<2x10x6x4xf32>
+  %max = tensor.empty() : tensor<2x10x6xf32>
+  %sum = tensor.empty() : tensor<2x10x6xf32>
+  %result:3 = iree_linalg_ext.online_attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, z}, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5], lowering_config = #config} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%acc, %max, %sum : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) {
+        ^bb0(%arg: f32):
+          iree_linalg_ext.yield %arg : f32
+        } -> tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>
+  return %result#0, %result#1, %result#2 : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>
+}
+
+// CHECK-LABEL: func.func @online_attention
+// CHECK:       iree_linalg_ext.online_attention
+// CHECK-SAME:  decomposition_config = {z}
+// CHECK-NOT:   iree_codegen.translation_info
+// CHECK-NOT:   iree_codegen.lowering_config
+// CHECK-NOT:   translation_info =
+// CHECK-NOT:   lowering_config =
+// CHECK-NOT:   decomposition_config =
