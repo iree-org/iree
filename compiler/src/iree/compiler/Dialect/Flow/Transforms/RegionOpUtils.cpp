@@ -846,41 +846,31 @@ bool isCloneableIntoDispatchOp(Operation *op,
   return false;
 }
 
-/// Returns true if `operand` is a passthrough init — the owning op writes
-/// only a subset of positions (`scatter.original`, `insert_slice.dest`, ...).
-static bool isPartialWriteDpsInit(OpOperand &operand) {
+/// Returns true if `operand` is an init that producers cannot be fused
+/// through (scatter's `original`, insert_slice's `dest`, ...).
+static bool isUnfusableInit(OpOperand &operand) {
   Operation *op = operand.getOwner();
   if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(op)) {
     return insertSlice.getDest() == operand.get();
-  }
-  if (auto parallelInsert = dyn_cast<tensor::ParallelInsertSliceOp>(op)) {
-    return parallelInsert.getDest() == operand.get();
   }
   auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
   if (!dpsOp || !dpsOp.isDpsInit(&operand)) {
     return false;
   }
+  // A null matching map means the init has no mapping into the affine
+  // iteration space, so producers cannot be fused through it.
+  // Scatter's `original` hits this branch — its writes are addressed by
+  // `indices`, not mapped from iteration variables.
   auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
   return fusionOp && !fusionOp.getMatchingIndexingMap(&operand);
 }
 
-/// Returns true if `op` bufferizes to a tensor-write (e.g. `linalg.fill`,
-/// bit-extend generics, tensor-typed `arith.constant`), as opposed to a
-/// view, alloc, or reshape that aliases an existing tensor.
-static bool bufferizesToTensorWrite(Operation *op) {
-  if (isa<tensor::ExtractSliceOp, tensor::EmptyOp, tensor::ExpandShapeOp,
-          tensor::CollapseShapeOp>(op)) {
-    return false;
-  }
-  return llvm::any_of(op->getResults(), [](Value r) {
-    return isa<RankedTensorType>(r.getType());
-  });
-}
-
-/// Values reaching a partial-write init inside `regionOp` via cloneable ops.
+/// Collects values whose producers materialize a tensor write feeding an
+/// init that cannot be fused through (scatter's `original`,
+/// insert_slice's `dest`, ...). Such producers must stay out of the dispatch.
 static llvm::DenseSet<Value>
-collectPartialWriteInitPredecessors(IREE::Flow::DispatchRegionOp regionOp,
-                                    CloneableIntoDispatchOptions options) {
+collectUnfusableInitSources(IREE::Flow::DispatchRegionOp regionOp,
+                            CloneableIntoDispatchOptions options) {
   BackwardSliceOptions sliceOpts;
   sliceOpts.omitUsesFromAbove = false;
   sliceOpts.omitBlockArguments = true;
@@ -892,23 +882,34 @@ collectPartialWriteInitPredecessors(IREE::Flow::DispatchRegionOp regionOp,
   SetVector<Operation *> slice;
   regionOp.getBody().walk([&](Operation *op) {
     for (OpOperand &operand : op->getOpOperands()) {
-      if (isPartialWriteDpsInit(operand)) {
+      if (isUnfusableInit(operand)) {
         (void)getBackwardSlice(operand.get(), &slice, sliceOpts);
       }
     }
   });
 
-  llvm::DenseSet<Value> predecessors;
+  llvm::DenseSet<Value> sources;
   for (Operation *sliceOp : slice) {
-    predecessors.insert(sliceOp->result_begin(), sliceOp->result_end());
+    if (isa<tensor::ExtractSliceOp, tensor::EmptyOp, tensor::ExpandShapeOp,
+            tensor::CollapseShapeOp>(sliceOp)) {
+      continue;
+    }
+    for (Value r : sliceOp->getResults()) {
+      if (isa<RankedTensorType>(r.getType())) {
+        sources.insert(r);
+      }
+    }
   }
-  return predecessors;
+  return sources;
 }
 
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
-static bool hasUnfusableUseInDispatch(
-    Value v, Operation *dispatchOp,
-    const llvm::DenseSet<Value> &partialWriteInitPredecessors) {
+static bool
+hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
+                          const llvm::DenseSet<Value> &unfusableInitSources) {
+  if (unfusableInitSources.contains(v)) {
+    return true;
+  }
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
 
@@ -919,24 +920,6 @@ static bool hasUnfusableUseInDispatch(
         isa<IREE::Flow::DispatchRegionOp>(dispatchOp)) {
       return true;
     }
-
-    Operation *ownerWorkgroupsOp =
-        user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
-    Operation *ownerRegionOp =
-        user->getParentOfType<IREE::Flow::DispatchRegionOp>();
-    Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
-
-    // Ignore uses outside of dispatch workgroups op.
-    if (owner != dispatchOp) {
-      continue;
-    }
-  }
-  // A tensor-writing producer feeding a partial-write init would race with
-  // the consumer's writes after tiling.
-  if (Operation *def = v.getDefiningOp();
-      def && bufferizesToTensorWrite(def) &&
-      partialWriteInitPredecessors.contains(v)) {
-    return true;
   }
   return false;
 }
@@ -951,8 +934,8 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
     return {};
   }
 
-  llvm::DenseSet<Value> partialWriteInitPredecessors =
-      collectPartialWriteInitPredecessors(regionOp, options);
+  llvm::DenseSet<Value> unfusableInitSources =
+      collectUnfusableInitSources(regionOp, options);
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
@@ -972,7 +955,7 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
     if (!definingOp ||
         !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp,
-                                  partialWriteInitPredecessors)) {
+                                  unfusableInitSources)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
