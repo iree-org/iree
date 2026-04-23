@@ -564,7 +564,12 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
 ///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
 ///   2. Not a GEMM. TODO(#23907): support convolution.
 ///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
-///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+///
+/// Note: LHS-transposed cases used to be rejected here because of regressions
+/// observed when ALL copies were forced to stream copy. With the per-copy
+/// (Triton-style) mixed-mode path in GPUConvertToCoalescedDMAPass, each
+/// operand independently decides async vs stream, so the all-or-nothing
+/// regression no longer applies.
 static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
                                       Type lhsElemType, Type rhsElemType,
                                       bool transposedLhs, bool transposedRhs) {
@@ -582,11 +587,6 @@ static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
 
   // Case 3: Only f16/bf16 are supported currently.
   if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
-    return true;
-  }
-
-  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
-  if (transposedLhs && !transposedRhs) {
     return true;
   }
 

@@ -50,25 +50,42 @@ enum class PipelineMode {
   /// Stream copy mode using transfer_read + transfer_write.
   /// - 2 or 3-stage pipelining without buffering transformation
   /// - Uses gpu.barrier for synchronization
-  StreamCopy
+  StreamCopy,
+
+  /// Mixed mode: some operands use async (gather_to_lds), others use stream
+  /// copy (transfer_read + transfer_write to shared). Triton recipe:
+  /// - Always multi-buffer all shared allocations (because at least one
+  ///   operand is async).
+  /// - Pipeline stage assignment matches AsyncCopy: all memory ops in stage 0,
+  ///   compute in stage numStages-1.
+  /// - Cluster assignment puts global loads (both gather_to_lds and stream
+  ///   transfer_read) in an early cluster, compute in the middle, and stream
+  ///   transfer_write to shared in a later cluster within the same stage,
+  ///   so compute can overlap with DMA latency.
+  /// - Barrier strategy mirrors AsyncCopy with explicit asyncmark for the
+  ///   gather_to_lds groups; the multi-buffered stream writes piggy-back on
+  ///   the same WAR/RAW barrier scheme.
+  MixedCopy
 };
 
 // Structure to hold the stage classification result.
 // Which fields are populated depends on the mode:
 // - AsyncCopy mode: loadStage + computeStage
 // - StreamCopy mode: readStage + writeStage + computeStage
+// - MixedCopy mode: loadStage (gather_to_lds) + readStage + writeStage +
+//   computeStage
 struct StageClassification {
   PipelineMode mode;
   unsigned numStages;
 
-  // AsyncCopy mode stages
+  // AsyncCopy / MixedCopy mode stages
   SmallVector<Operation *> loadStage;
 
-  // StreamCopy mode stages
+  // StreamCopy / MixedCopy mode stages
   SmallVector<Operation *> readStage;
   SmallVector<Operation *> writeStage;
 
-  // Common to both modes
+  // Common to all modes
   SmallVector<Operation *> computeStage;
 
   /// Returns all operations in stage order for scheduling.
@@ -76,7 +93,12 @@ struct StageClassification {
     SmallVector<Operation *> ops;
     if (mode == PipelineMode::AsyncCopy) {
       llvm::append_range(ops, loadStage);
+    } else if (mode == PipelineMode::StreamCopy) {
+      llvm::append_range(ops, readStage);
+      llvm::append_range(ops, writeStage);
     } else {
+      // MixedCopy: gather_to_lds + transfer_read + transfer_write
+      llvm::append_range(ops, loadStage);
       llvm::append_range(ops, readStage);
       llvm::append_range(ops, writeStage);
     }
@@ -258,10 +280,15 @@ static LogicalResult cloneViewOpsInsideLoop(memref::AllocOp alloc,
   return success();
 }
 
-/// Multi-buffer LDS allocations used by gather_to_lds operations.
-/// This enables double-buffering for pipelined async copies.
-static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
-                                               unsigned numBuffers) {
+/// Multi-buffer LDS allocations used by gather_to_lds operations and/or by
+/// stream-copy `vector.transfer_write` to shared memory. The latter case is
+/// only relevant in mixed mode (Triton recipe): when ANY operand uses async,
+/// we multi-buffer all shared allocations - including those used by stream
+/// copies - so the pipeliner can overlap DMA latency with compute and stream
+/// writes from prior iterations don't race with reads from current iteration.
+static LogicalResult
+multiBufferLDSAllocations(scf::ForOp forOp, unsigned numBuffers,
+                          bool includeStreamWrites = false) {
   SetVector<memref::AllocOp> sharedAllocs;
 
   // Find all LDS allocations used by gather_to_lds
@@ -272,6 +299,23 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
       }
     }
   });
+
+  // In mixed mode, also collect allocations used by stream-copy writes to
+  // shared memory. Those operands fell back from DMA but still need
+  // multi-buffering so they're decoupled from the async DMA timing.
+  if (includeStreamWrites) {
+    forOp->walk([&](vector::TransferWriteOp writeOp) {
+      auto dstType = dyn_cast<MemRefType>(writeOp.getBase().getType());
+      if (!hasSharedMemoryAddressSpace(dstType)) {
+        return;
+      }
+      if (auto alloc = traceToAllocation(writeOp.getBase())) {
+        if (hasSharedMemoryAddressSpace(alloc.getType())) {
+          sharedAllocs.insert(alloc);
+        }
+      }
+    });
+  }
 
   if (sharedAllocs.empty()) {
     LDBG() << "No LDS allocations found for multi-buffering";
@@ -313,6 +357,32 @@ static bool isGlobalMemoryRead(vector::TransferReadOp read) {
 static bool isSharedMemoryWrite(vector::TransferWriteOp write) {
   auto dstType = dyn_cast<MemRefType>(write.getBase().getType());
   return hasSharedMemoryAddressSpace(dstType);
+}
+
+// Returns true if the memref has the gpu.address_space<private> attribute or
+// no explicit address space (default = private/register).
+static bool isPrivateMemRef(MemRefType memref) {
+  if (!memref) {
+    return false;
+  }
+  Attribute space = memref.getMemorySpace();
+  if (!space) {
+    return true;
+  }
+  if (auto gpuSpace = dyn_cast<gpu::AddressSpaceAttr>(space)) {
+    return gpuSpace.getValue() == gpu::AddressSpace::Private;
+  }
+  return false;
+}
+
+// Helper function to check if a transfer_read reads from private memory.
+static bool isPrivateMemoryRead(vector::TransferReadOp read) {
+  return isPrivateMemRef(dyn_cast<MemRefType>(read.getBase().getType()));
+}
+
+// Helper function to check if a transfer_write writes to private memory.
+static bool isPrivateMemoryWrite(vector::TransferWriteOp write) {
+  return isPrivateMemRef(dyn_cast<MemRefType>(write.getBase().getType()));
 }
 
 // Analyzes the contents of an scf.if operation in a single pass.
@@ -405,6 +475,56 @@ static LogicalResult identifyRootOperations(
         loadRoots.push_back(&op);
         LDBG() << "  Load root (nested gather_to_lds): " << op;
       }
+    } else if (mode == PipelineMode::MixedCopy) {
+      // Mixed copy mode (Triton recipe): collect both async DMA loads
+      // (gather_to_lds) and stream-copy global reads / shared writes.
+      //
+      // For the stream-copy LHS fall-back path, the IR pattern is typically
+      //   %v = vector.transfer_read GLOBAL    // global -> register
+      //        vector.transfer_write %v, PRIV // register -> private bounce
+      //   %w = vector.transfer_read PRIV      // private -> register
+      //        vector.transfer_write %w, LDS  // register -> shared
+      // The PRIV<->register bounce ops have no SSA edge between them (they
+      // communicate via memory aliasing), so a pure backward-SSA slice from
+      // the LDS write does not pick up the private write. To keep the
+      // pipeliner's pre-flight check happy we explicitly classify the bounce
+      // ops:
+      //   - transfer_write to PRIVATE  -> readRoots  (paired with global read)
+      //   - transfer_read  from PRIVATE -> writeRoots (paired with LDS write)
+      // This puts the global-load chain in cluster 0 and the LDS-write chain
+      // in the post-compute cluster, exactly mirroring what we want for the
+      // mixed pipeline.
+      if (isa<amdgpu::GatherToLDSOp>(op)) {
+        loadRoots.push_back(&op);
+        LDBG() << "  Load root (async DMA): " << op;
+      } else if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+        if (isGlobalMemoryRead(read)) {
+          readRoots.push_back(&op);
+          LDBG() << "  Read root (stream global): " << op;
+        } else if (isPrivateMemoryRead(read)) {
+          writeRoots.push_back(&op);
+          LDBG() << "  Write root (stream private read bounce): " << op;
+        }
+      } else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+        if (isSharedMemoryWrite(write)) {
+          writeRoots.push_back(&op);
+          LDBG() << "  Write root (stream shared): " << op;
+        } else if (isPrivateMemoryWrite(write)) {
+          readRoots.push_back(&op);
+          LDBG() << "  Read root (stream private write bounce): " << op;
+        }
+      } else if (isa<scf::YieldOp>(op)) {
+        computeRoots.push_back(&op);
+        LDBG() << "  Compute root: " << op;
+      } else if (op.getNumRegions() > 0 && containsNestedGatherToLDS(&op)) {
+        loadRoots.push_back(&op);
+        LDBG() << "  Load root (nested gather_to_lds): " << op;
+      } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        // scf.if without nested gather: analyze for stream read/write roots.
+        if (failed(analyzeIfOp(ifOp, readRoots, writeRoots))) {
+          return failure();
+        }
+      }
     } else {
       // Stream copy mode: transfer_read, transfer_write, scf.yield
       // Read stage roots: vector.transfer_read from global memory
@@ -448,6 +568,12 @@ static LogicalResult identifyRootOperations(
   }
   if (mode == PipelineMode::StreamCopy && readRoots.empty()) {
     LDBG() << "No global memory reads found - cannot pipeline";
+    return failure();
+  }
+  if (mode == PipelineMode::MixedCopy &&
+      (loadRoots.empty() || readRoots.empty() || writeRoots.empty())) {
+    LDBG() << "MixedCopy requires at least one async load and one stream "
+           << "read/write each";
     return failure();
   }
 
@@ -586,6 +712,43 @@ computeStageClassification(scf::ForOp forOp, PipelineMode mode,
                     {&computeSlice, &stages.computeStage}}))) {
       return failure();
     }
+  } else if (mode == PipelineMode::MixedCopy) {
+    LDBG() << "\n=== Computing Backward Slices (Mixed Copy Mode) ===";
+    SetVector<Operation *> loadSlice, readSlice, writeSlice, computeSlice;
+
+    if (failed(computeBackwardSlice(loadRoots, forOp, loadSlice))) {
+      return failure();
+    }
+    LDBG() << "  Load slice (gather_to_lds): " << loadSlice.size() << " ops";
+
+    if (failed(computeBackwardSlice(readRoots, forOp, readSlice))) {
+      return failure();
+    }
+    LDBG() << "  Read slice (stream global reads): " << readSlice.size()
+           << " ops";
+
+    if (failed(computeBackwardSlice(writeRoots, forOp, writeSlice))) {
+      return failure();
+    }
+    LDBG() << "  Write slice (stream shared writes): " << writeSlice.size()
+           << " ops";
+
+    if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
+      return failure();
+    }
+    LDBG() << "  Compute slice: " << computeSlice.size() << " ops";
+
+    // Classification order matters: loadSlice first, then read, write,
+    // compute. An op that appears in multiple slices is assigned to the first
+    // matching one - this puts gather_to_lds chains into loadStage even if
+    // they share dependencies with stream reads (e.g. shared affine indices).
+    if (failed(classifyOperationsIntoStages(
+            forOp, {{&loadSlice, &stages.loadStage},
+                    {&readSlice, &stages.readStage},
+                    {&writeSlice, &stages.writeStage},
+                    {&computeSlice, &stages.computeStage}}))) {
+      return failure();
+    }
   } else {
     LDBG() << "\n=== Computing Backward Slices (Stream Copy Mode) ===";
     SetVector<Operation *> readSlice, writeSlice, computeSlice;
@@ -623,6 +786,22 @@ computeStageClassification(scf::ForOp forOp, PipelineMode mode,
   if (stages.mode == PipelineMode::AsyncCopy) {
     LDBG() << "--- Load Stage (" << stages.loadStage.size() << " ops) ---";
     for (Operation *op : stages.loadStage) {
+      LDBG() << *op;
+    }
+  } else if (stages.mode == PipelineMode::MixedCopy) {
+    LDBG() << "--- Load Stage / async DMA (" << stages.loadStage.size()
+           << " ops) ---";
+    for (Operation *op : stages.loadStage) {
+      LDBG() << *op;
+    }
+    LDBG() << "--- Read Stage / stream global reads ("
+           << stages.readStage.size() << " ops) ---";
+    for (Operation *op : stages.readStage) {
+      LDBG() << *op;
+    }
+    LDBG() << "--- Write Stage / stream shared writes ("
+           << stages.writeStage.size() << " ops) ---";
+    for (Operation *op : stages.writeStage) {
       LDBG() << *op;
     }
   } else {
@@ -684,6 +863,23 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
     for (Operation *op : stages.computeStage) {
       assignOp(op, /*stage=*/numStages - 1);
     }
+  } else if (stages.mode == PipelineMode::MixedCopy) {
+    // Mixed copy mode (Triton recipe): all memory ops in stage 0, compute in
+    // stage numStages-1. Stream copy reads/writes share the same pipeline
+    // stage as the async DMA loads, but live in different clusters within
+    // that stage so the pipeliner can interleave compute between them.
+    for (Operation *op : stages.loadStage) {
+      assignOp(op, /*stage=*/0);
+    }
+    for (Operation *op : stages.readStage) {
+      assignOp(op, /*stage=*/0);
+    }
+    for (Operation *op : stages.writeStage) {
+      assignOp(op, /*stage=*/0);
+    }
+    for (Operation *op : stages.computeStage) {
+      assignOp(op, /*stage=*/numStages - 1);
+    }
   } else if (numStages == 2) {
     // Two-stage pipelining: read+write in stage 0, compute in stage 1.
     for (Operation *op : stages.readStage) {
@@ -730,6 +926,33 @@ populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
     ++clusterID;
 
     for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+  } else if (stages.mode == PipelineMode::MixedCopy) {
+    // Mixed copy mode (Triton recipe): three clusters within the same stage.
+    //   cluster 0: all global loads (gather_to_lds + stream transfer_read +
+    //              transfer_write to private bounce buffer)
+    //   cluster 1: compute (mfma)
+    //   cluster 2: stream shared writes (transfer_read from private bounce
+    //              buffer + transfer_write to LDS)
+    // The pipeliner schedules clusters in order; placing the stream LDS
+    // writes after compute lets MFMA overlap with the in-flight DMA / global
+    // loads issued in cluster 0, exactly as the Triton recipe describes.
+    for (Operation *op : stages.loadStage) {
+      opToCluster[op] = clusterID;
+    }
+    for (Operation *op : stages.readStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.writeStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
@@ -911,13 +1134,6 @@ struct SharedBarrierState {
 // keeps the minimum number of synchronizations while still enforcing the R↔W
 // ordering required by the pipelined schedule.
 //
-// When `multiBuffered` is true, writes do NOT set `needBarrierBeforeRead`.
-// Use this only in async copy mode loop body, where only gather_to_lds write
-// present, and multi-buffering ensures that reads and writes target different
-// buffers. In this case, a single barrier placed before each write satisfies
-// both requirements: it acts as a WAR barrier for the upcoming write and as a
-// RAW barrier for the upcoming read (the previous iteration's writes are
-// guaranteed visible once all wavefronts pass the barrier).
 static SharedBarrierState
 insertBarriersInRange(RewriterBase &rewriter, Location loc,
                       Block::iterator begin, Block::iterator end,
@@ -1190,9 +1406,15 @@ static void insertExplicitAsyncMarkers(RewriterBase &rewriter,
 }
 
 // Dispatches to the appropriate barrier insertion strategy based on mode.
+// MixedCopy uses the AsyncCopy barrier strategy because:
+//   - All shared allocations (async + stream) are multi-buffered, so writes
+//     always target a different buffer slot than concurrent reads.
+//   - The async DMA still needs the WAR barrier before each new gather_to_lds
+//     to prevent overwriting data that other waves are still reading.
+//   - Stream writes piggy-back on the same WAR/RAW barrier pattern.
 static void insertPipelineBarriers(RewriterBase &rewriter, scf::ForOp newForOp,
                                    PipelineMode mode) {
-  if (mode == PipelineMode::AsyncCopy) {
+  if (mode == PipelineMode::AsyncCopy || mode == PipelineMode::MixedCopy) {
     insertAsyncCopyBarriers(rewriter, newForOp);
   } else {
     insertStreamCopyBarriers(rewriter, newForOp);
@@ -1229,27 +1451,34 @@ static bool hasGatherToLDS(scf::ForOp forOp) {
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
-  PipelineMode mode = hasGatherToLDS(forOp) ? PipelineMode::AsyncCopy
-                                            : PipelineMode::StreamCopy;
+  // Triton-style mixed mode: when the loop contains both async DMA loads
+  // (gather_to_lds) and stream copy ops (transfer_read + transfer_write to
+  // shared), we still pipeline using the AsyncCopy strategy so the async DMA
+  // operand benefits from multi-buffering and the stream operand piggy-backs
+  // on the same pipeline (no separate stage). This handles the case where one
+  // matmul operand falls back from DMA to stream copy (e.g. unaligned/padded
+  // LHS) while the other stays on gather_to_lds.
+  bool isMixed = hasDirectGatherToLDS(forOp) && hasStreamCopyOps(forOp);
 
-  // Check for mixed mode: both gather_to_lds and stream copy ops.
-  // This is unsupported - bail out entirely without any pipelining.
-  if (hasDirectGatherToLDS(forOp) && hasStreamCopyOps(forOp)) {
-    LDBG() << "Loop has both gather_to_lds and stream copy ops - "
-           << "skipping pipelining entirely";
-    return forOp;
+  PipelineMode mode;
+  if (isMixed) {
+    mode = PipelineMode::MixedCopy;
+  } else if (hasGatherToLDS(forOp)) {
+    mode = PipelineMode::AsyncCopy;
+  } else {
+    mode = PipelineMode::StreamCopy;
   }
 
   // Early validation and setup for each mode
-  if (mode == PipelineMode::AsyncCopy) {
+  if (mode == PipelineMode::AsyncCopy || mode == PipelineMode::MixedCopy) {
     // No prefetching needed for single-stage pipelining.
     if (numStages <= 1) {
       return forOp;
     }
-    // Async copy mode supports 2 or 3 stage pipelining with matching buffer
-    // count.
+    // Multi-buffered pipelining supports at most 3 stages.
     if (numStages > 3) {
-      LDBG() << "Async copy mode supports at most 3 stages, got " << numStages;
+      LDBG() << (mode == PipelineMode::AsyncCopy ? "Async" : "Mixed")
+             << " copy mode supports at most 3 stages, got " << numStages;
       return failure();
     }
   } else {
@@ -1281,6 +1510,15 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   if (mode == PipelineMode::AsyncCopy) {
     // Apply multi-buffering: numStages buffers for N-stage pipelining.
     if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
+      return failure();
+    }
+  } else if (mode == PipelineMode::MixedCopy) {
+    // Triton recipe: when ANY operand uses async, multi-buffer ALL shared
+    // allocations - including those used by stream copies that fell back from
+    // DMA. This decouples each operand's load from the others and lets the
+    // pipeliner overlap DMA latency with compute.
+    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages,
+                                         /*includeStreamWrites=*/true))) {
       return failure();
     }
   }
@@ -1333,7 +1571,9 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   // alias-analysis-based vmcnt insertion with precise explicit synchronization,
   // allowing DMA writes to a new buffer slot to overlap with ds_reads from the
   // previous slot.
-  if (mode == PipelineMode::AsyncCopy) {
+  // For MixedCopy, only the gather_to_lds ops become async - the stream
+  // transfer_read/write are unaffected by enableAsyncOnGatherOps.
+  if (mode == PipelineMode::AsyncCopy || mode == PipelineMode::MixedCopy) {
     insertExplicitAsyncMarkers(rewriter, newForOp, numStages);
   }
 

@@ -850,47 +850,29 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
-    // Only activate when at least one copy already has use_global_load_dma
-    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
-    // direct-load). Collect all promoted copies (use_global_load_dma or
-    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
-    // use_global_load_dma. If ANY fails, downgrade them all to
-    // derived_thread_config.
+    // Per-copy decision: for each promoted linalg.copy that was tagged with
+    // DMA intent (use_global_load_dma) by upstream config, check independently
+    // whether DMA conversion is feasible. If a particular copy is not
+    // convertible, fall back to derived_thread_config (stream copy) for that
+    // copy alone, leaving other DMA-eligible copies untouched. This is the
+    // Triton-style mixed-mode recipe: per-operand async vs stream lowering.
     // Note: GatherOps are excluded — they come from input IR (not from
     // GPUPromoteMatmulOperands) and are handled independently by
     // ConvertGatherToCoalescedDMA.
-    SmallVector<linalg::CopyOp> promotedCopies;
-    bool hasDMAIntent = false;
     funcOp->walk([&](linalg::CopyOp copyOp) {
-      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
-        hasDMAIntent = true;
-        promotedCopies.push_back(copyOp);
-      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
-                     copyOp)) {
-        promotedCopies.push_back(copyOp);
+      if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+        return;
       }
-    });
-
-    if (hasDMAIntent) {
-      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+      if (isCopyDMAConvertible(copyOp)) {
+        return;
+      }
       LLVM_DEBUG({
-        if (!allConvertible) {
-          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
-                       << "downgrading " << promotedCopies.size()
-                       << " copies to derived_thread_config\n";
-        }
+        llvm::dbgs() << "DMA per-copy: not convertible, falling back to "
+                     << "derived_thread_config for: " << copyOp << "\n";
       });
-      for (linalg::CopyOp copyOp : promotedCopies) {
-        if (allConvertible) {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
-        } else {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::DerivedThreadConfigAttr::get(context));
-        }
-      }
-    }
+      setLoweringConfig(copyOp,
+                        IREE::GPU::DerivedThreadConfigAttr::get(context));
+    });
 
     // Preprocessing: apply subgroup-level tiling.
     if (failed(applySubgroupTiling(funcOp))) {
