@@ -49,6 +49,11 @@ option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF
 option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
+
+# Allow opting into a stub CSPRNG implementation on generic/bare-metal targets.
+option(IREE_CSPRNG_USE_STUB
+  "Allow building a stub CSPRNG implementation on generic/bare-metal targets (returns IREE_STATUS_UNIMPLEMENTED)."
+  OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
