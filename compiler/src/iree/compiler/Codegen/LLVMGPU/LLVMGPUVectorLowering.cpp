@@ -238,21 +238,34 @@ struct TransposeContractOperands final
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
 
+    // Promote operands to the accumulator's element type *before* broadcast
+    // and transpose, matching the emission order of the old monolithic
+    // ContractToChainFMA. This order matters because translateModuleToLLVMIR
+    // is sensitive to use-list ordering in the in-memory IR.
+    auto accElemType = getElementTypeOrSelf(op.getAccType());
+    if (isa<FloatType>(lhsVecType.getElementType()) &&
+        lhsVecType.getElementType() != accElemType) {
+      Type promotedType = lhsVecType.clone(accElemType);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhsVecType = cast<VectorType>(lhs.getType());
+    }
+    if (isa<FloatType>(rhsVecType.getElementType()) &&
+        rhsVecType.getElementType() != accElemType) {
+      Type promotedType = rhsVecType.clone(accElemType);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhsVecType = cast<VectorType>(rhs.getType());
+    }
+
     ArrayRef<int64_t> lhsShape = lhsVecType.getShape();
     ArrayRef<int64_t> rhsShape = rhsVecType.getShape();
 
-    // Broadcast operands for missing parallel dimensions, then transpose to
-    // [reduction..., parallel...] layout. Each operand uses its own element
-    // type for the broadcast (important for mixed-precision contracts).
     SmallVector<int64_t> lhsTranspose, rhsTranspose;
     lhs = broadcastMissingDims(rewriter, loc, lhsMap, accMap,
                                op.getIteratorTypes(), numParDims, resultVecType,
-                               lhs, lhsShape, lhsVecType.getElementType(),
-                               lhsTranspose);
+                               lhs, lhsShape, accElemType, lhsTranspose);
     rhs = broadcastMissingDims(rewriter, loc, rhsMap, accMap,
                                op.getIteratorTypes(), numParDims, resultVecType,
-                               rhs, rhsShape, rhsVecType.getElementType(),
-                               rhsTranspose);
+                               rhs, rhsShape, accElemType, rhsTranspose);
 
     lhs = vector::TransposeOp::create(rewriter, loc, lhs, lhsTranspose);
     rhs = vector::TransposeOp::create(rewriter, loc, rhs, rhsTranspose);
