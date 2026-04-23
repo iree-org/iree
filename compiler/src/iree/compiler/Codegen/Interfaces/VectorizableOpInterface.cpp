@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -48,6 +49,63 @@ static bool getBoolOption(DictionaryAttr options, StringRef name,
     return attr.getValue();
   }
   return defaultValue;
+}
+
+static std::optional<vector::CombiningKind> matchScanCombiner(Region &region) {
+  if (!region.hasOneBlock()) {
+    return std::nullopt;
+  }
+
+  Block &block = region.front();
+  if (block.getNumArguments() != 2) {
+    return std::nullopt;
+  }
+
+  auto &ops = block.getOperations();
+  if (ops.size() != 2) {
+    return std::nullopt;
+  }
+
+  Operation &firstOp = ops.front();
+  Operation &yieldOp = ops.back();
+  if (firstOp.getNumOperands() != 2 || firstOp.getNumResults() != 1) {
+    return std::nullopt;
+  }
+  if (yieldOp.getNumOperands() != 1 ||
+      yieldOp.getOperand(0) != firstOp.getResult(0)) {
+    return std::nullopt;
+  }
+
+  Value arg0 = block.getArgument(0);
+  Value arg1 = block.getArgument(1);
+  Value opArg0 = firstOp.getOperand(0);
+  Value opArg1 = firstOp.getOperand(1);
+  if (opArg0 != arg0 || opArg1 != arg1) {
+    return std::nullopt;
+  }
+
+  return llvm::TypeSwitch<Operation *, std::optional<vector::CombiningKind>>(
+             &firstOp)
+      .Case<arith::AddIOp, arith::AddFOp>(
+          [](auto) { return vector::CombiningKind::ADD; })
+      .Case<arith::MulIOp, arith::MulFOp>(
+          [](auto) { return vector::CombiningKind::MUL; })
+      .Case<arith::AndIOp>([](auto) { return vector::CombiningKind::AND; })
+      .Case<arith::OrIOp>([](auto) { return vector::CombiningKind::OR; })
+      .Case<arith::XOrIOp>([](auto) { return vector::CombiningKind::XOR; })
+      .Case<arith::MaxSIOp>([](auto) { return vector::CombiningKind::MAXSI; })
+      .Case<arith::MaxUIOp>([](auto) { return vector::CombiningKind::MAXUI; })
+      .Case<arith::MinSIOp>([](auto) { return vector::CombiningKind::MINSI; })
+      .Case<arith::MinUIOp>([](auto) { return vector::CombiningKind::MINUI; })
+      .Case<arith::MaximumFOp>(
+          [](auto) { return vector::CombiningKind::MAXIMUMF; })
+      .Case<arith::MinimumFOp>(
+          [](auto) { return vector::CombiningKind::MINIMUMF; })
+      .Case<arith::MaxNumFOp>(
+          [](auto) { return vector::CombiningKind::MAXNUMF; })
+      .Case<arith::MinNumFOp>(
+          [](auto) { return vector::CombiningKind::MINNUMF; })
+      .Default([](Operation *) { return std::nullopt; });
 }
 
 struct GatherOpVectorizationModel
@@ -1342,6 +1400,138 @@ struct Im2colOpVectorizationModel
     return SmallVector<Value>{result};
   }
 };
+
+struct ScanOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<ScanOpVectorizationModel,
+                                             IREE::LinalgExt::ScanOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+
+    // Must be able to match region to CombiningKind.
+    if (!matchScanCombiner(scanOp.getRegion())) {
+      return false;
+    }
+
+    // Scalable vectors not yet supported.
+    if (llvm::any_of(scalableDims, [](bool b) { return b; })) {
+      return false;
+    }
+
+    // Without vector sizes, require static shapes.
+    if (vectorSizes.empty()) {
+      auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+      return inputTy.hasStaticShape();
+    }
+
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+    Location loc = scanOp.getLoc();
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(scanOp);
+
+    // Match combiner to CombiningKind.
+    auto kind = matchScanCombiner(scanOp.getRegion());
+    if (!kind) {
+      return failure();
+    }
+
+    // Determine vector shapes.
+    auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+    auto accumTy = cast<ShapedType>(scanOp.getAccumulator().getType());
+    Type elemType = inputTy.getElementType();
+    int64_t inputRank = inputTy.getRank();
+    int64_t scanDim = scanOp.getDimension();
+
+    SmallVector<int64_t> inputVecShape =
+        vectorSizes.empty() ? llvm::to_vector(inputTy.getShape())
+                            : llvm::to_vector(vectorSizes);
+
+    // Accumulator shape = input shape with scan dimension dropped.
+    SmallVector<int64_t> accumVecShape = inputVecShape;
+    accumVecShape.erase(accumVecShape.begin() + scanDim);
+
+    auto inputVecTy = VectorType::get(inputVecShape, elemType);
+    auto accumVecTy = VectorType::get(accumVecShape, elemType);
+
+    // Determine if masking is needed (dynamic shapes or vector > tensor).
+    bool needsInputMasking = !inputTy.hasStaticShape() ||
+                             !llvm::equal(inputTy.getShape(), inputVecShape);
+    bool needsAccumMasking = !accumTy.hasStaticShape() ||
+                             !llvm::equal(accumTy.getShape(), accumVecShape);
+
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> inputIndices(inputRank, zero);
+    SmallVector<Value> accumIndices(accumTy.getRank(), zero);
+
+    // Read input tensor to vector.
+    Value padding = ub::PoisonOp::create(rewriter, loc, elemType);
+    Value inputVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getInput(), inputVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsInputMasking);
+    if (needsInputMasking) {
+      SmallVector<OpFoldResult> inputDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getInput());
+      auto inputMaskTy = VectorType::get(inputVecShape, rewriter.getI1Type());
+      Value inputMask = vector::CreateMaskOp::create(
+          rewriter, loc, inputMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, inputDims));
+
+      // Replace masked-off lanes with identity value.
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, inputVecTy);
+      inputVec =
+          arith::SelectOp::create(rewriter, loc, inputMask, inputVec, identity);
+    }
+
+    // Read accumulator (initial value) to vector.
+    Value accumVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getAccumulator(), accumVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsAccumMasking);
+    if (needsAccumMasking) {
+      SmallVector<OpFoldResult> accumDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getAccumulator());
+      auto accumMaskTy = VectorType::get(accumVecShape, rewriter.getI1Type());
+      Value accumMask = vector::CreateMaskOp::create(
+          rewriter, loc, accumMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, accumDims));
+
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, accumVecTy);
+      accumVec =
+          arith::SelectOp::create(rewriter, loc, accumMask, accumVec, identity);
+    }
+
+    // Create vector.scan.
+    auto vectorScanOp =
+        vector::ScanOp::create(rewriter, loc, *kind, inputVec, accumVec,
+                               scanDim, scanOp.getInclusive());
+
+    // Write results back to tensors.
+    Value output = vector::createWriteOrMaskedWrite(
+                       rewriter, loc, vectorScanOp.getDest(),
+                       scanOp.getOutput(), inputIndices,
+                       /*useInBoundsInsteadOfMasking=*/!needsInputMasking)
+                       ->getResult(0);
+
+    Value accum = vector::createWriteOrMaskedWrite(
+                      rewriter, loc, vectorScanOp.getAccumulatedValue(),
+                      scanOp.getAccumulator(), accumIndices,
+                      /*useInBoundsInsteadOfMasking=*/!needsAccumMasking)
+                      ->getResult(0);
+
+    return SmallVector<Value>{output, accum};
+  }
+};
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -1355,6 +1545,7 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         *ctx);
     IREE::LinalgExt::Im2colOp::attachInterface<Im2colOpVectorizationModel>(
         *ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<ScanOpVectorizationModel>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {
