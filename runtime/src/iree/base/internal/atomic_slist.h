@@ -78,9 +78,10 @@ typedef struct iree_atomic_slist_entry_t {
 // etc. That said, the Windows Interlocked* variants don't seem to. Having a
 // single heavily tested implementation seems more worthwhile than several.
 typedef iree_alignas(iree_max_align_t) struct {
-  // TODO(benvanik): spend some time golfing this. Unblocking myself for now :)
   iree_slim_mutex_t mutex;
-  iree_atomic_slist_entry_t* head;
+  // Atomic head pointer used for relaxed empty checks without taking the mutex.
+  // All mutations still hold the mutex.
+  iree_atomic_intptr_t head;
 } iree_atomic_slist_t;
 
 // Initializes an slist handle to an empty list.

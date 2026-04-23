@@ -10,9 +10,17 @@
 
 #include "iree/base/attributes.h"
 
-// TODO(benvanik): add TSAN annotations when switched to atomics:
-// https://github.com/gcc-mirror/gcc/blob/master/libsanitizer/include/sanitizer/tsan_interface_atomic.h
-// https://reviews.llvm.org/D18500
+// Loads the head pointer with the given memory ordering.
+static inline iree_atomic_slist_entry_t* iree_atomic_slist_load_head(
+    iree_atomic_slist_t* list, iree_memory_order_t order) {
+  return (iree_atomic_slist_entry_t*)iree_atomic_load(&list->head, order);
+}
+
+// Stores the head pointer with release ordering (publishes prior writes).
+static inline void iree_atomic_slist_store_head(
+    iree_atomic_slist_t* list, iree_atomic_slist_entry_t* value) {
+  iree_atomic_store(&list->head, (intptr_t)value, iree_memory_order_release);
+}
 
 void iree_atomic_slist_initialize(iree_atomic_slist_t* out_list) {
   memset(out_list, 0, sizeof(*out_list));
@@ -20,7 +28,6 @@ void iree_atomic_slist_initialize(iree_atomic_slist_t* out_list) {
 }
 
 void iree_atomic_slist_deinitialize(iree_atomic_slist_t* list) {
-  // TODO(benvanik): assert empty.
   iree_slim_mutex_deinitialize(&list->mutex);
   memset(list, 0, sizeof(*list));
 }
@@ -30,37 +37,44 @@ void iree_atomic_slist_concat(iree_atomic_slist_t* list,
                               iree_atomic_slist_entry_t* tail) {
   if (IREE_UNLIKELY(!head)) return;
   iree_slim_mutex_lock(&list->mutex);
-  tail->next = list->head;
-  list->head = head;
+  tail->next = iree_atomic_slist_load_head(list, iree_memory_order_relaxed);
+  iree_atomic_slist_store_head(list, head);
   iree_slim_mutex_unlock(&list->mutex);
 }
 
 void iree_atomic_slist_push(iree_atomic_slist_t* list,
                             iree_atomic_slist_entry_t* entry) {
   iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_push_unsafe(list, entry);
+  entry->next = iree_atomic_slist_load_head(list, iree_memory_order_relaxed);
+  iree_atomic_slist_store_head(list, entry);
   iree_slim_mutex_unlock(&list->mutex);
 }
 
 void iree_atomic_slist_push_unsafe(iree_atomic_slist_t* list,
                                    iree_atomic_slist_entry_t* entry) {
-  // NOTE: no lock is held here and no atomic operation will be used when this
-  // is actually made atomic.
-  entry->next = list->head;
-  list->head = entry;
+  entry->next = iree_atomic_slist_load_head(list, iree_memory_order_relaxed);
+  iree_atomic_slist_store_head(list, entry);
 }
 
 void iree_atomic_slist_discard(iree_atomic_slist_t* list) {
   iree_slim_mutex_lock(&list->mutex);
-  list->head = NULL;
+  iree_atomic_slist_store_head(list, NULL);
   iree_slim_mutex_unlock(&list->mutex);
 }
 
 iree_atomic_slist_entry_t* iree_atomic_slist_pop(iree_atomic_slist_t* list) {
+  // Fast path: check if the list is empty without taking the mutex.
+  // The relaxed load is safe because we re-check under the mutex if non-NULL.
+  // False negatives (read NULL when an entry was just pushed) are benign:
+  // the entry will be seen on the next pop call.
+  if (!iree_atomic_slist_load_head(list, iree_memory_order_relaxed)) {
+    return NULL;
+  }
   iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_entry_t* entry = list->head;
+  iree_atomic_slist_entry_t* entry =
+      iree_atomic_slist_load_head(list, iree_memory_order_relaxed);
   if (entry != NULL) {
-    list->head = entry->next;
+    iree_atomic_slist_store_head(list, entry->next);
     entry->next = NULL;
   }
   iree_slim_mutex_unlock(&list->mutex);
@@ -71,19 +85,19 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
                              iree_atomic_slist_flush_order_t flush_order,
                              iree_atomic_slist_entry_t** out_head,
                              iree_atomic_slist_entry_t** out_tail) {
-  // Exchange list head with NULL to steal the entire list. The list will be in
-  // the native LIFO order of the slist.
+  // Fast path: check if the list is empty without taking the mutex.
+  if (!iree_atomic_slist_load_head(list, iree_memory_order_relaxed)) {
+    return false;
+  }
   iree_slim_mutex_lock(&list->mutex);
-  iree_atomic_slist_entry_t* head = list->head;
-  list->head = NULL;
+  iree_atomic_slist_entry_t* head =
+      iree_atomic_slist_load_head(list, iree_memory_order_relaxed);
+  iree_atomic_slist_store_head(list, NULL);
   iree_slim_mutex_unlock(&list->mutex);
   if (!head) return false;
 
   switch (flush_order) {
     case IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_LIFO: {
-      // List is already in native LIFO order. If the user wants a tail we have
-      // to scan for it, though, which we really only want to do when required
-      // as it's a linked list pointer walk.
       *out_head = head;
       if (out_tail) {
         iree_atomic_slist_entry_t* p = head;
@@ -93,9 +107,6 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
       break;
     }
     case IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO: {
-      // Reverse the list in a single scan. list_head is our tail, so scan
-      // forward to find our head. Since we have to walk the whole list anyway
-      // we can cheaply give both the head and tail to the caller.
       iree_atomic_slist_entry_t* tail = head;
       if (out_tail) *out_tail = tail;
       iree_atomic_slist_entry_t* p = head;

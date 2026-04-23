@@ -65,8 +65,9 @@ iree_status_t iree_task_worker_initialize(
       iree_max(IREE_TASK_WORKER_MIN_STACK_SIZE, stack_size);
 
   // NOTE: if the thread creation fails we'll bail here and let the caller
-  // cleanup by calling deinitialize (which is safe because we zero init
-  // everything).
+  // cleanup by calling deinitialize. The guard in deinitialize checks
+  // worker->executor (set above) to distinguish initialized workers from
+  // never-initialized ones in the same allocation.
   iree_status_t status = iree_thread_create(
       iree_task_worker_thread_entry, out_worker, thread_params,
       executor->allocator, &out_worker->thread);
@@ -126,10 +127,18 @@ void iree_task_worker_await_exit(iree_task_worker_t* worker) {
 }
 
 void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
+  // Skip workers that were never initialized. Their memory is zero-filled when
+  // the executor allocation is initialized, but their notifications were never
+  // initialized. Calling iree_notification_deinitialize on them would operate
+  // on a never-initialized pthread_mutex_t (undefined behavior on non-glibc).
+  // worker->executor is set at the start of iree_task_worker_initialize,
+  // before notification init, so NULL means initialize was never called.
+  if (!worker->executor) return;
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Must have called request_exit/await_exit, OR thread creation failed during
-  // initialization.
+  // initialization (thread is NULL but notifications are initialized).
   IREE_ASSERT_TRUE(!worker->thread || iree_task_worker_is_zombie(worker));
 
   iree_thread_release(worker->thread);
