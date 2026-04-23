@@ -141,7 +141,17 @@ iree_status_t iree_async_proactor_pool_create(
   // Initialize node IDs. Proactors and runners are created on-demand when
   // pool_get or pool_get_for_node is first called for each entry.
   for (iree_host_size_t i = 0; i < node_count; ++i) {
-    pool->entries[i].node_id = node_ids ? node_ids[i] : UINT32_MAX;
+    if (node_ids) {
+      pool->entries[i].node_id = node_ids[i];
+    } else if (node_count > 1) {
+      // Distinct IDs so iree_async_proactor_pool_get_for_node can route each
+      // NUMA node to its own proactor when callers pass OS node IDs (e.g. from
+      // task executors). Single-node pools keep UINT32_MAX below so poll
+      // runners stay unpinned by default.
+      pool->entries[i].node_id = (uint32_t)i;
+    } else {
+      pool->entries[i].node_id = UINT32_MAX;
+    }
   }
 
   *out_pool = pool;

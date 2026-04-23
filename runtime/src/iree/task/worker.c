@@ -159,7 +159,7 @@ static void iree_task_worker_mark_active(iree_task_worker_t* worker) {
   (void)old_idle_mask;
   IREE_TRACE_PLOT_VALUE_F32(
       worker->executor->trace_name,
-      old_idle_mask
+      old_idle_mask != 0
           ? (100.0f -
              100.0f * (iree_task_affinity_set_count_ones(old_idle_mask) - 1) /
                  (float)worker->executor->worker_count)

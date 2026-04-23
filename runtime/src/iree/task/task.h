@@ -165,9 +165,17 @@ struct iree_alignas(iree_max_align_t) iree_task_t {
 };
 static_assert(offsetof(iree_task_t, next_task) == 0,
               "next_task intrusive pointer must be at offset 0");
+#if IREE_TASK_EXECUTOR_MAX_WORKER_COUNT > 64
+// 128-bit affinity sets widen the header; keep a tight cap so pool footprint
+// stays predictable.
+static_assert(sizeof(iree_task_t) <= 96,
+              "the task header greatly influences pool sizes due to alignment "
+              "requirements and should be kept tiny");
+#else
 static_assert(sizeof(iree_task_t) <= 64,
               "the task header greatly influences pool sizes due to alignment "
               "requirements and should be kept tiny");
+#endif  // IREE_TASK_EXECUTOR_MAX_WORKER_COUNT
 
 // Initializes a task header with the given type.
 // Must be called on all tasks to ensure proper dependency tracking and list

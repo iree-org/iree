@@ -431,7 +431,7 @@ static bool iree_sysfs_find_sharing_cache_mask(uint32_t processor,
 // back to L2 if L3 is not available.
 iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     iree_task_topology_t* topology) {
-  // O(n^2), but n is always <= 64 (and often <= 8).
+  // O(n^2), but n is modest (physical core count on the node).
   for (iree_host_size_t i = 0; i < topology->group_count; ++i) {
     iree_task_topology_group_t* group = &topology->groups[i];
     uint32_t processor = group->processor_index;
@@ -449,7 +449,7 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
         const iree_task_topology_group_t* other_group = &topology->groups[j];
         uint32_t other_processor = other_group->processor_index;
         if (CPU_ISSET(other_processor, &processor_sharing_mask)) {
-          group_mask |= 1ull << other_group->group_index;
+          group_mask |= iree_task_topology_group_bit(other_group->group_index);
         }
       }
     }
@@ -468,7 +468,8 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            cpu_count,
+                            (size_t)IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
   }
   uint32_t processor_count = iree_sysfs_query_processor_count();
   if (processor_count == 0) {
@@ -513,6 +514,33 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
       group->ideal_thread_affinity.group = cluster_id;
     }
     iree_status_ignore(cluster_status);
+  }
+
+  // When every listed CPU maps to the same sysfs cluster / package, set the
+  // topology NUMA node so each executor routes async I/O to the matching
+  // proactor (see iree_async_proactor_pool_get_for_node). Mixed-node lists keep
+  // IREE_TASK_TOPOLOGY_NODE_ID_ANY.
+  if (cpu_count > 0) {
+    uint32_t common_node = 0;
+    bool have_common = true;
+    for (iree_host_size_t i = 0; i < cpu_count; ++i) {
+      uint32_t cid = 0;
+      iree_status_t nst = iree_sysfs_query_cluster_id(cpu_ids[i], &cid);
+      if (!iree_status_is_ok(nst) || !iree_sysfs_is_valid_cluster(cid)) {
+        iree_status_ignore(nst);
+        have_common = false;
+        break;
+      }
+      if (i == 0) {
+        common_node = cid;
+      } else if (cid != common_node) {
+        have_common = false;
+        break;
+      }
+    }
+    if (have_common) {
+      out_topology->node_id = common_node;
+    }
   }
 
   iree_status_t status =

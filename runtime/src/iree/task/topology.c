@@ -130,11 +130,12 @@ iree_status_t iree_task_topology_initialize_from_thread_affinities(
     iree_task_topology_t* out_topology) {
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (group_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (group_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many groups specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
-                            group_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            group_count,
+                            (size_t)IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

@@ -7,15 +7,30 @@
 #ifndef IREE_TASK_TUNING_H_
 #define IREE_TASK_TUNING_H_
 
+#include "iree/base/config.h"
+#include "iree/base/target_platform.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
 // Maximum number of workers that an executor can manage.
-// A 64 worker hard limit is based on us using uint64_t as a bitmask to select
-// workers. It's easy to go smaller (just use fewer bits) if it's known that
-// only <64 will ever be used (such as for devices with 2 cores).
+//
+// On x86-64 with GCC or Clang we use a 128-bit worker bitmask (see
+// affinity_set.h) and allow up to 128 workers. Other architectures and
+// toolchains (including MSVC, which does not expose 128-bit integer atomics in
+// C for this use) keep the prior uint64_t / 64-worker limit.
+//
+// The thread-hostile atomics-disabled configuration only implements generic
+// atomics up to 64-bit, so keep the smaller limit there even on x86-64.
+#if defined(IREE_ARCH_X86_64) && defined(__SIZEOF_INT128__) &&      \
+    __SIZEOF_INT128__ == 16 &&                                      \
+    (defined(IREE_COMPILER_CLANG) || defined(IREE_COMPILER_GCC)) && \
+    !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+#define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT (128)
+#else
 #define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT (64)
+#endif  // x86-64 + __int128 + GCC/Clang + real atomics
 
 // Initial number of shard tasks that are allocated in the executor pool.
 // Increasing this number will decrease initial allocation storms in cases of
