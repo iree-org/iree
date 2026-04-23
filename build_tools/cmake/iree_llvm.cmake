@@ -63,6 +63,13 @@ macro(iree_llvm_configure_bundled)
   endif()
   list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 
+  set(CLANG_INCLUDE_DIRS
+    ${IREE_SOURCE_DIR}/third_party/llvm-project/clang/include
+    ${IREE_BINARY_DIR}/llvm-project/tools/clang/include
+  )
+  set(CLANG_TOOLS_EXTRA_INCLUDE_DIR
+    ${IREE_SOURCE_DIR}/third_party/llvm-project/clang-tools-extra
+  )
   set(LLVM_INCLUDE_DIRS
     ${IREE_SOURCE_DIR}/${_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR}/include
     ${IREE_BINARY_DIR}/llvm-project/include
@@ -83,6 +90,7 @@ macro(iree_llvm_configure_bundled)
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
   set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
+  set(IREE_CLANG_TIDY_BINARY "$<TARGET_FILE:${IREE_CLANG_TIDY_TARGET}>")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${LLVM_VERSION_MAJOR}/include/")
 
   if(IREE_ENABLE_RUNTIME_COVERAGE)
@@ -121,6 +129,7 @@ macro(iree_llvm_configure_installed)
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:llvm-link>")
   set(IREE_LLD_BINARY "$<TARGET_FILE:lld>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:clang>")
+  set(IREE_CLANG_TIDY_BINARY "$<TARGET_FILE:clang-tidy>")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_LIBRARY_DIR}/clang/${LLVM_VERSION_MAJOR}/include")
   if(NOT EXISTS "${IREE_CLANG_BUILTIN_HEADERS_PATH}")
     message(WARNING "Could not find installed clang-resource-headers (tried ${IREE_CLANG_BUILTIN_HEADERS_PATH})")
@@ -190,6 +199,12 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(IREE_CLANG_TARGET)
   set(IREE_LLD_TARGET)
 
+  # clang-tidy is built only if we are bundled and need it.
+  set(IREE_CLANG_TIDY_TARGET)
+  if(IREE_ENABLE_EXPERIMENTAL_CUSTOM_CLANG_TIDY)
+    set(IREE_CLANG_TIDY_TARGET clang-tidy)
+  endif()
+
   # Unconditionally enable some other cheap LLVM tooling.
   set(IREE_LLVM_LINK_TARGET llvm-link)
   set(IREE_FILECHECK_TARGET FileCheck)
@@ -254,6 +269,9 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   if(IREE_CLANG_TARGET)
     list(APPEND LLVM_ENABLE_PROJECTS clang)
+  endif()
+  if(IREE_CLANG_TIDY_TARGET)
+    list(APPEND LLVM_ENABLE_PROJECTS clang-tools-extra)
   endif()
   if(IREE_LLD_TARGET)
     list(APPEND LLVM_ENABLE_PROJECTS lld)
