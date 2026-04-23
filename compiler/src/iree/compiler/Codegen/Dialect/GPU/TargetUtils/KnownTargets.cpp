@@ -22,6 +22,8 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 namespace {
 
+StringRef normalizeNVIDIAGPUTarget(StringRef target);
+
 //===----------------------------------------------------------------------===//
 // Target details structs
 //===----------------------------------------------------------------------===//
@@ -995,6 +997,7 @@ const WgpDetails *getPascalWgpDetails() {
 }
 
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
+  target = normalizeNVIDIAGPUTarget(target);
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
   const WgpDetails *voltaWgp = getVoltaWgpDetails();
@@ -1026,7 +1029,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
-      .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
+      .Cases({"ampere", "ada", "sm_80", "sm_86", "sm_87", "sm_89"},
              TargetDetails{ampereWgp, nullptr})
       .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
       .Cases({"volta", "sm_70", "sm_72"}, TargetDetails{voltaWgp, nullptr})
@@ -1052,6 +1055,7 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
+      .Case("ada", "sm_89")
       .Case("ampere", "sm_80") // Or sm_86/87; use smaller version.
       .Case("turing", "sm_75")
       .Case("volta", "sm_70")  // Or sm_72; use smaller version.
@@ -1192,12 +1196,26 @@ TargetAttr getMetalTargetDetails(MLIRContext *context) {
                           /*features=*/"spirv:v1.3,cap:Shader", context);
 }
 
+StringRef getCUDATargetFeatures(StringRef target, StringRef features) {
+  if (!features.empty()) {
+    return features;
+  }
+
+  StringRef normalizedTarget = normalizeCUDATarget(target);
+  // LLVM NVPTX rejects sm_89 when the PTX ISA level is pinned below 7.8.
+  if (normalizedTarget == "sm_89") {
+    return "+ptx78";
+  }
+  return "+ptx76";
+}
+
 TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
                                 MLIRContext *context) {
+  StringRef resolvedFeatures = getCUDATargetFeatures(target, features);
   if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
-                            features, context);
+                            resolvedFeatures, context);
   }
   return nullptr;
 }
