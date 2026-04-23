@@ -173,3 +173,32 @@ func.func @configured_zero_vector_size_falls_back_to_inference(
 }
 // CHECK-LABEL: func.func @configured_zero_vector_size_falls_back_to_inference(
 // CHECK:         arith.addf {{.*}} : vector<4x1xf32>
+
+// -----
+
+#scan_masked_config = #iree_cpu.lowering_config<vector_common_parallel = [8, 16]>
+
+func.func @vectorize_scan_masked_configured(
+    %input: tensor<?x?xf32>,
+    %output: tensor<?x?xf32>,
+    %accum: tensor<?xf32>) -> (tensor<?x?xf32>, tensor<?xf32>) {
+  %0:2 = iree_linalg_ext.scan {lowering_config = #scan_masked_config}
+      dimension(1) inclusive(true)
+      ins(%input : tensor<?x?xf32>)
+      outs(%output, %accum : tensor<?x?xf32>, tensor<?xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32):
+      %sum = arith.addf %arg0, %arg1 : f32
+      iree_linalg_ext.yield %sum : f32
+  } -> tensor<?x?xf32>, tensor<?xf32>
+  return %0#0, %0#1 : tensor<?x?xf32>, tensor<?xf32>
+}
+// CHECK-LABEL: func.func @vectorize_scan_masked_configured(
+// CHECK:         vector.create_mask {{.*}} : vector<8x16xi1>
+// CHECK:         vector.transfer_read {{.*}} : tensor<?x?xf32>, vector<8x16xf32>
+// CHECK:         arith.select {{.*}} : vector<8x16xi1>, vector<8x16xf32>
+// CHECK:         vector.create_mask {{.*}} : vector<8xi1>
+// CHECK:         vector.transfer_read {{.*}} : tensor<?xf32>, vector<8xf32>
+// CHECK:         arith.select {{.*}} : vector<8xi1>, vector<8xf32>
+// CHECK:         vector.scan <add>, {{.*}} {inclusive = true, reduction_dim = 1 : i64}
+// CHECK:         vector.transfer_write {{.*}} : vector<8x16xf32>, tensor<?x?xf32>
+// CHECK:         vector.transfer_write {{.*}} : vector<8xf32>, tensor<?xf32>

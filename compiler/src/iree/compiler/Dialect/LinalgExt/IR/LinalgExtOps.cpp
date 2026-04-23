@@ -1617,6 +1617,20 @@ SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
   return llvm::to_vector(getInputType().getShape());
 }
 
+ArrayAttr IREE::LinalgExt::ArgCompareOp::getIndexingMaps() {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  return Builder(getContext()).getAffineMapArrayAttr(maps);
+}
+
+AffineMap
+IREE::LinalgExt::ArgCompareOp::getMatchingIndexingMap(OpOperand *operand) {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  unsigned idx = operand->getOperandNumber();
+  assert(idx < maps.size() &&
+         "operand does not have an indexing map (e.g. index_base)");
+  return maps[idx];
+}
+
 MutableOperandRange ArgCompareOp::getDpsInitsMutable() {
   return MutableOperandRange(*this, /*numInputs=*/getInputIndex() ? 2 : 1,
                              /*numInits=*/2);
@@ -3297,19 +3311,23 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
   auto parentOp = getOperation()->getParentOp();
-  if (!isa<CustomOp, AttentionOp>(parentOp)) {
+  if (!isa<CustomOp, AttentionOp, OnlineAttentionOp>(parentOp)) {
     return emitOpError(
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
-        "`iree_linalg_ext.attention`");
+        "`iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`");
   }
-  auto customOp = dyn_cast<CustomOp>(parentOp);
-  auto attentionOp = dyn_cast<AttentionOp>(parentOp);
-  int64_t numLoops =
-      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+  int64_t numLoops;
+  if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
+    numLoops = customOp.getNumLoops();
+  } else if (auto attentionOp = dyn_cast<AttentionOp>(parentOp)) {
+    numLoops = attentionOp.getIterationDomainRank();
+  } else {
+    numLoops = cast<OnlineAttentionOp>(parentOp).getIterationDomainRank();
+  }
   if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
            << getDim() << ") to be lower than the number of loops (" << numLoops
-           << ") of the enclosing CustomOp/AttentionOp";
+           << ") of the enclosing operation";
   }
   return success();
 }

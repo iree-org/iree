@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/Support/SourceMgr.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -192,21 +191,6 @@ HALDialect::HALDialect(MLIRContext *context)
   addInterfaces<HALInlinerInterface, HALOpAsmInterface,
                 HALAffinityAnalysisDialectInterface,
                 HALToVMConversionInterface>();
-}
-
-//===----------------------------------------------------------------------===//
-// Dialect hooks
-//===----------------------------------------------------------------------===//
-
-Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
-                                           Type type, Location loc) {
-  if (isa<IndexType>(type)) {
-    // Some folders materialize raw index types, which just become std
-    // constants.
-    return mlir::arith::ConstantIndexOp::create(
-        builder, loc, cast<IntegerAttr>(value).getValue().getSExtValue());
-  }
-  return nullptr;
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

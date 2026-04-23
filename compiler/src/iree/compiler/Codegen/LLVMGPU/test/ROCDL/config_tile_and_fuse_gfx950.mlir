@@ -1,11 +1,11 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
 
@@ -412,13 +412,13 @@ func.func @matmul_large_symmetric_f16(
 
 // MI355X-LABEL: func.func @matmul_large_symmetric_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 2]
-//  MI355X-SAME:     subgroup = [2, 4, 0]
-//  MI355X-SAME:     workgroup = [256, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
 
 // -----
 
@@ -437,13 +437,13 @@ func.func @matmul_large_tall_m_f16(
 
 // MI355X-LABEL: func.func @matmul_large_tall_m_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 2]
-//  MI355X-SAME:     subgroup = [2, 4, 0]
-//  MI355X-SAME:     workgroup = [256, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
 
 // -----
 
@@ -462,13 +462,13 @@ func.func @matmul_large_wide_n_f16(
 
 // MI355X-LABEL: func.func @matmul_large_wide_n_f16
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
-//  MI355X-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
+//  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 2]
-//  MI355X-SAME:     subgroup = [2, 4, 0]
-//  MI355X-SAME:     workgroup = [256, 256, 0]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
+//  MI355X-SAME:     workgroup = [128, 256, 0]
 
 // -----
 
@@ -490,11 +490,11 @@ func.func @matmul_large_very_tall_m_f16(
 //  MI355X-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //  MI355X-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
 //       MI355X:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+//  MI355X-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 //  MI355X-SAME:     padding = [128, 256, 32]
 //  MI355X-SAME:     promote_operands = [0, 1]
-//  MI355X-SAME:     reduction = [0, 0, 2]
-//  MI355X-SAME:     subgroup = [2, 4, 0]
+//  MI355X-SAME:     reduction = [0, 0, 1]
+//  MI355X-SAME:     subgroup = [4, 8, 0]
 //  MI355X-SAME:     workgroup = [128, 256, 0]
 
 // -----

@@ -1339,32 +1339,37 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
   return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
 }
 
-struct DropAttentionUnitDims final
-    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  DropAttentionUnitDims(MLIRContext *context,
-                        linalg::ControlDropUnitDims options,
-                        PatternBenefit benefit = 1)
-      : OpRewritePattern<AttentionOp>(context, benefit),
+template <typename AttentionOpType>
+struct DropAttentionLikeUnitDims final : OpRewritePattern<AttentionOpType> {
+  DropAttentionLikeUnitDims(MLIRContext *context,
+                            linalg::ControlDropUnitDims options,
+                            PatternBenefit benefit = 1)
+      : OpRewritePattern<AttentionOpType>(context, benefit),
         options(std::move(options)) {}
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+  LogicalResult matchAndRewrite(AttentionOpType attentionOp,
                                 PatternRewriter &rewriter) const override {
     linalg::DroppedUnitDimsBuilder builder =
         [](Location loc, OpBuilder &b, IndexingMapOpInterface op,
            ArrayRef<Value> newOperands, ArrayRef<AffineMap> newIndexingMaps,
            const llvm::SmallDenseSet<unsigned> &droppedDims)
         -> IndexingMapOpInterface {
-      auto attentionOp = cast<AttentionOp>(op);
+      auto attentionOp = cast<AttentionOpType>(op);
       auto resultTypes = llvm::map_to_vector(
           newOperands.take_back(attentionOp.getNumDpsInits()),
           [](Value v) { return v.getType(); });
-      auto newOp = AttentionOp::create(
-          b, op.getLoc(), resultTypes,
-          newOperands.take_front(attentionOp.getNumDpsInputs()),
-          newOperands.take_back(attentionOp.getNumDpsInits()),
-          b.getAffineMapArrayAttr(newIndexingMaps));
-      b.cloneRegionBefore(attentionOp.getRegion(), newOp.getRegion(),
-                          newOp.getRegion().begin());
+
+      IRMapping mapping;
+      for (auto [oldOperand, newOperand] :
+           llvm::zip(attentionOp->getOperands(), newOperands)) {
+        mapping.map(oldOperand, newOperand);
+      }
+      auto *cloned = b.clone(*attentionOp, mapping);
+      auto newOp = cast<AttentionOpType>(cloned);
+      for (auto [result, type] : llvm::zip(newOp->getResults(), resultTypes)) {
+        result.setType(type);
+      }
+      newOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(newIndexingMaps));
       return newOp;
     };
     FailureOr<linalg::DropUnitDimsResult> result = linalg::dropUnitDims(
@@ -1385,8 +1390,11 @@ private:
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
-  patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims,
-               DropMapStoreUnitDims>(patterns.getContext(), options);
+  patterns
+      .add<DropGatherUnitDims, DropScatterUnitDims,
+           DropAttentionLikeUnitDims<AttentionOp>,
+           DropAttentionLikeUnitDims<OnlineAttentionOp>, DropMapStoreUnitDims>(
+          patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

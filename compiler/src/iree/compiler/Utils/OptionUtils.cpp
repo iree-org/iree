@@ -214,8 +214,6 @@ bool llvm::cl::parser<llvm::OptimizationLevel>::parse(
                  .Case("O1", OptimizationLevel::O1)
                  .Case("O2", OptimizationLevel::O2)
                  .Case("O3", OptimizationLevel::O3)
-                 // .Case("Os", OptimizationLevel::Os)
-                 // .Case("Oz", OptimizationLevel::Oz)
                  .Default(std::nullopt);
   if (!val) {
     return O.error("'" + Arg +
@@ -233,13 +231,13 @@ void llvm::cl::parser<llvm::OptimizationLevel>::printOptionDiff(
   std::string Str;
   {
     llvm::raw_string_ostream SS(Str);
-    SS << V.getSpeedupLevel() << "/" << V.getSizeLevel();
+    SS << V.getSpeedupLevel();
   }
   outs() << "= " << Str;
   outs().indent(2) << " (default: ";
   if (Default.hasValue()) {
     auto defaultVal = Default.getValue();
-    outs() << defaultVal.getSpeedupLevel() << "/" << defaultVal.getSizeLevel();
+    outs() << defaultVal.getSpeedupLevel();
   } else {
     outs() << "*no default*";
   }

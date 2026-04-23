@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "gpu_pipeline_relayout_ops.mlir"
     "horizontal_fusion_pipeline.mlir"
     "legalize.mlir"
+    "legalize_nd_vectors.mlir"
     "linalg_transform.mlir"
     "link_executables.mlir"
     "llvmgpu_bufferize.mlir"

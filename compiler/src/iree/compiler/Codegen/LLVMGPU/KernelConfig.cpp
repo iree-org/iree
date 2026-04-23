@@ -115,7 +115,7 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
+                    llvm::cl::Hidden, llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
@@ -869,7 +869,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
       /*m=*/getDimBounds(mDims),
-      /*n=*/getDimBounds(nDims),
+      /*n=*/getDimBounds(k2Dims),
       /*k=*/getDimBounds(k1Dims),
       /*batch=*/getDimBounds(batchDims),
       /*a=*/qElementType,

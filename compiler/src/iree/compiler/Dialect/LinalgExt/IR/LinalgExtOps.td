@@ -711,7 +711,13 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface>
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["generateScalarImplementation",
+     "getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
+     "getTiledImplementation"]>
 ]>{
   let summary = [{Top-K v2 operator.}];
   let description = [{
@@ -785,6 +791,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   DeclareOpInterfaceMethods<LinalgFusionInterface,
    ["getIndexingMapsForResults", "getIndexingMapsForOperands",
     "getStaticLoopRanges"]>,
+  DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   ["generateScalarImplementation",
