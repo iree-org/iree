@@ -86,6 +86,15 @@ external_cc_library(
   PUBLIC
 )
 
+# The iree-flatcc-cli tool depends on POSIX APIs (e.g., posix_memalign).
+# Skip building it when POSIX support is disabled and import the host binary instead.
+if(NOT IREE_ENABLE_POSIX)
+  if(IREE_HOST_BIN_DIR)
+    iree_import_binary(NAME iree-flatcc-cli)
+  endif()
+  return()
+endif()
+
 # Define our own binary target for the CLI.
 # flatcc's `flatcc_cli` target renames itself to `flatcc` or `flatcc_d`
 # depending on the build configuration, so we prefer to just set our own name.
