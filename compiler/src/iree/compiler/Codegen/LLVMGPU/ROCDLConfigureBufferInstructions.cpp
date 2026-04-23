@@ -74,44 +74,6 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   });
 }
 
-/// Return the maximum number of bytes spanned by the binding, or nullopt if
-/// unable to determine or if the calculation would overflow.
-static std::optional<int64_t>
-getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
-                const DataFlowSolver &solver) {
-  int64_t maxNumElems = 1;
-  ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
-  if (auto tensorType =
-          dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
-    resultTy = tensorType.asRankedTensorType();
-  }
-  if (!resultTy || !resultTy.hasRank()) {
-    return std::nullopt;
-  }
-  // Handle dynamic dimensions.
-  for (Value dynArg : binding.getResultDynamicDims(0)) {
-    FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, solver);
-    if (failed(dimMax)) {
-      return std::nullopt;
-    }
-    if (llvm::MulOverflow(maxNumElems, *dimMax, maxNumElems)) {
-      return std::nullopt;
-    }
-  }
-  // Handle static dimensions.
-  for (int64_t dim :
-       llvm::make_filter_range(resultTy.getShape(), ShapedType::isStatic)) {
-    if (llvm::MulOverflow(maxNumElems, dim, maxNumElems)) {
-      return std::nullopt;
-    }
-  }
-  int64_t elementBits = IREE::Util::getTypeBitWidth(resultTy.getElementType());
-  if (llvm::MulOverflow(maxNumElems, elementBits, maxNumElems)) {
-    return std::nullopt;
-  }
-  return maxNumElems / 8;
-}
-
 namespace {
 
 struct ROCDLConfigureBufferInstructionsPass final
@@ -150,15 +112,14 @@ struct ROCDLConfigureBufferInstructionsPass final
                << " not known workgroup-uniform\n";
         return;
       }
-      std::optional<int64_t> maxBytes = getSpannedBytes(binding, solver);
-      if (!maxBytes) {
-        LDBG() << "Couldn't bound binding size for " << binding;
-        return;
+      ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
+      if (auto tensorType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+              binding.getType())) {
+        resultTy = tensorType.asRankedTensorType();
       }
-      if (*maxBytes >=
-          static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-        LDBG() << "Size of " << binding << " too large (" << *maxBytes
-               << " bytes)";
+      if (!canUseFatRawBuffer(resultTy, binding.getResultDynamicDims(0),
+                              &solver)) {
+        LDBG() << "Size of " << binding << " too large or unbounded";
         return;
       }
       annotationHelper.setAttr(binding, unitAttr);
