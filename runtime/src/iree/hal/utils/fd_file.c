@@ -65,6 +65,10 @@ static iree_status_t iree_hal_platform_fd_pread(
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
 
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT32_MAX) count = INT32_MAX;
+
   DWORD bytes_read = 0;
   OVERLAPPED overlapped = {0};
   overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
@@ -90,6 +94,10 @@ static iree_status_t iree_hal_platform_fd_pwrite(
         IREE_STATUS_INVALID_ARGUMENT,
         "file descriptor is not backed by a valid Win32 HANDLE");
   }
+
+  // Cap at INT32_MAX to prevent silent DWORD truncation for >4GB requests.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_written = 0;
   OVERLAPPED overlapped = {0};
@@ -134,6 +142,9 @@ static iree_status_t iree_hal_platform_fd_pread(
     iree_host_size_t* out_bytes_read) {
   IREE_ASSERT_ARGUMENT(out_bytes_read);
   *out_bytes_read = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_read.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_read = pread(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_read > 0) {
     *out_bytes_read = (iree_host_size_t)bytes_read;
@@ -152,6 +163,9 @@ static iree_status_t iree_hal_platform_fd_pwrite(
     iree_host_size_t* out_bytes_written) {
   IREE_ASSERT_ARGUMENT(out_bytes_written);
   *out_bytes_written = 0;
+  // Cap at INT_MAX: some kernels return -EINVAL for counts exceeding this.
+  // Callers retry for the remaining bytes via out_bytes_written.
+  if (count > INT_MAX) count = INT_MAX;
   ssize_t bytes_written = pwrite(fd, buffer, (size_t)count, (off_t)offset);
   if (bytes_written > 0) {
     *out_bytes_written = (iree_host_size_t)bytes_written;
@@ -256,38 +270,35 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   file->fd = fd;
   file->length = length;
 
-  // If a proactor is provided, duplicate the fd and import it for async I/O.
-  // The duplicate is owned by the proactor-managed async file and closed when
-  // the async file is released.
+  // If a proactor is provided, attempt to duplicate the fd and import it for
+  // async I/O. The duplicate is owned by the proactor-managed async file and
+  // closed when the async file is released.
   //
-  // Currently only supported on platforms with native fd async primitives
-  // (POSIX). Windows IOCP requires HANDLE-based import with ReOpenFile to
-  // obtain a FILE_FLAG_OVERLAPPED handle, which needs the original share mode
-  // and access rights threaded through the import API.
-  iree_status_t status = iree_ok_status();
+  // If async import fails (unsupported fd type, platform limitations, etc.) the
+  // file degrades to synchronous-only mode: all reads/writes go through
+  // pread/pwrite instead of the proactor. This is always correct — async I/O is
+  // a performance optimization, not a correctness requirement.
 #if defined(IREE_ASYNC_HAVE_FD)
   if (proactor) {
     iree_async_primitive_t async_primitive = iree_async_primitive_from_fd(fd);
     iree_async_primitive_t dup_primitive;
-    status = iree_async_primitive_dup(async_primitive, &dup_primitive);
-    if (iree_status_is_ok(status)) {
-      status =
+    iree_status_t import_status =
+        iree_async_primitive_dup(async_primitive, &dup_primitive);
+    if (iree_status_is_ok(import_status)) {
+      import_status =
           iree_async_file_import(proactor, dup_primitive, &file->async_file);
-      if (!iree_status_is_ok(status)) {
+      if (!iree_status_is_ok(import_status)) {
         iree_async_primitive_close(&dup_primitive);
       }
     }
+    // Async import failure is non-fatal: degrade to sync-only mode.
+    iree_status_ignore(import_status);
   }
 #endif  // IREE_ASYNC_HAVE_FD
 
-  if (iree_status_is_ok(status)) {
-    *out_file = (iree_hal_file_t*)file;
-  } else {
-    iree_io_file_handle_release(file->handle);
-    iree_allocator_free(host_allocator, file);
-  }
+  *out_file = (iree_hal_file_t*)file;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_fd_file_destroy(iree_hal_file_t* IREE_RESTRICT base_file) {
