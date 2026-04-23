@@ -717,7 +717,12 @@ def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
      "getIterationDomain",
      "getLoopIteratorTypes",
      "getResultTilePosition",
-     "getTiledImplementation"]>
+     "getTiledImplementation"]>,
+  DeclareOpInterfaceMethods<PartialReductionOpInterface,
+    ["generateInitialTensorForPartialReduction",
+     "tileToPartialReduction",
+     "mergeReductions",
+     "getPartialResultTilePosition"]>
 ]>{
   let summary = [{Top-K v2 operator.}];
   let description = [{
