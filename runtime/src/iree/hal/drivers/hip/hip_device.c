@@ -778,6 +778,35 @@ static iree_status_t iree_hal_hip_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
+static iree_status_t iree_hal_hip_device_query_string(
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_capacity,
+    char* out_string, iree_host_size_t* out_string_length) {
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  if (out_string_length) *out_string_length = 0;
+  if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("architecture"))) {
+      hipDeviceProp_tR0000 prop;
+      IREE_HIP_RETURN_IF_ERROR(
+          device->hip_symbols,
+          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
+          "hipGetDeviceProperties");
+      iree_host_size_t string_length = strlen(prop.gcnArchName);
+      if (out_string_length) *out_string_length = string_length;
+      if (!out_string || out_string_capacity < string_length) {
+        return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+      }
+      memcpy(out_string, prop.gcnArchName, string_length);
+      return iree_ok_status();
+    }
+  }
+
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
+}
+
 static iree_status_t iree_hal_hip_device_query_capabilities(
     iree_hal_device_t* base_device,
     iree_hal_device_capabilities_t* out_capabilities) {
@@ -2798,6 +2827,7 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .replace_channel_provider = iree_hal_hip_replace_channel_provider,
     .trim = iree_hal_hip_device_trim,
     .query_i64 = iree_hal_hip_device_query_i64,
+    .query_string = iree_hal_hip_device_query_string,
     .query_capabilities = iree_hal_hip_device_query_capabilities,
     .topology_info = iree_hal_hip_device_topology_info,
     .refine_topology_edge = iree_hal_hip_device_refine_topology_edge,

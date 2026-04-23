@@ -495,20 +495,18 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO: we can support CUSTOM_DIRECT_ARGUMENTS quite easily here.
-  // Static indirect arguments and parameters are also easy (as we can
-  // map/capture them right now, even if slow as it's a host operation).
-  // Dynamic indirect arguments and parameters require patching or some other
-  // magic that may require recompiling dispatches.
-  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "direct/indirect arguments are not supported in CUDA streams");
-  } else if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "indirect parameters are not supported in CUDA streams");
+        "indirect parameters are not supported in HIP streams");
   }
+
+  // Check if this is a CUSTOM_DIRECT_ARGUMENTS dispatch.
+  // In this mode, the constants buffer contains the packed kernel arguments
+  // including raw device pointers. We pass them directly to the kernel using
+  // the HIP_LAUNCH_PARAM_BUFFER mechanism.
+  bool use_direct_arguments =
+      (flags & IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS) != 0;
 
   // If any of the workgroup counts are zero, we can skip execution
   // of the kernel. This prevents a 'hipErrorInvalidConfiguration' error when
@@ -543,67 +541,180 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &executable));
-
-  // We append push constants to the end of descriptors to form a linear chain
-  // of kernel arguments.
-  iree_host_size_t kernel_params_count =
-      kernel_params->binding_count + kernel_params->constant_count;
-  iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
-
-  // TODO: use packed parameters instead of the indirection mechanism - this
-  // would avoid additional driver overhead to reflect and repack them all.
-  //
-  // Each kernel_params[i] is itself a pointer to the corresponding
-  // element at the *second* inline allocation at the end of the current
-  // segment.
-  iree_host_size_t total_size = kernel_params_length * 2;
+  // For CUSTOM_DIRECT_ARGUMENTS, we skip the parameter resolution and pass
+  // the packed constants buffer directly to the kernel.
   uint8_t* storage_base = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_arena_allocate(&command_buffer->arena, total_size,
-                              (void**)&storage_base));
-  void** params_ptr = (void**)storage_base;
-  hipDeviceptr_t* payload_ptr =
-      (hipDeviceptr_t*)((uint8_t*)params_ptr + kernel_params_length);
-  for (iree_host_size_t i = 0; i < kernel_params_count; i++) {
-    params_ptr[i] = &payload_ptr[i];
-  }
-  for (iree_host_size_t i = 0; i < bindings.count; i++) {
-    const iree_hal_buffer_ref_t* binding = &bindings.values[i];
-    hipDeviceptr_t device_ptr = NULL;
-    if (binding->buffer) {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                           &binding->buffer));
-      hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
-          iree_hal_buffer_allocated_buffer(binding->buffer));
-      iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
-      device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
+  if (!use_direct_arguments) {
+    // TODO: use packed parameters instead of the indirection mechanism - this
+    // would avoid additional driver overhead to reflect and repack them all.
+    //
+    // Each kernel_params[i] is itself a pointer to the corresponding
+    // element at the *second* inline allocation at the end of the current
+    // segment.
+    iree_host_size_t total_size = 0;
+    iree_host_size_t kernel_params_count =
+        kernel_params->binding_count + kernel_params->constant_count;
+    iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
+    if (kernel_params->parameters) {
+      for (iree_host_size_t i = 0; i < kernel_params->parameter_count; i++) {
+        const iree_host_size_t param_end =
+            kernel_params->parameters[i].buffer_offset +
+            kernel_params->parameters[i].export.size;
+        if (param_end > total_size) {
+          total_size = param_end;
+        }
+      }
+      total_size += kernel_params_length;
+    } else {
+      // We append push constants to the end of descriptors to form a linear
+      // chain of kernel arguments.
+
+      total_size = kernel_params_length * 2;
     }
-    payload_ptr[i] = device_ptr;
-  }
 
-  // As commented in the above, what each kernel parameter points to is a
-  // hipDeviceptr_t, which as the size of a pointer on the target machine. we
-  // are just storing a 32-bit value for the push constant here instead. So we
-  // must process one element each type, for 64-bit machines.
-  for (iree_host_size_t i = 0; i < kernel_params->constant_count; i++) {
-    *((uint32_t*)params_ptr[kernel_params->binding_count + i]) =
-        ((const uint32_t*)constants.data)[i];
-  }
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_allocate(&command_buffer->arena, total_size,
+                                (void**)&storage_base));
+    if (kernel_params->parameters) {
+      void** params_ptr = (void**)storage_base;
+      hipDeviceptr_t* payload_ptr =
+          (hipDeviceptr_t*)((uint8_t*)params_ptr + kernel_params_length);
 
-  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-      command_buffer->hip_symbols,
-      hipModuleLaunchKernel(
-          kernel_params->function, config.workgroup_count[0],
-          config.workgroup_count[1], config.workgroup_count[2],
-          config.workgroup_size[0] ? config.workgroup_size[0]
-                                   : kernel_params->block_dims[0],
-          config.workgroup_size[1] ? config.workgroup_size[1]
-                                   : kernel_params->block_dims[1],
-          config.workgroup_size[2] ? config.workgroup_size[2]
-                                   : kernel_params->block_dims[2],
-          /*sharedMemBytes=*/0, command_buffer->hip_stream, params_ptr, NULL),
-      "hipModuleLaunchKernel");
+      iree_host_size_t constant_offset = 0;
+      iree_host_size_t binding_number = 0;
+      for (iree_host_size_t i = 0; i < kernel_params->parameter_count; ++i) {
+        const iree_hal_hip_kernel_export_parameter_t* param =
+            &kernel_params->parameters[i];
+        if (param->export.type ==
+            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING) {
+          hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(
+                  bindings.values[binding_number].buffer));
+          iree_device_size_t offset = iree_hal_buffer_byte_offset(
+              bindings.values[binding_number].buffer);
+          hipDeviceptr_t device_ptr = (uint8_t*)device_buffer + offset +
+                                      bindings.values[binding_number++].offset;
+          memcpy(payload_ptr + param->buffer_offset, &device_ptr,
+                 param->export.size);
+          params_ptr[i] = payload_ptr + param->buffer_offset;
+        } else if (param->export.type ==
+                   IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT) {
+          memcpy(payload_ptr + param->buffer_offset,
+                 (const uint8_t*)constants.data + constant_offset,
+                 param->export.size);
+          constant_offset += param->export.size;
+          params_ptr[i] = payload_ptr + param->buffer_offset;
+        }
+      }
+    } else {
+      iree_host_size_t kernel_params_count =
+          kernel_params->binding_count + kernel_params->constant_count;
+      iree_host_size_t kernel_params_length =
+          kernel_params_count * sizeof(void*);
+
+      void** params_ptr = (void**)storage_base;
+      hipDeviceptr_t* payload_ptr =
+          (hipDeviceptr_t*)((uint8_t*)params_ptr + kernel_params_length);
+      for (iree_host_size_t i = 0; i < kernel_params_count; i++) {
+        params_ptr[i] = &payload_ptr[i];
+      }
+      for (iree_host_size_t i = 0; i < bindings.count; i++) {
+        const iree_hal_buffer_ref_t* binding = &bindings.values[i];
+        hipDeviceptr_t device_ptr = NULL;
+        if (binding->buffer) {
+          IREE_RETURN_AND_END_ZONE_IF_ERROR(
+              z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                               &binding->buffer));
+          hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(binding->buffer));
+          iree_device_size_t offset =
+              iree_hal_buffer_byte_offset(binding->buffer);
+          device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
+        }
+        payload_ptr[i] = device_ptr;
+      }
+
+      // As commented in the above, what each kernel parameter points to is a
+      // hipDeviceptr_t, which as the size of a pointer on the target machine.
+      // we are just storing a 32-bit value for the push constant here instead.
+      // So we must process one element each type, for 64-bit machines.
+      for (iree_host_size_t i = 0; i < kernel_params->constant_count; i++) {
+        *((uint32_t*)params_ptr[kernel_params->binding_count + i]) =
+            ((const uint32_t*)constants.data)[i];
+      }
+    }
+  }
+  iree_status_t status = iree_ok_status();
+
+  if (use_direct_arguments) {
+    // The streaming layer zeroes out device pointer positions in the constants
+    // buffer and provides them as overlay bindings (with buffer_slot encoding
+    // the byte offset where each pointer originally appeared). We must write
+    // the real device pointers back before launching the kernel.
+    size_t kernarg_size = constants.data_length;
+
+    // Allocate a mutable, 256-byte-aligned copy for overlaying bindings.
+    void* raw_alloc = iree_alloca(kernarg_size + 256);
+    uint8_t* kernarg_buf =
+        (uint8_t*)(((uintptr_t)raw_alloc + 255) & ~(uintptr_t)255);
+    memcpy(kernarg_buf, constants.data, kernarg_size);
+
+    // Overlay binding pointers at their original kernarg offsets.
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      int32_t kernarg_offset = bindings.values[i].buffer_slot;
+      if (kernarg_offset < 0 ||
+          (iree_host_size_t)(kernarg_offset + sizeof(void*)) > kernarg_size) {
+        continue;
+      }
+      hipDeviceptr_t buffer_ptr = NULL;
+      if (bindings.values[i].buffer) {
+        hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
+            iree_hal_buffer_allocated_buffer(bindings.values[i].buffer));
+        buffer_ptr = (uint8_t*)device_buffer +
+                     iree_hal_buffer_byte_offset(bindings.values[i].buffer) +
+                     bindings.values[i].offset;
+      }
+      memcpy(kernarg_buf + kernarg_offset, &buffer_ptr, sizeof(buffer_ptr));
+    }
+
+    void* extra[] = {
+        HIP_LAUNCH_PARAM_BUFFER_POINTER,
+        kernarg_buf,
+        HIP_LAUNCH_PARAM_BUFFER_SIZE,
+        &kernarg_size,
+        HIP_LAUNCH_PARAM_END,
+    };
+
+    status = IREE_HIP_CALL_TO_STATUS(
+        command_buffer->hip_symbols,
+        hipModuleLaunchKernel(
+            kernel_params->function, config.workgroup_count[0],
+            config.workgroup_count[1], config.workgroup_count[2],
+            config.workgroup_size[0] ? config.workgroup_size[0]
+                                     : kernel_params->block_dims[0],
+            config.workgroup_size[1] ? config.workgroup_size[1]
+                                     : kernel_params->block_dims[1],
+            config.workgroup_size[2] ? config.workgroup_size[2]
+                                     : kernel_params->block_dims[2],
+            config.dynamic_workgroup_local_memory, command_buffer->hip_stream,
+            NULL, extra),
+        "hipModuleLaunchKernel(extra)");
+  } else {
+    status = IREE_HIP_CALL_TO_STATUS(
+        command_buffer->hip_symbols,
+        hipModuleLaunchKernel(
+            kernel_params->function, config.workgroup_count[0],
+            config.workgroup_count[1], config.workgroup_count[2],
+            config.workgroup_size[0] ? config.workgroup_size[0]
+                                     : kernel_params->block_dims[0],
+            config.workgroup_size[1] ? config.workgroup_size[1]
+                                     : kernel_params->block_dims[1],
+            config.workgroup_size[2] ? config.workgroup_size[2]
+                                     : kernel_params->block_dims[2],
+            /*sharedMemBytes=*/0, command_buffer->hip_stream,
+            (void**)storage_base, NULL),
+        "hipModuleLaunchKernel");
+  }
 
   IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,

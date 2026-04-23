@@ -505,6 +505,26 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value);
 
+// Queries a configuration value as string data.
+// The |category| and |key| will be provided to the device driver to interpret
+// in a device-specific way and if recognized the value will be converted to a
+// utf-8 string and stored in |out_string|.
+//
+// |out_string_capacity| is the total bytes available in |out_string|.
+// |out_string| may be NULL if only the length is needed.
+// |out_string_length| receives the actual string length, even when the buffer
+// is too small. The output is not NUL-terminated; callers may add a NUL
+// terminator themselves if needed.
+// Returns IREE_STATUS_OUT_OF_RANGE if the buffer is too small.
+// Returns IREE_STATUS_NOT_FOUND if the key is not recognized.
+//
+// Well-known queries (category :: key):
+//   hal.device.architecture :: some-pattern-*
+IREE_API_EXPORT iree_status_t iree_hal_device_query_string(
+    iree_hal_device_t* device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_capacity,
+    char* out_string, iree_host_size_t* out_string_length);
+
 // Queries device capabilities for topology construction.
 // Returns all information needed for cross-driver edge building.
 // If the device doesn't support topology queries, returns OK with zeroed
@@ -905,6 +925,10 @@ typedef struct iree_hal_device_vtable_t {
                                          iree_string_view_t category,
                                          iree_string_view_t key,
                                          int64_t* out_value);
+  iree_status_t(IREE_API_PTR* query_string)(
+      iree_hal_device_t* device, iree_string_view_t category,
+      iree_string_view_t key, iree_host_size_t out_string_capacity,
+      char* out_string, iree_host_size_t* out_string_length);
 
   iree_status_t(IREE_API_PTR* query_capabilities)(
       iree_hal_device_t* device,
