@@ -293,6 +293,20 @@ set(IREE_HAL_DRIVER_METAL_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 # Right now only support Apple silicon devices.
 if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
   set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
+else()
+  # Probe for Metal offline compilation tools (optional, for ahead-of-time
+  # compilation). The Metal compiler backend will automatically fall back to
+  # embedding MSL source for runtime compilation when these tools are absent.
+  execute_process(
+    COMMAND xcrun --find metal
+    OUTPUT_QUIET ERROR_QUIET
+    RESULT_VARIABLE _METAL_TOOL_RESULT
+  )
+  if(NOT _METAL_TOOL_RESULT EQUAL 0)
+    message(STATUS "Metal offline tools (xcrun metal/metallib) not found. "
+            "Metal compilation will embed MSL source for runtime compilation. "
+            "Install Xcode for ahead-of-time compilation.")
+  endif()
 endif()
 
 # Null skeleton driver is only enabled in debug builds or dev mode.
