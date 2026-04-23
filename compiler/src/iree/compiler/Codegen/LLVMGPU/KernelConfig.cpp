@@ -869,7 +869,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
       /*m=*/getDimBounds(mDims),
-      /*n=*/getDimBounds(nDims),
+      /*n=*/getDimBounds(k2Dims),
       /*k=*/getDimBounds(k1Dims),
       /*batch=*/getDimBounds(batchDims),
       /*a=*/qElementType,
