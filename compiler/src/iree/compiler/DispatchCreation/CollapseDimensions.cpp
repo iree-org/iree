@@ -1147,27 +1147,17 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
               }
               return maybeReplacements->results;
             })
-            .Case([&, &info = info](
-                      IREE::LinalgExt::AttentionOp attentionOp) -> ResultsType {
-              FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
-                  IREE::LinalgExt::collapseOpIterationDims(
-                      attentionOp, info.getReassociation(), rewriter);
-              if (failed(maybeReplacements)) {
-                return failure();
-              }
-              return maybeReplacements->results;
-            })
-            .Case([&, &info = info](
-                      IREE::LinalgExt::OnlineAttentionOp onlineAttentionOp)
-                      -> ResultsType {
-              FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
-                  IREE::LinalgExt::collapseOpIterationDims(
-                      onlineAttentionOp, info.getReassociation(), rewriter);
-              if (failed(maybeReplacements)) {
-                return failure();
-              }
-              return maybeReplacements->results;
-            })
+            .Case<IREE::LinalgExt::AttentionOp,
+                  IREE::LinalgExt::OnlineAttentionOp>(
+                [&, &info = info](auto attnLikeOp) -> ResultsType {
+                  FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
+                      IREE::LinalgExt::collapseOpIterationDims(
+                          attnLikeOp, info.getReassociation(), rewriter);
+                  if (failed(maybeReplacements)) {
+                    return failure();
+                  }
+                  return maybeReplacements->results;
+                })
             .Case([](tensor::EmptyOp) {
               // No need to do anything. It will be folded with reshapes.
               return failure();
