@@ -26,7 +26,7 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
 /// called directly when a custom swizzle is needed.
 LogicalResult populateSwizzleBasedOffsetsSizesStrides(
     OpBuilder &builder, Location loc, const Codegen::TileSwizzle &swizzle,
-    Value threadId, ArrayRef<int64_t> permutation,
+    Value laneId, ArrayRef<int64_t> permutation,
     SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides);

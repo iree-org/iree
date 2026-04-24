@@ -1354,7 +1354,7 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
     ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) const {
-  return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+  return cast<DataTiledMMAInterfaceAttr>(*this)
       .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
                                           permutation, offsets, sizes, strides);
 }
@@ -2809,7 +2809,7 @@ LogicalResult DataTiledScaledMMAAttr::populateOperandOffsetsSizesStrides(
     ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) const {
-  return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+  return cast<DataTiledMMAInterfaceAttr>(*this)
       .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
                                           permutation, offsets, sizes, strides);
 }

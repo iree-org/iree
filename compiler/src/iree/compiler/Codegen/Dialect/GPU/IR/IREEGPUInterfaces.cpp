@@ -88,9 +88,8 @@ DataTiledMMAInterfaceAttr::getUndistributedTileDimExpansion(
 }
 
 LogicalResult populateSwizzleBasedOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, const TileSwizzle &swizzle,
-    Value threadId, ArrayRef<int64_t> permutation,
-    SmallVectorImpl<OpFoldResult> &offsets,
+    OpBuilder &builder, Location loc, const TileSwizzle &swizzle, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) {
   SmallVector<int64_t> distributionThreadSizes =
@@ -101,7 +100,7 @@ LogicalResult populateSwizzleBasedOffsetsSizesStrides(
   // to get clamping behavior.
   SmallVector<OpFoldResult> tileOffsets =
       affine::AffineDelinearizeIndexOp::create(
-          builder, loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
+          builder, loc, getValueOrCreateConstantIndexOp(builder, loc, laneId),
           distributionThreadSizes, /*hasOuterBound=*/false)
           ->getResults()
           .drop_front();
@@ -149,7 +148,7 @@ LogicalResult populateSwizzleBasedOffsetsSizesStrides(
 }
 
 LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
     ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) {
@@ -160,7 +159,7 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
          << "    swizzle: " << swizzle << "\n";
 
   return populateSwizzleBasedOffsetsSizesStrides(
-      builder, loc, swizzle, threadId, permutation, offsets, sizes, strides);
+      builder, loc, swizzle, laneId, permutation, offsets, sizes, strides);
 }
 
 Attribute DataTiledMMAInterfaceAttr::getDistributionMappingKind() {
