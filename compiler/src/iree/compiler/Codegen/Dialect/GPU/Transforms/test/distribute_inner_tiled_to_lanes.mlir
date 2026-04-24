@@ -1281,7 +1281,7 @@ func.func @fuse_producer_slice(%arg1 : tensor<4x2x16x16xbf16>, %arg2 : tensor<1x
   affine_map<(m, n, k, kb) -> (n, k)>,
   affine_map<(m, n, k, kb) -> (m, n)>
 ]
-func.func @unshuffled_data_tiled_scaled_1x1x1_distribute(
+func.func @unswizzled_data_tiled_scaled_1x1x1_distribute(
     %lhs: tensor<1x1x1x16x4x32xf4E2M1FN>, %rhs: tensor<1x1x1x16x4x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x4x16xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16xf8E8M0FNU>,
     %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32>
@@ -1289,13 +1289,13 @@ func.func @unshuffled_data_tiled_scaled_1x1x1_distribute(
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unshuffled_operands = [0, 1]>,
+    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unswizzled_operands = [0, 1]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
   } : tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x4x16xf8E8M0FNU>, tensor<1x1x4x16xf8E8M0FNU> into tensor<1x1x4x16x4xf32>
   return %0 : tensor<1x1x4x16x4xf32>
 }
 
-// CHECK-LABEL: func @unshuffled_data_tiled_scaled_1x1x1_distribute
+// CHECK-LABEL: func @unswizzled_data_tiled_scaled_1x1x1_distribute
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[LHS_SCALES:[A-Za-z0-9]+]]
@@ -1314,7 +1314,7 @@ func.func @unshuffled_data_tiled_scaled_1x1x1_distribute(
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 1, 1, 4] [1, 1, 1, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]], %[[LHS_SCALE_SLICE]], %[[RHS_SCALE_SLICE]]) outs(%[[ACC_SLICE]])
-//  CHECK-SAME:       kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unshuffled_operands = [0, 1]>
+//  CHECK-SAME:       kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unswizzled_operands = [0, 1]>
 //  CHECK-SAME:       : tensor<1x1x1x1x1x32xf4E2M1FN>, tensor<1x1x1x1x1x32xf4E2M1FN>, tensor<1x1x1x1xf8E8M0FNU>, tensor<1x1x1x1xf8E8M0FNU> into tensor<1x1x1x1x4xf32>
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 1, 1, 4] [1, 1, 1, 1, 1]

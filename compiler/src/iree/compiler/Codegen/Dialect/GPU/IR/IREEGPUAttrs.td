@@ -512,11 +512,11 @@ def IREEGPU_DataTiledScaledMMAAttr :
               "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k,
           OptionalParameter<
               "DenseI64ArrayAttr",
-              "Operand indices with row-major (unshuffled) layout.">:$unshuffled_operands);
+              "Operand indices with row-major (unswizzled) layout.">:$unswizzled_operands);
 
   let extraClassDeclaration = [{
-    bool isUnshuffledOperand(unsigned idx) const;
-    bool hasUnshuffledOperands() const;
+    bool isUnswizzledOperand(unsigned idx) const;
+    bool hasUnswizzledOperands() const;
   }];
 }
 

@@ -20,7 +20,7 @@ Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
 
 /// Returns the swizzle for the full data-tiled-scaled-mma tile, including all
 /// the relevant unrolling and expansion factors. For operands listed in
-/// `unshuffled_operands`, the permutation is reset to identity.
+/// `unswizzled_operands`, the permutation is reset to identity.
 Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                                 unsigned operandIdx);
 

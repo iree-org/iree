@@ -262,8 +262,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
 
 TileSwizzle getDistributionSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                                    unsigned operandIdx) {
-  assert(scaledMma.isUnshuffledOperand(operandIdx) &&
-         "getDistributionSwizzle is only meaningful for unshuffled operands");
+  assert(scaledMma.isUnswizzledOperand(operandIdx) &&
+         "getDistributionSwizzle is only meaningful for unswizzled operands");
   return getSwizzleImpl(scaledMma, operandIdx);
 }
 

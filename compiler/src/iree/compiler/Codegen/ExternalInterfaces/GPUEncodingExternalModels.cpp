@@ -375,7 +375,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       /*operands_interleaving_intrinsics_m=*/{},
       /*operands_interleaving_intrinsics_n=*/{},
       /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK,
-      /*unshuffled_operands=*/{});
+      /*unswizzled_operands=*/{});
 }
 
 static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(

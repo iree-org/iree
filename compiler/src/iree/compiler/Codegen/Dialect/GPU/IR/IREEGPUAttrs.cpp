@@ -2810,7 +2810,7 @@ LogicalResult DataTiledScaledMMAAttr::populateOperandOffsetsSizesStrides(
     SmallVectorImpl<OpFoldResult> &sizes,
     SmallVectorImpl<OpFoldResult> &strides) const {
   if (!isUnswizzledOperand(operandIndex)) {
-    return cast<DataTiledMMAInterfaceAttr>(Attribute(*this))
+    return cast<DataTiledMMAInterfaceAttr>(*this)
         .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
                                             permutation, offsets, sizes,
                                             strides);
@@ -2852,15 +2852,15 @@ DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
           {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
-bool DataTiledScaledMMAAttr::isUnshuffledOperand(unsigned idx) const {
+bool DataTiledScaledMMAAttr::isUnswizzledOperand(unsigned idx) const {
   assert(idx < (unsigned)(getExpectedNumInputs() + getExpectedNumOutputs()) &&
          "operand index out of range for scaled MMA");
-  auto attr = getUnshuffledOperands();
+  auto attr = getUnswizzledOperands();
   return attr && llvm::is_contained(attr.asArrayRef(), idx);
 }
 
-bool DataTiledScaledMMAAttr::hasUnshuffledOperands() const {
-  auto attr = getUnshuffledOperands();
+bool DataTiledScaledMMAAttr::hasUnswizzledOperands() const {
+  auto attr = getUnswizzledOperands();
   return attr && !attr.empty();
 }
 
