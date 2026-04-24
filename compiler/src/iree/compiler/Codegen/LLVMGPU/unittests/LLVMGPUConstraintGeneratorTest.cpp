@@ -414,8 +414,8 @@ TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
   EXPECT_EQ(cast<IntKnobAttr>(counts[0]).getName().getValue(), kKnobSgMCntName);
   EXPECT_EQ(cast<IntKnobAttr>(counts[1]).getName().getValue(), kKnobSgNCntName);
   EXPECT_EQ(cast<IntegerAttr>(counts[2]).getInt(), 1);
-  auto mapping = cast<ArrayAttr>(sgBasis.get(kKnobMappingKey));
-  ASSERT_EQ(mapping.size(), 3u);
+  // VectorDistribute matmul uses identity mapping.
+  EXPECT_FALSE(sgBasis.get(kKnobMappingKey));
 
   auto wgSize = cast<ArrayAttr>(dict.get(kKnobWorkgroupSizeKey));
   ASSERT_EQ(wgSize.size(), 3u);
@@ -474,8 +474,8 @@ TEST_F(VectorDistributeKnobsTest, KnobDictForConv) {
   }
   EXPECT_EQ(cast<IntKnobAttr>(counts[2]).getName().getValue(), kKnobSgMCntName);
   EXPECT_EQ(cast<IntKnobAttr>(counts[3]).getName().getValue(), kKnobSgNCntName);
-  auto mapping = cast<ArrayAttr>(sgBasis.get(kKnobMappingKey));
-  ASSERT_EQ(mapping.size(), 7u);
+  // VectorDistribute conv uses identity mapping.
+  EXPECT_FALSE(sgBasis.get(kKnobMappingKey));
 
   auto wgSize = cast<ArrayAttr>(dict.get(kKnobWorkgroupSizeKey));
   ASSERT_EQ(wgSize.size(), 3u);
