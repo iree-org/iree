@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='opt-level=O2' --iree-codegen-llvmcpu-lowering-pipeline='opt-level=O2 include-llvm-lowering=false' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
