@@ -1217,9 +1217,9 @@ struct StableHLOCanonicalize final
 };
 
 } // namespace
-void populateCanonicalizationPatterns(MLIRContext *context,
-                                      RewritePatternSet *patterns,
-                                      PatternBenefit benefit) {
+void populateCanonicalizationPatternsNoReorder(MLIRContext *context,
+                                               RewritePatternSet *patterns,
+                                               PatternBenefit benefit) {
   patterns->add<
       // Arithmetic ops.
       AddOpCanon, SubtractOpCanon, MulOpCanon, CompareOpCanon, SelectOpCanon,
@@ -1238,6 +1238,12 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       ReshapeOpCanon, MergeConsecutiveReshapes, TransposeIsReshape,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
+}
+
+void populateCanonicalizationPatterns(MLIRContext *context,
+                                      RewritePatternSet *patterns,
+                                      PatternBenefit benefit) {
+  populateCanonicalizationPatternsNoReorder(context, patterns, benefit);
   patterns->add<ReorderElementwiseAndShapeOp>(context);
 }
 } // namespace mlir::iree_compiler::stablehlo
