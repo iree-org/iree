@@ -297,7 +297,9 @@ TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
   ASSERT_TRUE(!!op);
 
   std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
   FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
   SmallVector<Attribute> result =
       getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_TRUE(result.empty());
