@@ -56,6 +56,19 @@ iree_async_notification_query_epoch(iree_async_notification_t* notification) {
   return iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
 }
 
+IREE_API_EXPORT uint32_t
+iree_async_notification_begin_observe(iree_async_notification_t* notification) {
+  iree_atomic_fetch_add(&notification->observer_count, 1,
+                        iree_memory_order_acq_rel);
+  return iree_async_notification_query_epoch(notification);
+}
+
+IREE_API_EXPORT void iree_async_notification_end_observe(
+    iree_async_notification_t* notification) {
+  iree_atomic_fetch_sub(&notification->observer_count, 1,
+                        iree_memory_order_acq_rel);
+}
+
 IREE_API_EXPORT void iree_async_notification_signal(
     iree_async_notification_t* notification, int32_t wake_count) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -70,11 +83,39 @@ IREE_API_EXPORT void iree_async_notification_signal(
   IREE_TRACE_ZONE_END(z0);
 }
 
+IREE_API_EXPORT bool iree_async_notification_signal_if_observed(
+    iree_async_notification_t* notification, int32_t wake_count) {
+  // Always advance the epoch so a waiter that has observed the token and is
+  // between condition re-check and platform wait cannot miss the release. The
+  // expensive platform wake is conditional on a known observer.
+  iree_atomic_fetch_add(notification->epoch_ptr, 1, iree_memory_order_release);
+  if (iree_atomic_load(&notification->observer_count,
+                       iree_memory_order_acquire) <= 0) {
+    return false;
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  notification->proactor->vtable->notification_signal(notification->proactor,
+                                                      notification, wake_count);
+  IREE_TRACE_ZONE_END(z0);
+  return true;
+}
+
 IREE_API_EXPORT bool iree_async_notification_wait(
     iree_async_notification_t* notification, iree_timeout_t timeout) {
+  const uint32_t wait_token =
+      iree_async_notification_begin_observe(notification);
+  const bool signaled =
+      iree_async_notification_wait_for_token(notification, wait_token, timeout);
+  iree_async_notification_end_observe(notification);
+  return signaled;
+}
+
+IREE_API_EXPORT bool iree_async_notification_wait_for_token(
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   IREE_TRACE_ZONE_BEGIN(z0);
   bool signaled = notification->proactor->vtable->notification_wait(
-      notification->proactor, notification, timeout);
+      notification->proactor, notification, wait_token, timeout);
   IREE_TRACE_ZONE_END(z0);
   return signaled;
 }

@@ -56,6 +56,10 @@ iree_cc_library(
     "fence.h"
     "file.c"
     "file.h"
+    "pool.c"
+    "pool.h"
+    "pool_set.c"
+    "pool_set.h"
     "queue.h"
     "resource.h"
     "semaphore.c"
@@ -75,6 +79,20 @@ iree_cc_library(
     iree::hal::utils::platform_topology
     iree::io::file_handle
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    pool_test
+  SRCS
+    "pool_test.cc"
+  DEPS
+    ::hal
+    iree::async
+    iree::async::platform
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

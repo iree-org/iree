@@ -308,15 +308,21 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   logical_device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(logical_device->proactor_pool);
-  logical_device->frontier_tracker = create_params->frontier.tracker;
+  logical_device->frontier_tracker = create_params->frontier.base_axis != 0
+                                         ? create_params->frontier.tracker
+                                         : NULL;
   logical_device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&logical_device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (logical_device->frontier_tracker) {
-    iree_async_axis_table_add(&logical_device->frontier_tracker->axis_table,
-                              logical_device->axis, /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(
+        logical_device->frontier_tracker, logical_device->axis,
+        /*semaphore=*/NULL);
   }
-  iree_status_t status = iree_async_proactor_pool_get(
-      logical_device->proactor_pool, 0, &logical_device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(logical_device->proactor_pool, 0,
+                                          &logical_device->proactor);
+  }
 
   // Setup physical device table.
   // This extra indirection is unfortunate but allows us to have dynamic queue
@@ -927,7 +933,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_amdgpu_logical_device_t* logical_device =

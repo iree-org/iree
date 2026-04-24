@@ -82,6 +82,7 @@ typedef struct iree_hal_device_info_t {
 
 typedef struct iree_async_proactor_pool_t iree_async_proactor_pool_t;
 typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
+typedef struct iree_hal_pool_t iree_hal_pool_t;
 
 // Parameters for device creation that apply across all HAL drivers.
 //
@@ -553,6 +554,12 @@ iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
 // possible. It's still safe to synchronously release the buffer but the
 // lifetime will then be controlled by all potential retainers.
 //
+// |pool| optionally selects the queue allocation pool used for storage. NULL
+// uses the device's default queue allocation behavior. Non-NULL pools are a
+// requested execution contract; drivers that cannot honor the pool fail before
+// enqueueing work. The pool is borrowed for the duration of the call and
+// implementations retain it if the queue request may outlive the call.
+//
 // Usage:
 //   iree_hal_device_queue_alloca(wait(0), signal(1), &buffer);
 //   iree_hal_device_queue_execute(wait(1), signal(2), commands...);
@@ -561,7 +568,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
@@ -958,7 +965,7 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+      iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
       iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 

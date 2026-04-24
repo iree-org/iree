@@ -76,6 +76,10 @@ iree_runtime_cc_library(
         "fence.h",
         "file.c",
         "file.h",
+        "pool.c",
+        "pool.h",
+        "pool_set.c",
+        "pool_set.h",
         "queue.h",
         "resource.h",
         "semaphore.c",
@@ -98,6 +102,19 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal/utils:platform_topology",
         "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "pool_test",
+    srcs = ["pool_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
