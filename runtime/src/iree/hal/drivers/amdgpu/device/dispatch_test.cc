@@ -167,7 +167,12 @@ TEST(DispatchTest, EmplaceCustomKernargsCopiesRawBlob) {
   alignas(16) std::array<uint8_t, 32> kernargs = {};
   kernargs.fill(0xFD);
 
+  iree_hal_amdgpu_device_kernel_args_t kernel_args = {};
+  kernel_args.implicit_args_offset = UINT16_MAX;
+  const uint32_t workgroup_count[3] = {1, 1, 1};
+
   iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+      &kernel_args, workgroup_count, /*dynamic_workgroup_local_memory=*/0,
       &layout, custom_kernargs.data(), kernargs.data());
 
   EXPECT_EQ(std::memcmp(kernargs.data(), custom_kernargs.data(),

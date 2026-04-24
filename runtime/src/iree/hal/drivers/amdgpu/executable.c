@@ -880,6 +880,8 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
 
   out_kernel_args->binding_count = binding_count;
   out_kernel_args->constant_count = constant_count;
+  out_kernel_args->implicit_args_offset = UINT16_MAX;
+  out_kernel_args->reserved = 0;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -1810,6 +1812,29 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_raw_hsaco_kernel_args(
         kernel->private_segment_fixed_size) {
       host_kernel_args[kernel_ordinal].private_segment_size =
           kernel->private_segment_fixed_size;
+    }
+    // Detect HIP/OpenCL implicit args. The LLVM AMDGPU backend appends a
+    // hidden_* argument suffix at the end of the kernarg segment whenever
+    // the kernel reads any implicit value (gridDim, group_size, printf,
+    // etc.). We need to populate this region at dispatch time so kernels
+    // that use grid_stride loops or other implicit values behave correctly.
+    // Find the lowest offset of any HIDDEN-kind arg; that's where the
+    // implicit args region starts.
+    uint32_t implicit_args_offset = UINT32_MAX;
+    for (iree_host_size_t arg_index = 0; arg_index < kernel->arg_count;
+         ++arg_index) {
+      const iree_hal_amdgpu_hsaco_metadata_arg_t* arg = &kernel->args[arg_index];
+      if (arg->kind == IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_HIDDEN ||
+          arg->kind == IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_HIDDEN_NONE) {
+        if (arg->offset < implicit_args_offset) {
+          implicit_args_offset = arg->offset;
+        }
+      }
+    }
+    if (implicit_args_offset != UINT32_MAX &&
+        implicit_args_offset < UINT16_MAX) {
+      host_kernel_args[kernel_ordinal].implicit_args_offset =
+          (uint16_t)implicit_args_offset;
     }
   }
   return iree_ok_status();

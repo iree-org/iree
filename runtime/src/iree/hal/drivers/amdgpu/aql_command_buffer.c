@@ -1699,6 +1699,25 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_write_dispatch_tail(
       if (copy_bytes > 0) {
         memcpy(tail_payload, constants.data, copy_bytes);
       }
+      // HIP-compiled kernels (e.g. PyTorch's distribution_elementwise
+      // grid-stride kernels) read gridDim/blockDim through the implicit
+      // kernel args suffix that the LLVM AMDGPU backend appends to the
+      // kernarg segment. Callers using CUSTOM_DIRECT pack only the explicit
+      // args and leave the implicit region zero-initialized; the kernel
+      // would then see gridDim=0 and silently produce no output. Populate
+      // the implicit args from the dispatch config when the kernel metadata
+      // tells us where they live.
+      if (kernel_args->implicit_args_offset != UINT16_MAX &&
+          (size_t)kernel_args->implicit_args_offset +
+                  sizeof(iree_amdgpu_kernel_implicit_args_t) <=
+              layout->total_kernarg_size) {
+        iree_amdgpu_kernel_implicit_args_t* implicit_args =
+            (iree_amdgpu_kernel_implicit_args_t*)(tail_payload +
+                                                  kernel_args
+                                                      ->implicit_args_offset);
+        iree_hal_amdgpu_aql_command_buffer_write_implicit_args(
+            kernel_args, config, implicit_args);
+      }
       return iree_ok_status();
     }
     case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_INDIRECT:

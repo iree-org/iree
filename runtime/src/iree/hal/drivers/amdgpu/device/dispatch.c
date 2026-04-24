@@ -96,6 +96,9 @@ void iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
 }
 
 void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+    const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
+        kernel_args,
+    const uint32_t workgroup_count[3], uint32_t dynamic_workgroup_local_memory,
     const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* IREE_AMDGPU_RESTRICT
         layout,
     const void* IREE_AMDGPU_RESTRICT custom_kernarg_ptr,
@@ -103,6 +106,34 @@ void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
   if (layout->total_kernarg_size > 0) {
     iree_amdgpu_memcpy(kernarg_ptr, custom_kernarg_ptr,
                        layout->total_kernarg_size);
+  }
+  // HIP-compiled kernels (e.g. PyTorch's distribution_elementwise grid-stride
+  // kernels) read gridDim/blockDim through the implicit kernel args suffix
+  // appended by the LLVM AMDGPU backend. Callers using CUSTOM_DIRECT pack
+  // only the explicit args and leave the implicit region zero-initialized;
+  // the kernel would then see gridDim=0 and silently produce no output.
+  // Populate the implicit args from the dispatch config when the kernel
+  // metadata tells us where they live.
+  if (kernel_args && kernel_args->implicit_args_offset != (uint16_t)0xFFFFu &&
+      (size_t)kernel_args->implicit_args_offset +
+              sizeof(iree_amdgpu_kernel_implicit_args_t) <=
+          layout->total_kernarg_size) {
+    iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args =
+        (iree_amdgpu_kernel_implicit_args_t*)((uint8_t*)kernarg_ptr +
+                                              kernel_args
+                                                  ->implicit_args_offset);
+    iree_amdgpu_memset(implicit_args, 0,
+                       sizeof(iree_amdgpu_kernel_implicit_args_t));
+    implicit_args->block_count[0] = workgroup_count[0];
+    implicit_args->block_count[1] = workgroup_count[1];
+    implicit_args->block_count[2] = workgroup_count[2];
+    implicit_args->group_size[0] = kernel_args->workgroup_size[0];
+    implicit_args->group_size[1] = kernel_args->workgroup_size[1];
+    implicit_args->group_size[2] = kernel_args->workgroup_size[2];
+    implicit_args->grid_dims = 3;
+    implicit_args->printf_buffer = NULL;
+    implicit_args->hostcall_buffer = NULL;
+    implicit_args->dynamic_lds_size = dynamic_workgroup_local_memory;
   }
 }
 

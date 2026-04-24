@@ -54,8 +54,14 @@ typedef struct iree_hal_amdgpu_device_kernel_args_t {
   uint16_t constant_count;
   // Total number of bindings used by the dispatch (if a HAL dispatch).
   uint16_t binding_count;
+  // Byte offset in the kernarg segment where the HIP/OpenCL implicit args
+  // suffix begins, or UINT16_MAX when the kernel does not require implicit
+  // args (e.g. compiled with `amdgpu-no-implicitarg-ptr`). Populated from
+  // HSACO metadata for raw kernels; HAL flatbuffer kernels infer this from
+  // (kernarg_size - explicit_kernarg_size) at dispatch time.
+  uint16_t implicit_args_offset;
   // Reserved for future hot kernel metadata. Must be zero.
-  uint32_t reserved;
+  uint16_t reserved;
 } iree_hal_amdgpu_device_kernel_args_t;
 IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_device_kernel_args_t) <= 64,

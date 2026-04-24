@@ -163,12 +163,20 @@ void iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
 // |custom_kernarg_ptr| must provide |layout->total_kernarg_size| bytes in the
 // final kernel ABI shape expected by the target kernel.
 //
+// If |kernel_args->implicit_args_offset| is not UINT16_MAX the HIP/OpenCL
+// implicit args suffix is populated at that offset using |workgroup_count|
+// and |dynamic_workgroup_local_memory|. This is required for HIP-compiled
+// kernels that read gridDim/blockDim through the implicit args path.
+//
 // Preconditions:
-//   - |layout| and |kernarg_ptr| are non-NULL.
+//   - |kernel_args|, |layout|, and |kernarg_ptr| are non-NULL.
 //   - |layout| was derived with
 //     iree_hal_amdgpu_device_dispatch_make_custom_kernarg_layout.
 //   - |custom_kernarg_ptr| is non-NULL when |layout->total_kernarg_size| > 0.
 void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+    const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
+        kernel_args,
+    const uint32_t workgroup_count[3], uint32_t dynamic_workgroup_local_memory,
     const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* IREE_AMDGPU_RESTRICT
         layout,
     const void* IREE_AMDGPU_RESTRICT custom_kernarg_ptr,
