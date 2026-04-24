@@ -506,7 +506,7 @@ func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
 // PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // PDT-SAME:    outs(%[[RESULT]])
 // PDT-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
-// PDT-SAME:    kind = {{.*}}unshuffled_operands = [0, 1]>
+// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 
 // -----
@@ -569,7 +569,7 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
 // PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unshuffled_operands = [0, 1]>
+// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
@@ -631,7 +631,7 @@ func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
 // PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unshuffled_operands = [0, 1]>
+// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
@@ -712,7 +712,7 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
 // PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unshuffled_operands = [0, 1]>
+// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
