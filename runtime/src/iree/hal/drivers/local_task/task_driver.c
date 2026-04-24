@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/task/api.h"
+
 #define IREE_HAL_TASK_DEVICE_ID_DEFAULT 0
 
 typedef struct iree_hal_task_driver_t {
@@ -143,16 +145,72 @@ static iree_status_t iree_hal_task_driver_dump_device_info(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_driver_parse_topology_override(
+    iree_host_size_t param_count, const iree_string_pair_t* params,
+    bool* out_has_override, iree_host_size_t* out_group_count) {
+  *out_has_override = false;
+  *out_group_count = 0;
+  for (iree_host_size_t i = 0; i < param_count; ++i) {
+    if (!iree_string_view_equal(params[i].key,
+                                IREE_SV("task_topology_group_count"))) {
+      continue;
+    }
+    uint32_t group_count = 0;
+    if (!iree_string_view_atoi_uint32(params[i].value, &group_count) ||
+        group_count == 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "device parameter task_topology_group_count must be a non-zero "
+          "unsigned integer");
+    }
+    *out_has_override = true;
+    *out_group_count = group_count;
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_host_size_t param_count, const iree_string_pair_t* params,
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_task_driver_t* driver = iree_hal_task_driver_cast(base_driver);
-  return iree_hal_task_device_create(
-      driver->identifier, &driver->default_params, driver->queue_count,
-      driver->queue_executors, driver->loader_count, driver->loaders,
+  bool has_topology_override = false;
+  iree_host_size_t group_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_task_driver_parse_topology_override(
+      param_count, params, &has_topology_override, &group_count));
+  if (!has_topology_override) {
+    return iree_hal_task_device_create(
+        driver->identifier, &driver->default_params, driver->queue_count,
+        driver->queue_executors, driver->loader_count, driver->loaders,
+        driver->device_allocator, create_params, host_allocator, out_device);
+  }
+
+  iree_task_executor_options_t options;
+  IREE_RETURN_IF_ERROR(
+      iree_task_executor_options_initialize_from_flags(&options));
+  iree_task_topology_t topology;
+  iree_task_topology_initialize_from_group_count(group_count, &topology);
+
+  iree_task_executor_t* executor = NULL;
+  iree_status_t status =
+      iree_task_executor_create(options, &topology, host_allocator, &executor);
+  iree_task_topology_deinitialize(&topology);
+  if (!iree_status_is_ok(status)) {
+    return status;
+  }
+
+  // The device retains the executor through each per-queue retain in
+  // iree_hal_task_queue_initialize, so the post-create release here balances
+  // the create above. On failure the device's destroy path also releases any
+  // retains taken by partially-initialized queues.
+  iree_task_executor_t* executors[1] = {executor};
+  status = iree_hal_task_device_create(
+      driver->identifier, &driver->default_params, IREE_ARRAYSIZE(executors),
+      executors, driver->loader_count, driver->loaders,
       driver->device_allocator, create_params, host_allocator, out_device);
+  iree_task_executor_release(executor);
+  return status;
 }
 
 static iree_status_t iree_hal_task_driver_create_device_by_path(

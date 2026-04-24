@@ -7,7 +7,7 @@
 # Default implementations for HAL types that use the host resources.
 # These are generally just wrappers around host heap memory and host threads.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -53,5 +53,20 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:queue_emulation",
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/task",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "task_driver_test",
+    srcs = ["task_driver_test.cc"],
+    tags = ["driver=local-task"],
+    deps = [
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/local_task/registration",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
