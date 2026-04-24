@@ -602,15 +602,20 @@ iree_status_t iree_hal_cuda_device_create(
         iree_hal_cuda_device_cast(*out_device);
     cuda_device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(cuda_device->proactor_pool);
-    cuda_device->frontier_tracker = create_params->frontier.tracker;
+    cuda_device->frontier_tracker = create_params->frontier.base_axis != 0
+                                        ? create_params->frontier.tracker
+                                        : NULL;
     cuda_device->axis = create_params->frontier.base_axis;
     iree_atomic_store(&cuda_device->epoch, 0, iree_memory_order_relaxed);
     if (cuda_device->frontier_tracker) {
-      iree_async_axis_table_add(&cuda_device->frontier_tracker->axis_table,
-                                cuda_device->axis, /*semaphore=*/NULL);
+      status = iree_async_frontier_tracker_register_axis(
+          cuda_device->frontier_tracker, cuda_device->axis,
+          /*semaphore=*/NULL);
     }
-    status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
-                                          &cuda_device->proactor);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_proactor_pool_get(cuda_device->proactor_pool, 0,
+                                            &cuda_device->proactor);
+    }
   }
 
   iree_hal_cuda_event_pool_t* device_event_pool = NULL;
@@ -1007,9 +1012,14 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  if (IREE_UNLIKELY(pool)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "CUDA device does not support queue allocation pools");
+  }
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
 
   // NOTE: block on the semaphores here; we could avoid this by properly
@@ -1026,7 +1036,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   if (device->supports_memory_pools &&
       !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     status = iree_hal_cuda_memory_pools_alloca(
-        &device->memory_pools, device->dispatch_cu_stream, pool, params,
+        &device->memory_pools, device->dispatch_cu_stream, params,
         allocation_size, flags, out_buffer);
   } else {
     status = iree_hal_allocator_allocate_buffer(

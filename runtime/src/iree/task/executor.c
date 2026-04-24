@@ -91,7 +91,9 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, executor_size, (void**)&executor));
+      z0, iree_allocator_malloc_aligned(allocator, executor_size,
+                                        iree_alignof(iree_task_executor_t),
+                                        /*offset=*/0, (void**)&executor));
   memset(executor, 0, executor_size);
   iree_atomic_ref_count_init(&executor->ref_count);
   executor->allocator = allocator;
@@ -218,7 +220,7 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
   iree_task_pool_deinitialize(&executor->transient_task_pool);
-  iree_allocator_free(executor->allocator, executor);
+  iree_allocator_free_aligned(executor->allocator, executor);
 
   IREE_TRACE_ZONE_END(z0);
 }

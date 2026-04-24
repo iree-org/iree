@@ -30,7 +30,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
       /*hip_lib_search_paths=*/NULL, &symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    iree_status_free(status);
     GTEST_SKIP() << "Symbols cannot be loaded, skipping test.";
   }
 
@@ -58,7 +58,9 @@ TEST(DynamicSymbolsTest, SearchPathsFail) {
       /*hip_lib_search_path_count=*/IREE_ARRAYSIZE(non_existing_search_paths),
       non_existing_search_paths, &symbols);
 
-  ASSERT_TRUE(iree_status_is_unavailable(status));
+  iree_status_code_t status_code = iree_status_code(status);
+  iree_status_free(status);
+  ASSERT_EQ(IREE_STATUS_UNAVAILABLE, status_code);
 }
 
 #define NCCL_CHECK_ERRORS(expr)     \
@@ -74,7 +76,7 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
       /*hip_lib_search_paths=*/NULL, &hip_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    iree_status_free(status);
     GTEST_SKIP() << "HIP symbols cannot be loaded, skipping test.";
   }
 
@@ -83,7 +85,8 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
       iree_allocator_system(), &hip_symbols, &nccl_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
-    iree_status_ignore(status);
+    iree_status_free(status);
+    iree_hal_hip_dynamic_symbols_deinitialize(&hip_symbols);
     GTEST_SKIP() << "HIP RCCL symbols cannot be loaded, skipping test.";
   }
 

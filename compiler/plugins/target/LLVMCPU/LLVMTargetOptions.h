@@ -46,6 +46,7 @@ struct LLVMTarget {
       llvm::FloatABI::ABIType::Hard;
   static constexpr const char *DEFAULT_ENABLE_UKERNELS = "default";
   static constexpr bool DEFAULT_LINK_UKERNEL_BITCODE = true;
+  static constexpr bool DEFAULT_ENABLE_INNER_TILED = false;
 
   // Default initialize all fields.
   LLVMTarget();
@@ -59,6 +60,7 @@ struct LLVMTarget {
     linkEmbedded = other.linkEmbedded;
     ukernels = other.ukernels;
     linkUkernelBitcode = other.linkUkernelBitcode;
+    enableInnerTiled = other.enableInnerTiled;
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -130,6 +132,10 @@ struct LLVMTarget {
   // Link built-in ukernel bitcode libraries into generated executables.
   bool linkUkernelBitcode = DEFAULT_LINK_UKERNEL_BITCODE;
 
+  // When true, matmuls with encodings lower to iree_codegen.inner_tiled instead
+  // of linalg.mmt4d on LLVM CPU.
+  bool enableInnerTiled = DEFAULT_ENABLE_INNER_TILED;
+
 private:
   void populateDefaultsFromTargetMachine();
 
@@ -200,6 +206,7 @@ struct LLVMCPUTargetCLOptions {
       LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   std::string enableUkernels = LLVMTarget::DEFAULT_ENABLE_UKERNELS;
   bool linkUKernelBitcode = LLVMTarget::DEFAULT_LINK_UKERNEL_BITCODE;
+  bool enableInnerTiled = LLVMTarget::DEFAULT_ENABLE_INNER_TILED;
   bool listTargets; // Ignored - used with llvm::cl::ValueDisallowed.
 
   void bindOptions(OptionsBinder &binder);

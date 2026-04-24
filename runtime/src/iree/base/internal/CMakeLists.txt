@@ -146,6 +146,18 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    atomic_slist_benchmark
+  SRCS
+    "atomic_slist_benchmark.cc"
+  DEPS
+    ::atomic_slist
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
 iree_cc_library(
   NAME
     atomic_freelist
@@ -485,6 +497,17 @@ iree_cc_library(
   DEPS
     iree::base
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    sysfs_test
+  SRCS
+    "sysfs_test.cc"
+  DEPS
+    ::sysfs
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

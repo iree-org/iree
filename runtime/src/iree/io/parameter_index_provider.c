@@ -451,7 +451,7 @@ static iree_status_t iree_io_parameter_op_batch_advance_timeline(
 // guaranteed to select the same timeline to ensure the allocation and
 // operation are serialized and the wait has a higher chance of being elided.
 static iree_status_t iree_io_parameter_op_batch_enqueue_alloca(
-    iree_io_parameter_op_batch_t* batch, iree_hal_allocator_pool_t pool,
+    iree_io_parameter_op_batch_t* batch, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(batch);
@@ -779,8 +779,7 @@ static iree_status_t iree_io_parameter_index_provider_load(
       // Enqueue an allocation of the target buffer on a timeline.
       // The next operation we enqueue will go on the same timeline.
       status = iree_io_parameter_op_batch_enqueue_alloca(
-          &batch, IREE_HAL_ALLOCATOR_POOL_DEFAULT, target_params, span.length,
-          &target_buffer);
+          &batch, /*pool=*/NULL, target_params, span.length, &target_buffer);
 
       // Enqueue the operation on the same timeline as the allocation.
       if (iree_status_is_ok(status)) {

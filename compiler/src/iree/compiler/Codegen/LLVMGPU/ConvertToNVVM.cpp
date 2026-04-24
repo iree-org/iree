@@ -112,32 +112,19 @@ struct ConvertToNVVMPass final
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
       populateVectorToSCFConversionPatterns(
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateLowerGlobalSubgroupBarrierPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-      vector::populateVectorBroadcastLoweringPatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(
-          patterns, options.vectorContractLowering);
-      vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
+      // We need to keep this one here in case of source materialization.
       vector::populateVectorFromElementsUnrollPatterns(patterns);
-      vector::populateVectorToElementsUnrollPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
       vector::populateVectorMaskMaterializationPatterns(
           patterns, /*force32BitVectorIndices=*/false);
-      vector::populateVectorShapeCastLoweringPatterns(patterns);
-      // TODO: doubtful that the "default" does what one want here, it is likely
-      // better to use something else.
-      vector::populateVectorTransposeLoweringPatterns(
-          patterns, options.vectorTransposeLowering);
-      vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();

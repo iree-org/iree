@@ -50,11 +50,21 @@ static SmallVector<T> applyProjectedPermutation(const SmallVectorImpl<T> &input,
 }
 
 static bool wouldBroadcastAwayAttentionDimGroup(OpOperand *fusedOperand) {
-  auto attentionOp =
-      dyn_cast<IREE::LinalgExt::AttentionOp>(fusedOperand->getOwner());
-  if (!attentionOp) {
+  Operation *consumer = fusedOperand->getOwner();
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      TypeSwitch<Operation *, FailureOr<IREE::LinalgExt::AttentionOpDetail>>(
+          consumer)
+          .Case<IREE::LinalgExt::AttentionOp,
+                IREE::LinalgExt::OnlineAttentionOp>([](auto attentionOp) {
+            return IREE::LinalgExt::AttentionOpDetail::get(
+                attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+                attentionOp.getValueMap(), attentionOp.getOutputMap());
+          })
+          .Default({});
+  if (failed(maybeOpInfo)) {
     return false;
   }
+  IREE::LinalgExt::AttentionOpDetail opInfo = std::move(*maybeOpInfo);
 
   auto producer = dyn_cast_if_present<linalg::LinalgOp>(
       fusedOperand->get().getDefiningOp());
@@ -62,20 +72,13 @@ static bool wouldBroadcastAwayAttentionDimGroup(OpOperand *fusedOperand) {
     return false;
   }
 
-  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(
-          attentionOp.getQueryMap(), attentionOp.getKeyMap(),
-          attentionOp.getValueMap(), attentionOp.getOutputMap());
-  if (failed(maybeOpInfo)) {
-    return true;
-  }
-  IREE::LinalgExt::AttentionOpDetail opInfo = std::move(*maybeOpInfo);
-
   AffineMap producerInputMap =
       producer.getMatchingIndexingMap(producer.getDpsInputOperand(0));
   AffineMap producerResultMap =
       producer.getMatchingIndexingMap(producer.getDpsInitOperand(0));
-  AffineMap consumerInputMap = attentionOp.getMatchingIndexingMap(fusedOperand);
+  AffineMap consumerInputMap =
+      cast<IREE::LinalgExt::LinalgFusionOpInterface>(consumer)
+          .getMatchingIndexingMap(fusedOperand);
   AffineMap fusedInputMap =
       producerInputMap.compose(inversePermutation(producerResultMap))
           .compose(consumerInputMap);

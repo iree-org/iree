@@ -349,7 +349,7 @@ TEST(MergeTest, SourceEmptyTargetEmpty) {
   iree_async_frontier_initialize(target, 0);
   FRONTIER_ALLOC(source, 0);
   iree_async_frontier_initialize(source, 0);
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 0);
 }
 
@@ -357,7 +357,7 @@ TEST(MergeTest, SourceEmptyTargetNonEmpty) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
   FRONTIER_ALLOC(source, 0);
   iree_async_frontier_initialize(source, 0);
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].epoch, 5u);
   EXPECT_EQ(target->entries[1].epoch, 10u);
@@ -370,7 +370,7 @@ TEST(MergeTest, SourceEmptyTargetNonEmpty) {
 TEST(MergeTest, SameAxesSourceHigher) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 8), E(TestQueueAxis(1), 15));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].epoch, 8u);
   EXPECT_EQ(target->entries[1].epoch, 15u);
@@ -379,7 +379,7 @@ TEST(MergeTest, SameAxesSourceHigher) {
 TEST(MergeTest, SameAxesSourceLower) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 10), E(TestQueueAxis(1), 20));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 3), E(TestQueueAxis(1), 5));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].epoch, 10u);
   EXPECT_EQ(target->entries[1].epoch, 20u);
@@ -388,7 +388,7 @@ TEST(MergeTest, SameAxesSourceLower) {
 TEST(MergeTest, SameAxesEqual) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].epoch, 5u);
   EXPECT_EQ(target->entries[1].epoch, 10u);
@@ -399,7 +399,7 @@ TEST(MergeTest, SameAxesMixed) {
                 E(TestQueueAxis(2), 8));
   MAKE_FRONTIER(source, 3, E(TestQueueAxis(0), 10), E(TestQueueAxis(1), 3),
                 E(TestQueueAxis(2), 8));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 3);
   EXPECT_EQ(target->entries[0].epoch, 10u);  // Source higher.
   EXPECT_EQ(target->entries[1].epoch, 20u);  // Target higher.
@@ -415,7 +415,7 @@ TEST(MergeTest, SameAxesEightEntries) {
     target->entries[i] = E(TestQueueAxis(i), 100 + i);
     source->entries[i] = E(TestQueueAxis(i), 100 + (7 - i));
   }
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
   EXPECT_EQ(target->entry_count, 8);
   // Each entry should have max(100+i, 100+(7-i)).
   for (uint8_t i = 0; i < 8; ++i) {
@@ -429,7 +429,7 @@ TEST(MergeTest, SameAxesEntryCountUnchanged) {
                 E(TestQueueAxis(2), 15));
   MAKE_FRONTIER(source, 3, E(TestQueueAxis(0), 99), E(TestQueueAxis(1), 99),
                 E(TestQueueAxis(2), 99));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
   EXPECT_EQ(target->entry_count, 3);
 }
 
@@ -441,7 +441,7 @@ TEST(MergeTest, TargetEmptySourceNonEmpty) {
   FRONTIER_ALLOC(target, 4);
   iree_async_frontier_initialize(target, 0);
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[0].epoch, 5u);
@@ -453,7 +453,7 @@ TEST(MergeTest, PartialOverlap) {
   // Target: axes 0, 2. Source: axes 1, 2.
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(2), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 7), E(TestQueueAxis(2), 15));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 3);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[0].epoch, 5u);
@@ -467,7 +467,7 @@ TEST(MergeTest, DisjointAxes) {
   // Target: axes 0, 2. Source: axes 1, 3.
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(2), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 7), E(TestQueueAxis(3), 15));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 4);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
@@ -479,7 +479,7 @@ TEST(MergeTest, SourceEntirelyBeforeTarget) {
   // Source axes are all smaller than target axes.
   MAKE_FRONTIER(target, 6, E(TestQueueAxis(4), 10), E(TestQueueAxis(5), 20));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 1), E(TestQueueAxis(1), 2));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 6, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 6, source));
   EXPECT_EQ(target->entry_count, 4);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
@@ -491,7 +491,7 @@ TEST(MergeTest, SourceEntirelyAfterTarget) {
   // Source axes are all larger than target axes.
   MAKE_FRONTIER(target, 6, E(TestQueueAxis(0), 1), E(TestQueueAxis(1), 2));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(4), 10), E(TestQueueAxis(5), 20));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 6, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 6, source));
   EXPECT_EQ(target->entry_count, 4);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
@@ -504,7 +504,7 @@ TEST(MergeTest, InterleaveSourceBetweenTarget) {
   MAKE_FRONTIER(target, 8, E(TestQueueAxis(0), 10), E(TestQueueAxis(2), 20),
                 E(TestQueueAxis(4), 30));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 15), E(TestQueueAxis(3), 25));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
   EXPECT_EQ(target->entry_count, 5);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
@@ -517,9 +517,7 @@ TEST(MergeTest, CapacityInsufficient) {
   MAKE_FRONTIER(target, 8, E(TestQueueAxis(0), 5), E(TestQueueAxis(2), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 7), E(TestQueueAxis(3), 15));
   // Merged would be 4 entries, but capacity is 3.
-  iree_status_t status = iree_async_frontier_merge(target, 3, source);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
-  iree_status_free(status);
+  EXPECT_FALSE(iree_async_frontier_merge(target, 3, source));
   // Target must be unchanged.
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
@@ -550,9 +548,7 @@ TEST(MergeTest, CapacityOverflowLargeDisjointSets) {
   }
 
   // Capacity 255 is the max a uint8_t can hold, but 300 entries are needed.
-  iree_status_t status = iree_async_frontier_merge(target, 255, source);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
-  iree_status_free(status);
+  EXPECT_FALSE(iree_async_frontier_merge(target, 255, source));
   // Target must be unchanged.
   EXPECT_EQ(target->entry_count, 200);
 }
@@ -561,7 +557,7 @@ TEST(MergeTest, CapacityExactlyRight) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(2), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(1), 7), E(TestQueueAxis(3), 15));
   // Merged is exactly 4 entries, capacity is 4.
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 4);
 }
 
@@ -570,7 +566,7 @@ TEST(MergeTest, RightToLeftSingleShift) {
   // Target has 1 entry at position 0. After merge, it moves to position 2.
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(2), 99));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 1), E(TestQueueAxis(1), 2));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 3);
   EXPECT_EQ(target->entries[0].axis, TestQueueAxis(0));
   EXPECT_EQ(target->entries[1].axis, TestQueueAxis(1));
@@ -585,7 +581,7 @@ TEST(MergeTest, RightToLeftInsertBetween) {
   iree_async_axis_t axis_c = TestQueueAxis(2);
   MAKE_FRONTIER(target, 4, E(axis_a, 1), E(axis_c, 3));
   MAKE_FRONTIER(source, 1, E(axis_b, 2));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 3);
   EXPECT_EQ(target->entries[0].axis, axis_a);
   EXPECT_EQ(target->entries[0].epoch, 1u);
@@ -609,7 +605,7 @@ TEST(MergeTest, RightToLeftLargeShift) {
     source->entries[i] = E(TestQueueAxis(i), (uint64_t)(i + 1) * 10);
   }
 
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
   EXPECT_EQ(target->entry_count, 8);
   // All entries sorted, original values preserved after shift.
   for (uint8_t i = 0; i < 8; ++i) {
@@ -625,7 +621,7 @@ TEST(MergeTest, RightToLeftLargeShift) {
 TEST(MergeTest, Idempotent) {
   MAKE_FRONTIER(target, 4, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
   MAKE_FRONTIER(source, 2, E(TestQueueAxis(0), 5), E(TestQueueAxis(1), 10));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, source));
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].epoch, 5u);
   EXPECT_EQ(target->entries[1].epoch, 10u);
@@ -639,7 +635,7 @@ TEST(MergeTest, ResultDominatesInputs) {
   MAKE_FRONTIER(original_target, 2, E(TestQueueAxis(0), 3),
                 E(TestQueueAxis(2), 10));
 
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
 
   // Merged result must not be BEFORE either input.
   EXPECT_NE(iree_async_frontier_compare(target, original_target),
@@ -652,7 +648,7 @@ TEST(MergeTest, ResultIsSorted) {
   MAKE_FRONTIER(target, 8, E(TestQueueAxis(0), 5), E(TestQueueAxis(4), 10));
   MAKE_FRONTIER(source, 3, E(TestQueueAxis(1), 7), E(TestQueueAxis(3), 3),
                 E(TestQueueAxis(5), 20));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 8, source));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 8, source));
   IREE_EXPECT_OK(iree_async_frontier_validate(target));
 }
 
@@ -667,15 +663,15 @@ TEST(MergeTest, Commutativity) {
   MAKE_FRONTIER(ab, 8, E(ax0, 3), E(ax1, 5));
   MAKE_FRONTIER(b, 2, E(ax0, 7), E(ax2, 2));
   MAKE_FRONTIER(c, 1, E(ax1, 9));
-  IREE_EXPECT_OK(iree_async_frontier_merge(ab, 8, b));
-  IREE_EXPECT_OK(iree_async_frontier_merge(ab, 8, c));
+  EXPECT_TRUE(iree_async_frontier_merge(ab, 8, b));
+  EXPECT_TRUE(iree_async_frontier_merge(ab, 8, c));
 
   // Path: merge a+c, then merge result+b.
   MAKE_FRONTIER(ac, 8, E(ax0, 3), E(ax1, 5));
   MAKE_FRONTIER(b2, 2, E(ax0, 7), E(ax2, 2));
   MAKE_FRONTIER(c2, 1, E(ax1, 9));
-  IREE_EXPECT_OK(iree_async_frontier_merge(ac, 8, c2));
-  IREE_EXPECT_OK(iree_async_frontier_merge(ac, 8, b2));
+  EXPECT_TRUE(iree_async_frontier_merge(ac, 8, c2));
+  EXPECT_TRUE(iree_async_frontier_merge(ac, 8, b2));
 
   // Both paths should produce the same result.
   EXPECT_EQ(ab->entry_count, ac->entry_count);
@@ -794,7 +790,7 @@ TEST(ScenarioTest, MultiQueueFanOutFanIn) {
   // GPU0 consumes → wait = merge of both signals.
   MAKE_FRONTIER(target, 4, E(gpu0_q0, 10));
   MAKE_FRONTIER(gpu1_signal, 1, E(gpu1_q0, 5));
-  IREE_EXPECT_OK(iree_async_frontier_merge(target, 4, gpu1_signal));
+  EXPECT_TRUE(iree_async_frontier_merge(target, 4, gpu1_signal));
 
   EXPECT_EQ(target->entry_count, 2);
   EXPECT_EQ(target->entries[0].axis, gpu0_q0);
@@ -832,7 +828,7 @@ TEST(ScenarioTest, NetworkFrontierPropagation) {
   // Save local before merge.
   MAKE_FRONTIER(old_local, 1, E(local_q0, 50));
 
-  IREE_EXPECT_OK(iree_async_frontier_merge(local, 4, remote));
+  EXPECT_TRUE(iree_async_frontier_merge(local, 4, remote));
 
   // Merged includes both axes.
   EXPECT_EQ(local->entry_count, 2);
@@ -856,9 +852,7 @@ TEST(ScenarioTest, MergeOverflowDetection) {
   source->entries[2] = E(TestQueueAxis(5), 25);
 
   // Merged would be 7 entries (4 + 3, no overlap), capacity is 5.
-  iree_status_t status = iree_async_frontier_merge(target, 5, source);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
-  iree_status_free(status);
+  EXPECT_FALSE(iree_async_frontier_merge(target, 5, source));
 
   // Target unchanged.
   EXPECT_EQ(target->entry_count, 4);
@@ -881,7 +875,7 @@ TEST(ScenarioTest, CausalityChain) {
 
   // Merge B and C → LUB.
   MAKE_FRONTIER(merged, 4, E(axis_x, 2), E(axis_y, 1));
-  IREE_EXPECT_OK(iree_async_frontier_merge(merged, 4, c));
+  EXPECT_TRUE(iree_async_frontier_merge(merged, 4, c));
   EXPECT_EQ(merged->entry_count, 2);
   EXPECT_EQ(merged->entries[0].epoch, 2u);  // X: max(2, 0) = 2.
   EXPECT_EQ(merged->entries[1].epoch, 2u);  // Y: max(1, 2) = 2.

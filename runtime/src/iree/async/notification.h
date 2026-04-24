@@ -47,8 +47,8 @@ typedef struct iree_async_notification_wait_operation_t
 // Implementation mode for notification wait/wake primitives.
 typedef enum iree_async_notification_mode_e {
   // Futex word: wait/wake operate directly on the epoch atomic.
-  // Optimal (no fd overhead) but requires kernel futex support.
-  // Used by io_uring on Linux 6.7+ with FUTEX_OPERATIONS capability.
+  // Optimal (no fd overhead) but requires a backend-specific readiness
+  // contract for any kernel-side waiters.
   IREE_ASYNC_NOTIFICATION_MODE_FUTEX = 0,
 
   // Event fd: eventfd (Linux) or pipe (macOS/BSD) with poll-based waits.
@@ -102,6 +102,11 @@ typedef struct iree_async_notification_t {
   // &epoch above. For shared notifications, points to caller-provided shared
   // memory (e.g., an mmap'd region shared between processes).
   iree_atomic_int32_t* epoch_ptr;
+
+  // Number of active observe-check-wait scopes. This includes synchronous
+  // notification waits, explicit observation scopes, and submitted async
+  // notification waits that carry a caller-provided wait token.
+  iree_atomic_int32_t observer_count;
 
   // Creation flags stored at creation time for runtime branching on SHARED.
   iree_async_notification_flags_t flags;
@@ -299,6 +304,21 @@ IREE_API_EXPORT void iree_async_notification_release(
 IREE_API_EXPORT void iree_async_notification_signal(
     iree_async_notification_t* notification, int32_t wake_count);
 
+// Signals an advisory notification while avoiding wake work when no observer is
+// known to exist.
+//
+// The epoch is always advanced so a waiter that has already observed the token
+// cannot miss a concurrent signal between its protected-condition re-check and
+// its platform wait. Returns true when a platform wake was performed; returns
+// false when there were no active observe-check-wait scopes and wake work was
+// skipped.
+//
+// This must only be used for protocols where notification waits are advisory
+// wakeups over a separately checked condition. It is not a replacement for
+// iree_async_notification_signal() when the signal itself is user-visible.
+IREE_API_EXPORT bool iree_async_notification_signal_if_observed(
+    iree_async_notification_t* notification, int32_t wake_count);
+
 // Returns the current epoch of the notification.
 //
 // The epoch is incremented each time the notification is signaled. This can be
@@ -313,6 +333,25 @@ IREE_API_EXPORT void iree_async_notification_signal(
 //   The returned value represents a point-in-time snapshot.
 IREE_API_EXPORT uint32_t
 iree_async_notification_query_epoch(iree_async_notification_t* notification);
+
+// Begins an observe-check-wait protocol and returns the current epoch token.
+//
+// The returned token can be used with
+// iree_async_notification_wait_for_token(). Callers must pair every successful
+// begin with iree_async_notification_end_observe(), including when the
+// protected condition is satisfied and no wait is armed.
+//
+// This explicit observation scope is what makes
+// iree_async_notification_signal_if_observed() race-free: a producer that
+// signals after the observer begins will either advance the epoch or the
+// observer's protected-condition re-check will see the producer's state change.
+IREE_API_EXPORT uint32_t
+iree_async_notification_begin_observe(iree_async_notification_t* notification);
+
+// Ends an observe-check-wait protocol begun by
+// iree_async_notification_begin_observe().
+IREE_API_EXPORT void iree_async_notification_end_observe(
+    iree_async_notification_t* notification);
 
 // Blocks the calling thread until the notification is signaled or timeout
 // expires.
@@ -331,6 +370,18 @@ iree_async_notification_query_epoch(iree_async_notification_t* notification);
 //   from the proactor's poll thread (it would deadlock).
 IREE_API_EXPORT bool iree_async_notification_wait(
     iree_async_notification_t* notification, iree_timeout_t timeout);
+
+// Blocks until |notification|'s epoch differs from |wait_token| or |timeout|
+// expires.
+//
+// The caller must hold an active observation scope from
+// iree_async_notification_begin_observe() while calling this. Most callers
+// should use iree_async_notification_wait(); this lower-level form exists for
+// observe-check-wait protocols that need to capture the epoch before checking a
+// protected condition.
+IREE_API_EXPORT bool iree_async_notification_wait_for_token(
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"

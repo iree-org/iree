@@ -1206,10 +1206,22 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     int64_t intrinsicAN = intrinsicA.nSizes[0];
     int64_t intrinsicAK = intrinsicA.kSizes[0];
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
+      // The output of the QK matmul must be a valid LHS of the PV matmul.
+      // The total LHS tile (M x K) of the PV matmul must be a multiple of
+      // the output tile (M x N) of the intrinsic used for the QK matmul.
+      int64_t pvMTile = schedule.getTotalMTileSize() *
+                        schedule.getTotalMSize() *
+                        schedule.getTotalMSubgroupCount();
+      int64_t pvKTile = schedule.getTotalKTileSize() * schedule.getTotalKSize();
+      if (pvMTile % intrinsicAM != 0 || pvKTile % intrinsicAN != 0) {
+        return false;
+      }
+
       // Create a mma schedule for qkMatmul in attention.
       // qkMatmul.M = pvMatmul.M
       // qkMatmul.N = pvMatmul.K
-      // qkMatmul.K = problem.K
+      // qkMatmul.K = problem.K1
+      int64_t qkNTiles = pvKTile / intrinsicAN;
       SmallVector<int64_t, 2> qkKSizes = qkMatmul.kSizes;
       qkKSizes.back() = qkMatmul.kSizes.back() / intrinsicAK;
       GPUMMASchedule qkSchedule{
@@ -1220,7 +1232,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
           /*mSubgroupCount=*/schedule.mSubgroupCounts,
           /*nSubgroupCount=*/SmallVector<int64_t>(qkMatmul.nSizes.size(), 1),
           schedule.mTileSizes,
-          schedule.kTileSizes,
+          {qkNTiles},
           qkKSizes};
 
       bool isQKAligned =
@@ -1262,18 +1274,21 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     // Create a mma schedule for qkMatmul in attention.
     // qkMatmul.M = pvMatmul.M
     // qkMatmul.N = pvMatmul.K
-    // qkMatmul.K = problem.K
+    // qkMatmul.K = problem.K1
+    int64_t pvKTile =
+        pvSchedule->getTotalKTileSize() * pvSchedule->getTotalKSize();
+    int64_t qkNTiles = pvKTile / intrinsicAN;
     SmallVector<int64_t, 2> qkKSizes = qkMatmul.kSizes;
     qkKSizes.back() = qkMatmul.kSizes.back() / intrinsicAK;
     GPUMMASchedule qkSchedule{
         intrinsicA.mmaKind,
         pvSchedule->mSizes,
-        pvSchedule->kSizes,
+        {intrinsicAN},
         {intrinsicAK},
         /*mSubgroupCount=*/pvSchedule->mSubgroupCounts,
         /*nSubgroupCount=*/SmallVector<int64_t>(qkMatmul.nSizes.size(), 1),
         pvSchedule->mTileSizes,
-        pvSchedule->kTileSizes,
+        {qkNTiles},
         qkKSizes};
 
     return std::pair(qkSchedule, pvSchedule.value());

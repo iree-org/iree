@@ -32,6 +32,14 @@
 //
 // CHECK-INCORRECT-OPT-STACK-VALUE: for the --iree-llvmcpu-stack-allocation-limit option: '64266' value not a power-of-two
 
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu --iree-llvmcpu-enable-inner-tiled %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-INNER-TILED-FLAG
+//
+// CHECK-INNER-TILED-FLAG: module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} {
+// CHECK-INNER-TILED-FLAG-NEXT: util.global private @__device_0 = #hal.device.target<"local",
+// CHECK-INNER-TILED-FLAG-SAME: [#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+// CHECK-INNER-TILED-FLAG-SAME: enable_inner_tiled = true
+
 module {
   util.func public @foo(%arg0: tensor<?xf32>) -> tensor<?xf32> {
     util.return %arg0 : tensor<?xf32>

@@ -22,6 +22,7 @@
 // Platform-specific implementations must define:
 // - iree_hal_platform_query_numa_node_count_impl()
 // - iree_hal_platform_query_numa_distance_impl()
+// - iree_hal_platform_try_query_numa_distance_impl()
 // - iree_hal_platform_query_pcie_same_root_impl()
 // - iree_hal_platform_query_pcie_bdf_from_path_impl()
 
@@ -29,6 +30,9 @@
 extern iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void);
 
 extern iree_status_t iree_hal_platform_query_numa_distance_impl(
+    uint8_t node_a, uint8_t node_b, uint8_t* out_distance);
+
+extern bool iree_hal_platform_try_query_numa_distance_impl(
     uint8_t node_a, uint8_t node_b, uint8_t* out_distance);
 
 extern bool iree_hal_platform_query_pcie_same_root_impl(
@@ -51,6 +55,13 @@ iree_status_t iree_hal_platform_query_numa_distance(uint8_t node_a,
   IREE_ASSERT_ARGUMENT(out_distance);
   return iree_hal_platform_query_numa_distance_impl(node_a, node_b,
                                                     out_distance);
+}
+
+bool iree_hal_platform_try_query_numa_distance(uint8_t node_a, uint8_t node_b,
+                                               uint8_t* out_distance) {
+  IREE_ASSERT_ARGUMENT(out_distance);
+  return iree_hal_platform_try_query_numa_distance_impl(node_a, node_b,
+                                                        out_distance);
 }
 
 bool iree_hal_platform_query_pcie_same_root(
