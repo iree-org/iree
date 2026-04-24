@@ -1113,6 +1113,29 @@ static LogicalResult setAttentionReductionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
+  // Bail out on shapes this path cannot tile cleanly. K2 below the skinny-dim
+  // threshold leaves attention as a large elementwise; the intrinsic and
+  // reduction paths have nothing to offer. All three cases fall through to the
+  // BaseLowering scalar fallback.
+  int64_t k1Size = bounds[opInfo.getK1Dims().back()];
+  int64_t nSize = bounds[opInfo.getNDims().back()];
+  int64_t k2Size = bounds[opInfo.getK2Dims().back()];
+  int64_t nWorkgroupTile = seeds.numValueVectors * seeds.valueVectorSize;
+  if (!ShapedType::isDynamic(k1Size) && k1Size % seeds.keyVectorSize != 0) {
+    LDBG() << "Bailing out: K1 not a multiple of key vector size ("
+           << seeds.keyVectorSize << "): " << k1Size;
+    return failure();
+  }
+  if (!ShapedType::isDynamic(nSize) && nSize % nWorkgroupTile != 0) {
+    LDBG() << "Bailing out: N not a multiple of value workgroup tile ("
+           << nWorkgroupTile << "): " << nSize;
+    return failure();
+  }
+  if (!ShapedType::isDynamic(k2Size) && k2Size <= kVerySkinnyDimThreshold) {
+    LDBG() << "Bailing out due to skinny K2 dimension: " << k2Size;
+    return failure();
+  }
+
   // Distribute the 'available' resource to the basis on the given dimensions.
   // `currDim` tracks number of dims on which resources have already been
   // distributed (to keep track of order of dimension distribution).
@@ -1426,6 +1449,21 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                          /*valueVectorSize=*/valueVectorSize};
 
   return setAttentionReductionConfig(seeds, target, entryPoint, op);
+}
+
+/// Fallback attention config that lowers the op via the scalar base-lowering
+/// pipeline. Used when the vector-distribute attention paths bail out on
+/// shapes they cannot handle (skinny M/K2, head dim below vector width, etc.).
+static LogicalResult
+setAttentionBaseLoweringConfig(FunctionOpInterface entryPoint,
+                               IREE::LinalgExt::OnlineAttentionOp op) {
+  MLIRContext *context = op.getContext();
+  SmallVector<int64_t, 3> workgroupSize = {1, 1, 1};
+  auto translationInfo =
+      getGPUTranslationInfo(context, GPUPipeline::BaseLowering, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, IREE::Codegen::LoweringConfigAttrInterface(),
+      translationInfo);
 }
 
 static LogicalResult
@@ -2481,6 +2519,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
+      .Case([&](IREE::LinalgExt::OnlineAttentionOp attnOp) {
+        LDBG() << "Attention BaseLowering Config";
+        return setAttentionBaseLoweringConfig(entryPointFn, attnOp);
+      })
       .Case([&](IREE::LinalgExt::FftOp fftOp) {
         LDBG() << "FFT Config";
         return setFftConfig(target, entryPointFn, fftOp);
