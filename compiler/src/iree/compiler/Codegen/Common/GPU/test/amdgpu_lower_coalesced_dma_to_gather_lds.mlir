@@ -1279,7 +1279,7 @@ func.func @gather_dma_inner_dim_oob_64x62(
 // -----
 
 // Test: OOB check when source is a subview of a larger fat_raw_buffer.
-// Parent: 8x128, subview: 4x128. in_bounds = [false, true].
+// Parent: 8x128, subview at [2, 0]: 4x128. in_bounds = [false, true].
 // Because the source is a view of a larger buffer, dim 0 must also be
 // bounds-checked: an OOB dim-0 index in the subview still lands in valid
 // parent memory. The sentinel index uses the root buffer's dim-0 size (8),
@@ -1309,9 +1309,9 @@ func.func @gather_dma_subview_oob(
     hal.executable.target = #executable_target_rocm_hsaco_fb_subview,
     translation_info = #translation_32_subview} {
   // CHECK: %[[SUBVIEW:.+]] = memref.subview %[[PARENT]]
-  %subview = memref.subview %parent[0, 0][4, 128][1, 1]
+  %subview = memref.subview %parent[2, 0][4, 128][1, 1]
     : memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>
-      to memref<4x128xf32, strided<[128, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+      to memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%lane) in (32) {
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
@@ -1338,7 +1338,7 @@ func.func @gather_dma_subview_oob(
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %subview into %dest lane(%lane) in_bounds [false, true] :
-      memref<4x128xf32, strided<[128, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>,
       memref<4x128xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
