@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -57,6 +58,17 @@ struct FoldInsertSliceWithTensorStoreOp
     auto insertSliceOp =
         dispatchTensorStoreOp.getValue().getDefiningOp<tensor::InsertSliceOp>();
     if (!insertSliceOp) {
+      return failure();
+    }
+
+    // Only fold when dest is a load of the same target with matching
+    // offsets/sizes/strides; otherwise positions outside the partial insert
+    // lose passthrough.
+    auto loadOp = insertSliceOp.getDest()
+                      .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
+    if (!loadOp || loadOp.getSource() != dispatchTensorStoreOp.getTarget() ||
+        !mlir::detail::sameOffsetsSizesAndStrides(loadOp, dispatchTensorStoreOp,
+                                                  isEqualConstantIntOrValue)) {
       return failure();
     }
 

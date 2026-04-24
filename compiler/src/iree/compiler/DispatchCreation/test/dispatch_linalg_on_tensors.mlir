@@ -396,6 +396,70 @@ util.func public @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32
 
 // -----
 
+// Don't fold when insert_slice's dest is a load of a different target.
+util.func public @no_fold_insert_slice_with_unrelated_load(
+    %input: tensor<4x1x4xf32>, %val: tensor<?xf32>, %n: index) -> tensor<4x1xf32> {
+  %0 = flow.dispatch.workgroups(%input, %val, %n)
+      : (tensor<4x1x4xf32>, tensor<?xf32>{%n}, index) -> tensor<4x1xf32> =
+      (%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x4xf32>>,
+       %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>,
+       %arg2: index,
+       %arg3: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x1xf32>>) {
+    %dest = iree_tensor_ext.dispatch.tensor.load %arg0,
+        offsets = [0, 0, 0], sizes = [4, 1, 1], strides = [1, 1, 1]
+        : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x1x4xf32>>
+          -> tensor<4x1xf32>
+    %loaded = iree_tensor_ext.dispatch.tensor.load %arg1,
+        offsets = [0], sizes = [%arg2], strides = [1]
+        : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%arg2}
+          -> tensor<?xf32>
+    %inserted = tensor.insert_slice %loaded into %dest[0, 0] [%arg2, 1] [1, 1]
+        : tensor<?xf32> into tensor<4x1xf32>
+    iree_tensor_ext.dispatch.tensor.store %inserted, %arg3,
+        offsets = [0, 0], sizes = [4, 1], strides = [1, 1]
+        : tensor<4x1xf32>
+          -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x1xf32>>
+    flow.return
+  }
+  util.return %0 : tensor<4x1xf32>
+}
+// CHECK-LABEL: @no_fold_insert_slice_with_unrelated_load
+//       CHECK: tensor.insert_slice
+
+// -----
+
+// Fold when dest is an identity load of the store target.
+util.func public @fold_insert_slice_with_identity_load(
+    %val: tensor<?xf32>, %n: index) -> tensor<4x1xf32> {
+  %0 = flow.dispatch.workgroups(%val, %n)
+      : (tensor<?xf32>{%n}, index) -> tensor<4x1xf32> =
+      (%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>,
+       %arg1: index,
+       %arg2: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x1xf32>>) {
+    %dest = iree_tensor_ext.dispatch.tensor.load %arg2,
+        offsets = [0, 0], sizes = [4, 1], strides = [1, 1]
+        : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x1xf32>>
+          -> tensor<4x1xf32>
+    %loaded = iree_tensor_ext.dispatch.tensor.load %arg0,
+        offsets = [0], sizes = [%arg1], strides = [1]
+        : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%arg1}
+          -> tensor<?xf32>
+    %inserted = tensor.insert_slice %loaded into %dest[0, 0] [%arg1, 1] [1, 1]
+        : tensor<?xf32> into tensor<4x1xf32>
+    iree_tensor_ext.dispatch.tensor.store %inserted, %arg2,
+        offsets = [0, 0], sizes = [4, 1], strides = [1, 1]
+        : tensor<4x1xf32>
+          -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x1xf32>>
+    flow.return
+  }
+  util.return %0 : tensor<4x1xf32>
+}
+// CHECK-LABEL: @fold_insert_slice_with_identity_load
+//   CHECK-NOT: tensor.insert_slice
+//       CHECK: iree_tensor_ext.dispatch.tensor.store
+
+// -----
+
 util.func public @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1000xf32>, %offset: tensor<f32>) -> tensor<f32> {
   %zero = arith.constant 0.0 : f32
   %init = tensor.empty() : tensor<f32>
