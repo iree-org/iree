@@ -309,6 +309,7 @@ py_test(
     srcs = [
         "render/__init__.py",
         "render/backends.py",
+        "render/cli.py",
         "render/common.py",
         "render/perfetto.py",
         "render_test.py",
@@ -325,6 +326,7 @@ py_test(
         "//tools:iree-profile",
     ],
     main = "cli_test.py",
+    tags = ["noriscv"],
 )
 
 iree_cmake_extra_content(
@@ -346,6 +348,8 @@ iree_local_py_test(
   ARGS
     "--fixture-generator=$<TARGET_FILE:iree_tooling_profile_test_fixture_generator>"
     "--iree-profile=$<TARGET_FILE:iree-profile>"
+  LABELS
+    "noriscv"
   PACKAGE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )

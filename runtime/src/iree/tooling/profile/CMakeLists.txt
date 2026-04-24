@@ -375,6 +375,8 @@ iree_local_py_test(
   ARGS
     "--fixture-generator=$<TARGET_FILE:iree_tooling_profile_test_fixture_generator>"
     "--iree-profile=$<TARGET_FILE:iree-profile>"
+  LABELS
+    "noriscv"
   PACKAGE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )

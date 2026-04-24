@@ -85,6 +85,12 @@ jobs:
       - name: Run iree-flatcc-cli
         id: run_iree_flatcc_cli
         run: ./bin/iree-flatcc-cli --help
+      - name: Run iree-profile
+        id: run_iree_profile
+        run: ./bin/iree-profile --help
+      - name: Run iree-profile-render
+        id: run_iree_profile_render
+        run: ./bin/iree-profile-render --help
       - name: Run iree-opt
         id: run_iree_opt
         run: ./bin/iree-opt --help
@@ -119,6 +125,12 @@ jobs:
       - name: Py iree-cpuinfo
         id: py_iree_cpuinfo
         run: iree-cpuinfo
+      - name: Py iree-profile
+        id: py_iree_profile
+        run: iree-profile --help
+      - name: Py iree-profile-render
+        id: py_iree_profile_render
+        run: iree-profile-render --help
 
   publish_release:
     name: "Publish release"

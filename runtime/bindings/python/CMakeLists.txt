@@ -136,6 +136,7 @@ iree_py_library(
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
     "iree/_runtime/scripts/iree_flatcc_cli/__main__.py"
     "iree/_runtime/scripts/iree_profile/__main__.py"
+    "iree/_runtime/scripts/iree_profile_render/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
@@ -206,6 +207,35 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-module
   TO_EXE_NAME iree/_runtime_libs/iree-run-module
+)
+
+set(_PROFILE_RENDER_SOURCE_DIR "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render")
+set(_PROFILE_RENDER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree/_runtime_libs/share/iree/profile/render")
+add_custom_command(
+  TARGET iree_runtime_bindings_python_runtime
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E make_directory "${_PROFILE_RENDER_BINARY_DIR}"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/__init__.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/__init__.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/backends.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/backends.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/cli.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/cli.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/common.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/common.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/perfetto.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/perfetto.py"
 )
 
 if(_TRACY_ENABLED)
@@ -333,6 +363,13 @@ install(
   TARGETS iree_runtime_bindings_python_PyExtRt
   DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs"
   COMPONENT "${_INSTALL_COMPONENT}"
+)
+
+install(
+  DIRECTORY "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render"
+  DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs/share/iree/profile"
+  COMPONENT "${_INSTALL_COMPONENT}"
+  FILES_MATCHING PATTERN "*.py"
 )
 
 # Install tools into python_packages/iree_runtime/iree/runtime
