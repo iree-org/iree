@@ -91,7 +91,8 @@ static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
 
   if (isa<IntegerType>(elemTy)) {
     if (Attribute res =
-            constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
+            constFoldBinaryOp<IntegerAttr, IntegerAttr, IntegerAttr::ValueType,
+                              IntegerAttr::ValueType, void>(
                 operands, [&folder](const APInt &lhs, const APInt &rhs) {
                   return folder(lhs, rhs);
                 })) {
@@ -102,7 +103,8 @@ static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
 
   if (isa<FloatType>(elemTy)) {
     if (Attribute res =
-            constFoldBinaryOp<FloatAttr, FloatAttr::ValueType, void>(
+            constFoldBinaryOp<FloatAttr, FloatAttr, FloatAttr::ValueType,
+                              FloatAttr::ValueType, void>(
                 operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
                   return folder(lhs, rhs);
                 })) {
@@ -393,13 +395,13 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
-      if (Attribute res =
-              constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
-                  ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
-                  [direction, kind = *compType](const APInt &a,
-                                                const APInt &b) {
-                    return calculateComp(kind, direction, a, b);
-                  })) {
+      if (Attribute res = constFoldBinaryOp<IntegerAttr, IntegerAttr,
+                                            IntegerAttr::ValueType,
+                                            IntegerAttr::ValueType, void>(
+              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+              [direction, kind = *compType](const APInt &a, const APInt &b) {
+                return calculateComp(kind, direction, a, b);
+              })) {
         rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
         return success();
       }
