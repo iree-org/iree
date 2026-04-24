@@ -10,6 +10,8 @@
 #include <nanobind/intrusive/counter.h>
 
 #include <functional>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "./binding.h"
@@ -128,10 +130,13 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
     return iree_hal_device_allocator(raw_ptr());
   }
 
-  void BeginProfiling(std::optional<std::string> mode,
-                      std::optional<std::string> file_path);
+  void BeginProfiling(std::optional<std::string> mode);
   void FlushProfiling();
   void EndProfiling();
+  void BeginExternalCapture(std::string provider,
+                            std::optional<std::string> file_path,
+                            std::optional<std::string> label);
+  void EndExternalCapture();
   HalSemaphore CreateSemaphore(uint64_t initial_value);
   HalBuffer QueueAlloca(uint64_t allocation_size, py::handle wait_semaphores,
                         py::handle signal_semaphores);
