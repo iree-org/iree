@@ -130,9 +130,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK-NOT: arith.extf
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// P = P / sum — unmasked: plain divide, no eps guard. The standalone
-// AttentionOp decomposition gates the guard on mask presence, matching
-// OnlineAttention finalization.
+// P = P / sum
 // CHECK: linalg.generic
 // CHECK-NOT: arith.addf
 // CHECK:   arith.divf
@@ -150,8 +148,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 
-// Masked variant: the same decomposition, but with a mask operand. The
-// finalization (P = P / sum) must emit the eps-guarded divide so
+// Masked variant: (P = P / sum) must emit the eps-guarded divide so
 // fully-masked rows yield 0 instead of 0/0 == NaN.
 func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
                                 %key: tensor<192x1024x64xf16>,
