@@ -2615,19 +2615,28 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     }
 
     if (auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(op)) {
-      Value indices = scatterOp.getIndices();
-      if (!indices.getDefiningOp()) {
-        continue;
-      }
-
-      // Mark scatter's backward slices(inclusive) as to skip.
       BackwardSliceOptions options;
       options.inclusive = true;
       SetVector<Operation *> slices;
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(indices, &slices, options);
-      assert(result.succeeded());
-      genericToSkip.insert(slices.begin(), slices.end());
+      auto markBackwardSlice = [&](Value value) {
+        if (!value.getDefiningOp()) {
+          return;
+        }
+        slices.clear();
+        [[maybe_unused]] LogicalResult result =
+            getBackwardSlice(value, &slices, options);
+        assert(result.succeeded());
+        genericToSkip.insert(slices.begin(), slices.end());
+      };
+
+      // Mark scatter index producers as auxiliary to the scatter.
+      markBackwardSlice(scatterOp.getIndices());
+      if (!scatterOp.getUniqueIndices()) {
+        // Non-unique scatter updates are reduction-like writes into the
+        // original tensor. The scatter must be the root instead of letting an
+        // update producer capture the distribution strategy.
+        markBackwardSlice(scatterOp.getUpdates());
+      }
     }
   }
 

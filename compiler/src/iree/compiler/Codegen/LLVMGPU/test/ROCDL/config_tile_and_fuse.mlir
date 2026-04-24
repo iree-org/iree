@@ -616,6 +616,45 @@ func.func @scatter_as_root_op(%arg0: tensor<4x?xi64>,
 
 // -----
 
+func.func @non_unique_scatter_as_root_op(%arg0: tensor<4x?x32xf16>,
+                                         %arg1: tensor<4x?xi64>,
+                                         %arg2: tensor<?x32xf16>)
+    -> tensor<?x32xf16> {
+  %i1 = arith.constant 1 : index
+  %0 = tensor.dim %arg0, %i1 : tensor<4x?x32xf16>
+  %1 = tensor.empty(%0) : tensor<4x?xi32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<4x?xi64>) outs(%1 : tensor<4x?xi32>) {
+  ^bb0(%in: i64, %out: i32):
+    %3 = arith.trunci %in : i64 to i32
+    linalg.yield %3 : i32
+  } -> tensor<4x?xi32>
+  %3 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false)
+      ins(%arg0, %2 : tensor<4x?x32xf16>, tensor<4x?xi32>)
+      outs(%arg2 : tensor<?x32xf16>) {
+  ^bb0(%arg3: f16, %arg4: f16):
+    iree_linalg_ext.yield %arg3 : f16
+  } -> tensor<?x32xf16>
+  return %3 : tensor<?x32xf16>
+}
+
+// CHECK-LABEL: func.func @non_unique_scatter_as_root_op(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
+
+// Verify that the index producer does not get a lowering config.
+// CHECK:      linalg.generic
+// CHECK-SAME: ins(%arg1 : tensor<4x?xi64>)
+// CHECK-NOT:  lowering_config =
+
+// Verify that the non-unique scatter is the root.
+// CHECK:      iree_linalg_ext.scatter {lowering_config = #iree_gpu.lowering_config<{{.*}}thread = [0, 0, 8], workgroup = [0, 0, 16]
+// CHECK-SAME: unique_indices(false)
+
+// -----
+
 func.func @set_encoding_gpu(%0 : tensor<1234x567xi8>) -> tensor<10x9x8x4x4x4x2x8xi8> {
   %c0_i8 = arith.constant 0 : i8
   %22 = tensor.empty() : tensor<10x9x128x64xi8>

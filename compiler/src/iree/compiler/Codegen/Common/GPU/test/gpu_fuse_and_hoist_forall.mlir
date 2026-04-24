@@ -65,6 +65,42 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
 
 // -----
 
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [4, 1, 1] subgroup_size = 4>
+
+func.func @non_unique_scatter_keeps_forall_update(
+    %arg0: tensor<4x8xf32>, %arg1: tensor<4xi32>,
+    %arg2: tensor<16x8xf32>) -> tensor<16x8xf32>
+    attributes {translation_info = #translation_info} {
+  %empty = tensor.empty() : tensor<4x8xf32>
+  %updates = scf.forall (%i) in (4) shared_outs(%out = %empty)
+      -> (tensor<4x8xf32>) {
+    %src = tensor.extract_slice %arg0[%i, 0] [1, 8] [1, 1]
+        : tensor<4x8xf32> to tensor<1x8xf32>
+    %dst = tensor.extract_slice %out[%i, 0] [1, 8] [1, 1]
+        : tensor<4x8xf32> to tensor<1x8xf32>
+    %copy = linalg.copy ins(%src : tensor<1x8xf32>)
+        outs(%dst : tensor<1x8xf32>) -> tensor<1x8xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %copy into %out[%i, 0] [1, 8] [1, 1]
+          : tensor<1x8xf32> into tensor<4x8xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  %scatter = iree_linalg_ext.scatter dimension_map = [0]
+      unique_indices(false)
+      ins(%updates, %arg1 : tensor<4x8xf32>, tensor<4xi32>)
+      outs(%arg2 : tensor<16x8xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<16x8xf32>
+  return %scatter : tensor<16x8xf32>
+}
+
+// CHECK-LABEL: func.func @non_unique_scatter_keeps_forall_update(
+//       CHECK:   %[[UPDATES:.+]] = scf.forall
+//       CHECK:   iree_linalg_ext.scatter {{.*}}unique_indices(false) ins(%[[UPDATES]]
+
+// -----
+
 #translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #map = affine_map<(d0) -> (d0 * 2)>

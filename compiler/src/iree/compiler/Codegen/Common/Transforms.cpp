@@ -49,6 +49,12 @@ struct FuseTilableForallConsumers final
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(TilingInterface tilableOp,
                                 PatternRewriter &rewriter) const override {
+    auto scatterOp = dyn_cast<IREE::LinalgExt::ScatterOp>(*tilableOp);
+    if (scatterOp && !scatterOp.getUniqueIndices()) {
+      return rewriter.notifyMatchFailure(
+          tilableOp, "non-unique scatter indices are not consumer-fusible");
+    }
+
     // Currently consumer fusion requires DPS, and we don't want to fuse through
     // inits anyway.
     auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);

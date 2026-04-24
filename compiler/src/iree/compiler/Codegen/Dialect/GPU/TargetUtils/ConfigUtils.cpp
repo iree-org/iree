@@ -1628,15 +1628,18 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // TODO: Support non-unique indices.
-  if (!scatter.getUniqueIndices()) {
-    return failure();
-  }
-
   // Various problem parameters.
   int64_t loopDepth = scatter.getLoopIteratorTypes().size();
   int64_t elemBits = scatter.getOriginalType().getElementTypeBitWidth();
   SmallVector<int64_t> loopBounds = scatter.getStaticLoopRanges();
+  int64_t numBatch = scatter.getBatchRank();
+  bool hasUniqueIndices = scatter.getUniqueIndices();
+
+  // Duplicate indices make the batch dimensions reduction-like. Scalar scatters
+  // have no inner parallel slice dimensions to distribute safely.
+  if (!hasUniqueIndices && numBatch == loopDepth) {
+    return failure();
+  }
 
   // Configurations we need to decide.
   int64_t flatWorkgroupSize = target.getPreferredSubgroupSize();
@@ -1667,7 +1670,8 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
     // Floordiv to overestimate the required number of threads.
     int64_t residualThreads = flatWorkgroupSize / residualInnerSize;
     workgroupTileSizes.back() = residualInnerSize * vectorSize;
-    for (int64_t i = loopDepth - 2, e = 0; i >= e; --i) {
+    int64_t firstParallelDim = hasUniqueIndices ? 0 : numBatch;
+    for (int64_t i = loopDepth - 2, e = firstParallelDim; i >= e; --i) {
       if (residualThreads <= 1) {
         break;
       }
@@ -1680,7 +1684,15 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  int64_t numBatch = scatter.getBatchRank();
+  if (!hasUniqueIndices) {
+    // Keep the duplicate-index batch dimensions serial while still tiling the
+    // inner slice dimensions across workgroups and threads.
+    for (int64_t i = 0; i < numBatch; ++i) {
+      workgroupTileSizes[i] = 0;
+      threadTileSizes[i] = 0;
+    }
+  }
+
   // Currently bufferization will fail if the only dimension distributed to
   // workgroups is the batch dims because the workgroup level slice will fold
   // away and cause a mismatch. To work around this we ensure that at least one
