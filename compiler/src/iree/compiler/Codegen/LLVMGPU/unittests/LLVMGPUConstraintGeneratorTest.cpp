@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
@@ -19,6 +20,9 @@
 
 namespace mlir::iree_compiler {
 namespace {
+
+using IntKnobAttr = IREE::Codegen::IntKnobAttr;
+using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
 
 class GetCompatibleMMAAttrsTest : public ::testing::Test {
 protected:
@@ -400,66 +404,120 @@ private:
 };
 
 TEST_F(BuildVectorDistributeKnobsDictTest,
-       BuildVectorDistributeKnobs_Matmul_DictStr) {
+       BuildVectorDistributeKnobs_Matmul_Structure) {
   MLIRContext *ctx = getContext();
-  DictionaryAttr matmulKnobDict = buildVectorDistributeKnobsDict(
+  DictionaryAttr dict = buildVectorDistributeKnobsDict(
       ctx, loopInfoForMatmul(), matmulDims(), compatibleMMAs());
 
-  std::string result;
-  llvm::raw_string_ostream os(result);
-  matmulKnobDict.print(os);
+  ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
+  ASSERT_TRUE(dict.get(kKnobReductionKey));
+  ASSERT_TRUE(dict.get(kKnobMmaKindKey));
+  ASSERT_TRUE(dict.get(kKnobSubgroupBasisKey));
+  ASSERT_TRUE(dict.get(kKnobWorkgroupSizeKey));
+  ASSERT_TRUE(dict.get(kKnobSubgroupSizeKey));
 
-  StringRef expected =
-      "{"
-      "mma_kind = #iree_codegen.smt.one_of_knob<\"mma_idx\", "
-      "[\"mma_0\", \"mma_1\", \"mma_2\"]>, "
-      "reduction = [0, 0, #iree_codegen.smt.int_knob<\"red_2\">], "
-      "subgroup_basis = {"
-      "counts = [#iree_codegen.smt.int_knob<\"sg_m_cnt\">, "
-      "#iree_codegen.smt.int_knob<\"sg_n_cnt\">, 1], "
-      "mapping = [0, 1, 2]}, "
-      "subgroup_size = #iree_codegen.smt.int_knob<\"sg_size\">, "
-      "workgroup = [#iree_codegen.smt.int_knob<\"wg_0\">, "
-      "#iree_codegen.smt.int_knob<\"wg_1\">, 0], "
-      "workgroup_size = [#iree_codegen.smt.int_knob<\"wg_x\">, "
-      "#iree_codegen.smt.int_knob<\"wg_y\">, "
-      "#iree_codegen.smt.int_knob<\"wg_z\">]"
-      "}";
-  EXPECT_EQ(result, expected);
+  auto workgroup = cast<ArrayAttr>(dict.get(kKnobWorkgroupKey));
+  ASSERT_EQ(workgroup.size(), 3u);
+  EXPECT_EQ(cast<IntKnobAttr>(workgroup[0]).getName().getValue(),
+            makeVarName(kKnobWgPrefix, 0));
+  EXPECT_EQ(cast<IntKnobAttr>(workgroup[1]).getName().getValue(),
+            makeVarName(kKnobWgPrefix, 1));
+  EXPECT_EQ(cast<IntegerAttr>(workgroup[2]).getInt(), 0);
+
+  auto reduction = cast<ArrayAttr>(dict.get(kKnobReductionKey));
+  ASSERT_EQ(reduction.size(), 3u);
+  EXPECT_EQ(cast<IntegerAttr>(reduction[0]).getInt(), 0);
+  EXPECT_EQ(cast<IntegerAttr>(reduction[1]).getInt(), 0);
+  EXPECT_EQ(cast<IntKnobAttr>(reduction[2]).getName().getValue(),
+            makeVarName(kKnobRedPrefix, 2));
+
+  auto mmaKind = cast<OneOfKnobAttr>(dict.get(kKnobMmaKindKey));
+  EXPECT_EQ(mmaKind.getName().getValue(), kKnobMmaIdxName);
+  EXPECT_EQ(mmaKind.getOptions().size(), 3u);
+
+  auto sgBasis = cast<DictionaryAttr>(dict.get(kKnobSubgroupBasisKey));
+  auto counts = cast<ArrayAttr>(sgBasis.get(kKnobCountsKey));
+  ASSERT_EQ(counts.size(), 3u);
+  EXPECT_EQ(cast<IntKnobAttr>(counts[0]).getName().getValue(), kKnobSgMCntName);
+  EXPECT_EQ(cast<IntKnobAttr>(counts[1]).getName().getValue(), kKnobSgNCntName);
+  EXPECT_EQ(cast<IntegerAttr>(counts[2]).getInt(), 1);
+  auto mapping = cast<ArrayAttr>(sgBasis.get(kKnobMappingKey));
+  ASSERT_EQ(mapping.size(), 3u);
+
+  auto wgSize = cast<ArrayAttr>(dict.get(kKnobWorkgroupSizeKey));
+  ASSERT_EQ(wgSize.size(), 3u);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[0]).getName().getValue(),
+            kKnobWgSizeXName);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[1]).getName().getValue(),
+            kKnobWgSizeYName);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[2]).getName().getValue(),
+            kKnobWgSizeZName);
+
+  auto sgSize = cast<IntKnobAttr>(dict.get(kKnobSubgroupSizeKey));
+  EXPECT_EQ(sgSize.getName().getValue(), kKnobSgSizeName);
 }
 
 TEST_F(BuildVectorDistributeKnobsDictTest,
-       BuildVectorDistributeKnobs_Conv_DictStr) {
+       BuildVectorDistributeKnobs_Conv_Structure) {
   MLIRContext *ctx = getContext();
-  DictionaryAttr convKnobDict = buildVectorDistributeKnobsDict(
+  DictionaryAttr dict = buildVectorDistributeKnobsDict(
       ctx, loopInfoForConv(), convDims(), compatibleMMAs());
 
-  std::string result;
-  llvm::raw_string_ostream os(result);
-  convKnobDict.print(os);
+  ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
+  ASSERT_TRUE(dict.get(kKnobReductionKey));
+  ASSERT_TRUE(dict.get(kKnobMmaKindKey));
+  ASSERT_TRUE(dict.get(kKnobSubgroupBasisKey));
+  ASSERT_TRUE(dict.get(kKnobWorkgroupSizeKey));
+  ASSERT_TRUE(dict.get(kKnobSubgroupSizeKey));
 
-  StringRef expected =
-      "{"
-      "mma_kind = #iree_codegen.smt.one_of_knob<\"mma_idx\", "
-      "[\"mma_0\", \"mma_1\", \"mma_2\"]>, "
-      "reduction = [0, 0, 0, 0, 0, 0, #iree_codegen.smt.int_knob<\"red_6\">], "
-      "subgroup_basis = {"
-      "counts = [1, 1, "
-      "#iree_codegen.smt.int_knob<\"sg_m_cnt\">, "
-      "#iree_codegen.smt.int_knob<\"sg_n_cnt\">, "
-      "1, 1, 1], "
-      "mapping = [0, 1, 2, 3, 4, 5, 6]}, "
-      "subgroup_size = #iree_codegen.smt.int_knob<\"sg_size\">, "
-      "workgroup = [0, "
-      "#iree_codegen.smt.int_knob<\"wg_1\">, "
-      "#iree_codegen.smt.int_knob<\"wg_2\">, "
-      "#iree_codegen.smt.int_knob<\"wg_3\">, "
-      "0, 0, 0], "
-      "workgroup_size = [#iree_codegen.smt.int_knob<\"wg_x\">, "
-      "#iree_codegen.smt.int_knob<\"wg_y\">, "
-      "#iree_codegen.smt.int_knob<\"wg_z\">]"
-      "}";
-  EXPECT_EQ(result, expected);
+  // 7 loops: (n, oh, ow, oc, kh, kw, ic). m={1,2}, n={3}, k={6}.
+  auto workgroup = cast<ArrayAttr>(dict.get(kKnobWorkgroupKey));
+  ASSERT_EQ(workgroup.size(), 7u);
+  EXPECT_EQ(cast<IntegerAttr>(workgroup[0]).getInt(), 0);
+  EXPECT_EQ(cast<IntKnobAttr>(workgroup[1]).getName().getValue(),
+            makeVarName(kKnobWgPrefix, 1));
+  EXPECT_EQ(cast<IntKnobAttr>(workgroup[2]).getName().getValue(),
+            makeVarName(kKnobWgPrefix, 2));
+  EXPECT_EQ(cast<IntKnobAttr>(workgroup[3]).getName().getValue(),
+            makeVarName(kKnobWgPrefix, 3));
+  for (unsigned i : {4u, 5u, 6u}) {
+    EXPECT_EQ(cast<IntegerAttr>(workgroup[i]).getInt(), 0);
+  }
+
+  auto reduction = cast<ArrayAttr>(dict.get(kKnobReductionKey));
+  ASSERT_EQ(reduction.size(), 7u);
+  for (unsigned i = 0; i < 6; ++i) {
+    EXPECT_EQ(cast<IntegerAttr>(reduction[i]).getInt(), 0);
+  }
+  EXPECT_EQ(cast<IntKnobAttr>(reduction[6]).getName().getValue(),
+            makeVarName(kKnobRedPrefix, 6));
+
+  auto mmaKind = cast<OneOfKnobAttr>(dict.get(kKnobMmaKindKey));
+  EXPECT_EQ(mmaKind.getName().getValue(), kKnobMmaIdxName);
+  EXPECT_EQ(mmaKind.getOptions().size(), 3u);
+
+  auto sgBasis = cast<DictionaryAttr>(dict.get(kKnobSubgroupBasisKey));
+  auto counts = cast<ArrayAttr>(sgBasis.get(kKnobCountsKey));
+  ASSERT_EQ(counts.size(), 7u);
+  for (unsigned i : {0u, 1u, 4u, 5u, 6u}) {
+    EXPECT_EQ(cast<IntegerAttr>(counts[i]).getInt(), 1);
+  }
+  EXPECT_EQ(cast<IntKnobAttr>(counts[2]).getName().getValue(), kKnobSgMCntName);
+  EXPECT_EQ(cast<IntKnobAttr>(counts[3]).getName().getValue(), kKnobSgNCntName);
+  auto mapping = cast<ArrayAttr>(sgBasis.get(kKnobMappingKey));
+  ASSERT_EQ(mapping.size(), 7u);
+
+  auto wgSize = cast<ArrayAttr>(dict.get(kKnobWorkgroupSizeKey));
+  ASSERT_EQ(wgSize.size(), 3u);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[0]).getName().getValue(),
+            kKnobWgSizeXName);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[1]).getName().getValue(),
+            kKnobWgSizeYName);
+  EXPECT_EQ(cast<IntKnobAttr>(wgSize[2]).getName().getValue(),
+            kKnobWgSizeZName);
+
+  auto sgSize = cast<IntKnobAttr>(dict.get(kKnobSubgroupSizeKey));
+  EXPECT_EQ(sgSize.getName().getValue(), kKnobSgSizeName);
 }
 } // namespace
 } // namespace mlir::iree_compiler

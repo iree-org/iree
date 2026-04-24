@@ -30,6 +30,33 @@ struct RootOpLoopInfo {
   SmallVector<AffineMap> indexingMaps;
 };
 
+// Knobs dict keys.
+constexpr StringLiteral kKnobWorkgroupKey = "workgroup";
+constexpr StringLiteral kKnobReductionKey = "reduction";
+constexpr StringLiteral kKnobMmaKindKey = "mma_kind";
+constexpr StringLiteral kKnobSubgroupBasisKey = "subgroup_basis";
+constexpr StringLiteral kKnobWorkgroupSizeKey = "workgroup_size";
+constexpr StringLiteral kKnobSubgroupSizeKey = "subgroup_size";
+// For subgroup basis subdict.
+constexpr StringLiteral kKnobCountsKey = "counts";
+constexpr StringLiteral kKnobMappingKey = "mapping";
+
+// Knob variable names.
+constexpr StringLiteral kKnobMmaIdxName = "mma_idx";
+constexpr StringLiteral kKnobSgMCntName = "sg_m_cnt";
+constexpr StringLiteral kKnobSgNCntName = "sg_n_cnt";
+constexpr StringLiteral kKnobSgSizeName = "sg_size";
+constexpr StringLiteral kKnobWgSizeXName = "wg_size_x";
+constexpr StringLiteral kKnobWgSizeYName = "wg_size_y";
+constexpr StringLiteral kKnobWgSizeZName = "wg_size_z";
+
+// Knob variable name prefixes (combined with a dim index at runtime).
+constexpr StringLiteral kKnobWgPrefix = "wg_";
+constexpr StringLiteral kKnobRedPrefix = "red_";
+
+/// Build a knob variable name from a prefix, e.g. ("wg_", 2) -> "wg_2".
+std::string makeVarName(StringRef prefix, unsigned idx);
+
 /// Get unique compatible MMA attrs for matmul and conv ops.
 SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
                                              IREE::GPU::TargetAttr gpuTarget,

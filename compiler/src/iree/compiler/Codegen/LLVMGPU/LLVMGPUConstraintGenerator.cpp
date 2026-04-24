@@ -40,13 +40,17 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
 }
 
+std::string makeVarName(StringRef prefix, unsigned idx) {
+  return (prefix + Twine(idx)).str();
+}
+
 /// Helper to create an i64 IntegerAttr with a fixed value.
-static Attribute makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
+static IntegerAttr makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
   return IntegerAttr::get(IntegerType::get(ctx, 64), value);
 }
 
 /// Helper to create an IntKnobAttr.
-static Attribute makeIntKnob(MLIRContext *ctx, StringRef name) {
+static IntKnobAttr makeIntKnobAttr(MLIRContext *ctx, StringRef name) {
   return IntKnobAttr::get(ctx, StringAttr::get(ctx, name));
 }
 
@@ -149,23 +153,26 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
                                           makeIntAttr(ctx, 0));
   for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
     for (unsigned d : dimSet) {
-      workgroupEntries[d] = makeIntKnob(ctx, ("wg_" + Twine(d)).str());
+      workgroupEntries[d] = makeIntKnobAttr(ctx, makeVarName(kKnobWgPrefix, d));
     }
   }
-  knobsEntries.emplace_back("workgroup", ArrayAttr::get(ctx, workgroupEntries));
-
-  // Build reduction array: K dims get IntKnobAttr, others get 0 : i64.
-  SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
-                                          makeIntAttr(ctx, 0));
+  knobsEntries.emplace_back(kKnobWorkgroupKey,
+                            ArrayAttr::get(ctx, workgroupEntries));
+  IREE::Codegen::AssertOp::create()
+      // Build reduction array: K dims get IntKnobAttr, others get 0 : i64.
+      SmallVector<Attribute>
+          reductionEntries(loopInfo.numLoops, makeIntAttr(ctx, 0));
   for (unsigned d : dims.k) {
-    reductionEntries[d] = IntKnobAttr::get(ctx, ("red_" + Twine(d)).str());
+    reductionEntries[d] = makeIntKnobAttr(ctx, makeVarName(kKnobRedPrefix, d));
   }
-  knobsEntries.emplace_back("reduction", ArrayAttr::get(ctx, reductionEntries));
+  knobsEntries.emplace_back(kKnobReductionKey,
+                            ArrayAttr::get(ctx, reductionEntries));
 
   // Add mma_kind knob.
   knobsEntries.emplace_back(
-      "mma_kind", OneOfKnobAttr::get(ctx, StringAttr::get(ctx, "mma_idx"),
-                                     ArrayAttr::get(ctx, compatibleMMAs)));
+      kKnobMmaKindKey,
+      OneOfKnobAttr::get(ctx, StringAttr::get(ctx, kKnobMmaIdxName),
+                         ArrayAttr::get(ctx, compatibleMMAs)));
 
   // Build subgroup basis with counts and mapping.
   SmallVector<NamedAttribute> subgroupBasisEntries;
@@ -173,25 +180,27 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   SmallVector<Attribute> subgroupCounts(loopInfo.numLoops, makeIntAttr(ctx, 1));
   // A successful call to linalg::inferContractionDims guarantees that dims.m
   // and dims.n are non-empty.
-  subgroupCounts[dims.m.back()] = makeIntKnob(ctx, "sg_m_cnt");
-  subgroupCounts[dims.n.back()] = makeIntKnob(ctx, "sg_n_cnt");
-  subgroupBasisEntries.emplace_back("counts",
+  subgroupCounts[dims.m.back()] = makeIntKnobAttr(ctx, kKnobSgMCntName);
+  subgroupCounts[dims.n.back()] = makeIntKnobAttr(ctx, kKnobSgNCntName);
+  subgroupBasisEntries.emplace_back(kKnobCountsKey,
                                     ArrayAttr::get(ctx, subgroupCounts));
   SmallVector<Attribute> subgroupMapping;
   for (unsigned i = 0; i < loopInfo.numLoops; ++i) {
     subgroupMapping.push_back(makeIntAttr(ctx, i));
   }
-  subgroupBasisEntries.emplace_back("mapping",
+  subgroupBasisEntries.emplace_back(kKnobMappingKey,
                                     ArrayAttr::get(ctx, subgroupMapping));
-  knobsEntries.emplace_back("subgroup_basis",
+  knobsEntries.emplace_back(kKnobSubgroupBasisKey,
                             DictionaryAttr::get(ctx, subgroupBasisEntries));
 
   // Add workgroup size and subgroup size at the top level.
-  SmallVector<Attribute> wgSizeKnobs = {makeIntKnob(ctx, "wg_x"),
-                                        makeIntKnob(ctx, "wg_y"),
-                                        makeIntKnob(ctx, "wg_z")};
-  knobsEntries.emplace_back("workgroup_size", ArrayAttr::get(ctx, wgSizeKnobs));
-  knobsEntries.emplace_back("subgroup_size", makeIntKnob(ctx, "sg_size"));
+  SmallVector<Attribute> wgSizeKnobs = {makeIntKnobAttr(ctx, kKnobWgSizeXName),
+                                        makeIntKnobAttr(ctx, kKnobWgSizeYName),
+                                        makeIntKnobAttr(ctx, kKnobWgSizeZName)};
+  knobsEntries.emplace_back(kKnobWorkgroupSizeKey,
+                            ArrayAttr::get(ctx, wgSizeKnobs));
+  knobsEntries.emplace_back(kKnobSubgroupSizeKey,
+                            makeIntKnobAttr(ctx, kKnobSgSizeName));
 
   return DictionaryAttr::get(ctx, knobsEntries);
 }
@@ -208,17 +217,20 @@ emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
   // Problem size must be divisible by tiling size.
   for (ArrayRef<unsigned> dimSet : {ArrayRef(dims.m), ArrayRef(dims.n)}) {
     for (unsigned d : dimSet) {
-      Value wgKnob = mkKnob(builder, loc, ("wg_" + Twine(d)).str());
+      std::string name = makeVarName(kKnobWgPrefix, d);
+      Value wgKnob = mkKnob(builder, loc, name);
       assertDivisible(
           builder, loc, smtDimArgs[d], wgKnob,
-          ("dim_" + Twine(d) + " must be divisible by wg_" + Twine(d)).str());
+          (kLoopRangePrefix + Twine(d) + " must be divisible by " + name)
+              .str());
     }
   }
   for (unsigned d : dims.k) {
-    Value redKnob = mkKnob(builder, loc, ("red_" + Twine(d)).str());
+    std::string name = makeVarName(kKnobRedPrefix, d);
+    Value redKnob = mkKnob(builder, loc, name);
     assertDivisible(
         builder, loc, smtDimArgs[d], redKnob,
-        ("dim_" + Twine(d) + " must be divisible by red_" + Twine(d)).str());
+        (kLoopRangePrefix + Twine(d) + " must be divisible by " + name).str());
   }
 
   return success();
