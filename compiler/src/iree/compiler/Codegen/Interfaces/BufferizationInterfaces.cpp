@@ -569,6 +569,232 @@ struct StoreToBufferOpSubsetInsertionInterface
   }
 };
 
+// Bufferization interface for CastToRaggedShapeOp. The op is a pure view: it
+// reinterprets its source as a rank-(n+1) ragged buffer by attaching a
+// `RaggedShapeAttr` layout, without copying data. The bufferized op therefore
+// aliases its source buffer and must bufferize in place.
+struct CastToRaggedShapeBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<
+          CastToRaggedShapeBufferizationInterface,
+          IREE::TensorExt::CastToRaggedShapeOp> {
+
+  // Both operands are read: `source` for its data and `column_lengths` for
+  // the per-row sizes of the resulting ragged view.
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  // The op produces a view and never writes to any operand.
+  bool
+  bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                          const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  // Materializing the result view does not introduce new writes either.
+  bool resultBufferizesToMemoryWrite(
+      Operation *op, OpResult opResult,
+      const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  // A view must share storage with its source; bufferization cannot introduce
+  // a copy for this op.
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  // The result aliases the `source` operand (same underlying buffer, new
+  // layout). `column_lengths` is consumed as shape metadata and does not
+  // alias the result.
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const bufferization::AnalysisState &state) const {
+    auto castToRaggedShapeOp = cast<IREE::TensorExt::CastToRaggedShapeOp>(op);
+    if (opOperand.get() == castToRaggedShapeOp.getSource()) {
+      return {{castToRaggedShapeOp.getResult(), BufferRelation::Equivalent}};
+    };
+    return {};
+  }
+
+  // Inverse of `getAliasingValues`: the result's only aliasing operand is
+  // `source`.
+  bufferization::AliasingOpOperandList
+  getAliasingOpOperands(Operation *op, Value value,
+                        const bufferization::AnalysisState &state) const {
+    auto castToRaggedShapeOp = cast<IREE::TensorExt::CastToRaggedShapeOp>(op);
+    if (value == castToRaggedShapeOp.getResult()) {
+      return {{&castToRaggedShapeOp.getSourceMutable(),
+               BufferRelation::Equivalent}};
+    }
+    return {};
+  }
+
+  // For the result, the memref type preserves the tensor's ragged encoding by
+  // promoting it to the memref layout attribute. For `source` and
+  // `column_lengths` operands, use the default identity layout so the op
+  // consumes plain buffers.
+  FailureOr<bufferization::BufferLikeType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const BufferizationState &state,
+                SmallVector<Value> & /*invocationStack*/) const {
+    auto castToRaggedShapeOp = cast<IREE::TensorExt::CastToRaggedShapeOp>(op);
+
+    auto tensorType = dyn_cast<RankedTensorType>(value.getType());
+    if (!tensorType) {
+      return failure();
+    }
+
+    if (value == castToRaggedShapeOp.getResult()) {
+      return cast<bufferization::BufferLikeType>(MemRefType::get(
+          tensorType.getShape(), tensorType.getElementType(),
+          /*layout=*/
+          cast<MemRefLayoutAttrInterface>(tensorType.getEncoding())));
+    }
+
+    return cast<bufferization::BufferLikeType>(
+        MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+  }
+
+  // Replace the tensor-typed op with the identical op on memrefs: the source
+  // and column_lengths operands become buffers and the result takes the
+  // ragged-layout memref type computed by `getBufferType`. No data is copied.
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
+    auto castToRaggedShapeOp = cast<IREE::TensorExt::CastToRaggedShapeOp>(op);
+
+    FailureOr<Value> sourceBuffer =
+        getBuffer(rewriter, castToRaggedShapeOp.getSource(), options, state);
+    if (failed(sourceBuffer)) {
+      return failure();
+    }
+
+    FailureOr<Value> columnLengths = getBuffer(
+        rewriter, castToRaggedShapeOp.getColumnLengths(), options, state);
+    if (failed(columnLengths)) {
+      return failure();
+    }
+
+    auto resultMemRefType = bufferization::getBufferType(
+        castToRaggedShapeOp.getResult(), options, state);
+    if (failed(resultMemRefType)) {
+      return failure();
+    }
+    replaceOpWithNewBufferizedOp<IREE::TensorExt::CastToRaggedShapeOp>(
+        rewriter, op, resultMemRefType.value(), sourceBuffer.value(),
+        castToRaggedShapeOp.getRaggedDimAttr(), columnLengths.value(),
+        castToRaggedShapeOp.getNumRaggedRows(),
+        castToRaggedShapeOp.getSourceDynamicDims());
+    return success();
+  }
+};
+
+// Bufferization interface for LinearizeRaggedDimsOp. The op is the dual view
+// of `CastToRaggedShape`: it collapses the ragged dimensions of its source
+// back into a single dense dimension and drops the `RaggedShapeAttr` layout.
+// No data is moved, so the bufferized op aliases its source and must
+// bufferize in place.
+struct LinearizeRaggedDimsBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<
+          LinearizeRaggedDimsBufferizationInterface,
+          IREE::TensorExt::LinearizeRaggedDimsOp> {
+
+  // The source buffer is read to produce the linearized view.
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  // The op is a view and does not write to any operand.
+  bool
+  bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                          const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  // Materializing the result view does not introduce new writes.
+  bool resultBufferizesToMemoryWrite(
+      Operation *op, OpResult opResult,
+      const bufferization::AnalysisState &state) const {
+    return false;
+  }
+
+  // The result must share storage with the source; no copy is permitted.
+  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
+                            const bufferization::AnalysisState &state) const {
+    return true;
+  }
+
+  // The result aliases the `source` operand (same underlying buffer, layout
+  // without ragged encoding).
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const bufferization::AnalysisState &state) const {
+    auto linearizeOp = cast<IREE::TensorExt::LinearizeRaggedDimsOp>(op);
+    if (opOperand.get() == linearizeOp.getSource()) {
+      return {{linearizeOp.getResult(), BufferRelation::Equivalent}};
+    };
+    return {};
+  }
+
+  // Inverse of `getAliasingValues`: the result's only aliasing operand is
+  // `source`.
+  bufferization::AliasingOpOperandList
+  getAliasingOpOperands(Operation *op, Value value,
+                        const bufferization::AnalysisState &state) const {
+    auto linearizeOp = cast<IREE::TensorExt::LinearizeRaggedDimsOp>(op);
+    if (value == linearizeOp.getResult()) {
+      return {{&linearizeOp.getSourceMutable(), BufferRelation::Equivalent}};
+    }
+    return {};
+  }
+
+  // Both source and result use the default identity layout. The result type
+  // drops the ragged encoding the source carries as part of collapsing the
+  // ragged dimensions into one dense dimension.
+  FailureOr<bufferization::BufferLikeType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const BufferizationState &state,
+                SmallVector<Value> & /*invocationStack*/) const {
+    auto tensorType = dyn_cast<RankedTensorType>(value.getType());
+    if (!tensorType) {
+      return failure();
+    }
+
+    return cast<bufferization::BufferLikeType>(
+        MemRefType::get(tensorType.getShape(), tensorType.getElementType()));
+  }
+
+  // Replace the tensor-typed op with the identical op on memrefs: the source
+  // memref is reinterpreted as a lower-rank non-ragged memref with the
+  // provided dynamic result dims. No data is copied.
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const bufferization::BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
+    auto linearizeOp = cast<IREE::TensorExt::LinearizeRaggedDimsOp>(op);
+
+    FailureOr<Value> sourceBuffer =
+        getBuffer(rewriter, linearizeOp.getSource(), options, state);
+    if (failed(sourceBuffer)) {
+      return failure();
+    }
+
+    auto resultMemRefType =
+        bufferization::getBufferType(linearizeOp.getResult(), options, state);
+    if (failed(resultMemRefType)) {
+      return failure();
+    }
+
+    replaceOpWithNewBufferizedOp<IREE::TensorExt::LinearizeRaggedDimsOp>(
+        rewriter, op, resultMemRefType.value(), sourceBuffer.value(),
+        linearizeOp.getResultDynamicDims());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // IREE specific post analysis transformations.
 //===----------------------------------------------------------------------===//
@@ -587,6 +813,12 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   IREE::VectorExt::registerIREEVectorExtBufferizationInterfaces(registry);
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::TensorExt::IREETensorExtDialect *dialect) {
+        // CastToRaggedShapeOp
+        IREE::TensorExt::CastToRaggedShapeOp::attachInterface<
+            CastToRaggedShapeBufferizationInterface>(*ctx);
+        // LinearizeRaggedDimsOp
+        IREE::TensorExt::LinearizeRaggedDimsOp::attachInterface<
+            LinearizeRaggedDimsBufferizationInterface>(*ctx);
         // DispatchTensorLoadOp
         IREE::TensorExt::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpInterface>(*ctx);
