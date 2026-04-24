@@ -85,6 +85,7 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Target::init_targets
+    iree::compiler::Pipelines::Options
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_llvmir_translations
     iree::compiler::Tools::init_passes_and_dialects

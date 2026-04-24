@@ -113,7 +113,7 @@ def LLVMGPUSelectLoweringStrategyPass :
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
   let options = [
     Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
-      /*default=*/"GPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel::O0)",
+      /*default=*/"GPUCodegenOptions::FromFlags::get()",
       "Session-scoped GPU codegen options (tuning spec, etc.).">,
   ];
 }

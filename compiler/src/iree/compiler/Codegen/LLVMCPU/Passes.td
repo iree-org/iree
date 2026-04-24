@@ -89,7 +89,7 @@ def LLVMCPULowerExecutableTargetPass :
   }];
   let options = [
     Option<"cpuOptions", "cpu-options", "CPUCodegenOptions",
-      /*default=*/"CPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel::O0)",
+      /*default=*/"CPUCodegenOptions::FromFlags::get()",
       "Session-scoped CPU codegen options controlling optimization level, "
       "distribution, etc.">,
   ];
