@@ -93,7 +93,6 @@ protected:
                           unsigned int iw = 3, unsigned int ic = 1,
                           unsigned int kh = 1, unsigned int kw = 1,
                           unsigned int oc = 1) {
-
     OpBuilder builder = setupBuilder();
     Location loc = builder.getUnknownLoc();
     auto f32 = builder.getF32Type();
@@ -339,7 +338,6 @@ protected:
   // 7 loops: (b, oh, ow, oc, kh, kw, ic).
 
   RootOpLoopInfo loopInfoForConv() {
-
     AffineExpr d0 = getAffineDimExpr(0, &ctx);
     AffineExpr d1 = getAffineDimExpr(1, &ctx);
     AffineExpr d2 = getAffineDimExpr(2, &ctx);
