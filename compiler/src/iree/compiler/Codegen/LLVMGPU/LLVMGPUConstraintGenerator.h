@@ -55,9 +55,6 @@ constexpr StringLiteral kKnobWgSizeZName = "wg_size_z";
 constexpr StringLiteral kKnobWgPrefix = "wg_";
 constexpr StringLiteral kKnobRedPrefix = "red_";
 
-/// Build a knob variable name from a prefix, e.g. ("wg_", 2) -> "wg_2".
-std::string makeVarName(StringRef prefix, unsigned idx);
-
 /// Get unique compatible MMA attrs for matmul and conv ops.
 SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
                                              IREE::GPU::TargetAttr gpuTarget,

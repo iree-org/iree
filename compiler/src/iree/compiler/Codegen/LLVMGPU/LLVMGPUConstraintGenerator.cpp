@@ -40,7 +40,9 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
 }
 
-std::string makeVarName(StringRef prefix, unsigned idx) {
+/// Helper to build a knob variable name from a prefix.
+/// e.g. ("wg_", 2) -> "wg_2".
+static std::string makeVarName(StringRef prefix, unsigned idx) {
   return (prefix + Twine(idx)).str();
 }
 
@@ -88,7 +90,6 @@ SmallVector<Attribute> getCompatibleMMAAttrs(linalg::LinalgOp op,
       continue;
     }
     // Check if the mma intrinsic supports the problem.
-
     if (failed(canTargetIntrinsic(problem, getIntrinsic(mma),
                                   targetSubgroupSize, /*canUpcastAcc*/ true,
                                   /*mustBeAligned*/ false))) {
@@ -124,6 +125,10 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
         convolutionDims->inputChannel.empty()) {
       return failure();
     }
+    // TODO(Amily): This mapping aligns with how VectorDistribute
+    // sets the dims for convs. It may be too coarse for conv
+    // semantics; revisit when plumbing through conv constraint
+    // generation.
     return ContractionLikeDims{llvm::to_vector(convolutionDims->outputImage),
                                llvm::to_vector(convolutionDims->outputChannel),
                                llvm::to_vector(convolutionDims->inputChannel)};

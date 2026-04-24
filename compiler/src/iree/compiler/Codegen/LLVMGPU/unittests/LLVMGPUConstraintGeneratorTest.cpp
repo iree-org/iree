@@ -90,17 +90,17 @@ protected:
     unsigned int oh = ih - kh + 1;
     unsigned int ow = iw - kw + 1;
 
-    auto input_ty = RankedTensorType::get({b, ih, iw, ic}, f32);
-    auto filter_ty = RankedTensorType::get({kh, kw, ic, oc}, f32);
-    auto out_ty = RankedTensorType::get({b, oh, ow, oc}, f32);
+    auto inputTy = RankedTensorType::get({b, ih, iw, ic}, f32);
+    auto filterTy = RankedTensorType::get({kh, kw, ic, oc}, f32);
+    auto outTy = RankedTensorType::get({b, oh, ow, oc}, f32);
 
     Value input =
-        tensor::EmptyOp::create(builder, loc, input_ty.getShape(), f32);
+        tensor::EmptyOp::create(builder, loc, inputTy.getShape(), f32);
     Value filter =
-        tensor::EmptyOp::create(builder, loc, filter_ty.getShape(), f32);
-    Value out = tensor::EmptyOp::create(builder, loc, out_ty.getShape(), f32);
+        tensor::EmptyOp::create(builder, loc, filterTy.getShape(), f32);
+    Value out = tensor::EmptyOp::create(builder, loc, outTy.getShape(), f32);
 
-    return linalg::Conv2DNhwcHwcfOp::create(builder, loc, TypeRange{out_ty},
+    return linalg::Conv2DNhwcHwcfOp::create(builder, loc, TypeRange{outTy},
                                             ValueRange{input, filter},
                                             ValueRange{out});
   }
@@ -229,14 +229,6 @@ protected:
   }
 
   MLIRContext *getContext() { return &ctx; }
-
-  IREE::GPU::TargetAttr getGfx942Target() {
-    return IREE::GPU::getHIPTargetDetails("gfx942", "", &ctx);
-  }
-
-  IREE::GPU::TargetAttr getGfx1201Target() {
-    return IREE::GPU::getHIPTargetDetails("gfx1201", "", &ctx);
-  }
 
   linalg::MatmulOp getTestMatmulOp(Type inputType, Type accType,
                                    unsigned int m = 16, unsigned int n = 16,
@@ -406,11 +398,15 @@ TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
   EXPECT_TRUE(result.empty());
 }
 
-TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
+/// Helper to build a knob variable name from a prefix and index.
+/// e.g. ("wg_", 2) -> "wg_2".
+static std::string makeVarName(StringRef prefix, unsigned idx) {
+  return (prefix + Twine(idx)).str();
+}
 
+TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
   DictionaryAttr dict = buildVectorDistributeKnobsDict(
       getContext(), loopInfoForMatmul(), matmulDims(), compatibleMMAs());
-
   ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
   ASSERT_TRUE(dict.get(kKnobReductionKey));
   ASSERT_TRUE(dict.get(kKnobMmaKindKey));
@@ -462,7 +458,6 @@ TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
 TEST_F(VectorDistributeKnobsTest, KnobDictForConv) {
   DictionaryAttr dict = buildVectorDistributeKnobsDict(
       getContext(), loopInfoForConv(), convDims(), compatibleMMAs());
-
   ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
   ASSERT_TRUE(dict.get(kKnobReductionKey));
   ASSERT_TRUE(dict.get(kKnobMmaKindKey));
