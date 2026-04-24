@@ -188,13 +188,8 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   subgroupCounts[dims.n.back()] = makeIntKnobAttr(ctx, kKnobSgNCntName);
   subgroupBasisEntries.emplace_back(kKnobCountsKey,
                                     ArrayAttr::get(ctx, subgroupCounts));
-  SmallVector<Attribute> subgroupMapping;
-  // VectorDistribute sets identity mapping for matmul and conv.
-  for (unsigned i = 0; i < loopInfo.numLoops; ++i) {
-    subgroupMapping.push_back(makeIntAttr(ctx, i));
-  }
-  subgroupBasisEntries.emplace_back(kKnobMappingKey,
-                                    ArrayAttr::get(ctx, subgroupMapping));
+  // VectorDistribute sets identity mapping for matmul and conv, so
+  // omit it from the knob template.
   knobsEntries.emplace_back(kKnobSubgroupBasisKey,
                             DictionaryAttr::get(ctx, subgroupBasisEntries));
 
