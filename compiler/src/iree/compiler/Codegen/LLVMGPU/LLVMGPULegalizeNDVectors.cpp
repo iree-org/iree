@@ -802,13 +802,14 @@ struct LLVMGPULegalizeNDVectorsPass final
     populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                         typeConverter);
     patterns.add<UnrollElementwiseOps, ConvertReturnLike>(typeConverter, ctx);
-    patterns.add<
-        ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
-        ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
-        ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
-        ConvertVectorToElements, ConvertVectorFromElements,
-        ConvertVectorBroadcast, ConvertVectorBitcast,
-	ConvertVectorMultiReduction>(typeConverter, ctx);
+    patterns
+        .add<ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
+             ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
+             ConvertVectorInsertStridedSlice, ConvertArithConstant,
+             ConvertUBPoison, ConvertVectorToElements,
+             ConvertVectorFromElements, ConvertVectorBroadcast,
+             ConvertVectorBitcast, ConvertVectorMultiReduction>(typeConverter,
+                                                                ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
