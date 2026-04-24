@@ -23,15 +23,19 @@ namespace {
 using IntKnobAttr = IREE::Codegen::IntKnobAttr;
 using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
 
-class RootOpUtilsTest : public ::testing::Test {
+// Shared fixture providing MLIRContext, ModuleOp, and helpers to
+// construct common linalg test ops.
+class LinalgTestBase : public ::testing::Test {
 protected:
-  RootOpUtilsTest() {
+  LinalgTestBase() {
     DialectRegistry reg;
     reg.insert<arith::ArithDialect, func::FuncDialect, linalg::LinalgDialect,
-               tensor::TensorDialect>();
+               tensor::TensorDialect, IREE::GPU::IREEGPUDialect>();
     ctx.appendDialectRegistry(reg);
     ctx.loadAllAvailableDialects();
   }
+
+  MLIRContext *getContext() { return &ctx; }
 
   OpBuilder setupBuilder() {
     OpBuilder builder(&ctx);
@@ -40,24 +44,31 @@ protected:
     return builder;
   }
 
-  linalg::MatmulOp getTestMatmulOp(unsigned int m = 16, unsigned int n = 16,
+  linalg::MatmulOp getTestMatmulOp(Type inputType, Type accType,
+                                   unsigned int m = 16, unsigned int n = 16,
                                    unsigned int k = 32) {
     OpBuilder builder = setupBuilder();
     Location loc = builder.getUnknownLoc();
 
-    auto f16 = builder.getF16Type();
-    auto f32 = builder.getF32Type();
+    auto lhsType = RankedTensorType::get({m, k}, inputType);
+    auto rhsType = RankedTensorType::get({k, n}, inputType);
+    auto accTy = RankedTensorType::get({m, n}, accType);
 
-    auto lhsType = RankedTensorType::get({m, k}, f16);
-    auto rhsType = RankedTensorType::get({k, n}, f16);
-    auto accType = RankedTensorType::get({m, n}, f32);
+    Value lhs =
+        tensor::EmptyOp::create(builder, loc, lhsType.getShape(), inputType);
+    Value rhs =
+        tensor::EmptyOp::create(builder, loc, rhsType.getShape(), inputType);
+    Value acc =
+        tensor::EmptyOp::create(builder, loc, accTy.getShape(), accType);
 
-    Value lhs = tensor::EmptyOp::create(builder, loc, lhsType.getShape(), f16);
-    Value rhs = tensor::EmptyOp::create(builder, loc, rhsType.getShape(), f16);
-    Value acc = tensor::EmptyOp::create(builder, loc, accType.getShape(), f32);
-
-    return linalg::MatmulOp::create(builder, loc, TypeRange{accType},
+    return linalg::MatmulOp::create(builder, loc, TypeRange{accTy},
                                     ValueRange{lhs, rhs}, ValueRange{acc});
+  }
+
+  linalg::MatmulOp getTestMatmulOp(unsigned int m = 16, unsigned int n = 16,
+                                   unsigned int k = 32) {
+    return getTestMatmulOp(Float16Type::get(&ctx), Float32Type::get(&ctx), m, n,
+                           k);
   }
 
   linalg::FillOp getTestFillOp() {
@@ -144,6 +155,8 @@ private:
   OwningOpRef<ModuleOp> module;
 };
 
+class RootOpUtilsTest : public LinalgTestBase {};
+
 TEST_F(RootOpUtilsTest, InferContractionDimsForFillOp) {
   auto op = getTestFillOp();
   ASSERT_TRUE(!!op);
@@ -218,45 +231,79 @@ TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForNonLinalgOp) {
   ASSERT_FALSE(loopInfo.has_value());
 }
 
-class CompatibleMMAAttrsTest : public ::testing::Test {
-protected:
-  CompatibleMMAAttrsTest() {
-    DialectRegistry reg;
-    reg.insert<IREE::GPU::IREEGPUDialect, linalg::LinalgDialect,
-               tensor::TensorDialect>();
-    ctx.appendDialectRegistry(reg);
-    ctx.loadAllAvailableDialects();
+class CompatibleMMAAttrsTest : public LinalgTestBase {};
+
+TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
+  ASSERT_TRUE(target);
+
+  Type f16 = Float16Type::get(getContext());
+  Type f32 = Float32Type::get(getContext());
+  auto op = getTestMatmulOp(f16, f32);
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_FALSE(result.empty());
+
+  for (Attribute attr : result) {
+    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
+    ASSERT_TRUE(!!mma);
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    EXPECT_EQ(aType, f16);
+    EXPECT_EQ(bType, f16);
+    EXPECT_EQ(cType, f32);
   }
+}
 
-  MLIRContext *getContext() { return &ctx; }
+TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  ASSERT_TRUE(target);
 
-  linalg::MatmulOp getTestMatmulOp(Type inputType, Type accType,
-                                   unsigned int m = 16, unsigned int n = 16,
-                                   unsigned int k = 32) {
-    OpBuilder builder(&ctx);
-    module = ModuleOp::create(builder.getUnknownLoc());
-    builder.setInsertionPointToStart(module->getBody());
-    Location loc = builder.getUnknownLoc();
+  Type i8 = IntegerType::get(getContext(), 8);
+  Type i32 = IntegerType::get(getContext(), 32);
+  auto op = getTestMatmulOp(i8, i32);
+  ASSERT_TRUE(!!op);
 
-    auto lhsType = RankedTensorType::get({m, k}, inputType);
-    auto rhsType = RankedTensorType::get({k, n}, inputType);
-    auto accTy = RankedTensorType::get({m, n}, accType);
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_FALSE(result.empty());
 
-    Value lhs =
-        tensor::EmptyOp::create(builder, loc, lhsType.getShape(), inputType);
-    Value rhs =
-        tensor::EmptyOp::create(builder, loc, rhsType.getShape(), inputType);
-    Value acc =
-        tensor::EmptyOp::create(builder, loc, accTy.getShape(), accType);
-
-    return linalg::MatmulOp::create(builder, loc, TypeRange{accTy},
-                                    ValueRange{lhs, rhs}, ValueRange{acc});
+  for (Attribute attr : result) {
+    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
+    ASSERT_TRUE(!!mma);
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    EXPECT_EQ(aType, i8);
+    EXPECT_EQ(bType, i8);
+    EXPECT_EQ(cType, i32);
   }
+}
 
-private:
-  MLIRContext ctx;
-  OwningOpRef<ModuleOp> module;
-};
+TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  ASSERT_TRUE(target);
+
+  Type i1 = IntegerType::get(getContext(), 1);
+  auto op = getTestMatmulOp(i1, i1);
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  auto dims = inferContractionLikeDims(op);
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_TRUE(result.empty());
+}
+
+/// Helper to build a knob variable name from a prefix and index.
+/// e.g. ("wg_", 2) -> "wg_2".
+static std::string makeVarName(StringRef prefix, unsigned idx) {
+  return (prefix + Twine(idx)).str();
+}
 
 class VectorDistributeKnobsTest : public ::testing::Test {
 protected:
@@ -331,78 +378,6 @@ protected:
 private:
   MLIRContext ctx;
 };
-
-TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type f16 = Float16Type::get(getContext());
-  Type f32 = Float32Type::get(getContext());
-  auto op = getTestMatmulOp(f16, f32);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  ASSERT_TRUE(loopInfo.has_value());
-  auto dims = inferContractionLikeDims(op);
-  ASSERT_TRUE(succeeded(dims));
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_FALSE(result.empty());
-
-  for (Attribute attr : result) {
-    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
-    ASSERT_TRUE(!!mma);
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    EXPECT_EQ(aType, f16);
-    EXPECT_EQ(bType, f16);
-    EXPECT_EQ(cType, f32);
-  }
-}
-
-TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type i8 = IntegerType::get(getContext(), 8);
-  Type i32 = IntegerType::get(getContext(), 32);
-  auto op = getTestMatmulOp(i8, i32);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  ASSERT_TRUE(loopInfo.has_value());
-  auto dims = inferContractionLikeDims(op);
-  ASSERT_TRUE(succeeded(dims));
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_FALSE(result.empty());
-
-  for (Attribute attr : result) {
-    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
-    ASSERT_TRUE(!!mma);
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    EXPECT_EQ(aType, i8);
-    EXPECT_EQ(bType, i8);
-    EXPECT_EQ(cType, i32);
-  }
-}
-
-TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type i1 = IntegerType::get(getContext(), 1);
-  auto op = getTestMatmulOp(i1, i1);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  auto dims = inferContractionLikeDims(op);
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_TRUE(result.empty());
-}
-
-/// Helper to build a knob variable name from a prefix and index.
-/// e.g. ("wg_", 2) -> "wg_2".
-static std::string makeVarName(StringRef prefix, unsigned idx) {
-  return (prefix + Twine(idx)).str();
-}
 
 TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
   DictionaryAttr dict = buildVectorDistributeKnobsDict(
