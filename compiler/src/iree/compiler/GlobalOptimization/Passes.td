@@ -76,6 +76,45 @@ def DemoteContractionInputsPass
   ];
 }
 
+def PromoteContractionOutputsPass
+    : Pass<"iree-global-opt-promote-contraction-outputs", ""> {
+  let summary =
+      "Promotes outputs of linalg matmul-like ops from a narrower type to "
+      "f32.";
+  let options =
+      [Option<"promoteType", "type",
+              "mlir::iree_compiler::GlobalOptimization::PromoteType",
+              /*default=*/"", "Select the target type for promotion.",
+              [{::llvm::cl::values(
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteType::F16,
+                        "f16",
+                        "Promote from f16."),
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteType::BF16,
+                        "bf16",
+                        "Promote from bf16.")
+           )}]>,
+       Option<"promoteOperation", "operation",
+              "mlir::iree_compiler::GlobalOptimization::PromoteOperation",
+              /*default=*/
+              "mlir::iree_compiler::GlobalOptimization::PromoteOperation::All",
+              "Select the type of contraction ops to promote.",
+              [{::llvm::cl::values(
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteOperation::All,
+                        "all",
+                        "Promote all contraction ops."),
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteOperation::Conv,
+                        "conv",
+                        "Only promote convolution ops."),
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteOperation::Matmul,
+                        "matmul",
+                        "Only promote matmul ops."),
+             clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteOperation::None,
+                        "none",
+                        "Promote no contraction ops.")
+           )}]>,
+  ];
+}
+
 def DetachElementwiseFromNamedOpsPass :
     Pass<"iree-global-opt-detach-elementwise-from-named-ops", ""> {
   let summary = "Detaches elementwise ops from named Linalg ops.";
