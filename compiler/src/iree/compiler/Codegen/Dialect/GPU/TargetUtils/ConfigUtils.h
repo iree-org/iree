@@ -61,10 +61,11 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             Operation *op);
 
 /// Helper for setting up a memory bound reduction configuration, focusing
-/// on getting peak global memory bandwidth.
+/// on getting peak global memory bandwidth. Supports linalg::LinalgOp and
+/// LinalgExt::ArgCompareOp.
 LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                  mlir::FunctionOpInterface entryPoint,
-                                 linalg::LinalgOp op);
+                                 Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options
