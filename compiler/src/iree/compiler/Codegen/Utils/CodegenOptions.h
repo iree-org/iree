@@ -67,4 +67,44 @@ struct GPUCodegenOptions : CodegenOptions {
 
 } // namespace mlir::iree_compiler
 
+// Declares the machinery required to use `TYPE` as an MLIR pass option:
+//
+//   (1) `operator<<` in the type's associated namespace, so MLIR's pass-option
+//       printing (which goes through ADL via has_stream_operator) can serialize
+//       the value. We print nothing because the options are populated
+//       programmatically from a session-scoped instance, not from pass
+//       pipeline strings.
+//   (2) `llvm::cl::parser<TYPE>` specialized to inherit `basic_parser` instead
+//       of the default `generic_parser_base`. This sidesteps
+//       `GenericOptionParser::findArgStrForValue`, which `llvm_unreachable`s
+//       on struct-typed values that have no registered enum entries.
+//
+// The parse method is a no-op: these options never flow in from strings.
+#define IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(TYPE, VALUE_NAME_STR)         \
+  namespace mlir::iree_compiler {                                              \
+  inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TYPE &) {  \
+    return os;                                                                 \
+  }                                                                            \
+  } /* namespace mlir::iree_compiler */                                        \
+                                                                               \
+  namespace llvm::cl {                                                         \
+  extern template class basic_parser<TYPE>;                                    \
+  template <>                                                                  \
+  class parser<TYPE> : public basic_parser<TYPE> {                             \
+  public:                                                                      \
+    parser(Option &O) : basic_parser(O) {}                                     \
+    bool parse(Option &O, StringRef ArgName, StringRef Arg, TYPE &Val);        \
+    StringRef getValueName() const override { return VALUE_NAME_STR; }         \
+    void printOptionDiff(const Option &O, TYPE V, const OptVal &Default,       \
+                         size_t GlobalWidth) const;                            \
+    void anchor() override;                                                    \
+  };                                                                           \
+  } /* namespace llvm::cl */
+
+IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::CPUCodegenOptions,
+                                         "cpu codegen options")
+IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::GPUCodegenOptions,
+                                         "gpu codegen options")
+#undef IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION
+
 #endif // IREE_COMPILER_CODEGEN_UTILS_CODEGENOPTIONS_H_
