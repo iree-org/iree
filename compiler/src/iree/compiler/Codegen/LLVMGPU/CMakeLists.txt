@@ -178,6 +178,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRVectorUtils
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
