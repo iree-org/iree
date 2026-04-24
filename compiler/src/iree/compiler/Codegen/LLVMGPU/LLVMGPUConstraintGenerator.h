@@ -50,7 +50,8 @@ constexpr StringLiteral kKnobWgSizeXName = "wg_size_x";
 constexpr StringLiteral kKnobWgSizeYName = "wg_size_y";
 constexpr StringLiteral kKnobWgSizeZName = "wg_size_z";
 
-// Knob variable name prefixes (combined with a dim index at runtime).
+// Knob variable name prefixes. The loop dim count varies
+// per problem, so names are built at runtime as prefix + dim idx.
 constexpr StringLiteral kKnobWgPrefix = "wg_";
 constexpr StringLiteral kKnobRedPrefix = "red_";
 

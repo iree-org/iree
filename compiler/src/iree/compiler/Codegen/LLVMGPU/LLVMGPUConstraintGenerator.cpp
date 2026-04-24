@@ -158,10 +158,9 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   }
   knobsEntries.emplace_back(kKnobWorkgroupKey,
                             ArrayAttr::get(ctx, workgroupEntries));
-  IREE::Codegen::AssertOp::create()
-      // Build reduction array: K dims get IntKnobAttr, others get 0 : i64.
-      SmallVector<Attribute>
-          reductionEntries(loopInfo.numLoops, makeIntAttr(ctx, 0));
+  // Build reduction array: K dims get IntKnobAttr, others get 0 : i64.
+  SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
+                                          makeIntAttr(ctx, 0));
   for (unsigned d : dims.k) {
     reductionEntries[d] = makeIntKnobAttr(ctx, makeVarName(kKnobRedPrefix, d));
   }
