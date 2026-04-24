@@ -395,15 +395,13 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
-      if (Attribute res =
-              constFoldBinaryOp<IntegerAttr, IntegerAttr,
-                                IntegerAttr::ValueType, IntegerAttr::ValueType,
-                                void>(
-                  ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
-                  [direction, kind = *compType](const APInt &a,
-                                                const APInt &b) {
-                    return calculateComp(kind, direction, a, b);
-                  })) {
+      if (Attribute res = constFoldBinaryOp<IntegerAttr, IntegerAttr,
+                                            IntegerAttr::ValueType,
+                                            IntegerAttr::ValueType, void>(
+              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+              [direction, kind = *compType](const APInt &a, const APInt &b) {
+                return calculateComp(kind, direction, a, b);
+              })) {
         rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
         return success();
       }
