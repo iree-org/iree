@@ -276,7 +276,6 @@ struct SinkUnsetEncodingOp : OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
 
 } // namespace
 
-
 /// Create dispatch.region Ops based on a fusion heuristic.
 void HoistEncodingOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
