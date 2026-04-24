@@ -807,7 +807,7 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
-        ConvertVectorBroadcast, ConvertVectorBitcast
+        ConvertVectorBroadcast, ConvertVectorBitcast,
 	ConvertVectorMultiReduction>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
