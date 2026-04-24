@@ -4573,6 +4573,8 @@
       
         
       
+        
+      
     
     
     
@@ -4670,6 +4672,36 @@
     
   
     Profiling overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/device-profiling/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Device profiling
   
 
     
@@ -5181,10 +5213,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#profiling" class="md-nav__link">
+  <a href="#external-capture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Profiling
+        External capture
       
     </span>
   </a>
@@ -6378,10 +6410,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#profiling" class="md-nav__link">
+  <a href="#external-capture" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Profiling
+        External capture
       
     </span>
   </a>
@@ -6693,11 +6725,12 @@ in three steps:</p>
 translates to blocking wait and allocation.</p>
 <h4 id="collectives">Collectives<a class="headerlink" href="#collectives" title="Permanent link">link</a></h4>
 <p>Collectives support is not yet implemented.</p>
-<h4 id="profiling">Profiling<a class="headerlink" href="#profiling" title="Permanent link">link</a></h4>
-<p>The Metal HAL driver supports profiling via <code>MTLCaptureManager</code>. We can either
-capture to a trace file or XCode.</p>
-<p>To perform profiling in the command line, attach <code>--device_profiling_mode=queue
---device_profiling_file=/path/to/metal.gputrace</code> to IREE binaries.</p>
+<h4 id="external-capture">External capture<a class="headerlink" href="#external-capture" title="Permanent link">link</a></h4>
+<p>The Metal HAL driver supports external capture via <code>MTLCaptureManager</code>. We can
+either capture to a trace file or Xcode.</p>
+<p>To capture from the command line, attach
+<code>--device_capture_tool=metal --device_capture_file=/path/to/metal.gputrace</code> to
+IREE binaries.</p>
 <h3 id="command-buffer">Command buffer<a class="headerlink" href="#command-buffer" title="Permanent link">link</a></h3>
 <p>Command buffers are where IREE HAL and Metal API have a major difference.</p>
 <p>IREE HAL command buffers follow the flat Vulkan recording model, where all memory
