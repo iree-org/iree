@@ -7,6 +7,7 @@
 #include <inttypes.h>
 
 #include <cstring>
+#include <string>
 
 #include "benchmark/benchmark.h"
 #include "iree/async/frontier_tracker.h"
@@ -29,6 +30,12 @@ IREE_FLAG_LIST(
     "or --replay_executable_substitution=EXECUTABLE_ID@FORMAT=PATH when the "
     "format must be explicit. Use all=PATH or all@FORMAT=PATH to apply one "
     "replacement to every captured executable.");
+IREE_FLAG(
+    string, replay_scope, "",
+    "Times only replay operations inside matching named scope markers. The "
+    "full replay still executes each iteration so setup and teardown remain "
+    "faithful, but Google Benchmark reports manually accumulated time from "
+    "matching scope regions.");
 IREE_FLAG(bool, agents_md, false,
           "Prints an agent-oriented Markdown guide for HAL replay capture and "
           "tooling workflows and exits.");
@@ -54,6 +61,22 @@ typedef struct ReplayExecutableSubstitutionState {
   // Number of entries in |entries|.
   iree_host_size_t entry_count;
 } ReplayExecutableSubstitutionState;
+
+typedef struct ReplayScopeTimingState {
+  // Selected scope name borrowed from the flag storage.
+  iree_string_view_t selected_scope;
+  // State for matching selected scope intervals.
+  struct {
+    // Nesting depth of matching selected scopes.
+    iree_host_size_t depth;
+    // True once at least one matching begin marker was observed.
+    bool observed_begin;
+    // Monotonic start timestamp for the active outermost matching scope.
+    iree_time_t start_time_ns;
+    // Accumulated wall-clock time spent inside matching scope regions.
+    iree_duration_t elapsed_time_ns;
+  } match;
+} ReplayScopeTimingState;
 
 void ReleaseReplayExecutableSubstitutions(
     iree_allocator_t host_allocator, ReplayExecutableSubstitutionState* state) {
@@ -184,22 +207,89 @@ iree_status_t ReplayExecutableSubstitutionCallback(
   return iree_ok_status();
 }
 
+iree_status_t ReplayScopeTimingCallback(
+    void* user_data, const iree_hal_replay_scope_event_t* event) {
+  ReplayScopeTimingState* state = (ReplayScopeTimingState*)user_data;
+  if (!iree_string_view_equal(event->name, state->selected_scope)) {
+    return iree_ok_status();
+  }
+
+  switch (event->type) {
+    case IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_BEGIN:
+      state->match.observed_begin = true;
+      if (state->match.depth == 0) {
+        state->match.start_time_ns = iree_time_now();
+      }
+      ++state->match.depth;
+      return iree_ok_status();
+    case IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_END:
+      if (state->match.depth == 0) {
+        return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                                "replay scope '%.*s' ended before it began",
+                                (int)state->selected_scope.size,
+                                state->selected_scope.data);
+      }
+      --state->match.depth;
+      if (state->match.depth == 0) {
+        state->match.elapsed_time_ns +=
+            iree_time_now() - state->match.start_time_ns;
+        state->match.start_time_ns = 0;
+      }
+      return iree_ok_status();
+    default:
+      return iree_make_status(IREE_STATUS_DATA_LOSS,
+                              "unknown replay scope event type %" PRIu32,
+                              event->type);
+  }
+}
+
 void BenchmarkReplay(iree_const_byte_span_t file_contents,
                      iree_hal_device_group_t* device_group,
                      iree_hal_profiling_from_flags_t* profiling,
-                     const iree_hal_replay_execute_options_t* options,
+                     iree_hal_replay_execute_options_t options,
                      benchmark::State& state) {
   iree_allocator_t host_allocator = iree_allocator_system();
+  iree_string_view_t selected_scope = iree_make_cstring_view(FLAG_replay_scope);
+  const bool scoped_timing = !iree_string_view_is_empty(selected_scope);
   for (auto _ : state) {
     (void)_;
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("ReplayIteration");
-    IREE_CHECK_OK(iree_hal_replay_execute_file(file_contents, device_group,
-                                               options, host_allocator));
+    ReplayScopeTimingState scope_state = {
+        /*.selected_scope=*/selected_scope,
+        /*.match=*/{},
+    };
+    if (scoped_timing) {
+      options.scope_event_callback.fn = ReplayScopeTimingCallback;
+      options.scope_event_callback.user_data = &scope_state;
+    }
+    iree_status_t status = iree_hal_replay_execute_file(
+        file_contents, device_group, &options, host_allocator);
+    IREE_CHECK_OK(status);
+    if (scoped_timing) {
+      if (!scope_state.match.observed_begin) {
+        IREE_CHECK_OK(iree_make_status(
+            IREE_STATUS_NOT_FOUND,
+            "--replay_scope='%.*s' did not match any replay scope marker",
+            (int)selected_scope.size, selected_scope.data));
+      }
+      if (scope_state.match.depth != 0) {
+        IREE_CHECK_OK(iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "--replay_scope='%.*s' matched a scope that did not end",
+            (int)selected_scope.size, selected_scope.data));
+      }
+      state.SetIterationTime((double)scope_state.match.elapsed_time_ns /
+                             1000000000.0);
+    }
     IREE_TRACE_ZONE_END(z0);
-    state.PauseTiming();
-    IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
-    state.ResumeTiming();
+    if (!scoped_timing) {
+      state.PauseTiming();
+      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
+      state.ResumeTiming();
+    } else {
+      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
+    }
   }
   state.SetItemsProcessed(state.iterations());
 }
@@ -366,15 +456,26 @@ static int runMain(int argc, char** argv) {
         &executable_substitutions;
   }
   if (iree_status_is_ok(status)) {
-    benchmark::RegisterBenchmark("BM_replay",
-                                 [=](benchmark::State& state) -> void {
-                                   BenchmarkReplay(file_contents->const_buffer,
-                                                   device_group, profiling,
-                                                   &options, state);
-                                 })
-        ->MeasureProcessCPUTime()
-        ->UseRealTime()
-        ->Unit(benchmark::kMillisecond);
+    iree_string_view_t replay_scope = iree_make_cstring_view(FLAG_replay_scope);
+    std::string benchmark_name = "BM_replay";
+    if (!iree_string_view_is_empty(replay_scope)) {
+      benchmark_name.append("/scope:");
+      benchmark_name.append(replay_scope.data, replay_scope.size);
+    }
+    benchmark::Benchmark* replay_benchmark =
+        benchmark::RegisterBenchmark(
+            benchmark_name,
+            [=](benchmark::State& state) -> void {
+              BenchmarkReplay(file_contents->const_buffer, device_group,
+                              profiling, options, state);
+            })
+            ->MeasureProcessCPUTime()
+            ->Unit(benchmark::kMillisecond);
+    if (iree_string_view_is_empty(replay_scope)) {
+      replay_benchmark->UseRealTime();
+    } else {
+      replay_benchmark->UseManualTime();
+    }
     ::benchmark::RunSpecifiedBenchmarks();
   }
 

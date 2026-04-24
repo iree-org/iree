@@ -210,6 +210,7 @@ static iree_status_t iree_tooling_annotate_status_with_function_decl(
 static iree_status_t iree_tooling_run_function(
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_replay_recorder_t* replay_recorder,
     iree_allocator_t host_allocator, int* out_exit_code) {
   iree_string_view_t function_name = iree_vm_function_name(&function);
   (void)function_name;
@@ -219,6 +220,13 @@ static iree_status_t iree_tooling_run_function(
   iree_string_view_t arguments_cconv, results_cconv;
   iree_status_t status = iree_vm_function_call_get_cconv_fragments(
       &signature, &arguments_cconv, &results_cconv);
+
+  bool replay_execute_scope_open = false;
+  if (iree_status_is_ok(status) && replay_recorder) {
+    status = iree_hal_replay_recorder_scope_begin(replay_recorder,
+                                                  IREE_SV("execute"));
+    replay_execute_scope_open = iree_status_is_ok(status);
+  }
 
   // Parse --input= values into device buffers.
   iree_vm_list_t* inputs = NULL;
@@ -334,6 +342,10 @@ static iree_status_t iree_tooling_run_function(
   iree_io_stream_release(stdout_stream);
   fflush(stdout);
 
+  if (replay_execute_scope_open) {
+    status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
+                                          replay_recorder, IREE_SV("execute")));
+  }
   return status;
 }
 
@@ -428,15 +440,28 @@ iree_status_t iree_tooling_run_module_with_data(
   // Parse inputs, run the function, and process outputs.
   iree_status_t status =
       iree_tooling_run_function(context, function, device, device_allocator,
-                                host_allocator, out_exit_code);
+                                replay_recorder, host_allocator, out_exit_code);
 
   // Annotate errors with the function description.
   if (!iree_status_is_ok(status)) {
     status = iree_tooling_annotate_status_with_function_decl(status, function);
   }
 
+  bool replay_deinit_scope_open = false;
+  if (replay_recorder) {
+    iree_status_t begin_status = iree_hal_replay_recorder_scope_begin(
+        replay_recorder, IREE_SV("deinit"));
+    replay_deinit_scope_open = iree_status_is_ok(begin_status);
+    status = iree_status_join(status, begin_status);
+  }
+
   // Release the context and all retained resources (variables, constants, etc).
   iree_vm_context_release(context);
+
+  if (replay_deinit_scope_open) {
+    status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
+                                          replay_recorder, IREE_SV("deinit")));
+  }
 
   if (replay_recorder) {
     status = iree_status_join(

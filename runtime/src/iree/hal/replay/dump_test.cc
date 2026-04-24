@@ -84,6 +84,53 @@ static iree_const_byte_span_t MakeReplayFileContents(
       storage.data(), static_cast<iree_host_size_t>(file_header->file_length));
 }
 
+static std::vector<uint8_t> MakeScopeReplayFileStorage() {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_io_file_handle_t* file_handle = nullptr;
+  IREE_CHECK_OK(iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+      iree_make_byte_span(storage.data(), storage.size()),
+      iree_io_file_handle_release_callback_null(), iree_allocator_system(),
+      &file_handle));
+
+  iree_hal_replay_file_writer_t* writer = nullptr;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_create(
+      file_handle, iree_allocator_system(), &writer));
+  iree_io_file_handle_release(file_handle);
+
+  iree_hal_replay_file_record_metadata_t session_metadata = {};
+  session_metadata.sequence_ordinal = 0;
+  session_metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_SESSION;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_append_record(
+      writer, &session_metadata, 0, nullptr, nullptr));
+
+  const char scope_name[] = "execute";
+  iree_hal_replay_scope_payload_t payload = {};
+  payload.name_length = sizeof(scope_name) - 1;
+  iree_const_byte_span_t iovecs[] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(scope_name, sizeof(scope_name) - 1),
+  };
+  iree_hal_replay_file_record_metadata_t begin_metadata = {};
+  begin_metadata.sequence_ordinal = 1;
+  begin_metadata.record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION;
+  begin_metadata.payload_type = IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE;
+  begin_metadata.operation_code =
+      IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_append_record(
+      writer, &begin_metadata, IREE_ARRAYSIZE(iovecs), iovecs, nullptr));
+
+  iree_hal_replay_file_record_metadata_t end_metadata = begin_metadata;
+  end_metadata.sequence_ordinal = 2;
+  end_metadata.operation_code = IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END;
+  IREE_CHECK_OK(iree_hal_replay_file_writer_append_record(
+      writer, &end_metadata, IREE_ARRAYSIZE(iovecs), iovecs, nullptr));
+
+  IREE_CHECK_OK(iree_hal_replay_file_writer_close(writer));
+  iree_hal_replay_file_writer_free(writer);
+  return storage;
+}
+
 static std::vector<uint8_t> MakeExecutablePrepareReplayFileStorage() {
   std::vector<uint8_t> storage(4096, 0);
   iree_io_file_handle_t* file_handle = nullptr;
@@ -182,6 +229,32 @@ TEST(ReplayDumpTest, EmitsJsonlWithPayloadRanges) {
   EXPECT_THAT(output, HasSubstr("\"payload_type\":\"buffer_object\""));
   EXPECT_THAT(output, HasSubstr("\"payload_range\""));
   EXPECT_THAT(output, HasSubstr("\"allocation_size\":256"));
+}
+
+TEST(ReplayDumpTest, EmitsScopes) {
+  std::vector<uint8_t> storage = MakeScopeReplayFileStorage();
+  iree_hal_replay_dump_options_t options =
+      iree_hal_replay_dump_options_default();
+
+  std::string text_output;
+  IREE_ASSERT_OK(DumpReplayToString(MakeReplayFileContents(storage), &options,
+                                    &text_output));
+
+  EXPECT_THAT(text_output, HasSubstr("scopes: begin=1 end=1"));
+  EXPECT_THAT(text_output, HasSubstr("op=replay.scope_begin"));
+  EXPECT_THAT(text_output, HasSubstr("payload=replay_scope"));
+  EXPECT_THAT(text_output, HasSubstr("name=\"execute\""));
+
+  options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
+  std::string jsonl_output;
+  IREE_ASSERT_OK(DumpReplayToString(MakeReplayFileContents(storage), &options,
+                                    &jsonl_output));
+
+  EXPECT_THAT(jsonl_output, HasSubstr("\"scope_begin_count\":1"));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"scope_end_count\":1"));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"operation\":\"replay.scope_begin\""));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"payload_type\":\"replay_scope\""));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"name\":\"execute\""));
 }
 
 TEST(ReplayDumpTest, EmitsExecutableMetadataRanges) {

@@ -145,6 +145,32 @@ static iree_status_t NoopHostCall(void* user_data, const uint64_t args[4],
   return iree_ok_status();
 }
 
+typedef struct ReplayScopeCallbackState {
+  // Ordered scope event descriptions observed during replay.
+  std::vector<std::string>* events;
+} ReplayScopeCallbackState;
+
+static iree_status_t RecordReplayScopeEvent(
+    void* user_data, const iree_hal_replay_scope_event_t* event) {
+  ReplayScopeCallbackState* state = (ReplayScopeCallbackState*)user_data;
+  const char* prefix = nullptr;
+  switch (event->type) {
+    case IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_BEGIN:
+      prefix = "begin:";
+      break;
+    case IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_END:
+      prefix = "end:";
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unknown replay scope event type");
+  }
+  std::string text(prefix);
+  text.append(event->name.data, event->name.size);
+  state->events->push_back(text);
+  return iree_ok_status();
+}
+
 static std::vector<uint8_t> MakeMockExecutableData(uint8_t constant_count,
                                                    uint8_t binding_count,
                                                    uint8_t workgroup_size_x) {
@@ -264,6 +290,44 @@ static iree_status_t TestExecutableSubstitutionCallback(
   out_substitution->executable_format = state->executable_format;
   out_substitution->executable_data = state->executable_data;
   return iree_ok_status();
+}
+
+TEST(ReplayExecuteTest, ObservesScopeEvents) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_begin(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_end(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  std::vector<std::string> events;
+  ReplayScopeCallbackState callback_state = {
+      /*.events=*/&events,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.scope_event_callback.fn = RecordReplayScopeEvent;
+  options.scope_event_callback.user_data = &callback_state;
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+
+  ASSERT_EQ(events.size(), 2u);
+  EXPECT_EQ(events[0], "begin:execute");
+  EXPECT_EQ(events[1], "end:execute");
 }
 
 TEST(ReplayExecuteTest, SubstitutesRecordedExecutablePayload) {

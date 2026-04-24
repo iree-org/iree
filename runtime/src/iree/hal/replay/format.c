@@ -65,6 +65,10 @@ IREE_API_EXPORT const char* iree_hal_replay_operation_code_string(
   switch (operation_code) {
     case IREE_HAL_REPLAY_OPERATION_CODE_NONE:
       return "none";
+    case IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN:
+      return "replay.scope_begin";
+    case IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END:
+      return "replay.scope_end";
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_TRIM:
       return "device.trim";
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUERY_I64:
@@ -215,6 +219,8 @@ IREE_API_EXPORT const char* iree_hal_replay_payload_type_string(
       return "allocator_allocate_buffer";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER:
       return "allocator_import_buffer";
+    case IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE:
+      return "replay_scope";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE:
       return "buffer_range";
     case IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA:

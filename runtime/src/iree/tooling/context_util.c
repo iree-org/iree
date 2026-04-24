@@ -431,10 +431,16 @@ static iree_status_t iree_tooling_load_hal_async_module(
   // module and convenience outputs must all observe the same effective group.
   iree_hal_replay_recorder_t* replay_recorder = NULL;
   iree_hal_device_group_t* replay_device_group = NULL;
+  bool replay_init_scope_open = false;
   if (iree_status_is_ok(status) &&
       iree_tooling_device_replay_capture_requested()) {
     status = iree_tooling_create_hal_replay_recorder_from_flags(
         host_allocator, &replay_recorder);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_replay_recorder_scope_begin(replay_recorder,
+                                                    IREE_SV("init"));
+      replay_init_scope_open = iree_status_is_ok(status);
+    }
     if (iree_status_is_ok(status)) {
       status = iree_hal_replay_wrap_device_group(
           replay_recorder, device_group, host_allocator, &replay_device_group);
@@ -485,6 +491,10 @@ static iree_status_t iree_tooling_load_hal_async_module(
           instance, device_policy, module_device_group, flags,
           iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
     }
+  }
+  if (replay_init_scope_open) {
+    status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
+                                          replay_recorder, IREE_SV("init")));
   }
   iree_hal_device_group_release(replay_device_group);
   iree_hal_device_group_release(device_group);

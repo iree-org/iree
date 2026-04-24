@@ -64,6 +64,11 @@ The capture includes the HAL work issued by the benchmark run. The recorder is
 closed after the tool's HAL work completes, so the file header contains the
 final logical length when the process exits successfully.
 
+When capture is enabled, `iree-run-module` records standard replay scopes named
+`init`, `execute`, and `deinit`. These are metadata markers in the replay
+stream. They let replay tools benchmark or query individual phases while still
+preserving the complete capture around them.
+
 ## File policies
 
 Large models often use external parameter files. The replay recorder must avoid
@@ -125,7 +130,14 @@ iree_hal_device_group_t* replay_group = NULL;
 status = iree_hal_replay_wrap_device_group(recorder, base_group,
                                            host_allocator, &replay_group);
 if (iree_status_is_ok(status)) {
-  /* Use replay_group wherever the application would normally use base_group. */
+  status =
+      iree_hal_replay_recorder_scope_begin(recorder, IREE_SV("prefill"));
+  if (iree_status_is_ok(status)) {
+    /* Use replay_group for the application phase being captured. */
+    status = iree_status_join(
+        status,
+        iree_hal_replay_recorder_scope_end(recorder, IREE_SV("prefill")));
+  }
   iree_hal_device_group_release(replay_group);
 }
 
@@ -183,6 +195,28 @@ Benchmark                                 Time             CPU   Iterations User
 BM_replay/process_time/real_time      0.138 ms        0.138 ms            3 items_per_second=7.23988k/s
 ```
 
+If the capture contains replay scope markers, use `--replay_scope=` to report
+only a selected phase. The complete replay still executes every iteration, but
+the benchmark row uses manual timing accumulated between matching scope
+begin/end markers:
+
+```shell
+iree-benchmark-replay \
+  --device=amdgpu \
+  --benchmark_min_time=50x \
+  --replay_scope=execute \
+  /tmp/model.ireereplay
+```
+
+Example scoped benchmark output:
+
+```text
+-----------------------------------------------------------------------------------------------------------
+Benchmark                                                 Time             CPU   Iterations UserCounters...
+-----------------------------------------------------------------------------------------------------------
+BM_replay/scope:execute/process_time/manual_time      ... ms          ... ms            ... items_per_second=...
+```
+
 Add profiling flags to collect a `.ireeprof` bundle from the benchmarked replay
 iterations:
 
@@ -220,6 +254,7 @@ summary:
   environment_referenced: no
   strict_replay_supported: yes
   records: total=42 objects=12 operations=29 unsupported=0
+  scopes: begin=1 end=1
   files: total=0 external=0 inline=0 ranges=0 unknown=0
 records:
   @408 #4 operation   dev=1 obj=1 rel=3 thread=0 status=OK object=device(1) op=device.create_executable_cache(9)
@@ -232,6 +267,14 @@ Use JSONL for scripts and agent workflows:
 ```shell
 iree-dump-replay --format=jsonl /tmp/model.ireereplay | \
   jq 'select(.kind=="operation" and .operation=="device.queue_execute")'
+```
+
+Query named replay scopes:
+
+```shell
+iree-dump-replay --format=jsonl /tmp/model.ireereplay | \
+  jq 'select(.payload_type=="replay_scope") |
+      {operation, name: .payload.name}'
 ```
 
 Example JSONL row:

@@ -110,6 +110,22 @@ IREE_API_EXPORT void iree_hal_replay_recorder_release(
 IREE_API_EXPORT iree_status_t
 iree_hal_replay_recorder_close(iree_hal_replay_recorder_t* recorder);
 
+// Records the beginning of a named replay annotation scope.
+//
+// Scope markers are replay metadata only. They do not correspond to HAL device
+// operations and normal replay execution observes them only through optional
+// callbacks.
+IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_scope_begin(
+    iree_hal_replay_recorder_t* recorder, iree_string_view_t scope_name);
+
+// Records the end of a named replay annotation scope.
+//
+// Scopes may be nested and are matched by name by replay consumers that care
+// about them. The recorder preserves exactly the marker sequence requested by
+// the caller and does not maintain a host-side scope stack.
+IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_scope_end(
+    iree_hal_replay_recorder_t* recorder, iree_string_view_t scope_name);
+
 // Creates a device group whose devices record operations to |recorder|.
 //
 // |base_group| is retained by the wrappers so the underlying devices keep their

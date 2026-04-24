@@ -182,6 +182,15 @@ struct ReplayRecordSummary {
   iree_host_size_t buffer_flush_range_record_count = 0;
   iree_host_size_t buffer_unmap_range_record_count = 0;
   iree_host_size_t queue_execute_record_count = 0;
+  // Replay scope marker records.
+  struct {
+    // Number of scope begin records.
+    iree_host_size_t begin_record_count = 0;
+    // Number of scope end records.
+    iree_host_size_t end_record_count = 0;
+    // Name from the last parsed scope record.
+    std::string last_name;
+  } scope;
   iree_host_size_t unsupported_import_buffer_record_count = 0;
   iree_host_size_t unsupported_export_buffer_record_count = 0;
   iree_host_size_t unsupported_host_call_record_count = 0;
@@ -284,6 +293,12 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         } else if (record.header.operation_code ==
                    IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUEUE_EXECUTE) {
           ++summary.queue_execute_record_count;
+        } else if (record.header.operation_code ==
+                   IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN) {
+          ++summary.scope.begin_record_count;
+        } else if (record.header.operation_code ==
+                   IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END) {
+          ++summary.scope.end_record_count;
         }
         if (record.header.payload_type ==
             IREE_HAL_REPLAY_PAYLOAD_TYPE_BUFFER_RANGE_DATA) {
@@ -305,6 +320,24 @@ static ReplayRecordSummary ParseReplayRecordSummary(
         } else if (record.header.payload_type ==
                    IREE_HAL_REPLAY_PAYLOAD_TYPE_SEMAPHORE_OBJECT) {
           ++summary.semaphore_object_payload_count;
+        } else if (record.header.payload_type ==
+                   IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE) {
+          iree_hal_replay_scope_payload_t scope_payload;
+          if (record.payload.data_length < sizeof(scope_payload)) {
+            ADD_FAILURE() << "scope payload is short";
+            return summary;
+          }
+          memcpy(&scope_payload, record.payload.data, sizeof(scope_payload));
+          if (scope_payload.name_length > IREE_HOST_SIZE_MAX ||
+              sizeof(scope_payload) +
+                      (iree_host_size_t)scope_payload.name_length !=
+                  record.payload.data_length) {
+            ADD_FAILURE() << "scope payload name length mismatch";
+            return summary;
+          }
+          summary.scope.last_name.assign(
+              (const char*)record.payload.data + sizeof(scope_payload),
+              (iree_host_size_t)scope_payload.name_length);
         }
         EXPECT_EQ((uint32_t)IREE_STATUS_OK, record.header.status_code);
         break;
@@ -335,6 +368,24 @@ static iree_status_t CountHostCall(void* user_data, const uint64_t args[4],
   (void)context;
   ++*(int*)user_data;
   return iree_ok_status();
+}
+
+TEST(ReplayRecorderTest, RecordsNamedScopes) {
+  std::vector<uint8_t> storage(4096, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_begin(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_end(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+
+  ReplayRecordSummary summary = ParseReplayRecordSummary(storage);
+  EXPECT_EQ(1u, summary.session_record_count);
+  EXPECT_EQ(1u, summary.scope.begin_record_count);
+  EXPECT_EQ(1u, summary.scope.end_record_count);
+  EXPECT_EQ("execute", summary.scope.last_name);
 }
 
 TEST(ReplayRecorderTest, WrapDeviceGroupRecordsOrderedDeviceOperations) {

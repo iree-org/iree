@@ -109,6 +109,9 @@ enum iree_hal_replay_operation_code_e {
   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_EXTERNAL_CAPTURE_BEGIN = 27u,
   IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_EXTERNAL_CAPTURE_END = 28u,
 
+  IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN = 50u,
+  IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END = 51u,
+
   IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_TRIM = 100u,
   IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_QUERY_MEMORY_HEAPS = 101u,
   IREE_HAL_REPLAY_OPERATION_CODE_ALLOCATOR_ALLOCATE_BUFFER = 102u,
@@ -185,6 +188,13 @@ enum iree_hal_replay_payload_type_e {
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_READ = 24u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_DEVICE_QUEUE_WRITE = 25u,
   IREE_HAL_REPLAY_PAYLOAD_TYPE_ALLOCATOR_IMPORT_BUFFER = 26u,
+  IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE = 27u,
+};
+
+// Bitfield specifying properties of one replay scope marker.
+typedef uint32_t iree_hal_replay_scope_flags_t;
+enum iree_hal_replay_scope_flag_bits_e {
+  IREE_HAL_REPLAY_SCOPE_FLAG_NONE = 0u,
 };
 
 // Type of external file reference captured for a HAL file object.
@@ -450,6 +460,18 @@ typedef struct iree_hal_replay_event_object_payload_t {
   // Reserved for future event object metadata; must be zero.
   uint64_t reserved1;
 } iree_hal_replay_event_object_payload_t;
+
+// Payload describing a replay annotation scope followed by UTF-8 name bytes.
+typedef struct iree_hal_replay_scope_payload_t {
+  // Byte length of the scope name following this header.
+  uint64_t name_length;
+  // Scope marker flags.
+  iree_hal_replay_scope_flags_t flags;
+  // Reserved for future scope metadata; must be zero.
+  uint32_t reserved0;
+  // Reserved for future scope metadata; must be zero.
+  uint64_t reserved1;
+} iree_hal_replay_scope_payload_t;
 
 // Serialized replay reference to one semaphore timepoint.
 typedef struct iree_hal_replay_semaphore_timepoint_payload_t {

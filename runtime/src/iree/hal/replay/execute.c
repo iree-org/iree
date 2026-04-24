@@ -228,6 +228,43 @@ static iree_status_t iree_hal_replay_executor_require_payload(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_replay_executor_scope_event(
+    iree_hal_replay_executor_t* executor,
+    const iree_hal_replay_file_record_t* record,
+    iree_hal_replay_scope_event_type_t event_type) {
+  IREE_RETURN_IF_ERROR(iree_hal_replay_executor_require_payload(
+      record, IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE,
+      sizeof(iree_hal_replay_scope_payload_t)));
+  iree_hal_replay_scope_payload_t payload;
+  memcpy(&payload, record->payload.data, sizeof(payload));
+  if (IREE_UNLIKELY(payload.flags != IREE_HAL_REPLAY_SCOPE_FLAG_NONE ||
+                    payload.reserved0 != 0 || payload.reserved1 != 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay scope payload reserved fields must be "
+                            "zero");
+  }
+  if (IREE_UNLIKELY(payload.name_length > IREE_HOST_SIZE_MAX ||
+                    sizeof(payload) + (iree_host_size_t)payload.name_length !=
+                        record->payload.data_length ||
+                    payload.name_length == 0)) {
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "replay scope payload name length mismatch");
+  }
+
+  iree_hal_replay_scope_event_callback_t callback =
+      executor->options->scope_event_callback;
+  if (!callback.fn) return iree_ok_status();
+
+  iree_hal_replay_scope_event_t event = {
+      .sequence_ordinal = record->header.sequence_ordinal,
+      .type = event_type,
+      .name = iree_make_string_view(
+          (const char*)record->payload.data + sizeof(payload),
+          (iree_host_size_t)payload.name_length),
+  };
+  return callback.fn(callback.user_data, &event);
+}
+
 static iree_status_t iree_hal_replay_executor_make_buffer_params(
     const iree_hal_replay_allocator_allocate_buffer_payload_t* payload,
     iree_hal_buffer_params_t* out_params) {
@@ -2657,6 +2694,12 @@ static iree_status_t iree_hal_replay_executor_replay_operation(
     return iree_ok_status();
   }
   switch (record->header.operation_code) {
+    case IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN:
+      return iree_hal_replay_executor_scope_event(
+          executor, record, IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_BEGIN);
+    case IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END:
+      return iree_hal_replay_executor_scope_event(
+          executor, record, IREE_HAL_REPLAY_SCOPE_EVENT_TYPE_END);
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_TRIM:
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_ASSIGN_TOPOLOGY_INFO:
     case IREE_HAL_REPLAY_OPERATION_CODE_DEVICE_QUERY_I64:

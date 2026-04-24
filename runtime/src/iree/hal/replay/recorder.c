@@ -513,6 +513,49 @@ iree_hal_replay_recorder_close(iree_hal_replay_recorder_t* recorder) {
   return status;
 }
 
+static iree_status_t iree_hal_replay_recorder_record_scope(
+    iree_hal_replay_recorder_t* recorder,
+    iree_hal_replay_operation_code_t operation_code,
+    iree_string_view_t scope_name) {
+  IREE_ASSERT_ARGUMENT(recorder);
+  if (IREE_UNLIKELY(iree_string_view_is_empty(scope_name))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "replay scope name must be non-empty");
+  }
+
+  iree_hal_replay_scope_payload_t payload = {
+      .name_length = scope_name.size,
+      .flags = IREE_HAL_REPLAY_SCOPE_FLAG_NONE,
+  };
+  const iree_const_byte_span_t iovecs[] = {
+      iree_make_const_byte_span(&payload, sizeof(payload)),
+      iree_make_const_byte_span(scope_name.data, scope_name.size),
+  };
+  iree_hal_replay_file_record_metadata_t metadata = {
+      .record_type = IREE_HAL_REPLAY_FILE_RECORD_TYPE_OPERATION,
+      .payload_type = IREE_HAL_REPLAY_PAYLOAD_TYPE_REPLAY_SCOPE,
+      .operation_code = operation_code,
+  };
+
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_hal_replay_recorder_append_record_locked(
+      recorder, metadata, IREE_ARRAYSIZE(iovecs), iovecs, NULL);
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_scope_begin(
+    iree_hal_replay_recorder_t* recorder, iree_string_view_t scope_name) {
+  return iree_hal_replay_recorder_record_scope(
+      recorder, IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_BEGIN, scope_name);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_replay_recorder_scope_end(
+    iree_hal_replay_recorder_t* recorder, iree_string_view_t scope_name) {
+  return iree_hal_replay_recorder_record_scope(
+      recorder, IREE_HAL_REPLAY_OPERATION_CODE_REPLAY_SCOPE_END, scope_name);
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_replay_device_t
 //===----------------------------------------------------------------------===//
