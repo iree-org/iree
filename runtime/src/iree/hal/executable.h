@@ -97,14 +97,25 @@ typedef uint16_t iree_hal_executable_export_parameter_flags_t;
 typedef struct iree_hal_executable_export_parameter_t {
   // Type of the parameter.
   iree_hal_executable_export_parameter_type_t type;
-  // Size of the parameter in bytes. Does not contain padding.
-  uint8_t size;
   // Flags indicating parameter behavior.
   iree_hal_executable_export_parameter_flags_t flags;
-  // Parameter name if available, otherwise empty.
-  iree_string_view_t name;
+  // Size of the parameter in bytes. Does not contain padding.
+  // Widened from uint8_t so we can represent kernarg structs emitted by
+  // user toolchains (e.g. PyTorch HIP kernels routinely pass 300+ byte
+  // TensorIteratorBase structs by value).
+  uint16_t size;
   // Offset of the parameter in bytes or binding ordinal, depending on type.
   uint16_t offset;
+  // Backend-reported byte offset of this parameter within the raw kernarg
+  // segment. This is always the true kernarg offset regardless of |type| and
+  // is populated whenever the backend has it (e.g. HSACO metadata). Consumers
+  // that synthesize raw kernarg blobs (HIP/CUDA CUSTOM_DIRECT_ARGUMENTS) must
+  // use this field rather than |offset| for BINDING parameters because
+  // |offset| there is a binding ordinal, not a byte offset. Backends that
+  // don't have per-parameter kernarg offsets leave this 0.
+  uint16_t kernarg_offset;
+  // Parameter name if available, otherwise empty.
+  iree_string_view_t name;
 } iree_hal_executable_export_parameter_t;
 
 // Handle to a loaded executable.

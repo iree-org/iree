@@ -1785,6 +1785,32 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_raw_hsaco_kernel_args(
             requirements.binding_count, &host_kernel_args[kernel_ordinal]),
         "resolving kernel args for raw kernel `%.*s`", (int)symbol_name.size,
         symbol_name.data);
+    // HSA's `hsa_executable_symbol_get_info` can return 0 for
+    // KERNEL_KERNARG_SEGMENT_SIZE on large multi-kernel HSACO ELFs (e.g.
+    // rocBLAS TensileLibrary with 555 kernels) even though the kernel has
+    // non-zero kernargs in its metadata. When the ELF's own metadata declares
+    // a larger kernarg segment, trust the metadata as the authoritative value
+    // since both HSA and the metadata read from the same code object.
+    if (host_kernel_args[kernel_ordinal].kernarg_size <
+        kernel->kernarg_segment_size) {
+      host_kernel_args[kernel_ordinal].kernarg_size =
+          kernel->kernarg_segment_size;
+    }
+    if (host_kernel_args[kernel_ordinal].kernarg_alignment == 0 &&
+        kernel->kernarg_segment_alignment != 0) {
+      host_kernel_args[kernel_ordinal].kernarg_alignment =
+          kernel->kernarg_segment_alignment;
+    }
+    if (host_kernel_args[kernel_ordinal].group_segment_size <
+        kernel->group_segment_fixed_size) {
+      host_kernel_args[kernel_ordinal].group_segment_size =
+          kernel->group_segment_fixed_size;
+    }
+    if (host_kernel_args[kernel_ordinal].private_segment_size <
+        kernel->private_segment_fixed_size) {
+      host_kernel_args[kernel_ordinal].private_segment_size =
+          kernel->private_segment_fixed_size;
+    }
   }
   return iree_ok_status();
 }

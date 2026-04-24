@@ -1644,6 +1644,48 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
                    system->topology.gpu_agent_queue_count;
       return iree_ok_status();
     }
+    if (iree_string_view_equal(key, IREE_SV("gfxip"))) {
+      // Returns the gfxip version of the first physical device encoded as:
+      //   (major << 16) | (minor << 8) | stepping
+      // so callers can reconstruct a canonical "gfx<major><minor><stepping>"
+      // string. Example: gfx1100 -> (11<<16)|(0<<8)|0 = 0xB0000.
+      if (logical_device->physical_device_count == 0) {
+        return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                "logical device has no physical devices");
+      }
+      const iree_hal_amdgpu_physical_device_t* physical_device =
+          logical_device->physical_devices[0];
+      *out_value =
+          ((int64_t)(physical_device->gfxip_version.major & 0xFF) << 16) |
+          ((int64_t)(physical_device->gfxip_version.minor & 0xFF) << 8) |
+          ((int64_t)(physical_device->gfxip_version.stepping & 0xFF));
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("memory.total")) ||
+        iree_string_view_equal(key, IREE_SV("memory.free"))) {
+      // Sum the size of the device-local coarse-grained global memory pool
+      // across every physical device backing this logical device. HSA does not
+      // expose a "free" counter for memory pools, so memory.free returns the
+      // same value as memory.total here; higher layers (e.g. the HRX HIP
+      // binding) track allocations and report a more accurate free value to
+      // their callers via hipMemGetInfo / hipDeviceTotalMem.
+      uint64_t total = 0;
+      for (iree_host_size_t i = 0;
+           i < logical_device->physical_device_count; ++i) {
+        iree_hal_amdgpu_physical_device_t* physical_device =
+            logical_device->physical_devices[i];
+        hsa_amd_memory_pool_t pool =
+            physical_device->coarse_block_pools.large.memory_pool;
+        if (!pool.handle) continue;
+        size_t pool_size = 0;
+        IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+            IREE_LIBHSA(&system->libhsa), pool,
+            HSA_AMD_MEMORY_POOL_INFO_SIZE, &pool_size));
+        total += (uint64_t)pool_size;
+      }
+      *out_value = (int64_t)total;
+      return iree_ok_status();
+    }
   } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       uint32_t compute_unit_count = 0;

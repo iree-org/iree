@@ -1689,11 +1689,18 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_write_dispatch_tail(
       }
       return iree_ok_status();
     }
-    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT:
-      if (constants.data_length > 0) {
-        memcpy(tail_payload, constants.data, constants.data_length);
+    case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT: {
+      // Callers may provide a larger buffer than the kernel's declared
+      // kernarg_segment_size (e.g. rocBLAS/Tensile pads with an extra
+      // scalar). The kernel will only read layout->total_kernarg_size bytes,
+      // so clamp the copy to avoid overflowing the allocation.
+      const iree_host_size_t copy_bytes =
+          iree_min(constants.data_length, layout->total_kernarg_size);
+      if (copy_bytes > 0) {
+        memcpy(tail_payload, constants.data, copy_bytes);
       }
       return iree_ok_status();
+    }
     case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_INDIRECT:
       return iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
@@ -2016,12 +2023,16 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_plan(
 
   if (iree_hal_amdgpu_aql_dispatch_plan_uses_custom_direct_arguments(
           out_plan)) {
-    if (IREE_UNLIKELY(inputs->constants.data_length !=
+    // Callers (e.g. rocBLAS/Tensile) sometimes pad the kernarg buffer beyond
+    // the kernel's declared kernarg_segment_size with extra trailing scalars.
+    // The kernel only reads its declared size, so trailing bytes are ignored
+    // and the memcpy in write_dispatch_tail clamps to the declared size.
+    if (IREE_UNLIKELY(inputs->constants.data_length <
                       out_plan->descriptor->kernel_args.kernarg_size)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "custom dispatch argument length mismatch; expected %u but got "
-          "%" PRIhsz,
+          "custom dispatch argument length too short; expected at least %u "
+          "but got %" PRIhsz,
           out_plan->descriptor->kernel_args.kernarg_size,
           inputs->constants.data_length);
     }

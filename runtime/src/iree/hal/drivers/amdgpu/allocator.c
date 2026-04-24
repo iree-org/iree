@@ -1027,8 +1027,59 @@ static iree_status_t iree_hal_amdgpu_allocator_export_buffer(
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "AMDGPU buffer export not yet implemented");
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_external_buffer);
+  if (requested_flags != IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported AMDGPU external buffer flags: 0x%x",
+                            requested_flags);
+  }
+
+  // HSA memory-pool allocations from our allocator are GPU-visible virtual
+  // addresses directly usable as kernel arguments (and, for fine-grained
+  // pools, also host-mappable). The same pointer serves both roles, so we
+  // expose it as either a DEVICE_ALLOCATION or HOST_ALLOCATION on request.
+  iree_hal_buffer_t* allocated = iree_hal_buffer_allocated_buffer(buffer);
+  void* base_ptr = iree_hal_amdgpu_buffer_device_pointer(allocated);
+  if (!base_ptr) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "AMDGPU buffer does not expose a direct device pointer (e.g. an "
+        "imported or transient buffer without backing storage)");
+  }
+  const iree_device_size_t byte_offset = iree_hal_buffer_byte_offset(buffer);
+  const iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
+  void* view_ptr = (uint8_t*)base_ptr + byte_offset;
+
+  memset(out_external_buffer, 0, sizeof(*out_external_buffer));
+  out_external_buffer->type = requested_type;
+  out_external_buffer->flags = requested_flags;
+  out_external_buffer->size = byte_length;
+
+  switch (requested_type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
+      out_external_buffer->handle.device_allocation.ptr =
+          (uint64_t)(uintptr_t)view_ptr;
+      return iree_ok_status();
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION:
+      // HSA allocations that belong to fine-grained pools are host-addressable
+      // via the same pointer. For coarse-grained pools the pointer is still
+      // valid from the host's virtual address space (even if reads/writes
+      // from the CPU would be slow/undefined), so we return it here and let
+      // callers decide whether to use it. Allocator bookkeeping that truly
+      // needs host-visibility should request a HOST_LOCAL buffer up front.
+      out_external_buffer->handle.host_allocation.ptr = view_ptr;
+      return iree_ok_status();
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "AMDGPU external buffer type %u not supported",
+                              (unsigned)requested_type);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unknown AMDGPU external buffer type %u",
+                              (unsigned)requested_type);
+  }
 }
 
 static bool iree_hal_amdgpu_allocator_supports_virtual_memory(

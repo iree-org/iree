@@ -220,14 +220,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
 
   iree_host_size_t operation_resource_count = 1;
   if (iree_any_bit_set(flags, IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS)) {
-    if (IREE_UNLIKELY(constants.data_length !=
+    if (IREE_UNLIKELY(constants.data_length <
                       descriptor->kernel_args.kernarg_size)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "custom dispatch argument length mismatch; expected %u but got "
-          "%" PRIhsz,
+          "custom dispatch argument length too short; expected at least %u "
+          "but got %" PRIhsz,
           descriptor->kernel_args.kernarg_size, constants.data_length);
     }
+    // Callers (e.g. rocBLAS/Tensile) may pad beyond the declared
+    // kernarg_segment_size. The kernel descriptor only reads its declared
+    // size so extra trailing bytes are ignored downstream.
     if (IREE_UNLIKELY(constants.data_length > 0 && !constants.data)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
