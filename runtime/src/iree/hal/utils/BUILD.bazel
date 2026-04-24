@@ -188,6 +188,31 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "profile_file",
+    srcs = ["profile_file.c"],
+    hdrs = ["profile_file.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/io:stream",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "profile_file_test",
+    srcs = ["profile_file_test.cc"],
+    deps = [
+        ":profile_file",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "queue_emulation",
     srcs = ["queue_emulation.c"],
     hdrs = ["queue_emulation.h"],
@@ -207,6 +232,28 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "statistics_sink",
+    srcs = ["statistics_sink.c"],
+    hdrs = ["statistics_sink.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "statistics_sink_test",
+    srcs = ["statistics_sink_test.cc"],
+    deps = [
+        ":statistics_sink",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

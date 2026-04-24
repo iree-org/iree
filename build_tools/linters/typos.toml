@@ -15,6 +15,8 @@ extend-exclude = [
 [default.extend-words]
 # AMD Heterogeneous System Architecture.
 hsa = "hsa"
+# AMD vector ALU instruction category.
+valu = "valu"
 # ARM Scalable Matrix Extension.
 sme = "sme"
 # MLIR OpFoldResult abbreviation.

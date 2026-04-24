@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "iree/async/frontier.h"
@@ -113,15 +114,23 @@ static RENDERDOC_API_LATEST* iree_hal_vulkan_query_renderdoc_api(
 }
 
 // Begins a new RenderDoc capture.
-static void iree_hal_vulkan_begin_renderdoc_capture(
+static iree_status_t iree_hal_vulkan_begin_renderdoc_capture(
     RENDERDOC_API_LATEST* renderdoc_api, VkInstance instance,
-    const iree_hal_device_profiling_options_t* options) {
-  if (!renderdoc_api) return;
-  if (options->file_path) {
-    renderdoc_api->SetCaptureFilePathTemplate(options->file_path);
+    const iree_hal_device_external_capture_options_t* options) {
+  if (!renderdoc_api) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "RenderDoc external capture requires RenderDoc to be loaded");
+  }
+  std::string file_path_storage;
+  iree_string_view_t file_path = options->file_path;
+  if (!iree_string_view_is_empty(file_path)) {
+    file_path_storage.assign(file_path.data, file_path.size);
+    renderdoc_api->SetCaptureFilePathTemplate(file_path_storage.c_str());
   }
   renderdoc_api->StartFrameCapture(
       RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance), NULL);
+  return iree_ok_status();
 }
 
 // Ends the active RenderDoc capture, if any active.
@@ -569,8 +578,12 @@ typedef struct iree_hal_vulkan_device_t {
   iree_hal_device_topology_info_t topology_info;
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  // RenderDoc API loaded when the process is hooked by RenderDoc, or NULL.
   RENDERDOC_API_LATEST* renderdoc_api;
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+
+  // True when this device has started an external capture range.
+  bool external_capture_active;
 } iree_hal_vulkan_device_t;
 
 namespace {
@@ -1915,39 +1928,10 @@ static iree_status_t iree_hal_vulkan_device_queue_flush(
 static iree_status_t iree_hal_vulkan_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  (void)device;
-
-  if (iree_all_bits_set(options->mode,
-                        IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
-    // AMD-specific - we could snoop the device to only do this for the vendor
-    // but this is relatively cheap and could be useful to others. Ideally
-    // there would be a khronos standard for this.
-    // TODO(benvanik): figure out if we need to do this for all queues.
-    auto& syms = device->logical_device->syms();
-    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
-      VkDebugUtilsLabelEXT begin_label = {};
-      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-      begin_label.pNext = NULL;
-      begin_label.pLabelName = "AmdFrameBegin";
-      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
-          device->dispatch_queues[0]->handle(), &begin_label);
-    }
-
-    // For now we only support RenderDoc. As much as possible we should try to
-    // use standardized Vulkan layers to do profiling configuration/control like
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
-    // to avoid the combinatorial explosion of vendor tooling hooks.
-    // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
-    // support it here. If this grows beyond a few lines of code we should
-    // shuffle it off to another file.
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
-    iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
-                                            device->instance, options);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
-  }
-
-  return iree_ok_status();
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Vulkan HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_vulkan_device_profiling_flush(
@@ -1974,13 +1958,59 @@ static iree_status_t iree_hal_vulkan_device_profiling_flush(
 
 static iree_status_t iree_hal_vulkan_device_profiling_end(
     iree_hal_device_t* base_device) {
+  (void)base_device;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  (void)device;
+  if (!iree_string_view_equal(options->provider, IREE_SV("renderdoc"))) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan external capture provider '%.*s' is not implemented",
+        (int)options->provider.size, options->provider.data);
+  }
+  if (device->external_capture_active) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot nest Vulkan external capture");
+  }
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_begin_renderdoc_capture(
+      device->renderdoc_api, device->instance, options));
+
+  // AMD-specific.
+  auto& syms = device->logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT begin_label = {};
+    begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    begin_label.pNext = NULL;
+    begin_label.pLabelName = "AmdFrameBegin";
+    device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+        device->dispatch_queues[0]->handle(), &begin_label);
+  }
+
+  device->external_capture_active = true;
+  return iree_ok_status();
+#else
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Vulkan RenderDoc external capture is not compiled");
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+}
+
+static iree_status_t iree_hal_vulkan_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  if (!device->external_capture_active) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no Vulkan external capture is active");
+  }
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
   iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
                                         device->instance);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 
   // AMD-specific.
   auto& syms = device->logical_device->syms();
@@ -1992,7 +2022,9 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
     device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
         device->dispatch_queues[0]->handle(), &end_label);
   }
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 
+  device->external_capture_active = false;
   return iree_ok_status();
 }
 
@@ -2033,5 +2065,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
     /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
+    /*.external_capture_begin=*/
+    iree_hal_vulkan_device_external_capture_begin,
+    /*.external_capture_end=*/iree_hal_vulkan_device_external_capture_end,
 };
 }  // namespace

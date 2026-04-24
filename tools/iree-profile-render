@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Renders IREE ireeperf-jsonl streams into external analysis formats.
+
+This script intentionally has no dependency on IREE Python bindings. It is a
+small adapter over the JSONL interchange stream emitted by:
+
+  iree-profile export --format=ireeperf-jsonl --output=run.ireeperf.jsonl \
+      run.ireeprof
+
+Format-specific imports are optional and delayed until render time so `--help`
+and dependency diagnostics work in a plain checkout.
+"""
+
+import sys
+
+sys.dont_write_bytecode = True
+
+from pathlib import Path
+
+_SCRIPT_PATH = Path(__file__).resolve()
+_PROFILE_PACKAGE_PATHS = (
+    # Source checkout layout: repository root beside runtime/.
+    _SCRIPT_PATH.parent.parent / "runtime" / "src" / "iree" / "tooling" / "profile",
+    # CMake install layout: bin/iree-profile-render + share/iree/profile/render.
+    _SCRIPT_PATH.parent.parent / "share" / "iree" / "profile",
+)
+for profile_package_path in _PROFILE_PACKAGE_PATHS:
+    if (profile_package_path / "render").is_dir():
+        sys.path.insert(0, str(profile_package_path))
+        break
+
+from render.cli import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

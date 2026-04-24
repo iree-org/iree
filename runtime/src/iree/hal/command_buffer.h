@@ -72,6 +72,13 @@ enum iree_hal_command_buffer_mode_bits_t {
   // about lifetime this flag disables the internal resource tracking to reduce
   // overhead.
   IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
+
+  // Retains producer metadata required for command-buffer profiling.
+  // This makes profiling possible for the command buffer but does not enable
+  // profiling by itself. Implementations may spend additional recording-time
+  // CPU and memory to retain command operation metadata and compact sidecars
+  // used by profiling sessions.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA = 1u << 7,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 

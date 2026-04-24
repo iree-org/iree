@@ -117,6 +117,8 @@ iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
        IREE_SVL("ALLOW_INLINE_EXECUTION")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED, IREE_SVL("UNVALIDATED")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED, IREE_SVL("UNRETAINED")},
+      {IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA,
+       IREE_SVL("RETAIN_PROFILE_METADATA")},
   };
   return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);

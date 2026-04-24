@@ -350,27 +350,32 @@ py::str HalBufferView::Repr() {
 // HalDevice
 //------------------------------------------------------------------------------
 
-void HalDevice::BeginProfiling(std::optional<std::string> mode,
-                               std::optional<std::string> file_path) {
-  iree_hal_device_profiling_options_t options;
-  memset(&options, 0, sizeof(options));
-
-  options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
+void HalDevice::BeginProfiling(std::optional<std::string> mode) {
   if (mode) {
-    if (*mode == "queue") {
-      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
-    } else if (*mode == "dispatch") {
-      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
-    } else if (*mode == "executable") {
-      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
-    } else {
-      throw RaiseValueError("unrecognized profiling mode");
-    }
+    throw RaiseValueError(
+        "Python HAL native profiling requires a profile sink and is not "
+        "exposed by the runtime bindings");
   }
 
-  options.file_path = file_path ? file_path->c_str() : nullptr;
+  iree_hal_device_profiling_options_t options;
+  memset(&options, 0, sizeof(options));
+  options.data_families = IREE_HAL_DEVICE_PROFILING_DATA_NONE;
   CheckApiStatus(iree_hal_device_profiling_begin(raw_ptr(), &options),
                  "starting device profiling");
+}
+
+void HalDevice::BeginExternalCapture(std::string provider,
+                                     std::optional<std::string> file_path,
+                                     std::optional<std::string> label) {
+  iree_hal_device_external_capture_options_t options = {};
+  options.provider = iree_make_string_view(provider.data(), provider.size());
+  options.file_path =
+      file_path ? iree_make_string_view(file_path->data(), file_path->size())
+                : iree_string_view_empty();
+  options.label = label ? iree_make_string_view(label->data(), label->size())
+                        : iree_string_view_empty();
+  CheckApiStatus(iree_hal_device_external_capture_begin(raw_ptr(), &options),
+                 "starting external device capture");
 }
 
 void HalDevice::FlushProfiling() {
@@ -381,6 +386,11 @@ void HalDevice::FlushProfiling() {
 void HalDevice::EndProfiling() {
   CheckApiStatus(iree_hal_device_profiling_end(raw_ptr()),
                  "ending device profiling");
+}
+
+void HalDevice::EndExternalCapture() {
+  CheckApiStatus(iree_hal_device_external_capture_end(raw_ptr()),
+                 "ending external device capture");
 }
 
 HalSemaphore HalDevice::CreateSemaphore(uint64_t initial_value) {
@@ -1488,9 +1498,13 @@ void SetupHalBindings(nanobind::module_ m) {
           },
           py::keep_alive<0, 1>())
       .def("begin_profiling", &HalDevice::BeginProfiling,
-           py::arg("mode") = py::none(), py::arg("file_path") = py::none())
+           py::arg("mode") = py::none())
       .def("flush_profiling", &HalDevice::FlushProfiling)
       .def("end_profiling", &HalDevice::EndProfiling)
+      .def("begin_external_capture", &HalDevice::BeginExternalCapture,
+           py::arg("provider"), py::arg("file_path") = py::none(),
+           py::arg("label") = py::none())
+      .def("end_external_capture", &HalDevice::EndExternalCapture)
       .def("create_semaphore", &HalDevice::CreateSemaphore,
            py::arg("initial_value"))
       .def("queue_alloca", &HalDevice::QueueAlloca, py::arg("allocation_size"),
