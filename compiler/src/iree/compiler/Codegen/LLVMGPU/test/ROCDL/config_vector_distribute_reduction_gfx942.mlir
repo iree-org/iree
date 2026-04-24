@@ -609,9 +609,6 @@ func.func @reordered_post_reduction_consumer() {
 // Shapes that are too small or misaligned for the VectorDistribute attention
 // configs must fall back to the BaseLowering scalar pipeline.
 
-// K2=2 falls out of the intrinsic path via `deduceAttentionSchedule` (no MFMA
-// K matches 2 for f16) and out of the reduction path via the skinny-K2 check.
-
 // CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<BaseLowering> workgroup_size = [1, 1, 1]>
 // CHECK-LABEL: func.func @attention_skinny_K2
 // CHECK-NOT:     iree_gpu.lowering_config
