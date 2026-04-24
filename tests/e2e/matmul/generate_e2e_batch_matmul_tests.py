@@ -28,6 +28,7 @@ BATCH_BLOCK_SHAPES = {
     "block_static": [
         BatchTestShape(batch=32, m=128, k=128, n=128),
         BatchTestShape(batch=32, m=256, k=64, n=256),
+        BatchTestShape(batch=32, m=96, k=96, n=96),
     ],
 }
 
