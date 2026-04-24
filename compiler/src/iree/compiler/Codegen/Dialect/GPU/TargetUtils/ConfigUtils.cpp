@@ -116,7 +116,7 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     // operand that will be created together with the ukernel op.
     if (auto dtScaledMma =
             dyn_cast<GPU::DataTiledScaledMMAAttr>(dataTiledMmaAttr);
-        dtScaledMma && dtScaledMma.hasUnshuffledOperands()) {
+        dtScaledMma && dtScaledMma.hasUnswizzledOperands()) {
       defaultPrefetch = 2;
       operandList.append({2, 3});
       auto defaultCfg = GPU::DerivedThreadConfigAttr::get(context);
@@ -143,7 +143,7 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // By default, don't add any special padding or prefetching, since the
-  // data-tiled layout is already what we want. For unshuffled operands default
+  // data-tiled layout is already what we want. For unswizzled operands default
   // to 2 prefetch stages to enable software pipelining.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   int64_t prefetchStages = prefetchNumStages.value_or(defaultPrefetch);

@@ -306,7 +306,7 @@ func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
 // -----
 
 module {
-  func.func @unshuffled_data_tiled_scaled_mma_inner_tiled(
+  func.func @unswizzled_data_tiled_scaled_mma_inner_tiled(
       %lhs: tensor<1x1x1x16x4x32xf4E2M1FN>, %rhs: tensor<1x1x1x16x4x32xf4E2M1FN>,
       %lhs_scales: tensor<1x1x4x16xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16xf8E8M0FNU>,
       %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32> {
@@ -317,14 +317,14 @@ module {
                        affine_map<(m, n, k, kb) -> (n, k)>,
                        affine_map<(m, n, k, kb) -> (m, n)>],
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unshuffled_operands = [0, 1]>,
+      kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3], unswizzled_operands = [0, 1]>,
       semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
       : tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x1x16x4x32xf4E2M1FN>, tensor<1x1x4x16xf8E8M0FNU>, tensor<1x1x4x16xf8E8M0FNU> into tensor<1x1x4x16x4xf32>
       return %0 : tensor<1x1x4x16x4xf32>
   }
 }
 
-// CHECK-LABEL: func.func @unshuffled_data_tiled_scaled_mma_inner_tiled
+// CHECK-LABEL: func.func @unswizzled_data_tiled_scaled_mma_inner_tiled
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config

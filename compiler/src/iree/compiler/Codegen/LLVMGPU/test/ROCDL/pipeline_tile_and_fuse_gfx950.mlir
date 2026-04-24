@@ -375,7 +375,7 @@ func.func @matmul_i8()
 
 // -----
 
-// DataTiledScaledMMAAttr with unshuffled_operands pipeline test: verifies XOR
+// DataTiledScaledMMAAttr with unswizzled_operands pipeline test: verifies XOR
 // swizzle hints on data operands, software pipelining, and amdgpu.scaled_mfma
 // generation.
 
@@ -410,7 +410,7 @@ func.func @matmul_i8()
     #iree_gpu.derived_thread_config,
     #iree_gpu.derived_thread_config]
 }>
-func.func @unshuffled_dt_scaled_mma()
+func.func @unswizzled_dt_scaled_mma()
   attributes {hal.executable.target = #executable_target_rocm_pdt, translation_info = #translation_info_pdt} {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout_pdt) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x16x4x32xf4E2M1FN>>
@@ -442,14 +442,14 @@ func.func @unshuffled_dt_scaled_mma()
       operands_interleaving_intrinsics_m = [2],
       operands_interleaving_intrinsics_n = [3],
       operands_interleaving_intrinsics_k = [2, 3],
-      unshuffled_operands = [0, 1]>,
+      unswizzled_operands = [0, 1]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
     : tensor<9x9x1x16x4x32xf4E2M1FN>, tensor<9x9x1x16x4x32xf4E2M1FN>, tensor<9x9x4x16xf8E8M0FNU>, tensor<9x9x4x16xf8E8M0FNU> into tensor<9x9x4x16x4xf32>
   iree_tensor_ext.dispatch.tensor.store %10, %4, offsets = [0, 0, 0, 0, 0], sizes = [9, 9, 4, 16, 4], strides = [1, 1, 1, 1, 1] : tensor<9x9x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x16x4xf32>>
   return
 }
 
-// CHECK-LABEL: func.func @unshuffled_dt_scaled_mma()
+// CHECK-LABEL: func.func @unswizzled_dt_scaled_mma()
 // CHECK-DAG:  %[[PDT_C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:  %[[PDT_C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:  %[[PDT_C8:.+]] = arith.constant 8 : index
