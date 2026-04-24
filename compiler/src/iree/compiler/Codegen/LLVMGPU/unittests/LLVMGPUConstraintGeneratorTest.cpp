@@ -157,17 +157,16 @@ private:
 class RootOpUtilsTest : public LinalgTestBase {};
 
 TEST_F(RootOpUtilsTest, InferContractionDimsForFillOp) {
-  auto op = getTestFillOp();
+  linalg::FillOp op = getTestFillOp();
   ASSERT_TRUE(!!op);
   EXPECT_TRUE(failed(inferContractionLikeDims(op)));
 }
 
 TEST_F(RootOpUtilsTest, InferContractionDimsForMatmulOp) {
-  auto op = getTestMatmulOp();
+  linalg::MatmulOp op = getTestMatmulOp();
   ASSERT_TRUE(!!op);
 
-  auto dims = inferContractionLikeDims(op);
-
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
   // matmul loops: (m=0, n=1, k=2).
   EXPECT_EQ(dims->m, SmallVector<unsigned>({0}));
@@ -176,10 +175,10 @@ TEST_F(RootOpUtilsTest, InferContractionDimsForMatmulOp) {
 }
 
 TEST_F(RootOpUtilsTest, InferContractionDimsForConvOp) {
-  auto op = getTestConv2DNhwcHwcfOp();
+  linalg::Conv2DNhwcHwcfOp op = getTestConv2DNhwcHwcfOp();
   ASSERT_TRUE(op);
 
-  auto dims = inferContractionLikeDims(op);
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
 
   // conv_2d_nhwc_hwcf loops: (b=0, oh=1, ow=2, oc=3, kh=4, kw=5, ic=6).
@@ -192,7 +191,7 @@ TEST_F(RootOpUtilsTest, InferContractionDimsForConvOp) {
 }
 
 TEST_F(RootOpUtilsTest, InferContractionDimsForEmptyDimConvOp) {
-  auto op = getTestPoolingConv();
+  linalg::PoolingNhwcSumOp op = getTestPoolingConv();
   ASSERT_TRUE(!!op);
   EXPECT_TRUE(failed(inferContractionLikeDims(op)));
 }
@@ -201,10 +200,10 @@ TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForMatmulOp) {
   unsigned int m = 16;
   unsigned int n = 16;
   unsigned int k = 32;
-  auto op = getTestMatmulOp(m, n, k);
+  linalg::MatmulOp op = getTestMatmulOp(m, n, k);
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
   ASSERT_TRUE(loopInfo.has_value());
   EXPECT_EQ(loopInfo->numLoops, 3u);
   EXPECT_EQ(loopInfo->staticLoopRanges, SmallVector<int64_t>({m, n, k}));
@@ -212,10 +211,10 @@ TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForMatmulOp) {
 }
 
 TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForConvOp) {
-  auto op = getTestConv2DNhwcHwcfOp();
+  linalg::Conv2DNhwcHwcfOp op = getTestConv2DNhwcHwcfOp();
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
   ASSERT_TRUE(loopInfo.has_value());
   // conv_2d_nhwc_hwcf: (b, oh, ow, oc, kh, kw, ic) = 7 loops.
   EXPECT_EQ(loopInfo->numLoops, 7u);
@@ -223,29 +222,31 @@ TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForConvOp) {
 }
 
 TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForNonLinalgOp) {
-  auto op = getTestFuncOp();
+  func::FuncOp op = getTestFuncOp();
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
   ASSERT_FALSE(loopInfo.has_value());
 }
 
 class CompatibleMMAAttrsTest : public LinalgTestBase {};
 
 TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
+  IREE::GPU::TargetAttr target =
+      IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
   ASSERT_TRUE(target);
 
   Type f16 = Float16Type::get(getContext());
   Type f32 = Float32Type::get(getContext());
-  auto op = getTestMatmulOp(f16, f32);
+  linalg::MatmulOp op = getTestMatmulOp(f16, f32);
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
   ASSERT_TRUE(loopInfo.has_value());
-  auto dims = inferContractionLikeDims(op);
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  SmallVector<Attribute> result =
+      getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_FALSE(result.empty());
 
   for (Attribute attr : result) {
@@ -259,19 +260,21 @@ TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
 }
 
 TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  IREE::GPU::TargetAttr target =
+      IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
   ASSERT_TRUE(target);
 
   Type i8 = IntegerType::get(getContext(), 8);
   Type i32 = IntegerType::get(getContext(), 32);
-  auto op = getTestMatmulOp(i8, i32);
+  linalg::MatmulOp op = getTestMatmulOp(i8, i32);
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
   ASSERT_TRUE(loopInfo.has_value());
-  auto dims = inferContractionLikeDims(op);
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  SmallVector<Attribute> result =
+      getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_FALSE(result.empty());
 
   for (Attribute attr : result) {
@@ -285,16 +288,18 @@ TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
 }
 
 TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  IREE::GPU::TargetAttr target =
+      IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
   ASSERT_TRUE(target);
 
   Type i1 = IntegerType::get(getContext(), 1);
-  auto op = getTestMatmulOp(i1, i1);
+  linalg::MatmulOp op = getTestMatmulOp(i1, i1);
   ASSERT_TRUE(!!op);
 
-  auto loopInfo = getRootOpLoopInfo(op);
-  auto dims = inferContractionLikeDims(op);
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  std::optional<RootOpLoopInfo> loopInfo = getRootOpLoopInfo(op);
+  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(op);
+  SmallVector<Attribute> result =
+      getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
   EXPECT_TRUE(result.empty());
 }
 
