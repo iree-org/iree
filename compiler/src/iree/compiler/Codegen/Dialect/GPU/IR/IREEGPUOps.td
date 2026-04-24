@@ -172,7 +172,8 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
 
 def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
     Pure, ReturnLike, Terminator,
-    HasParent<"::mlir::iree_compiler::IREE::GPU::BarrierRegionOp">]> {
+    ParentOneOf<["::mlir::iree_compiler::IREE::GPU::BarrierRegionOp",
+                 "::mlir::iree_compiler::IREE::GPU::SubgroupScanOp"]>]> {
   let summary = [{Yield values from a iree_gpu region.}];
   let description = [{
      This operation is used to yield values from a within a region.
@@ -183,6 +184,81 @@ def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
 
   let assemblyFormat =
       [{  attr-dict ($values^ `:` type($values))? }];
+}
+
+//===----------------------------------------------------------------------===//
+// SubgroupScanOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SubgroupScanOp : Op<IREEGPU_Dialect, "subgroup_scan", [
+    SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">,
+    AllTypesMatch<["value", "result", "total"]>]> {
+  let summary = "Prefix scan across subgroup lanes with total.";
+  let description = [{
+    Performs a prefix scan of a scalar value across lanes within a subgroup
+    cluster, and returns the cluster total as a second result. The scan can
+    be either inclusive or exclusive:
+
+    - **Inclusive** (`inclusive` keyword present): lane at logical position `p`
+      receives `val_0 op val_1 op ... op val_p`. No identity is needed.
+    - **Exclusive** (default, no `inclusive` keyword): lane at position `p`
+      receives `identity op val_0 op ... op val_{p-1}`. Lane 0 receives the
+      identity. The `identity` operand is required for exclusive mode.
+
+    The combiner is specified by the region body, which takes two arguments
+    of the value type and yields one result.
+
+    The subgroup is divided into clusters of `size` lanes starting at lane 0
+    with inter-lane `stride`.
+
+    The second result `total` is the reduction of all values in the cluster:
+    `val_0 op val_1 op ... op val_{size-1}`.
+
+    The combiner must be associative. It does not need to be commutative.
+
+    Examples:
+    ```mlir
+    // Exclusive scan:
+    %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32)
+        cluster(size = 4, stride = 2) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %add = arith.addf %lhs, %rhs : f32
+      iree_gpu.yield %add : f32
+    } : f32
+
+    // Inclusive scan:
+    %scan, %total = iree_gpu.subgroup_scan inclusive (%x)
+        cluster(size = 4) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %add = arith.addf %lhs, %rhs : f32
+      iree_gpu.yield %add : f32
+    } : f32
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$value,
+    Optional<AnyTypeOf<[AnySignlessInteger, AnyFloat]>>:$identity,
+    UnitAttr:$inclusive,
+    OptionalAttr<I32Attr>:$cluster_size,
+    DefaultValuedAttr<I32Attr, "1">:$cluster_stride
+  );
+  let results = (outs
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$result,
+    AnyTypeOf<[AnySignlessInteger, AnyFloat]>:$total
+  );
+  let regions = (region SizedRegion<1>:$combiner);
+
+  let assemblyFormat = [{
+    (`inclusive` $inclusive^)?
+    `(` $value (`,` `identity` `=` $identity^ `:` type($identity))? `)`
+    (`cluster` `(` `size` `=` $cluster_size^
+      (`,` `stride` `=` $cluster_stride^)? `)`)?
+    $combiner attr-dict `:` type($value)
+  }];
+
+  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
