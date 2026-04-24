@@ -57,7 +57,7 @@
 static llvm::cl::opt<bool> clNoHoistDataOperandsScaledMMA(
     "test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma",
     llvm::cl::desc(
-        "Use unshuffled data operands for scaled matmuls: data operands "
+        "Use unswizzled data operands for scaled matmuls: data operands "
         "are pack-only (row-major), scales are fully shuffled."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
@@ -408,13 +408,13 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
         intrinsicsK = 2;
       }
     }
-    // For dynamic dimensions we still create an unshuffled attr with the
+    // For dynamic dimensions we still create an unswizzled attr with the
     // fixed-size defaults, which is conservative but correct.
     auto scaledMmaInterleaveM =
         DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandLhsScale});
     auto scaledMmaInterleaveN =
         DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandRhsScale});
-    auto unshuffledOperands = DenseI64ArrayAttr::get(
+    auto unswizzledOperands = DenseI64ArrayAttr::get(
         ctx, {kScaledMMAOperandLhs, kScaledMMAOperandRhs});
     return DataTiledScaledMMAAttr::get(
         ctx, intrinsicScaledMma.getIntrinsic(),
@@ -425,7 +425,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
         /*operands_interleaving_intrinsics_m=*/scaledMmaInterleaveM,
         /*operands_interleaving_intrinsics_n=*/scaledMmaInterleaveN,
         /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK,
-        /*unshuffled_operands=*/unshuffledOperands);
+        /*unswizzled_operands=*/unswizzledOperands);
   }
 
   return DataTiledScaledMMAAttr::get(
