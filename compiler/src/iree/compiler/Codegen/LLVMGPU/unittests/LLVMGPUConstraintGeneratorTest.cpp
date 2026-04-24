@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Parser/Parser.h"
 
 namespace mlir::iree_compiler {
 namespace {
@@ -41,8 +40,8 @@ protected:
     return builder;
   }
 
-  linalg::MatmulOp getTestMatmulOp(int64_t m = 16, int64_t n = 16,
-                                   int64_t k = 32) {
+  linalg::MatmulOp getTestMatmulOp(unsigned int m = 16, unsigned int n = 16,
+                                   unsigned int k = 32) {
     OpBuilder builder = setupBuilder();
     Location loc = builder.getUnknownLoc();
 
@@ -79,16 +78,17 @@ protected:
   }
 
   linalg::Conv2DNhwcHwcfOp
-  getTestConv2DNhwcHwcfOp(int64_t b = 1, int64_t ih = 3, int64_t iw = 3,
-                          int64_t ic = 1, int64_t kh = 1, int64_t kw = 1,
-                          int64_t oc = 1) {
+  getTestConv2DNhwcHwcfOp(unsigned int b = 1, unsigned int ih = 3,
+                          unsigned int iw = 3, unsigned int ic = 1,
+                          unsigned int kh = 1, unsigned int kw = 1,
+                          unsigned int oc = 1) {
 
     OpBuilder builder = setupBuilder();
     Location loc = builder.getUnknownLoc();
     auto f32 = builder.getF32Type();
 
-    int64_t oh = ih - kh + 1;
-    int64_t ow = iw - kw + 1;
+    unsigned int oh = ih - kh + 1;
+    unsigned int ow = iw - kw + 1;
 
     auto input_ty = RankedTensorType::get({b, ih, iw, ic}, f32);
     auto filter_ty = RankedTensorType::get({kh, kw, ic, oc}, f32);
@@ -113,14 +113,18 @@ protected:
     auto f32 = builder.getF32Type();
 
     auto inputTy = RankedTensorType::get({1, 16, 16, 8}, f32);
+    auto windowTy = RankedTensorType::get({3, 3}, f32);
     auto outTy = RankedTensorType::get({1, 14, 14, 8}, f32);
 
     Value input =
         tensor::EmptyOp::create(builder, loc, inputTy.getShape(), f32);
+    Value window =
+        tensor::EmptyOp::create(builder, loc, windowTy.getShape(), f32);
     Value out = tensor::EmptyOp::create(builder, loc, outTy.getShape(), f32);
 
     return linalg::PoolingNhwcSumOp::create(builder, loc, TypeRange{outTy},
-                                            ValueRange{input}, ValueRange{out});
+                                            ValueRange{input, window},
+                                            ValueRange{out});
   }
 
   func::FuncOp getTestFuncOp() {
@@ -140,99 +144,85 @@ private:
   OwningOpRef<ModuleOp> module;
 };
 
-TEST_F(RootOpUtilsTest, InferContractionDims_FillFails) {
+TEST_F(RootOpUtilsTest, InferContractionDimsForFillOp) {
   auto op = getTestFillOp();
   ASSERT_TRUE(!!op);
   EXPECT_TRUE(failed(inferContractionLikeDims(op)));
 }
 
-TEST_F(RootOpUtilsTest, InferContractionDims_Matmul) {
-  int64_t m = 32;
-  int64_t n = 64;
-  int64_t k = 8;
-  auto op = getTestMatmulOp(m, n, k);
+TEST_F(RootOpUtilsTest, InferContractionDimsForMatmulOp) {
+  auto op = getTestMatmulOp();
   ASSERT_TRUE(!!op);
 
   auto dims = inferContractionLikeDims(op);
 
   ASSERT_TRUE(succeeded(dims));
-  EXPECT_EQ(dims->m, SmallVector<unsigned>({m}));
-  EXPECT_EQ(dims->n, SmallVector<unsigned>({n}));
-  EXPECT_EQ(dims->k, SmallVector<unsigned>({k}));
+  // matmul loops: (m=0, n=1, k=2).
+  EXPECT_EQ(dims->m, SmallVector<unsigned>({0}));
+  EXPECT_EQ(dims->n, SmallVector<unsigned>({1}));
+  EXPECT_EQ(dims->k, SmallVector<unsigned>({2}));
 }
 
-TEST_F(RootOpUtilsTest, InferContractionDims_Conv) {
-  int64_t b = 1;
-  int64_t ih = 5;
-  int64_t iw = 6;
-  int64_t ic = 3;
-  int64_t kh = 2;
-  int64_t kw = 3;
-  int64_t oc = 8;
-
-  auto op = getTestConv2DNhwcHwcfOp(b, ih, iw, ic, kh, kw, oc);
+TEST_F(RootOpUtilsTest, InferContractionDimsForConvOp) {
+  auto op = getTestConv2DNhwcHwcfOp();
   ASSERT_TRUE(op);
 
   auto dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
 
-  int64_t oh = ih - kh + 1;
-  int64_t ow = iw - kw + 1;
-
-  // conv_2d_nhwc_hwcf:
-  // m = output spatial dims (oh, ow)
-  // n = output channel (oc)
-  // k = reduction dims (kh, kw, ic)
-  EXPECT_EQ(dims->m, SmallVector<unsigned>({oh, ow}));
-  EXPECT_EQ(dims->n, SmallVector<unsigned>({oc}));
-  EXPECT_EQ(dims->k, SmallVector<unsigned>({kh, kw, ic}));
+  // conv_2d_nhwc_hwcf loops: (b=0, oh=1, ow=2, oc=3, kh=4, kw=5, ic=6).
+  // m = outputImage dims (oh, ow)
+  // n = outputChannel dims(oc)
+  // k = inputChannel dims (ic)
+  EXPECT_EQ(dims->m, SmallVector<unsigned>({1, 2}));
+  EXPECT_EQ(dims->n, SmallVector<unsigned>({3}));
+  EXPECT_EQ(dims->k, SmallVector<unsigned>({6}));
 }
 
-TEST_F(RootOpUtilsTest, InferContractionDims_ConvEmptyDims) {
+TEST_F(RootOpUtilsTest, InferContractionDimsForEmptyDimConvOp) {
   auto op = getTestPoolingConv();
   ASSERT_TRUE(!!op);
   EXPECT_TRUE(failed(inferContractionLikeDims(op)));
 }
 
-TEST_F(RootOpUtilsTest, GetRootOpLoopInfo_Matmul) {
-  int64_t m = 16;
-  int64_t n = 16;
-  int64_t k = 32;
+TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForMatmulOp) {
+  unsigned int m = 16;
+  unsigned int n = 16;
+  unsigned int k = 32;
   auto op = getTestMatmulOp(m, n, k);
   ASSERT_TRUE(!!op);
 
-  auto info = getRootOpLoopInfo(op);
-  ASSERT_TRUE(info.has_value());
-  EXPECT_EQ(info->numLoops, 3u);
-  EXPECT_EQ(info->staticLoopRanges, SmallVector<int64_t>({m, n, k}));
-  EXPECT_EQ(info->indexingMaps.size(), 3u);
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  EXPECT_EQ(loopInfo->numLoops, 3u);
+  EXPECT_EQ(loopInfo->staticLoopRanges, SmallVector<int64_t>({m, n, k}));
+  EXPECT_EQ(loopInfo->indexingMaps.size(), 3u);
 }
 
-TEST_F(RootOpUtilsTest, GetRootOpLoopInfo_Conv) {
+TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForConvOp) {
   auto op = getTestConv2DNhwcHwcfOp();
   ASSERT_TRUE(!!op);
 
-  auto info = getRootOpLoopInfo(op);
-  ASSERT_TRUE(info.has_value());
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
   // conv_2d_nhwc_hwcf: (b, oh, ow, oc, kh, kw, ic) = 7 loops.
-  EXPECT_EQ(info->numLoops, 7u);
-  EXPECT_EQ(info->indexingMaps.size(), 3u);
+  EXPECT_EQ(loopInfo->numLoops, 7u);
+  EXPECT_EQ(loopInfo->indexingMaps.size(), 3u);
 }
 
-TEST_F(RootOpUtilsTest, GetRootOpLoopInfo_NonLinalg) {
+TEST_F(RootOpUtilsTest, GetRootOpLoopInfoForNonLinalgOp) {
   auto op = getTestFuncOp();
   ASSERT_TRUE(!!op);
 
-  auto info = getRootOpLoopInfo(op);
-  ASSERT_FALSE(info.has_value());
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_FALSE(loopInfo.has_value());
 }
 
 class CompatibleMMAAttrsTest : public ::testing::Test {
 protected:
   CompatibleMMAAttrsTest() {
     DialectRegistry reg;
-    reg.insert<IREE::GPU::IREEGPUDialect, arith::ArithDialect,
-               func::FuncDialect, linalg::LinalgDialect,
+    reg.insert<IREE::GPU::IREEGPUDialect, linalg::LinalgDialect,
                tensor::TensorDialect>();
     ctx.appendDialectRegistry(reg);
     ctx.loadAllAvailableDialects();
@@ -248,8 +238,9 @@ protected:
     return IREE::GPU::getHIPTargetDetails("gfx1201", "", &ctx);
   }
 
-  linalg::MatmulOp getTestMatmulOp(Type inputType, Type accType, int64_t m = 16,
-                                   int64_t n = 16, int64_t k = 32) {
+  linalg::MatmulOp getTestMatmulOp(Type inputType, Type accType,
+                                   unsigned int m = 16, unsigned int n = 16,
+                                   unsigned int k = 32) {
     OpBuilder builder(&ctx);
     module = ModuleOp::create(builder.getUnknownLoc());
     builder.setInsertionPointToStart(module->getBody());
@@ -275,76 +266,9 @@ private:
   OwningOpRef<ModuleOp> module;
 };
 
-TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type f16 = Float16Type::get(getContext());
-  Type f32 = Float32Type::get(getContext());
-  auto op = getTestMatmulOp(f16, f32);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  auto dims = inferContractionLikeDims(op);
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_FALSE(result.empty());
-
-  for (Attribute attr : result) {
-    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
-    ASSERT_TRUE(!!mma);
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    EXPECT_EQ(aType, f16);
-    EXPECT_EQ(bType, f16);
-    EXPECT_EQ(cType, f32);
-  }
-}
-
-TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type i8 = IntegerType::get(getContext(), 8);
-  Type i32 = IntegerType::get(getContext(), 32);
-  auto op = getTestMatmulOp(i8, i32);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  ASSERT_TRUE(loopInfo.has_value());
-  auto dims = inferContractionLikeDims(op);
-  ASSERT_TRUE(succeeded(dims));
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  auto dims = inferContractionLikeDims(op);
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_FALSE(result.empty());
-
-  for (Attribute attr : result) {
-    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
-    ASSERT_TRUE(!!mma);
-    auto [aType, bType, cType] = mma.getABCElementTypes();
-    EXPECT_EQ(aType, i8);
-    EXPECT_EQ(bType, i8);
-    EXPECT_EQ(cType, i32);
-  }
-}
-
-TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
-  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
-  ASSERT_TRUE(target);
-
-  Type i1 = IntegerType::get(getContext(), 1);
-  auto op = getTestMatmulOp(i1, i1);
-  ASSERT_TRUE(!!op);
-
-  auto loopInfo = getRootOpLoopInfo(op);
-  auto dims = inferContractionLikeDims(op);
-  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
-  EXPECT_TRUE(result.empty());
-}
-
-class VectorDistributeKnobsDictFixture : public ::testing::Test {
+class VectorDistributeKnobsTest : public ::testing::Test {
 protected:
-  VectorDistributeKnobsDictFixture() {
+  VectorDistributeKnobsTest() {
     DialectRegistry reg;
     reg.insert<IREE::Codegen::IREECodegenDialect>();
     ctx.appendDialectRegistry(reg);
@@ -416,19 +340,76 @@ private:
   MLIRContext ctx;
 };
 
-TEST_F(RootOpUtilsTest, BuildVectorDistributeKnobs_Matmul_Structure) {
-  auto op = getTestMatmulOp();
+TEST_F(CompatibleMMAAttrsTest, F16InputF32AccOnRDNA4) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx1201", "", getContext());
+  ASSERT_TRUE(target);
+
+  Type f16 = Float16Type::get(getContext());
+  Type f32 = Float32Type::get(getContext());
+  auto op = getTestMatmulOp(f16, f32);
   ASSERT_TRUE(!!op);
 
-  auto info = getRootOpLoopInfo(op);
-  ASSERT_TRUE(info.has_value());
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
   auto dims = inferContractionLikeDims(op);
   ASSERT_TRUE(succeeded(dims));
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_FALSE(result.empty());
 
-  auto compatibleMMAs = getCompatibleMMAAttrs(op, target, *info, *dims);
+  for (Attribute attr : result) {
+    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
+    ASSERT_TRUE(!!mma);
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    EXPECT_EQ(aType, f16);
+    EXPECT_EQ(bType, f16);
+    EXPECT_EQ(cType, f32);
+  }
+}
+
+TEST_F(CompatibleMMAAttrsTest, I8InputI32AccOnCDNA3) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  ASSERT_TRUE(target);
+
+  Type i8 = IntegerType::get(getContext(), 8);
+  Type i32 = IntegerType::get(getContext(), 32);
+  auto op = getTestMatmulOp(i8, i32);
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  ASSERT_TRUE(loopInfo.has_value());
+  auto dims = inferContractionLikeDims(op);
+  ASSERT_TRUE(succeeded(dims));
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_FALSE(result.empty());
+
+  for (Attribute attr : result) {
+    auto mma = dyn_cast<IREE::GPU::MmaInterfaceAttr>(attr);
+    ASSERT_TRUE(!!mma);
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    EXPECT_EQ(aType, i8);
+    EXPECT_EQ(bType, i8);
+    EXPECT_EQ(cType, i32);
+  }
+}
+
+TEST_F(CompatibleMMAAttrsTest, IncompatibleTypes) {
+  auto target = IREE::GPU::getHIPTargetDetails("gfx942", "", getContext());
+  ASSERT_TRUE(target);
+
+  Type i1 = IntegerType::get(getContext(), 1);
+  auto op = getTestMatmulOp(i1, i1);
+  ASSERT_TRUE(!!op);
+
+  auto loopInfo = getRootOpLoopInfo(op);
+  auto dims = inferContractionLikeDims(op);
+  auto result = getCompatibleMMAAttrs(op, target, *loopInfo, *dims);
+  EXPECT_TRUE(result.empty());
+}
+
+TEST_F(VectorDistributeKnobsTest, KnobDictForMatmul) {
 
   DictionaryAttr dict = buildVectorDistributeKnobsDict(
-      ctx, loopInfoForMatmul(), matmulDims(), compatibleMMAs());
+      getContext(), loopInfoForMatmul(), matmulDims(), compatibleMMAs());
 
   ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
   ASSERT_TRUE(dict.get(kKnobReductionKey));
@@ -478,11 +459,9 @@ TEST_F(RootOpUtilsTest, BuildVectorDistributeKnobs_Matmul_Structure) {
   EXPECT_EQ(sgSize.getName().getValue(), kKnobSgSizeName);
 }
 
-TEST_F(VectorDistributeKnobsDictFixture,
-       BuildVectorDistributeKnobs_Conv_Structure) {
-  MLIRContext *ctx = getContext();
+TEST_F(VectorDistributeKnobsTest, KnobDictForConv) {
   DictionaryAttr dict = buildVectorDistributeKnobsDict(
-      ctx, loopInfoForConv(), convDims(), compatibleMMAs());
+      getContext(), loopInfoForConv(), convDims(), compatibleMMAs());
 
   ASSERT_TRUE(dict.get(kKnobWorkgroupKey));
   ASSERT_TRUE(dict.get(kKnobReductionKey));

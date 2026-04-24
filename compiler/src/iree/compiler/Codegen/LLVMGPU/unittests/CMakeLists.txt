@@ -20,7 +20,6 @@ iree_cc_test(
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
-    MLIRParser
     MLIRTensorDialect
     gmock
     gtest
