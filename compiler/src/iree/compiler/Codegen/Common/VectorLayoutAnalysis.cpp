@@ -190,11 +190,7 @@ void LayoutAnalysis::propagateOneForward(Value val,
         continue;
       }
       if (auto ifOp = dyn_cast<scf::IfOp>(parentOp)) {
-        Value thenArg = ifOp.getThenRegion().getArgument(operandIdx);
-        Value elseArg = ifOp.getElseRegion().getArgument(operandIdx);
         Value result = ifOp->getResult(operandIdx);
-        addCandidate(thenArg, layout);
-        addCandidate(elseArg, layout);
         addCandidate(result, layout);
         continue;
       }
@@ -570,7 +566,13 @@ static bool collectDuplicatableChain(Operation *op,
         continue;
       }
       Operation *defOp = operand.getDefiningOp();
-      if (!defOp || defOp->getBlock() != block) {
+      if (!defOp) {
+        return false;
+      }
+      if (defOp->hasTrait<OpTrait::ConstantLike>()) {
+        continue;
+      }
+      if (defOp->getBlock() != block) {
         return false;
       }
       worklist.push(defOp);
