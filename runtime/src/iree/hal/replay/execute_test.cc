@@ -330,6 +330,52 @@ TEST(ReplayExecuteTest, ObservesScopeEvents) {
   EXPECT_EQ(events[1], "end:execute");
 }
 
+TEST(ReplayExecuteTest, ExecutesPreparedPlanRepeatedly) {
+  std::vector<uint8_t> storage(32768, 0);
+  iree_hal_replay_recorder_t* recorder = CreateHostAllocationRecorder(&storage);
+
+  iree_hal_device_group_t* source_group = CreateSyncDeviceGroup();
+  iree_hal_device_group_t* wrapped_group = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_wrap_device_group(
+      recorder, source_group, iree_allocator_system(), &wrapped_group));
+
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_begin(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_scope_end(
+      recorder, iree_make_cstring_view("execute")));
+  IREE_ASSERT_OK(iree_hal_replay_recorder_close(recorder));
+  iree_hal_replay_recorder_release(recorder);
+  iree_hal_device_group_release(wrapped_group);
+  iree_hal_device_group_release(source_group);
+
+  iree_hal_replay_plan_t* plan = nullptr;
+  IREE_ASSERT_OK(iree_hal_replay_plan_create(GetCapturedFileContents(storage),
+                                             iree_allocator_system(), &plan));
+
+  std::vector<std::string> events;
+  ReplayScopeCallbackState callback_state = {
+      /*.events=*/&events,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.scope_event_callback.fn = RecordReplayScopeEvent;
+  options.scope_event_callback.user_data = &callback_state;
+
+  iree_hal_device_group_t* replay_group = CreateSyncDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_plan_execute(plan, replay_group, &options,
+                                              iree_allocator_system()));
+  IREE_EXPECT_OK(iree_hal_replay_plan_execute(plan, replay_group, &options,
+                                              iree_allocator_system()));
+  iree_hal_device_group_release(replay_group);
+  iree_hal_replay_plan_destroy(plan);
+
+  ASSERT_EQ(events.size(), 4u);
+  EXPECT_EQ(events[0], "begin:execute");
+  EXPECT_EQ(events[1], "end:execute");
+  EXPECT_EQ(events[2], "begin:execute");
+  EXPECT_EQ(events[3], "end:execute");
+}
+
 TEST(ReplayExecuteTest, SubstitutesRecordedExecutablePayload) {
   std::vector<uint8_t> captured_data =
       MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,

@@ -243,7 +243,7 @@ iree_status_t ReplayScopeTimingCallback(
   }
 }
 
-void BenchmarkReplay(iree_const_byte_span_t file_contents,
+void BenchmarkReplay(const iree_hal_replay_plan_t* replay_plan,
                      iree_hal_device_group_t* device_group,
                      iree_hal_profiling_from_flags_t* profiling,
                      iree_hal_replay_execute_options_t options,
@@ -263,8 +263,8 @@ void BenchmarkReplay(iree_const_byte_span_t file_contents,
       options.scope_event_callback.fn = ReplayScopeTimingCallback;
       options.scope_event_callback.user_data = &scope_state;
     }
-    iree_status_t status = iree_hal_replay_execute_file(
-        file_contents, device_group, &options, host_allocator);
+    iree_status_t status = iree_hal_replay_plan_execute(
+        replay_plan, device_group, &options, host_allocator);
     IREE_CHECK_OK(status);
     if (scoped_timing) {
       if (!scope_state.match.observed_begin) {
@@ -455,6 +455,13 @@ static int runMain(int argc, char** argv) {
     options.executable_substitution_callback.user_data =
         &executable_substitutions;
   }
+
+  iree_hal_replay_plan_t* replay_plan = nullptr;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_plan_create(file_contents->const_buffer,
+                                         host_allocator, &replay_plan);
+  }
+
   if (iree_status_is_ok(status)) {
     iree_string_view_t replay_scope = iree_make_cstring_view(FLAG_replay_scope);
     std::string benchmark_name = "BM_replay";
@@ -463,12 +470,12 @@ static int runMain(int argc, char** argv) {
       benchmark_name.append(replay_scope.data, replay_scope.size);
     }
     benchmark::Benchmark* replay_benchmark =
-        benchmark::RegisterBenchmark(
-            benchmark_name,
-            [=](benchmark::State& state) -> void {
-              BenchmarkReplay(file_contents->const_buffer, device_group,
-                              profiling, options, state);
-            })
+        benchmark::RegisterBenchmark(benchmark_name,
+                                     [=](benchmark::State& state) -> void {
+                                       BenchmarkReplay(replay_plan,
+                                                       device_group, profiling,
+                                                       options, state);
+                                     })
             ->MeasureProcessCPUTime()
             ->Unit(benchmark::kMillisecond);
     if (iree_string_view_is_empty(replay_scope)) {
@@ -481,6 +488,7 @@ static int runMain(int argc, char** argv) {
 
   status =
       iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  iree_hal_replay_plan_destroy(replay_plan);
   ReleaseReplayExecutableSubstitutions(host_allocator,
                                        &executable_substitutions);
   iree_allocator_free(host_allocator, file_path_remaps);
