@@ -178,7 +178,8 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
       OneOfKnobAttr::get(ctx, StringAttr::get(ctx, kKnobMmaIdxName),
                          ArrayAttr::get(ctx, compatibleMMAs)));
 
-  // Build subgroup basis with counts and mapping.
+  // Build subgroup basis with counts only, as mapping is always identity
+  // for VectorDistribute matmul and conv.
   SmallVector<NamedAttribute> subgroupBasisEntries;
   // Only innermost M and N dims get subgroup tiling, others stay 1.
   SmallVector<Attribute> subgroupCounts(loopInfo.numLoops, makeIntAttr(ctx, 1));
@@ -188,8 +189,6 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   subgroupCounts[dims.n.back()] = makeIntKnobAttr(ctx, kKnobSgNCntName);
   subgroupBasisEntries.emplace_back(kKnobCountsKey,
                                     ArrayAttr::get(ctx, subgroupCounts));
-  // VectorDistribute sets identity mapping for matmul and conv, so
-  // omit it from the knob template.
   knobsEntries.emplace_back(kKnobSubgroupBasisKey,
                             DictionaryAttr::get(ctx, subgroupBasisEntries));
 
