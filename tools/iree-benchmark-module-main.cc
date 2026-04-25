@@ -163,13 +163,23 @@ static iree_hal_profiling_from_flags_t* g_profiling = nullptr;
 namespace iree {
 namespace {
 
-static void BenchmarkGenericFunction(const std::string& benchmark_name,
-                                     int32_t batch_size,
-                                     iree_hal_device_t* device,
-                                     iree_vm_context_t* context,
-                                     iree_vm_function_t function,
-                                     iree_vm_list_t* inputs,
-                                     benchmark::State& state) {
+static void BeginReplayExecuteScope(iree_hal_replay_recorder_t* recorder) {
+  if (!recorder) return;
+  IREE_CHECK_OK(
+      iree_hal_replay_recorder_scope_begin(recorder, IREE_SV("execute")));
+}
+
+static void EndReplayExecuteScope(iree_hal_replay_recorder_t* recorder) {
+  if (!recorder) return;
+  IREE_CHECK_OK(
+      iree_hal_replay_recorder_scope_end(recorder, IREE_SV("execute")));
+}
+
+static void BenchmarkGenericFunction(
+    const std::string& benchmark_name, int32_t batch_size,
+    iree_hal_replay_recorder_t* recorder, iree_hal_device_t* device,
+    iree_vm_context_t* context, iree_vm_function_t function,
+    iree_vm_list_t* inputs, benchmark::State& state) {
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
                                       benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
@@ -182,10 +192,12 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
   while (state.KeepRunningBatch(batch_size)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
+    BeginReplayExecuteScope(recorder);
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs, outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+    EndReplayExecuteScope(recorder);
     IREE_TRACE_ZONE_END(z1);
     if (device) {
       state.PauseTiming();
@@ -199,6 +211,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
 }
 
 void RegisterGenericBenchmark(const std::string& function_name,
+                              iree_hal_replay_recorder_t* recorder,
                               iree_hal_device_t* device,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
@@ -208,8 +221,8 @@ void RegisterGenericBenchmark(const std::string& function_name,
   benchmark::RegisterBenchmark(benchmark_name.c_str(),
                                [=](benchmark::State& state) -> void {
                                  BenchmarkGenericFunction(
-                                     benchmark_name, batch_size, device,
-                                     context, function, inputs, state);
+                                     benchmark_name, batch_size, recorder,
+                                     device, context, function, inputs, state);
                                })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
@@ -236,9 +249,10 @@ void RegisterGenericBenchmark(const std::string& function_name,
 //     [invocation 1] -> [invocation 3]
 static void BenchmarkAsyncFunction(
     const std::string& benchmark_name, int32_t batch_size,
-    int32_t batch_concurrency, iree_hal_device_t* device,
-    iree_vm_context_t* context, iree_vm_function_t function,
-    iree_vm_list_t* common_inputs, benchmark::State& state) {
+    int32_t batch_concurrency, iree_hal_replay_recorder_t* recorder,
+    iree_hal_device_t* device, iree_vm_context_t* context,
+    iree_vm_function_t function, iree_vm_list_t* common_inputs,
+    benchmark::State& state) {
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
                                       benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
@@ -316,6 +330,7 @@ static void BenchmarkAsyncFunction(
     IREE_TRACE_ZONE_END(z_begin);
 
     state.ResumeTiming();
+    BeginReplayExecuteScope(recorder);
     {
       // TODO(benvanik): replace with async invocations. Today if the invocation
       // performs any waits this will block on the initial invoke instead of
@@ -330,6 +345,7 @@ static void BenchmarkAsyncFunction(
                                         iree_infinite_timeout(),
                                         IREE_ASYNC_WAIT_FLAG_NONE));
     }
+    EndReplayExecuteScope(recorder);
     state.PauseTiming();
 
     IREE_TRACE_ZONE_BEGIN_NAMED(z_end, "CleanupBatch");
@@ -355,6 +371,7 @@ static void BenchmarkAsyncFunction(
 }
 
 void RegisterAsyncBenchmark(const std::string& function_name,
+                            iree_hal_replay_recorder_t* recorder,
                             iree_hal_device_t* device,
                             iree_vm_context_t* context,
                             iree_vm_function_t function,
@@ -362,12 +379,13 @@ void RegisterAsyncBenchmark(const std::string& function_name,
   auto benchmark_name = "BM_" + function_name;
   int32_t batch_size = FLAG_batch_size;
   int32_t batch_concurrency = FLAG_batch_concurrency;
-  benchmark::RegisterBenchmark(
-      benchmark_name.c_str(),
-      [=](benchmark::State& state) -> void {
-        BenchmarkAsyncFunction(benchmark_name, batch_size, batch_concurrency,
-                               device, context, function, inputs, state);
-      })
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [=](benchmark::State& state) -> void {
+                                 BenchmarkAsyncFunction(
+                                     benchmark_name, batch_size,
+                                     batch_concurrency, recorder, device,
+                                     context, function, inputs, state);
+                               })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -380,6 +398,7 @@ void RegisterAsyncBenchmark(const std::string& function_name,
 }
 
 static void BenchmarkDispatchFunction(const std::string& benchmark_name,
+                                      iree_hal_replay_recorder_t* recorder,
                                       iree_vm_context_t* context,
                                       iree_vm_function_t function,
                                       benchmark::State& state) {
@@ -401,10 +420,12 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
   while (state.KeepRunningBatch(FLAG_batch_size)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
+    BeginReplayExecuteScope(recorder);
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs.get(), outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+    EndReplayExecuteScope(recorder);
     IREE_TRACE_ZONE_END(z1);
   }
   state.SetItemsProcessed(state.iterations());
@@ -413,14 +434,17 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
 }
 
 void RegisterDispatchBenchmark(const std::string& function_name,
+                               iree_hal_replay_recorder_t* recorder,
                                iree_vm_context_t* context,
                                iree_vm_function_t function) {
   auto benchmark_name = "BM_" + function_name;
-  benchmark::RegisterBenchmark(
-      benchmark_name.c_str(),
-      [benchmark_name, context, function](benchmark::State& state) -> void {
-        BenchmarkDispatchFunction(benchmark_name, context, function, state);
-      })
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [benchmark_name, recorder, context,
+                                function](benchmark::State& state) -> void {
+                                 BenchmarkDispatchFunction(benchmark_name,
+                                                           recorder, context,
+                                                           function, state);
+                               })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -535,12 +559,14 @@ class IREEBenchmark {
         &function, IREE_SV("iree.abi.model"));
     if (iree_string_view_equal(invocation_model, IREE_SV("coarse-fences"))) {
       // Asynchronous invocation.
-      iree::RegisterAsyncBenchmark(function_name, device_.get(), context_.get(),
-                                   function, inputs_.get());
+      iree::RegisterAsyncBenchmark(function_name, replay_recorder_,
+                                   device_.get(), context_.get(), function,
+                                   inputs_.get());
     } else {
       // Synchronous invocation.
-      iree::RegisterGenericBenchmark(function_name, device_.get(),
-                                     context_.get(), function, inputs_.get());
+      iree::RegisterGenericBenchmark(function_name, replay_recorder_,
+                                     device_.get(), context_.get(), function,
+                                     inputs_.get());
     }
     return iree_ok_status();
   }
@@ -563,12 +589,12 @@ class IREEBenchmark {
           &function, IREE_SV("iree.benchmark"));
       if (iree_string_view_equal(benchmark_type, IREE_SV("dispatch"))) {
         iree::RegisterDispatchBenchmark(
-            std::string(function_name.data, function_name.size), context_.get(),
-            function);
+            std::string(function_name.data, function_name.size),
+            replay_recorder_, context_.get(), function);
       } else if (iree_string_view_equal(benchmark_type, IREE_SV("entry"))) {
         iree::RegisterGenericBenchmark(
-            std::string(function_name.data, function_name.size), device_.get(),
-            context_.get(), function,
+            std::string(function_name.data, function_name.size),
+            replay_recorder_, device_.get(), context_.get(), function,
             /*inputs=*/nullptr);
       } else {
         // Pick up generic () -> () functions.
@@ -597,7 +623,7 @@ class IREEBenchmark {
             // Only functions taking a (wait, signal) fence pair are run.
             iree::RegisterAsyncBenchmark(
                 std::string(function_name.data, function_name.size),
-                device_.get(), context_.get(), function,
+                replay_recorder_, device_.get(), context_.get(), function,
                 /*inputs=*/nullptr);
           }
         } else {
@@ -607,7 +633,7 @@ class IREEBenchmark {
             // anything).
             iree::RegisterGenericBenchmark(
                 std::string(function_name.data, function_name.size),
-                device_.get(), context_.get(), function,
+                replay_recorder_, device_.get(), context_.get(), function,
                 /*inputs=*/nullptr);
           }
         }
