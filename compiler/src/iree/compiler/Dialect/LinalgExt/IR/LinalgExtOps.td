@@ -1632,6 +1632,23 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     // Returns true if the op has non-zero output padding.
     bool hasOutputPadding();
 
+    // Returns true if *this satisfies every structural precondition for
+    // async-copy decomposition. See the design spec for the exact list
+    // of checks. Callers that intend to invoke decomposeOperationAsyncCopy
+    // MUST call this first; the method itself also runs the same checks
+    // and returns failure() on mismatch, so this is a pure query with no
+    // side effects.
+    bool canDecomposeAsyncCopy();
+
+    // Decomposes *this into the async-copy form (collapsed source +
+    // linalg.generic index tensor + iree_linalg_ext.gather + expand-shape).
+    // Precondition: canDecomposeAsyncCopy() returns true. This is NOT part
+    // of the AggregatedOpInterface; it is a direct entry point callers can
+    // use when they know async-copy is the right lowering (e.g. the
+    // GPUConvertToCoalescedDMA pass after it has checked the
+    // use_global_load_dma lowering_config).
+    FailureOr<SmallVector<Value>> decomposeOperationAsyncCopy(OpBuilder &b);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

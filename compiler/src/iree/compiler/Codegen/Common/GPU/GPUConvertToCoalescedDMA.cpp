@@ -12,13 +12,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -153,6 +152,10 @@ static bool sourceIsFromFatRawBuffer(Value source) {
     }
     if (auto pad = source.getDefiningOp<tensor::PadOp>()) {
       source = pad.getSource();
+      continue;
+    }
+    if (auto collapseOp = source.getDefiningOp<tensor::CollapseShapeOp>()) {
+      source = collapseOp.getSrc();
       continue;
     }
     break;
@@ -492,49 +495,6 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
         return failure();
       }
     }
-  } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
-    source = innerOp.getSource();
-    indices = innerOp.getIndices();
-
-    // Convert indices tensor to vector for DMA if present.
-    if (indices) {
-      rewriter.setInsertionPoint(inParallelOp);
-      auto indicesType = cast<RankedTensorType>(indices.getType());
-      Type elementType = indicesType.getElementType();
-
-      // First, read the indices tensor as a vector with the original element
-      // type.
-      auto vectorTypeOriginal =
-          VectorType::get(indicesType.getShape(), elementType);
-
-      int64_t rank = indicesType.getRank();
-      SmallVector<Value> readIndices(rank);
-      for (int64_t i = 0; i < rank; ++i) {
-        readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
-      }
-
-      // Create padding value - use i32 for index type.
-      Type paddingType = elementType;
-      if (elementType.isIndex()) {
-        paddingType = rewriter.getI32Type();
-      }
-      TypedAttr zeroPadAttr = rewriter.getIntegerAttr(paddingType, 0);
-      Value zeroPad = arith::ConstantOp::create(rewriter, loc, zeroPadAttr);
-
-      Value indicesVec = vector::TransferReadOp::create(
-          rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
-
-      // Convert to i32 type if needed.
-      Type i32Type = rewriter.getI32Type();
-      if (elementType != i32Type) {
-        VectorType i32VectorType =
-            VectorType::get(indicesType.getShape(), i32Type);
-        indices = arith::IndexCastOp::create(rewriter, loc, i32VectorType,
-                                             indicesVec);
-      } else {
-        indices = indicesVec;
-      }
-    }
   }
 
   // Create the DMA op in the in_parallel region.
@@ -713,13 +673,7 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Get subgroup size from translation_info.
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize) {
-      return failure();
-    }
-
-    // Validate that innermost dimension is large enough for coalesced DMA.
+    // Validate DMA alignment and get subgroup size.
     auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
@@ -727,32 +681,9 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !targetSupportsGlobalLoadDMA(target)) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim % minElementsPerTransfer != 0) {
+    std::optional<int64_t> subgroupSize = getDMAAlignedSubgroupSize(
+        funcOp, outputType.getElementType(), innermostDim);
+    if (!subgroupSize) {
       return failure();
     }
 
@@ -858,6 +789,63 @@ struct ConvertGatherToCoalescedDMA
   }
 };
 
+/// Returns true if an im2col op is viable for the async-copy (gather +
+/// DMA) lowering. Structural decomposition preconditions are delegated
+/// to Im2colOp::canDecomposeAsyncCopy — this function only layers the
+/// DMA-specific policy on top (target capability and alignment).
+static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
+  auto funcOp = im2colOp->getParentOfType<FunctionOpInterface>();
+  if (!funcOp) {
+    return false;
+  }
+
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    return false;
+  }
+
+  // Structural preconditions are the single source of truth in LinalgExt.
+  // Calling canDecomposeAsyncCopy guarantees that if this function
+  // returns true, decomposeOperationAsyncCopy will succeed at runtime.
+  if (!im2colOp.canDecomposeAsyncCopy()) {
+    return false;
+  }
+
+  // DMA alignment check — canDecomposeAsyncCopy guarantees the vectorized
+  // dim is the innermost output dim, so contiguousSize is the last dim.
+  auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
+  int64_t contiguousSize = outputType.getShape().back();
+  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   contiguousSize)
+      .has_value();
+}
+
+/// Decomposes an Im2colOp tagged with use_global_load_dma into the
+/// gather + extract_slice + insert form via Im2colOp::
+/// decomposeOperationAsyncCopy. The im2col pre-check downgrades any
+/// non-viable op's lowering config before this pattern runs, so by
+/// construction every matched op is DMA-viable. On the should-be-unreachable
+/// drift case where decomposition still fails, the op is left in place and
+/// the drift verifier in the pass emits the diagnostic.
+struct DecomposeIm2colToAsyncCopy
+    : OpRewritePattern<IREE::LinalgExt::Im2colOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::Im2colOp im2colOp,
+                                PatternRewriter &rewriter) const override {
+    if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+      return failure();
+    }
+    FailureOr<SmallVector<Value>> decomposed =
+        im2colOp.decomposeOperationAsyncCopy(rewriter);
+    if (failed(decomposed)) {
+      return failure();
+    }
+    rewriter.replaceOp(im2colOp, decomposed.value());
+    return success();
+  }
+};
+
 struct GPUConvertToCoalescedDMAPass final
     : impl::GPUConvertToCoalescedDMAPassBase<GPUConvertToCoalescedDMAPass> {
   using GPUConvertToCoalescedDMAPassBase::GPUConvertToCoalescedDMAPassBase;
@@ -865,16 +853,40 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
-    // Only activate when at least one copy already has use_global_load_dma
-    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
-    // direct-load). Collect all promoted copies (use_global_load_dma or
-    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
-    // use_global_load_dma. If ANY fails, downgrade them all to
-    // derived_thread_config.
-    // Note: GatherOps are excluded — they come from input IR (not from
-    // GPUPromoteMatmulOperands) and are handled independently by
-    // ConvertGatherToCoalescedDMA.
+    // Phase 0a: coordinate linalg.copy DMA configs.
+    applyCopyDMAPreCheck(funcOp);
+
+    // Phase 0b: pre-check + decomposition + drift verification for im2col.
+    if (failed(applyIm2colDMAHandling(funcOp))) {
+      return signalPassFailure();
+    }
+
+    // Phase 1: subgroup tiling — also tiles new gather ops from Phase 0.
+    if (failed(applySubgroupTiling(funcOp))) {
+      return signalPassFailure();
+    }
+
+    // Phase 2: gather/copy -> DMA.
+    RewritePatternSet patterns(context);
+    patterns.add<ConvertGatherToCoalescedDMA>(context);
+    patterns.add<ConvertCopyToCoalescedDMA>(context);
+    patterns.add<ConvertPadFusionCopyToCoalescedDMA>(context);
+
+    walkAndApplyPatterns(funcOp, std::move(patterns));
+  }
+
+private:
+  /// Coordinate linalg.copy DMA configs across the function. Activates only
+  /// when at least one copy already carries use_global_load_dma (DMA intent
+  /// from upstream config, e.g. --iree-llvmgpu-use-direct-load). All promoted
+  /// copies (use_global_load_dma or derived_thread_config) are collected; if
+  /// every one is DMA-convertible they are upgraded to use_global_load_dma,
+  /// otherwise the whole group is downgraded to derived_thread_config.
+  /// GatherOps are excluded — they originate from input IR (not from
+  /// GPUPromoteMatmulOperands) and are handled by ConvertGatherToCoalescedDMA.
+  void applyCopyDMAPreCheck(FunctionOpInterface funcOp) {
+    MLIRContext *context = &getContext();
+
     SmallVector<linalg::CopyOp> promotedCopies;
     bool hasDMAIntent = false;
     funcOp->walk([&](linalg::CopyOp copyOp) {
@@ -887,42 +899,70 @@ struct GPUConvertToCoalescedDMAPass final
       }
     });
 
-    if (hasDMAIntent) {
-      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
-      LLVM_DEBUG({
-        if (!allConvertible) {
-          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
-                       << "downgrading " << promotedCopies.size()
-                       << " copies to derived_thread_config\n";
-        }
-      });
-      for (linalg::CopyOp copyOp : promotedCopies) {
-        if (allConvertible) {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
-        } else {
-          setLoweringConfig(copyOp,
-                            IREE::GPU::DerivedThreadConfigAttr::get(context));
-        }
+    if (!hasDMAIntent) {
+      return;
+    }
+
+    bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+    LLVM_DEBUG({
+      if (!allConvertible) {
+        llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                     << "downgrading " << promotedCopies.size()
+                     << " copies to derived_thread_config\n";
+      }
+    });
+    for (linalg::CopyOp copyOp : promotedCopies) {
+      if (allConvertible) {
+        setLoweringConfig(copyOp,
+                          IREE::GPU::UseGlobalLoadDMAAttr::get(context));
+      } else {
+        setLoweringConfig(copyOp,
+                          IREE::GPU::DerivedThreadConfigAttr::get(context));
       }
     }
-
-    // Preprocessing: apply subgroup-level tiling.
-    if (failed(applySubgroupTiling(funcOp))) {
-      return signalPassFailure();
-    }
-
-    // Only tile and convert ops within forall ops with warp mapping.
-    // Also handle tensor.pad fusion cases that don't have warp mapping.
-    RewritePatternSet patterns(context);
-    patterns.add<ConvertGatherToCoalescedDMA>(context);
-    patterns.add<ConvertCopyToCoalescedDMA>(context);
-    patterns.add<ConvertPadFusionCopyToCoalescedDMA>(context);
-
-    walkAndApplyPatterns(funcOp, std::move(patterns));
   }
 
-private:
+  /// Pre-check, decompose, and verify im2col ops tagged use_global_load_dma.
+  ///
+  /// Step 1 (precheck walk): downgrade non-DMA-viable im2col ops to
+  /// derived_thread_config so the decomposition pattern only sees viable ops.
+  /// Step 2 (pattern application): DecomposeIm2colToAsyncCopy rewrites every
+  /// remaining viable im2col op via Im2colOp::decomposeOperationAsyncCopy.
+  /// Step 3 (drift verifier): if any im2col with use_global_load_dma survives
+  /// the pattern, isIm2colDMAConvertible (which gates on canDecomposeAsyncCopy)
+  /// drifted from decomposeOperationAsyncCopy — emit a diagnostic and fail.
+  LogicalResult applyIm2colDMAHandling(FunctionOpInterface funcOp) {
+    MLIRContext *context = &getContext();
+
+    funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) {
+      if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+        return;
+      }
+      if (!isIm2colDMAConvertible(im2colOp)) {
+        setLoweringConfig(im2colOp,
+                          IREE::GPU::DerivedThreadConfigAttr::get(context));
+      }
+    });
+
+    RewritePatternSet patterns(context);
+    patterns.add<DecomposeIm2colToAsyncCopy>(context);
+    walkAndApplyPatterns(funcOp, std::move(patterns));
+
+    WalkResult result =
+        funcOp->walk([&](IREE::LinalgExt::Im2colOp im2colOp) -> WalkResult {
+          if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(im2colOp)) {
+            return WalkResult::advance();
+          }
+          im2colOp.emitOpError(
+              "im2col op with use_global_load_dma config survived "
+              "decomposition pattern — isIm2colDMAConvertible (gating on "
+              "canDecomposeAsyncCopy) is out of sync with "
+              "Im2colOp::decomposeOperationAsyncCopy");
+          return WalkResult::interrupt();
+        });
+    return result.wasInterrupted() ? failure() : success();
+  }
+
   /// Compute tile sizes for subgroup-level distribution.
   /// Returns {tileSizes, numTiledDims}.
   ///
@@ -1019,37 +1059,10 @@ private:
       return failure();
     }
 
-    // Get the element type bit width.
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    // Get DMA sizes from target to compute minimum transfer size.
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
-      return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    // Find minimum elements per transfer across all DMA sizes.
-    // We need innermostDim >= subgroupSize * minElementsPerLane.
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
     // Determine how many elements are available for coalesced access.
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
+    Type elementType = outputType.getElementType();
     int64_t availableElements = innermostDim;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
@@ -1059,10 +1072,8 @@ private:
       }
     }
 
-    // If no valid DMA size found or available elements are not aligned to
-    // transfer size, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements % minElementsPerTransfer != 0) {
+    // Check DMA alignment using the shared helper.
+    if (!getDMAAlignedSubgroupSize(funcOp, elementType, availableElements)) {
       return failure();
     }
 
