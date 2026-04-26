@@ -1704,7 +1704,17 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
     // If the inner most slice is a single element then we have to bail out.
     // TODO: Support this case.
     if (!hasNonUnitInnerSlice) {
-      return failure();
+      if (llvm::any_of(loopBounds, ShapedType::isDynamic)) {
+        return failure();
+      }
+      TileSizesListType tileSizes = {loopBounds};
+      std::array<int64_t, 3> workgroupSize = {2 * flatWorkgroupSize, 1, 1};
+      auto loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
+          scatter.getContext(), tileSizes);
+      return setOpConfigAndEntryPointFnTranslation(
+          entryPoint, scatter, loweringConfig,
+          getGPUTranslationInfo(op->getContext(), LoweringPipeline::Distribute,
+                                workgroupSize, flatWorkgroupSize));
     }
   }
 
