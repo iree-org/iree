@@ -1463,6 +1463,7 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
 // Contraction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+// Selects an LLVMGPU lowering configuration for matmul-like contractions.
 static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                        mlir::FunctionOpInterface entryPoint,
                                        linalg::LinalgOp op) {
@@ -1660,9 +1661,19 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
     // SIMT matmul case. Query the best configuration.
     SmallVector<TileWorkgroupSizePair> tileSizeConfig = getMatmulConfig(target);
+    // Treat unit tiles on non-skinny dimensions as degenerate exact matches.
+    auto isDegenerateUnitTile = [&](const TileWorkgroupSizePair &config) {
+      return (config.tileSize[0] == 1 && sizeM > kVerySkinnyDimThreshold) ||
+             (config.tileSize[1] == 1 && sizeN > kVerySkinnyDimThreshold);
+    };
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
+      // Skip degenerate matches so later configs can use both parallel
+      // dimensions.
+      if (isDegenerateUnitTile(config)) {
+        continue;
+      }
       if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
           sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
