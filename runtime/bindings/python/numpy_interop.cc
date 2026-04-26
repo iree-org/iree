@@ -36,6 +36,8 @@ static const char* ConvertHalElementTypeToDtypeName(iree_hal_element_type_t t) {
       return "uint64";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       return "float16";
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      return "bfloat16";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       return "float32";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
@@ -44,6 +46,16 @@ static const char* ConvertHalElementTypeToDtypeName(iree_hal_element_type_t t) {
       return "complex64";
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
       return "complex128";
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2:
+      return "float8_e5m2";
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FN:
+      return "float8_e4m3fn";
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ:
+      return "float8_e5m2fnuz";
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
+      return "float8_e4m3fnuz";
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
+      return "float8_e8m0fnu";
     default:
       throw py::value_error("Unsupported VM Buffer -> numpy dtype mapping");
   }

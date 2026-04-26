@@ -175,6 +175,40 @@ class DeviceHalTest(unittest.TestCase):
         self.assertEqual(repr(ary), "<IREE DeviceArray: shape=[3, 4], dtype=bool>")
         np.testing.assert_array_equal(ary.to_host(), init_ary)
 
+    def testBFloat16(self):
+        dtype = np.dtype("bfloat16")
+        init_ary = np.arange(12, dtype=dtype).reshape(3, 4)
+        ary = iree.runtime.asdevicearray(self.device, init_ary)
+        self.assertEqual(ary.dtype, init_ary.dtype)
+        result = ary.to_host()
+        self.assertEqual(result.dtype, init_ary.dtype)
+        np.testing.assert_array_equal(result, init_ary)
+
+    def testFloat8ElementTypes(self):
+        float8_cases = [
+            (iree.runtime.HalElementType.FLOAT_8_E5M2, "float8_e5m2"),
+            (iree.runtime.HalElementType.FLOAT_8_E4M3_FN, "float8_e4m3fn"),
+            (
+                iree.runtime.HalElementType.FLOAT_8_E5M2_FNUZ,
+                "float8_e5m2fnuz",
+            ),
+            (
+                iree.runtime.HalElementType.FLOAT_8_E4M3_FNUZ,
+                "float8_e4m3fnuz",
+            ),
+            (iree.runtime.HalElementType.FLOAT_8_E8M0_FNU, "float8_e8m0fnu"),
+        ]
+        for hal_element_type, dtype_name in float8_cases:
+            with self.subTest(dtype=dtype_name):
+                init_ary = np.arange(12, dtype=np.dtype(dtype_name)).reshape(3, 4)
+                ary = iree.runtime.asdevicearray(self.device, init_ary)
+                self.assertEqual(ary.dtype, init_ary.dtype)
+                result = ary.to_host()
+                self.assertEqual(result.dtype, init_ary.dtype)
+                np.testing.assert_array_equal(
+                    result.view(np.uint8), init_ary.view(np.uint8)
+                )
+
     def testCopyToHostImportPath(self):
         """_copy_to_host import path must preserve values on local-task."""
         init_ary = np.arange(12, dtype=np.float32).reshape(3, 4)
