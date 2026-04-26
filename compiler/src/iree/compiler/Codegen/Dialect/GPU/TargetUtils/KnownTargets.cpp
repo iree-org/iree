@@ -913,10 +913,14 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 // cooperative matrix layouts are opaque. We need to create NVIDIA specific WMMA
 // intrinsics if we need to have explicit layout analysis and register mapping.
 
+// Reports Ampere-class NVIDIA tensor core capabilities for GPU target
+// selection.
 const WgpDetails *getAmpereWgpDetails() {
+  // Expose BF16 mma.sync where Ampere-class hardware supports the instruction.
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
