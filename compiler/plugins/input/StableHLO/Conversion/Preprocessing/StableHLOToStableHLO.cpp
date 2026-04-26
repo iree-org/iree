@@ -850,38 +850,54 @@ struct ScatterIndexedDimsFirst final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
     auto dimNumbers = op.getScatterDimensionNumbers();
+    ArrayRef<int64_t> scatterDimsToOperandDims =
+        dimNumbers.getScatterDimsToOperandDims();
+    ArrayRef<int64_t> insertedWindowDims = dimNumbers.getInsertedWindowDims();
+    ArrayRef<int64_t> updateWindowDims = dimNumbers.getUpdateWindowDims();
+    ArrayRef<int64_t> inputBatchingDims = dimNumbers.getInputBatchingDims();
+    ArrayRef<int64_t> scatterIndicesBatchingDims =
+        dimNumbers.getScatterIndicesBatchingDims();
+
     // Keep batching cases out of this rewrite. This pattern only reorders
     // indexed and window dimensions within a single scatter slice layout.
-    if (!dimNumbers.getInputBatchingDims().empty() ||
-        !dimNumbers.getScatterIndicesBatchingDims().empty()) {
+    if (!inputBatchingDims.empty() || !scatterIndicesBatchingDims.empty()) {
       return rewriter.notifyMatchFailure(op, "batching dims are not handled");
     }
 
-    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
-    // If indexed operand dims are already leading, there is nothing to do.
-    if (llvm::all_of(llvm::enumerate(scatterDimsToOperandDims), [&](auto it) {
-          return it.index() == static_cast<size_t>(it.value());
-        })) {
-      return rewriter.notifyMatchFailure(op,
-                                         "indexed operand dims are already leading");
+    auto isIdentityPermutation = [](ArrayRef<int64_t> perm) {
+      return llvm::all_of(llvm::enumerate(perm), [](auto it) {
+        return static_cast<int64_t>(it.index()) == it.value();
+      });
+    };
+
+    if (isIdentityPermutation(scatterDimsToOperandDims)) {
+      return rewriter.notifyMatchFailure(
+          op, "indexed operand dims are already leading");
     }
 
-    auto operandTy = dyn_cast<RankedTensorType>(op.getInputs().front().getType());
+    ValueRange inputs = op.getInputs();
+    ValueRange updates = op.getUpdates();
+    Value operand = inputs.front();
+    Value update = updates.front();
+    auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
     if (!operandTy) {
       return rewriter.notifyMatchFailure(op, "operand has no ranked type");
     }
+    auto updateTy = dyn_cast<RankedTensorType>(update.getType());
+    if (!updateTy) {
+      return rewriter.notifyMatchFailure(op, "update has no ranked type");
+    }
 
-    auto updateWindowDims = dimNumbers.getUpdateWindowDims();
-
-    // Build a permutation that moves indexed operand dims to the front while
-    // preserving the relative order of the remaining dims.
     int64_t operandRank = operandTy.getRank();
     llvm::SmallVector<bool> isIndexedDim(operandRank, false);
     for (int64_t dim : scatterDimsToOperandDims) {
       isIndexedDim[dim] = true;
     }
 
+    // Move indexed operand dims to the front while preserving the relative
+    // order of all remaining dims.
     llvm::SmallVector<int64_t> operandPerm;
     operandPerm.reserve(operandRank);
     operandPerm.append(scatterDimsToOperandDims.begin(),
@@ -900,64 +916,50 @@ struct ScatterIndexedDimsFirst final
     // Recover the operand dims that correspond to update window dims so the
     // updates tensor can be permuted consistently with the operand.
     llvm::SmallVector<bool> isInsertedDim(operandRank, false);
-    for (int64_t dim : dimNumbers.getInsertedWindowDims()) {
+    for (int64_t dim : insertedWindowDims) {
       isInsertedDim[dim] = true;
     }
 
-    llvm::SmallVector<int64_t> oldWindowDims;
-    oldWindowDims.reserve(updateWindowDims.size());
+    llvm::SmallVector<int64_t> windowOperandDims;
+    windowOperandDims.reserve(updateWindowDims.size());
     for (int64_t dim = 0; dim < operandRank; ++dim) {
       if (!isInsertedDim[dim]) {
-        oldWindowDims.push_back(dim);
+        windowOperandDims.push_back(dim);
       }
     }
-    if (oldWindowDims.size() != updateWindowDims.size()) {
+    if (windowOperandDims.size() != updateWindowDims.size()) {
       return rewriter.notifyMatchFailure(
           op, "window dims do not match non-inserted operand dims");
     }
 
     // Map each operand window dim back to the update dim that materializes it.
-    llvm::DenseMap<int64_t, int64_t> oldWindowDimToUpdateDim;
-    for (auto [oldWindowDim, updateDim] :
-         llvm::zip_equal(oldWindowDims, updateWindowDims)) {
-      oldWindowDimToUpdateDim[oldWindowDim] = updateDim;
+    llvm::SmallVector<int64_t> windowOperandDimToUpdateDim(operandRank, -1);
+    for (auto [operandDim, updateDim] :
+         llvm::zip_equal(windowOperandDims, updateWindowDims)) {
+      windowOperandDimToUpdateDim[operandDim] = updateDim;
     }
 
-    // Reorder operand window dims in the same order they appear after the
-    // operand permutation.
-    llvm::SmallVector<int64_t> reorderedWindowDims;
-    reorderedWindowDims.reserve(updateWindowDims.size());
-    for (int64_t oldDim : operandPerm) {
-      if (!isInsertedDim[oldDim]) {
-        reorderedWindowDims.push_back(oldDim);
-      }
-    }
-
-    auto updatesTy = dyn_cast<RankedTensorType>(op.getUpdates().front().getType());
-    if (!updatesTy) {
-      return rewriter.notifyMatchFailure(op, "update has no ranked type");
-    }
-
-    // Keep non-window update dims fixed and only permute the update window
-    // dims to follow the reordered operand window dims.
-    llvm::SmallVector<bool> isUpdateWindowDim(updatesTy.getRank(), false);
+    int64_t updateRank = updateTy.getRank();
+    llvm::SmallVector<bool> isUpdateWindowDim(updateRank, false);
     for (int64_t dim : updateWindowDims) {
       isUpdateWindowDim[dim] = true;
     }
 
+    // Keep non-window update dims fixed. Permute window dims to match the
+    // operand window dims after operandPerm is applied.
     llvm::SmallVector<int64_t> updatePerm;
-    updatePerm.reserve(updatesTy.getRank());
-    int64_t nextWindowDim = 0;
-    for (int64_t dim = 0, e = updatesTy.getRank(); dim < e; ++dim) {
-      if (!isUpdateWindowDim[dim]) {
+    updatePerm.reserve(updateRank);
+    auto reorderedWindowDims = llvm::make_filter_range(
+        operandPerm, [&](int64_t dim) { return !isInsertedDim[dim]; });
+    auto nextWindowDim = reorderedWindowDims.begin();
+    for (int64_t dim = 0; dim < updateRank; ++dim) {
+      if (isUpdateWindowDim[dim]) {
+        updatePerm.push_back(windowOperandDimToUpdateDim[*nextWindowDim++]);
+      } else {
         updatePerm.push_back(dim);
-        continue;
       }
-      updatePerm.push_back(
-          oldWindowDimToUpdateDim.lookup(reorderedWindowDims[nextWindowDim++]));
     }
 
-    // Shared helpers for rebuilding ranked tensor types after a transpose.
     auto transposeType = [&](RankedTensorType type,
                              ArrayRef<int64_t> perm) -> RankedTensorType {
       llvm::SmallVector<int64_t> shape;
@@ -971,39 +973,35 @@ struct ScatterIndexedDimsFirst final
 
     auto createTranspose = [&](Value value, RankedTensorType type,
                                ArrayRef<int64_t> perm) -> Value {
-      if (llvm::equal(perm, llvm::seq(int64_t{0}, type.getRank()))) {
+      if (isIdentityPermutation(perm)) {
         return value;
       }
       return mlir::stablehlo::TransposeOp::create(
-          rewriter, op.getLoc(), transposeType(type, perm), value,
+          rewriter, loc, transposeType(type, perm), value,
           rewriter.getDenseI64ArrayAttr(perm));
     };
 
-    // Transpose all scatter inputs and expected result types into the canonical
-    // operand layout.
     llvm::SmallVector<Value> transposedInputs;
     llvm::SmallVector<Type> transposedResultTypes;
-    transposedInputs.reserve(op.getInputs().size());
-    transposedResultTypes.reserve(op.getInputs().size());
-    for (Value input : op.getInputs()) {
+    transposedInputs.reserve(inputs.size());
+    transposedResultTypes.reserve(inputs.size());
+    for (Value input : inputs) {
       auto inputTy = cast<RankedTensorType>(input.getType());
-      auto transposedTy = transposeType(inputTy, operandPerm);
       transposedInputs.push_back(createTranspose(input, inputTy, operandPerm));
-      transposedResultTypes.push_back(transposedTy);
+      transposedResultTypes.push_back(transposeType(inputTy, operandPerm));
     }
 
-    // Apply the matching permutation to all updates tensors.
     llvm::SmallVector<Value> transposedUpdates;
-    transposedUpdates.reserve(op.getUpdates().size());
-    for (Value update : op.getUpdates()) {
-      auto updateTy = cast<RankedTensorType>(update.getType());
-      transposedUpdates.push_back(createTranspose(update, updateTy, updatePerm));
+    transposedUpdates.reserve(updates.size());
+    for (Value updateValue : updates) {
+      auto updateValueTy = cast<RankedTensorType>(updateValue.getType());
+      transposedUpdates.push_back(
+          createTranspose(updateValue, updateValueTy, updatePerm));
     }
 
-    // Rewrite dimension numbers to describe the transposed scatter.
     llvm::SmallVector<int64_t> newInsertedWindowDims;
-    newInsertedWindowDims.reserve(dimNumbers.getInsertedWindowDims().size());
-    for (int64_t dim : dimNumbers.getInsertedWindowDims()) {
+    newInsertedWindowDims.reserve(insertedWindowDims.size());
+    for (int64_t dim : insertedWindowDims) {
       newInsertedWindowDims.push_back(inverseOperandPerm[dim]);
     }
     llvm::sort(newInsertedWindowDims);
@@ -1015,25 +1013,22 @@ struct ScatterIndexedDimsFirst final
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), updateWindowDims, newInsertedWindowDims,
-        dimNumbers.getInputBatchingDims(),
-        dimNumbers.getScatterIndicesBatchingDims(),
+        inputBatchingDims, scatterIndicesBatchingDims,
         newScatterDimsToOperandDims, dimNumbers.getIndexVectorDim());
 
-    // Create the rewritten scatter in canonical operand order.
     auto newScatter = mlir::stablehlo::ScatterOp::create(
-        rewriter, op.getLoc(), transposedResultTypes, transposedInputs,
+        rewriter, loc, transposedResultTypes, transposedInputs,
         op.getScatterIndices(), transposedUpdates, newDimNumbers,
         op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
 
-    // Transpose results back so the rewritten op preserves the original type.
     llvm::SmallVector<Value> results;
     results.reserve(newScatter.getNumResults());
-    for (auto [result, originalType] :
+    for (auto [result, originalResultTy] :
          llvm::zip_equal(newScatter.getResults(), op.getResultTypes())) {
       results.push_back(mlir::stablehlo::TransposeOp::create(
-          rewriter, op.getLoc(), cast<RankedTensorType>(originalType), result,
+          rewriter, loc, cast<RankedTensorType>(originalResultTy), result,
           rewriter.getDenseI64ArrayAttr(inverseOperandPerm)));
     }
 
@@ -1077,7 +1072,7 @@ struct ScatterMaterializeInsertedDim final
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     auto indices = op.getScatterIndices();
-    auto operand = op.getInputs().front();
+    Value operand = op.getInputs().front();
     auto indicesTy = cast<ShapedType>(indices.getType());
     auto operandTy = cast<ShapedType>(operand.getType());
 
@@ -2151,10 +2146,10 @@ struct StableHLOToStableHLOPreprocessing final
     patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,
-                    ScatterImplicitBatch, ScatterMaterializeInsertedDim,
-                    ScatterCollapseBatch, ScatterBatchFirst,
-                    ScatterIndexedDimsFirst>(context);
+    patterns
+        .insert<ScatterInt64Indices, ScatterImplicitIndex, ScatterImplicitBatch,
+                ScatterMaterializeInsertedDim, ScatterCollapseBatch,
+                ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
