@@ -970,9 +970,16 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_F16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
@@ -1808,17 +1815,20 @@ static Value createLaneParityPredicate(OpBuilder &builder, Location loc) {
 // For 16-bit source data (f16/bf16): vector<4xi8>, 2 groups per i8.
 // For 8-bit source data (i8/f8*): vector<2xi16>, 4 groups per i16.
 //
-// Only the first element carries active selector bits; remaining
-// elements are padding zeros.
+// The selector is broadcast across all elements so the entire i32 the
+// hardware reads is filled with the same group pattern. The number of
+// bits the SMFMAC instruction actually consumes per lane scales with
+// the native K-extent: cdna3 16x16x32_F16 reads 8 bits, cdna4
+// 16x16x64_F16 reads 16 bits, cdna4 16x16x128_*8 reads all 32 bits.
+// Broadcasting keeps every variant correct without per-case tuning.
 static Value createConstSparseIndex(OpBuilder &builder, Location loc,
                                     VectorType sparseIndexVectorType,
                                     int64_t selectorBits) {
   Type elemTy = sparseIndexVectorType.getElementType();
-  Value zero = arith::ConstantOp::create(
-      builder, loc, builder.getZeroAttr(sparseIndexVectorType));
   Value selector = arith::ConstantOp::create(
       builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
-  return vector::InsertOp::create(builder, loc, selector, zero, 0);
+  return vector::BroadcastOp::create(builder, loc, sparseIndexVectorType,
+                                     selector);
 }
 
 // Returns the number of native intrinsics chained along K per virtual

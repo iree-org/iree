@@ -57,6 +57,8 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUTileAndFuseWMMA1250 = "LLVMGPUTileAndFuseWMMA1250"
     LLVMGPUVectorDistributeMFMABlockBatch = "LLVMGPUVectorDistributeMFMABlockBatch"
     LLVMGPUTileAndFuseMFMABlockBatch = "LLVMGPUTileAndFuseMFMABlockBatch"
+    LLVMGPUTileAndFuseVDMFMA_CDNA3 = "LLVMGPUTileAndFuseVDMFMA_CDNA3"
+    LLVMGPUTileAndFuseVDMFMA_CDNA4 = "LLVMGPUTileAndFuseVDMFMA_CDNA4"
     LLVMGPUVectorDistributeCUDA = "LLVMGPUVectorDistributeCUDA"
     LLVMGPUTileAndFuseCUDA = "LLVMGPUTileAndFuseCUDA"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
@@ -97,6 +99,11 @@ class IREEGPUCompilationInfo(CompilationInfo):
         if self.subgroup_size is not None:
             subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
 
+        # Virtual intrinsics (VMFMA, VDMFMA) use virtual_mma_layout;
+        # physical intrinsics (MFMA, WMMA, NV_MMA_SYNC) use mma_layout.
+        is_virtual = self.mma_schedule.intrinsic.startswith("V")
+        mma_attr = "virtual_mma_layout" if is_virtual else "mma_layout"
+
         if compiler_pipeline == "#iree_gpu.pipeline<TileAndFuse>":
             # Add convert_acc_gemm for NVIDIA mma.sync intrinsics
             convert_acc_gemm = ""
@@ -109,7 +116,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
             )
             lowering_config = (
                 f"  lowering_config = #iree_gpu.lowering_config<{{"
-                f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
+                f"  mma_kind = #iree_gpu.{mma_attr}<{self.mma_schedule.intrinsic}>, "
                 f"  subgroup = {subgroup_tile}, "
                 f"  {convert_acc_gemm}"
                 f"  promote_operands = [0, 1], "
@@ -124,7 +131,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
             )
             lowering_config = (
                 f"  lowering_config = #iree_gpu.lowering_config<{{"
-                f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
+                f"  mma_kind = #iree_gpu.{mma_attr}<{self.mma_schedule.intrinsic}>, "
                 f"  subgroup_basis = {subgroup_basis}, "
                 f"  workgroup = {self.workgroup_tile}, "
                 f"  reduction = {self.reduction_tile} }}>,\n"
@@ -228,6 +235,8 @@ def get_rocm_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR4: ("WMMAR4", vecdist),
         CompilationInfoId.LLVMGPUVectorDistributeWMMA1250: ("WMMA1250", vecdist),
         CompilationInfoId.LLVMGPUTileAndFuseMFMA: ("MFMA", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA3: ("VDMFMA_CDNA3", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA4: ("VDMFMA_CDNA4", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR3: ("WMMAR3", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR4: ("WMMAR4", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMA1250: ("WMMA1250", tileandfuse),
@@ -286,6 +295,24 @@ def get_rocm_test_compilation_infos(
             MMASchedule("VMFMA_F32_32x32x16_F16", 4, 2, 1, 2, 4),
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
             MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
+        ]
+    elif intrinsic == "VDMFMA_CDNA3":
+        # CDNA3 (gfx94x) VDMFMA: virtual dense MFMAs for skinny matmuls.
+        # F16/BF16: M=8, N=16, K=64 (x2 underlying MFMAs)
+        schedules = [
+            MMASchedule("VDMFMA_F32_8x16x64x2_F16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x2_F16", 1, 2, 1, 2, 2),
+            MMASchedule("VDMFMA_F32_8x16x64x2_BF16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x2_BF16", 1, 2, 1, 2, 2),
+        ]
+    elif intrinsic == "VDMFMA_CDNA4":
+        # CDNA4 (gfx95x) VDMFMA: virtual dense MFMAs for skinny matmuls.
+        # F16/BF16: M=8, N=16, K=64 (x1 underlying MFMA)
+        schedules = [
+            MMASchedule("VDMFMA_F32_8x16x64x1_F16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x1_F16", 1, 2, 1, 2, 2),
+            MMASchedule("VDMFMA_F32_8x16x64x1_BF16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x1_BF16", 1, 2, 1, 2, 2),
         ]
     elif intrinsic == "WMMAR3":
         schedules = [
@@ -367,8 +394,9 @@ def get_rocm_test_compilation_infos(
     else:
         raise NotImplementedError("unhandled intrinsic case")
 
+    # MFMA and VDMFMA use 64-lane subgroups (CDNA).
     # WMMAR3, WMMAR4, WMMA1250 all use 32.
-    subgroup_size = 64 if intrinsic == "MFMA" else 32
+    subgroup_size = 64 if intrinsic in ("MFMA", "VDMFMA_CDNA3", "VDMFMA_CDNA4") else 32
 
     infos = []
     for schedule in schedules:
@@ -403,6 +431,16 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
+        elif schedule.intrinsic in (
+            "VDMFMA_F32_8x16x64x2_F16",
+            "VDMFMA_F32_8x16x64x2_BF16",
+            "VDMFMA_F32_8x16x64x1_F16",
+            "VDMFMA_F32_8x16x64x1_BF16",
+        ):
+            # VDMFMA skinny intrinsics: M=8, N=16, K=64
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 8
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 64
         elif (
             schedule.intrinsic == "VMFMA_F32_32x32x16_F16"
             or schedule.intrinsic == "MFMA_F32_32x32x16_F8E4M3FNUZ"
@@ -611,6 +649,8 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
         CompilationInfoId.LLVMGPUVectorDistributeWMMA1250,
         CompilationInfoId.LLVMGPUTileAndFuseMFMA,
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA3,
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA4,
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR3,
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR4,
         CompilationInfoId.LLVMGPUTileAndFuseWMMA1250,
