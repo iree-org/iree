@@ -22,6 +22,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "stablehlo/dialect/Base.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
@@ -1237,6 +1238,25 @@ struct ReorderBroadcastInDimOpAndElementwiseOp final
   }
 };
 
+// Accepts fused widening operands for ops that have no additional type
+// constraints.
+template <typename Op>
+LogicalResult verifyFusedWidenOperands(Op op, ArrayRef<Value> operands) {
+  return success();
+}
+
+// Rejects convolution fusion when the resulting operand types violate
+// StableHLO.
+LogicalResult verifyFusedWidenOperands(mlir::stablehlo::ConvolutionOp op,
+                                       ArrayRef<Value> operands) {
+  Type lhsType = getElementTypeOrSelf(operands[0].getType());
+  Type rhsType = getElementTypeOrSelf(operands[1].getType());
+  if (!mlir::hlo::isCompatibleForHloTypeInference(lhsType, rhsType)) {
+    return failure();
+  }
+  return success();
+}
+
 // Identifies cases where a dense operation has inputs that come from widening
 // operations. For instance, a dot product widening from FP16 to FP32 is better
 // to have the casting operation fused into the dot operation. This decreases
@@ -1245,6 +1265,8 @@ template <class Op>
 struct FuseWidenOperands final : OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
+  // Fuses widening converts into dense ops after checking op-specific type
+  // rules.
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     llvm::SmallVector<Value> operands;
@@ -1274,6 +1296,13 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
             llvm::zip_equal(operands, op->getOperands()),
             [](auto pair) { return std::get<0>(pair) == std::get<1>(pair); })) {
       return failure();
+    }
+
+    // Recheck type constraints after replacing widened operands with their
+    // inputs.
+    if (failed(verifyFusedWidenOperands(op, operands))) {
+      return rewriter.notifyMatchFailure(
+          op, "fused operands do not satisfy op type constraints");
     }
 
     rewriter.replaceOpWithNewOp<Op>(op, op->getResultTypes(), operands,
