@@ -18,12 +18,14 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "sm89_target.mlir",
             "smoketest.mlir",
         ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
