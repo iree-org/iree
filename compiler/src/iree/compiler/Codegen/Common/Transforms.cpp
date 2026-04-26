@@ -49,6 +49,11 @@ struct FuseTilableForallConsumers final
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(TilingInterface tilableOp,
                                 PatternRewriter &rewriter) const override {
+    if (isa<IREE::LinalgExt::ScatterOp>(*tilableOp)) {
+      return rewriter.notifyMatchFailure(
+          tilableOp, "scatter consumer fusion is not supported");
+    }
+
     // Currently consumer fusion requires DPS, and we don't want to fuse through
     // inits anyway.
     auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);

@@ -187,6 +187,31 @@ func.func @forall_fuse_then_hoist_with_fill(%3: tensor<128x128xf16>, %4: tensor<
 
 // -----
 
+func.func @do_not_consumer_fuse_scatter(%arg0: tensor<2x1x2x256xf32>,
+                                        %arg1: tensor<2xi32>,
+                                        %arg2: tensor<256x1x2x256xf32>) -> tensor<256x1x2x256xf32> {
+  %empty = tensor.empty() : tensor<2x1x2x256xf32>
+  %0 = scf.forall (%arg3) in (2) shared_outs(%arg4 = %empty) -> (tensor<2x1x2x256xf32>) {
+    %2 = tensor.extract_slice %arg0[%arg3, 0, 0, 0] [1, 1, 2, 256] [1, 1, 1, 1] : tensor<2x1x2x256xf32> to tensor<1x1x2x256xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %2 into %arg4[%arg3, 0, 0, 0] [1, 1, 2, 256] [1, 1, 1, 1] : tensor<1x1x2x256xf32> into tensor<2x1x2x256xf32>
+    }
+  }
+  %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false)
+    ins(%0, %arg1 : tensor<2x1x2x256xf32>, tensor<2xi32>) outs(%arg2 : tensor<256x1x2x256xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg3 : f32
+  } -> tensor<256x1x2x256xf32>
+  return %1 : tensor<256x1x2x256xf32>
+}
+
+// CHECK-LABEL: func @do_not_consumer_fuse_scatter(
+//       CHECK:   %[[PRODUCER:.+]] = scf.forall
+//       CHECK:   iree_linalg_ext.scatter
+//  CHECK-SAME:     ins(%[[PRODUCER]],
+
+// -----
+
 func.func @multi_hoist_and_fuse_trailing_stuff(%2: tensor<128x128xf16>) -> tensor<128x128xf16> {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
