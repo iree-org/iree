@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -328,6 +329,83 @@ struct ConvertHALInterfaceBindingSubspanOp
                         operands.getByteOffset(), memRefType,
                         operands.getDynamicDims(), rewriter);
     rewriter.replaceOp(subspanOp, {memRefDesc});
+    return success();
+  }
+};
+
+/// Rewrites memref.alloc with #iree_codegen.workgroup_local memory space to a
+/// memref descriptor backed by HAL dispatch workgroup local memory.
+struct ConvertWorkgroupLocalAllocOp
+    : ConvertOpToLLVMWithABIPattern<memref::AllocOp> {
+  ConvertWorkgroupLocalAllocOp(HALDispatchABI &abi,
+                               LLVMTypeConverter &typeConverter)
+      : ConvertOpToLLVMWithABIPattern(abi, typeConverter, /*benefit=*/2) {}
+
+  LogicalResult
+  matchAndRewrite(memref::AllocOp allocOp, memref::AllocOpAdaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    MemRefType memRefType = allocOp.getType();
+    if (!isa_and_nonnull<IREE::Codegen::WorkgroupLocalMemoryAttr>(
+            memRefType.getMemorySpace())) {
+      return failure();
+    }
+    if (!memRefType.hasStaticShape()) {
+      return allocOp.emitOpError(
+          "workgroup local memory allocations must have static shape");
+    }
+    SmallVector<int64_t> strides;
+    int64_t offset = 0;
+    if (failed(memRefType.getStridesAndOffset(strides, offset)) ||
+        ShapedType::isDynamic(offset) ||
+        llvm::any_of(strides, ShapedType::isDynamic)) {
+      return allocOp.emitOpError(
+          "workgroup local memory allocations must have static layout");
+    }
+
+    auto rangeAttr = allocOp->getAttrOfType<DenseI64ArrayAttr>(
+        kWorkgroupLocalMemoryRangeAttrName);
+    if (!rangeAttr || rangeAttr.size() != 2 || rangeAttr[0] < 0 ||
+        rangeAttr[1] < 0) {
+      return allocOp.emitOpError(
+          "missing valid iree_codegen.local_memory_range annotation");
+    }
+
+    Location loc = allocOp.getLoc();
+    Value basePtr = abi.loadWorkgroupLocalMemoryPtr(allocOp, rewriter);
+    Value byteOffset = LLVM::ConstantOp::create(
+        rewriter, loc, rewriter.getI64Type(), rangeAttr[0]);
+    Value offsetPtr = LLVM::GEPOp::create(
+        rewriter, loc, basePtr.getType(), rewriter.getI8Type(), basePtr,
+        byteOffset, LLVM::GEPNoWrapFlags::inbounds);
+
+    MemRefType strippedType =
+        MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                        memRefType.getLayout());
+    auto desc = MemRefDescriptor::fromStaticShape(
+        rewriter, loc, *getTypeConverter(), strippedType, offsetPtr);
+    rewriter.replaceOp(allocOp, {desc});
+    return success();
+  }
+};
+
+/// Erases deallocations for #iree_codegen.workgroup_local memory. The storage
+/// is owned by the HAL dispatch frame and released when the dispatch returns.
+struct ConvertWorkgroupLocalDeallocOp
+    : ConvertOpToLLVMWithABIPattern<memref::DeallocOp> {
+  ConvertWorkgroupLocalDeallocOp(HALDispatchABI &abi,
+                                 LLVMTypeConverter &typeConverter)
+      : ConvertOpToLLVMWithABIPattern(abi, typeConverter, /*benefit=*/2) {}
+
+  LogicalResult
+  matchAndRewrite(memref::DeallocOp deallocOp, memref::DeallocOpAdaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto memRefType = dyn_cast<MemRefType>(deallocOp.getMemref().getType());
+    if (!memRefType ||
+        !isa_and_nonnull<IREE::Codegen::WorkgroupLocalMemoryAttr>(
+            memRefType.getMemorySpace())) {
+      return failure();
+    }
+    rewriter.eraseOp(deallocOp);
     return success();
   }
 };
@@ -1052,6 +1130,11 @@ void ConvertToLLVMPass::runOnOperation() {
   options.dataLayout = llvm::DataLayout(dataLayoutStr);
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter typeConverter(&getContext(), options, &dataLayoutAnalysis);
+  typeConverter.addTypeAttributeConversion(
+      [](BaseMemRefType, IREE::Codegen::WorkgroupLocalMemoryAttr attr)
+          -> TypeConverter::AttributeConversionResult {
+        return IntegerAttr::get(IntegerType::get(attr.getContext(), 64), 0);
+      });
 
   RewritePatternSet patterns(&getContext());
 
@@ -1123,6 +1206,8 @@ void ConvertToLLVMPass::runOnOperation() {
     ConvertHALInterfaceWorkgroupCountOp,
     ConvertHALInterfaceConstantLoadOp,
     ConvertHALInterfaceBindingSubspanOp,
+    ConvertWorkgroupLocalAllocOp,
+    ConvertWorkgroupLocalDeallocOp,
     ConvertHALInstrumentWorkgroupOp,
     ConvertHALInstrumentValueOp,
     ConvertHALInstrumentMemoryLoadOp,

@@ -144,6 +144,17 @@ func.func private @translation_info_vmvx_pipeline() attributes {
 
 // -----
 
+func.func @workgroup_local_memory_space(
+    %arg0: memref<64x64xf32, #iree_codegen.workgroup_local>)
+    -> memref<64x64xf32, #iree_codegen.workgroup_local> {
+  return %arg0 : memref<64x64xf32, #iree_codegen.workgroup_local>
+}
+// CHECK-LABEL: func.func @workgroup_local_memory_space(
+// CHECK-SAME:    memref<64x64xf32, #iree_codegen.workgroup_local>
+// CHECK-SAME:    -> memref<64x64xf32, #iree_codegen.workgroup_local>
+
+// -----
+
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,

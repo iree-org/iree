@@ -67,6 +67,8 @@ constexpr StringLiteral kUkernelAttrName = "iree_codegen.ukernel";
 constexpr StringLiteral kUKernelProviderName = "iree_codegen.ukernel_provider";
 constexpr StringLiteral kVectorTileSizesAttrName =
     "iree_codegen.vector_tile_sizes";
+constexpr StringLiteral kWorkgroupLocalMemoryRangeAttrName =
+    "iree_codegen.local_memory_range";
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on a

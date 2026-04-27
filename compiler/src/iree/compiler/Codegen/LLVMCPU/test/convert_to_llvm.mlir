@@ -112,3 +112,26 @@ module attributes {
 
 // CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
 // CHECK: llvm.intr.masked.gather {{.*}} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
+
+// -----
+
+func.func @workgroup_local_alloc() {
+  %0 = memref.alloc() {iree_codegen.local_memory_range = array<i64: 128, 1024>} : memref<16x16xf32, #iree_codegen.workgroup_local>
+  %c0 = arith.constant 0 : index
+  %val = memref.load %0[%c0, %c0] : memref<16x16xf32, #iree_codegen.workgroup_local>
+  llvm.call @sink_f32(%val) : (f32) -> ()
+  memref.dealloc %0 : memref<16x16xf32, #iree_codegen.workgroup_local>
+  return
+}
+llvm.func @sink_f32(%arg0: f32) {
+  llvm.return
+}
+
+// CHECK-LABEL: llvm.func @workgroup_local_alloc(
+// CHECK:       %[[WG_STATE:.+]] = llvm.load %arg2
+// CHECK:       %[[LOCAL_MEM:.+]] = llvm.extractvalue %[[WG_STATE]][5]
+// CHECK:       %[[LOCAL_PTR:.+]] = llvm.getelementptr inbounds %[[LOCAL_MEM]][128] : (!llvm.ptr) -> !llvm.ptr, i8
+// CHECK-NOT:   llvm.alloca
+// CHECK:       llvm.call @sink_f32
+// CHECK-NOT:   free
+// CHECK:       llvm.return

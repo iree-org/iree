@@ -65,3 +65,12 @@ func.func @complex_alloca() {
   return
 }
 // CHECK-LABEL: func @complex_alloca(
+
+// -----
+
+func.func @workgroup_local_alloc_not_counted() {
+  %0 = memref.alloc() : memref<16384xf32, #iree_codegen.workgroup_local>
+  %1 = memref.alloca() : memref<1024xf32>
+  return
+}
+// CHECK-LABEL: func @workgroup_local_alloc_not_counted(
