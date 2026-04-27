@@ -192,6 +192,7 @@ iree_runtime_cc_test(
     srcs = ["sequence_test.cc"],
     deps = [
         ":byte_fallback",
+        ":byte_level",
         ":decoder_test_util",
         ":metaspace",
         ":passthrough",

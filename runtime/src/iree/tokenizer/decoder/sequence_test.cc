@@ -14,6 +14,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tokenizer/decoder/byte_fallback.h"
+#include "iree/tokenizer/decoder/byte_level.h"
 #include "iree/tokenizer/decoder/decoder_test_util.h"
 #include "iree/tokenizer/decoder/metaspace.h"
 #include "iree/tokenizer/decoder/passthrough.h"
@@ -461,6 +462,81 @@ TEST_F(SequenceDecoderTest, OverlapByteFallbackAndReplace) {
 
   TestWithAllBatchSizes(decoder.get(), tokens, " Hello World",
                         /*expect_pending_after_process=*/false);
+}
+
+//===----------------------------------------------------------------------===//
+// Capability Composition with STATELESS_EXCEPT_PARTIAL_UTF8
+//===----------------------------------------------------------------------===//
+
+TEST_F(SequenceDecoderTest, PartialUtf8PlusStatelessPromotion) {
+  // Sequence(ByteLevel, Passthrough) should promote to PARTIAL_UTF8.
+  // ByteLevel has PARTIAL_UTF8, Passthrough has STATELESS.
+  ScopedDecoder byte_level;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), byte_level.put()));
+  ScopedDecoder passthrough;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_passthrough_allocate(
+      iree_allocator_system(), passthrough.put()));
+
+  std::vector<ScopedDecoder> children;
+  children.push_back(std::move(byte_level));
+  children.push_back(std::move(passthrough));
+  auto decoder = CreateSequence(std::move(children));
+  ASSERT_NE(decoder.get(), nullptr);
+
+  iree_tokenizer_decoder_capability_t caps =
+      iree_tokenizer_decoder_capabilities(decoder.get());
+  EXPECT_TRUE(caps &
+              IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8)
+      << "Sequence(ByteLevel, Passthrough) should be PARTIAL_UTF8";
+  EXPECT_FALSE(caps & IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS)
+      << "Should not be fully STATELESS";
+}
+
+TEST_F(SequenceDecoderTest, PartialUtf8PlusPositionSensitiveDegrades) {
+  // Sequence(ByteLevel, Metaspace) should degrade to NONE because
+  // POSITION_SENSITIVE + PARTIAL_UTF8 is unsupported.
+  ScopedDecoder byte_level;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), byte_level.put()));
+  ScopedDecoder metaspace;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_metaspace_allocate(
+      0x2581,  // ▁ (LOWER ONE EIGHTH BLOCK)
+      IREE_TOKENIZER_DECODER_METASPACE_PREPEND_ALWAYS, iree_allocator_system(),
+      metaspace.put()));
+
+  std::vector<ScopedDecoder> children;
+  children.push_back(std::move(byte_level));
+  children.push_back(std::move(metaspace));
+  auto decoder = CreateSequence(std::move(children));
+  ASSERT_NE(decoder.get(), nullptr);
+
+  iree_tokenizer_decoder_capability_t caps =
+      iree_tokenizer_decoder_capabilities(decoder.get());
+  EXPECT_EQ(caps, IREE_TOKENIZER_DECODER_CAPABILITY_NONE)
+      << "PARTIAL_UTF8 + POSITION_SENSITIVE must degrade to NONE";
+}
+
+TEST_F(SequenceDecoderTest, PartialUtf8PlusByteFallbackDegrades) {
+  // Sequence(ByteLevel, ByteFallback) should degrade to NONE because
+  // the two mechanisms use incompatible detection at decode time.
+  ScopedDecoder byte_level;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_byte_level_allocate(
+      iree_allocator_system(), byte_level.put()));
+  ScopedDecoder byte_fallback;
+  IREE_ASSERT_OK(iree_tokenizer_decoder_byte_fallback_allocate(
+      iree_allocator_system(), byte_fallback.put()));
+
+  std::vector<ScopedDecoder> children;
+  children.push_back(std::move(byte_level));
+  children.push_back(std::move(byte_fallback));
+  auto decoder = CreateSequence(std::move(children));
+  ASSERT_NE(decoder.get(), nullptr);
+
+  iree_tokenizer_decoder_capability_t caps =
+      iree_tokenizer_decoder_capabilities(decoder.get());
+  EXPECT_EQ(caps, IREE_TOKENIZER_DECODER_CAPABILITY_NONE)
+      << "PARTIAL_UTF8 + BYTE_TOKENS must degrade to NONE";
 }
 
 }  // namespace

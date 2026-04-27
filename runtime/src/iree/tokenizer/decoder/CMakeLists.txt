@@ -207,6 +207,7 @@ iree_cc_test(
     "sequence_test.cc"
   DEPS
     ::byte_fallback
+    ::byte_level
     ::decoder_test_util
     ::metaspace
     ::passthrough

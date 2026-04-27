@@ -104,6 +104,7 @@ iree_runtime_cc_library(
     srcs = ["tokenizer.c"],
     hdrs = ["tokenizer.h"],
     deps = [
+        ":byte_level_tables",
         ":decoder",
         ":model",
         ":normalizer",
