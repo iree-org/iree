@@ -94,11 +94,8 @@ TEST_F(HipGraphCommandBufferTest, RecordsMoreThanInitialNodeCapacity) {
     status = iree_hal_command_buffer_begin(command_buffer);
   }
 
-  iree_hal_buffer_ref_t target_ref = {
-      .buffer = buffer,
-      .offset = 0,
-      .length = sizeof(uint32_t),
-  };
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(buffer, 0, sizeof(uint32_t));
   for (uint32_t i = 0; i < kFillNodeCount && iree_status_is_ok(status); ++i) {
     target_ref.offset = i * sizeof(uint32_t);
     status = iree_hal_command_buffer_fill_buffer(
