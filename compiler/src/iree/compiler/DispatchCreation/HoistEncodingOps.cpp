@@ -7,6 +7,7 @@
 #include <cassert>
 #include <queue>
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
@@ -20,6 +21,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -39,6 +41,13 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
+
+static llvm::cl::opt<bool> clNoHoistDataOperandsScaledMMA(
+  "test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma",
+  llvm::cl::desc(
+      "Use unswizzled data operands for scaled matmuls: data operands "
+      "are pack-only (row-major), scales are fully shuffled."),
+  llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
@@ -313,6 +322,23 @@ void HoistEncodingOpsPass::runOnOperation() {
     Attribute encoding = setEncodingOp.getResultType().getEncoding();
     if (isa_and_nonnull<IREE::Encoding::PaddingAttr>(encoding)) {
       return;
+    }
+    // When --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma is
+    // set, data operands benefit from staying fused in the dispatch (identity
+    // permute loads) while scale operands benefit from pre-encoding via
+    // hoisting.
+    if (clNoHoistDataOperandsScaledMMA) {
+      if (auto encodingAttr =
+              dyn_cast_or_null<IREE::Encoding::EncodingAttr>(encoding)) {
+        if (encodingAttr.getOpType().getValue() ==
+            IREE::Encoding::EncodingOpType::scaled_matmul) {
+          int64_t operandIndex = encodingAttr.getOperandIndex().getInt();
+          if (operandIndex != IREE::GPU::kScaledMMAOperandLhsScale &&
+              operandIndex != IREE::GPU::kScaledMMAOperandRhsScale) {
+            return;
+          }
+        }
+      }
     }
 
     bool isHoistable = true;
