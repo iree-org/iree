@@ -26,12 +26,11 @@ static void printAsyncDMASourceIndexTypes(OpAsmPrinter &p, Operation *op,
                                           OperandRange sourceIndices,
                                           TypeRange sourceIndexTypes) {
   if (llvm::all_of(sourceIndexTypes, llvm::IsaPred<IndexType>)) {
-    p << ", ";
     return;
   }
   p << " [";
   llvm::interleaveComma(sourceIndexTypes, p);
-  p << "], ";
+  p << "]";
 }
 
 static ParseResult parseAsyncDMASourceIndexTypes(
@@ -40,10 +39,9 @@ static ParseResult parseAsyncDMASourceIndexTypes(
   if (failed(parser.parseOptionalLSquare())) {
     sourceIndexTypes.assign(sourceIndices.size(),
                             parser.getBuilder().getIndexType());
-    return parser.parseComma();
+    return success();
   }
-  if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare() ||
-      parser.parseComma()) {
+  if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare()) {
     return failure();
   }
   return success();

@@ -410,13 +410,14 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
   let assemblyFormat = [{
     $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
     $transfer_type
-    (`permutation_map` $permutation_map^)?
-    (`in_bounds` $in_bounds^)?
+    oilist(
+      `permutation_map` $permutation_map |
+      `in_bounds` $in_bounds
+    )
     attr-dict `:` type($source)
     ``
     custom<AsyncDMASourceIndexTypes>(ref($source_indices), type($source_indices))
-    ``
-    type($dest) ( `->` type($result)^ )?
+    `` `,` type($dest) ( `->` type($result)^ )?
   }];
   let hasVerifier = 1;
 

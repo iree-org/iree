@@ -252,6 +252,28 @@ func.func @async_dma_in_bounds(%src: tensor<20x64xf16>,
 
 // -----
 
+func.func @async_dma_clause_reordering(%src: tensor<20x64xf16>,
+                                        %dest: tensor<64xf16, #gpu.address_space<workgroup>>,
+                                        %i: index, %j: index, %c0: index)
+    -> tensor<64xf16, #gpu.address_space<workgroup>> {
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0], vector<64xf16>
+      in_bounds [true]
+      permutation_map affine_map<(d0, d1) -> (d1)>
+      : tensor<20x64xf16>, tensor<64xf16, #gpu.address_space<workgroup>>
+      -> tensor<64xf16, #gpu.address_space<workgroup>>
+  return %0 : tensor<64xf16, #gpu.address_space<workgroup>>
+}
+
+// CHECK-DAG: #[[$MAP_REORDER:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-LABEL: func @async_dma_clause_reordering
+//       CHECK:   iree_gpu.async_dma %{{.+}}[%{{.+}}, %{{.+}}] to %{{.+}}[%{{.+}}], vector<64xf16>
+//  CHECK-SAME:     permutation_map #[[$MAP_REORDER]]
+//  CHECK-SAME:     in_bounds [true]
+//  CHECK-SAME:     : tensor<20x64xf16>, tensor<64xf16, #gpu.address_space<workgroup>>
+//  CHECK-SAME:     -> tensor<64xf16, #gpu.address_space<workgroup>>
+
+// -----
+
 // Test async_dma with gather (vector) source indices.
 func.func @async_dma_gather(%src: tensor<1024x64xf16>,
                              %dest: tensor<1x64xf16, #gpu.address_space<workgroup>>,
