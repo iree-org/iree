@@ -1831,6 +1831,176 @@ LogicalResult TopkV2Op::getResultTilePosition(
   return success();
 }
 
+FailureOr<SmallVector<Value>>
+TopkV2Op::generateInitialTensorForPartialReduction(
+    OpBuilder &b, Location loc, ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims) {
+  // For TopkV2, the output already has K on the reduction dim. The accumulator
+  // shape matches the output shape — no broadcasting needed. Just return the
+  // output init tensors directly.
+  SmallVector<Value> result = {getOutputValues()};
+  if (Value outputIndices = getOutputIndices()) {
+    result.push_back(outputIndices);
+  }
+  return result;
+}
+
+FailureOr<TilingResult> TopkV2Op::tileToPartialReduction(
+    OpBuilder &b, Location loc, ReductionTilingStrategy strategy,
+    ValueRange init, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs) {
+  if (strategy != ReductionTilingStrategy::PartialReductionOuterReduction) {
+    return failure();
+  }
+
+  int64_t rank = getInputRank();
+  int64_t kDim = getDimension();
+
+  if (reductionDims.size() != 1 ||
+      static_cast<int64_t>(reductionDims[0]) != kDim) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> strides(rank, b.getIndexAttr(1));
+  SmallVector<Operation *> slices;
+
+  // Slice input values.
+  Operation *inputSlice =
+      getSlice(b, loc, getValues(), offsets, sizes, strides);
+  slices.push_back(inputSlice);
+
+  // Slice or generate input indices.
+  Value tiledInputIndices;
+  Value inputIndices = getInputIndices();
+  if (inputIndices) {
+    Operation *indicesSlice =
+        getSlice(b, loc, inputIndices, offsets, sizes, strides);
+    tiledInputIndices = indicesSlice->getResult(0);
+    slices.push_back(indicesSlice);
+  } else if (getOutputIndices()) {
+    // Implicit-index mode: generate iota indices offset by tile IV for global
+    // index tracking. Convert to explicit-index mode in the tiled op.
+    Type idxElTy =
+        cast<ShapedType>(getOutputIndices().getType()).getElementType();
+    SmallVector<OpFoldResult> tileSizes(sizes);
+    Value emptyIdx = tensor::EmptyOp::create(b, loc, tileSizes, idxElTy);
+
+    // Build iota: for each element along kDim, index = offset + local_pos.
+    SmallVector<AffineMap> maps = {b.getMultiDimIdentityMap(rank)};
+    SmallVector<utils::IteratorType> iterators(rank,
+                                               utils::IteratorType::parallel);
+    auto iotaOp = linalg::GenericOp::create(
+        b, loc, emptyIdx.getType(), ValueRange{}, ValueRange{emptyIdx}, maps,
+        iterators, [&](OpBuilder &nb, Location nl, ValueRange args) {
+          Value localIdx = linalg::IndexOp::create(nb, nl, kDim);
+          Value offsetVal =
+              getValueOrCreateConstantIndexOp(nb, nl, offsets[kDim]);
+          Value globalIdx = arith::AddIOp::create(nb, nl, offsetVal, localIdx);
+          Value castedIdx = globalIdx;
+          if (!isa<IndexType>(idxElTy)) {
+            castedIdx = arith::IndexCastOp::create(nb, nl, idxElTy, globalIdx);
+          }
+          linalg::YieldOp::create(nb, nl, castedIdx);
+        });
+    tiledInputIndices = iotaOp->getResult(0);
+  }
+
+  // Create the tiled TopkV2Op without is_sorted — sorting inside every
+  // iteration is wasted work since the next iteration can disorder it.
+  Value initValues = init[0];
+  Value initIndices = getOutputIndices() ? init[1] : Value();
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(initValues.getType());
+    if (initIndices) {
+      resultTypes.push_back(initIndices.getType());
+    }
+  }
+
+  auto tiledOp = TopkV2Op::create(b, loc, resultTypes, kDim,
+                                  /*is_sorted=*/false, inputSlice->getResult(0),
+                                  tiledInputIndices, initValues, initIndices);
+
+  // Clone comparator region.
+  Region &targetRegion = tiledOp.getRegion();
+  Region &sourceRegion = getRegion();
+  IRMapping mapper;
+  sourceRegion.cloneInto(&targetRegion, mapper);
+
+  return TilingResult{{tiledOp.getOperation()},
+                      SmallVector<Value>(tiledOp->getResults()),
+                      slices};
+}
+
+FailureOr<MergeResult>
+TopkV2Op::mergeReductions(OpBuilder &b, Location loc, ValueRange partialReduce,
+                          const llvm::SetVector<unsigned> &reductionDims) {
+  int64_t kDim = getDimension();
+
+  // If the original op does not require sorted output, the scf.for
+  // accumulation already has the correct top-K. Return as-is.
+  if (!getIsSorted()) {
+    return MergeResult{{}, SmallVector<Value>(partialReduce)};
+  }
+
+  // Original op has is_sorted: create a final TopkV2Op with is_sorted to
+  // produce sorted output from the accumulated (unsorted) top-K.
+  Value outputValues = getDpsInits()[0];
+  Value outputIndices = getOutputIndices() ? getDpsInits()[1] : Value();
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValues.getType());
+    if (outputIndices) {
+      resultTypes.push_back(outputIndices.getType());
+    }
+  }
+
+  auto mergeOp = TopkV2Op::create(b, loc, resultTypes, kDim,
+                                  /*is_sorted=*/true, partialReduce[0],
+                                  getOutputIndices() && partialReduce.size() > 1
+                                      ? partialReduce[1]
+                                      : Value(),
+                                  outputValues, outputIndices);
+
+  Region &targetRegion = mergeOp.getRegion();
+  Region &sourceRegion = getRegion();
+  IRMapping mapper;
+  sourceRegion.cloneInto(&targetRegion, mapper);
+
+  return MergeResult{{mergeOp.getOperation()},
+                     SmallVector<Value>(mergeOp->getResults())};
+}
+
+LogicalResult TopkV2Op::getPartialResultTilePosition(
+    OpBuilder &b, unsigned resultNumber, ReductionTilingStrategy tilingStrategy,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    const llvm::SetVector<unsigned> &reductionDims,
+    ArrayRef<OpFoldResult> splitReductionIvs,
+    SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  int64_t kDim = getDimension();
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  Value kSize = getDimValue(b, getLoc(), getDpsInits()[resultNumber], kDim);
+
+  for (auto [i, size, offset] : llvm::enumerate(sizes, offsets)) {
+    if (static_cast<int64_t>(i) == kDim) {
+      resultOffsets.push_back(b.getIndexAttr(0));
+      resultSizes.push_back(getAsOpFoldResult(kSize));
+    } else {
+      resultOffsets.push_back(offset);
+      resultSizes.push_back(size);
+    }
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // ArgCompareOp
 //===----------------------------------------------------------------------===//

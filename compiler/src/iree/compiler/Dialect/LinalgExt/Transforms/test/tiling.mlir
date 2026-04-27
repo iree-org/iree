@@ -4340,3 +4340,120 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// TopkV2 OuterReduction: 2D, reduce along dim 1, no is_sorted.
+// Accumulator has K=4 elements. No merge needed since is_sorted is not set.
+func.func @topk_v2_outer_reduction_no_sorted(%arg0: tensor<8x1024xf32>, %out_val: tensor<8x4xf32>, %out_idx: tensor<8x4xi32>) -> (tensor<8x4xf32>, tensor<8x4xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2
+      dimension(1)
+      ins(%arg0 : tensor<8x1024xf32>)
+      outs(%out_val, %out_idx : tensor<8x4xf32>, tensor<8x4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<8x4xf32>, tensor<8x4xi32>
+
+  return %0#0, %0#1 : tensor<8x4xf32>, tensor<8x4xi32>
+}
+
+// CHECK-LABEL: func.func @topk_v2_outer_reduction_no_sorted
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<8x1024xf32>, %[[OUT_VAL:.+]]: tensor<8x4xf32>, %[[OUT_IDX:.+]]: tensor<8x4xi32>)
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
+// CHECK-DAG:     %[[C1024:.+]] = arith.constant 1024 : index
+
+// scf.for with topk_v2 (without is_sorted) inside the loop.
+// CHECK:         %[[ITER:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[C1024]] step %[[C128]] iter_args(%[[VAL_ARG:.+]] = %[[OUT_VAL]], %[[IDX_ARG:.+]] = %[[OUT_IDX]]) -> (tensor<8x4xf32>, tensor<8x4xi32>)
+// CHECK:           %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[IV]]] [8, 128] [1, 1] : tensor<8x1024xf32> to tensor<8x128xf32>
+// CHECK:           %[[IOTA:.+]] = linalg.generic {{.*}} outs({{.*}} : tensor<8x128xi32>)
+// CHECK:           %[[TOPK:.+]]:2 = iree_linalg_ext.topk_v2 dimension(1) ins(%[[INPUT_SLICE]], %[[IOTA]] : tensor<8x128xf32>, tensor<8x128xi32>) outs(%[[VAL_ARG]], %[[IDX_ARG]] : tensor<8x4xf32>, tensor<8x4xi32>)
+// CHECK-NOT:       is_sorted
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           scf.yield %[[TOPK]]#0, %[[TOPK]]#1
+
+// No merge for non-sorted: result is returned directly.
+// CHECK:         return %[[ITER]]#0, %[[ITER]]#1 : tensor<8x4xf32>, tensor<8x4xi32>
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %topk_op = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op, %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %topk_op by tile_sizes = [0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// TopkV2 OuterReduction: 2D, reduce along dim 1, WITH is_sorted.
+// Merge step uses topk_v2 with is_sorted to produce sorted output.
+func.func @topk_v2_outer_reduction_sorted(%arg0: tensor<8x1024xf32>, %out_val: tensor<8x4xf32>, %out_idx: tensor<8x4xi32>) -> (tensor<8x4xf32>, tensor<8x4xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2
+      dimension(1) is_sorted
+      ins(%arg0 : tensor<8x1024xf32>)
+      outs(%out_val, %out_idx : tensor<8x4xf32>, tensor<8x4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<8x4xf32>, tensor<8x4xi32>
+
+  return %0#0, %0#1 : tensor<8x4xf32>, tensor<8x4xi32>
+}
+
+// CHECK-LABEL: func.func @topk_v2_outer_reduction_sorted
+// CHECK:         %[[ITER:.+]]:2 = scf.for {{.*}} iter_args
+// Inner topk_v2 without is_sorted.
+// CHECK:           %[[TOPK:.+]]:2 = iree_linalg_ext.topk_v2 dimension(1) ins
+// CHECK-NOT:       is_sorted
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           scf.yield %[[TOPK]]#0, %[[TOPK]]#1
+
+// Merge uses topk_v2 WITH is_sorted for final sorting.
+// CHECK:         %[[REDUCED:.+]]:2 = iree_linalg_ext.topk_v2 dimension(1) is_sorted ins(%[[ITER]]#0, %[[ITER]]#1 : tensor<8x4xf32>, tensor<8x4xi32>) outs(%{{.*}}, %{{.*}} : tensor<8x4xf32>, tensor<8x4xi32>)
+// CHECK:           iree_linalg_ext.yield
+// CHECK:         return %[[REDUCED]]#0, %[[REDUCED]]#1
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %topk_op = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op, %split_op, %combining_op, %merge_op, %for_op = transform.structured.tile_reduction_using_for %topk_op by tile_sizes = [0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// TopkV2 OuterReduction: values-only (no output indices).
+func.func @topk_v2_outer_reduction_values_only(%arg0: tensor<8x1024xf32>, %out_val: tensor<8x4xf32>) -> tensor<8x4xf32> {
+  %0 = iree_linalg_ext.topk_v2
+      dimension(1)
+      ins(%arg0 : tensor<8x1024xf32>)
+      outs(%out_val : tensor<8x4xf32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<8x4xf32>
+
+  return %0 : tensor<8x4xf32>
+}
+
+// CHECK-LABEL: func.func @topk_v2_outer_reduction_values_only
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<8x1024xf32>, %[[OUT_VAL:.+]]: tensor<8x4xf32>)
+
+// scf.for with topk_v2 (values only, no iota, no indices).
+// CHECK:         %[[ITER:.+]] = scf.for {{.*}} iter_args(%[[VAL_ARG:.+]] = %[[OUT_VAL]]) -> (tensor<8x4xf32>)
+// CHECK:           %[[INPUT_SLICE:.+]] = tensor.extract_slice
+// CHECK:           %[[TOPK:.+]] = iree_linalg_ext.topk_v2 dimension(1) ins(%[[INPUT_SLICE]] : tensor<8x128xf32>) outs(%[[VAL_ARG]] : tensor<8x4xf32>)
+// CHECK-NOT:       is_sorted
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           scf.yield %[[TOPK]]
+// CHECK:         return %[[ITER]] : tensor<8x4xf32>
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %topk_op = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %topk_op by tile_sizes = [0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
