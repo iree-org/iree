@@ -57,12 +57,6 @@ OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
 /// instead of paying for it once per output element.
 Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc, Value sum);
 
-/// Compute `1 / max(sum, 1)` for a softmax row-sum tensor. This keeps the
-/// fully-masked-row guard (`sum == 0`) at row-reduction granularity while
-/// enabling a multiply-based finalization (`x * reciprocal`) in the larger
-/// output tensor.
-Value createSafeSoftmaxReciprocal(OpBuilder &builder, Location loc, Value sum);
-
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);

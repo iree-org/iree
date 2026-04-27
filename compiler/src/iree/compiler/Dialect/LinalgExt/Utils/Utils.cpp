@@ -100,29 +100,6 @@ Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
-Value createSafeSoftmaxReciprocal(OpBuilder &builder, Location loc, Value sum) {
-  auto sumType = cast<RankedTensorType>(sum.getType());
-  Type elementType = sumType.getElementType();
-  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(builder, loc, sum);
-  Value output = tensor::EmptyOp::create(builder, loc, sizes, elementType);
-
-  SmallVector<AffineMap> maps = {
-      builder.getMultiDimIdentityMap(sumType.getRank()),
-      builder.getMultiDimIdentityMap(sumType.getRank())};
-  SmallVector<utils::IteratorType> iteratorTypes(sumType.getRank(),
-                                                 utils::IteratorType::parallel);
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, output.getType(), sum, output, maps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value one =
-            arith::ConstantOp::create(b, loc, b.getFloatAttr(elementType, 1.0));
-        Value safeDenominator = arith::MaximumFOp::create(b, loc, args[0], one);
-        Value reciprocal = arith::DivFOp::create(b, loc, one, safeDenominator);
-        linalg::YieldOp::create(b, loc, reciprocal);
-      });
-  return genericOp.getResult(0);
-}
-
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = cast<ShapedType>(v.getType());
   if (!type.isDynamicDim(dim)) {

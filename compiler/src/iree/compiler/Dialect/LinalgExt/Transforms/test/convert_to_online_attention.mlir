@@ -65,16 +65,13 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 }
 
 // CHECK-LABEL: func.func @masked_attention
-// Masked: finalization clamps sum at row granularity so fully-masked rows
-// (sum == 0) yield 0 / 1 = 0 instead of 0/0 == NaN.
+// Masked: finalization guards fully-masked rows so `sum == 0` yields 0 instead
+// of `0/0 == NaN`.
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
-// CHECK: %[[RECIP:.+]] = linalg.generic
-// CHECK-SAME: ins(%[[OUT]]#2
-// CHECK: arith.maximumf
-// CHECK: arith.divf
-// CHECK: linalg.yield
 // CHECK: linalg.generic
-// CHECK-SAME: ins(%[[RECIP]], %[[OUT]]#0
-// CHECK: arith.mulf
+// CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
+// CHECK: arith.divf
+// CHECK: arith.cmpf oeq
+// CHECK: arith.select
 // CHECK: arith.truncf
 // CHECK: linalg.yield

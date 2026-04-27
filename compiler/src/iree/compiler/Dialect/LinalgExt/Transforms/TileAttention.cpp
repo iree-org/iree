@@ -117,18 +117,12 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   ops.push_back(onlineAttn);
 
   Value x = onlineAttn.getResult(0);
-  Value sumOrReciprocal = onlineAttn.getResult(2);
-  bool useReciprocal = false;
+  Value sum = onlineAttn.getResult(2);
+  bool hasMask = static_cast<bool>(mask);
 
-  // Finalize online attention: x = x / sum. When a mask is present,
-  // fully-masked rows have sum == 0, so clamp the row denominator once before
-  // normalizing. For masked cases, precompute row-level reciprocal so the
-  // larger output loop uses mul instead of div.
-  if (mask) {
-    sumOrReciprocal =
-        createSafeSoftmaxReciprocal(rewriter, loc, sumOrReciprocal);
-    useReciprocal = true;
-  }
+  // Finalize online attention: x = x / sum. With a mask, fully-masked rows can
+  // have `sum == 0` and `x == 0`; guard that case to produce 0 instead of NaN.
+  // Keep this in the existing finalization loop to avoid an extra row pass.
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
@@ -138,12 +132,17 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                                                  utils::IteratorType::parallel);
 
   auto genericOp = linalg::GenericOp::create(
-      rewriter, loc, attnOp.getOutput().getType(),
-      ValueRange{sumOrReciprocal, x}, attnOp.getOutput(), compressedMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = useReciprocal
-                           ? arith::MulFOp::create(b, loc, args[1], args[0])
-                           : arith::DivFOp::create(b, loc, args[1], args[0]);
+      rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
+      attnOp.getOutput(), compressedMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = arith::DivFOp::create(b, loc, args[1], args[0]);
+        if (hasMask) {
+          Value zero =
+              arith::ConstantOp::create(b, loc, b.getFloatAttr(f32Type, 0.0));
+          Value isZero = arith::CmpFOp::create(
+              b, loc, arith::CmpFPredicate::OEQ, args[0], zero);
+          result = arith::SelectOp::create(b, loc, isZero, zero, result);
+        }
         // Cast result to the required type by attention output.
         result = convertScalarToDtype(b, loc, result, args[2].getType(),
                                       /*isUnsignedCast=*/false);
