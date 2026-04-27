@@ -235,15 +235,28 @@ struct TransposeContractOperands final
     }
 
     Location loc = op.getLoc();
+    auto elemType = getElementTypeOrSelf(op.getAccType());
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
+
+    // Promote operands to the accumulator element type before
+    // broadcast/transpose so that the normalized contract has uniform types.
+    if (isa<FloatType>(elemType) && lhsVecType.getElementType() != elemType) {
+      Type promotedType = lhsVecType.clone(elemType);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhsVecType = cast<VectorType>(lhs.getType());
+    }
+    if (isa<FloatType>(elemType) && rhsVecType.getElementType() != elemType) {
+      Type promotedType = rhsVecType.clone(elemType);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhsVecType = cast<VectorType>(rhs.getType());
+    }
 
     ArrayRef<int64_t> lhsShape = lhsVecType.getShape();
     ArrayRef<int64_t> rhsShape = rhsVecType.getShape();
 
     // Broadcast operands for missing parallel dimensions, then transpose to
-    // [reduction..., parallel...] layout. Each operand uses its own element
-    // type for the broadcast (important for mixed-precision contracts).
+    // [reduction..., parallel...] layout.
     SmallVector<int64_t> lhsTranspose, rhsTranspose;
     lhs = broadcastMissingDims(rewriter, loc, lhsMap, accMap,
                                op.getIteratorTypes(), numParDims, resultVecType,
