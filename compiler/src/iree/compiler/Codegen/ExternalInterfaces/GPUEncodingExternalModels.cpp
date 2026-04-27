@@ -54,11 +54,11 @@
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
-static llvm::cl::opt<bool> clNoHoistDataOperandsScaledMMA(
-    "test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma",
+static llvm::cl::opt<bool> clAlternateDataTilingHeuristic(
+    "test-iree-data-tiling-alternate-heuristic",
     llvm::cl::desc(
-        "Use unswizzled data operands for scaled matmuls: data operands "
-        "are pack-only (row-major), scales are fully shuffled."),
+        "For scaled matmuls, use alternate heuristic for data tiling based on"
+        "tuned seeds instead of the default heuristic."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -377,7 +377,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       ctx, {kScaledMMAOperandLhsScale, kScaledMMAOperandRhsScale});
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
 
-  if (clNoHoistDataOperandsScaledMMA) {
+  if (clAlternateDataTilingHeuristic) {
     if (succeeded(matmulSizes) && !ShapedType::isDynamic(matmulSizes->M) &&
         !ShapedType::isDynamic(matmulSizes->N) &&
         !ShapedType::isDynamic(matmulSizes->K)) {
