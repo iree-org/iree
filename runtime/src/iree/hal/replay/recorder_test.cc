@@ -415,7 +415,7 @@ TEST(ReplayRecorderTest,
   params.usage =
       IREE_HAL_BUFFER_USAGE_MAPPING | IREE_HAL_BUFFER_USAGE_SHARING_EXPORT;
 
-  uint8_t imported_storage[16] = {0};
+  alignas(64) uint8_t imported_storage[16] = {0};
   iree_hal_external_buffer_t external_buffer = {};
   external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
   external_buffer.size = sizeof(imported_storage);
