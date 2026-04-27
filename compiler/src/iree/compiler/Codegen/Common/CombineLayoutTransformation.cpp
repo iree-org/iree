@@ -1307,6 +1307,26 @@ struct CombineSourceLayoutTransformationPass final
     IRRewriter rewriter(context);
     simplifyComplexRelayoutOps(rewriter, funcOp);
 
+    // Raise transpose generics in nested regions (e.g., inside scf.for
+    // from promotion tiling). simplifyComplexRelayoutOps only walks
+    // top-level ops via Region::getOps, missing ops inside loop bodies.
+    // When a transpose generic is not raised, collectRelayoutChain stops
+    // early, causing spurious map_load creation that produces scalar
+    // memref.store ops. This deep walk is only needed in the source
+    // pass; the result pass should not raise nested generics as it can
+    // change downstream vectorization decisions on other backends.
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      SmallVector<linalg::GenericOp> nestedGenerics;
+      funcOp.walk([&](linalg::GenericOp op) { nestedGenerics.push_back(op); });
+      for (auto genericOp : nestedGenerics) {
+        if (linalg::isaTransposeOpInterface(genericOp)) {
+          rewriter.setInsertionPoint(genericOp);
+          (void)linalg::specializeGenericOp(rewriter, genericOp);
+        }
+      }
+    }
+
     // Insert identity map_load ops after load_from_buffer ops and fold
     // consumer relayout ops into them.
     RewritePatternSet patterns(context);
