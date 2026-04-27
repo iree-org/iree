@@ -52,6 +52,7 @@ iree_runtime_cc_library(
     srcs = [
         "thread.c",
         "thread_darwin.c",
+        "thread_generic.c",
         "thread_pthreads.c",
         "thread_win32.c",
     ],
