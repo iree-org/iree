@@ -135,6 +135,16 @@ static bool hip_registered_ =
                "HIP stream command buffers can hang when a transient buffer "
                "subspan is filled after stream-ordered queue_alloca; this "
                "requires a HIP transient-buffer sequencing fix."},
+              {"TransientBufferTest.FillTransientBuffer1Byte",
+               "HIP graph command buffers can hang on gfx950 when a transient "
+               "buffer is filled with a 1-byte pattern after stream-ordered "
+               "queue_alloca; gfx1100 passes locally, so this requires a HIP "
+               "transient-buffer sequencing fix across targets."},
+              {"TransientBufferTest.FillTransientWithZeroAccessFlags",
+               "HIP stream command buffers can hang on gfx950 when filling a "
+               "transient buffer allocated with HAL-module access=0; gfx1100 "
+               "passes locally, so this requires a HIP transient-buffer "
+               "access/sequence fix across targets."},
               {"QueueAllocaTest.AllocaDeallocaCycle",
                "HIP async queue_dealloca does not yet reliably advance "
                "stream-ordered dealloca dependencies for transient buffers."},
