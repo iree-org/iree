@@ -117,13 +117,17 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   ops.push_back(onlineAttn);
 
   Value x = onlineAttn.getResult(0);
-  Value sum = onlineAttn.getResult(2);
+  Value sumOrReciprocal = onlineAttn.getResult(2);
+  bool useReciprocal = false;
 
   // Finalize online attention: x = x / sum. When a mask is present,
   // fully-masked rows have sum == 0, so clamp the row denominator once before
-  // normalizing instead of guarding every output element.
+  // normalizing. For masked cases, precompute row-level reciprocal so the
+  // larger output loop uses mul instead of div.
   if (mask) {
-    sum = createSafeSoftmaxDenominator(rewriter, loc, sum);
+    sumOrReciprocal =
+        createSafeSoftmaxReciprocal(rewriter, loc, sumOrReciprocal);
+    useReciprocal = true;
   }
 
   // Compress the indexing maps.
@@ -134,10 +138,12 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                                                  utils::IteratorType::parallel);
 
   auto genericOp = linalg::GenericOp::create(
-      rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
-      attnOp.getOutput(), compressedMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = arith::DivFOp::create(b, loc, args[1], args[0]);
+      rewriter, loc, attnOp.getOutput().getType(),
+      ValueRange{sumOrReciprocal, x}, attnOp.getOutput(), compressedMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = useReciprocal
+                           ? arith::MulFOp::create(b, loc, args[1], args[0])
+                           : arith::DivFOp::create(b, loc, args[1], args[0]);
         // Cast result to the required type by attention output.
         result = convertScalarToDtype(b, loc, result, args[2].getType(),
                                       /*isUnsignedCast=*/false);
