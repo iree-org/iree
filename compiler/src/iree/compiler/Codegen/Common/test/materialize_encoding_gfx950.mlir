@@ -2,7 +2,7 @@
 // RUN:   --iree-gpu-test-target=gfx950 \
 // RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_data_tiling}))" \
-// RUN:   --iree-gpu-test-target=gfx950 --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma \
+// RUN:   --iree-gpu-test-target=gfx950 --test-iree-data-tiling-alternate-heuristic \
 // RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK-ALL,PDT
 
 // Contains tests that differ from gfx942/MI-300
