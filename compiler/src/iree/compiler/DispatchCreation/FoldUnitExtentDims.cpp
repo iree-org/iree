@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -264,6 +265,37 @@ struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
 
 } // namespace
 
+template <typename AttentionOpTy>
+static SmallVector<unsigned>
+getAllowedAttentionUnitDims(AttentionOpTy attentionOp) {
+  SetVector<unsigned> allowedUnitDims;
+  allowedUnitDims.insert_range(
+      llvm::seq<unsigned>(0, attentionOp.getNumLoops()));
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+          attentionOp.getValueMap(), attentionOp.getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return {};
+  }
+
+  SmallVector<int64_t> loopRanges = attentionOp.getStaticLoopRanges();
+  llvm::SmallDenseSet<unsigned> preservedUnitDims;
+  auto preserveInnermostUnitDim = [&](ArrayRef<int64_t> dims) {
+    if (dims.empty()) {
+      return;
+    }
+    if (llvm::all_of(dims, [&](int64_t dim) { return loopRanges[dim] == 1; })) {
+      preservedUnitDims.insert(dims.back());
+    }
+  };
+  preserveInnermostUnitDim(maybeOpInfo->getK1Dims());
+  preserveInnermostUnitDim(maybeOpInfo->getNDims());
+
+  allowedUnitDims.set_subtract(preservedUnitDims);
+  return allowedUnitDims.takeVector();
+}
+
 static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
   linalg::ControlDropUnitDims options;
   auto defaultFn = options.controlFn;
@@ -272,6 +304,12 @@ static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
     // Ignore operations already in dispatches.
     if (!IREE::Flow::isNonNullAndOutsideDispatch(op)) {
       return SmallVector<unsigned>{};
+    }
+    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(op)) {
+      return getAllowedAttentionUnitDims(attentionOp);
+    }
+    if (auto attentionOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(op)) {
+      return getAllowedAttentionUnitDims(attentionOp);
     }
     if (isa<IREE::LinalgExt::LinalgExtOp>(op)) {
       return IREE::LinalgExt::defaultControlDropUnitDims(op);
