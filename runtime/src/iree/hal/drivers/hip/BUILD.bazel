@@ -123,6 +123,24 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "graph_command_buffer_test",
+    srcs = ["graph_command_buffer_test.cc"],
+    tags = [
+        "driver=hip",
+        "requires-gpu-amd",
+    ],
+    deps = [
+        ":hip",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "hip_allocator_test",
     srcs = ["hip_allocator_test.cc"],
     tags = [
