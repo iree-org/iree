@@ -883,3 +883,43 @@ util.func public @innermost_unit_dim(%4: !iree_tensor_ext.dispatch.tensor<readon
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
 //       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]
+
+// -----
+
+// CHECK-LABEL: @makeBitCastStaticFromValuesFull
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor
+util.func public @makeBitCastStaticFromValuesFull(%arg0 : tensor<?x?x?x?xf16>) -> (tensor<?x?x?x?xcomplex<f16>>){
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c32 = arith.constant 32 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  //      CHECK: %[[CAST0:.+]] = tensor.cast %[[ARG0]]
+  // CHECK-SAME:   tensor<?x?x?x?xf16> to tensor<4x1x32x128xf16>
+  //      CHECK: %[[BITCAST:.+]] = flow.tensor.bitcast %[[CAST0]]
+  // CHECK-SAME:   tensor<4x1x32x128xf16> -> tensor<4x1x32x64xcomplex<f16>>
+  //      CHECK: %[[CAST1:.+]] = tensor.cast %[[BITCAST]]
+  // CHECK-SAME:   tensor<4x1x32x64xcomplex<f16>> to tensor<?x?x?x?xcomplex<f16>>
+  %bitcast = flow.tensor.bitcast %arg0 : tensor<?x?x?x?xf16>{%c4, %c1, %c32, %c128} -> tensor<?x?x?x?xcomplex<f16>>{%c4, %c1, %c32, %c64}
+  util.return %bitcast : tensor<?x?x?x?xcomplex<f16>>
+}
+
+// -----
+
+// CHECK-LABEL: @makeBitCastStaticFromValuesPartial
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: index
+util.func public @makeBitCastStaticFromValuesPartial(%arg0 : tensor<?x?x?x?xf16>, %arg1 : index) -> (tensor<?x?x?x?xcomplex<f16>>){
+  %c1 = arith.constant 1 : index
+  %c32 = arith.constant 32 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  //      CHECK: %[[CAST0:.+]] = tensor.cast %[[ARG0]]
+  // CHECK-SAME:   tensor<?x?x?x?xf16> to tensor<?x1x32x128xf16>
+  //      CHECK: %[[BITCAST:.+]] = flow.tensor.bitcast %[[CAST0]]
+  // CHECK-SAME:   tensor<?x1x32x128xf16>{%[[ARG1]]} -> tensor<?x1x32x64xcomplex<f16>>{%[[ARG1]]}
+  //      CHECK: %[[CAST1:.+]] = tensor.cast %[[BITCAST]]
+  // CHECK-SAME:   tensor<?x1x32x64xcomplex<f16>> to tensor<?x?x?x?xcomplex<f16>>
+  %bitcast = flow.tensor.bitcast %arg0 : tensor<?x?x?x?xf16>{%arg1, %c1, %c32, %c128} -> tensor<?x?x?x?xcomplex<f16>>{%arg1, %c1, %c32, %c64}
+  util.return %bitcast : tensor<?x?x?x?xcomplex<f16>>
+}
