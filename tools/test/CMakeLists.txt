@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "compile_pipelines.mlir"
     "compile_to_continuation.mlir"
     "compile_to_phase.mlir"
+    "compile_to_resources.mlir"
     "executable_benchmarks.mlir"
     "executable_configurations.mlir"
     "executable_sources.mlir"
