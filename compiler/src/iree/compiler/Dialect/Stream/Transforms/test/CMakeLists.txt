@@ -64,6 +64,7 @@ iree_lit_test_suite(
     "schedule_allocation_parameters.mlir"
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
+    "schedule_execution_invalid.mlir"
     "schedule_execution_scf.mlir"
     "schedule_execution_timeline_aware.mlir"
     "specialize_dispatches.mlir"
