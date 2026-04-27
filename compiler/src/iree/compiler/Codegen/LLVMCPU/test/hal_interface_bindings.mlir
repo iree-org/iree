@@ -19,7 +19,10 @@ func.func @binding_ptrs() {
   %c128 = arith.constant 128 : index
   %memref = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c72) : memref<?x2xf32, strided<[2, 1], offset: 18>>{%c128}
 
-  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][18]
+  // The HAL subspan byte offset is applied to the binding base pointer. The
+  // memref layout offset is then applied by the memref load lowering.
+  // CHECK: %[[BYTE_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][72] : (!llvm.ptr) -> !llvm.ptr, i8
+  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BYTE_PTR]][18]
   // CHECK: %[[OFFSET_D0:.+]] = llvm.mul %[[C5]], %[[C2]]
   // CHECK: %[[INDEX1:.+]] = llvm.add %[[OFFSET_D0]], %[[C1]]
   // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][%[[INDEX1]]]
@@ -27,6 +30,43 @@ func.func @binding_ptrs() {
   %c1 = arith.constant 1 : index
   %c5 = arith.constant 5 : index
   %value = memref.load %memref[%c5, %c1] : memref<?x2xf32, strided<[2, 1], offset: 18>>
+
+  // CHECK: llvm.call @sink(%[[VALUE]])
+  llvm.call @sink(%value) : (f32) -> ()
+  return
+}
+llvm.func @sink(%arg0: f32) {
+  llvm.return
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+// CHECK-LABEL: llvm.func @binding_ptrs_static_shape_dynamic_offset
+func.func @binding_ptrs_static_shape_dynamic_offset() {
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1
+  // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
+  // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
+  // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
+  %offset = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+
+  // CHECK: %[[STATE1:.+]] = llvm.load %arg1
+  // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE1]][10]
+  // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+  // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
+  %memref = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%offset) : memref<8xf32>
+
+  // Static-shape memrefs use MemRefDescriptor::fromStaticShape; the subspan
+  // byte offset must still adjust the base pointer before descriptor creation.
+  // CHECK: %[[BYTE_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[OFFSET_ZEXT]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
+  // CHECK: %[[OFFSET_PTR:.+]] = llvm.getelementptr inbounds|nuw %[[BYTE_PTR]][3]
+  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR]]
+  %c3 = arith.constant 3 : index
+  %value = memref.load %memref[%c3] : memref<8xf32>
 
   // CHECK: llvm.call @sink(%[[VALUE]])
   llvm.call @sink(%value) : (f32) -> ()
@@ -46,8 +86,6 @@ llvm.func @sink(%arg0: f32) {
 // CHECK-LABEL: llvm.func @binding_ptrs_dynamic
 func.func @binding_ptrs_dynamic() {
   // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1 :
-  // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
-  // CHECK-DAG: %[[C32:.+]] = llvm.mlir.constant(32 :
   // CHECK-DAG: %[[C7:.+]] = llvm.mlir.constant(7 :
   // CHECK-DAG: %[[C5:.+]] = llvm.mlir.constant(5 :
   // CHECK-DAG: %[[C3:.+]] = llvm.mlir.constant(3 :
@@ -78,16 +116,16 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
   %memref = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%offset) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%dim0, %dim1, %dim2}
 
-  // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
-  // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C32]]
+  // The dynamic subspan offset is a byte offset on the binding base pointer.
+  // The dynamic memref descriptor offset is therefore zero.
+  // CHECK: %[[BYTE_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[OFFSET_ZEXT]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
   // CHECK: %[[STRIDE1:.+]] = llvm.mul %[[DIM2_ZEXT]], %[[C1]]
   // CHECK: %[[STRIDE2:.+]] = llvm.mul %[[STRIDE1]], %[[DIM1_ZEXT]]
-  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
   // CHECK: %[[INDEX2:.+]] = llvm.mul %[[STRIDE2]], %[[C7]]
   // CHECK: %[[INDEX1:.+]] = llvm.mul %[[STRIDE1]], %[[C5]]
   // CHECK: %[[T1:.+]] = llvm.add %[[INDEX2]], %[[INDEX1]]
   // CHECK: %[[T2:.+]] = llvm.add %[[T1]], %[[C3]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][%[[T2]]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[BYTE_PTR]][%[[T2]]]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c3 = arith.constant 3 : index
   %c5 = arith.constant 5 : index
@@ -111,9 +149,6 @@ llvm.func @sink(%arg0: f32) {
 
 // CHECK-LABEL: llvm.func @binding_ptrs_sub_byte_dynamic
 func.func @binding_ptrs_sub_byte_dynamic() {
-  // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
-  // CHECK-DAG: %[[C4:.+]] = llvm.mlir.constant(4 :
-
   // CHECK: %[[STATE:.+]] = llvm.load %arg1
   // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
   // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
@@ -127,10 +162,9 @@ func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
   %memref = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%offset) : memref<?xi4, strided<[1], offset: ?>>{%dim0}
 
-  // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
-  // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C4]]
-  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][7]
+  // The byte offset stays byte-granular even for sub-byte element types.
+  // CHECK: %[[BYTE_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[OFFSET_ZEXT]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[BYTE_PTR]][7]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c7 = arith.constant 7 : index
   %value = memref.load %memref[%c7] : memref<?xi4, strided<[1], offset: ?>>
