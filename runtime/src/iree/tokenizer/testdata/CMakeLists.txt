@@ -15,6 +15,7 @@ iree_c_embed_data(
     streaming_testdata
   SRCS
     "bpe_bytelevel_minimal.json"
+    "wordpiece_bert_pair_minimal.json"
   C_FILE_OUTPUT
     "streaming_testdata.c"
   H_FILE_OUTPUT

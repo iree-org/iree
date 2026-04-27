@@ -147,7 +147,7 @@ enum iree_tokenizer_encode_flag_bits_e {
   // Insert special tokens from the postprocessor template (prefix, suffix).
   // When set, the postprocessor's active template (single or pair) is used
   // to emit special tokens and assign type_ids to model-produced tokens.
-  // When not set, no special tokens are inserted and type_ids are all 0.
+  // When not set, no special tokens are inserted and type_ids are not written.
   IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS = 1u << 2,
   // Disable special token matching in input text. When set, sequences like
   // <|endoftext|> are tokenized as ordinary text instead of being matched
@@ -367,14 +367,38 @@ iree_status_t iree_tokenizer_decode(const iree_tokenizer_t* tokenizer,
 // Multi-Item Batch Encode/Decode
 //===----------------------------------------------------------------------===//
 
+// Per-item flags for multi-item batch encoding.
+enum iree_tokenizer_encode_batch_item_flag_bits_e {
+  IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_NONE = 0u,
+  // Indicates that |text_pair| is present and should be encoded as sequence B.
+  // This distinguishes an absent pair from an intentionally empty second
+  // sequence.
+  IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR = 1u << 0,
+};
+typedef uint32_t iree_tokenizer_encode_batch_item_flags_t;
+
 // Input/output item for multi-item batch encoding. Caller allocates arrays of
 // these items, fills in the inputs (text, output buffers), and the batch
 // function fills in out_token_count for each.
 typedef struct iree_tokenizer_encode_batch_item_t {
-  // Input: text to encode.
+  // Input: text to encode (sequence A).
   iree_string_view_t text;
+
+  // Input: optional second text for pair encoding (sequence B).
+  // Only read when |flags| contains HAS_TEXT_PAIR. When ADD_SPECIAL_TOKENS is
+  // also set, the postprocessor's pair template is used instead of the single
+  // template: the output is [prefix] text [infix] text_pair [suffix] with
+  // type_ids assigned per the template's sequence_a_type_id and
+  // sequence_b_type_id. Token offsets for sequence B are relative to
+  // |text_pair|, and special tokens use zero-length offsets.
+  iree_string_view_t text_pair;
+
+  // Input: per-item options controlling batch encoding.
+  iree_tokenizer_encode_batch_item_flags_t flags;
+
   // Input: output buffers for token IDs and optional offsets.
   iree_tokenizer_token_output_t output;
+
   // Output: actual number of tokens written.
   iree_host_size_t out_token_count;
 } iree_tokenizer_encode_batch_item_t;

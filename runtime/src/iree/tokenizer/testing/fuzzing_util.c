@@ -198,6 +198,33 @@ static iree_status_t iree_fuzz_build_dummy_tokenizer(
   }
   iree_tokenizer_builder_set_decoder(&builder, decoder);
 
+  iree_tokenizer_postprocessor_template_t single_template = {0};
+  single_template.prefix_count = 1;
+  single_template.suffix_count = 1;
+  single_template.token_ids[0] = 1;
+  single_template.token_ids[1] = 2;
+
+  iree_tokenizer_postprocessor_template_t pair_template = {0};
+  pair_template.prefix_count = 1;
+  pair_template.infix_count = 1;
+  pair_template.suffix_count = 1;
+  pair_template.sequence_a_type_id = 0;
+  pair_template.sequence_b_type_id = 1;
+  pair_template.token_ids[0] = 1;
+  pair_template.token_ids[1] = 2;
+  pair_template.token_ids[2] = 2;
+  pair_template.type_ids[2] = 1;
+
+  iree_tokenizer_postprocessor_t postprocessor;
+  status = iree_tokenizer_postprocessor_initialize(
+      &single_template, &pair_template, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE,
+      &postprocessor);
+  if (!iree_status_is_ok(status)) {
+    iree_tokenizer_builder_deinitialize(&builder);
+    return status;
+  }
+  iree_tokenizer_builder_set_postprocessor(&builder, postprocessor);
+
   // Build.
   status = iree_tokenizer_builder_build(&builder, out_tokenizer);
   iree_tokenizer_builder_deinitialize(&builder);

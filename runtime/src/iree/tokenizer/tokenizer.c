@@ -1065,6 +1065,140 @@ iree_status_t iree_tokenizer_decode(const iree_tokenizer_t* tokenizer,
 // Multi-Item Batch Encode/Decode
 //===----------------------------------------------------------------------===//
 
+typedef uint32_t iree_tokenizer_encode_state_reset_flags_t;
+enum iree_tokenizer_encode_state_reset_flag_bits_e {
+  IREE_TOKENIZER_ENCODE_STATE_RESET_FLAG_NONE = 0u,
+  // Preserve postprocessor phase/template while resetting the rest of the
+  // encode pipeline. Used between pair sequence A and sequence B.
+  IREE_TOKENIZER_ENCODE_STATE_RESET_FLAG_PRESERVE_POSTPROCESSOR = 1u << 0,
+};
+
+typedef uint32_t iree_tokenizer_encode_state_finalize_flags_t;
+enum iree_tokenizer_encode_state_finalize_flag_bits_e {
+  IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_NONE = 0u,
+  // Finalize normalizer/segmenter/model state without transitioning to or
+  // emitting the postprocessor suffix. Used after pair sequence A so the
+  // caller can emit the pair infix and continue with sequence B.
+  IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_OMIT_SUFFIX = 1u << 0,
+};
+
+static iree_status_t iree_tokenizer_encode_state_finalize_internal(
+    iree_tokenizer_encode_state_t* state, iree_tokenizer_token_output_t output,
+    iree_tokenizer_encode_state_finalize_flags_t finalize_flags,
+    iree_host_size_t* out_token_count);
+
+static void iree_tokenizer_encode_state_reset_internal(
+    iree_tokenizer_encode_state_t* state, iree_tokenizer_encode_flags_t flags,
+    iree_tokenizer_encode_state_reset_flags_t reset_flags) {
+  if (!state) return;
+  const iree_tokenizer_t* tokenizer = state->tokenizer;
+
+  // Deinitialize and re-initialize pipeline stage states.
+  iree_tokenizer_model_state_deinitialize(state->model_state);
+  iree_tokenizer_segmenter_state_deinitialize(state->segmenter_state);
+  iree_tokenizer_normalizer_state_deinitialize(state->normalizer_state);
+
+  // Reset ring buffer positions.
+  state->flags = flags;
+  state->read_position = 0;
+  state->write_position = 0;
+  state->segmenter_view_start = 0;
+  state->segment_count = 0;
+  state->segments_consumed = 0;
+
+  // Re-initialize pipeline stage states (storage layout unchanged).
+  if (state->normalizer_state) {
+    iree_tokenizer_normalizer_state_initialize(tokenizer->normalizer,
+                                               (void*)state->normalizer_state,
+                                               &state->normalizer_state);
+  }
+  if (state->segmenter_state) {
+    iree_tokenizer_segmenter_state_initialize(tokenizer->segmenter,
+                                              (void*)state->segmenter_state,
+                                              &state->segmenter_state);
+  }
+  if (state->model_state) {
+    iree_tokenizer_model_state_initialize(
+        tokenizer->model, (void*)state->model_state, &state->model_state);
+  }
+
+  // Reset special token match states.
+  iree_tokenizer_special_tokens_encode_state_initialize(
+      &state->special_token_match);
+  iree_tokenizer_special_tokens_encode_state_initialize(
+      &state->special_token_match_post);
+
+  if (!iree_all_bits_set(
+          reset_flags,
+          IREE_TOKENIZER_ENCODE_STATE_RESET_FLAG_PRESERVE_POSTPROCESSOR)) {
+    if (iree_all_bits_set(flags,
+                          IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS)) {
+      iree_tokenizer_postprocessor_encode_state_initialize(
+          &tokenizer->postprocessor, &tokenizer->postprocessor.single,
+          &state->postprocessor);
+    } else {
+      memset(&state->postprocessor, 0, sizeof(state->postprocessor));
+    }
+  }
+
+  state->pending_special_token = -1;
+  state->first_consumed_by_special_token = false;
+  state->in_finalize_mode = false;
+  state->has_partial_segment = false;
+}
+
+static iree_tokenizer_token_output_t iree_tokenizer_sub_token_output(
+    iree_tokenizer_token_output_t output, iree_host_size_t token_offset) {
+  iree_tokenizer_token_output_t sub_output = {
+      .capacity = output.capacity - token_offset,
+      .token_ids = output.token_ids ? &output.token_ids[token_offset] : NULL,
+      .token_offsets =
+          output.token_offsets ? &output.token_offsets[token_offset] : NULL,
+      .type_ids = output.type_ids ? &output.type_ids[token_offset] : NULL,
+  };
+  return sub_output;
+}
+
+static iree_status_t iree_tokenizer_encode_batch_feed_sequence(
+    iree_tokenizer_encode_state_t* state, iree_string_view_t text,
+    iree_tokenizer_token_output_t output,
+    iree_tokenizer_encode_state_finalize_flags_t finalize_flags,
+    iree_host_size_t* total_tokens) {
+  while (text.size > 0) {
+    if (*total_tokens >= output.capacity) {
+      return iree_make_status(
+          IREE_STATUS_RESOURCE_EXHAUSTED,
+          "batch encode: output buffer full before input was consumed "
+          "(wrote %" PRIhsz " of %" PRIhsz " capacity)",
+          *total_tokens, output.capacity);
+    }
+    iree_host_size_t bytes_consumed = 0;
+    iree_host_size_t tokens_written = 0;
+    iree_tokenizer_token_output_t sub_output =
+        iree_tokenizer_sub_token_output(output, *total_tokens);
+    iree_status_t status = iree_tokenizer_encode_state_feed(
+        state, text, sub_output, &bytes_consumed, &tokens_written);
+    *total_tokens += tokens_written;
+    if (!iree_status_is_ok(status)) return status;
+    text.data += bytes_consumed;
+    text.size -= bytes_consumed;
+  }
+
+  if (*total_tokens > output.capacity) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "batch encode: output count exceeded capacity "
+                            "(wrote %" PRIhsz " of %" PRIhsz " capacity)",
+                            *total_tokens, output.capacity);
+  }
+  iree_host_size_t final_tokens = 0;
+  iree_tokenizer_token_output_t final_output =
+      iree_tokenizer_sub_token_output(output, *total_tokens);
+  iree_status_t status = iree_tokenizer_encode_state_finalize_internal(
+      state, final_output, finalize_flags, &final_tokens);
+  *total_tokens += final_tokens;
+  return status;
+}
+
 iree_status_t iree_tokenizer_encode_batch(
     const iree_tokenizer_t* tokenizer,
     iree_tokenizer_encode_batch_item_t* items, iree_host_size_t item_count,
@@ -1096,55 +1230,90 @@ iree_status_t iree_tokenizer_encode_batch(
       effective_flags |= IREE_TOKENIZER_ENCODE_FLAG_TRACK_OFFSETS;
     }
 
+    bool has_text_pair = iree_all_bits_set(
+        item->flags, IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR);
+    iree_tokenizer_encode_batch_item_flags_t unknown_flags =
+        item->flags & ~IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+    if (unknown_flags != 0) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "batch encode item has unknown flags 0x%08x",
+                                (unsigned)unknown_flags);
+    } else if (!has_text_pair && item->text_pair.size > 0) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "batch encode item has non-empty text_pair but HAS_TEXT_PAIR flag "
+          "is not set");
+    }
+
     // First item: full initialize. Subsequent items: lightweight reset.
-    if (state == NULL) {
+    if (iree_status_is_ok(status) && state == NULL) {
       status = iree_tokenizer_encode_state_initialize(
           tokenizer, state_storage, transform_buffer, offset_runs,
           effective_flags, &state);
-    } else {
+    } else if (iree_status_is_ok(status)) {
       iree_tokenizer_encode_state_reset(state, effective_flags);
     }
 
-    // Feed all text, collecting tokens.
-    iree_string_view_t text = item->text;
-    iree_host_size_t total_tokens = 0;
-
-    while (iree_status_is_ok(status) && text.size > 0) {
-      iree_host_size_t bytes_consumed = 0;
-      iree_host_size_t tokens_written = 0;
-      iree_tokenizer_token_output_t sub_output = {
-          .capacity = item->output.capacity - total_tokens,
-          .token_ids = &item->output.token_ids[total_tokens],
-          .token_offsets = item->output.token_offsets
-                               ? &item->output.token_offsets[total_tokens]
-                               : NULL,
-          .type_ids = item->output.type_ids
-                          ? &item->output.type_ids[total_tokens]
-                          : NULL,
-      };
-      status = iree_tokenizer_encode_state_feed(
-          state, text, sub_output, &bytes_consumed, &tokens_written);
-      total_tokens += tokens_written;
-      text.data += bytes_consumed;
-      text.size -= bytes_consumed;
+    // For pair encoding, re-initialize the postprocessor with the pair
+    // template. encode_state_initialize/reset always selects the single
+    // template; pair template selection is an encode_batch concern since the
+    // streaming API does not support pair encoding.
+    if (iree_status_is_ok(status) && has_text_pair &&
+        iree_all_bits_set(effective_flags,
+                          IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS)) {
+      if (!iree_tokenizer_postprocessor_supports_pair(
+              &tokenizer->postprocessor)) {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "pair encoding requested but tokenizer has no pair template");
+      } else {
+        iree_tokenizer_postprocessor_encode_state_initialize(
+            &tokenizer->postprocessor, &tokenizer->postprocessor.pair,
+            &state->postprocessor);
+      }
     }
 
-    // Finalize to flush remaining tokens.
+    // Feed all text (sequence A), collecting tokens.
+    iree_host_size_t total_tokens = 0;
+
     if (iree_status_is_ok(status)) {
-      iree_host_size_t final_tokens = 0;
-      iree_tokenizer_token_output_t final_output = {
-          .capacity = item->output.capacity - total_tokens,
-          .token_ids = &item->output.token_ids[total_tokens],
-          .token_offsets = item->output.token_offsets
-                               ? &item->output.token_offsets[total_tokens]
-                               : NULL,
-          .type_ids = item->output.type_ids
-                          ? &item->output.type_ids[total_tokens]
-                          : NULL,
-      };
-      status = iree_tokenizer_encode_state_finalize(state, final_output,
-                                                    &final_tokens);
-      total_tokens += final_tokens;
+      iree_tokenizer_encode_state_finalize_flags_t finalize_flags =
+          has_text_pair ? IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_OMIT_SUFFIX
+                        : IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_NONE;
+      status = iree_tokenizer_encode_batch_feed_sequence(
+          state, item->text, item->output, finalize_flags, &total_tokens);
+    }
+
+    // Pair encoding: emit infix tokens, reset pipeline for sequence B, then
+    // feed and finalize the second text.
+    if (iree_status_is_ok(status) && has_text_pair) {
+      // Transition SEQUENCE_A → INFIX (or directly to SEQUENCE_B).
+      iree_tokenizer_postprocessor_begin_infix(&state->postprocessor);
+
+      // Emit infix special tokens (e.g., [SEP] between sequences).
+      total_tokens += iree_tokenizer_postprocessor_emit_infix(
+          &state->postprocessor, item->output, total_tokens);
+      if (iree_tokenizer_postprocessor_encode_state_has_pending(
+              &state->postprocessor)) {
+        status = iree_make_status(
+            IREE_STATUS_RESOURCE_EXHAUSTED,
+            "batch encode: output buffer full while emitting pair infix "
+            "(wrote %" PRIhsz " of %" PRIhsz " capacity)",
+            total_tokens, item->output.capacity);
+      }
+    }
+
+    if (iree_status_is_ok(status) && has_text_pair) {
+      // Reset the normalizer/segmenter/model pipeline for sequence B while
+      // preserving the postprocessor state (now in SEQUENCE_B phase).
+      // AT_INPUT_START is set because sequence B is a fresh input to the
+      // normalizer (e.g., prepend_scheme="first" applies per-sequence).
+      iree_tokenizer_encode_state_reset_internal(
+          state, effective_flags,
+          IREE_TOKENIZER_ENCODE_STATE_RESET_FLAG_PRESERVE_POSTPROCESSOR);
+      status = iree_tokenizer_encode_batch_feed_sequence(
+          state, item->text_pair, item->output,
+          IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_NONE, &total_tokens);
     }
 
     item->out_token_count = total_tokens;
@@ -1430,58 +1599,8 @@ void iree_tokenizer_encode_state_deinitialize(
 
 void iree_tokenizer_encode_state_reset(iree_tokenizer_encode_state_t* state,
                                        iree_tokenizer_encode_flags_t flags) {
-  if (!state) return;
-  const iree_tokenizer_t* tokenizer = state->tokenizer;
-
-  // Deinitialize component states (may have pending data to clear).
-  iree_tokenizer_model_state_deinitialize(state->model_state);
-  iree_tokenizer_segmenter_state_deinitialize(state->segmenter_state);
-  iree_tokenizer_normalizer_state_deinitialize(state->normalizer_state);
-
-  // Reset ring buffer positions.
-  state->flags = flags;
-  state->read_position = 0;
-  state->write_position = 0;
-  state->segmenter_view_start = 0;
-  state->segment_count = 0;
-  state->segments_consumed = 0;
-
-  // Re-initialize component states (storage layout unchanged).
-  if (state->normalizer_state) {
-    iree_tokenizer_normalizer_state_initialize(tokenizer->normalizer,
-                                               (void*)state->normalizer_state,
-                                               &state->normalizer_state);
-  }
-  if (state->segmenter_state) {
-    iree_tokenizer_segmenter_state_initialize(tokenizer->segmenter,
-                                              (void*)state->segmenter_state,
-                                              &state->segmenter_state);
-  }
-  if (state->model_state) {
-    iree_tokenizer_model_state_initialize(
-        tokenizer->model, (void*)state->model_state, &state->model_state);
-  }
-
-  // Reset special token match state.
-  iree_tokenizer_special_tokens_encode_state_initialize(
-      &state->special_token_match);
-
-  // Reset post-normalization special token match state.
-  iree_tokenizer_special_tokens_encode_state_initialize(
-      &state->special_token_match_post);
-
-  // Reset postprocessor state if ADD_SPECIAL_TOKENS is requested.
-  if (iree_all_bits_set(flags, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS)) {
-    iree_tokenizer_postprocessor_encode_state_initialize(
-        &tokenizer->postprocessor, &tokenizer->postprocessor.single,
-        &state->postprocessor);
-  } else {
-    memset(&state->postprocessor, 0, sizeof(state->postprocessor));
-  }
-
-  state->pending_special_token = -1;
-  state->first_consumed_by_special_token = false;
-  state->in_finalize_mode = false;
+  iree_tokenizer_encode_state_reset_internal(
+      state, flags, IREE_TOKENIZER_ENCODE_STATE_RESET_FLAG_NONE);
 }
 
 // Returns true if the encode pipeline has content that must be emitted before
@@ -2680,8 +2799,9 @@ iree_status_t iree_tokenizer_encode_state_feed(
   return status;
 }
 
-iree_status_t iree_tokenizer_encode_state_finalize(
+static iree_status_t iree_tokenizer_encode_state_finalize_internal(
     iree_tokenizer_encode_state_t* state, iree_tokenizer_token_output_t output,
+    iree_tokenizer_encode_state_finalize_flags_t finalize_flags,
     iree_host_size_t* out_token_count) {
   IREE_ASSERT_ARGUMENT(state);
   IREE_ASSERT_ARGUMENT(output.token_ids);
@@ -2928,9 +3048,13 @@ iree_status_t iree_tokenizer_encode_state_finalize(
   }
 
   // Emit suffix special tokens (e.g., [SEP], </s>) after all model tokens.
-  iree_tokenizer_postprocessor_begin_suffix(&state->postprocessor);
-  total_tokens += iree_tokenizer_postprocessor_emit_suffix(
-      &state->postprocessor, output, total_tokens);
+  if (!iree_all_bits_set(
+          finalize_flags,
+          IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_OMIT_SUFFIX)) {
+    iree_tokenizer_postprocessor_begin_suffix(&state->postprocessor);
+    total_tokens += iree_tokenizer_postprocessor_emit_suffix(
+        &state->postprocessor, output, total_tokens);
+  }
 
   *out_token_count = total_tokens;
 
@@ -2946,6 +3070,14 @@ iree_status_t iree_tokenizer_encode_state_finalize(
   }
 
   return iree_ok_status();
+}
+
+iree_status_t iree_tokenizer_encode_state_finalize(
+    iree_tokenizer_encode_state_t* state, iree_tokenizer_token_output_t output,
+    iree_host_size_t* out_token_count) {
+  return iree_tokenizer_encode_state_finalize_internal(
+      state, output, IREE_TOKENIZER_ENCODE_STATE_FINALIZE_FLAG_NONE,
+      out_token_count);
 }
 
 //===----------------------------------------------------------------------===//
