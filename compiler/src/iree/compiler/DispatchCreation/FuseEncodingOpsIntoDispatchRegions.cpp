@@ -52,7 +52,8 @@ static bool isFusableWithSetEncoding(Operation *target) {
     if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
              tensor::ExtractSliceOp, IREE::Encoding::SetEncodingOp,
              IREE::Encoding::UnsetEncodingOp, linalg::LinalgOp,
-             IREE::LinalgExt::AttentionOp, IREE::LinalgExt::GatherOp>(op)) {
+             IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp,
+             IREE::LinalgExt::GatherOp>(op)) {
       return false;
     }
   }

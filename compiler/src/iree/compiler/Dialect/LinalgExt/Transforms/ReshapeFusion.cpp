@@ -354,8 +354,9 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   return success();
 }
 
+template <typename AttentionOpTy>
 static SmallVector<ReshapeOperandInfo>
-getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+getAttentionLikeReshapeInfo(AttentionOpTy attentionOp) {
   return llvm::map_to_vector(
       attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
         ReshapeOperandInfo operandInfo;
@@ -379,27 +380,13 @@ getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
 }
 
 static SmallVector<ReshapeOperandInfo>
-getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
-  return llvm::map_to_vector(
-      attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
-        ReshapeOperandInfo operandInfo;
-        auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
-        if (!operandType) {
-          assert(
-              attentionOp.getMatchingIndexingMap(&opOperand).getNumResults() ==
-                  0 &&
-              "expected non-shaped type to have no results in indexing map");
-          return operandInfo;
-        }
+getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
+  return getAttentionLikeReshapeInfo(attentionOp);
+}
 
-        operandInfo.originalShape = getDimSizes(opOperand.get());
-        for (auto result :
-             attentionOp.getMatchingIndexingMap(&opOperand).getResults()) {
-          operandInfo.operandToIterationSpace.push_back(
-              cast<AffineDimExpr>(result).getPosition());
-        }
-        return operandInfo;
-      });
+static SmallVector<ReshapeOperandInfo>
+getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
+  return getAttentionLikeReshapeInfo(attentionOp);
 }
 
 static SmallVector<ReshapeOperandInfo>
@@ -501,7 +488,7 @@ getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
 }
 
 template <typename OpTy>
-static std::optional<Value>
+static std::optional<SmallVector<Value>>
 fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
                            OpOperand *fusableOpOperand,
                            PatternRewriter &rewriter) {
@@ -544,12 +531,13 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
     mapping.map(operand.get(), maybeNewOperand.value());
   }
 
-  assert(op.getNumDpsInits() == 1);
-  OpOperand *original = op.getDpsInitOperand(0);
   auto newOp = cast<OpTy>(rewriter.clone(*op, mapping));
-  newOp->getResult(0).setType(mapping.lookup(original->get()).getType());
+  for (auto [i, initOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
+    newOp->getResult(i).setType(mapping.lookup(initOperand.get()).getType());
+  }
 
-  if constexpr (std::is_same_v<OpTy, AttentionOp>) {
+  if constexpr (std::is_same_v<OpTy, AttentionOp> ||
+                std::is_same_v<OpTy, OnlineAttentionOp>) {
     auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
         llvm::map_range(op.getIndexingMapsArray(), [&](AffineMap m) {
           return getIndexingMapInExpandedOp(rewriter, m, info);
@@ -558,17 +546,21 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
         rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
   }
 
-  auto originalShapeMap = info.getShapeMap(original);
-  SmallVector<ReassociationIndices> originalReassoc =
-      computeReassocFromShapeMap(originalShapeMap);
-
-  // Collapse back to original shape.
-  if (isIdentityReassoc(originalReassoc)) {
-    return std::optional{newOp->getResult(0)};
+  SmallVector<Value> replacements;
+  replacements.reserve(op->getNumResults());
+  for (auto [i, initOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
+    SmallVector<ReassociationIndices> originalReassoc =
+        info.getReassoc(&initOperand);
+    Value newResult = newOp->getResult(i);
+    if (isIdentityReassoc(originalReassoc)) {
+      replacements.push_back(newResult);
+    } else {
+      replacements.push_back(tensor::CollapseShapeOp::create(
+          rewriter, loc, op.getResult(i).getType(), newResult,
+          originalReassoc));
+    }
   }
-  return tensor::CollapseShapeOp::create(rewriter, loc,
-                                         op.getResult(0).getType(),
-                                         newOp->getResult(0), originalReassoc);
+  return replacements;
 }
 
 //===----------------------------------------------------------------------===//
@@ -926,121 +918,8 @@ struct FoldWithProducerReshapeByExpansion final : OpRewritePattern<OpTy> {
         continue;
       }
 
-      std::optional<Value> replacementValue =
-          fuseWithReshapeByExpansion(op, reshapeOp, &opOperand, rewriter);
-      if (!replacementValue) {
-        return failure();
-      }
-      rewriter.replaceOp(op, *replacementValue);
-      return success();
-    }
-    return failure();
-  }
-
-  linalg::ControlFusionFn controlFoldingReshapes;
-};
-
-static std::optional<SmallVector<Value>>
-fuseOnlineAttentionWithProducerReshapeByExpansion(OnlineAttentionOp op,
-                                                  Operation *reshapeOp,
-                                                  OpOperand *fusableOpOperand,
-                                                  PatternRewriter &rewriter) {
-  Location loc = op.getLoc();
-  auto expandingReshapeOp = dyn_cast<tensor::ExpandShapeOp>(*reshapeOp);
-  auto collapsingReshapeOp = dyn_cast<tensor::CollapseShapeOp>(*reshapeOp);
-  bool isExpanding = (expandingReshapeOp != nullptr);
-  Value expandedVal = isExpanding ? expandingReshapeOp.getResult()
-                                  : collapsingReshapeOp.getSrc();
-  SmallVector<DimSize> expandedSize;
-  if (isExpanding) {
-    if (failed(moveValueDefinitions(rewriter,
-                                    expandingReshapeOp.getOutputShape(), op))) {
-      return std::nullopt;
-    }
-    llvm::append_range(expandedSize, expandingReshapeOp.getMixedOutputShape());
-  } else {
-    expandedSize = getDimSizes(expandedVal);
-  }
-
-  ExpansionInfo info;
-  if (failed(info.compute(
-          getReshapeInfo(op), op.getStaticLoopRanges(), fusableOpOperand,
-          isExpanding ? expandingReshapeOp.getReassociationIndices()
-                      : collapsingReshapeOp.getReassociationIndices(),
-          expandedSize))) {
-    return std::nullopt;
-  }
-
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(op);
-
-  IRMapping mapping;
-  for (OpOperand &operand : op->getOpOperands()) {
-    std::optional<Value> maybeNewOperand =
-        info.getOrCreateExpanded(loc, &operand, rewriter);
-    assert(maybeNewOperand.has_value());
-    mapping.map(operand.get(), maybeNewOperand.value());
-  }
-
-  auto newOp = cast<OnlineAttentionOp>(rewriter.clone(*op, mapping));
-  auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap>(
-      llvm::map_range(op.getIndexingMapsArray(), [&](AffineMap m) {
-        return getIndexingMapInExpandedOp(rewriter, m, info);
-      }));
-  newOp.setIndexingMapsAttr(
-      rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
-
-  SmallVector<OpOperand *> dpsInitOperands;
-  for (OpOperand &operand : op.getDpsInitsMutable()) {
-    dpsInitOperands.push_back(&operand);
-  }
-  for (auto [i, initOperand] : llvm::enumerate(dpsInitOperands)) {
-    newOp->getResult(i).setType(mapping.lookup(initOperand->get()).getType());
-  }
-
-  SmallVector<Value> replacements;
-  replacements.reserve(op->getNumResults());
-  for (auto [i, initOperand] : llvm::enumerate(dpsInitOperands)) {
-    SmallVector<ReassociationIndices> originalReassoc =
-        info.getReassoc(initOperand);
-    Value newResult = newOp->getResult(i);
-    if (isIdentityReassoc(originalReassoc)) {
-      replacements.push_back(newResult);
-      continue;
-    }
-    replacements.push_back(tensor::CollapseShapeOp::create(
-        rewriter, loc, op.getResult(i).getType(), newResult, originalReassoc));
-  }
-  return replacements;
-}
-
-struct FoldOnlineAttentionWithProducerReshapeByExpansion final
-    : OpRewritePattern<OnlineAttentionOp> {
-  FoldOnlineAttentionWithProducerReshapeByExpansion(
-      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
-      PatternBenefit benefit = 1)
-      : OpRewritePattern<OnlineAttentionOp>(context, benefit),
-        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
-
-  LogicalResult matchAndRewrite(OnlineAttentionOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.hasPureTensorSemantics()) {
-      return failure();
-    }
-
-    for (OpOperand &opOperand : op->getOpOperands()) {
-      tensor::CollapseShapeOp reshapeOp =
-          opOperand.get().getDefiningOp<tensor::CollapseShapeOp>();
-      if (!reshapeOp) {
-        continue;
-      }
-      if (!controlFoldingReshapes(&opOperand)) {
-        continue;
-      }
-
       std::optional<SmallVector<Value>> replacementValues =
-          fuseOnlineAttentionWithProducerReshapeByExpansion(
-              op, reshapeOp, &opOperand, rewriter);
+          fuseWithReshapeByExpansion(op, reshapeOp, &opOperand, rewriter);
       if (!replacementValues) {
         return failure();
       }
@@ -1048,44 +927,6 @@ struct FoldOnlineAttentionWithProducerReshapeByExpansion final
       return success();
     }
     return failure();
-  }
-
-  linalg::ControlFusionFn controlFoldingReshapes;
-};
-
-struct FoldOnlineAttentionWithConsumerReshapeByExpansion final
-    : OpRewritePattern<tensor::ExpandShapeOp> {
-  FoldOnlineAttentionWithConsumerReshapeByExpansion(
-      MLIRContext *context, linalg::ControlFusionFn controlFoldingReshapes,
-      PatternBenefit benefit = 1)
-      : OpRewritePattern<tensor::ExpandShapeOp>(context, benefit),
-        controlFoldingReshapes(std::move(controlFoldingReshapes)) {}
-
-  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
-                                PatternRewriter &rewriter) const override {
-    auto producerResult = dyn_cast<OpResult>(expandOp.getSrc());
-    if (!producerResult) {
-      return rewriter.notifyMatchFailure(expandOp,
-                                         "source not produced by an operation");
-    }
-
-    auto op = expandOp.getSrc().getDefiningOp<OnlineAttentionOp>();
-    if (!op || !op.hasPureTensorSemantics()) {
-      return failure();
-    }
-
-    if (!controlFoldingReshapes(&expandOp.getSrcMutable())) {
-      return failure();
-    }
-
-    std::optional<SmallVector<Value>> replacementValues =
-        fuseOnlineAttentionWithProducerReshapeByExpansion(
-            op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
-    if (!replacementValues) {
-      return failure();
-    }
-    rewriter.replaceOp(op, *replacementValues);
-    return success();
   }
 
   linalg::ControlFusionFn controlFoldingReshapes;
@@ -1117,12 +958,13 @@ struct FoldWithConsumerReshapeByExpansion final
       return failure();
     }
 
-    std::optional<Value> replacementValue = fuseWithReshapeByExpansion(
-        op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
-    if (!replacementValue) {
+    std::optional<SmallVector<Value>> replacementValues =
+        fuseWithReshapeByExpansion(
+            op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
+    if (!replacementValues) {
       return failure();
     }
-    rewriter.replaceOp(op, *replacementValue);
+    rewriter.replaceOp(op, *replacementValues);
     return success();
   }
 
@@ -1161,7 +1003,8 @@ getOperandReassociation(AffineMap indexingMap,
 }
 
 /// Get the new value to use for a given `OpOperand` in the collapsed operation.
-static Value getCollapsedOpOperand(Location loc, AttentionOp op,
+template <typename AttentionOpTy>
+static Value getCollapsedOpOperand(Location loc, AttentionOpTy op,
                                    OpOperand *opOperand,
                                    const CollapsingInfo &collapsingInfo,
                                    OpBuilder &builder) {
@@ -1188,7 +1031,8 @@ static Value getCollapsedOpOperand(Location loc, AttentionOp op,
       .getResult();
 }
 
-static void collapseOperandsAndResults(AttentionOp op,
+template <typename AttentionOpTy>
+static void collapseOperandsAndResults(AttentionOpTy op,
                                        const CollapsingInfo &collapsingInfo,
                                        RewriterBase &rewriter,
                                        SmallVectorImpl<Value> &inputOperands,
@@ -1242,8 +1086,9 @@ getCollapsedOpIndexingMap(AffineMap indexingMap,
                         resultExprs, context);
 }
 
-/// Returns a copy of `attentionOp` with collapsed iteration dimensions.
-static Operation *createCollapsedOp(AttentionOp origOp,
+/// Returns a copy of `origOp` with collapsed iteration dimensions.
+template <typename AttentionOpTy>
+static Operation *createCollapsedOp(AttentionOpTy origOp,
                                     const CollapsingInfo &collapsingInfo,
                                     RewriterBase &rewriter) {
   SmallVector<Value> inputOperands, outputOperands;
@@ -1255,7 +1100,7 @@ static Operation *createCollapsedOp(AttentionOp origOp,
         return getCollapsedOpIndexingMap(map, collapsingInfo);
       }));
 
-  auto collapsedOp = AttentionOp::create(
+  auto collapsedOp = AttentionOpTy::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
       rewriter.getAffineMapArrayAttr(indexingMaps));
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
@@ -1263,10 +1108,10 @@ static Operation *createCollapsedOp(AttentionOp origOp,
   return collapsedOp;
 }
 
-FailureOr<CollapseResult>
-collapseOpIterationDims(AttentionOp op,
-                        ArrayRef<ReassociationIndices> foldedIterationDims,
-                        RewriterBase &rewriter) {
+template <typename AttentionOpTy>
+static FailureOr<CollapseResult> collapseAttentionLikeOpIterationDims(
+    AttentionOpTy op, ArrayRef<ReassociationIndices> foldedIterationDims,
+    RewriterBase &rewriter) {
   if (op.getNumLoops() <= 1 || foldedIterationDims.empty() ||
       llvm::all_of(foldedIterationDims, [](ReassociationIndicesRef foldedDims) {
         return foldedDims.size() <= 1;
@@ -1315,13 +1160,29 @@ collapseOpIterationDims(AttentionOp op,
   return CollapseResult{results, collapsedOp};
 }
 
+FailureOr<CollapseResult>
+collapseOpIterationDims(AttentionOp op,
+                        ArrayRef<ReassociationIndices> foldedIterationDims,
+                        RewriterBase &rewriter) {
+  return collapseAttentionLikeOpIterationDims(op, foldedIterationDims,
+                                              rewriter);
+}
+
+FailureOr<CollapseResult>
+collapseOpIterationDims(OnlineAttentionOp op,
+                        ArrayRef<ReassociationIndices> foldedIterationDims,
+                        RewriterBase &rewriter) {
+  return collapseAttentionLikeOpIterationDims(op, foldedIterationDims,
+                                              rewriter);
+}
+
 void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes) {
   patterns.add<FoldWithProducerReshapeByExpansion<AttentionOp>,
-               FoldOnlineAttentionWithProducerReshapeByExpansion,
-               FoldOnlineAttentionWithConsumerReshapeByExpansion,
                FoldWithConsumerReshapeByExpansion<AttentionOp>,
+               FoldWithProducerReshapeByExpansion<OnlineAttentionOp>,
+               FoldWithConsumerReshapeByExpansion<OnlineAttentionOp>,
                FoldWithProducerReshapeByExpansion<ScatterOp>,
                FoldWithConsumerReshapeByExpansion<ScatterOp>,
                FoldWithProducerReshapeByExpansion<GatherOp>,

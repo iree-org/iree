@@ -484,6 +484,93 @@ util.func public @no_fuse_attention_mixed_static_dynamic(%arg0: tensor<?x4096x16
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
 //      CHECK:   tensor.expand_shape %[[ATTENTION]]
 
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+
+util.func public @online_attention_sink_expand(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> (tensor<2x10x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %acc = tensor.empty() : tensor<20x4096x64xf32>
+  %max = tensor.empty() : tensor<20x4096xf32>
+  %sum = tensor.empty() : tensor<20x4096xf32>
+  %out:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%acc, %max, %sum : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score: f32
+  } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+  %expanded = tensor.expand_shape %out#0 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 64] : tensor<20x4096x64xf32> into tensor<2x10x4096x64xf32>
+  util.return %expanded, %out#1, %out#2 : tensor<2x10x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+}
+
+// CHECK-LABEL: func public @online_attention_sink_expand(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x4096x16xf16>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x1024x16xf16>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<20x1024x64xf16>
+//  CHECK-SAME:     %[[ARG3:.+]]: f16)
+//   CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, 10, 4096, 16]
+//   CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, 10, 1024, 16]
+//   CHECK-DAG:   %[[VALUE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, 10, 1024, 64]
+//       CHECK:   %[[ATTN:.+]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:       indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+//  CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[ARG3]] :
+//   CHECK-DAG:   %[[MAX:.+]] = tensor.collapse_shape %[[ATTN]]#1 {{\[}}[0, 1], [2]{{\]}} : tensor<2x10x4096xf32> into tensor<20x4096xf32>
+//   CHECK-DAG:   %[[SUM:.+]] = tensor.collapse_shape %[[ATTN]]#2 {{\[}}[0, 1], [2]{{\]}} : tensor<2x10x4096xf32> into tensor<20x4096xf32>
+//       CHECK:   util.return %[[ATTN]]#0, %[[MAX]], %[[SUM]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+
+util.func public @online_attention_sink_collapsed_producer(%arg0: tensor<4x32x64x128xf16>, %arg1: tensor<128x64x128xf16>, %arg2: tensor<128x64x128xf16>, %arg3: f16) -> (tensor<128x64x128xf32>, tensor<128x64xf32>, tensor<128x64xf32>) {
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1], [2], [3]] : tensor<4x32x64x128xf16> into tensor<128x64x128xf16>
+  %acc = tensor.empty() : tensor<128x64x128xf32>
+  %max = tensor.empty() : tensor<128x64xf32>
+  %sum = tensor.empty() : tensor<128x64xf32>
+  %out:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%collapsed, %arg1, %arg2, %arg3 : tensor<128x64x128xf16>, tensor<128x64x128xf16>, tensor<128x64x128xf16>, f16) outs(%acc, %max, %sum : tensor<128x64x128xf32>, tensor<128x64xf32>, tensor<128x64xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score: f32
+  } -> tensor<128x64x128xf32>, tensor<128x64xf32>, tensor<128x64xf32>
+  util.return %out#0, %out#1, %out#2 : tensor<128x64x128xf32>, tensor<128x64xf32>, tensor<128x64xf32>
+}
+
+// CHECK-LABEL: func public @online_attention_sink_collapsed_producer(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x32x64x128xf16>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<128x64x128xf16>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<128x64x128xf16>
+//  CHECK-SAME:     %[[ARG3:.+]]: f16)
+//   CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [4, 32, 64, 128]
+//   CHECK-DAG:   %[[VALUE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [4, 32, 64, 128]
+//       CHECK:   %[[ATTN:.+]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:       indexing_maps =
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+//  CHECK-SAME:       ins(%[[ARG0]], %[[KEY]], %[[VALUE]], %[[ARG3]] :
+//   CHECK-DAG:   %[[OUT:.+]] = tensor.collapse_shape %[[ATTN]]#0 {{\[}}[0, 1], [2], [3]{{\]}} : tensor<4x32x64x128xf32> into tensor<128x64x128xf32>
+//   CHECK-DAG:   %[[MAX:.+]] = tensor.collapse_shape %[[ATTN]]#1 {{\[}}[0, 1], [2]{{\]}} : tensor<4x32x64xf32> into tensor<128x64xf32>
+//   CHECK-DAG:   %[[SUM:.+]] = tensor.collapse_shape %[[ATTN]]#2 {{\[}}[0, 1], [2]{{\]}} : tensor<4x32x64xf32> into tensor<128x64xf32>
+//       CHECK:   util.return %[[OUT]], %[[MAX]], %[[SUM]]
+
+// -----
 
 util.func @scatter_collapse_updates(%arg0: tensor<4x?x2x16x4x128xf16>, %arg1: tensor<?x1xi32>, %arg2: tensor<?x2x16x4x128xf16>) -> tensor<?x2x16x4x128xf16> {
   %collapsed = tensor.collapse_shape %arg0[[0, 1], [2], [3], [4], [5]] : tensor<4x?x2x16x4x128xf16> into tensor<?x2x16x4x128xf16>

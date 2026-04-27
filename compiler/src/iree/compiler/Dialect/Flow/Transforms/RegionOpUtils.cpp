@@ -758,6 +758,12 @@ static bool isAttentionMaskGenerator(Operation *op) {
         return true;
       }
     }
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
   }
   return false;
 }
