@@ -894,6 +894,10 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
 }
 
 void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
+  // OnlineAttentionOp has no scalar implementation; decompose first so the
+  // resulting matmul/generic ops can go through LinalgExtToLoops below.
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+
   addBufferizePasses(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
