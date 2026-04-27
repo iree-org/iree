@@ -1798,27 +1798,32 @@ static Value createLaneParityPredicate(OpBuilder &builder, Location loc) {
                                zero);
 }
 
-// Creates a constant sparse index vector for SMFMAC operations.
+// Creates a constant sparse index for SMFMAC operations.
 //
 // The sparse index encodes which 2 positions out of each group of 4
 // K-elements are selected for 2:4 structured sparsity. Each 4-bit
 // field within selectorBits selects positions for one K-group:
 //   0x4 (0100b) -> positions {0,1};  0xE (1110b) -> positions {2,3}.
 //
-// For 16-bit source data (f16/bf16): vector<4xi8>, 2 groups per i8.
-// For 8-bit source data (i8/f8*): vector<2xi16>, 4 groups per i16.
+// gfx942 16-bit (k=32): vector<4xi8>, 2 groups per i8.
+// gfx950 16-bit / gfx942 8-bit (k=64): vector<2xi16>, 4 groups per i16.
+// gfx950 8-bit (k=128): i32 scalar, 8 groups packed into 32 bits.
 //
-// Only the first element carries active selector bits; remaining
-// elements are padding zeros.
+// For vector types, only the first element carries active selector bits;
+// remaining elements are padding zeros.
 static Value createConstSparseIndex(OpBuilder &builder, Location loc,
-                                    VectorType sparseIndexVectorType,
-                                    int64_t selectorBits) {
-  Type elemTy = sparseIndexVectorType.getElementType();
-  Value zero = arith::ConstantOp::create(
-      builder, loc, builder.getZeroAttr(sparseIndexVectorType));
-  Value selector = arith::ConstantOp::create(
-      builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
-  return vector::InsertOp::create(builder, loc, selector, zero, 0);
+                                    Type sparseIndexType,
+                                    uint32_t selectorBits) {
+  if (auto vecTy = dyn_cast<VectorType>(sparseIndexType)) {
+    Type elemTy = vecTy.getElementType();
+    Value zero =
+        arith::ConstantOp::create(builder, loc, builder.getZeroAttr(vecTy));
+    Value selector = arith::ConstantOp::create(
+        builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
+    return vector::InsertOp::create(builder, loc, selector, zero, 0);
+  }
+  return arith::ConstantOp::create(
+      builder, loc, builder.getIntegerAttr(sparseIndexType, selectorBits));
 }
 
 // Returns the number of native intrinsics chained along K per virtual
@@ -1869,9 +1874,9 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 struct VDMFMAConfig {
   int64_t m, n, nativeK;
   int64_t unrollFactor;
-  VectorType sparseIndexVectorType;
-  int64_t evenSparseIndex;
-  int64_t oddSparseIndex;
+  Type sparseIndexType;
+  uint32_t evenSparseIndex;
+  uint32_t oddSparseIndex;
   int64_t aSliceWidth;
 };
 
@@ -1987,9 +1992,9 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
 
   Value sparseIndex = arith::SelectOp::create(
       builder, loc, isOddLane,
-      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+      createConstSparseIndex(builder, loc, config.sparseIndexType,
                              config.oddSparseIndex),
-      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+      createConstSparseIndex(builder, loc, config.sparseIndexType,
                              config.evenSparseIndex));
 
   Value lhs = inputs[0];
@@ -2104,7 +2109,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/32,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
+                        /*sparseIndexType=*/
                         VectorType::get({4}, builder.getIntegerType(8)),
                         /*evenSparseIndex=*/0x44,
                         /*oddSparseIndex=*/0xEE,
@@ -2123,7 +2128,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/64,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
+                        /*sparseIndexType=*/
                         VectorType::get({2}, builder.getIntegerType(16)),
                         /*evenSparseIndex=*/0x4444,
                         /*oddSparseIndex=*/0xEEEE,
@@ -2140,10 +2145,10 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/64,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({4}, builder.getIntegerType(8)),
-                        /*evenSparseIndex=*/0x44,
-                        /*oddSparseIndex=*/0xEE,
+                        /*sparseIndexType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
                         /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
@@ -2160,10 +2165,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/128,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({2}, builder.getIntegerType(16)),
-                        /*evenSparseIndex=*/0x4444,
-                        /*oddSparseIndex=*/0xEEEE,
+                        /*sparseIndexType=*/builder.getI32Type(),
+                        /*evenSparseIndex=*/0x44444444,
+                        /*oddSparseIndex=*/0xEEEEEEEE,
                         /*aSliceWidth=*/16};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
