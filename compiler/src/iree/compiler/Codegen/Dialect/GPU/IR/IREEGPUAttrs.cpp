@@ -1813,7 +1813,7 @@ static Value createLaneParityPredicate(OpBuilder &builder, Location loc) {
 // remaining elements are padding zeros.
 static Value createConstSparseIndex(OpBuilder &builder, Location loc,
                                     Type sparseIndexType,
-                                    int64_t selectorBits) {
+                                    uint32_t selectorBits) {
   if (auto vecTy = dyn_cast<VectorType>(sparseIndexType)) {
     Type elemTy = vecTy.getElementType();
     Value zero =
@@ -1875,8 +1875,8 @@ struct VDMFMAConfig {
   int64_t m, n, nativeK;
   int64_t unrollFactor;
   Type sparseIndexType;
-  int64_t evenSparseIndex;
-  int64_t oddSparseIndex;
+  uint32_t evenSparseIndex;
+  uint32_t oddSparseIndex;
   int64_t aSliceWidth;
 };
 
@@ -2136,7 +2136,6 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   // CDNA4/gfx950 F16/BF16: wider native smfmac K=64, unroll=1.
-  // gfx950 16-bit variant requires vector<2xi16> sparse indices.
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16: {
     if (getColMajor()) {
@@ -2154,10 +2153,6 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   // CDNA4/gfx950 I8 + IEEE fp8: wider native smfmac K=128, unroll=1.
-  // gfx950 8-bit variant requires i32 sparse indices (no internal set
-  // structure; hardware ignores CBSZ/ABID and uses first set only).
-  // 8 groups of 4-bit selectors packed into 32 bits: even=0x44444444,
-  // odd=0xEEEEEEEE.
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
@@ -2172,7 +2167,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*unrollFactor=*/getIntrinsicsK(),
                         /*sparseIndexType=*/builder.getI32Type(),
                         /*evenSparseIndex=*/0x44444444,
-                        /*oddSparseIndex=*/static_cast<int64_t>(0xEEEEEEEE),
+                        /*oddSparseIndex=*/0xEEEEEEEE,
                         /*aSliceWidth=*/16};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
