@@ -470,3 +470,60 @@ func.func @fold_broadcast_pad_expand_shape(%buffer : memref<2x64xf32>, %batch : 
 //       FOLD:     iree_linalg_ext.yield %[[BATCH]], {{.*}}, %[[CST]] : index, index, f32
 //       FOLD:   } : tensor<2x64xf32> into tensor<1x4x16x4x2x16xf32> -> tensor<1x4x16x4x2x16xf32>
 //       FOLD:   linalg.copy
+
+// -----
+
+// Transpose generic inside a nested region (scf.for) must be raised to
+// linalg.transpose so the relayout chain extends to the copy with
+// lowering_config, preventing map_load creation.
+#map_in  = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+#map_out = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @nested_transpose_generic_blocks_mapload(
+    %buffer : memref<8x4xf32>) -> tensor<2x2x4xf32> {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %source = iree_codegen.load_from_buffer %buffer
+      : memref<8x4xf32> -> tensor<8x4xf32>
+  %out_init = tensor.empty() : tensor<2x2x4xf32>
+  %result = scf.for %iv = %c0 to %c2 step %c1
+      iter_args(%arg = %out_init) -> tensor<2x2x4xf32> {
+    %slice = tensor.extract_slice %source[%iv, 0] [3, 4] [1, 1]
+        : tensor<8x4xf32> to tensor<3x4xf32>
+    %padded = tensor.pad %slice low[0, 0] high[1, 0] {
+    ^bb0(%a: index, %b: index):
+      tensor.yield %cst : f32
+    } : tensor<3x4xf32> to tensor<4x4xf32>
+    %expanded = tensor.expand_shape %padded [[0, 1], [2]]
+        output_shape [2, 2, 4]
+        : tensor<4x4xf32> into tensor<2x2x4xf32>
+    %empty = tensor.empty() : tensor<2x2x4xf32>
+    %transposed = linalg.generic {
+        indexing_maps = [#map_in, #map_out],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%expanded : tensor<2x2x4xf32>)
+        outs(%empty : tensor<2x2x4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<2x2x4xf32>
+    %dest = tensor.extract_slice %arg[0, 0, 0] [2, 2, 4] [1, 1, 1]
+        : tensor<2x2x4xf32> to tensor<2x2x4xf32>
+    %copied = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+        ins(%transposed : tensor<2x2x4xf32>)
+        outs(%dest : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+    %inserted = tensor.insert_slice %copied into %arg[0, 0, 0] [2, 2, 4] [1, 1, 1]
+        : tensor<2x2x4xf32> into tensor<2x2x4xf32>
+    scf.yield %inserted : tensor<2x2x4xf32>
+  }
+  return %result : tensor<2x2x4xf32>
+}
+// The transpose generic is raised to linalg.transpose inside the loop.
+// The chain {extract_slice, pad, expand_shape, linalg.transpose, linalg.copy}
+// includes linalg.copy with lowering_config, so isComplexRelayoutChain returns
+// false and no map_load is created.
+// CHECK-LABEL: @nested_transpose_generic_blocks_mapload
+//       CHECK:   scf.for
+//       CHECK:     linalg.transpose
+//       CHECK:     linalg.copy
+//   CHECK-NOT:   iree_linalg_ext.map_load

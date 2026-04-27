@@ -46,8 +46,8 @@ using IREE::LinalgExt::MapStoreOp;
 static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
                                        FunctionOpInterface funcOp) {
   OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<linalg::PackOp> packOps(
-      funcOp.getFunctionBody().getOps<linalg::PackOp>());
+  SmallVector<linalg::PackOp> packOps;
+  funcOp.walk([&](linalg::PackOp op) { packOps.push_back(op); });
   for (auto packOp : packOps) {
     rewriter.setInsertionPoint(packOp);
     FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
@@ -63,15 +63,15 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
       rewriter.replaceOp(result->padOp, result->padOp.getSource());
     }
   }
-  SmallVector<linalg::UnPackOp> unPackOps(
-      funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
+  SmallVector<linalg::UnPackOp> unPackOps;
+  funcOp.walk([&](linalg::UnPackOp op) { unPackOps.push_back(op); });
   for (auto unPackOp : unPackOps) {
     rewriter.setInsertionPoint(unPackOp);
     (void)linalg::lowerUnPack(rewriter, unPackOp,
                               /*lowerUnpadLikeWithExtractSlice=*/false);
   }
-  SmallVector<linalg::GenericOp> genericOps(
-      funcOp.getFunctionBody().getOps<linalg::GenericOp>());
+  SmallVector<linalg::GenericOp> genericOps;
+  funcOp.walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
   for (auto genericOp : genericOps) {
     if (linalg::isaTransposeOpInterface(genericOp)) {
       rewriter.setInsertionPoint(genericOp);
