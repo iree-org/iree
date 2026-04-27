@@ -62,6 +62,131 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+namespace {
+
+static bool isConstantValue(Value value) {
+  Attribute constantAttr;
+  return matchPattern(value, m_Constant(&constantAttr));
+}
+
+static bool tryMatchConstantValue(Value value, Attribute &constantAttr) {
+  return matchPattern(value, m_Constant(&constantAttr));
+}
+
+static Value getConstantAvailableAt(PatternRewriter &rewriter,
+                                    TensorImportOp importOp, Value value) {
+  Operation *constantOp = value.getDefiningOp();
+  assert(constantOp && "expected constant to have defining op");
+  if (constantOp->getBlock() == importOp->getBlock() &&
+      constantOp->isBeforeInBlock(importOp)) {
+    return value;
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(importOp);
+  Operation *clonedOp = rewriter.clone(*constantOp);
+  return clonedOp->getResult(0);
+}
+
+struct DimEvidence {
+  // First constant dimension value observed from shape-aware consumers.
+  Value constantValue;
+  // Constant attribute used to compare equivalent dimension values.
+  Attribute constantAttr;
+  // Whether any shape-aware consumer provided a constant dimension.
+  bool hasConstant = false;
+  // Whether any shape-aware consumer kept the dimension dynamic.
+  bool hasNonConstant = false;
+  // Whether shape-aware consumers provided different constant dimensions.
+  bool hasConflict = false;
+};
+
+struct PropagateImportDimsFromConsumers
+    : public OpRewritePattern<TensorImportOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TensorImportOp importOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange targetDims = importOp.getTargetDims();
+    if (targetDims.empty()) {
+      return failure();
+    }
+    if (llvm::all_of(targetDims, isConstantValue)) {
+      return failure();
+    }
+
+    SmallVector<DimEvidence> evidence(targetDims.size());
+    for (OpOperand &use : importOp.getTarget().getUses()) {
+      Operation *userOp = use.getOwner();
+      if (userOp->getBlock() != importOp->getBlock()) {
+        // Region-local users may only refine the imported shape on one
+        // control-flow path. Keep the import dims unchanged unless all evidence
+        // comes from the import's block.
+        return failure();
+      }
+
+      auto shapeAwareUser = dyn_cast<IREE::Util::ShapeAwareOpInterface>(userOp);
+      if (!shapeAwareUser) {
+        continue;
+      }
+
+      ValueRange userDims =
+          shapeAwareUser.getOperandDynamicDims(use.getOperandNumber());
+      if (userDims.size() != targetDims.size()) {
+        return failure();
+      }
+
+      for (auto [index, userDim] : llvm::enumerate(userDims)) {
+        if (isConstantValue(targetDims[index])) {
+          continue;
+        }
+
+        Attribute constantAttr;
+        if (!tryMatchConstantValue(userDim, constantAttr)) {
+          evidence[index].hasNonConstant = true;
+          continue;
+        }
+
+        DimEvidence &dimEvidence = evidence[index];
+        if (!dimEvidence.hasConstant) {
+          dimEvidence.constantValue = userDim;
+          dimEvidence.constantAttr = constantAttr;
+          dimEvidence.hasConstant = true;
+        } else if (dimEvidence.constantAttr != constantAttr) {
+          dimEvidence.hasConflict = true;
+        }
+      }
+    }
+
+    bool anyResolved = false;
+    SmallVector<Value> resolvedDims(targetDims.begin(), targetDims.end());
+    for (auto [index, dimEvidence] : llvm::enumerate(evidence)) {
+      if (isConstantValue(targetDims[index]) || !dimEvidence.hasConstant ||
+          dimEvidence.hasNonConstant || dimEvidence.hasConflict) {
+        continue;
+      }
+      resolvedDims[index] =
+          getConstantAvailableAt(rewriter, importOp, dimEvidence.constantValue);
+      anyResolved = true;
+    }
+    if (!anyResolved) {
+      return failure();
+    }
+
+    rewriter.modifyOpInPlace(importOp, [&]() {
+      importOp.getTargetDimsMutable().assign(resolvedDims);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<PropagateImportDimsFromConsumers>(context);
+}
+
 OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
     // Cannot fold through an import with byte_offset — it's a subview.
