@@ -124,7 +124,8 @@ Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
 //
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
-struct QuantizedConvToConv : OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
+struct QuantizedConvNhwcToConvNhwc
+    : public OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfQOp op,
@@ -239,6 +240,127 @@ struct QuantizedConvToConv : OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
   }
 };
 
+// Pattern lowering conv_2d_nchw_fchw_q to conv_2d_nchw_fchw.
+struct QuantizedConvNchwToConvNchw
+    : public OpRewritePattern<linalg::Conv2DNchwFchwQOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwQOp op,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+    Value input = op.getInputs()[0];
+    Value filter = op.getInputs()[1];
+    Value iZp = op.getInputs()[2];
+    Value fZp = op.getInputs()[3];
+    Value output = op.getOutputs()[0];
+
+    auto inputTy = llvm::cast<RankedTensorType>(input.getType());
+    auto resultTy = llvm::cast<ShapedType>(output.getType());
+    auto accETy = resultTy.getElementType();
+
+    auto strides = op.getStrides();
+    auto dilations = op.getDilations();
+
+    IntegerAttr iZpConst, fZpConst;
+    bool iZpIsZero = matchPattern(iZp, m_Constant(&iZpConst)) &&
+                     iZpConst.getValue().isZero();
+    bool fZpIsZero = matchPattern(fZp, m_Constant(&fZpConst)) &&
+                     fZpConst.getValue().isZero();
+
+    // First implement the convolution without the zero point.
+    Value newConv = linalg::Conv2DNchwFchwOp::create(
+                        builder, resultTy, ValueRange{input, filter},
+                        op.getOutputs(), strides, dilations)
+                        .getResult(0);
+
+    if (iZpIsZero && fZpIsZero) {
+      rewriter.replaceOp(op, newConv);
+      return success();
+    }
+
+    // Compute the summation and correction for the filter zero point:
+    //  sum(F) = filter(F,C,KH,KW)
+    //  conv(N,F,OH,OW) -= iZp * sum(F)
+    if (!iZpIsZero) {
+      Value filterSum =
+          sumReduceDimensionSubset(builder, filter, accETy,
+                                   /*reduce_dim=*/{false, true, true, true});
+      newConv = applyZeroPoint(builder, newConv, filterSum, iZp, {1});
+    }
+
+    if (!fZpIsZero) {
+      // Reduce along the input feature dimension:
+      //   sum(a, b, c) = input(a, b, c, d)
+      Value inputSum =
+          sumReduceDimensionSubset(builder, input, accETy,
+                                   /*reduce_dim=*/{false, true, false, false});
+
+      //   [N, H, W] -> [N, 1, H, W]
+      SmallVector<ReassociationExprs> reassociationMap(3);
+      reassociationMap[0].push_back(builder.getAffineDimExpr(0));
+      reassociationMap[0].push_back(builder.getAffineDimExpr(1));
+      reassociationMap[1].push_back(builder.getAffineDimExpr(2));
+      reassociationMap[2].push_back(builder.getAffineDimExpr(3));
+
+      auto expandTy =
+          RankedTensorType::get({inputTy.getDimSize(0), 1,
+                                 inputTy.getDimSize(2), inputTy.getDimSize(3)},
+                                accETy);
+      inputSum = tensor::ExpandShapeOp::create(builder, expandTy, inputSum,
+                                               reassociationMap);
+
+      SmallVector<int64_t> poolDims;
+      SmallVector<Value> poolDynDims;
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 0); // N
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 1); // C
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);  // OH
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 3);  // OW
+
+      auto poolTy = RankedTensorType::get(poolDims, accETy);
+      Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
+
+      // Create the empty kernel defining the shape for the pooling operation.
+      SmallVector<int64_t> kDims;
+      SmallVector<Value> kDyn;
+      GetDynamicDym(builder, kDims, kDyn, filter, 2);
+      GetDynamicDym(builder, kDims, kDyn, filter, 3);
+      Value poolInit = tensor::EmptyOp::create(builder, kDims, accETy, kDyn);
+
+      inputSum =
+          linalg::PoolingNchwSumOp::create(builder, ArrayRef<Type>{poolTy},
+                                           ValueRange{inputSum, poolInit},
+                                           poolTensor, strides, dilations)
+              .getResult(0);
+
+      // Collapse the dimension.
+      auto resultShape = resultTy.getShape();
+      SmallVector<int64_t> collapseShape = {
+          resultShape[0], // N
+          resultShape[2], // OH
+          resultShape[3]  // OW
+      };
+      auto collapseTy = RankedTensorType::get(collapseShape, accETy);
+      inputSum = tensor::CollapseShapeOp::create(builder, collapseTy, inputSum,
+                                                 reassociationMap);
+
+      // Broadcast inputSum over the output-channel dim using {N=0, OH=2, OW=3}.
+      newConv = applyZeroPoint(builder, newConv, inputSum, fZp, {0, 2, 3});
+    }
+
+    // Apply the final update that occurs when there are multiple zero-points.
+    if (!iZpIsZero && !fZpIsZero) {
+      Value count = multiplyDims(builder, filter, {1, 2, 3});
+      Value cast = arith::IndexCastOp::create(builder, accETy, count);
+      Value ifZp = arith::MulIOp::create(builder, iZp, fZp);
+      Value zpUpdate = arith::MulIOp::create(builder, ifZp, cast);
+      newConv = addScalar(builder, newConv, zpUpdate);
+    }
+
+    rewriter.replaceOp(op, newConv);
+    return success();
+  }
+};
+
 // Pattern lowering depthwise_conv_2d_nhwc_hwc_q to depthwise_conv_2d_nhwc_hwc.
 //
 // This is implementing the math explained in Section 2.3 of
@@ -343,8 +465,8 @@ public:
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     linalg::populateSimplifyDepthwiseConvPatterns(patterns);
-    patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
-        context);
+    patterns.add<QuantizedConvNhwcToConvNhwc, QuantizedConvNchwToConvNchw,
+                 QuantizedDepthwiseConvToDepthwiseConv>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       signalPassFailure();
