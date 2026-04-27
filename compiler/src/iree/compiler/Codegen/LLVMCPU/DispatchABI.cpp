@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/Matchers.h"
 
 static llvm::cl::opt<bool> clVerboseDebugInfo(
     "iree-codegen-llvm-verbose-debug-info",
@@ -794,6 +795,14 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // Load the base buffer pointer in the appropriate type (f32*, etc).
   Value basePtrValue = loadBindingPtr(forOp, ordinal, builder);
 
+  // Apply the subspan byte offset to the base pointer. The memref descriptor
+  // offset below is the memref layout offset, not the HAL binding byte offset.
+  if (baseOffsetValue && !matchPattern(baseOffsetValue, m_Zero())) {
+    basePtrValue =
+        LLVM::GEPOp::create(builder, loc, basePtrValue.getType(),
+                            builder.getI8Type(), basePtrValue, baseOffsetValue);
+  }
+
   // NOTE: if we wanted to check the range was in bounds here would be the
   // place to do it.
 
@@ -817,19 +826,8 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     desc.setAlignedPtr(builder, loc, basePtrValue);
     auto llvmIndexType = typeConverter->convertType(builder.getIndexType());
     if (ShapedType::isDynamic(offset)) {
-      // The offset in the subspan is byteoffset. It is converted to element
-      // offset here. It is assumed that the byte offset is a multiple of
-      // the element type byte width.
-      int32_t elementBitWidth =
-          IREE::Util::getTypeBitWidth(memRefType.getElementType());
-      Value elementWidthVal = LLVM::ConstantOp::create(
-          builder, loc, llvmIndexType, elementBitWidth);
-      Value eight = LLVM::ConstantOp::create(builder, loc, llvmIndexType, 8);
-      Value bitOffset =
-          LLVM::MulOp::create(builder, loc, baseOffsetValue, eight);
-      Value elementOffsetVal =
-          LLVM::UDivOp::create(builder, loc, bitOffset, elementWidthVal);
-      desc.setOffset(builder, loc, elementOffsetVal);
+      desc.setOffset(builder, loc,
+                     LLVM::ConstantOp::create(builder, loc, llvmIndexType, 0));
     } else {
       desc.setConstantOffset(builder, loc, offset);
     }
