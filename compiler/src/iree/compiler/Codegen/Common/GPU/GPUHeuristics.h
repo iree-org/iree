@@ -223,6 +223,12 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
+/// Checks if the given intrinsic can be used for the given problem.
+LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
+                                 const GPUMatmulShapeType &intrinsic,
+                                 int64_t preferredSubgroupSize,
+                                 bool canUpcastAcc, bool mustBeAligned);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_

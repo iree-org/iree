@@ -260,10 +260,10 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
   return schedule;
 }
 
-static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
-                                        const GPUMatmulShapeType &intrinsic,
-                                        int64_t preferredSubgroupSize,
-                                        bool canUpcastAcc, bool mustBeAligned) {
+LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
+                                 const GPUMatmulShapeType &intrinsic,
+                                 int64_t preferredSubgroupSize,
+                                 bool canUpcastAcc, bool mustBeAligned) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
          intrinsic.kSizes.size() <= 2 &&
          "expected intrinsic to have a single M, N, and K <= 2 dimensions");

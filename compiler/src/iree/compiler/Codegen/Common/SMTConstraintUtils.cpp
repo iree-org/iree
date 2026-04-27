@@ -61,7 +61,7 @@ static void emitCommonConstraints(OpBuilder &builder, Location loc,
     Value eq = smt::EqOp::create(builder, loc, dimArg, constVal);
     IREE::Codegen::AssertOp::create(
         builder, loc, eq,
-        ("dim_" + Twine(d) + " ({}) == " + Twine(staticSize)).str(),
+        (kLoopRangePrefix + Twine(d) + " ({}) == " + Twine(staticSize)).str(),
         ValueRange{dimArg});
   }
 }
