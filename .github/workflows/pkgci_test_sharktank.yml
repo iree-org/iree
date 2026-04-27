@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 20d62fb
+          ref: 20d62fb0575aa580b2b6ca74571dd23cd780e775
           path: iree-test-suites
           lfs: false
 
@@ -190,7 +190,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 20d62fb
+          ref: 20d62fb0575aa580b2b6ca74571dd23cd780e775
           path: iree-test-suites
           lfs: false
 
