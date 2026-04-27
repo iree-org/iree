@@ -43,6 +43,20 @@ OpFoldResult subOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
 OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                         OpFoldResult b, OpFoldResult c);
 
+/// Clamp a softmax row-sum tensor to at least 1. Used before the softmax
+/// finalization step in masked attention: a fully-masked row has `sum == 0`
+/// and a zero numerator, so the unguarded divide produces `0/0 == NaN`.
+/// Clamping that denominator row to 1 rescues the row to `0`, matching
+/// PyTorch's SDPA convention, which explicitly zeroes fully-masked rows via
+/// `_safe_softmax`:
+/// https://github.com/pytorch/pytorch/blob/7231f9e7a302e0368eee7adf8dcbcd6fd79fe2be/aten/src/ATen/native/transformers/attention.cpp#L677-L687
+///
+/// For any non-fully-masked row the softmax invariant guarantees `sum >= 1`
+/// (at least one `exp(S - max) = exp(0) = 1`), so the denominator is
+/// unperturbed. This keeps the safety check at row-reduction granularity,
+/// instead of paying for it once per output element.
+Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc, Value sum);
+
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);

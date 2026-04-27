@@ -16,6 +16,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
+    "attention_f16_mask.mlir"
     "attention_i1_mask.mlir"
     "dynamic_attention.mlir"
     "gather.mlir"
@@ -92,6 +93,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
+    "attention_f16_mask.mlir"
     "gather.mlir"
     "map_load.mlir"
     "map_store.mlir"

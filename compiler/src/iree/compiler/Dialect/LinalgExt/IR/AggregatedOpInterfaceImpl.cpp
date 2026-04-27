@@ -485,6 +485,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
 
   // P = P / sum
+  if (mask != nullptr) {
+    sum = createSafeSoftmaxDenominator(b, loc, sum);
+  }
   p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
 
   // ---- Scale and truncate LHS to match RHS ----
