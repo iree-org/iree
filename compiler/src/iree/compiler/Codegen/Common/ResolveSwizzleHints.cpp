@@ -74,16 +74,36 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   VectorType type = load.getVectorType();
   int64_t loadWidth = type.getShape()[0];
   Value memrefOffset = load.getIndices()[0];
+
+  // For loads smaller than accessWidth, swizzle the base offset and add
+  // back the within-group offset. swizzleOffset drops |memrefOffset %
+  // accessWidth| because it targets group-aligned accesses; for scalar
+  // or sub-group loads we need to preserve the element's position within
+  // the group so threads at different elements within the same group
+  // read from distinct addresses.
+  if (loadWidth < accessWidth) {
+    Value swizzledBase = getValueOrCreateConstantIndexOp(
+        rewriter, hintLoc,
+        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
+                                          memrefOffset, hintOp.getOperand()));
+    Value accessWidthVal =
+        arith::ConstantIndexOp::create(rewriter, hintLoc, accessWidth);
+    Value withinGroup =
+        arith::RemUIOp::create(rewriter, hintLoc, memrefOffset, accessWidthVal);
+    Value newOffset =
+        arith::AddIOp::create(rewriter, hintLoc, swizzledBase, withinGroup);
+    auto newLoad = vector::LoadOp::create(rewriter, load.getLoc(), type,
+                                          load.getBase(), newOffset);
+    rewriter.replaceOp(load, newLoad);
+    return;
+  }
+
   VectorType swizzledLoadType =
       VectorType::get({accessWidth}, type.getElementType());
 
-  // ~ vector.undef, overwritten by unrolling.
   Value replacement = arith::ConstantOp::create(rewriter, hintLoc, type,
                                                 rewriter.getZeroAttr(type));
 
-  // Load type = vector<C>, k = accessWidth
-  // i = 0 -> C += k is the offset into the vector of a contiguous group of
-  // swizzled elements.
   for (int64_t i = 0; i < loadWidth; i += accessWidth) {
     Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
     Value newOffset = getValueOrCreateConstantIndexOp(
@@ -120,9 +140,25 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   int64_t storeWidth = type.getShape()[0];
   Value memrefOffset = store.getIndices()[0];
 
-  // Store type = vector<C>, k = accessWidth
-  // i = 0 -> C += k is the offset into the vector of a contiguous group of
-  // swizzled elements.
+  // For stores smaller than accessWidth, swizzle the base offset and add
+  // back the within-group offset (symmetric to the load path above).
+  if (storeWidth < accessWidth) {
+    Value swizzledBase = getValueOrCreateConstantIndexOp(
+        rewriter, hintLoc,
+        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
+                                          memrefOffset, hintOp.getOperand()));
+    Value accessWidthVal =
+        arith::ConstantIndexOp::create(rewriter, hintLoc, accessWidth);
+    Value withinGroup =
+        arith::RemUIOp::create(rewriter, hintLoc, memrefOffset, accessWidthVal);
+    Value newOffset =
+        arith::AddIOp::create(rewriter, hintLoc, swizzledBase, withinGroup);
+    vector::StoreOp::create(rewriter, store.getLoc(), store.getValueToStore(),
+                            store.getBase(), newOffset);
+    rewriter.eraseOp(store);
+    return;
+  }
+
   for (int64_t i = 0; i < storeWidth; i += accessWidth) {
     Value subVec = vector::ExtractStridedSliceOp::create(
         rewriter, store.getLoc(), store.getValueToStore(), ArrayRef<int64_t>{i},
@@ -162,13 +198,11 @@ static void resolveHintOp(RewriterBase &rewriter,
                           IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
-  int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
       VectorType loadType = load.getVectorType();
-      // Guard on zero rank loads and loads not divisible by the access width.
-      if (loadType.getRank() != 1 ||
-          loadType.getShape()[0] % accessWidth != 0) {
+      // Guard on zero rank loads.
+      if (loadType.getRank() != 1) {
         return;
       }
       loads.push_back(load);
@@ -176,9 +210,8 @@ static void resolveHintOp(RewriterBase &rewriter,
     }
     if (auto store = dyn_cast<vector::StoreOp>(user)) {
       VectorType storeType = store.getVectorType();
-      // Guard on zero rank stores and stores not divisible by the access width.
-      if (storeType.getRank() != 1 ||
-          storeType.getShape()[0] % accessWidth != 0) {
+      // Guard on zero rank stores.
+      if (storeType.getRank() != 1) {
         return;
       }
       stores.push_back(store);

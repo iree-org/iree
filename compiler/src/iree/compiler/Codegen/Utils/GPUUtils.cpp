@@ -943,9 +943,9 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
   if (!workgroupMemoryBankCount.has_value()) {
     return failure();
   }
-  // Assuming each bank is 4 bytes wide (32 bits).
   int64_t ldsBankWidthBits =
-      (workgroupMemoryBankCount.value() * int64_t(32)) / *bitwidth;
+      (workgroupMemoryBankCount.value() * kSharedMemoryBankWidthBytes * 8) /
+      *bitwidth;
 
   // Row width must be less than or equal to the row size (in elements) of LDS
   // bank width to prevent bank conflicts.

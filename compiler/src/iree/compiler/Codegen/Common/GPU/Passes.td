@@ -441,8 +441,10 @@ def GPUVectorAllocPass :
                 "to GPU shared memory";
   let dependentDialects = [
     "::mlir::gpu::GPUDialect",
+    "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect",
     "::mlir::bufferization::BufferizationDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
   ];
 }

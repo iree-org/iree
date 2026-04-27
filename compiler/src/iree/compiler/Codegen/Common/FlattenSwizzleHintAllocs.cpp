@@ -44,8 +44,25 @@ struct FlattenSwizzleHintAllocsPass final
 static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
                                      IREE::Codegen::SwizzleHintOp hintOp) {
   auto allocOp = hintOp.getOperand().getDefiningOp<memref::AllocOp>();
-  if (!allocOp || !allocOp->hasOneUse()) {
+  if (!allocOp) {
     return;
+  }
+  // The alloc may have one direct use (the hint) or two uses (the hint and a
+  // matching memref.dealloc inserted by bufferization). Anything else (e.g.
+  // an aliased subview) means we can't safely rewrite the alloc shape.
+  memref::DeallocOp deallocOp;
+  for (Operation *user : allocOp->getUsers()) {
+    if (user == hintOp) {
+      continue;
+    }
+    if (auto da = dyn_cast<memref::DeallocOp>(user)) {
+      if (deallocOp) {
+        return; // Multiple deallocs — bail.
+      }
+      deallocOp = da;
+      continue;
+    }
+    return; // Unknown user — bail.
   }
   MemRefType resultType = allocOp.getType();
   if (resultType.getRank() == 1 || !resultType.getLayout().isIdentity() ||
@@ -57,17 +74,27 @@ static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
   auto newResultType =
       MemRefType::get(newResultShape, resultType.getElementType(), AffineMap(),
                       resultType.getMemorySpace());
-  rewriter.setInsertionPoint(hintOp);
   ReassociationIndices reassoc =
       llvm::to_vector(llvm::seq(resultType.getRank()));
+  // Create the new alloc at the original alloc's position so it dominates
+  // the dealloc (which may live outside the hint's enclosing region).
+  rewriter.setInsertionPoint(allocOp);
   auto newAllocOp =
-      memref::AllocOp::create(rewriter, hintOp.getLoc(), newResultType);
+      memref::AllocOp::create(rewriter, allocOp.getLoc(), newResultType);
+  rewriter.setInsertionPoint(hintOp);
   auto newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
       rewriter, hintOp.getLoc(), newAllocOp.getResult(), hintOp.getSwizzle());
   auto expandShape = memref::ExpandShapeOp::create(rewriter, hintOp.getLoc(),
                                                    resultType.getShape(),
                                                    newSwizzleHintOp, {reassoc});
   rewriter.replaceOp(hintOp, expandShape);
+  if (deallocOp) {
+    rewriter.setInsertionPoint(deallocOp);
+    memref::DeallocOp::create(rewriter, deallocOp.getLoc(),
+                              newAllocOp.getResult());
+    rewriter.eraseOp(deallocOp);
+  }
+  rewriter.eraseOp(allocOp);
 }
 
 void FlattenSwizzleHintAllocsPass::runOnOperation() {
