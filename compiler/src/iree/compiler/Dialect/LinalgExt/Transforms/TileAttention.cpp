@@ -119,7 +119,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value x = onlineAttn.getResult(0);
   Value sum = onlineAttn.getResult(2);
 
-  // Finalize online attention: x = (1 / sum) * x. When a mask is present,
+  // Finalize online attention: x = x / sum. When a mask is present,
   // fully-masked rows have sum == 0, so clamp the row denominator once before
   // normalizing instead of guarding every output element.
   if (mask) {
