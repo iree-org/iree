@@ -839,6 +839,204 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   }
 };
 
+// Move indexed operand dimensions to the front so scatter_dims_to_operand_dims
+// becomes [0, 1, ..., index_depth - 1]. This canonicalizes StableHLO scatter
+// to the form expected by downstream IREE scatter lowering.
+//
+// This rewrite only permutes operand, update and result dimensions.
+struct ScatterIndexedDimsFirst final
+    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    ArrayRef<int64_t> scatterDimsToOperandDims =
+        dimNumbers.getScatterDimsToOperandDims();
+    ArrayRef<int64_t> insertedWindowDims = dimNumbers.getInsertedWindowDims();
+    ArrayRef<int64_t> updateWindowDims = dimNumbers.getUpdateWindowDims();
+    ArrayRef<int64_t> inputBatchingDims = dimNumbers.getInputBatchingDims();
+    ArrayRef<int64_t> scatterIndicesBatchingDims =
+        dimNumbers.getScatterIndicesBatchingDims();
+
+    // Keep batching cases out of this rewrite. This pattern only reorders
+    // indexed and window dimensions within a single scatter slice layout.
+    if (!inputBatchingDims.empty() || !scatterIndicesBatchingDims.empty()) {
+      return rewriter.notifyMatchFailure(op, "batching dims are not handled");
+    }
+
+    auto isIdentityPermutation = [](ArrayRef<int64_t> perm) {
+      return llvm::all_of(llvm::enumerate(perm), [](auto it) {
+        return static_cast<int64_t>(it.index()) == it.value();
+      });
+    };
+
+    if (isIdentityPermutation(scatterDimsToOperandDims)) {
+      return rewriter.notifyMatchFailure(
+          op, "indexed operand dims are already leading");
+    }
+
+    ValueRange inputs = op.getInputs();
+    ValueRange updates = op.getUpdates();
+    Value operand = inputs.front();
+    Value update = updates.front();
+    auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
+    if (!operandTy) {
+      return rewriter.notifyMatchFailure(op, "operand has no ranked type");
+    }
+    auto updateTy = dyn_cast<RankedTensorType>(update.getType());
+    if (!updateTy) {
+      return rewriter.notifyMatchFailure(op, "update has no ranked type");
+    }
+
+    int64_t operandRank = operandTy.getRank();
+    llvm::SmallVector<bool> isIndexedDim(operandRank, false);
+    for (int64_t dim : scatterDimsToOperandDims) {
+      isIndexedDim[dim] = true;
+    }
+
+    // Move indexed operand dims to the front while preserving the relative
+    // order of all remaining dims.
+    llvm::SmallVector<int64_t> operandPerm;
+    operandPerm.reserve(operandRank);
+    operandPerm.append(scatterDimsToOperandDims.begin(),
+                       scatterDimsToOperandDims.end());
+    for (int64_t dim = 0; dim < operandRank; ++dim) {
+      if (!isIndexedDim[dim]) {
+        operandPerm.push_back(dim);
+      }
+    }
+
+    llvm::SmallVector<int64_t> inverseOperandPerm(operandRank);
+    for (auto [newDim, oldDim] : llvm::enumerate(operandPerm)) {
+      inverseOperandPerm[oldDim] = newDim;
+    }
+
+    // Recover the operand dims that correspond to update window dims so the
+    // updates tensor can be permuted consistently with the operand.
+    llvm::SmallVector<bool> isInsertedDim(operandRank, false);
+    for (int64_t dim : insertedWindowDims) {
+      isInsertedDim[dim] = true;
+    }
+
+    llvm::SmallVector<int64_t> windowOperandDims;
+    windowOperandDims.reserve(updateWindowDims.size());
+    for (int64_t dim = 0; dim < operandRank; ++dim) {
+      if (!isInsertedDim[dim]) {
+        windowOperandDims.push_back(dim);
+      }
+    }
+    if (windowOperandDims.size() != updateWindowDims.size()) {
+      return rewriter.notifyMatchFailure(
+          op, "window dims do not match non-inserted operand dims");
+    }
+
+    // Map each operand window dim back to the update dim that materializes it.
+    llvm::SmallVector<int64_t> windowOperandDimToUpdateDim(operandRank, -1);
+    for (auto [operandDim, updateDim] :
+         llvm::zip_equal(windowOperandDims, updateWindowDims)) {
+      windowOperandDimToUpdateDim[operandDim] = updateDim;
+    }
+
+    int64_t updateRank = updateTy.getRank();
+    llvm::SmallVector<bool> isUpdateWindowDim(updateRank, false);
+    for (int64_t dim : updateWindowDims) {
+      isUpdateWindowDim[dim] = true;
+    }
+
+    // Keep non-window update dims fixed. Permute window dims to match the
+    // operand window dims after operandPerm is applied.
+    llvm::SmallVector<int64_t> updatePerm;
+    updatePerm.reserve(updateRank);
+    auto reorderedWindowDims = llvm::make_filter_range(
+        operandPerm, [&](int64_t dim) { return !isInsertedDim[dim]; });
+    auto nextWindowDim = reorderedWindowDims.begin();
+    for (int64_t dim = 0; dim < updateRank; ++dim) {
+      if (isUpdateWindowDim[dim]) {
+        updatePerm.push_back(windowOperandDimToUpdateDim[*nextWindowDim++]);
+      } else {
+        updatePerm.push_back(dim);
+      }
+    }
+
+    auto transposeType = [&](RankedTensorType type,
+                             ArrayRef<int64_t> perm) -> RankedTensorType {
+      llvm::SmallVector<int64_t> shape;
+      shape.reserve(type.getRank());
+      for (int64_t dim : perm) {
+        shape.push_back(type.getDimSize(dim));
+      }
+      return RankedTensorType::get(shape, type.getElementType(),
+                                   type.getEncoding());
+    };
+
+    auto createTranspose = [&](Value value, RankedTensorType type,
+                               ArrayRef<int64_t> perm) -> Value {
+      if (isIdentityPermutation(perm)) {
+        return value;
+      }
+      return mlir::stablehlo::TransposeOp::create(
+          rewriter, loc, transposeType(type, perm), value,
+          rewriter.getDenseI64ArrayAttr(perm));
+    };
+
+    llvm::SmallVector<Value> transposedInputs;
+    llvm::SmallVector<Type> transposedResultTypes;
+    transposedInputs.reserve(inputs.size());
+    transposedResultTypes.reserve(inputs.size());
+    for (Value input : inputs) {
+      auto inputTy = cast<RankedTensorType>(input.getType());
+      transposedInputs.push_back(createTranspose(input, inputTy, operandPerm));
+      transposedResultTypes.push_back(transposeType(inputTy, operandPerm));
+    }
+
+    llvm::SmallVector<Value> transposedUpdates;
+    transposedUpdates.reserve(updates.size());
+    for (Value updateValue : updates) {
+      auto updateValueTy = cast<RankedTensorType>(updateValue.getType());
+      transposedUpdates.push_back(
+          createTranspose(updateValue, updateValueTy, updatePerm));
+    }
+
+    llvm::SmallVector<int64_t> newInsertedWindowDims;
+    newInsertedWindowDims.reserve(insertedWindowDims.size());
+    for (int64_t dim : insertedWindowDims) {
+      newInsertedWindowDims.push_back(inverseOperandPerm[dim]);
+    }
+    llvm::sort(newInsertedWindowDims);
+
+    llvm::SmallVector<int64_t> newScatterDimsToOperandDims(
+        scatterDimsToOperandDims.size());
+    std::iota(newScatterDimsToOperandDims.begin(),
+              newScatterDimsToOperandDims.end(), 0);
+
+    auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), updateWindowDims, newInsertedWindowDims,
+        inputBatchingDims, scatterIndicesBatchingDims,
+        newScatterDimsToOperandDims, dimNumbers.getIndexVectorDim());
+
+    auto newScatter = mlir::stablehlo::ScatterOp::create(
+        rewriter, loc, transposedResultTypes, transposedInputs,
+        op.getScatterIndices(), transposedUpdates, newDimNumbers,
+        op.getIndicesAreSorted(), op.getUniqueIndices());
+    Region &region = newScatter.getUpdateComputation();
+    rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
+
+    llvm::SmallVector<Value> results;
+    results.reserve(newScatter.getNumResults());
+    for (auto [result, originalResultTy] :
+         llvm::zip_equal(newScatter.getResults(), op.getResultTypes())) {
+      results.push_back(mlir::stablehlo::TransposeOp::create(
+          rewriter, loc, cast<RankedTensorType>(originalResultTy), result,
+          rewriter.getDenseI64ArrayAttr(inverseOperandPerm)));
+    }
+
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
 // stablehlo.scatter can materialize a unit dimension at both indexed dimensions
 // or at unary dimensions in the destination matrix. linalg_ext.scatter only
 // allows unit dimensions at indexed dimensions. This pattern inserts all
@@ -874,7 +1072,7 @@ struct ScatterMaterializeInsertedDim final
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     auto indices = op.getScatterIndices();
-    auto operand = op.getInputs().front();
+    Value operand = op.getInputs().front();
     auto indicesTy = cast<ShapedType>(indices.getType());
     auto operandTy = cast<ShapedType>(operand.getType());
 
@@ -1948,9 +2146,10 @@ struct StableHLOToStableHLOPreprocessing final
     patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,
-                    ScatterImplicitBatch, ScatterMaterializeInsertedDim,
-                    ScatterCollapseBatch, ScatterBatchFirst>(context);
+    patterns
+        .insert<ScatterInt64Indices, ScatterImplicitIndex, ScatterImplicitBatch,
+                ScatterMaterializeInsertedDim, ScatterCollapseBatch,
+                ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
