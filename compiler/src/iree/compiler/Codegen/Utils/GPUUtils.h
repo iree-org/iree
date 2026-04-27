@@ -271,7 +271,8 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                    bool skipUntunedFallback = false);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
@@ -279,7 +280,8 @@ FailureOr<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                  bool skipUntunedFallback = false);
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
