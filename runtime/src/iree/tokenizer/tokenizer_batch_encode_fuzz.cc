@@ -51,27 +51,52 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   // First byte: number of batch items (1-16).
   size_t item_count = (data[0] % kMaxBatchItems) + 1;
-  data++;
-  size--;
+  uint8_t batch_control = data[1];
+  data += 2;
+  size -= 2;
 
   // Partition remaining bytes among items.
   // Each item gets a roughly equal share, with remainder going to last item.
-  iree_tokenizer_encode_batch_item_t items[kMaxBatchItems];
+  iree_tokenizer_encode_batch_item_t items[kMaxBatchItems] = {};
   iree_tokenizer_token_id_t token_storage[kMaxBatchItems * kMaxTokensPerItem];
+  iree_tokenizer_offset_t offset_storage[kMaxBatchItems * kMaxTokensPerItem];
+  uint8_t type_id_storage[kMaxBatchItems * kMaxTokensPerItem];
 
   size_t offset = 0;
   size_t base_item_size = size / item_count;
   for (size_t i = 0; i < item_count; ++i) {
     size_t item_size = (i == item_count - 1) ? (size - offset) : base_item_size;
 
-    items[i].text = iree_make_string_view(
-        reinterpret_cast<const char*>(data + offset), item_size);
+    const uint8_t* item_data = data + offset;
+    bool has_text_pair = item_size > 0 && (item_data[0] & 0x01) != 0;
+    if (has_text_pair) {
+      size_t payload_size = item_size - 1;
+      size_t split = payload_size == 0 ? 0 : item_data[0] % (payload_size + 1);
+      items[i].text = iree_make_string_view(
+          reinterpret_cast<const char*>(item_data + 1), split);
+      items[i].text_pair = iree_make_string_view(
+          reinterpret_cast<const char*>(item_data + 1 + split),
+          payload_size - split);
+      items[i].flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+    } else {
+      items[i].text = iree_make_string_view(
+          reinterpret_cast<const char*>(item_data), item_size);
+    }
 
     // Each item gets its own slice of the token output buffer.
     iree_tokenizer_token_id_t* item_tokens =
         &token_storage[i * kMaxTokensPerItem];
+    iree_tokenizer_offset_t* item_offsets =
+        &offset_storage[i * kMaxTokensPerItem];
+    uint8_t* item_type_ids = &type_id_storage[i * kMaxTokensPerItem];
     items[i].output = iree_tokenizer_make_token_output(item_tokens, NULL, NULL,
                                                        kMaxTokensPerItem);
+    if (iree_tokenizer_fuzz_track_offsets()) {
+      items[i].output.token_offsets = item_offsets;
+    }
+    if (batch_control & 0x02) {
+      items[i].output.type_ids = item_type_ids;
+    }
     items[i].out_token_count = 0;
 
     offset += item_size;
@@ -114,9 +139,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   //===--------------------------------------------------------------------===//
 
   iree_tokenizer_encode_flags_t flags = IREE_TOKENIZER_ENCODE_FLAG_NONE;
-  if (iree_tokenizer_fuzz_track_offsets()) {
-    flags |= IREE_TOKENIZER_ENCODE_FLAG_TRACK_OFFSETS;
+  if (batch_control & 0x01) {
+    flags |= IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
   }
+
+  iree_tokenizer_offset_run_t offset_runs[4096];
+  iree_tokenizer_offset_run_list_t offset_run_list = {
+      /*.capacity=*/IREE_ARRAYSIZE(offset_runs),
+      /*.values=*/offset_runs,
+  };
 
   status = iree_tokenizer_encode_batch(
       g_tokenizer, items, item_count, flags,
@@ -124,7 +155,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                           state_size),
       iree_make_byte_span(reinterpret_cast<uint8_t*>(transform_buffer),
                           buffer_size),
-      iree_tokenizer_offset_run_list_empty());
+      iree_tokenizer_fuzz_track_offsets()
+          ? offset_run_list
+          : iree_tokenizer_offset_run_list_empty());
   // RESOURCE_EXHAUSTED is expected when output buffers are too small.
   iree_status_ignore(status);
 

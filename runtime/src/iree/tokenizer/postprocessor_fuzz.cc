@@ -182,7 +182,19 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                                                  seq_a_count);
     offset += seq_a_count;
 
-    // Transition to suffix and emit.
+    iree_tokenizer_postprocessor_begin_infix(&state);
+    offset += iree_tokenizer_postprocessor_emit_infix(&state, output, offset);
+
+    // Simulate sequence B model tokens.
+    iree_host_size_t seq_b_count = 4;
+    if (offset + seq_b_count > 64) seq_b_count = 64 - offset;
+    for (iree_host_size_t i = 0; i < seq_b_count; ++i) {
+      token_ids[offset + i] = (int32_t)(i + 300);
+    }
+    iree_tokenizer_postprocessor_assign_type_ids(&state, output, offset,
+                                                 seq_b_count);
+    offset += seq_b_count;
+
     iree_tokenizer_postprocessor_begin_suffix(&state);
     offset += iree_tokenizer_postprocessor_emit_suffix(&state, output, offset);
 

@@ -17,6 +17,7 @@ iree_c_embed_data(
     testonly = True,
     srcs = [
         "bpe_bytelevel_minimal.json",
+        "wordpiece_bert_pair_minimal.json",
     ],
     c_file_output = "streaming_testdata.c",
     flatten = True,

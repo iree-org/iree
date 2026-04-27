@@ -130,6 +130,27 @@ TEST(Postprocessor, InitializeBertPair) {
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
+TEST(Postprocessor, ExplicitEmptyPairTemplateIsSupported) {
+  auto single = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{});
+  auto pair = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{},
+                           /*prefix_type_ids=*/{},
+                           /*infix_type_ids=*/{},
+                           /*suffix_type_ids=*/{},
+                           /*sequence_a_type_id=*/0,
+                           /*sequence_b_type_id=*/0);
+
+  iree_tokenizer_postprocessor_t pp;
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, &pair, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
+
+  EXPECT_TRUE(iree_tokenizer_postprocessor_supports_pair(&pp));
+  EXPECT_EQ(iree_tokenizer_postprocessor_template_total_count(&pp.pair), 0);
+  EXPECT_EQ(pp.pair.sequence_a_type_id, 0);
+  EXPECT_EQ(pp.pair.sequence_b_type_id, 0);
+
+  iree_tokenizer_postprocessor_deinitialize(&pp);
+}
+
 TEST(Postprocessor, InitializeLlama) {
   // LLaMA 2 single: <bos> $A
   auto single = MakeTemplate(/*prefix=*/{1}, /*infix=*/{}, /*suffix=*/{});
@@ -594,6 +615,297 @@ TEST(PostprocessorEncodeState, FullBertFlow) {
   EXPECT_EQ(type_ids[4], 0);
 
   EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+}
+
+TEST(PostprocessorEncodeState, FullBertPairFlow) {
+  // BERT pair: [CLS]=101 $A [SEP]=102 $B [SEP]=102
+  // Pair template: prefix={101}, infix={102}, suffix={102}
+  // sequence_a_type_id=0, sequence_b_type_id=1
+  auto pair_tmpl = MakeTemplate(
+      /*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102},
+      /*prefix_type_ids=*/{0}, /*infix_type_ids=*/{0},
+      /*suffix_type_ids=*/{1},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/1);
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = pair_tmpl;
+  pp.flags = IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &pair_tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[10] = {};
+  uint8_t type_ids[10];
+  memset(type_ids, 0xFF, sizeof(type_ids));
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 10);
+
+  iree_host_size_t offset = 0;
+
+  // Phase: PREFIX → emit [CLS]
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX);
+  offset += iree_tokenizer_postprocessor_emit_prefix(&state, output, offset);
+  EXPECT_EQ(offset, 1u);
+  EXPECT_EQ(token_ids[0], 101);
+  EXPECT_EQ(type_ids[0], 0);  // [CLS] type_id from prefix_type_ids
+
+  // Phase: SEQUENCE_A — simulate model producing 2 tokens
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
+  token_ids[1] = 2000;
+  token_ids[2] = 2001;
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, offset, 2);
+  offset += 2;
+  EXPECT_EQ(type_ids[1], 0);  // sequence_a_type_id
+  EXPECT_EQ(type_ids[2], 0);
+
+  // Transition: SEQUENCE_A → INFIX
+  iree_tokenizer_postprocessor_begin_infix(&state);
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX);
+
+  // Phase: INFIX → emit [SEP] between sequences
+  offset += iree_tokenizer_postprocessor_emit_infix(&state, output, offset);
+  EXPECT_EQ(offset, 4u);
+  EXPECT_EQ(token_ids[3], 102);
+  EXPECT_EQ(type_ids[3], 0);  // infix type_id from infix_type_ids
+
+  // Phase: SEQUENCE_B — simulate model producing 2 tokens
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B);
+  token_ids[4] = 3000;
+  token_ids[5] = 3001;
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, offset, 2);
+  offset += 2;
+  EXPECT_EQ(type_ids[4], 1);  // sequence_b_type_id
+  EXPECT_EQ(type_ids[5], 1);
+
+  // Transition: SEQUENCE_B → SUFFIX
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX);
+
+  // Phase: SUFFIX → emit trailing [SEP]
+  offset += iree_tokenizer_postprocessor_emit_suffix(&state, output, offset);
+  EXPECT_EQ(offset, 7u);
+  EXPECT_EQ(token_ids[6], 102);
+  EXPECT_EQ(type_ids[6], 1);  // suffix type_id from suffix_type_ids
+
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+
+  // Verify full output: [CLS] 2000 2001 [SEP] 3000 3001 [SEP]
+  EXPECT_EQ(token_ids[0], 101);
+  EXPECT_EQ(token_ids[1], 2000);
+  EXPECT_EQ(token_ids[2], 2001);
+  EXPECT_EQ(token_ids[3], 102);
+  EXPECT_EQ(token_ids[4], 3000);
+  EXPECT_EQ(token_ids[5], 3001);
+  EXPECT_EQ(token_ids[6], 102);
+
+  // Verify type_ids: 0 0 0 0 1 1 1
+  EXPECT_EQ(type_ids[0], 0);
+  EXPECT_EQ(type_ids[1], 0);
+  EXPECT_EQ(type_ids[2], 0);
+  EXPECT_EQ(type_ids[3], 0);
+  EXPECT_EQ(type_ids[4], 1);
+  EXPECT_EQ(type_ids[5], 1);
+  EXPECT_EQ(type_ids[6], 1);
+}
+
+TEST(PostprocessorEncodeState, PairBeginInfixNoInfix) {
+  // Template with no infix tokens — begin_infix transitions directly to
+  // SEQUENCE_B (used by models that only use type_ids to distinguish
+  // sequences, no [SEP] between them).
+  auto tmpl = MakeTemplate(
+      /*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102},
+      /*prefix_type_ids=*/{}, /*infix_type_ids=*/{}, /*suffix_type_ids=*/{},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/1);
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // Skip to SEQUENCE_A.
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  iree_tokenizer_postprocessor_begin_infix(&state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B);
+}
+
+TEST(PostprocessorEncodeState, PairTypeIdsOnlyTemplateKeepsSequencePhases) {
+  // No special tokens are required for pair encoding: some templates only use
+  // type IDs to distinguish sequence A from sequence B.
+  auto tmpl = MakeTemplate(
+      /*prefix=*/{}, /*infix=*/{}, /*suffix=*/{},
+      /*prefix_type_ids=*/{}, /*infix_type_ids=*/{}, /*suffix_type_ids=*/{},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/1);
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
+
+  uint8_t type_ids[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 4);
+
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 2);
+  EXPECT_EQ(type_ids[0], 0);
+  EXPECT_EQ(type_ids[1], 0);
+
+  iree_tokenizer_postprocessor_begin_infix(&state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B);
+
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 2, 2);
+  EXPECT_EQ(type_ids[2], 1);
+  EXPECT_EQ(type_ids[3], 1);
+}
+
+TEST(PostprocessorEncodeState, PairBeginInfixNoOpWrongPhase) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102});
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // In PREFIX phase — begin_infix should be a no-op.
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX);
+  iree_tokenizer_postprocessor_begin_infix(&state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX);
+}
+
+TEST(PostprocessorEncodeState, EmitInfixNoOpWrongPhase) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102});
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 4);
+
+  // In PREFIX phase — emit_infix should return 0.
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_infix(&state, output, 0);
+  EXPECT_EQ(emitted, 0u);
+}
+
+TEST(PostprocessorEncodeState, PairBeginSuffixFromSequenceB) {
+  // Verify begin_suffix works from SEQUENCE_B (not just SEQUENCE_A).
+  auto tmpl = MakeTemplate(
+      /*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102},
+      /*prefix_type_ids=*/{}, /*infix_type_ids=*/{}, /*suffix_type_ids=*/{},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/1);
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B;
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX);
+}
+
+TEST(PostprocessorEncodeState, PairRobertaDoubleInfix) {
+  // RoBERTa pair: <s>=0 $A </s></s>=2,2 $B </s>=2
+  // Two infix tokens (</s></s> between sequences).
+  auto tmpl = MakeTemplate(
+      /*prefix=*/{0}, /*infix=*/{2, 2}, /*suffix=*/{2},
+      /*prefix_type_ids=*/{0}, /*infix_type_ids=*/{0, 0},
+      /*suffix_type_ids=*/{0},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/0);
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[10] = {};
+  uint8_t type_ids[10];
+  memset(type_ids, 0xFF, sizeof(type_ids));
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 10);
+
+  iree_host_size_t offset = 0;
+
+  // PREFIX: <s>
+  offset += iree_tokenizer_postprocessor_emit_prefix(&state, output, offset);
+  EXPECT_EQ(offset, 1u);
+
+  // SEQUENCE_A: 2 tokens
+  token_ids[offset] = 500;
+  token_ids[offset + 1] = 501;
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, offset, 2);
+  offset += 2;
+
+  // INFIX: </s></s> (two tokens)
+  iree_tokenizer_postprocessor_begin_infix(&state);
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX);
+  offset += iree_tokenizer_postprocessor_emit_infix(&state, output, offset);
+  EXPECT_EQ(offset, 5u);
+  EXPECT_EQ(token_ids[3], 2);
+  EXPECT_EQ(token_ids[4], 2);
+
+  // SEQUENCE_B: 1 token
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B);
+  token_ids[offset] = 600;
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, offset, 1);
+  offset += 1;
+
+  // SUFFIX: </s>
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  offset += iree_tokenizer_postprocessor_emit_suffix(&state, output, offset);
+  EXPECT_EQ(offset, 7u);
+  EXPECT_EQ(token_ids[6], 2);
+
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+
+  // All type_ids should be 0 for RoBERTa (sequence_a_type_id=0,
+  // sequence_b_type_id=0).
+  for (int j = 0; j < 7; ++j) {
+    EXPECT_EQ(type_ids[j], 0) << "type_ids[" << j << "]";
+  }
+}
+
+TEST(PostprocessorEncodeState, HasPendingIncludesInfix) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102});
+
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.pair = tmpl;
+
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // PREFIX: has_pending = true
+  EXPECT_TRUE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
+
+  // SEQUENCE_A: has_pending = false (model tokens, not postprocessor tokens)
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  EXPECT_FALSE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
+
+  // INFIX: has_pending = true
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX;
+  EXPECT_TRUE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
+
+  // SEQUENCE_B: has_pending = false
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B;
+  EXPECT_FALSE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
+
+  // SUFFIX: has_pending = true
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX;
+  EXPECT_TRUE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
+
+  // DONE: has_pending = false
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE;
+  EXPECT_FALSE(iree_tokenizer_postprocessor_encode_state_has_pending(&state));
 }
 
 TEST(PostprocessorEncodeState, EmitPrefixWithOffsets) {
