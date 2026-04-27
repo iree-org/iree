@@ -38,7 +38,6 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
 // CHECK: arith.divf
-// CHECK: arith.mulf
 // CHECK: arith.truncf
 // CHECK: linalg.yield
 
@@ -76,6 +75,5 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[SAFE_SUM]], %[[OUT]]#0
 // CHECK: arith.divf
-// CHECK: arith.mulf
 // CHECK: arith.truncf
 // CHECK: linalg.yield

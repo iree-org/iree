@@ -137,12 +137,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
       attnOp.getOutput(), compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value one = arith::ConstantOp::create(
-            b, loc, b.getFloatAttr(args[0].getType(), 1.0));
-        Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
-        // Both sum and x are in fp32, as created earlier, so we only need
-        // to cast after the mul.
-        Value result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+        Value result = arith::DivFOp::create(b, loc, args[1], args[0]);
         // Cast result to the required type by attention output.
         result = convertScalarToDtype(b, loc, result, args[2].getType(),
                                       /*isUnsignedCast=*/false);
