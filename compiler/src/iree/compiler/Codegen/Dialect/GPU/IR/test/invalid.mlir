@@ -92,7 +92,7 @@ func.func @mma_inner_tiled_invalid_outer_shape(%lhs: tensor<2x2x4xf16>, %rhs: te
 // -----
 
 func.func @mma_inner_tiled_invalid_dynamic_inner_dim(%lhs: tensor<?x?x?xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{Unexpected dynamic inner dim for operand 0 of type 'tensor<?x?x?xf16>'}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<?xf16>' is incompatible with expected MMA tile type 'vector<16x16xf16>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -105,7 +105,7 @@ func.func @mma_inner_tiled_invalid_dynamic_inner_dim(%lhs: tensor<?x?x?xf16>, %r
 // -----
 
 func.func @mma_inner_tiled_invalid_element_type(%lhs: tensor<?x?x4xf32>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{op operand element type f32 does not match expected MMA tile element type f16}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<4xf32>' is incompatible with expected MMA tile type 'vector<16x16xf16>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -118,7 +118,7 @@ func.func @mma_inner_tiled_invalid_element_type(%lhs: tensor<?x?x4xf32>, %rhs: t
 // -----
 
 func.func @mma_inner_tiled_invalid_inner_types_distributed_opaque(%lhs: tensor<?x?x3xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{op operand type tensor<?x?x3xf16>, implying tile type vector<3xf16>, is incompatible with permuted InnerTiledDescAttr tile type vector<4xf16> under semantics #iree_gpu.mma_semantics<distributed = true, opaque = true>}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<3xf16>' is incompatible with expected MMA tile type 'vector<4xf16>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -131,7 +131,7 @@ func.func @mma_inner_tiled_invalid_inner_types_distributed_opaque(%lhs: tensor<?
 // -----
 
 func.func @mma_inner_tiled_invalid_inner_types_undistributed_nonopaque(%lhs: tensor<?x?x4x16x4xf16>, %rhs: tensor<?x?x4x16x4xf16>, %acc: tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> {
-  // expected-error @+1 {{op operand type tensor<?x?x16x16xf32>, implying tile type vector<16x16xf32>, is incompatible with permuted InnerTiledDescAttr tile type vector<4x16x4xf32> under semantics #iree_gpu.mma_semantics<distributed = false, opaque = false>}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #2 inner tile 'tensor<16x16xf32>' is incompatible with expected MMA tile type 'vector<4x16x4xf32>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -144,7 +144,7 @@ func.func @mma_inner_tiled_invalid_inner_types_undistributed_nonopaque(%lhs: ten
 // -----
 
 func.func @mma_inner_tiled_invalid_inner_types_distributed_nonopaque(%lhs: tensor<?x?x1x1x4xf16>, %rhs: tensor<?x?x1x1x4xf16>, %acc: tensor<?x?x1x2x2xf32>) -> tensor<?x?x1x2x2xf32> {
-  // expected-error @+1 {{op operand type tensor<?x?x1x2x2xf32>, implying tile type vector<1x2x2xf32>, is incompatible with permuted InnerTiledDescAttr tile type vector<1x1x4xf32> under semantics #iree_gpu.mma_semantics<distributed = true, opaque = false>}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #2 inner tile 'tensor<1x2x2xf32>' is incompatible with expected MMA tile type 'vector<1x1x4xf32>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
