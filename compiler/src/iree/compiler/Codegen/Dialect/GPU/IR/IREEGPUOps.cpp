@@ -10,13 +10,44 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
+
+namespace mlir::iree_compiler::IREE::GPU {
+
+static void printAsyncDMASourceIndexTypes(OpAsmPrinter &p, Operation *op,
+                                          OperandRange sourceIndices,
+                                          TypeRange sourceIndexTypes) {
+  if (llvm::all_of(sourceIndexTypes, llvm::IsaPred<IndexType>)) {
+    return;
+  }
+  p << " [";
+  llvm::interleaveComma(sourceIndexTypes, p);
+  p << "]";
+}
+
+static ParseResult parseAsyncDMASourceIndexTypes(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> sourceIndices,
+    SmallVectorImpl<Type> &sourceIndexTypes) {
+  if (failed(parser.parseOptionalLSquare())) {
+    sourceIndexTypes.assign(sourceIndices.size(),
+                            parser.getBuilder().getIndexType());
+    return success();
+  }
+  if (parser.parseTypeList(sourceIndexTypes) || parser.parseRSquare()) {
+    return failure();
+  }
+  return success();
+}
+
+} // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off
 #define GET_OP_CLASSES
@@ -379,6 +410,152 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       return emitOpError("in_bounds array size (")
              << inBoundsAttr->size() << ") must match init rank (" << initRank
              << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AsyncDMAOp
+//===----------------------------------------------------------------------===//
+
+void AsyncDMAOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  Value source = getSource();
+  Value dest = getDest();
+
+  if (isa<MemRefType>(source.getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+
+  if (isa<MemRefType>(dest.getType())) {
+    effects.emplace_back(MemoryEffects::Write::get(), &getDestMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+LogicalResult AsyncDMAOp::verify() {
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto destType = cast<ShapedType>(getDest().getType());
+
+  int64_t sourceRank = sourceType.getRank();
+  int64_t destRank = destType.getRank();
+
+  if (getSourceIndices().size() != sourceRank) {
+    return emitOpError("expected ")
+           << sourceRank << " source indices (source rank), got "
+           << getSourceIndices().size();
+  }
+
+  if (getDestIndices().size() != destRank) {
+    return emitOpError("expected ")
+           << destRank << " dest indices (dest rank), got "
+           << getDestIndices().size();
+  }
+
+  // Each source index must be index or 1-D vector<Nxindex>.
+  for (auto [i, idx] : llvm::enumerate(getSourceIndices())) {
+    Type idxType = idx.getType();
+    if (isa<IndexType>(idxType)) {
+      continue;
+    }
+    auto vecType = dyn_cast<VectorType>(idxType);
+    if (!vecType || vecType.getRank() != 1 ||
+        !vecType.getElementType().isIndex()) {
+      return emitOpError("source index #")
+             << i << " must be index or vector<Nxindex>, got " << idxType;
+    }
+  }
+
+  if (hasTensorSemantics()) {
+    if (!getResult()) {
+      return emitOpError("expected result for tensor operand");
+    }
+    if (getResult().getType() != getDest().getType()) {
+      return emitOpError("result type must match dest type");
+    }
+  } else {
+    if (getResult()) {
+      return emitOpError("unexpected result for memref operand");
+    }
+  }
+
+  if (sourceType.getElementType() != destType.getElementType()) {
+    return emitOpError(
+        "expected source and dest to have the same element type");
+  }
+
+  auto transferVectorType = dyn_cast<VectorType>(getTransferType());
+  if (!transferVectorType) {
+    return emitOpError("transfer_type must be a VectorType");
+  }
+
+  if (transferVectorType.getElementType() != sourceType.getElementType()) {
+    return emitOpError("transfer_type element type (")
+           << transferVectorType.getElementType()
+           << ") must match source/dest element type ("
+           << sourceType.getElementType() << ")";
+  }
+
+  if (transferVectorType.getRank() != destRank) {
+    return emitOpError("transfer_type rank (")
+           << transferVectorType.getRank() << ") must match dest rank ("
+           << destRank << ")";
+  }
+
+  if (std::optional<ArrayAttr> inBoundsAttr = getInBounds()) {
+    if (static_cast<int64_t>(inBoundsAttr->size()) != destRank) {
+      return emitOpError("in_bounds array size (")
+             << inBoundsAttr->size() << ") must match dest rank (" << destRank
+             << ")";
+    }
+  }
+
+  // Permutation map validation.
+  if (std::optional<AffineMap> map = getPermutationMap()) {
+    if (map->getNumDims() != sourceRank) {
+      return emitOpError("permutation_map num dims (")
+             << map->getNumDims() << ") must match source rank (" << sourceRank
+             << ")";
+    }
+    if (map->getNumResults() != destRank) {
+      return emitOpError("permutation_map num results (")
+             << map->getNumResults() << ") must match dest rank (" << destRank
+             << ")";
+    }
+    if (!map->isProjectedPermutation()) {
+      return emitOpError("permutation_map must be a projected permutation");
+    }
+  } else if (sourceRank != destRank) {
+    return emitOpError("permutation_map is required when source rank (")
+           << sourceRank << ") differs from dest rank (" << destRank << ")";
+  }
+
+  // Validate vector gather index sizes against transfer_type dimensions.
+  AffineMap map = getPermutationMap().value_or(
+      AffineMap::getMultiDimIdentityMap(sourceRank, getContext()));
+  ArrayRef<int64_t> transferShape = transferVectorType.getShape();
+  for (auto [i, idx] : llvm::enumerate(getSourceIndices())) {
+    auto vecType = dyn_cast<VectorType>(idx.getType());
+    if (!vecType) {
+      continue;
+    }
+    std::optional<unsigned> destDim =
+        map.getResultPosition(getAffineDimExpr(i, getContext()));
+    if (!destDim) {
+      return emitOpError("source dimension ")
+             << i << " has a gather index but is not mapped by permutation_map";
+    }
+    int64_t expectedSize = transferShape[*destDim];
+    int64_t actualSize = vecType.getDimSize(0);
+    if (actualSize != expectedSize) {
+      return emitOpError("gather index size (")
+             << actualSize << ") for source dimension " << i
+             << " must match transfer_type size (" << expectedSize
+             << ") in dest dimension " << *destDim;
     }
   }
 

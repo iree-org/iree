@@ -362,6 +362,98 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 }
 
 //===----------------------------------------------------------------------===//
+// AsyncDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
+    DestinationStyleOpInterface,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    AttrSizedOperandSegments]> {
+  let summary = "Asynchronous data movement";
+  let description = [{
+    Represents an asynchronous data movement from one memory to another without
+    intermediate materialization of the values in registers.
+
+    The `transfer_type` attribute is a `VectorType` describing the shape and
+    element type of the transfer. The shape is used to determine the transfer
+    tile and to validate gather indices.
+
+    Each source index can be either a scalar `index` (contiguous read starting
+    at that offset) or a `vector<Nxindex>` (gather: read N elements at the
+    positions specified by the vector). When a source index is a vector, its
+    size must match the transfer_type size in the corresponding destination
+    dimension.
+
+    Source and destination ranks may differ. When they do, a `permutation_map`
+    must be provided to map source dimensions to destination/layout dimensions.
+    When omitted, identity mapping is assumed (requires equal ranks).
+
+    This operation exists in two forms: tensor-based (value-semantic) and
+    buffer-based (memref-semantic). In tensor form, the operation returns a
+    result that aliases the `dest` operand and can be used in combination with
+    `iree_gpu.value_barrier` to synchronize with the data movement. In memref
+    form, the operation has no result and writes directly to the `dest` memref.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensorOrMemRef:$source,
+    Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$source_indices,
+    AnyRankedTensorOrMemRef:$dest,
+    Variadic<Index>:$dest_indices,
+    TypeAttr:$transfer_type,
+    OptionalAttr<AffineMapAttr>:$permutation_map,
+    OptionalAttr<BoolArrayAttr>:$in_bounds
+  );
+
+  let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
+
+  let assemblyFormat = [{
+    $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
+    $transfer_type
+    oilist(
+      `permutation_map` $permutation_map |
+      `in_bounds` $in_bounds
+    )
+    attr-dict `:` type($source)
+    ``
+    custom<AsyncDMASourceIndexTypes>(ref($source_indices), type($source_indices))
+    `` `,` type($dest) ( `->` type($result)^ )?
+  }];
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool hasTensorSemantics() {
+      return ::llvm::isa<RankedTensorType>(getDest().getType());
+    }
+
+    unsigned getSourceRank() {
+      return ::llvm::cast<ShapedType>(getSource().getType()).getRank();
+    }
+
+    unsigned getDestRank() {
+      return ::llvm::cast<ShapedType>(getDest().getType()).getRank();
+    }
+
+    bool hasGatherIndices() {
+      return ::llvm::any_of(getSourceIndices(), [](Value v) {
+        return ::llvm::isa<VectorType>(v.getType());
+      });
+    }
+
+    unsigned getNumGatherDims() {
+      return ::llvm::count_if(getSourceIndices(), [](Value v) {
+        return ::llvm::isa<VectorType>(v.getType());
+      });
+    }
+
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getDestMutable();
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // GlobalSubgroupBarrierOp
 //===----------------------------------------------------------------------===//
 

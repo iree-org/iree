@@ -189,3 +189,95 @@ func.func @vector_multi_mma_with_permutation_of_wrong_size(%lhs: vector<2x3x4xf1
   } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
   return %0 : vector<2x5x4xf32>
 }
+
+// -----
+
+// async_dma: wrong number of source indices.
+func.func @async_dma_wrong_index_count(%src: tensor<20x64xf16>,
+                                        %dest: tensor<1x64xf16>,
+                                        %i: index, %c0: index) {
+  // expected-error @+1 {{expected 2 source indices (source rank), got 1}}
+  %0 = iree_gpu.async_dma %src[%i] to %dest[%c0], vector<1x64xf16>
+      : tensor<20x64xf16>, tensor<1x64xf16> -> tensor<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: permutation_map required when ranks differ.
+func.func @async_dma_missing_permutation_map(%src: memref<20x64xf16>,
+                                              %dest: memref<64xf16>,
+                                              %i: index, %j: index, %c0: index) {
+  // expected-error @+1 {{permutation_map is required when source rank (2) differs from dest rank (1)}}
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0], vector<64xf16>
+      : memref<20x64xf16>, memref<64xf16>
+  return
+}
+
+// -----
+
+// async_dma: wrong in_bounds array size (checked against dest rank).
+func.func @async_dma_in_bounds_wrong_size(%src: tensor<20x64xf16>,
+                                           %dest: tensor<1x64xf16>,
+                                           %i: index, %j: index,
+                                           %c0: index) {
+  // expected-error @+1 {{in_bounds array size (1) must match dest rank (2)}}
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<1x64xf16>
+      in_bounds [true]
+      : tensor<20x64xf16>, tensor<1x64xf16> -> tensor<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: transfer_type rank mismatch (checked against dest rank).
+func.func @async_dma_transfer_type_rank_mismatch(%src: tensor<20x64xf16>,
+                                                   %dest: tensor<1x64xf16>,
+                                                   %i: index, %j: index,
+                                                   %c0: index) {
+  // expected-error @+1 {{transfer_type rank (1) must match dest rank (2)}}
+  %0 = iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<64xf16>
+      : tensor<20x64xf16>, tensor<1x64xf16> -> tensor<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: permutation_map has wrong number of dims.
+func.func @async_dma_permutation_map_wrong_dims(%src: memref<20x64xf16>,
+                                                  %dest: memref<64xf16>,
+                                                  %i: index, %j: index, %c0: index) {
+  // expected-error @+1 {{permutation_map num dims (1) must match source rank (2)}}
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0], vector<64xf16>
+      permutation_map affine_map<(d0) -> (d0)>
+      : memref<20x64xf16>, memref<64xf16>
+  return
+}
+
+// -----
+
+// async_dma: permutation_map has wrong number of results.
+func.func @async_dma_permutation_map_wrong_results(%src: memref<20x64xf16>,
+                                                     %dest: memref<1x64xf16>,
+                                                     %i: index, %j: index,
+                                                     %c0: index) {
+  // expected-error @+1 {{permutation_map num results (1) must match dest rank (2)}}
+  iree_gpu.async_dma %src[%i, %j] to %dest[%c0, %c0], vector<1x64xf16>
+      permutation_map affine_map<(d0, d1) -> (d0)>
+      : memref<20x64xf16>, memref<1x64xf16>
+  return
+}
+
+// -----
+
+// async_dma: gather index size doesn't match transfer_type dimension size.
+func.func @async_dma_gather_size_mismatch(%src: tensor<1024x64xf16>,
+                                           %dest: tensor<1x64xf16>,
+                                           %indices: vector<4xindex>,
+                                           %j: index, %c0: index) {
+  // expected-error @+1 {{gather index size (4) for source dimension 0 must match transfer_type size (1) in dest dimension 0}}
+  %0 = iree_gpu.async_dma %src[%indices, %j] to %dest[%c0, %c0], vector<1x64xf16>
+      : tensor<1024x64xf16> [vector<4xindex>, index],
+        tensor<1x64xf16> -> tensor<1x64xf16>
+  return
+}
