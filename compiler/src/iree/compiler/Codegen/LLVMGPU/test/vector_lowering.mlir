@@ -1,24 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-vector-lowering,canonicalize,cse))" --split-input-file %s | FileCheck %s
 
 module {
-  func.func @broadcast_read_lowering(%arg0: memref<4096x32xf16>) -> vector<1x8xf16> {
-    %cst_1 = arith.constant 0.000000e+00 : f16
-    %0 = gpu.thread_id x
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %broadcast_read = vector.transfer_read %arg0[%workgroup_id_x, %0], %cst_1 {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, 0)>} : memref<4096x32xf16>, vector<1x8xf16>
-    return %broadcast_read : vector<1x8xf16>
-  }
-}
-// CHECK-LABEL: func.func @broadcast_read_lowering
-//  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x32xf16>)
-//  CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]]{{.*}} : memref<4096x32xf16>
-//  CHECK: %[[ELEM:.+]] = vector.extract %[[LOAD]][0] : f16 from vector<1xf16>
-//  CHECK: %[[INSERT:.+]] = vector.broadcast %[[ELEM]] : f16 to vector<1x8xf16>
-//  CHECK: return %[[INSERT]]
-
-// -----
-
-module {
   func.func @contraction_masked(%lhs: vector<3xf16>, %rhs: vector<2x3xf16>, %acc: vector<2xf32>, %mask: vector<3x2xi1>) -> vector<2xf32> {
     %ret = vector.mask %mask { vector.contract {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1)>], iterator_types = ["reduction", "parallel"], kind = #vector.kind<add>} %lhs, %rhs, %acc : vector<3xf16>, vector<2x3xf16> into vector<2xf32> } : vector<3x2xi1> -> vector<2xf32>
     return %ret: vector<2xf32>
@@ -203,10 +185,10 @@ func.func @transfer_gather_unroll_embedding_lookup(
   return %out : vector<4x64xf16>
 }
 
-// After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
+// After unrolling + canonicalization, the 2D gather becomes 4 transfer_read
 // CHECK-LABEL: func.func @transfer_gather_unroll_embedding_lookup
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-4: vector.load
+// CHECK-COUNT-4: vector.transfer_read
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -230,10 +212,10 @@ func.func @transfer_gather_unroll_masked(
 }
 
 // After unrolling, mask slices are passed to each sub-gather.
-// The masked rank-1 gathers lower to vector.maskedload ops.
+// The masked rank-1 gathers lower to masked transfer_read ops.
 // CHECK-LABEL: func.func @transfer_gather_unroll_masked
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-4: vector.maskedload
+// CHECK-COUNT-4: vector.transfer_read %{{.*}}, %{{.*}}, %{{.*}}
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -257,10 +239,10 @@ func.func @transfer_gather_unroll_transposed_index(
 }
 
 // After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
-// the 3D gather becomes 4*8=32 contiguous loads.
+// the 3D gather becomes 4*8=32 transfer_reads.
 // CHECK-LABEL: func.func @transfer_gather_unroll_transposed_index
 // CHECK-NOT: transfer_gather
-// CHECK-COUNT-32: vector.load
+// CHECK-COUNT-32: vector.transfer_read
 // CHECK-NOT: transfer_gather
 
 // -----
@@ -281,9 +263,9 @@ func.func @transfer_scatter_unroll_embedding_write(
   return
 }
 
-// After unrolling, the 2D scatter becomes 4 rank-1 stores.
+// After unrolling, the 2D scatter becomes 4 rank-1 transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_embedding_write
-// CHECK-COUNT-4: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+// CHECK-COUNT-4: vector.transfer_write {{.+}} : vector<64xf16>, memref<4096x64xf16>
 
 // -----
 
@@ -304,9 +286,9 @@ func.func @transfer_scatter_unroll_masked(
   return
 }
 
-// After unrolling, mask slices are passed to each masked store.
+// After unrolling, mask slices are passed to each masked transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_masked
-// CHECK-COUNT-4: vector.maskedstore {{.+}} : memref<4096x64xf16>, vector<64xi1>, vector<64xf16>
+// CHECK-COUNT-4: vector.transfer_write %{{.+}}, %{{.+}}, %{{.+}} : vector<64xf16>, memref<4096x64xf16>
 
 // -----
 
@@ -351,6 +333,6 @@ func.func @transfer_scatter_unroll_transposed_index(
 }
 
 // After two rounds of unrolling (d0=4 then d1=8), the 3D scatter
-// becomes 4*8=32 rank-1 stores.
+// becomes 4*8=32 rank-1 transfer_writes.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
-// CHECK-COUNT-32: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+// CHECK-COUNT-32: vector.transfer_write {{.+}} : vector<64xf16>, memref<4096x64xf16>

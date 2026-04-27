@@ -4,14 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -730,6 +734,571 @@ struct ConvertReturnLike final
   }
 };
 
+// TODO: Upstream into mlir/Dialect/Vector/Utils/VectorUtils.h. This is a copy
+// of the file-local `sliceTransferIndices` from VectorUnroll.cpp.
+static SmallVector<Value> sliceTransferIndices(ArrayRef<int64_t> elementOffsets,
+                                               ArrayRef<Value> indices,
+                                               AffineMap permutationMap,
+                                               Location loc,
+                                               OpBuilder &builder) {
+  MLIRContext *ctx = builder.getContext();
+  auto isBroadcast = [](AffineExpr expr) {
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
+      return constExpr.getValue() == 0;
+    }
+    return false;
+  };
+  SmallVector<Value> slicedIndices(indices);
+  for (const auto &dim : llvm::enumerate(permutationMap.getResults())) {
+    if (isBroadcast(dim.value())) {
+      continue;
+    }
+    unsigned pos = cast<AffineDimExpr>(dim.value()).getPosition();
+    auto expr = getAffineDimExpr(0, ctx) +
+                getAffineConstantExpr(elementOffsets[dim.index()], ctx);
+    auto map = AffineMap::get(/*dimCount=*/1, /*symbolCount=*/0, expr);
+    slicedIndices[pos] =
+        affine::AffineApplyOp::create(builder, loc, map, indices[pos]);
+  }
+  return slicedIndices;
+}
+
+/// Determine which outer dims of a transfer op's permutation map have
+/// in_bounds = false and map to a real source dimension (not a broadcast).
+/// Returns true if any outer dim needs a bounds check.
+static bool getOuterBoundsInfo(ArrayAttr inBoundsAttr, AffineMap permMap,
+                               int64_t numOuterDims,
+                               SmallVectorImpl<bool> &outerInBounds) {
+  outerInBounds.assign(numOuterDims, false);
+  if (inBoundsAttr) {
+    for (int64_t d = 0; d < numOuterDims; ++d) {
+      outerInBounds[d] = cast<BoolAttr>(inBoundsAttr[d]).getValue();
+    }
+  }
+  for (int64_t d = 0; d < numOuterDims; ++d) {
+    if (!outerInBounds[d] && isa<AffineDimExpr>(permMap.getResult(d))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Build an i1 condition that is true iff all OOB outer dims are within the
+/// source bounds for the given `newIndices`. Returns nullptr if no check is
+/// needed (all outer dims are in-bounds or are broadcasts).
+static Value buildOuterBoundsCond(OpBuilder &builder, Location loc,
+                                  Value source, AffineMap permMap,
+                                  ArrayRef<bool> outerInBounds,
+                                  ValueRange newIndices) {
+  Value cond;
+  for (int64_t d = 0, e = outerInBounds.size(); d < e; ++d) {
+    if (outerInBounds[d]) {
+      continue;
+    }
+    auto dimExpr = dyn_cast<AffineDimExpr>(permMap.getResult(d));
+    if (!dimExpr) {
+      continue;
+    }
+    int64_t memrefDim = dimExpr.getPosition();
+    Value dimSize = vector::createOrFoldDimOp(builder, loc, source, memrefDim);
+    Value cmp = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::slt,
+                                      newIndices[memrefDim], dimSize);
+    cond = cond ? Value(arith::AndIOp::create(builder, loc, cond, cmp)) : cmp;
+  }
+  return cond;
+}
+
+/// Conditionally execute `thenFn` when `cond` is true, otherwise yield
+/// `fallback`. Returns the scf.if result.
+static Value buildCondOp(OpBuilder &builder, Location loc, Value cond,
+                         Value fallback,
+                         function_ref<Value(OpBuilder &)> thenFn) {
+  auto ifOp =
+      scf::IfOp::create(builder, loc, TypeRange{fallback.getType()}, cond,
+                        /*addThenBlock=*/true, /*addElseBlock=*/true);
+  {
+    auto thenBuilder = ifOp.getThenBodyBuilder();
+    scf::YieldOp::create(thenBuilder, loc, thenFn(thenBuilder));
+  }
+  {
+    auto elseBuilder = ifOp.getElseBodyBuilder();
+    scf::YieldOp::create(elseBuilder, loc, fallback);
+  }
+  return ifOp.getResult(0);
+}
+
+/// Given a transfer op's in_bounds attribute, return the attribute reduced to
+/// only the innermost entry (the last vector dimension). Returns null if the
+/// input attribute is null (i.e. the op uses the default).
+template <typename TransferOp>
+static ArrayAttr getInnerInBoundsAttr(OpBuilder &builder, TransferOp op) {
+  ArrayAttr inBounds = op.getInBoundsAttr();
+  if (!inBounds) {
+    return {};
+  }
+  return builder.getArrayAttr({inBounds.getValue().back()});
+}
+
+struct ConvertTransferRead final
+    : public OpConversionPattern<vector::TransferReadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::TransferReadOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType resultTy = op.getVectorType();
+    if (resultTy.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    ArrayRef<int64_t> shape = resultTy.getShape();
+    ArrayRef<int64_t> outerShape = shape.drop_back();
+    int64_t numOuterDims = outerShape.size();
+    auto vec1DType = VectorType::get({shape.back()}, resultTy.getElementType());
+
+    AffineMap permMap = op.getPermutationMap();
+    AffineMap newPermMap = permMap.getMinorSubMap(1);
+    ArrayAttr newInBoundsAttr = getInnerInBoundsAttr(rewriter, op);
+
+    SmallVector<bool> outerInBounds;
+    bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
+                                               numOuterDims, outerInBounds);
+
+    Value paddingVec;
+    if (needsBoundsCheck) {
+      paddingVec = vector::BroadcastOp::create(rewriter, loc, vec1DType,
+                                               op.getPadding());
+    }
+
+    ValueRange convertedMask = adaptor.getMask();
+
+    int32_t idx = 0;
+    SmallVector<Value> results;
+    SmallVector<int64_t> tileShape(numOuterDims, 1);
+    for (SmallVector<int64_t> outerIdx :
+         StaticTileOffsetRange(outerShape, tileShape)) {
+      outerIdx.push_back(0);
+      SmallVector<Value> originalIndices(op.getIndices());
+      SmallVector<Value> newIndices = sliceTransferIndices(
+          outerIdx, originalIndices, permMap, loc, rewriter);
+
+      Value newMask = convertedMask.empty() ? Value{} : convertedMask[idx++];
+
+      Value inBoundsCond =
+          needsBoundsCheck
+              ? buildOuterBoundsCond(rewriter, loc, op.getBase(), permMap,
+                                     outerInBounds, newIndices)
+              : Value{};
+
+      auto buildRead = [&](OpBuilder &b) -> Value {
+        return vector::TransferReadOp::create(
+            b, loc, vec1DType, op.getBase(), newIndices,
+            AffineMapAttr::get(newPermMap), op.getPadding(), newMask,
+            newInBoundsAttr);
+      };
+
+      Value result;
+      if (inBoundsCond) {
+        result =
+            buildCondOp(rewriter, loc, inBoundsCond, paddingVec, buildRead);
+      } else {
+        result = buildRead(rewriter);
+      }
+      results.push_back(result);
+    }
+    rewriter.replaceOpWithMultiple(op, {results});
+    return success();
+  }
+};
+
+/// Convert transfer_write with an n-D vector into multiple rank-1 writes,
+/// one per outer-dim combination, with adjusted memref indices. For tensor
+/// semantics, sub-writes are chained via SSA results.
+struct ConvertTransferWrite final
+    : public OpConversionPattern<vector::TransferWriteOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::TransferWriteOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType vectorTy = op.getVectorType();
+    if (vectorTy.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    ArrayRef<int64_t> shape = vectorTy.getShape();
+    ArrayRef<int64_t> outerShape = shape.drop_back();
+    int64_t numOuterDims = outerShape.size();
+
+    AffineMap permMap = op.getPermutationMap();
+    AffineMap newPermMap = permMap.getMinorSubMap(1);
+    ArrayAttr newInBoundsAttr = getInnerInBoundsAttr(rewriter, op);
+
+    SmallVector<bool> outerInBounds;
+    bool needsBoundsCheck = getOuterBoundsInfo(op.getInBoundsAttr(), permMap,
+                                               numOuterDims, outerInBounds);
+
+    SmallVector<Value> vectorSlices(adaptor.getValueToStore());
+    ValueRange convertedMask = adaptor.getMask();
+    Value dest = op.getBase();
+    bool isTensor = op.hasPureTensorSemantics();
+
+    int64_t flatIdx = 0;
+    SmallVector<int64_t> tileShape(numOuterDims, 1);
+    for (SmallVector<int64_t> outerIdx :
+         StaticTileOffsetRange(outerShape, tileShape)) {
+      outerIdx.push_back(0);
+      SmallVector<Value> originalIndices(op.getIndices());
+      SmallVector<Value> newIndices = sliceTransferIndices(
+          outerIdx, originalIndices, permMap, loc, rewriter);
+
+      Value newMask = convertedMask.empty() ? Value{} : convertedMask[flatIdx];
+      Value vecSlice = vectorSlices[flatIdx++];
+
+      Value inBoundsCond =
+          needsBoundsCheck
+              ? buildOuterBoundsCond(rewriter, loc, op.getBase(), permMap,
+                                     outerInBounds, newIndices)
+              : Value{};
+
+      auto buildWrite = [&](OpBuilder &b) {
+        return vector::TransferWriteOp::create(
+            b, loc, vecSlice, dest, newIndices, AffineMapAttr::get(newPermMap),
+            newMask, newInBoundsAttr);
+      };
+
+      if (inBoundsCond && isTensor) {
+        dest = buildCondOp(
+            rewriter, loc, inBoundsCond, dest,
+            [&](OpBuilder &b) -> Value { return buildWrite(b).getResult(); });
+      } else if (inBoundsCond && !isTensor) {
+        scf::IfOp::create(rewriter, loc, inBoundsCond,
+                          [&](OpBuilder &thenBuilder, Location thenLoc) {
+                            buildWrite(thenBuilder);
+                            scf::YieldOp::create(thenBuilder, thenLoc);
+                          });
+      } else if (!inBoundsCond && isTensor) {
+        auto writeOp = buildWrite(rewriter);
+        dest = writeOp.getResult();
+      } else /* (!inBoundsCond && !isTensor) */ {
+        buildWrite(rewriter);
+      }
+    }
+
+    if (isTensor) {
+      rewriter.replaceOp(op, dest);
+    } else {
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Gather/Scatter helpers
+//===----------------------------------------------------------------------===//
+
+using IREE::VectorExt::TransferGatherOp;
+using IREE::VectorExt::TransferScatterOp;
+
+/// Remove all outer dims (0 through numOuterDims-1) from a base map.
+/// Outer dim references become constant 0 (offsets handle the actual values).
+/// Inner dims are renumbered starting from 0.
+static AffineMap removeOuterDimsFromBaseMap(AffineMap map,
+                                            int64_t numOuterDims) {
+  MLIRContext *ctx = map.getContext();
+  SmallVector<AffineExpr> newResults;
+  for (AffineExpr expr : map.getResults()) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      int64_t pos = dimExpr.getPosition();
+      if (pos < numOuterDims) {
+        newResults.push_back(getAffineConstantExpr(0, ctx));
+      } else {
+        newResults.push_back(getAffineDimExpr(pos - numOuterDims, ctx));
+      }
+    } else {
+      newResults.push_back(expr);
+    }
+  }
+  return AffineMap::get(map.getNumDims() - numOuterDims, map.getNumSymbols(),
+                        newResults, ctx);
+}
+
+/// Remove outer dim references from an index vec or mask map. Results
+/// referencing outer dims are dropped; their (axis, outerDim) pairs are
+/// recorded in `axisExtractions` for slicing. Inner dims are renumbered.
+static AffineMap removeOuterDimsFromIndexMap(
+    AffineMap map, int64_t numOuterDims,
+    SmallVectorImpl<std::pair<int64_t, int64_t>> &axisExtractions) {
+  MLIRContext *ctx = map.getContext();
+  SmallVector<AffineExpr> newResults;
+  for (auto [resultIdx, expr] : llvm::enumerate(map.getResults())) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      int64_t pos = dimExpr.getPosition();
+      if (pos < numOuterDims) {
+        axisExtractions.push_back({resultIdx, pos});
+        continue;
+      }
+      newResults.push_back(getAffineDimExpr(pos - numOuterDims, ctx));
+    } else {
+      newResults.push_back(expr);
+    }
+  }
+  return AffineMap::get(map.getNumDims() - numOuterDims, map.getNumSymbols(),
+                        newResults, ctx);
+}
+
+/// For each outer dim, find which base map results reference it.
+static void computeBaseDimsPerOuterDim(
+    AffineMap baseMap, int64_t numOuterDims,
+    SmallVectorImpl<SmallVector<int64_t>> &baseDimsPerOuterDim) {
+  baseDimsPerOuterDim.resize(numOuterDims);
+  for (auto [resultIdx, expr] : llvm::enumerate(baseMap.getResults())) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      int64_t pos = dimExpr.getPosition();
+      if (pos < numOuterDims) {
+        baseDimsPerOuterDim[pos].push_back(resultIdx);
+      }
+    }
+  }
+}
+
+/// Extract a slice from a vector at position `idx` along the given `axis`.
+/// For a vector<4x8xindex>, extracting axis=0, idx=2 gives vector<8xindex>.
+static Value extractVecSlice(OpBuilder &b, Location loc, Value vec,
+                             int64_t axis, int64_t idx) {
+  auto vecType = cast<VectorType>(vec.getType());
+  int64_t rank = vecType.getRank();
+  if (rank == 0) {
+    return vec;
+  }
+  if (axis == 0) {
+    return vector::ExtractOp::create(b, loc, vec, int64_t{idx});
+  }
+  SmallVector<int64_t> offsets(rank, 0);
+  SmallVector<int64_t> sizes(vecType.getShape());
+  SmallVector<int64_t> strides(rank, 1);
+  offsets[axis] = idx;
+  sizes[axis] = 1;
+  Value slice = vector::ExtractStridedSliceOp::create(b, loc, vec, offsets,
+                                                      sizes, strides);
+  SmallVector<int64_t> newShape;
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i != axis) {
+      newShape.push_back(vecType.getShape()[i]);
+    }
+  }
+  auto newType = VectorType::get(newShape, vecType.getElementType());
+  return vector::ShapeCastOp::create(b, loc, newType, slice);
+}
+
+/// Extract slices from a vector (index vec or mask) for a given outer index.
+/// Extractions are sorted by axis descending so that earlier extractions
+/// don't shift the positions of later ones.
+static Value
+extractForOuterIdx(OpBuilder &b, Location loc, Value vec,
+                   ArrayRef<std::pair<int64_t, int64_t>> axisExtractions,
+                   ArrayRef<int64_t> outerIdx) {
+  SmallVector<std::pair<int64_t, int64_t>> sorted(axisExtractions);
+  llvm::sort(sorted, [](auto &a, auto &b) { return a.first > b.first; });
+  for (auto [axis, outerDim] : sorted) {
+    vec = extractVecSlice(b, loc, vec, axis, outerIdx[outerDim]);
+  }
+  return vec;
+}
+
+/// Compute the fully-reduced indexing maps (removing all outer dims) and
+/// populate the tracking structures needed for offset/index-vec/mask slicing.
+static void computeReducedMapsAndTracking(
+    ArrayRef<AffineMap> indexingMaps, int64_t numOuterDims,
+    int64_t numIndexVecs, bool hasMask, SmallVectorImpl<AffineMap> &reducedMaps,
+    SmallVectorImpl<SmallVector<int64_t>> &baseDimsPerOuterDim,
+    SmallVectorImpl<SmallVector<std::pair<int64_t, int64_t>>>
+        &indexVecExtractions,
+    SmallVectorImpl<std::pair<int64_t, int64_t>> &maskExtractions) {
+  AffineMap baseMap = indexingMaps[0];
+  reducedMaps.push_back(removeOuterDimsFromBaseMap(baseMap, numOuterDims));
+  computeBaseDimsPerOuterDim(baseMap, numOuterDims, baseDimsPerOuterDim);
+
+  for (int64_t k = 0; k < numIndexVecs; ++k) {
+    SmallVector<std::pair<int64_t, int64_t>> extractions;
+    reducedMaps.push_back(removeOuterDimsFromIndexMap(
+        indexingMaps[1 + k], numOuterDims, extractions));
+    indexVecExtractions.push_back(std::move(extractions));
+  }
+
+  if (hasMask) {
+    reducedMaps.push_back(removeOuterDimsFromIndexMap(
+        indexingMaps.back(), numOuterDims, maskExtractions));
+  }
+}
+
+/// Compute new offsets for a given outer index by adding each component
+/// to the base offsets that reference the corresponding outer dim.
+static SmallVector<Value>
+computeOffsetsForOuterIdx(OpBuilder &b, Location loc, ValueRange offsets,
+                          ArrayRef<SmallVector<int64_t>> baseDimsPerOuterDim,
+                          ArrayRef<int64_t> outerIdx) {
+  SmallVector<Value> newOffsets(offsets);
+  for (auto [d, dims] : llvm::enumerate(baseDimsPerOuterDim)) {
+    if (outerIdx[d] == 0) {
+      continue;
+    }
+    Value iVal = arith::ConstantIndexOp::create(b, loc, outerIdx[d]);
+    for (int64_t baseDim : dims) {
+      newOffsets[baseDim] =
+          arith::AddIOp::create(b, loc, newOffsets[baseDim], iVal);
+    }
+  }
+  return newOffsets;
+}
+
+//===----------------------------------------------------------------------===//
+// ConvertTransferGather / ConvertTransferScatter
+//===----------------------------------------------------------------------===//
+
+/// Convert transfer_gather with an n-D result vector into multiple rank-1
+/// sub-gathers, one per outer-dim combination. Replaces the op with
+/// multiple 1-D vector results via the 1:N type conversion.
+struct ConvertTransferGather final
+    : public OpConversionPattern<TransferGatherOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TransferGatherOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType vectorType = op.getVector().getType();
+    if (vectorType.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    ArrayRef<int64_t> shape = vectorType.getShape();
+    ArrayRef<int64_t> outerShape = shape.drop_back();
+    int64_t numOuterDims = outerShape.size();
+    auto vec1DType =
+        VectorType::get({shape.back()}, vectorType.getElementType());
+
+    SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
+    OperandRange indexVecs = op.getIndexVecs();
+    int64_t numIndexVecs = indexVecs.size();
+    Value mask = op.getMask();
+
+    SmallVector<AffineMap> reducedMaps;
+    SmallVector<SmallVector<int64_t>> baseDimsPerOuterDim;
+    SmallVector<SmallVector<std::pair<int64_t, int64_t>>> indexVecExtractions;
+    SmallVector<std::pair<int64_t, int64_t>> maskExtractions;
+    computeReducedMapsAndTracking(indexingMaps, numOuterDims, numIndexVecs,
+                                  !!mask, reducedMaps, baseDimsPerOuterDim,
+                                  indexVecExtractions, maskExtractions);
+
+    SmallVector<Value> results;
+    SmallVector<int64_t> tileShape(numOuterDims, 1);
+    for (SmallVector<int64_t> outerIdx :
+         StaticTileOffsetRange(outerShape, tileShape)) {
+      SmallVector<Value> newOffsets = computeOffsetsForOuterIdx(
+          rewriter, loc, op.getOffsets(), baseDimsPerOuterDim, outerIdx);
+
+      SmallVector<Value> newIndexVecs;
+      for (int64_t k = 0; k < numIndexVecs; ++k) {
+        newIndexVecs.push_back(extractForOuterIdx(
+            rewriter, loc, indexVecs[k], indexVecExtractions[k], outerIdx));
+      }
+
+      Value newMask = mask ? extractForOuterIdx(rewriter, loc, mask,
+                                                maskExtractions, outerIdx)
+                           : nullptr;
+
+      auto subGather = TransferGatherOp::create(
+          rewriter, loc, vec1DType, op.getBase(), newOffsets, newIndexVecs,
+          rewriter.getAffineMapArrayAttr(reducedMaps), op.getPadding(),
+          newMask);
+      results.push_back(subGather.getResult());
+    }
+
+    rewriter.replaceOpWithMultiple(op, {results});
+    return success();
+  }
+};
+
+/// Convert transfer_scatter with an n-D vector operand into multiple rank-1
+/// sub-scatters. The adapted vector values (already split into 1-D by the
+/// type converter) are scattered one at a time. For tensor semantics,
+/// sub-scatters are chained via SSA results.
+struct ConvertTransferScatter final
+    : public OpConversionPattern<TransferScatterOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TransferScatterOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType vectorType = op.getVectorType();
+    if (vectorType.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    ArrayRef<int64_t> shape = vectorType.getShape();
+    ArrayRef<int64_t> outerShape = shape.drop_back();
+    int64_t numOuterDims = outerShape.size();
+
+    SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
+    OperandRange indexVecs = op.getIndexVecs();
+    int64_t numIndexVecs = indexVecs.size();
+    Value mask = op.getMask();
+
+    SmallVector<AffineMap> reducedMaps;
+    SmallVector<SmallVector<int64_t>> baseDimsPerOuterDim;
+    SmallVector<SmallVector<std::pair<int64_t, int64_t>>> indexVecExtractions;
+    SmallVector<std::pair<int64_t, int64_t>> maskExtractions;
+    computeReducedMapsAndTracking(indexingMaps, numOuterDims, numIndexVecs,
+                                  !!mask, reducedMaps, baseDimsPerOuterDim,
+                                  indexVecExtractions, maskExtractions);
+
+    SmallVector<Value> vectorSlices(adaptor.getVector());
+    Value dest = op.getBase();
+
+    SmallVector<int64_t> tileShape(numOuterDims, 1);
+    int64_t flatIdx = 0;
+    for (SmallVector<int64_t> outerIdx :
+         StaticTileOffsetRange(outerShape, tileShape)) {
+      SmallVector<Value> newOffsets = computeOffsetsForOuterIdx(
+          rewriter, loc, op.getOffsets(), baseDimsPerOuterDim, outerIdx);
+
+      SmallVector<Value> newIndexVecs;
+      for (int64_t k = 0; k < numIndexVecs; ++k) {
+        newIndexVecs.push_back(extractForOuterIdx(
+            rewriter, loc, indexVecs[k], indexVecExtractions[k], outerIdx));
+      }
+
+      Value newMask = mask ? extractForOuterIdx(rewriter, loc, mask,
+                                                maskExtractions, outerIdx)
+                           : nullptr;
+
+      Value vecSlice = vectorSlices[flatIdx++];
+      if (op.hasTensorSemantics()) {
+        auto subScatter = TransferScatterOp::create(
+            rewriter, loc, dest.getType(), dest, vecSlice, newOffsets,
+            newIndexVecs, rewriter.getAffineMapArrayAttr(reducedMaps), newMask);
+        dest = subScatter.getResult();
+      } else {
+        TransferScatterOp::create(
+            rewriter, loc, TypeRange{}, dest, vecSlice, newOffsets,
+            newIndexVecs, rewriter.getAffineMapArrayAttr(reducedMaps), newMask);
+      }
+    }
+
+    if (op.hasTensorSemantics()) {
+      rewriter.replaceOp(op, dest);
+    } else {
+      rewriter.eraseOp(op);
+    }
+    return success();
+  }
+};
+
 struct LLVMGPULegalizeNDVectorsPass final
     : impl::LLVMGPULegalizeNDVectorsPassBase<LLVMGPULegalizeNDVectorsPass> {
 
@@ -745,12 +1314,14 @@ struct LLVMGPULegalizeNDVectorsPass final
     populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                         typeConverter);
     patterns.add<UnrollElementwiseOps, ConvertReturnLike>(typeConverter, ctx);
-    patterns.add<
-        ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
-        ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
-        ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
-        ConvertVectorToElements, ConvertVectorFromElements,
-        ConvertVectorBroadcast, ConvertVectorBitcast>(typeConverter, ctx);
+    patterns
+        .add<ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
+             ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
+             ConvertVectorInsertStridedSlice, ConvertArithConstant,
+             ConvertUBPoison, ConvertVectorToElements,
+             ConvertVectorFromElements, ConvertVectorBroadcast,
+             ConvertVectorBitcast, ConvertTransferRead, ConvertTransferWrite,
+             ConvertTransferGather, ConvertTransferScatter>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the

@@ -71,6 +71,7 @@ iree_lit_test_suite(
     "transpose_pipeline_test.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
+    "vector_transfer_lowering.mlir"
     "winograd_pipeline_test.mlir"
   TOOLS
     FileCheck

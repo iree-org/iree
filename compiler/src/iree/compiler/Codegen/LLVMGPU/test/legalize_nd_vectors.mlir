@@ -311,3 +311,370 @@ util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> 
 //       CHECK:   %[[R0:.+]] = arith.addf %[[A0]], %[[B0]] : vector<4xf32>
 //       CHECK:   %[[R1:.+]] = arith.addf %[[A1]], %[[B1]] : vector<4xf32>
 //       CHECK:   util.return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 2-D result: unrolled into rank-1 reads with adjusted offsets.
+func.func @transfer_read_2d(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %padding: f32) -> vector<5x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c], %padding {in_bounds = [true, false]} : memref<?x?x?xf32>, vector<5x4xf32>
+  return %vec : vector<5x4xf32>
+}
+// CHECK-DAG:   #[[$ID:.*]] = affine_map<(d0) -> (d0)>
+// CHECK-DAG:   #[[$P1:.*]] = affine_map<(d0) -> (d0 + 1)>
+// CHECK-DAG:   #[[$P2:.*]] = affine_map<(d0) -> (d0 + 2)>
+// CHECK-DAG:   #[[$P3:.*]] = affine_map<(d0) -> (d0 + 3)>
+// CHECK-DAG:   #[[$P4:.*]] = affine_map<(d0) -> (d0 + 4)>
+// CHECK-LABEL: func.func @transfer_read_2d
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_2:.+]] = affine.apply #[[$P2]](%[[IDX1]])
+//       CHECK:   %[[OFF2_2:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V2:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_2]], %[[OFF2_2]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_3:.+]] = affine.apply #[[$P3]](%[[IDX1]])
+//       CHECK:   %[[OFF2_3:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V3:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_3]], %[[OFF2_3]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_4:.+]] = affine.apply #[[$P4]](%[[IDX1]])
+//       CHECK:   %[[OFF2_4:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V4:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_4]], %[[OFF2_4]]], %[[PAD]] : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   return %[[V0]], %[[V1]], %[[V2]], %[[V3]], %[[V4]] : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 2-D mask: each unrolled read gets the corresponding 1-D mask slice.
+func.func @transfer_read_2d_masked(%A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %padding: f32, %mask: vector<2x4xi1>) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c], %padding, %mask {in_bounds = [true, false]} : memref<?x?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_2d_masked
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[PAD:.+]]: f32, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V0:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[PAD]], %[[M0]]
+//  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   %[[V1:.+]] = vector.transfer_read %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[PAD]], %[[M1]]
+//  CHECK-SAME:     : memref<?x?x?xf32>, vector<4xf32>
+//       CHECK:   return %[[V0]], %[[V1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_write with 2-D vector on memref: unrolled into rank-1 writes with adjusted offsets.
+func.func @transfer_write_2d(%vec: vector<3x4xf32>, %A: memref<?x?x?xf32>, %a: index, %b: index, %c: index) {
+  vector.transfer_write %vec, %A[%a, %b, %c] {in_bounds = [true, false]} : vector<3x4xf32>, memref<?x?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @transfer_write_2d
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index)
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_2:.+]] = affine.apply #[[$P2]](%[[IDX1]])
+//       CHECK:   %[[OFF2_2:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V2]], %[[A]][%[[IDX0]], %[[OFF1_2]], %[[OFF2_2]]] : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   return
+
+// -----
+
+// transfer_write with 2-D mask: each unrolled write gets the corresponding 1-D mask slice.
+func.func @transfer_write_2d_masked(%vec: vector<2x4xf32>, %A: memref<?x?x?xf32>, %a: index, %b: index, %c: index, %mask: vector<2x4xi1>) {
+  vector.transfer_write %vec, %A[%a, %b, %c], %mask {in_bounds = [true, false]} : vector<2x4xf32>, memref<?x?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @transfer_write_2d_masked
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?x?xf32>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//       CHECK:   %[[OFF1_0:.+]] = affine.apply #[[$ID]](%[[IDX1]])
+//       CHECK:   %[[OFF2_0:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V0]], %[[A]][%[[IDX0]], %[[OFF1_0]], %[[OFF2_0]]], %[[M0]]
+//  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   %[[OFF1_1:.+]] = affine.apply #[[$P1]](%[[IDX1]])
+//       CHECK:   %[[OFF2_1:.+]] = affine.apply #[[$ID]](%[[IDX2]])
+//       CHECK:   vector.transfer_write %[[V1]], %[[A]][%[[IDX0]], %[[OFF1_1]], %[[OFF2_1]]], %[[M1]]
+//  CHECK-SAME:     : vector<4xf32>, memref<?x?x?xf32>
+//       CHECK:   return
+
+// -----
+
+// transfer_read with OOB outer dim: generates scf.if bounds checks with
+// padding fallback. Outer dim (vector dim 0) maps to memref dim 0 and is
+// not guaranteed in-bounds.
+func.func @transfer_read_2d_oob(%A: memref<?x?xf32>, %i: index, %j: index, %pad: f32) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%i, %j], %pad {in_bounds = [false, true]} : memref<?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_2d_oob
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[PADVEC:.+]] = vector.broadcast %[[PAD]] : f32 to vector<4xf32>
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[J0:.+]] = affine.apply #[[$ID]](%[[J]])
+//       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
+//       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]][%[[I0]], %[[J0]]], %[[PAD]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[J1:.+]] = affine.apply #[[$ID]](%[[J]])
+//       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
+//       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]][%[[I1]], %[[J1]]], %[[PAD]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   return %[[R0]], %[[R1]]
+
+// -----
+
+// transfer_write with OOB outer dim on memref: generates scf.if to
+// conditionally skip the write when the outer index is out of bounds.
+func.func @transfer_write_2d_oob(%vec: vector<2x4xf32>, %A: memref<?x?xf32>, %i: index, %j: index) {
+  vector.transfer_write %vec, %A[%i, %j] {in_bounds = [false, true]} : vector<2x4xf32>, memref<?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @transfer_write_2d_oob
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[J0:.+]] = affine.apply #[[$ID]](%[[J]])
+//       CHECK:   %[[DIM0:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
+//       CHECK:   scf.if %[[CMP0]] {
+//       CHECK:     vector.transfer_write %[[V0]], %[[A]][%[[I0]], %[[J0]]] {in_bounds = [true]}
+//       CHECK:   }
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[J1:.+]] = affine.apply #[[$ID]](%[[J]])
+//       CHECK:   %[[DIM1:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
+//       CHECK:   scf.if %[[CMP1]] {
+//       CHECK:     vector.transfer_write %[[V1]], %[[A]][%[[I1]], %[[J1]]] {in_bounds = [true]}
+//       CHECK:   }
+//       CHECK:   return
+
+// -----
+
+// transfer_write on tensor: each unrolled rank-1 write chains the SSA result
+// as the destination for the next write.
+func.func @transfer_write_tensor(%vec: vector<3x4xf32>, %dest: tensor<?x?xf32>, %i: index, %j: index) -> tensor<?x?xf32> {
+  %res = vector.transfer_write %vec, %dest[%i, %j] {in_bounds = [true, true]} : vector<3x4xf32>, tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @transfer_write_tensor
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[DEST:.+]]: tensor<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//  CHECK-SAME:   -> tensor<?x?xf32>
+//       CHECK:   %[[W0:.+]] = vector.transfer_write %[[V0]], %[[DEST]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   %[[W1:.+]] = vector.transfer_write %[[V1]], %[[W0]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   %[[W2:.+]] = vector.transfer_write %[[V2]], %[[W1]][{{.*}}] {in_bounds = [true]} : vector<4xf32>, tensor<?x?xf32>
+//       CHECK:   return %[[W2]] : tensor<?x?xf32>
+
+// -----
+
+// transfer_read with all dims in-bounds: no bounds check, inner in_bounds is [true].
+func.func @transfer_read_all_in_bounds(%A: memref<?x?xf32>, %i: index, %j: index, %pad: f32) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%i, %j], %pad {in_bounds = [true, true]} : memref<?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_all_in_bounds
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32)
+//   CHECK-NOT:   scf.if
+//   CHECK-NOT:   memref.dim
+//       CHECK:   vector.transfer_read %[[A]]{{.*}} {in_bounds = [true]} : memref<?x?xf32>, vector<4xf32>
+//       CHECK:   vector.transfer_read %[[A]]{{.*}} {in_bounds = [true]} : memref<?x?xf32>, vector<4xf32>
+//       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>
+
+// -----
+
+// transfer_read with 3-D result: unrolled into 2*3=6 rank-1 reads.
+func.func @transfer_read_3d(%A: memref<?x?x?x?xf32>, %a: index, %b: index, %c: index, %d: index, %pad: f32) -> vector<2x3x4xf32> {
+  %vec = vector.transfer_read %A[%a, %b, %c, %d], %pad {in_bounds = [true, true, true]} : memref<?x?x?x?xf32>, vector<2x3x4xf32>
+  return %vec : vector<2x3x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_3d
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
+//   CHECK-NOT:   scf.if
+//  CHECK-COUNT-6: vector.transfer_read {{.*}} : memref<?x?x?x?xf32>, vector<4xf32>
+//       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+// Rank-1 transfer_read is left untouched by the pattern.
+func.func @negative_transfer_read_1d(%A: memref<?xf32>, %i: index, %pad: f32) -> vector<4xf32> {
+  %vec = vector.transfer_read %A[%i], %pad {in_bounds = [true]} : memref<?xf32>, vector<4xf32>
+  return %vec : vector<4xf32>
+}
+// CHECK-LABEL: func.func @negative_transfer_read_1d
+//  CHECK-SAME:   (%[[A:.+]]: memref<?xf32>, %[[I:.+]]: index, %[[PAD:.+]]: f32) -> vector<4xf32>
+//       CHECK:   %[[V:.+]] = vector.transfer_read %[[A]][%[[I]]], %[[PAD]] {in_bounds = [true]} : memref<?xf32>, vector<4xf32>
+//       CHECK:   return %[[V]] : vector<4xf32>
+
+// -----
+
+// Rank-1 transfer_write is left untouched by the pattern.
+func.func @negative_transfer_write_1d(%vec: vector<4xf32>, %A: memref<?xf32>, %i: index) {
+  vector.transfer_write %vec, %A[%i] {in_bounds = [true]} : vector<4xf32>, memref<?xf32>
+  return
+}
+// CHECK-LABEL: func.func @negative_transfer_write_1d
+//  CHECK-SAME:   (%[[V:.+]]: vector<4xf32>, %[[A:.+]]: memref<?xf32>, %[[I:.+]]: index)
+//       CHECK:   vector.transfer_write %[[V]], %[[A]][%[[I]]] {in_bounds = [true]} : vector<4xf32>, memref<?xf32>
+//       CHECK:   return
+
+// -----
+
+// transfer_read with OOB outer dim and a mask: the scf.if guard wraps the
+// masked read, and the else branch yields the padding vector.
+func.func @transfer_read_oob_masked(%A: memref<?x?xf32>, %i: index, %j: index, %pad: f32, %mask: vector<2x4xi1>) -> vector<2x4xf32> {
+  %vec = vector.transfer_read %A[%i, %j], %pad, %mask {in_bounds = [false, true]} : memref<?x?xf32>, vector<2x4xf32>
+  return %vec : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @transfer_read_oob_masked
+//  CHECK-SAME:   (%[[A:.+]]: memref<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index, %[[PAD:.+]]: f32, %[[M0:.+]]: vector<4xi1>, %[[M1:.+]]: vector<4xi1>)
+//       CHECK:   %[[PADVEC:.+]] = vector.broadcast %[[PAD]] : f32 to vector<4xf32>
+//       CHECK:   %[[DIM:.+]] = memref.dim %[[A]], %{{.+}} : memref<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %{{.+}}, %[[DIM]] : index
+//       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]]{{.*}}, %[[PAD]], %[[M0]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %{{.+}}, %{{.+}} : index
+//       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (vector<4xf32>) {
+//       CHECK:     vector.transfer_read %[[A]]{{.*}}, %[[PAD]], %[[M1]] {in_bounds = [true]}
+//       CHECK:     scf.yield
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[PADVEC]]
+//       CHECK:   }
+//       CHECK:   return %[[R0]], %[[R1]]
+
+// -----
+
+// transfer_write on tensor with OOB outer dim: generates scf.if that yields
+// the updated tensor or the original when the index is out of bounds.
+func.func @transfer_write_tensor_oob(%vec: vector<2x4xf32>, %dest: tensor<?x?xf32>, %i: index, %j: index) -> tensor<?x?xf32> {
+  %res = vector.transfer_write %vec, %dest[%i, %j] {in_bounds = [false, true]} : vector<2x4xf32>, tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @transfer_write_tensor_oob
+//  CHECK-SAME:   (%[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[DEST:.+]]: tensor<?x?xf32>, %[[I:.+]]: index, %[[J:.+]]: index)
+//  CHECK-SAME:   -> tensor<?x?xf32>
+//       CHECK:   %[[I0:.+]] = affine.apply #[[$ID]](%[[I]])
+//       CHECK:   %[[DIM0:.+]] = tensor.dim %[[DEST]], %{{.+}} : tensor<?x?xf32>
+//       CHECK:   %[[CMP0:.+]] = arith.cmpi slt, %[[I0]], %[[DIM0]] : index
+//       CHECK:   %[[R0:.+]] = scf.if %[[CMP0]] -> (tensor<?x?xf32>) {
+//       CHECK:     %[[W0:.+]] = vector.transfer_write %[[V0]], %[[DEST]][{{.*}}] {in_bounds = [true]}
+//       CHECK:     scf.yield %[[W0]] : tensor<?x?xf32>
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[DEST]] : tensor<?x?xf32>
+//       CHECK:   }
+//       CHECK:   %[[I1:.+]] = affine.apply #[[$P1]](%[[I]])
+//       CHECK:   %[[DIM1:.+]] = tensor.dim %[[DEST]], %{{.+}} : tensor<?x?xf32>
+//       CHECK:   %[[CMP1:.+]] = arith.cmpi slt, %[[I1]], %[[DIM1]] : index
+//       CHECK:   %[[R1:.+]] = scf.if %[[CMP1]] -> (tensor<?x?xf32>) {
+//       CHECK:     %[[W1:.+]] = vector.transfer_write %[[V1]], %[[R0]][{{.*}}] {in_bounds = [true]}
+//       CHECK:     scf.yield %[[W1]] : tensor<?x?xf32>
+//       CHECK:   } else {
+//       CHECK:     scf.yield %[[R0]] : tensor<?x?xf32>
+//       CHECK:   }
+//       CHECK:   return %[[R1]] : tensor<?x?xf32>
+
+// -----
+
+// transfer_gather with 2-D result: unrolled into rank-1 sub-gathers.
+// CHECK-DAG: #[[$GATHER_BASE:.*]] = affine_map<(d0)[s0] -> (0, s0, d0)>
+// CHECK-DAG: #[[$GATHER_IDX:.*]] = affine_map<(d0)[s0] -> ()>
+func.func @transfer_gather_2d(%base: memref<4096x512x8xf16>, %indices: vector<4xindex>, %pad: f16) -> vector<4x8xf16> {
+  %c0 = arith.constant 0 : index
+  %result = iree_vector_ext.transfer_gather %base[%c0, %c0, %c0]
+    [%indices : vector<4xindex>], %pad {
+      indexing_maps = [
+        affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+        affine_map<(d0, d1)[s0] -> (d0)>
+      ]
+    } : memref<4096x512x8xf16>, vector<4x8xf16>
+  return %result : vector<4x8xf16>
+}
+// CHECK-LABEL: func.func @transfer_gather_2d
+//  CHECK-SAME:   (%[[BASE:.+]]: memref<4096x512x8xf16>, %[[IDX:.+]]: vector<4xindex>, %[[PAD:.+]]: f16)
+//  CHECK-SAME:   -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[I0:.+]] = vector.extract %[[IDX]][0] : index from vector<4xindex>
+//       CHECK:   %[[G0:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I0]] : index], %[[PAD]] {indexing_maps = [#[[$GATHER_BASE]], #[[$GATHER_IDX]]]} : memref<4096x512x8xf16>, vector<8xf16>
+//       CHECK:   %[[I1:.+]] = vector.extract %[[IDX]][1] : index from vector<4xindex>
+//       CHECK:   %[[G1:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I1]] : index], %[[PAD]] {indexing_maps = [#[[$GATHER_BASE]], #[[$GATHER_IDX]]]} : memref<4096x512x8xf16>, vector<8xf16>
+//       CHECK:   %[[I2:.+]] = vector.extract %[[IDX]][2] : index from vector<4xindex>
+//       CHECK:   %[[G2:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I2]] : index], %[[PAD]] {indexing_maps = [#[[$GATHER_BASE]], #[[$GATHER_IDX]]]} : memref<4096x512x8xf16>, vector<8xf16>
+//       CHECK:   %[[I3:.+]] = vector.extract %[[IDX]][3] : index from vector<4xindex>
+//       CHECK:   %[[G3:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I3]] : index], %[[PAD]] {indexing_maps = [#[[$GATHER_BASE]], #[[$GATHER_IDX]]]} : memref<4096x512x8xf16>, vector<8xf16>
+//       CHECK:   return %[[G0]], %[[G1]], %[[G2]], %[[G3]] : vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>
+
+// -----
+
+// transfer_scatter with 2-D vector on memref: unrolled into rank-1 sub-scatters.
+// CHECK-DAG: #[[$SCATTER_BASE:.*]] = affine_map<(d0)[s0] -> (0, s0, d0)>
+// CHECK-DAG: #[[$SCATTER_IDX:.*]] = affine_map<(d0)[s0] -> ()>
+func.func @transfer_scatter_2d(%vec: vector<4x8xf16>, %base: memref<4096x512x8xf16>, %indices: vector<4xindex>) {
+  %c0 = arith.constant 0 : index
+  iree_vector_ext.transfer_scatter %vec into %base[%c0, %c0, %c0]
+    [%indices : vector<4xindex>] {
+      indexing_maps = [
+        affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+        affine_map<(d0, d1)[s0] -> (d0)>
+      ]
+    } : vector<4x8xf16>, memref<4096x512x8xf16>
+  return
+}
+// CHECK-LABEL: func.func @transfer_scatter_2d
+//  CHECK-SAME:   (%[[V0:.+]]: vector<8xf16>, %[[V1:.+]]: vector<8xf16>, %[[V2:.+]]: vector<8xf16>, %[[V3:.+]]: vector<8xf16>,
+//  CHECK-SAME:    %[[BASE:.+]]: memref<4096x512x8xf16>, %[[IDX:.+]]: vector<4xindex>)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[I0:.+]] = vector.extract %[[IDX]][0] : index from vector<4xindex>
+//       CHECK:   iree_vector_ext.transfer_scatter %[[V0]] into %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I0]] : index] {indexing_maps = [#[[$SCATTER_BASE]], #[[$SCATTER_IDX]]]} : vector<8xf16>, memref<4096x512x8xf16>
+//       CHECK:   %[[I1:.+]] = vector.extract %[[IDX]][1] : index from vector<4xindex>
+//       CHECK:   iree_vector_ext.transfer_scatter %[[V1]] into %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I1]] : index] {indexing_maps = [#[[$SCATTER_BASE]], #[[$SCATTER_IDX]]]} : vector<8xf16>, memref<4096x512x8xf16>
+//       CHECK:   %[[I2:.+]] = vector.extract %[[IDX]][2] : index from vector<4xindex>
+//       CHECK:   iree_vector_ext.transfer_scatter %[[V2]] into %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I2]] : index] {indexing_maps = [#[[$SCATTER_BASE]], #[[$SCATTER_IDX]]]} : vector<8xf16>, memref<4096x512x8xf16>
+//       CHECK:   %[[I3:.+]] = vector.extract %[[IDX]][3] : index from vector<4xindex>
+//       CHECK:   iree_vector_ext.transfer_scatter %[[V3]] into %[[BASE]][%[[C0]], %[[C0]], %[[C0]]] [%[[I3]] : index] {indexing_maps = [#[[$SCATTER_BASE]], #[[$SCATTER_IDX]]]} : vector<8xf16>, memref<4096x512x8xf16>
+//       CHECK:   return
+
+// -----
+
+// transfer_gather with contiguous dim (d0 maps to base): offsets are adjusted.
+// CHECK-DAG: #[[$CONTIG_BASE:.*]] = affine_map<(d0) -> (0, d0)>
+func.func @transfer_gather_contiguous_dim(%base: memref<64x64xf16>, %pad: f16) -> vector<4x8xf16> {
+  %c0 = arith.constant 0 : index
+  %result = iree_vector_ext.transfer_gather %base[%c0, %c0], %pad {
+      indexing_maps = [
+        affine_map<(d0, d1) -> (d0, d1)>
+      ]
+    } : memref<64x64xf16>, vector<4x8xf16>
+  return %result : vector<4x8xf16>
+}
+// CHECK-LABEL: func.func @transfer_gather_contiguous_dim
+//  CHECK-SAME:   (%[[BASE:.+]]: memref<64x64xf16>, %[[PAD:.+]]: f16)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[G0:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[C0]], %[[C0]]], %[[PAD]] {indexing_maps = [#[[$CONTIG_BASE]]]} : memref<64x64xf16>, vector<8xf16>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[IDX1:.+]] = arith.addi %[[C0]], %[[C1]] : index
+//       CHECK:   %[[G1:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[IDX1]], %[[C0]]], %[[PAD]] {indexing_maps = [#[[$CONTIG_BASE]]]} : memref<64x64xf16>, vector<8xf16>
+//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[IDX2:.+]] = arith.addi %[[C0]], %[[C2]] : index
+//       CHECK:   %[[G2:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[IDX2]], %[[C0]]], %[[PAD]] {indexing_maps = [#[[$CONTIG_BASE]]]} : memref<64x64xf16>, vector<8xf16>
+//       CHECK:   %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:   %[[IDX3:.+]] = arith.addi %[[C0]], %[[C3]] : index
+//       CHECK:   %[[G3:.+]] = iree_vector_ext.transfer_gather %[[BASE]][%[[IDX3]], %[[C0]]], %[[PAD]] {indexing_maps = [#[[$CONTIG_BASE]]]} : memref<64x64xf16>, vector<8xf16>
+//       CHECK:   return %[[G0]], %[[G1]], %[[G2]], %[[G3]]
