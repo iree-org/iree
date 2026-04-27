@@ -34,6 +34,7 @@ iree_cc_library(
     "executable_format.c"
   DEPS
     iree::base
+    iree::hal::utils::elf_format
   PUBLIC
 )
 
@@ -144,6 +145,48 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    inline_dispatch
+  HDRS
+    "inline_dispatch.h"
+  SRCS
+    "inline_dispatch.c"
+  DEPS
+    ::local
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    profile
+  HDRS
+    "profile.h"
+  SRCS
+    "profile.c"
+  DEPS
+    ::executable_loader
+    iree::base
+    iree::base::threading
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    profile_test
+  SRCS
+    "profile_test.cc"
+  DEPS
+    ::executable_loader
+    ::profile
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     local
   HDRS
     "executable_loader.h"
@@ -156,10 +199,26 @@ iree_cc_library(
   DEPS
     ::executable_environment
     ::executable_library
+    ::profile
     iree::base
     iree::base::internal
     iree::base::internal::cpu
     iree::base::internal::fpu_state
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    transient_buffer
+  HDRS
+    "transient_buffer.h"
+  SRCS
+    "transient_buffer.c"
+  DEPS
+    iree::async
+    iree::base
+    iree::base::threading
     iree::hal
   PUBLIC
 )

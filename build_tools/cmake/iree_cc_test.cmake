@@ -143,6 +143,20 @@ function(iree_cc_test)
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   set(_ENVIRONMENT_VARS)
+  if(IREE_ENABLE_ASAN)
+    if("driver=hip" IN_LIST _RULE_LABELS)
+      set(_LSAN_SUPP_FILE
+          "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_rocm.txt")
+      list(APPEND _ENVIRONMENT_VARS
+          "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
+    if("driver=vulkan" IN_LIST _RULE_LABELS)
+      set(_LSAN_SUPP_FILE
+          "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_vulkan.txt")
+      list(APPEND _ENVIRONMENT_VARS
+          "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
+  endif()
 
   # Case for cross-compiling towards Android.
   if(ANDROID)

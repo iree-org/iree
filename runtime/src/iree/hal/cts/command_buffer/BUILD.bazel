@@ -92,6 +92,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "dispatch_indirect_parameters_test",
+    testonly = True,
+    srcs = ["dispatch_indirect_parameters_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "dispatch_multi_workgroup_test",
     testonly = True,
     srcs = ["dispatch_multi_workgroup_test.cc"],
@@ -113,6 +124,28 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+iree_runtime_cc_library(
+    name = "transient_buffer_test",
+    testonly = True,
+    srcs = ["transient_buffer_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "stress_test",
+    testonly = True,
+    srcs = ["stress_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
 # All command buffer tests (non-executable).
 iree_runtime_cc_library(
     name = "all_tests",
@@ -121,8 +154,32 @@ iree_runtime_cc_library(
         ":basic_test",
         ":copy_buffer_test",
         ":fill_buffer_test",
+        ":stress_test",
+        ":transient_buffer_test",
         ":update_buffer_test",
     ],
+)
+
+iree_runtime_cc_library(
+    name = "dispatch_pipeline_test",
+    testonly = True,
+    srcs = ["dispatch_pipeline_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "dispatch_reuse_test",
+    testonly = True,
+    srcs = ["dispatch_reuse_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
 )
 
 # All executable-dependent command buffer tests.
@@ -132,8 +189,11 @@ iree_runtime_cc_library(
     deps = [
         ":dispatch_constants_bindings_test",
         ":dispatch_constants_test",
+        ":dispatch_indirect_parameters_test",
         ":dispatch_multi_entrypoint_test",
         ":dispatch_multi_workgroup_test",
+        ":dispatch_pipeline_test",
+        ":dispatch_reuse_test",
         ":dispatch_test",
     ],
 )

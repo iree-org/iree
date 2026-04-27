@@ -121,6 +121,24 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    graph_command_buffer_test
+  SRCS
+    "graph_command_buffer_test.cc"
+  DEPS
+    ::hip
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=hip"
+    "requires-gpu-amd"
+)
+
+iree_cc_test(
+  NAME
     hip_allocator_test
   SRCS
     "hip_allocator_test.cc"

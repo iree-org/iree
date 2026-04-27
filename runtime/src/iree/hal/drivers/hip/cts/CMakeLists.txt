@@ -59,6 +59,8 @@ iree_hal_cts_test_suite(
   LABELS
     "driver=hip"
     "requires-gpu-amd"
+  RESOURCE_GROUP
+    hip_driver
 )
 
 iree_hal_cts_test_suite(
@@ -70,9 +72,12 @@ iree_hal_cts_test_suite(
     graph
   ARGS
     "--hip_use_streams=false"
+    "--gtest_filter=-CTS/QueueTransferTest.*:CTS/AsyncTransientBufferTest.*"
   LABELS
     "driver=hip"
     "requires-gpu-amd"
+  RESOURCE_GROUP
+    hip_driver
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

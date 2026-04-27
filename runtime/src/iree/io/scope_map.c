@@ -61,7 +61,9 @@ IREE_API_EXPORT iree_status_t iree_io_scope_map_lookup(
                                               (void**)&entry));
   entry->scope =
       iree_make_string_view((const char*)entry + sizeof(*entry), scope.size);
-  memcpy((char*)entry->scope.data, scope.data, scope.size);
+  if (scope.size > 0) {
+    memcpy((char*)entry->scope.data, scope.data, scope.size);
+  }
 
   iree_status_t status =
       iree_io_parameter_index_create(scope_map->host_allocator, &entry->index);

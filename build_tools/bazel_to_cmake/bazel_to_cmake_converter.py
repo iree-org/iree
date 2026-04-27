@@ -1224,10 +1224,17 @@ class BuildFileFunctions(object):
         flag_values=None,
         name="",
         args=None,
+        resource_group=None,
         tags=None,
         testonly=None,
         **kwargs,
     ):
+        if not resource_group and tags:
+            for tag in tags:
+                if tag.startswith("resource_group:"):
+                    resource_group = tag[len("resource_group:") :]
+                    break
+
         # Expand executable_formats into individual iree_hal_cts_testdata()
         # calls. The CMake function takes only flat TESTDATA_LIBS, avoiding
         # nested dict argument parsing.
@@ -1261,6 +1268,9 @@ class BuildFileFunctions(object):
         )
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
+        resource_group_block = self._convert_string_arg_block(
+            "RESOURCE_GROUP", resource_group, quote=False
+        )
         testonly_block = self._convert_option_block("TESTONLY", testonly)
 
         self._converter.body += (
@@ -1270,6 +1280,7 @@ class BuildFileFunctions(object):
             f"{name_block}"
             f"{args_block}"
             f"{labels_block}"
+            f"{resource_group_block}"
             f"{testonly_block}"
             f")\n\n"
         )
