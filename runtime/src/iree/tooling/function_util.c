@@ -21,6 +21,17 @@ iree_status_t iree_tooling_append_async_fences(
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
+  if (!device) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "coarse-fences invocation requires a HAL device to "
+        "create wait/signal fences, but module dependency "
+        "resolution did not create one; ensure the invoked "
+        "function signals or fails its signal fence through "
+        "HAL operations so the module declares a HAL "
+        "dependency");
+  }
 
   // Create the signal fence as a 0->1 transition. The caller will wait on that.
   iree_hal_semaphore_t* semaphore = NULL;
