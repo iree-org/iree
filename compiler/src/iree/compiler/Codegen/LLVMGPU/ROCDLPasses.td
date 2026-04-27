@@ -50,6 +50,18 @@ def ROCDLConfigureBufferInstructionsPass :
   let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
+
+def ROCDLGroupBufferLoadsPass :
+    InterfacePass<"iree-rocdl-group-buffer-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Group adjacent buffer loads to improve AMDGPU instruction scheduling";
+  let description = [{
+    Moves buffer loads (vector.load from fat raw buffer memrefs) next to each
+    other when they are separated only by operations that do not depend on the
+    preceding load's result. This enables the AMDGPU backend to issue multiple
+    buffer loads before waiting, instead of serializing each load behind its
+    own waitcount.
+  }];
+}
 def ROCDLLoadToTransposeLoadPass :
     InterfacePass<"iree-rocdl-load-to-transpose-load", "mlir::FunctionOpInterface"> {
   let summary = "Lower vector.transfer_read to amdgpu.transpose_load when profitable";
