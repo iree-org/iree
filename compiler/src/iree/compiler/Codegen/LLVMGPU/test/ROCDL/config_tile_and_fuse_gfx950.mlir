@@ -13,6 +13,12 @@
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: %s | FileCheck %s --check-prefix=CHECK-DIRECT-LOAD
+//
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS-DIRECT-LOAD-2
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
@@ -583,3 +589,38 @@ func.func @matmul_bf16(
 // CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16
 // CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
 // CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<64, 8>>, #iree_gpu.use_global_load_dma]
+
+// -----
+
+// DMA rejected: operand exceeds AMDGPU fat_raw_buffer INT32_MAX byte limit.
+// LHS = 16384 x 150000 x bf16 = ~4.9GB > INT32_MAX (2GB).
+func.func @matmul_bf16_fat_raw_overflow_no_dma(
+    %arg0: tensor<16384x150000xbf16>,
+    %arg1: tensor<150000x4096xbf16>,
+    %arg2: tensor<16384x4096xf32>) -> tensor<16384x4096xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<16384x150000xbf16>, tensor<150000x4096xbf16>)
+                      outs(%arg2 : tensor<16384x4096xf32>) -> tensor<16384x4096xf32>
+  return %0 : tensor<16384x4096xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16_fat_raw_overflow_no_dma
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-NOT:     use_global_load_dma
+
+// -----
+
+// DMA rejected: K=65 with bf16 causes a non-evenly-divisible pre-pad tile
+// (65 > tileK=32, 65 % 32 != 0), producing a dynamic innermost dimension that
+// fails the DWORD alignment check.
+func.func @matmul_bf16_non_dword_aligned_no_dma(
+    %arg0: tensor<4096x65xbf16>,
+    %arg1: tensor<65x4096xbf16>,
+    %arg2: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<4096x65xbf16>, tensor<65x4096xbf16>)
+                      outs(%arg2 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %0 : tensor<4096x4096xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16_non_dword_aligned_no_dma
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-NOT:     use_global_load_dma

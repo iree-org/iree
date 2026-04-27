@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file --verify-diagnostics 2>&1 | FileCheck %s
 
 #gpu_target_copy = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -114,20 +114,12 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 #exec_target_small_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_small_inner}>
 #translation_small_inner = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_small_innermost_dim
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x32xf32>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x32xf32>
 func.func @copy_small_innermost_dim(%source: tensor<64x32xf32>, %init: tensor<64x32xf32>) -> tensor<64x32xf32>
   attributes {hal.executable.target = #exec_target_small_inner, translation_info = #translation_small_inner} {
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x32xf32>)
     outs(%init : tensor<64x32xf32>) -> tensor<64x32xf32>
-
-  // Innermost dimension (32) < subgroup size (64), so coalesced DMA should NOT be applied.
-  // The linalg.copy should remain unchanged.
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<64x32xf32>
 }
 
@@ -151,19 +143,13 @@ func.func @copy_small_innermost_dim(%source: tensor<64x32xf32>, %init: tensor<64
 #exec_target_not_aligned = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_not_aligned}>
 #translation_not_aligned = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_not_aligned_to_dma
-// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<320xbf16>
 func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<320xbf16>) -> tensor<320xbf16>
   attributes {hal.executable.target = #exec_target_not_aligned, translation_info = #translation_not_aligned} {
   %source = iree_codegen.load_from_buffer %source_buffer : memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<320xbf16>
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<320xbf16>)
     outs(%init : tensor<320xbf16>) -> tensor<320xbf16>
-
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<320xbf16>
 }
 
@@ -369,23 +355,12 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
 #exec_target_no_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_linearize}>
 #translation_no_linearize = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
 
-// CHECK-LABEL: func.func @copy_small_innermost_no_linearize
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
-// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: tensor<128x16xf32>
 func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest: tensor<128x16xf32>) -> tensor<128x16xf32>
   attributes {hal.executable.target = #exec_target_no_linearize, translation_info = #translation_no_linearize} {
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<128x16xf32>)
     outs(%dest : tensor<128x16xf32>) -> tensor<128x16xf32>
-
-  // Innermost dimension (16) < minElementsPerTransfer (64), and output is not
-  // tensor.empty(), so linearization is not possible. The copy should remain.
-
-  // CHECK: %[[RESULT:.+]] = linalg.copy
-  // CHECK-SAME: ins(%[[SRC]] : tensor<128x16xf32>)
-  // CHECK-SAME: outs(%[[DST]] : tensor<128x16xf32>)
-  // CHECK: return %[[RESULT]]
-
   return %result : tensor<128x16xf32>
 }
 
@@ -565,7 +540,7 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
 
 // -----
 
-// Test: tensor.pad fusion bails out when source row size is not DWORD-aligned.
+// Negative test: tensor.pad fusion bails out when source row size is not DWORD-aligned.
 // On AMD CDNA, per-component range checking is performed for each DWORD.
 // If a DWORD is partially out-of-bounds, the entire DWORD returns zero,
 // causing incorrect results. We bail out to avoid the slow path.
@@ -581,9 +556,6 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
 #exec_target_pad_unaligned = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_unaligned}>
 #translation_pad_unaligned = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_with_tensor_pad_unaligned_row
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<65x121xf16>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x124xf16>
 func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init: tensor<4x124xf16>, %off: index, %sz: index, %high_m: index) -> tensor<4x124xf16>
   attributes {hal.executable.target = #exec_target_pad_unaligned, translation_info = #translation_pad_unaligned} {
   // Extract a dynamic slice: tensor<?x121xf16>.
@@ -599,17 +571,13 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
   } : tensor<?x121xf16> to tensor<4x124xf16>
 
   // Copy from padded tensor.
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<4x124xf16>)
     outs(%init : tensor<4x124xf16>) -> tensor<4x124xf16>
 
   // Source row size (121 * 2 = 242 bytes) is not DWORD-aligned.
   // Coalesced DMA bails out to avoid partial OOB in per-DWORD range checking.
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
-  // CHECK: tensor.pad
-  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<4x124xf16>
 }
 
@@ -628,9 +596,6 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 #exec_target_pad_dynamic_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_dynamic_inner}>
 #translation_pad_dynamic_inner = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_with_tensor_pad_dynamic_inner_dim
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<457x330xi8>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x256xi8>
 func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %init: tensor<4x256xi8>, %off: index, %sz_m: index, %sz_k: index, %high_m: index, %high_k: index) -> tensor<4x256xi8>
   attributes {hal.executable.target = #exec_target_pad_dynamic_inner, translation_info = #translation_pad_dynamic_inner} {
   // Extract a dynamic slice where both dimensions are dynamic.
@@ -645,15 +610,10 @@ func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %
   } : tensor<?x?xi8> to tensor<4x256xi8>
 
   // Copy from padded tensor.
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<4x256xi8>)
     outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
-
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
-  // CHECK: tensor.pad
-  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<4x256xi8>
 }
 
@@ -743,7 +703,7 @@ func.func @copy_from_fat_raw_buffer_small(
 
 // -----
 
-// Test: Copy from load_from_buffer with storage_buffer (non-fat_raw_buffer).
+// Negative test: Copy from load_from_buffer with storage_buffer (non-fat_raw_buffer).
 // DMA should NOT be applied because the source binding was not converted to
 // fat_raw_buffer, indicating it exceeds the 2GB limit.
 
@@ -758,30 +718,22 @@ func.func @copy_from_fat_raw_buffer_small(
 #exec_target_storage_buf = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_storage_buf}>
 #translation_storage_buf = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_from_non_fat_raw_buffer
-// CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]: memref<64x512xbf16, #hal.descriptor_type<storage_buffer>>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xbf16>
 func.func @copy_from_non_fat_raw_buffer(
     %buf: memref<64x512xbf16, #hal.descriptor_type<storage_buffer>>,
     %init: tensor<64x512xbf16>) -> tensor<64x512xbf16>
   attributes {hal.executable.target = #exec_target_storage_buf, translation_info = #translation_storage_buf} {
   %source = iree_codegen.load_from_buffer %buf
       : memref<64x512xbf16, #hal.descriptor_type<storage_buffer>> -> tensor<64x512xbf16>
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x512xbf16>)
     outs(%init : tensor<64x512xbf16>) -> tensor<64x512xbf16>
-
-  // storage_buffer source: sourceIsNotFromFatRawBuffer returns true, DMA skipped.
-  // The linalg.copy should remain unchanged.
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<64x512xbf16>
 }
 
 // -----
 
-// Test: Copy from dispatch.tensor.load source.
+// Negative test: Copy from dispatch.tensor.load source.
 // DMA should NOT be applied because dispatch.tensor.load indicates the binding
 // was not bufferized to a memref (e.g., >2GB binding loaded via dispatch tensor
 // path), so fat_raw_buffer is not available.
@@ -802,7 +754,6 @@ func.func @copy_from_non_fat_raw_buffer(
 #exec_target_dtl = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_dtl}>
 #translation_dtl = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
-// CHECK-LABEL: func.func @copy_from_dispatch_tensor_load
 func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<64x512xbf16>
   attributes {hal.executable.target = #exec_target_dtl, translation_info = #translation_dtl} {
   %c0 = arith.constant 0 : index
@@ -810,15 +761,10 @@ func.func @copy_from_dispatch_tensor_load(%init: tensor<64x512xbf16>) -> tensor<
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x512xbf16>>
   %source = iree_tensor_ext.dispatch.tensor.load %binding, offsets = [0, 0], sizes = [64, 512], strides = [1, 1]
       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x512xbf16>> -> tensor<64x512xbf16>
+  // expected-error @+1 {{copy marked with use_global_load_dma was not converted to DMA}}
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x512xbf16>)
     outs(%init : tensor<64x512xbf16>) -> tensor<64x512xbf16>
-
-  // dispatch.tensor.load source: sourceIsNotFromFatRawBuffer returns true,
-  // DMA skipped. The linalg.copy should remain unchanged.
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
   return %result : tensor<64x512xbf16>
 }
 
