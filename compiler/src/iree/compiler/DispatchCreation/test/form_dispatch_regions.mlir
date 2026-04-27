@@ -2366,6 +2366,126 @@ util.func public @fuse_scalar_reduction_with_scalar_consumer(
 
 // -----
 
+// Check that a full reduction producing a scalar fuses with a parallel
+// elementwise consumer when they share an input tensor.
+util.func public @fuse_scalar_reduction_with_parallel_consumer_shared_input(
+    %arg0: tensor<4xf32>, %init: tensor<f32>) -> tensor<4xf32> {
+  %sum = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]
+  } ins(%arg0 : tensor<4xf32>) outs(%init : tensor<f32>) {
+  ^bb0(%in: f32, %acc: f32):
+    %0 = arith.addf %in, %acc : f32
+    linalg.yield %0 : f32
+  } -> tensor<f32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %res = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> ()>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]
+  } ins(%arg0, %sum : tensor<4xf32>, tensor<f32>) outs(%empty : tensor<4xf32>) {
+  ^bb0(%x: f32, %s: f32, %out: f32):
+    %0 = arith.divf %x, %s : f32
+    linalg.yield %0 : f32
+  } -> tensor<4xf32>
+  util.return %res : tensor<4xf32>
+}
+// CHECK-LABEL: util.func public @fuse_scalar_reduction_with_parallel_consumer_shared_input
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["reduction"]
+//       CHECK:     %[[NORM:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//  CHECK-SAME:         ins({{.*}}%[[REDUCE]]
+//       CHECK:     flow.return %[[NORM]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// Check that a parallel elementwise producer fuses with a full-reduction
+// consumer when they share an input tensor.
+util.func public @fuse_parallel_producer_with_scalar_reduction_consumer_shared_input(
+    %arg0: tensor<4xf32>, %arg1: tensor<4xf32>, %init: tensor<f32>) -> tensor<f32> {
+  %empty = tensor.empty() : tensor<4xf32>
+  %elt = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]
+  } ins(%arg0, %arg1 : tensor<4xf32>, tensor<4xf32>) outs(%empty : tensor<4xf32>) {
+  ^bb0(%x: f32, %y: f32, %out: f32):
+    %0 = arith.addf %x, %y : f32
+    linalg.yield %0 : f32
+  } -> tensor<4xf32>
+  %sum = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]
+  } ins(%elt, %arg1 : tensor<4xf32>, tensor<4xf32>) outs(%init : tensor<f32>) {
+  ^bb0(%x: f32, %y: f32, %acc: f32):
+    %0 = arith.mulf %x, %y : f32
+    %1 = arith.addf %0, %acc : f32
+    linalg.yield %1 : f32
+  } -> tensor<f32>
+  util.return %sum : tensor<f32>
+}
+// CHECK-LABEL: util.func public @fuse_parallel_producer_with_scalar_reduction_consumer_shared_input
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[ELT:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//       CHECK:     %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["reduction"]
+//  CHECK-SAME:         ins(%[[ELT]],
+//       CHECK:     flow.return %[[REDUCE]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// Check that a parallel elementwise producer still fuses with a full-reduction
+// consumer even without a shared input: the reduction only reads the producer's
+// output (plus an unrelated tensor), and eliminating that intermediate tensor
+// is itself the bandwidth payoff.
+util.func public @fuse_parallel_producer_with_scalar_reduction_consumer_no_shared_input(
+    %arg0: tensor<4xf32>, %arg1: tensor<4xf32>, %arg2: tensor<4xf32>,
+    %init: tensor<f32>) -> tensor<f32> {
+  %empty = tensor.empty() : tensor<4xf32>
+  %elt = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]
+  } ins(%arg0, %arg1 : tensor<4xf32>, tensor<4xf32>) outs(%empty : tensor<4xf32>) {
+  ^bb0(%x: f32, %y: f32, %out: f32):
+    %0 = arith.addf %x, %y : f32
+    linalg.yield %0 : f32
+  } -> tensor<4xf32>
+  %sum = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]
+  } ins(%elt, %arg2 : tensor<4xf32>, tensor<4xf32>) outs(%init : tensor<f32>) {
+  ^bb0(%x: f32, %y: f32, %acc: f32):
+    %0 = arith.mulf %x, %y : f32
+    %1 = arith.addf %0, %acc : f32
+    linalg.yield %1 : f32
+  } -> tensor<f32>
+  util.return %sum : tensor<f32>
+}
+// CHECK-LABEL: util.func public @fuse_parallel_producer_with_scalar_reduction_consumer_no_shared_input
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[ELT:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//       CHECK:     %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["reduction"]
+//  CHECK-SAME:         ins(%[[ELT]],
+//       CHECK:     flow.return %[[REDUCE]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
 // Producer blocked: tensor.extract result captured from above by root's body.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 util.func public @no_producer_fusion_with_extract_use_from_above(

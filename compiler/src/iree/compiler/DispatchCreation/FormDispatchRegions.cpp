@@ -117,6 +117,43 @@ public:
       return false;
     }
 
+    // If the root has no parallel loops (e.g. full reduction to scalar), fuse
+    // if the candidate is also scalar, or if it shares an input with the group.
+    // Only applied on the consumer-side fuse; the producer-side is already
+    // handled by the default mapping path.
+    bool isConsumerSideFuse = llvm::any_of(op->getOperands(), [&](Value v) {
+      return loopMaps.contains(v.getDefiningOp());
+    });
+    auto rootFusionOp =
+        dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+    if (isConsumerSideFuse && rootFusionOp &&
+        rootFusionOp.getNumParallelLoops() == 0) {
+      auto candidateFusionOp =
+          dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
+      if (!candidateFusionOp) {
+        return false;
+      }
+      if (candidateFusionOp.getNumParallelLoops() == 0) {
+        return true;
+      }
+      SetVector<Value> groupInputs;
+      for (auto &entry : loopMaps) {
+        if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(entry.first)) {
+          for (OpOperand *in : dpsOp.getDpsInputOperands()) {
+            groupInputs.insert(in->get());
+          }
+        }
+      }
+      if (auto dpsCand = dyn_cast<DestinationStyleOpInterface>(op)) {
+        for (OpOperand *in : dpsCand.getDpsInputOperands()) {
+          if (groupInputs.contains(in->get())) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     FailureOr<AffineMap> maybeMap = getRootParallelLoopToOpMap(op);
     if (failed(maybeMap)) {
       return false;
