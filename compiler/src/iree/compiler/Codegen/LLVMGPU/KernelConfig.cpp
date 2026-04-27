@@ -1132,7 +1132,7 @@ static LogicalResult setAttentionReductionConfig(
     return failure();
   }
   if (!ShapedType::isDynamic(k2Size) && k2Size <= kVerySkinnyDimThreshold) {
-    LDBG() << "Bailing out due to skinny K2 dimension: " << k2Size;
+    LDBG() << "Bailing out due to very skinny K2 dimension: " << k2Size;
     return failure();
   }
 
