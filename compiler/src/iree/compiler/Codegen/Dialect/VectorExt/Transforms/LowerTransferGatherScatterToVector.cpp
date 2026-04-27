@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -138,5 +139,11 @@ struct LowerTransferGatherScatterToVectorPass final
 };
 
 } // namespace
+
+void populateLowerTransferGatherScatterToVectorPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<LowerTransferGatherToVectorGather,
+               LowerTransferScatterToVectorScatter>(patterns.getContext());
+}
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
