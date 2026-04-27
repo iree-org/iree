@@ -233,10 +233,12 @@ public:
         computeInputKPerm(inputMap, filterMap, convDims);
 
     // Build unified offsets and output_sizes for the im2col op.
-    // Canonical output dim order: [batch dims, M (1 dim), K dims].
+    // Canonical output dim order: [batch, M, inputChannel K, filterLoop K].
     // At conv-to-im2col time all offsets are zero.
 
-    // Identify which original filter dims are parallel (depth + outputChannel).
+    // Classify each original filter dim as parallel, inputChannel, or
+    // filterLoop. The canonical im2col output order places inputChannel K
+    // dims before filterLoop K dims.
     llvm::SmallDenseSet<int64_t, 4> parallelFilterDims;
     for (auto iterDim :
          llvm::concat<const unsigned>(convDims.depth, convDims.outputChannel)) {
@@ -246,26 +248,45 @@ public:
         parallelFilterDims.insert(maybeDim.value());
       }
     }
-
-    // Collect K output dim inner sizes from filter reassociation indices.
-    // Each reduction group (group not entirely composed of parallel dims)
-    // becomes one K output dim whose inner sizes are the original filter
-    // dim sizes in that group.
-    SmallVector<SmallVector<int64_t>> kInnerSizes;
-    for (const auto &indices : filterReassocIndices) {
-      bool isParallel =
-          indices.size() == 1 && parallelFilterDims.contains(indices[0]);
-      if (!isParallel) {
-        SmallVector<int64_t> innerSizes;
-        for (int64_t idx : indices) {
-          innerSizes.push_back(filterShape[idx]);
-        }
-        kInnerSizes.push_back(innerSizes);
+    llvm::SmallDenseSet<int64_t, 4> inputChannelFilterDims;
+    for (unsigned iterDim : convDims.inputChannel) {
+      std::optional<int64_t> maybeDim = filterMap.getResultPosition(
+          getAffineDimExpr(iterDim, filterMap.getContext()));
+      if (maybeDim) {
+        inputChannelFilterDims.insert(maybeDim.value());
       }
     }
 
-    int64_t numOutputDims =
-        batchPos.size() + mShape.size() + kInnerSizes.size();
+    // Collect K output dim inner sizes from filter reassociation indices,
+    // separated into inputChannel and filterLoop groups. The canonical
+    // im2col output order is: [batch, M, inputChannel K, filterLoop K].
+    SmallVector<SmallVector<int64_t>> inputChannelInnerSizes;
+    SmallVector<SmallVector<int64_t>> filterLoopInnerSizes;
+    for (const auto &indices : filterReassocIndices) {
+      bool isParallel =
+          indices.size() == 1 && parallelFilterDims.contains(indices[0]);
+      if (isParallel) {
+        continue;
+      }
+      SmallVector<int64_t> innerSizes;
+      for (int64_t idx : indices) {
+        innerSizes.push_back(filterShape[idx]);
+      }
+      // Classify as inputChannel if all filter dims in the group are
+      // inputChannel dims; otherwise classify as filterLoop.
+      bool isInputChannel = llvm::all_of(indices, [&](int64_t idx) {
+        return inputChannelFilterDims.contains(idx);
+      });
+      if (isInputChannel) {
+        inputChannelInnerSizes.push_back(innerSizes);
+      } else {
+        filterLoopInnerSizes.push_back(innerSizes);
+      }
+    }
+
+    int64_t numOutputDims = batchPos.size() + mShape.size() +
+                            inputChannelInnerSizes.size() +
+                            filterLoopInnerSizes.size();
     SmallVector<OpFoldResult> offsets(numOutputDims, rewriter.getIndexAttr(0));
     SmallVector<SmallVector<OpFoldResult>> outputSizes;
     // Batch dims: each has a single inner size.
@@ -276,8 +297,11 @@ public:
     for (int64_t m : mShape) {
       outputSizes.push_back({rewriter.getIndexAttr(m)});
     }
-    // K dims: inner sizes from filter reassociation.
-    for (const auto &innerSizes : kInnerSizes) {
+    // InputChannel K dims first, then filterLoop K dims.
+    for (const auto &innerSizes : inputChannelInnerSizes) {
+      outputSizes.push_back(getAsIndexOpFoldResult(getContext(), innerSizes));
+    }
+    for (const auto &innerSizes : filterLoopInnerSizes) {
       outputSizes.push_back(getAsIndexOpFoldResult(getContext(), innerSizes));
     }
 
