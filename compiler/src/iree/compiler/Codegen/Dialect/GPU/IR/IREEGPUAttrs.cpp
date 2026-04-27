@@ -835,6 +835,12 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
         smmaAttr.getIntrinsic(), operandIndex,
         operandIndex == kScaledMMAOperandAcc && smmaAttr.getColMajor());
   }
+  if (auto dtsmma = dyn_cast<DataTiledScaledMMAAttr>(mmaKind)) {
+    // DataTiledScaledMMAAttr does not carry a col_major field; column-major
+    // accumulator layouts are not used with data-tiled scaled MMA today.
+    return IREE::GPU::getSingleSubgroupLayout(dtsmma.getIntrinsic(),
+                                              operandIndex);
+  }
   assert(false && "unhandled MMA Interface type.");
   return {};
 }
