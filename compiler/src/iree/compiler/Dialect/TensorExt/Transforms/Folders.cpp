@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 

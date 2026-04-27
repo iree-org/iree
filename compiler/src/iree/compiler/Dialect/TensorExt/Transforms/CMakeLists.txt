@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformUtils
+    MLIRViewLikeInterface
     iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
