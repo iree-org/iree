@@ -46,8 +46,8 @@ using IREE::LinalgExt::MapStoreOp;
 static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
                                        FunctionOpInterface funcOp) {
   OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<linalg::PackOp> packOps;
-  funcOp.walk([&](linalg::PackOp op) { packOps.push_back(op); });
+  SmallVector<linalg::PackOp> packOps(
+      funcOp.getFunctionBody().getOps<linalg::PackOp>());
   for (auto packOp : packOps) {
     rewriter.setInsertionPoint(packOp);
     FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
@@ -63,15 +63,15 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
       rewriter.replaceOp(result->padOp, result->padOp.getSource());
     }
   }
-  SmallVector<linalg::UnPackOp> unPackOps;
-  funcOp.walk([&](linalg::UnPackOp op) { unPackOps.push_back(op); });
+  SmallVector<linalg::UnPackOp> unPackOps(
+      funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
   for (auto unPackOp : unPackOps) {
     rewriter.setInsertionPoint(unPackOp);
     (void)linalg::lowerUnPack(rewriter, unPackOp,
                               /*lowerUnpadLikeWithExtractSlice=*/false);
   }
-  SmallVector<linalg::GenericOp> genericOps;
-  funcOp.walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
+  SmallVector<linalg::GenericOp> genericOps(
+      funcOp.getFunctionBody().getOps<linalg::GenericOp>());
   for (auto genericOp : genericOps) {
     if (linalg::isaTransposeOpInterface(genericOp)) {
       rewriter.setInsertionPoint(genericOp);
@@ -1306,6 +1306,26 @@ struct CombineSourceLayoutTransformationPass final
     // ops like unpack into simpler supported ops.
     IRRewriter rewriter(context);
     simplifyComplexRelayoutOps(rewriter, funcOp);
+
+    // Raise transpose generics in nested regions (e.g., inside scf.for
+    // from promotion tiling). simplifyComplexRelayoutOps only walks
+    // top-level ops via Region::getOps, missing ops inside loop bodies.
+    // When a transpose generic is not raised, collectRelayoutChain stops
+    // early, causing spurious map_load creation that produces scalar
+    // memref.store ops. This deep walk is only needed in the source
+    // pass; the result pass should not raise nested generics as it can
+    // change downstream vectorization decisions on other backends.
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      SmallVector<linalg::GenericOp> nestedGenerics;
+      funcOp.walk([&](linalg::GenericOp op) { nestedGenerics.push_back(op); });
+      for (auto genericOp : nestedGenerics) {
+        if (linalg::isaTransposeOpInterface(genericOp)) {
+          rewriter.setInsertionPoint(genericOp);
+          (void)linalg::specializeGenericOp(rewriter, genericOp);
+        }
+      }
+    }
 
     // Insert identity map_load ops after load_from_buffer ops and fold
     // consumer relayout ops into them.
