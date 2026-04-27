@@ -460,6 +460,35 @@ util.func public @fold_insert_slice_with_identity_load(
 
 // -----
 
+util.func public @fold_insert_slice_with_empty_dest(
+    %val: tensor<?xf32>, %n: index) -> tensor<4x1xf32> {
+  %0 = flow.dispatch.workgroups(%val, %n)
+      : (tensor<?xf32>{%n}, index) -> tensor<4x1xf32> =
+      (%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>,
+       %arg1: index,
+       %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1xf32>>) {
+    %dest = tensor.empty() : tensor<4x1xf32>
+    %loaded = iree_tensor_ext.dispatch.tensor.load %arg0,
+        offsets = [0], sizes = [%arg1], strides = [1]
+        : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%arg1}
+          -> tensor<?xf32>
+    %inserted = tensor.insert_slice %loaded into %dest[0, 0] [%arg1, 1] [1, 1]
+        : tensor<?xf32> into tensor<4x1xf32>
+    iree_tensor_ext.dispatch.tensor.store %inserted, %arg2,
+        offsets = [0, 0], sizes = [4, 1], strides = [1, 1]
+        : tensor<4x1xf32>
+          -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1xf32>>
+    flow.return
+  }
+  util.return %0 : tensor<4x1xf32>
+}
+// CHECK-LABEL: @fold_insert_slice_with_empty_dest
+//   CHECK-NOT: tensor.empty
+//   CHECK-NOT: tensor.insert_slice
+//       CHECK: iree_tensor_ext.dispatch.tensor.store
+
+// -----
+
 util.func public @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1000xf32>, %offset: tensor<f32>) -> tensor<f32> {
   %zero = arith.constant 0.0 : f32
   %init = tensor.empty() : tensor<f32>
