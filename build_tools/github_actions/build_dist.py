@@ -182,6 +182,7 @@ def build_main_dist():
         "bin",
         "lib",
         "include",
+        "share",
     ]
     dist_archive = os.path.join(
         BINDIST_DIR,
