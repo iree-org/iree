@@ -275,6 +275,16 @@ static iree_status_t iree_hal_task_command_buffer_flush_tasks(
 // to build out the proper task graph.
 static iree_status_t iree_hal_task_command_buffer_emit_global_barrier(
     iree_hal_task_command_buffer_t* command_buffer) {
+  // If no tasks were recorded since the last barrier, skip creating a new one.
+  // Creating it would wire the existing leaf barrier to the new one via
+  // iree_task_set_completion_task, setting its completion_task. Later,
+  // iree_hal_task_command_buffer_issue would attempt to set completion_task
+  // again to retire_task, which violates the single-completion invariant and
+  // causes retire_task to never be signaled. (#20166)
+  if (command_buffer->state.open_barrier != NULL &&
+      command_buffer->state.open_task_count == 0) {
+    return iree_ok_status();
+  }
   // Flush open tasks to the previous barrier. This resets our state such that
   // we can assign the new open barrier and start recording tasks for it.
   // Previous tasks will be moved into the leaf_tasks list.

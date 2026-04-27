@@ -71,6 +71,7 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
         "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir",
         "split_reduction_using_tiling.mlir",
+        "trailing_barrier_hang_issue_20166.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
