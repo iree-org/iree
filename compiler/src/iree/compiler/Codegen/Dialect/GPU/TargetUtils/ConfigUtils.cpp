@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
@@ -585,13 +586,112 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+/// Pre-schedule rejection: returns true if direct load DMA should be rejected
+/// based on checks that do not require tile sizes (run before MMA schedule
+/// selection).
+///
+/// Rejection cases:
+///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
+///   2. Not a GEMM. TODO(#23907): support convolution.
+///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
+///   4. LHS transposed, RHS not transposed shows regressions. TODO(#24117).
+///   5. Operand cannot fit in AMDGPU fat_raw_buffer (> INT32_MAX bytes).
+static bool shouldRejectDMAPreSchedule(IREE::GPU::TargetAttr target,
+                                       bool isGemm, ArrayRef<Value> operands,
+                                       Type lhsElemType, Type rhsElemType,
+                                       bool transposedLhs, bool transposedRhs,
+                                       int64_t splitReductionTripCnt = 0) {
+  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+
+  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
+  if (!targetSupportsGlobalLoadDMA(target)) {
+    LDBG() << "Target does not support global load DMA";
+    return true;
+  }
+
+  // Case 2: Only GEMM are supported currently.
+  if (!isGemm) {
+    LDBG() << "Only GEMM are supported currently";
+    return true;
+  }
+
+  // Case 3: Only f16/bf16 are supported currently.
+  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+    LDBG() << "Only f16/bf16 are supported currently";
+    return true;
+  }
+
+  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
+  if (transposedLhs && !transposedRhs) {
+    LDBG() << "LHS transposed, RHS not transposed show regressions";
+    return true;
+  }
+
+  // Case 5: Operand buffers must fit in fat_raw_buffer (INT32_MAX bytes).
+  // When split-reduction is active, operand shapes are post-split but the
+  // underlying HAL bindings reference the original (pre-split) buffers.
+  // Scale the effective size by splitReductionTripCnt to check the original.
+  auto lhsShape = dyn_cast<ShapedType>(operands[0].getType());
+  auto rhsShape = dyn_cast<ShapedType>(operands[1].getType());
+  std::optional<ValueRange> lhsDynDims =
+      IREE::Util::findDynamicDims(operands[0]);
+  std::optional<ValueRange> rhsDynDims =
+      IREE::Util::findDynamicDims(operands[1]);
+  if (!canFitAMDGPUFatRawBuffer(lhsShape, lhsDynDims, /*solver=*/nullptr,
+                                splitReductionTripCnt) ||
+      !canFitAMDGPUFatRawBuffer(rhsShape, rhsDynDims, /*solver=*/nullptr,
+                                splitReductionTripCnt)) {
+    LDBG() << "Operands do not fit in fat_raw_buffer";
+    return true;
+  }
+
+  return false;
+}
+
+/// Build the promoted (post-pad) tile shape for an operand by projecting
+/// |paddingTileSizes| through the operand's affine map.
+static SmallVector<int64_t>
+getPromotedTileShape(AffineMap map, ArrayRef<int64_t> paddingTileSizes) {
+  SmallVector<int64_t> tileShape;
+  for (AffineExpr result : map.getResults()) {
+    unsigned pos = cast<AffineDimExpr>(result).getPosition();
+    tileShape.push_back(paddingTileSizes[pos]);
+  }
+  return tileShape;
+}
+
+/// Build the pre-pad tile shape for an operand by projecting |bounds| and
+/// |paddingTileSizes| through the operand's affine map. For each dimension,
+/// the pre-pad size is:
+///   - bounds[dim]              if bounds < tileSize (single tile, padded up)
+///   - tileSize                 if bounds evenly divides by tileSize
+///   - ShapedType::kDynamic     otherwise (last tile has dynamic size)
+static SmallVector<int64_t>
+getPrePadTileShape(AffineMap map, ArrayRef<int64_t> bounds,
+                   ArrayRef<int64_t> paddingTileSizes) {
+  SmallVector<int64_t> tileShape;
+  for (AffineExpr result : map.getResults()) {
+    unsigned pos = cast<AffineDimExpr>(result).getPosition();
+    int64_t bound = bounds[pos];
+    int64_t tileSize = paddingTileSizes[pos];
+    if (bound < tileSize) {
+      tileShape.push_back(bound);
+    } else if (bound % tileSize == 0) {
+      tileShape.push_back(tileSize);
+    } else {
+      tileShape.push_back(ShapedType::kDynamic);
+    }
+  }
+  return tileShape;
+}
+
 constexpr int64_t kMinWorkgroupsPerCU = 2;
 
-/// Rejects DMA when its extra LDS usage would drop occupancy (WGs/CU) below
-/// `kMinWorkgroupsPerCU` while non-DMA would still meet it. When chip info
-/// is available, the LDS-limited occupancy is capped by actual work
-/// (totalWorkgroups / numCUs) so that under-subscribed shapes are not
-/// penalized.
+/// Returns true if direct load DMA should be rejected because its extra LDS
+/// usage would drop occupancy (WGs/CU) below `kMinWorkgroupsPerCU` while
+/// non-DMA would still meet it. When chip info is available, the LDS-limited
+/// occupancy is capped by actual work (totalWorkgroups / numCUs) so that
+/// under-subscribed shapes are not penalized.
 /// TODO(#24375): Remove this guard once the tile-size heuristic stops
 /// over-allocating LDS or 1-warp/SIMD codegen can recover the perf without
 /// requiring inter-SIMD latency hiding via WGs/CU >= 2.
@@ -600,24 +700,19 @@ static bool shouldRejectDMAForOccupancy(
     IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
     ArrayRef<int64_t> bounds, ArrayRef<int64_t> workgroupTileSizes) {
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
   int64_t dmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
       schedule, problem, /*useDirectLoad=*/true, prefetchNumStages,
       doCPromotion);
   int64_t nonDmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
       schedule, problem, /*useDirectLoad=*/false, /*prefetchNumStages=*/0,
       doCPromotion);
-
   assert(dmaLdsBytes > 0 && nonDmaLdsBytes > 0 && "LDS usage must be positive");
-
   int64_t dmaMaxWgsPerCU = maxSharedMemoryBytes / dmaLdsBytes;
   int64_t nonDmaMaxWgsPerCU = maxSharedMemoryBytes / nonDmaLdsBytes;
-
   // When chip info is available, cap effective WGs/CU by how many workgroups
   // actually exist per CU. This avoids over-rejecting DMA for small shapes
   // where the GPU is under-subscribed.
-  IREE::GPU::TargetChipAttr chip = target.getChip();
-  if (chip) {
+  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
     int64_t numCUs = chip.getWgpCount();
     int64_t totalWorkgroups = 1;
     for (auto [dim, tileSize] : llvm::zip_equal(bounds, workgroupTileSizes)) {
@@ -629,44 +724,62 @@ static bool shouldRejectDMAForOccupancy(
     dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
     nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
   }
-
   return dmaMaxWgsPerCU < kMinWorkgroupsPerCU &&
          nonDmaMaxWgsPerCU >= kMinWorkgroupsPerCU;
 }
 
-/// Returns true if direct load DMA should be rejected, and fall back to stream
-/// copies.
+/// Post-schedule rejection: returns true if direct load DMA should be rejected
+/// based on checks that require computed tile sizes (run after MMA schedule
+/// selection).
 ///
 /// Rejection cases:
-///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
-///   2. Not a GEMM. TODO(#23907): support convolution.
-///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
-///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
-static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
-                                      Type lhsElemType, Type rhsElemType,
-                                      bool transposedLhs, bool transposedRhs) {
-  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+///   1. Promoted (post-pad) tile elements are not aligned to DMA transfer
+///   sizes.
+///   2. Pre-pad tile source is not DWORD-aligned.
+///   3. LDS-limited occupancy drop (see `shouldRejectDMAForOccupancy`).
+static bool shouldRejectDMAPostSchedule(
+    IREE::GPU::TargetAttr target, int64_t targetSubgroupSize,
+    ArrayRef<Value> operands, ArrayRef<AffineMap> maps,
+    ArrayRef<int64_t> bounds, const GPUMatmulShapeType &problem,
+    const GPUMMASchedule &schedule, int64_t prefetchNumStages,
+    bool doCPromotion, ArrayRef<int64_t> workgroupTileSizes,
+    ArrayRef<int64_t> paddingTileSizes) {
+  auto lhsType = cast<RankedTensorType>(operands[0].getType());
+  auto rhsType = cast<RankedTensorType>(operands[1].getType());
 
-  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
-  if (!targetSupportsGlobalLoadDMA(target)) {
+  SmallVector<int64_t> lhsTileShape =
+      getPromotedTileShape(maps[0], paddingTileSizes);
+  SmallVector<int64_t> rhsTileShape =
+      getPromotedTileShape(maps[1], paddingTileSizes);
+
+  // Case 1: Check alignment against DMA transfer sizes.
+  if (!isDMATransferAligned(target, targetSubgroupSize,
+                            lhsType.getElementType(), lhsTileShape) ||
+      !isDMATransferAligned(target, targetSubgroupSize,
+                            rhsType.getElementType(), rhsTileShape)) {
+    LDBG() << "DMA alignment check failed";
     return true;
   }
 
-  // Case 2: Only GEMM are supported currently.
-  if (!isGemm) {
+  // Case 2: Check DWORD alignment of pre-pad tile source.
+  auto lhsPrePadType = RankedTensorType::get(
+      getPrePadTileShape(maps[0], bounds, paddingTileSizes),
+      lhsType.getElementType());
+  auto rhsPrePadType = RankedTensorType::get(
+      getPrePadTileShape(maps[1], bounds, paddingTileSizes),
+      rhsType.getElementType());
+  if (!isTypeDWORDAligned(lhsPrePadType) ||
+      !isTypeDWORDAligned(rhsPrePadType)) {
+    LDBG() << "Pre-pad source not DWORD-aligned";
     return true;
   }
 
-  // Case 3: Only f16/bf16 are supported currently.
-  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+  // Case 3: LDS-limited occupancy drop.
+  if (shouldRejectDMAForOccupancy(schedule, problem, target, prefetchNumStages,
+                                  doCPromotion, bounds, workgroupTileSizes)) {
+    LDBG() << "LDS limits occupancy (WGs/CU)";
     return true;
   }
-
-  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
-  if (transposedLhs && !transposedRhs) {
-    return true;
-  }
-
   return false;
 }
 
@@ -865,12 +978,13 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
   Location loc = operands[0].getLoc();
   // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size)
-  // happens below via shouldRejectDMAForOccupancy after the schedule and
+  // happens below via shouldRejectDMAPostSchedule after the schedule and
   // workgroup tiles are computed.
   if (useDirectLoad &&
-      shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
-                                transposedLhs, transposedRhs)) {
-    LDBG() << "overriding direct load DMA, falling back to stream copies";
+      shouldRejectDMAPreSchedule(target, isGemm, operands, lhsElemType,
+                                 rhsElemType, transposedLhs, transposedRhs,
+                                 splitReductionTripCnt)) {
+    LDBG() << "Overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
 
@@ -999,15 +1113,34 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
-  // Stage 2 (tile-size) DMA rejection: now that workgroup tiles are known,
-  // check whether DMA would cause an unacceptable occupancy drop. Stage 1
-  // (problem-size + target-arch) ran above via shouldRejectDirectLoadDMA.
+  // Compute the promoted tile sizes in the iteration domain. This merges
+  // workgroup, reduction, and intrinsic K-packing into one array that
+  // both the DMA alignment check and the "padding" attribute can share.
+  SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
+  for (int64_t kDim : kDims) {
+    paddingTileSizes[kDim] = reductionTileSizes[kDim];
+  }
+  int64_t kPackFactor;
+  int64_t innerKDim = contractionK.back();
+  if (scaled) {
+    auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
+    kPackFactor = std::get<2>(smmaKind.getScaledMNKShape());
+  } else {
+    auto mmaKind = cast<IREE::GPU::MmaInterfaceAttr>(kind);
+    kPackFactor = std::get<2>(mmaKind.getMNKShape());
+  }
+  paddingTileSizes[innerKDim] *= kPackFactor;
+
+  // Stage 2 (post-schedule) DMA rejection: now that workgroup tiles are known,
+  // run alignment, DWORD, and occupancy checks. Stage 1 (problem-size +
+  // target-arch) ran above via shouldRejectDMAPreSchedule.
   if (useDirectLoad &&
-      shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
-                                  hasExistingAccumulator, bounds,
-                                  workgroupTileSizes)) {
-    LDBG() << "rejecting direct load DMA: LDS limits occupancy (WGs/CU)";
+      shouldRejectDMAPostSchedule(target, targetSubgroupSize, operands, maps,
+                                  bounds, problem, *schedule, prefetchNumStages,
+                                  hasExistingAccumulator, workgroupTileSizes,
+                                  paddingTileSizes)) {
     useDirectLoad = false;
+    LDBG() << "Overriding direct load DMA, falling back to stream copies";
   }
 
   // Use global load DMA attribute (subgroup sizes will be derived from
@@ -1059,22 +1192,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionArray);
   if (!mustBeAligned || couldNeedPadding) {
-    SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
-
-    // Initialize inner and outer padding sizes from reductionTileSizes.
-    for (int64_t kDim : kDims) {
-      paddingTileSizes[kDim] = reductionTileSizes[kDim];
-    }
-
-    int64_t kPackFactor, innerKDim = contractionK.back();
-    if (scaled) {
-      auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
-      kPackFactor = std::get<2>(smmaKind.getScaledMNKShape());
-    } else {
-      auto mmaKind = cast<IREE::GPU::MmaInterfaceAttr>(kind);
-      kPackFactor = std::get<2>(mmaKind.getMNKShape());
-    }
-    paddingTileSizes[innerKDim] *= kPackFactor;
     attrs.emplace_back("padding", b.getI64ArrayAttr(paddingTileSizes));
 
     // Create `padding_conv` attribute when padding convolutions before IGEMM
