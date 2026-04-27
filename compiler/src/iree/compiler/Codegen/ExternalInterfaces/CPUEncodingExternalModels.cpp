@@ -464,6 +464,21 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
       };
     }
   }
+  // Integer 8 path: standard RVV widening multiply-accumulate.
+  // Same formula as the f32 path: N0 = VLEN/8, targeting LMUL=4 for i32
+  // accumulators. The widening chain is i8(m1) -> i16(m2) -> i32(m4),
+  // fully utilizing the register capacity at any VLEN.
+  // M0=7 with LMUL=4 accumulators: 7*4 + 2(prod) + 1(rhs) = 31 regs.
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
+    int N0 = vlen / 8;
+    return {
+        TileMxNxK{7, N0, 1}, // Primary shape for RVV widening int8 kernels.
+        TileMxNxK{4, N0, 1}, // Truncation of the above.
+        TileMxNxK{2, N0, 1}, // Truncation of the above.
+        TileMxNxK{1, N0, 1}, // Truncation of the above.
+    };
+  }
   // Fallback - no architecture-optimized tile size for this case.
   return {};
 }
