@@ -2692,6 +2692,7 @@ iree_generated_e2e_runner_test(
     --iree-dispatch-creation-data-tiling=true
     --iree-rocm-encoding-layout-resolver=data-tiling
     --test-iree-data-tiling-alternate-heuristic
+    --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma
   LABELS
     "noasan"
     "nomsan"
