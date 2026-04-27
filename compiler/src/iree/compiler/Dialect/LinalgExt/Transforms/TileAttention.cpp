@@ -119,12 +119,12 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value x = onlineAttn.getResult(0);
   Value sum = onlineAttn.getResult(2);
 
-  // Finalize online attention: x = x / sum. When a mask is present,
-  // fully-masked rows have sum == 0; createSafeDivide rescues those to 0
-  // (matches PyTorch _safe_softmax). Detecting a fully-masked row inside
-  // the softmax loop would cost critical-path instructions between the
-  // two matmuls that carry the hot path, so we only check at finalization
-  // (once per output element, off the K-inner loop).
+  // Finalize online attention: x = (1 / sum) * x. When a mask is present,
+  // fully-masked rows have sum == 0, so clamp the row denominator once before
+  // normalizing instead of guarding every output element.
+  if (mask) {
+    sum = createSafeSoftmaxDenominator(rewriter, loc, sum);
+  }
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
@@ -137,10 +137,13 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
       attnOp.getOutput(), compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value sumVal = args[0];
-        Value xVal = args[1];
-        Value result = mask ? createSafeDivide(b, loc, xVal, sumVal)
-                            : arith::DivFOp::create(b, loc, xVal, sumVal);
+        Value one = arith::ConstantOp::create(
+            b, loc, b.getFloatAttr(args[0].getType(), 1.0));
+        Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
+        // Both sum and x are in fp32, as created earlier, so we only need
+        // to cast after the mul.
+        Value result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+        // Cast result to the required type by attention output.
         result = convertScalarToDtype(b, loc, result, args[2].getType(),
                                       /*isUnsignedCast=*/false);
         linalg::YieldOp::create(b, loc, result);

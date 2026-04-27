@@ -34,11 +34,11 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 // CHECK-NEXT:             ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
 // CHECK-NEXT:               iree_linalg_ext.yield %[[SCORE]] : f32
 // CHECK-NEXT:        }
-// Unmasked: sum > 0 strictly, no eps guard.
+// Unmasked: sum > 0 strictly, no denominator guard.
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
-// CHECK-NOT: arith.addf
 // CHECK: arith.divf
+// CHECK: arith.mulf
 // CHECK: arith.truncf
 // CHECK: linalg.yield
 
@@ -66,12 +66,16 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 }
 
 // CHECK-LABEL: func.func @masked_attention
-// Masked: finalization adds eps to sum so fully-masked rows (sum == 0) yield
-// 0 / eps = 0 instead of 0/0 == NaN (matches PyTorch SDPA semantics).
+// Masked: finalization clamps sum at row granularity so fully-masked rows
+// (sum == 0) yield 0 / 1 = 0 instead of 0/0 == NaN.
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
+// CHECK: %[[SAFE_SUM:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[OUT]]#2
+// CHECK: arith.maximumf
+// CHECK: linalg.yield
 // CHECK: linalg.generic
-// CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
-// CHECK: arith.addf
+// CHECK-SAME: ins(%[[SAFE_SUM]], %[[OUT]]#0
 // CHECK: arith.divf
+// CHECK: arith.mulf
 // CHECK: arith.truncf
 // CHECK: linalg.yield

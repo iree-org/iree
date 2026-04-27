@@ -472,30 +472,10 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
 
   // P = P / sum
-  if (mask == nullptr) {
-    p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
-  } else {
-    // Masked: use createSafeDivide so fully-masked rows (sum == 0) yield 0
-    // instead of 0/0 == NaN (matches PyTorch _safe_softmax).
-    SmallVector<AffineMap> compressedMaps =
-        compressUnusedDims(SmallVector<AffineMap>{pMap, sumMap});
-    AffineMap cPMap = compressedMaps[0];
-    AffineMap cSumMap = compressedMaps[1];
-    SmallVector<utils::IteratorType> iteratorTypes(
-        cPMap.getNumDims(), utils::IteratorType::parallel);
-    p = linalg::GenericOp::create(
-            b, loc, p.getType(), sum, p, SmallVector<AffineMap>{cSumMap, cPMap},
-            iteratorTypes,
-            [&](OpBuilder &nb, Location nloc, ValueRange args) {
-              Value pVal = args[1];
-              Value sumVal =
-                  convertScalarToDtype(nb, nloc, args[0], pVal.getType(),
-                                       /*isUnsignedCast=*/false);
-              Value result = createSafeDivide(nb, nloc, pVal, sumVal);
-              linalg::YieldOp::create(nb, nloc, result);
-            })
-            .getResult(0);
+  if (mask != nullptr) {
+    sum = createSafeSoftmaxDenominator(b, loc, sum);
   }
+  p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
 
   // ---- Scale and truncate LHS to match RHS ----
   SmallVector<OpFoldResult> sSizes;

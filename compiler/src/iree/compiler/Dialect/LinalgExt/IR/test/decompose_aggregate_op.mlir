@@ -148,8 +148,8 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 
-// Masked variant: (P = P / sum) must emit the eps-guarded divide so
-// fully-masked rows yield 0 instead of 0/0 == NaN.
+// Masked variant: clamp the sum denominator once per row so fully-masked rows
+// yield 0 instead of 0/0 == NaN.
 func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
                                 %key: tensor<192x1024x64xf16>,
                                 %value: tensor<192x1024x64xf16>,
@@ -198,10 +198,14 @@ func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// P = P / (sum + eps): mask is present, so finalization uses the
-// eps-guarded divide to rescue fully-masked rows to 0.
+// sum = max(sum, 1): mask is present, so fully-masked rows use a denominator
+// of 1 while non-fully-masked rows are unchanged.
 // CHECK: linalg.generic
-// CHECK:   arith.addf
+// CHECK:   arith.maximumf
+// CHECK:   linalg.yield
+// P = P / sum
+// CHECK: linalg.generic
+// CHECK-NOT: arith.addf
 // CHECK:   arith.divf
 // CHECK:   linalg.yield
 
