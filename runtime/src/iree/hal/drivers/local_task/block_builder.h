@@ -173,6 +173,9 @@ typedef struct iree_hal_cmd_block_builder_t {
   // Maximum across all blocks in this recording. Used to size .data at
   // issue time. Updated at each block finalization.
   uint16_t global_max_region_dispatch_count;
+
+  // Maximum binding slot count across all blocks in this recording. Used to
+  // size .data at issue time.
   uint16_t global_max_total_binding_count;
 } iree_hal_cmd_block_builder_t;
 

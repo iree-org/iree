@@ -290,12 +290,6 @@ bool iree_task_executor_try_place_in_compute_slot(
     if (iree_atomic_compare_exchange_strong(
             &slot->process, &expected, IREE_TASK_COMPUTE_SLOT_RESERVED,
             iree_memory_order_acq_rel, iree_memory_order_relaxed)) {
-      iree_atomic_store(&slot->wake_budget,
-                        iree_task_process_wake_budget(process),
-                        iree_memory_order_release);
-      iree_atomic_store(&process->admission_budget_ptr,
-                        (intptr_t)&slot->wake_budget,
-                        iree_memory_order_release);
       int32_t placement_epoch =
           iree_task_process_advance_placement_epoch(process);
       iree_atomic_store(&slot->placement_epoch, placement_epoch,
@@ -377,6 +371,11 @@ void iree_task_executor_schedule_process(iree_task_executor_t* executor,
             &process->schedule_state, &expected,
             (int32_t)IREE_TASK_PROCESS_SCHEDULE_DRAINING,
             iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+      // This fresh compute-slot lifetime consumes the activation that moved the
+      // process out of IDLE. Later schedule_process calls while the process is
+      // already DRAINING publish needs_drain again and are consumed by the
+      // final-drainer release/rejoin checks.
+      iree_atomic_store(&process->needs_drain, 0, iree_memory_order_seq_cst);
       iree_task_executor_place_in_compute_slot(executor, process);
     }
     // Wake workers up to the budget (whether first activation or re-wake).

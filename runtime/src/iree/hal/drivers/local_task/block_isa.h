@@ -119,11 +119,10 @@ typedef struct iree_hal_cmd_header_t {
   // NOT (they live in .data via fixup).
   uint8_t size_qwords;
   // Work commands (DISPATCH, FILL, COPY, UPDATE): region-local index into .data
-  // tile_indices[]. The builder resets this to 0 at each barrier, so
-  // commands in different regions reuse the same .data slots. The multi-
-  // worker processor uses this to distribute tiles across workers for ALL
-  // work command types. Must be 0 for non-work commands (BARRIER, BRANCH,
-  // RETURN).
+  // tile_indices[]. The builder resets this to 0 at each barrier, so commands
+  // in different regions reuse the same .data slots. The multi-worker processor
+  // uses this to distribute tiles across workers for all work command types.
+  // Must be 0 for non-work commands (BARRIER, BRANCH, RETURN).
   uint8_t dispatch_index;
 } iree_hal_cmd_header_t;
 
@@ -528,7 +527,7 @@ static_assert(sizeof(iree_hal_cmd_update_t) == 24,
 typedef struct iree_hal_cmd_barrier_t {
   iree_hal_cmd_header_t header;  // opcode=BARRIER, size_qwords=1
   // Number of work commands in the following region. Used by the processor to
-  // zero exactly this many tile_index entries at region entry.
+  // walk the region command stream and profile dispatch completions.
   uint8_t dispatch_count;
   uint8_t reserved;
   // Wake demand hint for the following region. 0 means the processor decides
@@ -560,9 +559,11 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // .data block state
 //===----------------------------------------------------------------------===//
 
-// Per-block mutable execution state (.data). Allocated at issue time, sized
-// to the highwater mark across all blocks (known after recording). Reused
-// across blocks: each block entry reinitializes the state.
+// Per-block mutable execution state (.data). Allocated at issue time. Each
+// slot is sized to the highwater mark across all blocks, known after recording.
+// Single-worker execution reuses one slot across blocks; multi-worker
+// execution uses one slot per block so stale workers can finish reading old
+// binding state after a block transition.
 //
 // Block tasks are NOT in .data — they live in a separate contiguous slab
 // allocated at issue time. The slab is pre-linked: each block task's
@@ -586,16 +587,17 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // Layout in memory (all hot atomics are cache-line padded):
 //
 //   iree_hal_cmd_block_state_t  [fixed part: 2 cache lines]
-//     - active_region_index     [cache line 0: mostly-read by all workers]
+//     - region_state            [cache line 0: mostly-read by all workers]
 //     - remaining_tiles         [cache line 1: written on tile completion]
-//   tile_index[0..max-1]        [per-dispatch work-stealing counters]
+//   tile_index[0..max-1]        [per-command work-stealing counters]
 //   void*    binding_ptrs[total_binding_count]   [cold: written once at fixup]
 //   size_t   binding_lengths[total_binding_count] [cold: written once at fixup]
 //
-// Each tile_index is a 64-bit atomic counter. Workers claim tiles via
-// fetch-add. The region-drainer gate, not the tile counter, is the correctness
-// boundary around .data reuse: the completer closes the gate and waits for all
-// admitted workers before resetting tile counters for the next region/block.
+// Each tile_index is a 64-bit atomic counter. The upper 32 bits carry the
+// active region epoch and the lower 32 bits hold the next tile. Workers claim
+// tiles with epoch-validating CAS. A stale worker that races a region
+// transition observes an epoch mismatch and cannot claim from the next
+// region's reset counters.
 //
 // binding_lengths are always populated for correctness (the dispatch ABI
 // may use them for bounds checking). If profiling shows the extra .data
@@ -603,16 +605,17 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
 // dispatch state.
 //
 // Initialization at block entry:
-//   memset(state, 0, state_size) + fixup loop + compute remaining_tiles.
-//   All counters (active_region_index, tile_indices) are zero-initialized.
-//   remaining_tiles is set to the first active region's total tiles.
-//   The only other non-zero data is binding_ptrs from fixup.
+//   Resolve fixups, compute remaining_tiles, and publish a fresh epoch.
+//   tile_indices are zeroed and remaining_tiles is set to
+//   (epoch << 32 | first_active_region_total_tiles).
+//   Multi-worker processors use one state slot per block so binding_ptrs and
+//   binding_lengths are not rewritten while stale workers may still be reading
+//   the previous block's state.
 //
 // At region boundary (completer only, immediate — no arrival wait):
-//   - Reset tile_index counters for the next region (cache-line-strided
-//     stores).
+//   - Reset tile_index counters for the next region.
 //   - Set remaining_tiles from the next region's current tile counts.
-//   - Store active_region_index (release) to unlock workers.
+//   - Store region_state (release) to publish the active region and counters.
 
 // Cache-line stride for tile_index entries. Each tile_index is padded to
 // a full cache line so that workers claiming tiles from different dispatches
@@ -621,36 +624,26 @@ typedef iree_hal_cmd_header_t iree_hal_cmd_return_t;
   ((iree_host_size_t)iree_hardware_destructive_interference_size)
 
 typedef struct iree_hal_cmd_block_state_t {
-  // Which region is currently executing. Workers read this to find the
-  // barrier in the command stream (barrier index within the current block).
-  // Written only at region transitions by the completer.
-  // Own cache line: read traffic from workers must not compete with writes
-  // on the remaining_tiles cache line.
+  // Packed current region identity. The upper 32 bits are the global region
+  // epoch, and the lower 32 bits are the active region index in the current
+  // block. The completer publishes this with release semantics after updating
+  // tile_indices and remaining_tiles. Workers acquire this as a single value so
+  // they never observe a region index from one epoch and tile counters from
+  // another. The region's barrier pointer is derived from immutable block
+  // metadata using this acquired active region index.
+  //
+  // Own cache line: read traffic from workers must not compete with writes on
+  // the remaining_tiles cache line.
   iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_int32_t active_region_index;
-
-  // Global region epoch: monotonically increasing counter used as the region
-  // publication sequence and no-work advancement token. Unlike
-  // active_region_index (which resets to 0 per block), this never resets.
-  // Workers acquire this at drain entry after entering the region-drainer gate.
-  //
-  // Same cache line as active_region_index: both are read together.
-  iree_atomic_int32_t region_epoch;
-
-  // Cached pointer to the current region's barrier command. Set by
-  // init_block (first region) and by the completer at region transitions.
-  // Workers load this instead of walking the command stream from the block
-  // header on each drain() call.
-  //
-  // Same cache line as active_region_index: both are read together.
-  iree_atomic_intptr_t cached_barrier;
+      iree_atomic_int64_t region_state;
 
   // Countdown of remaining tiles in the current region. Upper 32 bits carry
   // the region epoch for profiling/diagnostics; lower 32 bits hold the
   // remaining count.
   // Initialized to (epoch << 32 | total_tiles) at block entry and region
-  // transitions. Workers decrement with fetch-sub after completing tiles. The
-  // worker whose decrement drives the count to zero becomes the completer.
+  // transitions. Workers decrement with epoch-validating CAS after completing
+  // tiles. The worker whose decrement drives the count to zero becomes the
+  // completer.
   //
   // Workers with 0 tiles skip the election to avoid false positives.
   //
@@ -661,6 +654,24 @@ typedef struct iree_hal_cmd_block_state_t {
   // Variable-length arrays follow at computed offsets.
   // Use the iree_hal_cmd_block_state_* accessors below.
 } iree_hal_cmd_block_state_t;
+
+// Packs a region epoch and region index for atomic publication.
+static inline int64_t iree_hal_cmd_block_region_state_pack(
+    int32_t region_epoch, int32_t region_index) {
+  return ((int64_t)region_epoch << 32) | (uint32_t)region_index;
+}
+
+// Returns the global region epoch from a packed region state.
+static inline int32_t iree_hal_cmd_block_region_state_epoch(
+    int64_t region_state) {
+  return (int32_t)(region_state >> 32);
+}
+
+// Returns the active region index from a packed region state.
+static inline int32_t iree_hal_cmd_block_region_state_index(
+    int64_t region_state) {
+  return (int32_t)(uint32_t)region_state;
+}
 
 // Returns a pointer to a specific tile_index entry. Each entry is a 64-bit
 // atomic tile counter padded to a full cache line so workers claiming tiles
@@ -677,10 +688,10 @@ static inline iree_atomic_int64_t* iree_hal_cmd_block_state_tile_index(
 // NOT region-shared — each dispatch has unique bindings identified by
 // binding_data_base. Cold during execution; no cache-line padding needed.
 static inline void** iree_hal_cmd_block_state_binding_ptrs(
-    iree_hal_cmd_block_state_t* state, uint16_t max_region_dispatch_count) {
+    iree_hal_cmd_block_state_t* state, uint16_t tile_index_count) {
   uint8_t* base = (uint8_t*)state + sizeof(iree_hal_cmd_block_state_t);
   uintptr_t after_tiles =
-      (uintptr_t)(base + (iree_host_size_t)max_region_dispatch_count *
+      (uintptr_t)(base + (iree_host_size_t)tile_index_count *
                              IREE_HAL_CMD_TILE_INDEX_STRIDE);
   return (void**)iree_host_align(after_tiles, iree_alignof(void*));
 }
@@ -688,21 +699,20 @@ static inline void** iree_hal_cmd_block_state_binding_ptrs(
 // Returns the binding_lengths array (total_binding_count entries).
 // Follows binding_ptrs contiguously. Cold during execution.
 static inline size_t* iree_hal_cmd_block_state_binding_lengths(
-    iree_hal_cmd_block_state_t* state, uint16_t max_region_dispatch_count,
+    iree_hal_cmd_block_state_t* state, uint16_t tile_index_count,
     uint16_t total_binding_count) {
   void** binding_ptrs =
-      iree_hal_cmd_block_state_binding_ptrs(state, max_region_dispatch_count);
+      iree_hal_cmd_block_state_binding_ptrs(state, tile_index_count);
   return (size_t*)(binding_ptrs + total_binding_count);
 }
 
 // Computes the total .data allocation size for a block with the given
 // parameters.
 static inline iree_host_size_t iree_hal_cmd_block_state_size(
-    uint16_t max_region_dispatch_count, uint16_t total_binding_count) {
+    uint16_t tile_index_count, uint16_t total_binding_count) {
   iree_host_size_t size = sizeof(iree_hal_cmd_block_state_t);
   // Cache-line-padded tile indices.
-  size += (iree_host_size_t)max_region_dispatch_count *
-          IREE_HAL_CMD_TILE_INDEX_STRIDE;
+  size += (iree_host_size_t)tile_index_count * IREE_HAL_CMD_TILE_INDEX_STRIDE;
   // Pointer-aligned cold binding arrays.
   size = iree_host_align(size, iree_alignof(void*));
   size += total_binding_count * sizeof(void*);
@@ -833,7 +843,8 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 // The block chain is a singly-linked list via next_block pointers. Each block
 // is an independent compilation unit: its own command stream, fixup tables,
 // and region metadata. The processor executes blocks sequentially via BRANCH
-// commands, reinitializing .data at each block entry.
+// commands. Multi-worker processors keep one .data slot per block so stale
+// workers can finish reading old block fixups after a block transition.
 typedef struct iree_hal_cmd_block_recording_t {
   // Block pool the blocks were acquired from. Needed for release.
   iree_arena_block_pool_t* block_pool;
@@ -842,11 +853,13 @@ typedef struct iree_hal_cmd_block_recording_t {
   // Total blocks in the chain. Used at issue time to size the task slab.
   uint16_t block_count;
   // .data sizing: maximum max_region_dispatch_count across all blocks.
-  // Determines the number of cache-line-padded tile_index entries in .data.
-  // .data is sized to the highwater mark so it can be reused across blocks.
+  // Determines the number of cache-line-padded tile_index entries in each
+  // block-state slot.
   uint16_t max_region_dispatch_count;
-  // .data sizing: maximum total_binding_count across all blocks.
-  // Determines the binding_ptrs[] and binding_lengths[] array sizes in .data.
+
+  // .data sizing: maximum total_binding_count across all blocks. Determines
+  // the binding_ptrs[] and binding_lengths[] array sizes in each block-state
+  // slot.
   uint16_t max_total_binding_count;
 } iree_hal_cmd_block_recording_t;
 

@@ -43,11 +43,6 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
   // scheduler publishes slot metadata, or a valid process.
   iree_atomic_intptr_t process;
 
-  // Active-drainer admission budget mirrored from the current process. Workers
-  // read this before claiming active_drainers, while the process pointer may
-  // still be only a stale quick-check observation.
-  iree_atomic_int32_t wake_budget;
-
   // Process placement epoch captured at publication time. Slot releases
   // snapshot this before clearing the slot so they can detect if the same
   // persistent process was republished before the old release callback runs.

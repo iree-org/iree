@@ -18,12 +18,14 @@
 // other contexts. No hooks, no callbacks, no implicit blocking — all yield
 // and scheduling policy lives in the caller.
 //
-// The inner loop is tight: one amortized atomic fetch-add per tile reservation,
+// The inner loop is tight: one amortized atomic CAS per tile reservation,
 // zero task system interaction between dispatches within a region. Region
 // transitions are handled by the completer (elected via remaining_tiles
-// countdown). The completer closes the region-drainer gate before rewriting
-// .data so workers that sampled shared state cannot race the next region/block
-// initialization.
+// countdown). Tile counters and remaining_tiles carry epoch tags so stale
+// workers from an earlier region fail their next claim without an arrival
+// barrier. Multi-worker contexts keep separate .data storage for each block so
+// block fixups are never rewritten under workers that may still be finishing
+// the previous block.
 //
 // Execution paths:
 //   - Single-worker (worker_count=1): drain() executes the entire recording
@@ -51,12 +53,12 @@ typedef struct iree_task_executor_t iree_task_executor_t;
 //===----------------------------------------------------------------------===//
 
 // Execution context shared across all workers processing a recording.
-// Contains the .data pointer (mutable execution state) and synchronization
+// Contains the .data storage (mutable execution state) and synchronization
 // state for multi-worker coordination.
 //
 // For single-worker execution, declare on the stack and use
 // context_initialize. For multi-worker, use context_allocate (which
-// allocates the context + .data together with proper alignment).
+// allocates the context + .data storage together with proper alignment).
 typedef struct iree_hal_cmd_block_processor_profile_dispatch_t {
   // Earliest host timestamp observed for this dispatch in the active region.
   iree_atomic_int64_t start_host_time_ns;
@@ -78,15 +80,27 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // The recording being executed (immutable .text).
   const iree_hal_cmd_block_recording_t* recording;
 
-  // Binding table for indirect fixup resolution.
+  // Binding entries used for indirect fixup resolution.
   const iree_hal_cmd_binding_entry_t* binding_table;
+
+  // Number of entries in |binding_table|.
   iree_host_size_t binding_table_length;
 
-  // Per-block mutable execution state (.data). Sized to the recording's
-  // highwater marks, reused across blocks. Separately allocated (arena or
-  // trailing allocation from context_allocate).
-  iree_hal_cmd_block_state_t* state;
+  // First block-state storage slot. Single-worker contexts reuse this slot;
+  // multi-worker contexts allocate one slot per recorded block.
+  iree_hal_cmd_block_state_t* state_storage;
+
+  // Byte size of one block-state payload without trailing slot padding.
   iree_host_size_t state_size;
+
+  // Byte stride between block-state slots.
+  iree_host_size_t state_stride;
+
+  // Number of block-state slots available in |state_storage|.
+  uint16_t state_count;
+
+  // Next block-state slot to initialize for a multi-worker block transition.
+  uint16_t next_block_state_index;
 
   // Total workers cooperating on this recording.
   uint32_t worker_count;
@@ -95,11 +109,6 @@ typedef struct iree_hal_cmd_block_processor_context_t {
   // This seeds the task process wake_budget when a recording is published and
   // is updated by region/block completers. It is not an admission limit.
   iree_atomic_int32_t current_wake_budget;
-
-  // Low bits count workers that entered the active region and may read .data;
-  // the high bit closes the gate while the completer rewrites .data.
-  iree_alignas(iree_hardware_destructive_interference_size)
-      iree_atomic_int32_t region_drainer_state;
 
   // Set to 1 when RETURN is reached or an error occurs. Workers check this
   // on each drain() entry and exit immediately when set.
@@ -119,27 +128,28 @@ typedef struct iree_hal_cmd_block_processor_context_t {
       iree_atomic_intptr_t error_status;
 
   // The current block being processed. Updated by the completer at block
-  // transitions before incrementing block_sequence. Stored as intptr_t
-  // for TSAN visibility (the release/acquire on block_sequence provides
-  // ordering).
+  // transitions before publishing the next odd block_sequence value.
   iree_atomic_intptr_t current_block;
 
-  // Sizing parameters from the recording (cached for .data access).
+  // The current block-state slot. Updated with |current_block| at block
+  // transitions so workers sample a matching immutable block and mutable state.
+  iree_atomic_intptr_t current_state;
+
+  // Maximum active-region dispatch count in any recorded block. This is the
+  // number of tile_index slots in each block-state slot.
   uint16_t max_region_dispatch_count;
+
+  // Maximum total binding count in any recorded block.
   uint16_t max_total_binding_count;
 
   // Global epoch counter for region publication. Monotonically increasing
   // across region and block transitions. Only the completer writes this
   // (single-writer, not atomic). Workers read the epoch from
-  // state->region_epoch instead.
+  // state->region_state instead.
   int32_t next_epoch;
 
   // Process wake budget updated by the completer at region transitions.
   iree_atomic_int32_t* wake_budget_ptr;
-
-  // Optional pointer to the process field that points at its active compute
-  // slot's mirrored admission budget.
-  iree_atomic_intptr_t* admission_budget_ptr;
 
   // Executor to notify when a region transition increases wake demand.
   iree_task_executor_t* wake_executor;
@@ -251,12 +261,6 @@ static_assert(offsetof(iree_hal_cmd_block_processor_context_t, completed) %
                       iree_hardware_destructive_interference_size ==
                   0,
               "processor completion flag must start on its own cache line");
-static_assert(offsetof(iree_hal_cmd_block_processor_context_t,
-                       region_drainer_state) %
-                      iree_hardware_destructive_interference_size ==
-                  0,
-              "processor region drainer state must start on its own cache "
-              "line");
 static_assert(offsetof(iree_hal_cmd_block_processor_context_t, block_sequence) %
                       iree_hardware_destructive_interference_size ==
                   0,
@@ -299,16 +303,12 @@ typedef enum iree_hal_cmd_block_processor_drain_reason_e {
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETED,
   // A block transition was in progress.
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_BLOCK_TRANSITION,
-  // A region transition was in progress.
-  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_TRANSITION,
   // The active block had no remaining runnable regions.
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_COMPLETE,
   // The block sequence changed while the worker was sampling state.
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_STALE_BLOCK_SEQUENCE,
   // A worker-visible error had already been reported.
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_ERROR,
-  // The active region did not have a cached barrier pointer.
-  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_MISSING_BARRIER,
   // The worker claimed no tiles from the active region.
   IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NO_TILES,
   // The worker claimed one or more tiles.
@@ -343,8 +343,12 @@ typedef struct iree_hal_cmd_block_processor_drain_result_t {
   // after the transition gate has reopened so woken workers enter ready state.
   int32_t wake_delta;
 
+  // Maximum warm retainers requested by recorded region lookahead. Zero means
+  // the caller should use the process's current wake budget.
+  int32_t warm_retainer_limit;
+
   // True when this no-work drain should keep the worker spinning near the
-  // processor because recorded region lookahead shows wide work is imminent.
+  // processor because the next recorded candidate region is wide.
   bool prefer_warm_spin;
 
   // Trace-only diagnostic reason describing why this drain call returned.
@@ -420,10 +424,10 @@ iree_status_t iree_hal_cmd_block_processor_context_allocate(
 // For worker_count == 1: executes the entire recording synchronously on the
 // first call and returns completed=true. No atomics, no coordination.
 //
-// For worker_count > 1: claims tiles from the current region via atomic
-// fetch-add, executes them, and participates in completer election via
-// remaining_tiles countdown. If elected as completer, advances the region or
-// handles block transitions before returning.
+// For worker_count > 1: claims tiles from the current region via epoch-tagged
+// atomic CAS, executes them, and participates in completer election via
+// epoch-tagged remaining_tiles countdown. If elected as completer, advances the
+// region or handles block transitions before returning.
 // Returns control to the caller after one pass.
 //
 // The caller is responsible for yield/scheduling policy:
@@ -431,7 +435,7 @@ iree_status_t iree_hal_cmd_block_processor_context_allocate(
 //     iree_hal_cmd_block_processor_drain(context, &worker_context,
 //                                        &worker_state, &result);
 //     if (!result.completed && result.tiles_executed == 0) {
-//       iree_thread_yield();  // or: scan other contexts, park, etc.
+//       // Scan other contexts, park, or otherwise apply caller policy.
 //     }
 //   } while (!result.completed);
 //

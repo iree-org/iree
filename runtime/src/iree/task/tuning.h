@@ -62,7 +62,7 @@ extern "C" {
 // separate from the generic tail spin above: only drain functions with concrete
 // lookahead evidence request this wider handoff window.
 #ifndef IREE_TASK_WARM_WAIT_LOOKAHEAD_SPIN_NS
-#define IREE_TASK_WARM_WAIT_LOOKAHEAD_SPIN_NS (200 * 1000)
+#define IREE_TASK_WARM_WAIT_LOOKAHEAD_SPIN_NS (10 * 1000)
 #endif  // IREE_TASK_WARM_WAIT_LOOKAHEAD_SPIN_NS
 
 // Maximum number of remaining active drainers where a no-work warm retainer is

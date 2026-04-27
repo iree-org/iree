@@ -837,6 +837,7 @@ static void iree_hal_task_queue_wait_resolved(
   iree_hal_task_queue_wait_entry_t* entry =
       (iree_hal_task_queue_wait_entry_t*)user_data;
   iree_hal_task_queue_op_t* operation = entry->operation;
+  iree_hal_task_queue_t* queue = operation->queue;
   iree_hal_semaphore_t* semaphore = entry->semaphore;
 
   // Record the first failure via CAS.
@@ -870,10 +871,8 @@ static void iree_hal_task_queue_wait_resolved(
     } else {
       // All waits satisfied. Push to ready list and wake queue.
       iree_hal_task_queue_profile_record_ready(operation);
-      iree_hal_task_queue_op_slist_push(&operation->queue->ready_list,
-                                        operation);
-      iree_task_executor_schedule_process(operation->queue->executor,
-                                          &operation->queue->process);
+      iree_hal_task_queue_op_slist_push(&queue->ready_list, operation);
+      iree_task_executor_schedule_process(queue->executor, &queue->process);
     }
   }
 
@@ -1472,8 +1471,6 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   // the null-safe block processor drain path.
   if (processor_context) {
     processor_context->wake_budget_ptr = &queue->compute_process.wake_budget;
-    processor_context->admission_budget_ptr =
-        &queue->compute_process.admission_budget_ptr;
     processor_context->wake_executor = queue->executor;
     processor_context->retention_epoch_ptr =
         &queue->compute_process.retention_epoch;
@@ -2437,6 +2434,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     bool processor_keep_active = false;
     bool processor_publish_keep_active = false;
     bool processor_keep_warm = false;
+    int32_t processor_keep_warm_retainer_limit = 0;
     bool processor_keep_warm_spin = false;
     int32_t processor_keep_warm_epoch = 0;
     if (!processor_result.completed && processor_result.tiles_executed == 0) {
@@ -2450,8 +2448,20 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
         processor_keep_active = true;
         processor_publish_keep_active = true;
       } else {
-        processor_keep_warm = true;
-        processor_keep_warm_spin = processor_result.prefer_warm_spin;
+        int32_t expected_retain_drain = 0;
+        if (iree_atomic_compare_exchange_strong(
+                &process->retain_drain, &expected_retain_drain, 1,
+                iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+          // A warm wait needs some drainer to advance the command-buffer
+          // retention epoch. Elect one no-work/no-advance drainer to stay
+          // active so peer drainers can park warm without stranding progress.
+          processor_keep_active = true;
+        } else {
+          processor_keep_warm = true;
+          processor_keep_warm_retainer_limit =
+              processor_result.warm_retainer_limit;
+          processor_keep_warm_spin = processor_result.prefer_warm_spin;
+        }
       }
       processor_did_work = false;
       if (IREE_UNLIKELY(
@@ -2471,6 +2481,7 @@ static iree_status_t iree_hal_task_queue_compute_process_drain(
     out_result->keep_active = processor_keep_active;
     out_result->publish_keep_active = processor_publish_keep_active;
     out_result->keep_warm = processor_keep_warm;
+    out_result->keep_warm_retainer_limit = processor_keep_warm_retainer_limit;
     out_result->keep_warm_spin = processor_keep_warm_spin;
     out_result->keep_warm_epoch = processor_keep_warm_epoch;
     out_result->completed = false;

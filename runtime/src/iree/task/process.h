@@ -87,6 +87,10 @@ typedef struct iree_task_process_drain_result_t {
   // the process retention epoch changes.
   bool keep_warm;
 
+  // Maximum warm retainers allowed for this keep_warm decision. A zero value
+  // uses the process's current wake budget.
+  int32_t keep_warm_retainer_limit;
+
   // True if a keep_warm worker should enter the longer lookahead spin window.
   // Drain functions set this only when they have process-specific evidence
   // that near-future work needs more workers than the generic tail policy keeps
@@ -250,11 +254,12 @@ struct iree_task_process_t {
 
   iree_alignas(iree_hardware_destructive_interference_size)
 
-      // Wake demand and active-drainer admission limit. The scheduler uses this
-      // to seed the executor wake tree and cap the number of workers
-      // concurrently draining the process. The process scheduler class is
-      // separate: processes with IREE_TASK_PROCESS_FLAG_COMPUTE_SLOT stay in
-      // compute slots even when their current wake demand is one.
+      // Wake demand hint. The scheduler uses this to seed the executor wake
+      // tree when a process is activated or republished. This is not an
+      // admission limit: already-active workers may still enter drain().
+      // The process scheduler class is separate: processes with
+      // IREE_TASK_PROCESS_FLAG_COMPUTE_SLOT stay in compute slots even when
+      // their current wake demand is one.
       //
       // Drain functions may update the hint at region transitions when the
       // amount of useful parallel work changes.
@@ -262,11 +267,6 @@ struct iree_task_process_t {
 
   // Immutable scheduler and lifecycle flags.
   iree_task_process_flags_t flags;
-
-  // Optional pointer to the active compute slot's mirrored wake budget. Set by
-  // the executor while the process is published in a compute slot and cleared
-  // before the slot can be reused.
-  iree_atomic_intptr_t admission_budget_ptr;
 
   // Monotonic compute-slot placement generation. Incremented immediately
   // before publishing this process into a compute slot and sampled by slot
@@ -493,14 +493,15 @@ static inline int32_t iree_task_process_warm_retainer_count(
 
 // Attempts to retain one warm worker near the process. Warm retention is
 // capacity for near-future useful draining, so admission is capped by the
-// process wake budget. Excess workers should leave active draining and park.
+// caller-provided retention limit. Excess workers should leave active draining
+// and park.
 static inline bool iree_task_process_try_retain_warm(
-    iree_task_process_t* process) {
+    iree_task_process_t* process, int32_t retainer_limit) {
+  if (retainer_limit <= 0) return false;
   int32_t current_count =
       iree_atomic_load(&process->warm_retainers, iree_memory_order_acquire);
   while (true) {
-    const int32_t wake_budget = iree_task_process_wake_budget(process);
-    if (current_count >= wake_budget) return false;
+    if (current_count >= retainer_limit) return false;
     if (iree_atomic_compare_exchange_weak(
             &process->warm_retainers, &current_count, current_count + 1,
             iree_memory_order_acq_rel, iree_memory_order_acquire)) {

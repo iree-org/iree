@@ -47,8 +47,6 @@ void iree_task_process_initialize(iree_task_process_drain_fn_t drain_fn,
   iree_atomic_store(&out_process->error_status, 0, iree_memory_order_relaxed);
   iree_atomic_store(&out_process->wake_budget, wake_budget,
                     iree_memory_order_relaxed);
-  iree_atomic_store(&out_process->admission_budget_ptr, 0,
-                    iree_memory_order_relaxed);
   iree_atomic_store(&out_process->placement_epoch, 0,
                     iree_memory_order_relaxed);
   iree_atomic_store(&out_process->schedule_state, 0, iree_memory_order_relaxed);

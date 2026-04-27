@@ -300,9 +300,9 @@ buffer (block ISA) and executes it cooperatively:
   processor context, advances the frontier.
 
 This is where 99% of cycles are spent. The drain() hot path is: atomic load
-(block_sequence check) → atomic load (active_region_index) → atomic load
-(region_epoch) → CAS loop on tile_index → kernel call. No allocation, no
-indirection beyond the drain function pointer.
+(block_sequence check) → atomic load (packed region_state) → CAS loop on
+tile_index → kernel call. No allocation, no indirection beyond the drain
+function pointer.
 
 ### Immediate process: queue management
 
@@ -413,7 +413,7 @@ Cache line 2 (scheduling — written by drain function):
     wake_budget, sleeping flag, last_did_work
 
 Cache line 3+ (process-specific mutable state):
-    Block processor: active_region_index, region_epoch, remaining_tiles, ...
+    Block processor: packed region_state, remaining_tiles, tile_indices, ...
 ```
 
 Workers scanning the compute list touch cache line 0 (read function pointer)

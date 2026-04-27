@@ -312,15 +312,13 @@ TEST(BlockISATest, BlockStateLayout) {
   auto* state = reinterpret_cast<iree_hal_cmd_block_state_t*>(data);
 
   // Verify cache-line isolation of the fixed fields.
-  auto active_addr = reinterpret_cast<uintptr_t>(&state->active_region_index);
+  auto region_addr = reinterpret_cast<uintptr_t>(&state->region_state);
   auto remaining_addr = reinterpret_cast<uintptr_t>(&state->remaining_tiles);
-  EXPECT_EQ(active_addr % 64, 0)
-      << "active_region_index must be cache-line aligned";
+  EXPECT_EQ(region_addr % 64, 0) << "region_state must be cache-line aligned";
   EXPECT_EQ(remaining_addr % 64, 0)
       << "remaining_tiles must be cache-line aligned";
-  EXPECT_GE(remaining_addr - active_addr, 64u)
-      << "active_region_index and remaining_tiles must be on different cache "
-         "lines";
+  EXPECT_GE(remaining_addr - region_addr, 64u)
+      << "region_state and remaining_tiles must be on different cache lines";
 
   // Verify tile_index entries are cache-line strided.
   for (uint16_t i = 0; i < max_region_dispatch_count; ++i) {
@@ -396,8 +394,8 @@ TEST(BlockISATest, BlockStateSizingExtremes) {
                            1 * IREE_HAL_CMD_TILE_INDEX_STRIDE +
                            1 * sizeof(void*) + 1 * sizeof(size_t));
 
-  // Verify the struct itself is 2 cache lines (active_region_index +
-  // remaining_tiles, each on their own line).
+  // Verify the struct itself is 2 cache lines: the mostly-read region state and
+  // hot remaining-tile counter stay on separate lines.
   EXPECT_EQ(sizeof(iree_hal_cmd_block_state_t), 128u);
 }
 

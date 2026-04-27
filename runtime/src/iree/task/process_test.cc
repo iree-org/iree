@@ -102,24 +102,23 @@ TEST(ProcessTest, InitializeRunnable) {
   EXPECT_EQ(iree_task_process_wake_budget(&process), 4);
 }
 
-TEST(ProcessTest, WarmRetainerAdmissionCapsToWakeBudget) {
+TEST(ProcessTest, WarmRetainerAdmissionCapsToLimit) {
   iree_task_process_t process;
   iree_task_process_initialize(drain_immediate, /*suspend_count=*/0,
                                /*wake_budget=*/2, &process);
 
-  EXPECT_TRUE(iree_task_process_try_retain_warm(&process));
-  EXPECT_TRUE(iree_task_process_try_retain_warm(&process));
-  EXPECT_FALSE(iree_task_process_try_retain_warm(&process));
+  EXPECT_TRUE(iree_task_process_try_retain_warm(&process, 2));
+  EXPECT_TRUE(iree_task_process_try_retain_warm(&process, 2));
+  EXPECT_FALSE(iree_task_process_try_retain_warm(&process, 2));
   EXPECT_EQ(iree_task_process_warm_retainer_count(&process), 2);
 
-  iree_atomic_store(&process.wake_budget, 1, iree_memory_order_relaxed);
-  EXPECT_FALSE(iree_task_process_try_retain_warm(&process));
+  EXPECT_FALSE(iree_task_process_try_retain_warm(&process, 1));
   EXPECT_EQ(iree_task_process_warm_retainer_count(&process), 2);
 
   iree_atomic_fetch_sub(&process.warm_retainers, 1, iree_memory_order_acq_rel);
-  EXPECT_FALSE(iree_task_process_try_retain_warm(&process));
+  EXPECT_FALSE(iree_task_process_try_retain_warm(&process, 1));
   iree_atomic_fetch_sub(&process.warm_retainers, 1, iree_memory_order_acq_rel);
-  EXPECT_TRUE(iree_task_process_try_retain_warm(&process));
+  EXPECT_TRUE(iree_task_process_try_retain_warm(&process, 1));
   EXPECT_EQ(iree_task_process_warm_retainer_count(&process), 1);
 }
 
