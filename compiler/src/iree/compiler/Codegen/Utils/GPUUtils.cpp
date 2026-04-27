@@ -21,7 +21,10 @@
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -1363,6 +1366,74 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   });
 
   return rootOps;
+}
+
+Value applyInverseXorSwizzleToDMASourceOffset(
+    OpBuilder &builder, Location loc, Value srcLinearOffset,
+    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements,
+    int64_t elementsPerLane, Value dest) {
+  // Compute the subgroup's base offset within the full allocation by tracing
+  // through view-like ops and accumulating the linear element offset.
+  Value swizzleBaseOffset;
+  int64_t swizzlePeriod = swizzle.getRowWidth() *
+                          (swizzle.getRowWidth() / swizzle.getAccessWidth());
+  if (destElements % swizzlePeriod != 0) {
+    Value destTrace = dest;
+    OpFoldResult totalOffset = builder.getIndexAttr(0);
+    while (auto viewOp = destTrace.getDefiningOp<ViewLikeOpInterface>()) {
+      if (auto subviewOp = dyn_cast<memref::SubViewOp>(viewOp.getOperation())) {
+        auto parentType = cast<MemRefType>(subviewOp.getSource().getType());
+        SmallVector<int64_t> strides;
+        int64_t offset;
+        if (succeeded(parentType.getStridesAndOffset(strides, offset))) {
+          SmallVector<OpFoldResult> strideOFRs =
+              getAsIndexOpFoldResult(builder.getContext(), strides);
+          auto &&[expr, values] = computeLinearIndex(
+              totalOffset, strideOFRs, subviewOp.getMixedOffsets());
+          totalOffset =
+              affine::makeComposedFoldedAffineApply(builder, loc, expr, values);
+        }
+      }
+      destTrace = viewOp.getViewSource();
+    }
+    if (!isConstantIntValue(totalOffset, 0)) {
+      swizzleBaseOffset =
+          getValueOrCreateConstantIndexOp(builder, loc, totalOffset);
+    }
+  }
+
+  // Add the subgroup's base offset within the full allocation.
+  Value swizzleInput = srcLinearOffset;
+  if (swizzleBaseOffset) {
+    swizzleInput =
+        arith::AddIOp::create(builder, loc, swizzleBaseOffset, srcLinearOffset);
+  }
+
+  // Subtract the accessWidth remainder.
+  int64_t accessWidth = swizzle.getAccessElementCount();
+  Value remainder;
+  if (elementsPerLane < accessWidth) {
+    Value accessWidthVal =
+        arith::ConstantIndexOp::create(builder, loc, accessWidth);
+    remainder =
+        arith::RemUIOp::create(builder, loc, swizzleInput, accessWidthVal);
+    swizzleInput = arith::SubIOp::create(builder, loc, swizzleInput, remainder);
+  }
+
+  // Apply the actual swizzle.
+  Value swizzled = getValueOrCreateConstantIndexOp(
+      builder, loc, swizzle.swizzleOffset(builder, loc, swizzleInput, dest));
+
+  // Add the remainder back.
+  if (remainder) {
+    swizzled = arith::AddIOp::create(builder, loc, swizzled, remainder);
+  }
+
+  // Subtract the subgroup base offset.
+  if (swizzleBaseOffset) {
+    return arith::SubIOp::create(builder, loc, swizzled, swizzleBaseOffset);
+  }
+  return swizzled;
 }
 
 } // namespace mlir::iree_compiler

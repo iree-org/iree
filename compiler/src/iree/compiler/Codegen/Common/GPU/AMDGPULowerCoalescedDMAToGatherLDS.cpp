@@ -166,109 +166,6 @@ getDestSwizzleAttr(Value dest) {
   return std::nullopt;
 }
 
-/// Trace a memref value through view-like ops, accumulating the linear
-/// element offset. Returns nullptr if the offset is zero.
-static Value computeSwizzleBaseOffset(RewriterBase &rewriter, Location loc,
-                                      Value dest) {
-  OpFoldResult totalOffset = rewriter.getIndexAttr(0);
-  while (auto viewOp = dest.getDefiningOp<ViewLikeOpInterface>()) {
-    if (auto subviewOp = dyn_cast<memref::SubViewOp>(viewOp.getOperation())) {
-      auto parentType = cast<MemRefType>(subviewOp.getSource().getType());
-      SmallVector<int64_t> strides;
-      int64_t offset;
-      if (succeeded(parentType.getStridesAndOffset(strides, offset))) {
-        SmallVector<OpFoldResult> strideOFRs =
-            getAsIndexOpFoldResult(rewriter.getContext(), strides);
-        auto &&[expr, values] = computeLinearIndex(totalOffset, strideOFRs,
-                                                   subviewOp.getMixedOffsets());
-        totalOffset =
-            affine::makeComposedFoldedAffineApply(rewriter, loc, expr, values);
-      }
-    }
-    dest = viewOp.getViewSource();
-  }
-  if (isConstantIntValue(totalOffset, 0)) {
-    return nullptr;
-  }
-  return getValueOrCreateConstantIndexOp(rewriter, loc, totalOffset);
-}
-
-/// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
-/// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
-///
-/// Two adjustments are needed beyond the swizzle itself:
-///
-/// 1. Subgroup base offset: when the subgroup transfer size is not a
-///    multiple of the swizzle period, we add the subgroup's base offset
-///    within the full allocation before swizzling and subtract it after.
-///
-///    Example: xor_shuffle<64, 8>, period = 64*64/8 = 512 elements.
-///    Workgroup tile = 32x32, 4 subgroups of 8x32 = 256 each.
-///    256 < 512, so the fix is needed:
-///    ```
-///      BUG: swizzle(local)
-///           Subgroups 0 and 1 see the same local offsets but occupy
-///           different rows in the full allocation.
-///      FIX: swizzle(local + base) - base
-///    ```
-///
-/// 2. Access-width alignment: when elementsPerLane < accessWidth, we
-///    strip the sub-accessWidth remainder before swizzling and add it
-///    back after.
-///
-///    Example: xor_shuffle<64, 8>, elementsPerLane = 2 (< 8).
-///    ```
-///      BUG: swizzle(offset)
-///           swizzle(0) == swizzle(2) == swizzle(6) because swizzle
-///           divides by accessWidth, truncating all three to the same group.
-///      FIX: swizzle(offset - rem) + rem, where rem = offset % accessWidth
-///    ```
-static Value applySwizzleToSourceOffset(RewriterBase &rewriter, Location loc,
-                                        Value srcLinearOffset,
-                                        IREE::Codegen::XORShuffleAttr swizzle,
-                                        int64_t destElements,
-                                        int64_t elementsPerLane, Value dest) {
-  // Add the subgroup's base offset within the full allocation.
-  Value swizzleBaseOffset;
-  int64_t swizzlePeriod = swizzle.getRowWidth() *
-                          (swizzle.getRowWidth() / swizzle.getAccessWidth());
-  if (destElements % swizzlePeriod != 0) {
-    swizzleBaseOffset = computeSwizzleBaseOffset(rewriter, loc, dest);
-  }
-  Value swizzleInput = srcLinearOffset;
-  if (swizzleBaseOffset) {
-    swizzleInput = arith::AddIOp::create(rewriter, loc, swizzleBaseOffset,
-                                         srcLinearOffset);
-  }
-
-  // Subtract the accessWidth remainder.
-  int64_t accessWidth = swizzle.getAccessElementCount();
-  Value remainder;
-  if (elementsPerLane < accessWidth) {
-    Value accessWidthVal =
-        arith::ConstantIndexOp::create(rewriter, loc, accessWidth);
-    remainder =
-        arith::RemUIOp::create(rewriter, loc, swizzleInput, accessWidthVal);
-    swizzleInput =
-        arith::SubIOp::create(rewriter, loc, swizzleInput, remainder);
-  }
-
-  // Apply the actual swizzle.
-  Value swizzled = getValueOrCreateConstantIndexOp(
-      rewriter, loc, swizzle.swizzleOffset(rewriter, loc, swizzleInput, dest));
-
-  // Add the remainder back.
-  if (remainder) {
-    swizzled = arith::AddIOp::create(rewriter, loc, swizzled, remainder);
-  }
-
-  // Subtract the subgroup base offset.
-  if (swizzleBaseOffset) {
-    return arith::SubIOp::create(rewriter, loc, swizzled, swizzleBaseOffset);
-  }
-  return swizzled;
-}
-
 /// Verifies that every transfer segment is compatible with the destination
 /// XOR swizzle's |accessWidth|.
 ///
@@ -580,7 +477,7 @@ private:
           // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
           if (destSwizzle) {
             int64_t destElements = ShapedType::getNumElements(destShape);
-            srcLinearOffset = applySwizzleToSourceOffset(
+            srcLinearOffset = applyInverseXorSwizzleToDMASourceOffset(
                 rewriter, loc, srcLinearOffset, *destSwizzle, destElements,
                 segment.elementsPerLane, dest);
           }
