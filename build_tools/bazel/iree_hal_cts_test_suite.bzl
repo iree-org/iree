@@ -283,6 +283,7 @@ def iree_hal_cts_test_suite(
     # Common deps for all test binaries.
     common_deps = [
         backends_lib,
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/testing:gtest",
