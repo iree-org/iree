@@ -637,6 +637,27 @@ static TileSizes getIterationSpaceTileSizes(Operation *op, unsigned numLoops,
   return iterTileSizes;
 }
 
+/// Gather tile sizes into the iteration space of a linalg op by looking up
+/// both operand and result lattice states in the solver.
+static TileSizes
+getLinalgIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
+                                 const DataFlowSolver &solver) {
+  TileSizes iterTileSizes =
+      getIterationSpaceTileSizes(linalgOp, linalgOp.getNumLoops(),
+                                 linalgOp.getIndexingMapsArray(), solver);
+
+  for (auto [idx, result] : llvm::enumerate(linalgOp->getResults())) {
+    const TileSizeLattice *lattice =
+        solver.lookupState<TileSizeLattice>(result);
+    TileSizes tileSizes = getTileSizesFor(result, lattice);
+    OpOperand *init = linalgOp.getDpsInitOperand(idx);
+    AffineMap map = linalgOp.getMatchingIndexingMap(init);
+    iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
+  }
+
+  return iterTileSizes;
+}
+
 /// Get tile sizes for an im2col op from its result lattice. Im2col's output
 /// dimensions are the iteration domain, so the result lattice directly holds
 /// the iteration-space tile sizes.
@@ -645,6 +666,89 @@ static TileSizes getIm2colTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   Value result = im2colOp.getResult(0);
   const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(result);
   return getTileSizesFor(result, lattice);
+}
+
+static std::optional<TileSizes>
+getUseOperandTileSizes(OpOperand &use, const DataFlowSolver &solver) {
+  Operation *user = use.getOwner();
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
+    TileSizes iterTileSizes =
+        getLinalgIterationSpaceTileSizes(linalgOp, solver);
+    AffineMap map = linalgOp.getMatchingIndexingMap(&use);
+    TileSizes operandTileSizes = iterTileSizes.mapFromIterationSpace(map);
+    if (!operandTileSizes.isDefined()) {
+      return std::nullopt;
+    }
+    return operandTileSizes;
+  }
+
+  if (auto toLayoutOp = dyn_cast<ToLayoutOp>(user)) {
+    Value result = toLayoutOp.getResult();
+    const TileSizeLattice *lattice =
+        solver.lookupState<TileSizeLattice>(result);
+    TileSizes tileSizes = getTileSizesFor(result, lattice);
+    if (!tileSizes.isDefined()) {
+      return std::nullopt;
+    }
+    return tileSizes;
+  }
+
+  return std::nullopt;
+}
+
+static LogicalResult
+materializeDuplicatableLinalgOp(linalg::LinalgOp linalgOp,
+                                const DataFlowSolver &solver) {
+  if (linalgOp->getNumResults() != 1) {
+    return failure();
+  }
+  if (linalgOp->hasAttr(kVectorTileSizesAttrName)) {
+    return success();
+  }
+  Value result = linalgOp->getResult(0);
+  if (!isDuplicatable(result)) {
+    return failure();
+  }
+
+  SmallVector<std::pair<TileSizes, SmallVector<OpOperand *>>> useGroups;
+  for (OpOperand &use : result.getUses()) {
+    std::optional<TileSizes> maybeTileSizes =
+        getUseOperandTileSizes(use, solver);
+    if (!maybeTileSizes || !maybeTileSizes->isDefined()) {
+      continue;
+    }
+    auto it = llvm::find_if(
+        useGroups, [&](auto &entry) { return entry.first == *maybeTileSizes; });
+    if (it == useGroups.end()) {
+      useGroups.emplace_back(*maybeTileSizes, SmallVector<OpOperand *>{&use});
+    } else {
+      it->second.push_back(&use);
+    }
+  }
+
+  if (useGroups.empty()) {
+    return success();
+  }
+
+  auto setTileSizeAttr = [](Operation *op, TileSizes tileSizes) {
+    op->setAttr(kVectorTileSizesAttrName,
+                DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
+  };
+
+  setTileSizeAttr(linalgOp, useGroups.front().first);
+
+  OpBuilder builder(linalgOp);
+  builder.setInsertionPointAfter(linalgOp);
+  for (auto &useGroup : llvm::drop_begin(useGroups)) {
+    Operation *cloned = builder.clone(*linalgOp.getOperation());
+    setTileSizeAttr(cloned, useGroup.first);
+    Value clonedResult = cloned->getResult(0);
+    for (OpOperand *use : useGroup.second) {
+      use->set(clonedResult);
+    }
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -670,8 +774,24 @@ public:
       return signalPassFailure();
     }
 
+    SmallVector<linalg::LinalgOp> duplicatableLinalgOps;
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (linalgOp->getNumResults() == 1 &&
+          isDuplicatable(linalgOp->getResult(0))) {
+        duplicatableLinalgOps.push_back(linalgOp);
+      }
+    });
+    for (linalg::LinalgOp linalgOp : duplicatableLinalgOps) {
+      if (failed(materializeDuplicatableLinalgOp(linalgOp, solver))) {
+        return signalPassFailure();
+      }
+    }
+
     auto materialize = [](Operation *op, TileSizes tileSizes) -> LogicalResult {
       if (tileSizes.isOverdefined()) {
+        if (op->hasAttr(kVectorTileSizesAttrName)) {
+          return success();
+        }
         op->emitOpError()
             << "tile size analysis did not determine a valid tile size";
         return failure();
@@ -706,9 +826,8 @@ public:
         return WalkResult(materialize(op, tileSizes));
       }
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-        SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
-        TileSizes tileSizes = getIterationSpaceTileSizes(
-            op, linalgOp.getNumLoops(), indexingMaps, solver);
+        TileSizes tileSizes =
+            getLinalgIterationSpaceTileSizes(linalgOp, solver);
         assert(!tileSizes.isDefined() ||
                tileSizes.rank() == linalgOp.getNumLoops());
         return WalkResult(materialize(op, tileSizes));
