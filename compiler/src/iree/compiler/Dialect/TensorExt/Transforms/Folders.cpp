@@ -62,14 +62,26 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
     }
 
-    // Only fold when dest is a load of the same target with matching
-    // offsets/sizes/strides; otherwise positions outside the partial insert
-    // lose passthrough.
-    auto loadOp = insertSliceOp.getDest()
-                      .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!loadOp || loadOp.getSource() != dispatchTensorStoreOp.getTarget() ||
-        !mlir::detail::sameOffsetsSizesAndStrides(loadOp, dispatchTensorStoreOp,
-                                                  isEqualConstantIntOrValue)) {
+    // Fold is safe when dest carries no values that need to pass through:
+    // either `tensor.empty` (uninitialized) or a `dispatch.tensor.load` of
+    // the same target with matching offsets/sizes/strides (the load/store
+    // round-trip leaves outside-insert positions unchanged).
+    auto isFoldSafe = [&] {
+      Operation *destOp = insertSliceOp.getDest().getDefiningOp();
+      if (!destOp) {
+        return false;
+      }
+      if (isa<tensor::EmptyOp>(destOp)) {
+        return true;
+      }
+      auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(destOp);
+      if (!loadOp || loadOp.getSource() != dispatchTensorStoreOp.getTarget()) {
+        return false;
+      }
+      return mlir::detail::sameOffsetsSizesAndStrides(
+          loadOp, dispatchTensorStoreOp, isEqualConstantIntOrValue);
+    };
+    if (!isFoldSafe()) {
       return failure();
     }
 
