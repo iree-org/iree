@@ -146,14 +146,81 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
   return segments;
 }
 
+/// Walk a memref value through ViewLikeOpInterface ops to find the root
+/// buffer that backs it.
+static Value getRootSource(Value val) {
+  while (auto viewOp = val.getDefiningOp<ViewLikeOpInterface>()) {
+    val = viewOp.getViewSource();
+  }
+  return val;
+}
+
+/// Applies OOB clamping to source indices for fat_raw_buffer sources.
+///
+/// Raw buffer OOB clamping is 1D (linear): it returns 0 only when the byte
+/// offset >= total buffer size. For non-outermost dims, an OOB index wraps
+/// into the next row instead of returning 0. When the source is a view of a
+/// larger buffer, the outermost dim also needs checking because an OOB dim-0
+/// index may still land in valid parent memory.
+///
+/// Fix: when any checked source index exceeds its dimension, replace
+/// srcIndices[0] with the root buffer's dim-0 size to force the linearized
+/// offset past the buffer end.
+static void applyOOBClamping(OpBuilder &builder, Location loc, Value source,
+                             SmallVector<Value> &srcIndices,
+                             ArrayAttr inBoundsAttr) {
+  auto sourceType = cast<MemRefType>(source.getType());
+  if (!hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+    return;
+  }
+
+  Value rootSource = getRootSource(source);
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  Value anyOOB =
+      arith::ConstantOp::create(builder, loc, builder.getBoolAttr(false));
+
+  // For view-like sources (subview, etc.), dim 0 must also be checked because
+  // an OOB dim-0 index may still land in valid parent memory.
+  int64_t startDim =
+      source.getDefiningOp<ViewLikeOpInterface>() != nullptr ? 0 : 1;
+  for (int64_t dim = startDim; dim < sourceType.getRank(); ++dim) {
+    if (dim >= static_cast<int64_t>(inBoundsAttr.size())) {
+      break;
+    }
+    if (cast<BoolAttr>(inBoundsAttr[dim]).getValue()) {
+      continue;
+    }
+
+    Value dimSize;
+    if (ShapedType::isDynamic(sourceShape[dim])) {
+      dimSize = memref::DimOp::create(builder, loc, source, dim);
+    } else {
+      dimSize = arith::ConstantIndexOp::create(builder, loc, sourceShape[dim]);
+    }
+
+    Value isOOB = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::uge,
+                                        srcIndices[dim], dimSize);
+    anyOOB = arith::OrIOp::create(builder, loc, anyOOB, isOOB);
+  }
+
+  auto rootType = cast<MemRefType>(rootSource.getType());
+  Value oobOuterIdx;
+  if (ShapedType::isDynamic(rootType.getShape()[0])) {
+    oobOuterIdx = memref::DimOp::create(builder, loc, rootSource, 0);
+  } else {
+    oobOuterIdx =
+        arith::ConstantIndexOp::create(builder, loc, rootType.getShape()[0]);
+  }
+  srcIndices[0] =
+      arith::SelectOp::create(builder, loc, anyOOB, oobOuterIdx, srcIndices[0]);
+}
+
 /// Trace a memref value through view-like ops to find a SwizzleHintOp.
 /// Returns the swizzle attribute if it is an XOR swizzle (which is
 /// self-inverse), std::nullopt otherwise.
 static std::optional<IREE::Codegen::SwizzleAttrInterface>
 getDestSwizzleAttr(Value dest) {
-  while (auto viewOp = dest.getDefiningOp<mlir::ViewLikeOpInterface>()) {
-    dest = viewOp.getViewSource();
-  }
+  dest = getRootSource(dest);
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
     auto swizzle = hintOp.getSwizzle();
     // Only XOR swizzle is self-inverse (swizzle(swizzle(x)) = x), so it can
@@ -497,53 +564,8 @@ private:
           auto [srcIndices, dstIndices] = generateGatherIndices(
               rewriter, loc, srcDimOffsets, dstDimOffsets, indices);
 
-          // Raw buffer OOB clamping is 1D (linear): it returns 0 only when the
-          // byte offset >= total buffer size. For non-outermost dimensions,
-          // an OOB index wraps into the next row instead of returning 0.
-          // Fix: when any non-outermost source index exceeds its dimension,
-          // replace the outermost index with sourceShape[0] to force the
-          // linearized offset past the buffer end → hardware returns 0.
-          auto sourceType = cast<MemRefType>(source.getType());
-          if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-            ArrayRef<int64_t> sourceShape = sourceType.getShape();
-            Value anyNonOutermostOOB = arith::ConstantOp::create(
-                rewriter, loc, rewriter.getBoolAttr(false));
-
-            for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
-              if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
-                break;
-              }
-              bool dimInBounds =
-                  cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
-              if (dimInBounds) {
-                continue;
-              }
-
-              Value dimSize;
-              if (ShapedType::isDynamic(sourceShape[dim])) {
-                dimSize = memref::DimOp::create(rewriter, loc, source, dim);
-              } else {
-                dimSize = arith::ConstantIndexOp::create(rewriter, loc,
-                                                         sourceShape[dim]);
-              }
-
-              Value isOOB = arith::CmpIOp::create(rewriter, loc,
-                                                  arith::CmpIPredicate::uge,
-                                                  srcIndices[dim], dimSize);
-
-              anyNonOutermostOOB = arith::OrIOp::create(
-                  rewriter, loc, anyNonOutermostOOB, isOOB);
-            }
-
-            Value oobOuterIdx;
-            if (ShapedType::isDynamic(sourceShape[0])) {
-              oobOuterIdx = memref::DimOp::create(rewriter, loc, source, 0);
-            } else {
-              oobOuterIdx =
-                  arith::ConstantIndexOp::create(rewriter, loc, sourceShape[0]);
-            }
-            srcIndices[0] = arith::SelectOp::create(
-                rewriter, loc, anyNonOutermostOOB, oobOuterIdx, srcIndices[0]);
+          if (inBoundsAttr) {
+            applyOOBClamping(rewriter, loc, source, srcIndices, *inBoundsAttr);
           }
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
@@ -705,44 +727,8 @@ void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
     auto [srcIndices, dstIndices] =
         generateGatherIndices(b, loc, srcDimOffsets, dstDimOffsets, indices);
 
-    // OOB handling: replicate the fast path's outermost-index-replacement
-    // trick for non-outermost dimensions.
-    auto sourceType = cast<MemRefType>(source.getType());
-    if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-      ArrayRef<int64_t> sourceShape = sourceType.getShape();
-      Value anyNonOutermostOOB =
-          arith::ConstantOp::create(b, loc, b.getBoolAttr(false));
-
-      for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
-        if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
-          break;
-        }
-        bool dimInBounds = cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
-        if (dimInBounds) {
-          continue;
-        }
-
-        Value dimSize;
-        if (ShapedType::isDynamic(sourceShape[dim])) {
-          dimSize = memref::DimOp::create(b, loc, source, dim);
-        } else {
-          dimSize = arith::ConstantIndexOp::create(b, loc, sourceShape[dim]);
-        }
-
-        Value isOOB = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::uge,
-                                            srcIndices[dim], dimSize);
-        anyNonOutermostOOB =
-            arith::OrIOp::create(b, loc, anyNonOutermostOOB, isOOB);
-      }
-
-      Value oobOuterIdx;
-      if (ShapedType::isDynamic(sourceShape[0])) {
-        oobOuterIdx = memref::DimOp::create(b, loc, source, 0);
-      } else {
-        oobOuterIdx = arith::ConstantIndexOp::create(b, loc, sourceShape[0]);
-      }
-      srcIndices[0] = arith::SelectOp::create(b, loc, anyNonOutermostOOB,
-                                              oobOuterIdx, srcIndices[0]);
+    if (inBoundsAttr) {
+      applyOOBClamping(b, loc, source, srcIndices, *inBoundsAttr);
     }
 
     // Determine in_bounds for vector.transfer_read.
