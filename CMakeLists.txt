@@ -48,6 +48,7 @@ option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_ENABLE_THIRD_PARTY_BENCHMARK "Enables building and linking the bundled google benchmark dependency." ON)
 option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 # Enables POSIX API support. When disabled, tools requiring POSIX (e.g., iree-flatcc-cli) will not be built.
@@ -86,6 +87,15 @@ option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and 
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 option(IREE_BUILD_CLANG_TOOLS_EXTRA "Enables building the 'clang-tools-extra' LLVM targets." OFF)
 option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
+
+if(NOT IREE_ENABLE_THIRD_PARTY_BENCHMARK)
+  if(IREE_BUILD_TESTS)
+    message(FATAL_ERROR "IREE_ENABLE_THIRD_PARTY_BENCHMARK=OFF requires IREE_BUILD_TESTS=OFF.")
+  endif()
+  if(IREE_BUILD_PYTHON_BINDINGS)
+    message(FATAL_ERROR "IREE_ENABLE_THIRD_PARTY_BENCHMARK=OFF requires IREE_BUILD_PYTHON_BINDINGS=OFF.")
+  endif()
+endif()
 
 if(IREE_USE_SYSTEM_DEPS)
   message(WARNING "IREE_USE_SYSTEM_DEPS is on. This option is untested and may find incompatible dependencies.")
@@ -984,7 +994,7 @@ if(IREE_BUILD_TESTS)
   add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_ENABLE_THREADING)
+if(IREE_ENABLE_THREADING AND IREE_ENABLE_THIRD_PARTY_BENCHMARK)
   # Benchmark.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)

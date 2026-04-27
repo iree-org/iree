@@ -85,24 +85,26 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
-iree_cc_binary(
-  NAME
-    iree-benchmark-module
-  SRCS
-    "iree-benchmark-module-main.cc"
-  DEPS
-    benchmark
-    iree::base
-    iree::base::tooling::flags
-    iree::hal
-    iree::modules::hal::types
-    iree::tooling::context_util
-    iree::tooling::device_util
-    iree::tooling::function_io
-    iree::vm
-  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
-  INSTALL_COMPONENT IREETools-Runtime
-)
+if(IREE_ENABLE_THIRD_PARTY_BENCHMARK)
+  iree_cc_binary(
+    NAME
+      iree-benchmark-module
+    SRCS
+      "iree-benchmark-module-main.cc"
+    DEPS
+      benchmark
+      iree::base
+      iree::base::tooling::flags
+      iree::hal
+      iree::modules::hal::types
+      iree::tooling::context_util
+      iree::tooling::device_util
+      iree::tooling::function_io
+      iree::vm
+    COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+    INSTALL_COMPONENT IREETools-Runtime
+  )
+endif()
 
 iree_cc_binary(
   NAME
