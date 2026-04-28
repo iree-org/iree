@@ -23,13 +23,47 @@ table ShaderModuleDef {
   source_map:string;
 }
 
+// A struct for the kernel workgroup size along each dimension.
+struct WorkgroupSize {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+// Describes the behavior of each binding.
+enum BindingBits:uint64 (bit_flags) {
+  READ_ONLY = 0,  // 1u << 0
+  INDIRECT = 1,  // 1u << 1
+}
+
+// Information about an exported compute entry point.
+table ExportDef {
+  // Ordinal of the shader module containing the entry point in the executable
+  // shader module list.
+  shader_module_ordinal:uint32;
+
+  // String name of the entry point function in the shader module.
+  entry_point:string;
+
+  // Static workgroup size for the export.
+  workgroup_size:WorkgroupSize;
+
+  // Total number of 32-bit push constants used by the export.
+  constant_count:uint32;
+
+  // Binding count and flags for each binding.
+  binding_flags:[BindingBits];
+
+  // Optional debug information related to the export.
+  debug_info:iree.hal.debug.ExportDef;
+}
+
 table ExecutableDef {
+  // Exported functions in canonical executable entry point order.
+  exports:[ExportDef];
+
   // An ordered list of shader modules, each containing 1+ entry points.
   shader_modules:[ShaderModuleDef];
-
-  // A mapping of executable entry point ordinals to the shader module in which
-  // they reside.
-  entry_points:[uint];
 
   // Embedded source files sorted ascending by path.
   source_files:[iree.hal.debug.SourceFileDef];

@@ -12,6 +12,8 @@ import sys
 IREE_CUDA_DEPS_DIR_ENV_KEY = "IREE_CUDA_DEPS_DIR"
 IREE_CUDA_TOOLKIT_ROOT_ENV_KEY = "IREE_CUDA_TOOLKIT_ROOT"
 VULKAN_SDK_ENV_KEY = "VULKAN_SDK"
+WEBGPU_SPIRV_PLUGIN_ID = "hal_target_webgpu_spirv"
+WEBGPU_SPIRV_ENV_KEY = "IREE_TARGET_BACKEND_WEBGPU_SPIRV"
 
 
 def detect_unix_platform_config(bazelrc):
@@ -262,6 +264,8 @@ def get_plugin_defaults():
         "hal_target_rocm": (False, "IREE_TARGET_BACKEND_ROCM", rocm_available),
         "hal_target_vmvx": (True, "IREE_TARGET_BACKEND_VMVX", True),
         "hal_target_vulkan_spirv": (True, "IREE_TARGET_BACKEND_VULKAN_SPIRV", True),
+        # Dawn/Tint is large and should not be fetched by broad default builds.
+        WEBGPU_SPIRV_PLUGIN_ID: (False, WEBGPU_SPIRV_ENV_KEY, True),
         # Sample plugins (always buildable)
         "example": (True, None, True),
         "simple_io_sample": (True, None, True),
@@ -272,8 +276,8 @@ def parse_plugin_spec(spec, plugin_defaults):
     """Parse a plugin specification that may include 'all' and exclusions.
 
     Supports:
-      - "all" - all plugins that can be built on this system
-      - "all,-plugin1,-plugin2" - all except specified plugins
+      - "all" - all default plugins that can be built on this system
+      - "all,-plugin1,-plugin2" - all default plugins except specified plugins
       - "plugin1,plugin2" - explicit list
 
     Returns a tuple (plugin_list, used_all) where used_all indicates whether
@@ -287,12 +291,17 @@ def parse_plugin_spec(spec, plugin_defaults):
         return [], False
 
     if parts[0] == "all":
-        # Start with all buildable plugins
-        enabled = set(
-            plugin_id
-            for plugin_id, (_, _, can_build) in plugin_defaults.items()
-            if can_build
-        )
+        # Start with the default broad plugin set. WebGPU SPIR-V depends on
+        # Dawn/Tint and is intentionally opt-in even though it can be built.
+        enabled = set()
+        for plugin_id, (_, env_var, can_build) in plugin_defaults.items():
+            if not can_build:
+                continue
+            if plugin_id == WEBGPU_SPIRV_PLUGIN_ID and not cmake_bool_is_true(
+                os.environ.get(env_var)
+            ):
+                continue
+            enabled.add(plugin_id)
 
         # Process exclusions
         for part in parts[1:]:
@@ -378,6 +387,9 @@ def write_iree_plugin_options(bazelrc):
         else:
             cuda_env_key = IREE_CUDA_TOOLKIT_ROOT_ENV_KEY
         print(f"common --repo_env={cuda_env_key}={cuda_toolkit_root}", file=bazelrc)
+
+    if WEBGPU_SPIRV_PLUGIN_ID in enabled_plugins:
+        print("build --config=webgpu_spirv", file=bazelrc)
 
 
 def write_vulkan_sdk_options(bazelrc):

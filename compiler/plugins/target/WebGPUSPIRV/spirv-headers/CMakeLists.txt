@@ -8,8 +8,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   spirv-headers
-  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-  GIT_TAG ${IREE_SPIRV_HEADERS_TAG}
+  URL https://github.com/KhronosGroup/SPIRV-Headers/archive/${IREE_SPIRV_HEADERS_TAG}.zip
 )
 
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
