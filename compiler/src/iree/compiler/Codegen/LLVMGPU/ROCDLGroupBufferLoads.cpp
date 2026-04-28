@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-group-buffer-loads"
 
@@ -47,12 +48,36 @@ static void collectDepsInRange(Operation *op, Operation *boundary,
   }
 }
 
-/// Returns true if any op in `deps` has a side effect or is a load/store
-/// that could alias with other memory operations between the boundary and
-/// the load. We conservatively bail out if any dep has memory effects.
-static bool hasMemoryEffects(const llvm::SetVector<Operation *> &deps) {
-  for (Operation *op : deps) {
-    if (!isPure(op)) {
+/// Returns true if `op` writes to buffer or global memory. Used to decide
+/// whether a non-dependent op left between the previous buffer load and the
+/// load being hoisted would invalidate the load by changing observable
+/// memory.
+static bool writesToBufferOrGlobalMemory(Operation *op) {
+  if (isPure(op)) {
+    return false;
+  }
+  auto effectOp = dyn_cast<MemoryEffectOpInterface>(op);
+  if (!effectOp) {
+    // Non-pure op without the memory-effects interface; conservatively assume
+    // it could write to buffer or global memory.
+    return true;
+  }
+  SmallVector<MemoryEffects::EffectInstance> effects;
+  effectOp.getEffects(effects);
+  for (const MemoryEffects::EffectInstance &effect : effects) {
+    if (!isa<MemoryEffects::Write>(effect.getEffect())) {
+      continue;
+    }
+    Value value = effect.getValue();
+    if (!value) {
+      // Write to an unknown resource; be conservative.
+      return true;
+    }
+    auto memrefType = dyn_cast<MemRefType>(value.getType());
+    if (!memrefType) {
+      continue;
+    }
+    if (hasGlobalMemoryAddressSpace(memrefType)) {
       return true;
     }
   }
@@ -82,13 +107,33 @@ static void groupBufferLoadsInBlock(Block &block) {
       continue;
     }
 
-    // Collect all pure ops between prevBufferLoad and load that the load
-    // depends on (transitively).
+    // Collect the ops between `prevBufferLoad` and `load` that the load
+    // transitively depends on and would need to be hoisted alongside it.
     llvm::SetVector<Operation *> deps;
     collectDepsInRange(load, prevBufferLoad, deps);
 
-    // Only move if all dependencies are pure (no memory effects).
-    if (hasMemoryEffects(deps)) {
+    // The dependencies move with the load, but they must be pure so that
+    // hoisting them above unrelated ops in the range is safe.
+    if (!llvm::all_of(deps, [](Operation *op) { return isPure(op); })) {
+      prevBufferLoad = load;
+      continue;
+    }
+
+    // Non-dependent ops in (prevBufferLoad, load) are left in place after the
+    // load is hoisted. If any of them writes to buffer or global memory the
+    // hoisted load could observe stale memory, so the move is unsafe.
+    bool unsafe = false;
+    for (Operation *cur = prevBufferLoad->getNextNode(); cur && cur != load;
+         cur = cur->getNextNode()) {
+      if (deps.contains(cur)) {
+        continue;
+      }
+      if (writesToBufferOrGlobalMemory(cur)) {
+        unsafe = true;
+        break;
+      }
+    }
+    if (unsafe) {
       prevBufferLoad = load;
       continue;
     }
