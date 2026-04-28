@@ -59,6 +59,38 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
   return distributedValues;
 }
 
+// Returns the swizzle's distributed N-D shape: every dim concatenated in
+// expandShape order (then permuted), with CrossThread dims collapsed to size
+// 1. This matches GPU's `DataTiledMMAInterfaceAttr::getDistributedTileTypes`
+// (cross-thread factors live in the lane id, not the per-thread vector) and
+// is also the rank/shape that `distributeMmaFragmentToIntrinsics` expects to
+// index every cross-intrinsic dim. For CPU there are no CrossThread dims, so
+// this is the full expanded shape.
+static SmallVector<int64_t> fullDistributedShape(const TileSwizzle &swizzle) {
+  return sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+    return d.kind() != TileSwizzle::Dim::Kind::CrossThread;
+  });
+}
+
+// Reshapes `value` to the swizzle's distributed N-D vector type if it is not
+// already in that form. "Distributed" here means every dim of the swizzle's
+// expand groups, with CrossThread dim sizes collapsed to 1 (those factors live
+// in the lane id, not the per-lane vector). CPU `getDistributedTileTypes`
+// produces a 2-D (outer × inner) collapsed form while GPU produces the
+// distributed N-D form; this reshape lets the shared lowering body operate
+// uniformly.
+static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
+                                         Value value,
+                                         const TileSwizzle &swizzle) {
+  auto vecType = cast<VectorType>(value.getType());
+  SmallVector<int64_t> fullShape = fullDistributedShape(swizzle);
+  if (vecType.getShape() == ArrayRef<int64_t>(fullShape)) {
+    return value;
+  }
+  auto fullType = VectorType::get(fullShape, vecType.getElementType());
+  return vector::ShapeCastOp::create(builder, loc, fullType, value);
+}
+
 LogicalResult buildDataTiledMMAUnderlyingOperations(
     OpBuilder &builder, Location loc, const TileSwizzle &lhsSwizzle,
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
@@ -70,19 +102,27 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     return failure();
   }
 
-  // Prepare LHS/RHS operand slices to feed the per-intrinsic emitter.
+  // Reshape LHS/RHS to the swizzle's distributed form so the GPU-style
+  // distribution code can index every cross-intrinsic dim independently.
+  Value lhs = reshapeToSwizzleDistributed(builder, loc, inputs[0], lhsSwizzle);
+  Value rhs = reshapeToSwizzleDistributed(builder, loc, inputs[1], rhsSwizzle);
   SmallVector<Value> intrinsicsLhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, lhs, lhsSwizzle);
   SmallVector<Value> intrinsicsRhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
+      distributeMmaFragmentToIntrinsics(builder, loc, rhs, rhsSwizzle);
 
-  // Distribute the accumulator into per-intrinsic slices; the reassembly
-  // conversion will be hoisted out of the reduction loop.
+  // The ACC reshape happens inside the HoistableConversionOp body so the
+  // shape_cast pairs sit *outside* the conversion and the distribute /
+  // reassemble bodies remain exact inverses (required for the elimination
+  // pass to cancel them across reduction loop boundaries).
   auto distributeAccOp = IREE::Util::HoistableConversionOp::create(
       builder, loc, /*tag=*/kDataTiledAccDistribute,
       /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
-        return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
+        Value accDistributed =
+            reshapeToSwizzleDistributed(b, loc, args[0], accSwizzle);
+        return distributeMmaFragmentToIntrinsics(b, loc, accDistributed,
+                                                 accSwizzle);
       });
   SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
 
@@ -102,7 +142,10 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     }
   }
 
-  // Reassemble per-intrinsic ACC pieces into the original accumulator tile.
+  // Reassemble per-intrinsic ACC pieces into the swizzle's distributed form,
+  // then shape_cast to the original output type as the final step inside the
+  // HoistableConversionOp body (paired with the inverse cast above).
+  SmallVector<int64_t> accFullShape = fullDistributedShape(accSwizzle);
   SmallVector<int64_t> accCrossIntrinsicShape =
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
@@ -111,7 +154,9 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind() == TileSwizzle::Dim::Kind::Internal;
       });
-  Type accElemType = cast<VectorType>(outputs[0].getType()).getElementType();
+  Type origAccType = outputs[0].getType();
+  Type accElemType = cast<VectorType>(origAccType).getElementType();
+  auto fullAccType = VectorType::get(accFullShape, accElemType);
 
   auto reassembleOp = IREE::Util::HoistableConversionOp::create(
       builder, loc, /*tag=*/kDataTiledAccReassemble,
@@ -120,14 +165,17 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
         int64_t dstRank = accCrossIntrinsicShape.size();
         SmallVector<int64_t> strides(dstRank, 1);
         SmallVector<int64_t> indices(dstRank, 0);
-        Value acc = arith::ConstantOp::create(
-            b, loc, b.getZeroAttr(outputs[0].getType()));
+        Value acc =
+            arith::ConstantOp::create(b, loc, b.getZeroAttr(fullAccType));
         for (Value intrAcc : args) {
           Value expandedAcc = vector::ShapeCastOp::create(
               b, loc, VectorType::get(accInternalShape, accElemType), intrAcc);
           acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
                                                      indices, strides);
           incrementIndices(indices, accCrossIntrinsicShape);
+        }
+        if (acc.getType() != origAccType) {
+          acc = vector::ShapeCastOp::create(b, loc, origAccType, acc);
         }
         return {acc};
       });
