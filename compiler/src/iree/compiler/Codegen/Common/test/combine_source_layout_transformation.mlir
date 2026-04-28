@@ -518,12 +518,12 @@ func.func @nested_transpose_generic_blocks_mapload(
   }
   return %result : tensor<2x2x4xf32>
 }
-// The transpose generic is raised to linalg.transpose inside the loop.
-// The chain {extract_slice, pad, expand_shape, linalg.transpose, linalg.copy}
-// includes linalg.copy with lowering_config, so isComplexRelayoutChain returns
-// false and no map_load is created.
+// The transpose generic inside the loop is recognized as a relayout chain
+// member. The chain {extract_slice, pad, expand_shape, generic(transpose),
+// copy{lowering_config}} includes an op with lowering_config, so
+// isComplexRelayoutChain returns false and no map_load is created.
 // CHECK-LABEL: @nested_transpose_generic_blocks_mapload
 //       CHECK:   scf.for
-//       CHECK:     linalg.transpose
+//       CHECK:     linalg.generic
 //       CHECK:     linalg.copy
 //   CHECK-NOT:   iree_linalg_ext.map_load
