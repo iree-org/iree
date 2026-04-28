@@ -153,6 +153,8 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+if(TARGET iree::hal::drivers::local_sync::sync_driver)
+
 iree_cc_test(
   NAME
     execute_test
@@ -173,6 +175,8 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+endif()
+
 iree_cc_test(
   NAME
     file_test
@@ -184,6 +188,8 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
+
+if(TARGET iree::hal::drivers::local_sync::sync_driver)
 
 iree_cc_test(
   NAME
@@ -202,5 +208,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
 )
+
+endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
