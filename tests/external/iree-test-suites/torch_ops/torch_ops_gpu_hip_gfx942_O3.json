@@ -17,5 +17,12 @@
   "expected_compile_failures": [],
   "expected_run_failures": [],
   "golden_times_ms": {
+    "AB/128x128xf32_bench": 0.10,
+    "AB/256x256xf32_bench": 0.10,
+    "AB/512x512xf32_bench": 0.10,
+    "AB/1024x1024xf32_bench": 0.10,
+    "AB/2048x2048xf32_bench": 0.22,
+    "AB/4096x4096xf32_bench": 1.27,
+    "AB/8192x8192xf32_bench": 9.17
   }
 }
