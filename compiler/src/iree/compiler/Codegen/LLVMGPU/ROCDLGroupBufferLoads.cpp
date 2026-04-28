@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-group-buffer-loads"
 

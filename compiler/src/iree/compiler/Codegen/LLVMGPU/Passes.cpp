@@ -1052,8 +1052,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // Group buffer loads together to improve AMDGPU instruction scheduling.
   // This must run after SCF->CF lowering and memref optimizations, but before
   // the func-level adaptor is committed.
-  funcPassManager.addPredicatedPass(forROCDL,
-                                    createROCDLGroupBufferLoadsPass);
+  funcPassManager.addPredicatedPass(forROCDL, createROCDLGroupBufferLoadsPass);
 
   // Commit the func-level adaptor before adding module-level passes.
   funcPassManager.commitPass();
