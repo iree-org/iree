@@ -84,6 +84,39 @@ hal.executable private @packing_and_alignment {
   target_triple = "x86_64-unknown-linux-gnu"
 }>
 
+// CHECK-LABEL: hal.executable private @zero_sized_local_alloc
+hal.executable private @zero_sized_local_alloc {
+  hal.executable.variant public @embedded target(#executable_target) {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout)
+    builtin.module {
+      // CHECK-LABEL: func.func @dispatch
+      func.func @dispatch() {
+        // CHECK: %[[PACKED:.+]] = memref.alloc() : memref<0xi8, #iree_codegen.workgroup_local>
+        // CHECK: %[[C0:.+]] = arith.constant 0 : index
+        // CHECK: memref.view %[[PACKED]][%[[C0]]][] : memref<0xi8, #iree_codegen.workgroup_local> to memref<0xf32, #iree_codegen.workgroup_local>
+        %0 = memref.alloc() : memref<0xf32, #iree_codegen.workgroup_local>
+        return
+      }
+      // CHECK: iree_codegen.dispatch_config @dispatch workgroup_local_memory = 0
+      iree_codegen.dispatch_config @dispatch {
+        %c1 = arith.constant 1 : index
+        iree_codegen.yield %c1, %c1, %c1 : index, index, index
+      }
+    }
+  }
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+  native_vector_size = 64 : index,
+  target_triple = "x86_64-unknown-linux-gnu"
+}>
+
 // CHECK-LABEL: hal.executable private @strided_layout
 // CHECK:       hal.executable.export public @dispatch
 hal.executable private @strided_layout {

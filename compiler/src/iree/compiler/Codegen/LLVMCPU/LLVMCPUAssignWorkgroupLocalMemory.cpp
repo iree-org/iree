@@ -75,6 +75,10 @@ static LogicalResult checkedAlignTo(int64_t value, int64_t alignment,
   return checkedAdd(value, alignment - remainder, result);
 }
 
+static bool hasZeroElementShape(MemRefType type) {
+  return llvm::is_contained(type.getShape(), 0);
+}
+
 static FailureOr<int64_t>
 computeStaticElementFootprint(memref::AllocOp allocOp) {
   MemRefType type = allocOp.getType();
@@ -104,7 +108,7 @@ computeStaticElementFootprint(memref::AllocOp allocOp) {
     return failure();
   }
 
-  if (llvm::is_contained(type.getShape(), 0)) {
+  if (hasZeroElementShape(type)) {
     return 0;
   }
 
