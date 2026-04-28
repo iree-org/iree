@@ -34,6 +34,7 @@ jobs:
             markers: "cpu"
             config-file: torch_ops_cpu_llvm_sync.json
             cache-dir: /home/nod/iree_tests_cache
+            extra-flags: ""
             runs-on:
               - self-hosted # Must come first.
               - persistent-cache
@@ -43,19 +44,23 @@ jobs:
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
             cache-dir: /home/nod/iree_tests_cache
+            extra-flags: "--benchmark-with-rocprofv3"
           - name: amdgpu_hip_gfx1201_O3
             config-file: torch_ops_gpu_hip_gfx1201_O3.json
             runs-on: [Linux, X64, gfx1201]
             cache-dir: /home/nod/iree_tests_cache
+            extra-flags: "--benchmark-with-rocprofv3"
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
             runs-on: [Linux, X64, rdna3, shark10-ci]
             cache-dir: /home/nod/iree_tests_cache
+            extra-flags: ""
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
             cache-dir: /shark-cache/data/iree-regression-cache
+            extra-flags: ""
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
@@ -86,7 +91,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 3182e7a131551362e5e5eb20bbb18bfa6e7eb89c
+          ref: 612f93663b32ea86ea442e87be549f1056a5de1c
           path: iree-test-suites
           lfs: false
       - name: Install Torch ops test suite requirements
@@ -106,7 +111,8 @@ jobs:
               --durations=20 \
               --report-log=${LOG_FILE_PATH} \
               --config-files=${CONFIG_FILE_PATH} \
-              --artifact-directory=${{ matrix.cache-dir }}/torch_ops/artifacts
+              --artifact-directory=${{ matrix.cache-dir }}/torch_ops/artifacts \
+              ${{ matrix.extra-flags }}
 
   tests:
     name: "torch_models tests :: ${{ matrix.name }}"
@@ -156,7 +162,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 3182e7a131551362e5e5eb20bbb18bfa6e7eb89c
+          ref: 612f93663b32ea86ea442e87be549f1056a5de1c
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
