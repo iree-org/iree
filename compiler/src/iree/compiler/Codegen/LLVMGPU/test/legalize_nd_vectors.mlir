@@ -315,6 +315,20 @@ func.func @interleave_2d(%a: vector<2x3xf32>, %b: vector<2x3xf32>) -> vector<2x6
 
 // -----
 
+// vector.deinterleave on a 2-D vector: each 1-D vector is deinterleaved individually.
+func.func @deinterleave_2d(%v: vector<2x6xf32>) -> (vector<2x3xf32>, vector<2x3xf32>) {
+  %0, %1 = vector.deinterleave %v : vector<2x6xf32> -> vector<2x3xf32>
+  return %0, %1 : vector<2x3xf32>, vector<2x3xf32>
+}
+// CHECK-LABEL: func.func @deinterleave_2d
+//  CHECK-SAME:   (%[[V0:.+]]: vector<6xf32>, %[[V1:.+]]: vector<6xf32>)
+//  CHECK-SAME:   -> (vector<3xf32>, vector<3xf32>, vector<3xf32>, vector<3xf32>)
+//       CHECK:   %[[E0:.+]], %[[O0:.+]] = vector.deinterleave %[[V0]] : vector<6xf32> -> vector<3xf32>
+//       CHECK:   %[[E1:.+]], %[[O1:.+]] = vector.deinterleave %[[V1]] : vector<6xf32> -> vector<3xf32>
+//       CHECK:   return %[[E0]], %[[E1]], %[[O0]], %[[O1]] : vector<3xf32>, vector<3xf32>, vector<3xf32>, vector<3xf32>
+
+// -----
+
 util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4xf32> {
   %0 = arith.addf %arg0, %arg1 : vector<2x4xf32>
   util.return %0 : vector<2x4xf32>

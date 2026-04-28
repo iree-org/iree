@@ -743,6 +743,37 @@ struct ConvertVectorInterleave final
   }
 };
 
+/// Convert vector.deinterleave on n-D vectors. The source is already split
+/// into flat 1-D vectors by the type converter; create a 1-D deinterleave
+/// for each and group results so that all res1 values come first, then all
+/// res2 values.
+struct ConvertVectorDeinterleave final
+    : public OpConversionPattern<vector::DeinterleaveOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::DeinterleaveOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType srcType = op.getSourceVectorType();
+    if (srcType.getRank() <= 1) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    SmallVector<Value> srcValues(adaptor.getSource());
+
+    SmallVector<Value> res1Values;
+    SmallVector<Value> res2Values;
+    for (Value src : srcValues) {
+      auto deinterleave = vector::DeinterleaveOp::create(rewriter, loc, src);
+      res1Values.push_back(deinterleave.getRes1());
+      res2Values.push_back(deinterleave.getRes2());
+    }
+    rewriter.replaceOpWithMultiple(op, {res1Values, res2Values});
+    return success();
+  }
+};
+
 /// Convert any ReturnLike op with 1:N type-converted operands.
 struct ConvertReturnLike final
     : public OpTraitConversionPattern<OpTrait::ReturnLike> {
@@ -778,13 +809,13 @@ struct LLVMGPULegalizeNDVectorsPass final
     populateAnyFunctionOpInterfaceTypeConversionPattern(patterns,
                                                         typeConverter);
     patterns.add<UnrollElementwiseOps, ConvertReturnLike>(typeConverter, ctx);
-    patterns
-        .add<ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
-             ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
-             ConvertVectorInsertStridedSlice, ConvertArithConstant,
-             ConvertUBPoison, ConvertVectorToElements,
-             ConvertVectorFromElements, ConvertVectorBroadcast,
-             ConvertVectorBitcast, ConvertVectorInterleave>(typeConverter, ctx);
+    patterns.add<
+        ConvertVectorExtract, ConvertVectorInsert, ConvertVectorTranspose,
+        ConvertVectorShapeCast, ConvertVectorExtractStridedSlice,
+        ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
+        ConvertVectorToElements, ConvertVectorFromElements,
+        ConvertVectorBroadcast, ConvertVectorBitcast, ConvertVectorInterleave,
+        ConvertVectorDeinterleave>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
