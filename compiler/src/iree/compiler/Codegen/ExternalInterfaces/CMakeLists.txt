@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
