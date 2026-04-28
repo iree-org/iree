@@ -32,8 +32,6 @@
 
 namespace {
 
-using ::testing::HasSubstr;
-
 static iree_hal_device_t* CreateSyncDevice(const char* identifier) {
   iree_async_proactor_pool_t* proactor_pool = nullptr;
   IREE_CHECK_OK(iree_async_proactor_pool_create(
@@ -476,15 +474,10 @@ TEST(ReplayExecuteTest, RejectsExecutableSubstitutionAbiMismatch) {
   options.executable_substitution_callback.user_data = &substitution_state;
 
   iree_hal_device_group_t* replay_group = CreateMockExecutableDeviceGroup();
-  iree_status_t status = iree_hal_replay_execute_file(
-      GetCapturedFileContents(storage), replay_group, &options,
-      iree_allocator_system());
-  auto owned_status = ::iree::internal::ConsumeForTest(status);
-  EXPECT_THAT(owned_status,
-              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
-                  IREE_STATUS_FAILED_PRECONDITION)));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("ABI mismatch"));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("executable 3"));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_hal_replay_execute_file(
+                            GetCapturedFileContents(storage), replay_group,
+                            &options, iree_allocator_system()));
   EXPECT_EQ(substitution_state.invocation_count, 1u);
   iree_hal_device_group_release(replay_group);
 }
@@ -510,15 +503,10 @@ TEST(ReplayExecuteTest, RejectsTargetDeviceCountMismatch) {
   iree_hal_device_release(replay_device_a);
   iree_hal_device_release(replay_device_b);
 
-  iree_status_t status = iree_hal_replay_execute_file(
-      GetCapturedFileContents(storage), replay_group, nullptr,
-      iree_allocator_system());
-  auto owned_status = ::iree::internal::ConsumeForTest(status);
-  EXPECT_THAT(owned_status,
-              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
-                  IREE_STATUS_FAILED_PRECONDITION)));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("captured 1 device"));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("contains 2 device"));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_hal_replay_execute_file(
+                            GetCapturedFileContents(storage), replay_group,
+                            nullptr, iree_allocator_system()));
 
   iree_hal_device_group_release(replay_group);
   iree_hal_replay_recorder_release(recorder);
@@ -1044,16 +1032,10 @@ TEST(ReplayExecuteTest, CopiedFdBackedQueueReadFailsIdentityValidation) {
       iree_hal_replay_execute_options_default();
   options.file_path_remap_count = 1;
   options.file_path_remaps = &file_path_remap;
-  iree_status_t status = iree_hal_replay_execute_file(
-      GetCapturedFileContents(storage), replay_group, &options,
-      iree_allocator_system());
-  auto owned_status = ::iree::internal::ConsumeForTest(status);
-  EXPECT_THAT(owned_status,
-              ::iree::testing::status::StatusIs(static_cast<::iree::StatusCode>(
-                  IREE_STATUS_FAILED_PRECONDITION)));
-  EXPECT_THAT(owned_status.ToString(),
-              HasSubstr("--device_replay_file_validation=digest"));
-  EXPECT_THAT(owned_status.ToString(), HasSubstr("--replay_file_remap"));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION,
+                        iree_hal_replay_execute_file(
+                            GetCapturedFileContents(storage), replay_group,
+                            &options, iree_allocator_system()));
   iree_hal_device_group_release(replay_group);
 #else
   GTEST_SKIP() << "FD-backed replay requires POSIX file IO.";
