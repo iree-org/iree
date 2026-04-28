@@ -473,6 +473,103 @@ func.func @fold_broadcast_pad_expand_shape(%buffer : memref<2x64xf32>, %batch : 
 
 // -----
 
+func.func @pack(%buffer : memref<8x4xf32>) -> tensor<2x2x4x2xf32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<8x4xf32> -> tensor<8x4xf32>
+  %dest = tensor.empty() : tensor<2x2x4x2xf32>
+  %packed = linalg.pack %source
+      inner_dims_pos = [0, 1] inner_tiles = [4, 2]
+      into %dest : tensor<8x4xf32> -> tensor<2x2x4x2xf32>
+  return %packed : tensor<2x2x4x2xf32>
+}
+// In CHECK mode, the pack is a simple relayout chain (no lowering_config),
+// so it is not folded into map_load.
+// In FOLD mode, the pack is directly folded into map_load.
+// CHECK-LABEL: @pack
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       CHECK:   linalg.pack
+//   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @pack
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
+//       FOLD:   %[[DEST:.+]] = tensor.empty() : tensor<2x2x4x2xf32>
+//   FOLD-NOT:   linalg.pack
+//       FOLD:   %[[MAP_LOAD:.+]] = iree_linalg_ext.map_load
+//  FOLD-SAME:     %[[SOURCE]] into %[[DEST]] {
+//  FOLD-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index):
+//       FOLD:     %[[LIN:.+]] = affine.linearize_index disjoint [%[[IDX0]], %[[IDX2]], %[[IDX1]], %[[IDX3]]] by (2, 4, 2, 2)
+//       FOLD:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[LIN]] into (8, 4)
+//       FOLD:     iree_linalg_ext.yield %[[DELIN]]#0, %[[DELIN]]#1, {{.*}} : index, index, f32
+//       FOLD:   } : tensor<8x4xf32> into tensor<2x2x4x2xf32> -> tensor<2x2x4x2xf32>
+
+// -----
+
+func.func @unpack(%buffer : memref<2x2x4x2xf32>) -> tensor<8x4xf32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<2x2x4x2xf32> -> tensor<2x2x4x2xf32>
+  %dest = tensor.empty() : tensor<8x4xf32>
+  %unpacked = linalg.unpack %source
+      inner_dims_pos = [0, 1] inner_tiles = [4, 2]
+      into %dest : tensor<2x2x4x2xf32> -> tensor<8x4xf32>
+  return %unpacked : tensor<8x4xf32>
+}
+// In CHECK mode, the unpack is a simple relayout chain (no lowering_config),
+// so it is not folded into map_load.
+// In FOLD mode, the unpack is directly folded into map_load.
+// CHECK-LABEL: @unpack
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       CHECK:   linalg.unpack
+//   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @unpack
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
+//       FOLD:   %[[DEST:.+]] = tensor.empty() : tensor<8x4xf32>
+//   FOLD-NOT:   linalg.unpack
+//       FOLD:   %[[MAP_LOAD:.+]] = iree_linalg_ext.map_load
+//  FOLD-SAME:     %[[SOURCE]] into %[[DEST]] {
+//  FOLD-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       FOLD:     %[[DELIN0:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 4)
+//       FOLD:     %[[DELIN1:.+]]:2 = affine.delinearize_index %[[IDX1]] into (2, 2)
+//       FOLD:     iree_linalg_ext.yield %[[DELIN0]]#0, %[[DELIN1]]#0, %[[DELIN0]]#1, %[[DELIN1]]#1, {{.*}} : index, index, index, index, f32
+//       FOLD:   } : tensor<2x2x4x2xf32> into tensor<8x4xf32> -> tensor<8x4xf32>
+
+// -----
+
+#map_transpose_in  = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#map_transpose_out = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @transpose_generic(%buffer : memref<2x4x16xf32>) -> tensor<4x16x2xf32> {
+  %source = iree_codegen.load_from_buffer %buffer : memref<2x4x16xf32> -> tensor<2x4x16xf32>
+  %init = tensor.empty() : tensor<4x16x2xf32>
+  %transposed = linalg.generic {
+    indexing_maps = [#map_transpose_in, #map_transpose_out],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%source : tensor<2x4x16xf32>) outs(%init : tensor<4x16x2xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<4x16x2xf32>
+  return %transposed : tensor<4x16x2xf32>
+}
+// In CHECK mode, the generic stays as-is (simple chain, no lowering_config).
+// In FOLD mode, the transpose generic is directly folded into map_load.
+// CHECK-LABEL: @transpose_generic
+//  CHECK-SAME:   %[[BUFFER:.+]]:
+//       CHECK:   iree_codegen.load_from_buffer %[[BUFFER]]
+//       CHECK:   linalg.generic
+//   CHECK-NOT:   iree_linalg_ext.map_load
+// FOLD-LABEL: @transpose_generic
+//  FOLD-SAME:   %[[BUFFER:.+]]:
+//       FOLD:   %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
+//       FOLD:   %[[DEST:.+]] = tensor.empty() : tensor<4x16x2xf32>
+//   FOLD-NOT:   linalg.generic
+//   FOLD-NOT:   linalg.transpose
+//       FOLD:   %[[MAP_LOAD:.+]] = iree_linalg_ext.map_load
+//  FOLD-SAME:     %[[SOURCE]] into %[[DEST]] {
+//  FOLD-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       FOLD:     iree_linalg_ext.yield %[[IDX2]], %[[IDX0]], %[[IDX1]], {{.*}} : index, index, index, f32
+//       FOLD:   } : tensor<2x4x16xf32> into tensor<4x16x2xf32> -> tensor<4x16x2xf32>
+
+// -----
+
 // Transpose generic inside a nested region (scf.for) must be raised to
 // linalg.transpose so the relayout chain extends to the copy with
 // lowering_config, preventing map_load creation.

@@ -37,51 +37,6 @@ using IREE::LinalgExt::MapLoadOp;
 using IREE::LinalgExt::MapStoreOp;
 
 //===----------------------------------------------------------------------===//
-// Preprocessing Utilities
-//===----------------------------------------------------------------------===//
-
-/// Convert complex ops into simpler ops by decomposing or raising to a named
-/// op.
-///  - `PackOp`s and `UnPackOp`s are decomposed.
-///  - Transpose `linalg::GenericOp`s are raised to `linalg::TransposeOp`s.
-static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
-                                       FunctionOpInterface funcOp) {
-  OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<linalg::PackOp> packOps(
-      funcOp.getFunctionBody().getOps<linalg::PackOp>());
-  for (auto packOp : packOps) {
-    rewriter.setInsertionPoint(packOp);
-    FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
-        rewriter, packOp, /*lowerPadLikeWithInsertSlice=*/false);
-    // For aligned pack ops, the pad will be a no-op, and can be folded away.
-    // Fold it here so it does not complicate the index transformation folding
-    // later on.
-    if (failed(result) || !result->padOp) {
-      continue;
-    }
-    if (areAllConstantIntValue(result->padOp.getMixedLowPad(), 0) &&
-        areAllConstantIntValue(result->padOp.getMixedHighPad(), 0)) {
-      rewriter.replaceOp(result->padOp, result->padOp.getSource());
-    }
-  }
-  SmallVector<linalg::UnPackOp> unPackOps(
-      funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
-  for (auto unPackOp : unPackOps) {
-    rewriter.setInsertionPoint(unPackOp);
-    (void)linalg::lowerUnPack(rewriter, unPackOp,
-                              /*lowerUnpadLikeWithExtractSlice=*/false);
-  }
-  SmallVector<linalg::GenericOp> genericOps(
-      funcOp.getFunctionBody().getOps<linalg::GenericOp>());
-  for (auto genericOp : genericOps) {
-    if (linalg::isaTransposeOpInterface(genericOp)) {
-      rewriter.setInsertionPoint(genericOp);
-      (void)linalg::specializeGenericOp(rewriter, genericOp);
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Combining Layout Transformation Ops
 //===----------------------------------------------------------------------===//
 
@@ -507,127 +462,6 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
   return mapStoreOp;
 }
 
-/// Given an expanded (strip-mined) shape and reassociation indices, compute the
-/// collapsed shape by multiplying sizes within each reassociation group.
-static SmallVector<int64_t>
-computeCollapsedShape(ArrayRef<int64_t> expandedShape,
-                      ArrayRef<ReassociationIndices> reassociations) {
-  SmallVector<int64_t> collapsedShape(reassociations.size(), 1);
-  for (auto [collapsedIdx, group] : llvm::enumerate(reassociations)) {
-    for (int64_t expandedIdx : group) {
-      collapsedShape[collapsedIdx] *= expandedShape[expandedIdx];
-    }
-  }
-  return collapsedShape;
-}
-
-/// Fold a `packOp` producer into a consumer `mapStoreOp`.
-/// A pack is: pad + expand_shape + transpose.
-/// For producer folding into map_store, we apply the FORWARD transforms
-/// (source indices -> packed indices) at the start of the transformation
-/// region. The map_store input is rewired to the pack's source.
-static FailureOr<MapStoreOp> foldPackIntoMapStore(RewriterBase &rewriter,
-                                                  linalg::PackOp packOp,
-                                                  MapStoreOp mapStoreOp) {
-  assert(mapStoreOp.getInput() == packOp->getResult(0) &&
-         "expected packOp to be the producer of mapStoreOp");
-  if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
-    return rewriter.notifyMatchFailure(packOp,
-                                       "dynamic inner tiles not supported");
-  }
-
-  PackingMetadata packingMetadata;
-  SmallVector<int64_t> packedToExpandedPerm =
-      linalg::getPackInverseDestPerm(packOp, packingMetadata);
-  // Invert permutation for consumer folding.
-  SmallVector<int64_t> expandedToPackedPerm =
-      invertPermutationVector(packedToExpandedPerm);
-
-  MLIRContext *ctx = rewriter.getContext();
-
-  auto packedType = cast<RankedTensorType>(packOp.getResult().getType());
-  SmallVector<int64_t> expandedShape(packedType.getShape());
-  applyPermutationToVector(expandedShape, packedToExpandedPerm);
-  SmallVector<OpFoldResult> expandedDims =
-      getAsIndexOpFoldResult(ctx, expandedShape);
-
-  SmallVector<int64_t> collapsedShape =
-      computeCollapsedShape(expandedShape, packingMetadata.reassociations);
-  SmallVector<OpFoldResult> collapsedDims =
-      getAsIndexOpFoldResult(ctx, collapsedShape);
-
-  Location loc = packOp->getLoc();
-  rewriter.modifyOpInPlace(mapStoreOp, [&]() {
-    mapStoreOp.insertTransformationAtStart(
-        rewriter,
-        [&rewriter, loc, collapsedDims, expandedDims, expandedToPackedPerm](
-            ArrayRef<BlockArgument> sourceIndices) -> SmallVector<Value> {
-          SmallVector<Value> indexValues(sourceIndices.begin(),
-                                         sourceIndices.end());
-          auto linearizeOp = affine::AffineLinearizeIndexOp::create(
-              rewriter, loc, indexValues, collapsedDims, /*disjoint=*/true);
-          auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
-              rewriter, loc, linearizeOp.getResult(), expandedDims,
-              /*hasOuterBound=*/true);
-          SmallVector<Value> expandedIndices(delinearizeOp->getResults());
-          return applyPermutation(expandedIndices, expandedToPackedPerm);
-        },
-        collapsedDims.size());
-    mapStoreOp.getInputMutable().assign(packOp.getSource());
-  });
-  return mapStoreOp;
-}
-
-/// Fold an `unPackOp` producer into a consumer `mapStoreOp`.
-/// An unpack is: transpose + collapse_shape + extract_slice + copy.
-/// For producer folding, we apply: inverse transpose + expand (delinearize).
-static FailureOr<MapStoreOp> foldUnPackIntoMapStore(RewriterBase &rewriter,
-                                                    linalg::UnPackOp unPackOp,
-                                                    MapStoreOp mapStoreOp) {
-  assert(mapStoreOp.getInput() == unPackOp->getResult(0) &&
-         "expected unPackOp to be the producer of mapStoreOp");
-
-  PackingMetadata packingMetadata;
-  SmallVector<int64_t> packedToExpandedPerm =
-      linalg::getUnPackInverseSrcPerm(unPackOp, packingMetadata);
-
-  MLIRContext *ctx = rewriter.getContext();
-
-  auto packedType = cast<RankedTensorType>(unPackOp.getSourceType());
-  SmallVector<int64_t> expandedShape(packedType.getShape());
-  applyPermutationToVector(expandedShape, packedToExpandedPerm);
-  SmallVector<OpFoldResult> expandedDims =
-      getAsIndexOpFoldResult(ctx, expandedShape);
-
-  SmallVector<int64_t> collapsedShape =
-      computeCollapsedShape(expandedShape, packingMetadata.reassociations);
-  SmallVector<OpFoldResult> collapsedDims =
-      getAsIndexOpFoldResult(ctx, collapsedShape);
-
-  Location loc = unPackOp->getLoc();
-  rewriter.modifyOpInPlace(mapStoreOp, [&]() {
-    mapStoreOp.insertTransformationAtStart(
-        rewriter,
-        [&rewriter, loc, packedToExpandedPerm, expandedDims, collapsedDims](
-            ArrayRef<BlockArgument> packedIndices) -> SmallVector<Value> {
-          SmallVector<Value> indexValues(packedIndices.begin(),
-                                         packedIndices.end());
-          SmallVector<Value> expandedIndices =
-              applyPermutation(indexValues, packedToExpandedPerm);
-          auto linearizeOp = affine::AffineLinearizeIndexOp::create(
-              rewriter, loc, expandedIndices, expandedDims,
-              /*disjoint=*/true);
-          auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
-              rewriter, loc, linearizeOp.getResult(), collapsedDims,
-              /*hasOuterBound=*/true);
-          return delinearizeOp->getResults();
-        },
-        expandedDims.size());
-    mapStoreOp.getInputMutable().assign(unPackOp.getSource());
-  });
-  return mapStoreOp;
-}
-
 /// Fold a transpose-like `genericOp` producer into a consumer `mapStoreOp`.
 /// Same as foldTransposeIntoMapStore but extracts perm from indexing maps.
 static FailureOr<MapStoreOp> foldTransposeGenericIntoMapStore(
@@ -658,11 +492,17 @@ FailureOr<MapStoreOp> foldIntoMapStore(RewriterBase &rewriter, Operation *op,
         return foldExtractSliceIntoMapStore(rewriter, extractSliceOp,
                                             mapStoreOp);
       })
-      .Case([&](linalg::PackOp packOp) {
-        return foldPackIntoMapStore(rewriter, packOp, mapStoreOp);
+      .Case([&](linalg::PackOp packOp) -> FailureOr<MapStoreOp> {
+        if (failed(linalg::lowerPack(rewriter, packOp))) {
+          return failure();
+        }
+        return mapStoreOp;
       })
-      .Case([&](linalg::UnPackOp unPackOp) {
-        return foldUnPackIntoMapStore(rewriter, unPackOp, mapStoreOp);
+      .Case([&](linalg::UnPackOp unPackOp) -> FailureOr<MapStoreOp> {
+        if (failed(linalg::lowerUnPack(rewriter, unPackOp))) {
+          return failure();
+        }
+        return mapStoreOp;
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
@@ -920,11 +760,6 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     return failure();
   }
 
-  // Apply some preprocessing to convert complex layout transformation
-  // ops like pack and unpack into simpler supported ops.
-  IRRewriter rewriter(ctx);
-  simplifyComplexRelayoutOps(rewriter, funcOp);
-
   // Resolve dims aggressively and canonicalize to simplify the IR.
   // This improves pattern matching and makes it easier for subsequent
   // rewrites/proofs to recognize identity/no-op cases.
@@ -951,6 +786,7 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   }
 
   // Clean up any identity map_store ops after combining.
+  IRRewriter rewriter(ctx);
   funcOp->walk([&](MapStoreOp mapStoreOp) {
     if (mapStoreOp.isIdentity()) {
       rewriter.replaceOp(mapStoreOp, mapStoreOp.getInput());
@@ -1340,122 +1176,6 @@ static FailureOr<MapLoadOp> foldPadIntoMapLoad(RewriterBase &rewriter,
                                      indexTransformBuilder, padValue);
 }
 
-/// Fold a consumer `packOp` into a producer `mapLoadOp`.
-/// A pack is semantically: pad + expand_shape + transpose.
-/// Index transformation (inverse order, output -> source):
-///   1. Inverse transpose (undo packed permutation)
-///   2. Linearize + delinearize (undo expand_shape via reassociations)
-///   3. Subtract low pad offsets (always zero for pack)
-/// Fill value is set to the pack's padding value.
-static FailureOr<MapLoadOp> foldPackIntoMapLoad(RewriterBase &rewriter,
-                                                linalg::PackOp packOp,
-                                                MapLoadOp mapLoadOp) {
-  assert(packOp.getSource() == mapLoadOp.getResult(0) &&
-         "expected mapLoadOp to be the producer of packOp source");
-  if (llvm::any_of(packOp.getStaticInnerTiles(), ShapedType::isDynamic)) {
-    return rewriter.notifyMatchFailure(packOp,
-                                       "dynamic inner tiles not supported");
-  }
-
-  // Compute the permutation and metadata that lowerPack would use.
-  PackingMetadata packingMetadata;
-  SmallVector<int64_t> packedToExpandedPerm =
-      linalg::getPackInverseDestPerm(packOp, packingMetadata);
-
-  MLIRContext *ctx = rewriter.getContext();
-
-  auto packedType = cast<RankedTensorType>(packOp.getResult().getType());
-  SmallVector<int64_t> expandedShape(packedType.getShape());
-  applyPermutationToVector(expandedShape, packedToExpandedPerm);
-  SmallVector<OpFoldResult> expandedDims =
-      getAsIndexOpFoldResult(ctx, expandedShape);
-
-  SmallVector<int64_t> collapsedShape =
-      computeCollapsedShape(expandedShape, packingMetadata.reassociations);
-  SmallVector<OpFoldResult> collapsedDims =
-      getAsIndexOpFoldResult(ctx, collapsedShape);
-
-  Value mapLoadPad = mapLoadOp.getPaddingValue();
-  Value packPad = packOp.getPaddingValue();
-  Value fillValue = packPad ? packPad : mapLoadPad;
-  if (!mapLoadPad.getDefiningOp<ub::PoisonOp>() && mapLoadPad != fillValue) {
-    return rewriter.notifyMatchFailure(
-        packOp, "map_load already has a non-poison padding value and it is "
-                "different from the pack padding value; folding "
-                "another pad would overwrite it");
-  }
-
-  Location loc = packOp->getLoc();
-  auto indexTransformBuilder =
-      [&rewriter, loc, packedToExpandedPerm, expandedDims, collapsedDims](
-          ArrayRef<BlockArgument> packedIndices) -> SmallVector<Value> {
-    SmallVector<Value> indexValues(packedIndices.begin(), packedIndices.end());
-    SmallVector<Value> expandedIndices =
-        applyPermutation(indexValues, packedToExpandedPerm);
-    auto linearizeOp = affine::AffineLinearizeIndexOp::create(
-        rewriter, loc, expandedIndices, expandedDims,
-        /*disjoint=*/true);
-    auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, linearizeOp.getResult(), collapsedDims,
-        /*hasOuterBound=*/true);
-    return delinearizeOp->getResults();
-  };
-
-  return foldConsumerIntoMapLoadImpl(rewriter, packOp, mapLoadOp,
-                                     indexTransformBuilder, fillValue);
-}
-
-/// Fold a consumer `unPackOp` into a producer `mapLoadOp`.
-/// An unpack is semantically: transpose + collapse_shape + extract_slice +
-/// copy. Index transformation (inverse order, output -> source):
-///   1. Delinearize (undo collapse_shape)
-///   2. Transpose (undo the packed permutation)
-/// No fill value needed.
-static FailureOr<MapLoadOp> foldUnPackIntoMapLoad(RewriterBase &rewriter,
-                                                  linalg::UnPackOp unPackOp,
-                                                  MapLoadOp mapLoadOp) {
-  assert(unPackOp.getSource() == mapLoadOp.getResult(0) &&
-         "expected mapLoadOp to be the producer of unPackOp source");
-
-  PackingMetadata packingMetadata;
-  SmallVector<int64_t> packedToExpandedPerm =
-      linalg::getUnPackInverseSrcPerm(unPackOp, packingMetadata);
-
-  MLIRContext *ctx = rewriter.getContext();
-
-  auto packedType = cast<RankedTensorType>(unPackOp.getSourceType());
-  SmallVector<int64_t> expandedShape(packedType.getShape());
-  applyPermutationToVector(expandedShape, packedToExpandedPerm);
-  SmallVector<OpFoldResult> expandedDims =
-      getAsIndexOpFoldResult(ctx, expandedShape);
-
-  SmallVector<int64_t> collapsedShape =
-      computeCollapsedShape(expandedShape, packingMetadata.reassociations);
-  SmallVector<OpFoldResult> collapsedDims =
-      getAsIndexOpFoldResult(ctx, collapsedShape);
-
-  // To undo the unpack transpose (consumer fold), we apply the inverse perm.
-  SmallVector<int64_t> expandedToPackedPerm =
-      invertPermutationVector(packedToExpandedPerm);
-
-  Location loc = unPackOp->getLoc();
-  auto indexTransformBuilder =
-      [&rewriter, loc, collapsedDims, expandedDims, expandedToPackedPerm](
-          ArrayRef<BlockArgument> destIndices) -> SmallVector<Value> {
-    SmallVector<Value> indexValues(destIndices.begin(), destIndices.end());
-    auto linearizeOp = affine::AffineLinearizeIndexOp::create(
-        rewriter, loc, indexValues, collapsedDims, /*disjoint=*/true);
-    auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, linearizeOp.getResult(), expandedDims,
-        /*hasOuterBound=*/true);
-    SmallVector<Value> expandedIndices(delinearizeOp->getResults());
-    return applyPermutation(expandedIndices, expandedToPackedPerm);
-  };
-
-  return foldConsumerIntoMapLoadImpl(rewriter, unPackOp, mapLoadOp,
-                                     indexTransformBuilder);
-}
-
 /// Fold a consumer transpose-like `genericOp` into a producer `mapLoadOp`.
 /// Same as foldTransposeIntoMapLoad but extracts the permutation from the
 /// generic's indexing maps via isaTransposeOpInterface.
@@ -1490,12 +1210,19 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
       .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
         return foldPadIntoMapLoad(rewriter, padOp, mapLoadOp);
       })
-      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
-        return foldPackIntoMapLoad(rewriter, packOp, mapLoadOp);
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) -> FailureOr<MapLoadOp> {
+        if (failed(linalg::lowerPack(rewriter, packOp))) {
+          return failure();
+        }
+        return mapLoadOp;
       })
-      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unPackOp) {
-        return foldUnPackIntoMapLoad(rewriter, unPackOp, mapLoadOp);
-      })
+      .Case<linalg::UnPackOp>(
+          [&](linalg::UnPackOp unPackOp) -> FailureOr<MapLoadOp> {
+            if (failed(linalg::lowerUnPack(rewriter, unPackOp))) {
+              return failure();
+            }
+            return mapLoadOp;
+          })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
           return foldTransposeGenericIntoMapLoad(rewriter, genericOp, *perm,
@@ -1613,11 +1340,6 @@ struct CombineSourceLayoutTransformationPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
-
-    // Apply some preprocessing to convert complex layout transformation
-    // ops like unpack into simpler supported ops.
-    IRRewriter rewriter(context);
-    simplifyComplexRelayoutOps(rewriter, funcOp);
 
     // Insert identity map_load ops after load_from_buffer ops and fold
     // consumer relayout ops into them.
