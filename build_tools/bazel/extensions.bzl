@@ -96,6 +96,13 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/rccl",
     )
 
+    # Doug Lea's malloc (dlmalloc v2.8.6, MIT-0 license)
+    new_local_repository(
+        name = "dlmalloc",
+        build_file = "@iree_core//:build_tools/third_party/dlmalloc/BUILD.overlay",
+        path = "third_party/dlmalloc",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",

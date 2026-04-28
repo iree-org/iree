@@ -75,6 +75,7 @@ use_repo(
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
+    "dlmalloc",
     "hip_api_headers",
     "hsa_runtime_headers",
     "iree_cuda",
