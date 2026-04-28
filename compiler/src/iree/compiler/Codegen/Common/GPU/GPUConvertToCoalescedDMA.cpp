@@ -34,8 +34,6 @@
 
 namespace mlir::iree_compiler {
 
-static constexpr llvm::StringLiteral kRedundantOnDistribute =
-    "iree_gpu.redundant_on_distribute";
 
 #define GEN_PASS_DEF_GPUCONVERTTOCOALESCEDDMAPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
@@ -1314,7 +1312,6 @@ private:
     // only meaningful when output traces to tensor.empty (otherwise warp
     // tiles share the innermost dim, already checked for alignment above).
     SmallVector<int64_t> effectiveNumWarps = numWarps;
-    bool cappedWarps = false;
     if (!isPadFusion && availableElements % *minAligned == 0) {
       bool outputTracesEmpty = false;
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
@@ -1327,11 +1324,8 @@ private:
         int64_t totalWarps = llvm::product_of(positiveWarps);
         int64_t maxSegments = availableElements / *minAligned;
         if (maxSegments < totalWarps) {
-          // Collapse onto a single dim; computeSubgroupTileSizes only uses
-          // the product, so the layout of effectiveNumWarps doesn't matter.
           effectiveNumWarps.assign(numWarps.size(), 1);
           effectiveNumWarps.front() = maxSegments;
-          cappedWarps = true;
         }
       }
     }
@@ -1367,22 +1361,6 @@ private:
     rewriter.setInsertionPoint(op);
     FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
         rewriter, cast<TilingInterface>(op.getOperation()), tilingOptions);
-
-    // When the warp count was capped below the workgroup's warp count, the
-    // generated forall has fewer iterations than warps. GPUDistributeForall
-    // would otherwise emit a scf.for guarded on the warp id (→ scf.if at
-    // flatten), leaving the unused warps idle. Mark the forall so the
-    // distribute pass broadcasts the body across all warps instead: every
-    // warp issues the same gather_to_lds redundantly. Safe because a DMA
-    // write of identical data to the same LDS offset is idempotent.
-    if (cappedWarps && succeeded(tilingResult)) {
-      for (LoopLikeOpInterface loop : tilingResult->loops) {
-        if (auto forall = dyn_cast<scf::ForallOp>(loop.getOperation())) {
-          forall->setAttr(kRedundantOnDistribute, UnitAttr::get(context));
-          break;
-        }
-      }
-    }
 
     return tilingResult;
   }
