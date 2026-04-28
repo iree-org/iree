@@ -64,7 +64,6 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
-#include "iree/hal/replay/help.h"
 #include "iree/hal/replay/recorder.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
@@ -85,8 +84,8 @@ IREE_FLAG(int32_t, batch_size, 1,
 IREE_FLAG(int32_t, batch_concurrency, 1,
           "Number of invocations within a batch that should run concurrently.");
 IREE_FLAG(bool, agents_md, false,
-          "Prints an agent-oriented Markdown guide for HAL replay capture and "
-          "tooling workflows and exits.");
+          "Prints AGENTS.md guidance for iree-benchmark-module replay capture "
+          "and exits.");
 
 IREE_FLAG(string, function, "",
           "Name of a function contained in the module specified by --module= "
@@ -162,6 +161,61 @@ static iree_hal_profiling_from_flags_t* g_profiling = nullptr;
 
 namespace iree {
 namespace {
+
+static const char kIreeBenchmarkModuleUsage[] =
+    "Benchmarks exported functions from a compiled IREE module.\n"
+    "\n"
+    "Replay capture wraps the resolved HAL device group after normal "
+    "--device=\n"
+    "selection. Use --device_replay_output=path.ireereplay to record the HAL\n"
+    "work issued by the benchmark. The recorder is closed after benchmark\n"
+    "execution so the output file is complete when the tool exits.\n"
+    "\n"
+    "Replay capture flags:\n"
+    "  --device_replay_output=path.ireereplay\n"
+    "      Writes a HAL replay stream.\n"
+    "  --device_replay_file_policy=reference|capture-ranges|capture-all|fail\n"
+    "      Controls imported fd-backed HAL files such as parameter archives.\n"
+    "  --device_replay_file_validation=identity|digest\n"
+    "      Validation for referenced fd-backed files.\n"
+    "  --agents_md\n"
+    "      Prints AGENTS.md guidance specific to iree-benchmark-module "
+    "capture.\n"
+    "      Use `iree-run-replay --agents_md` for the full replay tool "
+    "playbook.\n";
+
+static void PrintBenchmarkModuleAgentMarkdown(FILE* file) {
+  fputs(
+      "# iree-benchmark-module Replay Capture\n"
+      "\n"
+      "`iree-benchmark-module` can capture the HAL work issued by benchmark\n"
+      "iterations with `--device_replay_output=/path/to/model.ireereplay`.\n"
+      "Capture flags compose with normal Google Benchmark controls.\n"
+      "\n"
+      "Synchronous and dispatch benchmarks record replay `execute` scopes "
+      "around\n"
+      "the VM invoke/list reset body. Asynchronous benchmarks record the "
+      "scope\n"
+      "around the resumed timing interval and keep batch setup and cleanup "
+      "outside\n"
+      "the selected scope. Use `iree-benchmark-replay --replay_scope=execute` "
+      "to\n"
+      "time the same region later while replay still executes the full "
+      "captured\n"
+      "stream.\n"
+      "\n"
+      "Use `--device_replay_file_policy=reference` for large stable parameter\n"
+      "archives and `--device_replay_file_validation=identity` unless the "
+      "files\n"
+      "will move across filesystems and need digest validation.\n"
+      "\n"
+      "For replay execution, executable substitution, file remapping, dump "
+      "JSONL,\n"
+      "and the shared replay failure contract, pipe `iree-run-replay "
+      "--agents_md`\n"
+      "into your AGENTS.md.\n",
+      file);
+}
 
 static void BeginReplayExecuteScope(iree_hal_replay_recorder_t* recorder) {
   if (!recorder) return;
@@ -658,12 +712,12 @@ static int runMain(int argc, char** argv) {
 
   // Pass through flags to benchmark (allowing --help to fall through).
   iree_flags_set_usage("iree-benchmark-module",
-                       iree_hal_replay_capture_usage_text());
+                       iree::kIreeBenchmarkModuleUsage);
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   if (FLAG_agents_md) {
-    iree_hal_replay_print_agent_markdown(stdout);
+    iree::PrintBenchmarkModuleAgentMarkdown(stdout);
     fflush(stdout);
     IREE_TRACE_ZONE_END(z0);
     return EXIT_SUCCESS;

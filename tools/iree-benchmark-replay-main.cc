@@ -15,7 +15,6 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/replay/execute.h"
-#include "iree/hal/replay/help.h"
 #include "iree/io/file_contents.h"
 #include "iree/tooling/device_util.h"
 
@@ -37,10 +36,100 @@ IREE_FLAG(
     "faithful, but Google Benchmark reports manually accumulated time from "
     "matching scope regions.");
 IREE_FLAG(bool, agents_md, false,
-          "Prints an agent-oriented Markdown guide for HAL replay capture and "
-          "tooling workflows and exits.");
+          "Prints AGENTS.md guidance for iree-benchmark-replay and exits.");
 
 namespace {
+
+static const char kIreeBenchmarkReplayUsage[] =
+    "Benchmarks deterministic execution of an IREE HAL replay file.\n"
+    "\n"
+    "Each Google Benchmark iteration replays the complete captured HAL stream\n"
+    "against the selected device group. Profiling flushes are performed "
+    "outside\n"
+    "the timed region, so --device_profiling_output captures the useful "
+    "replay\n"
+    "work without charging the benchmark iteration for profile serialization.\n"
+    "\n"
+    "Usage:\n"
+    "  iree-benchmark-replay [benchmark options] [replay options]\n"
+    "      <capture.ireereplay>\n"
+    "\n"
+    "Important flags:\n"
+    "  --device=URI\n"
+    "      Target HAL device URI, matching iree-benchmark-module.\n"
+    "  --replay_file_remap=captured_prefix=replay_prefix\n"
+    "      Remaps referenced external file paths before strict identity\n"
+    "      validation. Repeat the flag for multiple roots.\n"
+    "  --replay_executable_substitution=EXECUTABLE_ID=PATH\n"
+    "  --replay_executable_substitution=EXECUTABLE_ID@FORMAT=PATH\n"
+    "  --replay_executable_substitution=all=PATH\n"
+    "  --replay_executable_substitution=all@FORMAT=PATH\n"
+    "      Replaces captured executable payloads for kernel iteration. The "
+    "same\n"
+    "      syntax and ABI validation as iree-run-replay applies.\n"
+    "  --replay_scope=name\n"
+    "      Times only regions enclosed by matching replay scope markers. The\n"
+    "      complete capture still executes on every iteration.\n"
+    "  --benchmark_min_time=20x\n"
+    "      Useful for fixed-iteration replay benchmarking.\n"
+    "  --device_profiling_mode=queue-events,host-execution\n"
+    "  --device_profiling_output=path.ireeprof\n"
+    "      Captures HAL profiling for benchmarked replay iterations.\n"
+    "  --agents_md\n"
+    "      Prints AGENTS.md guidance specific to iree-benchmark-replay. Use\n"
+    "      `iree-run-replay --agents_md` for the full replay tool playbook.\n"
+    "\n"
+    "Examples:\n"
+    "  iree-benchmark-replay --device=local-sync --benchmark_min_time=20x \\\n"
+    "      /tmp/model.ireereplay\n"
+    "  iree-benchmark-replay --device=local-sync --benchmark_min_time=20x \\\n"
+    "      --replay_scope=execute /tmp/model.ireereplay\n";
+
+static void PrintBenchmarkReplayAgentMarkdown(FILE* file) {
+  fputs(
+      "# iree-benchmark-replay\n"
+      "\n"
+      "`iree-benchmark-replay` executes a prepared `.ireereplay` plan inside\n"
+      "Google Benchmark. It creates the replay plan once, then executes fresh\n"
+      "per-run replay object state for each iteration.\n"
+      "\n"
+      "Use fixed iteration counts for small replay workloads:\n"
+      "\n"
+      "```bash\n"
+      "iree-benchmark-replay --device=local-sync --benchmark_min_time=20x \\\n"
+      "  /tmp/model.ireereplay\n"
+      "```\n"
+      "\n"
+      "`--replay_scope=name` reports manual time accumulated inside matching\n"
+      "scope markers while still executing the complete captured stream every\n"
+      "iteration. Use this when a capture includes setup/teardown and you "
+      "want\n"
+      "numbers for the VM invocation or another named phase:\n"
+      "\n"
+      "```bash\n"
+      "iree-benchmark-replay --device=local-sync --benchmark_min_time=20x \\\n"
+      "  --replay_scope=execute /tmp/model.ireereplay\n"
+      "```\n"
+      "\n"
+      "Profiling flushes happen outside unscoped benchmark timing. Scoped "
+      "manual\n"
+      "timing records only the selected scope and still flushes profiling "
+      "after\n"
+      "the replay iteration completes:\n"
+      "\n"
+      "```bash\n"
+      "iree-benchmark-replay --device=amdgpu --benchmark_min_time=50x \\\n"
+      "  --device_profiling_mode=queue-events,device-queue-events \\\n"
+      "  --device_profiling_output=/tmp/model-replay.ireeprof \\\n"
+      "  /tmp/model.ireereplay\n"
+      "```\n"
+      "\n"
+      "For capture, single-run replay, file remapping, executable "
+      "substitution,\n"
+      "dump JSONL, and the shared replay failure contract, pipe "
+      "`iree-run-replay --agents_md` into your AGENTS.md.\n",
+      file);
+}
 
 typedef struct ReplayExecutableSubstitution {
   // True when this replacement applies to every captured executable.
@@ -371,13 +460,12 @@ iree_status_t ParseReplayFileRemaps(
 static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-replay");
 
-  iree_flags_set_usage("iree-benchmark-replay",
-                       iree_hal_replay_benchmark_usage_text());
+  iree_flags_set_usage("iree-benchmark-replay", kIreeBenchmarkReplayUsage);
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   if (FLAG_agents_md) {
-    iree_hal_replay_print_agent_markdown(stdout);
+    PrintBenchmarkReplayAgentMarkdown(stdout);
     fflush(stdout);
     IREE_TRACE_ZONE_END(z0);
     return EXIT_SUCCESS;

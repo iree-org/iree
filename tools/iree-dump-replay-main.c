@@ -9,13 +9,78 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/replay/dump.h"
-#include "iree/hal/replay/help.h"
 #include "iree/io/file_contents.h"
 
 IREE_FLAG(string, format, "text", "Output format: text, jsonl, or c.");
 IREE_FLAG(bool, agents_md, false,
-          "Prints an agent-oriented Markdown guide for HAL replay capture and "
-          "tooling workflows and exits.");
+          "Prints AGENTS.md guidance for iree-dump-replay and exits.");
+
+static const char kIreeDumpReplayUsage[] =
+    "Dumps information from an IREE HAL replay file.\n"
+    "\n"
+    "The dumper validates the replay container and emits projections without\n"
+    "materializing large payload bytes. Blob data and embedded payloads are\n"
+    "reported as byte ranges in the original .ireereplay file so JSONL and\n"
+    "the C projection can reference the capture directly.\n"
+    "\n"
+    "Usage:\n"
+    "  iree-dump-replay [--format=text|jsonl|c] <capture.ireereplay>\n"
+    "\n"
+    "Formats:\n"
+    "  text\n"
+    "      Human-readable record stream for quick inspection.\n"
+    "  jsonl\n"
+    "      One JSON object per line for jq and automation. Payload bytes are\n"
+    "      represented as replay-file ranges.\n"
+    "  c\n"
+    "      Reserved for the C reproducer projection. The flag is accepted so\n"
+    "      scripts can probe support, but current builds return "
+    "UNIMPLEMENTED.\n"
+    "\n"
+    "Important flags:\n"
+    "  --agents_md\n"
+    "      Prints AGENTS.md guidance specific to iree-dump-replay. Use\n"
+    "      `iree-run-replay --agents_md` for the full replay tool playbook.\n"
+    "\n"
+    "Examples:\n"
+    "  iree-dump-replay --format=text /tmp/model.ireereplay\n"
+    "  iree-dump-replay --format=jsonl /tmp/model.ireereplay | \\\n"
+    "      jq 'select(.kind==\"operation\" and "
+    ".operation==\"device.queue_execute\")'\n";
+
+static void iree_dump_replay_print_agent_markdown(FILE* file) {
+  fputs(
+      "# iree-dump-replay\n"
+      "\n"
+      "Use `iree-dump-replay --format=text` for quick inspection and\n"
+      "`--format=jsonl` for agent workflows. JSONL emits one object per line "
+      "and\n"
+      "keeps payload bytes as replay-file ranges instead of dumping raw blob "
+      "data.\n"
+      "\n"
+      "Useful queries:\n"
+      "\n"
+      "```bash\n"
+      "iree-dump-replay --format=jsonl /tmp/model.ireereplay | \\\n"
+      "  jq 'select(.kind==\"operation\" and "
+      ".operation==\"device.queue_execute\")'\n"
+      "iree-dump-replay --format=jsonl /tmp/model.ireereplay | \\\n"
+      "  jq 'select(.payload_type==\"replay_scope\") | .payload.name'\n"
+      "```\n"
+      "\n"
+      "Rows carry object ids, operation ids, queue wait/signal lists, buffer\n"
+      "binding tables, file references, and replay-file byte ranges. "
+      "`--format=c`\n"
+      "is reserved for a future C reproducer projection and fails loudly in "
+      "current\n"
+      "builds instead of emitting a partial file.\n"
+      "\n"
+      "For replay execution, executable substitution, file remapping, and the\n"
+      "shared replay failure contract, pipe `iree-run-replay --agents_md` "
+      "into\n"
+      "your AGENTS.md.\n",
+      file);
+}
 
 static iree_status_t iree_dump_replay_parse_format(
     const char* value, iree_hal_replay_dump_format_t* out_format) {
@@ -53,10 +118,10 @@ int main(int argc, char** argv) {
   iree_allocator_t host_allocator = iree_allocator_system();
   int exit_code = EXIT_SUCCESS;
 
-  iree_flags_set_usage("iree-dump-replay", iree_hal_replay_dump_usage_text());
+  iree_flags_set_usage("iree-dump-replay", kIreeDumpReplayUsage);
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (FLAG_agents_md) {
-    iree_hal_replay_print_agent_markdown(stdout);
+    iree_dump_replay_print_agent_markdown(stdout);
     fflush(stdout);
     IREE_TRACE_ZONE_END(z0);
     IREE_TRACE_APP_EXIT(exit_code);
