@@ -56,6 +56,9 @@ struct CPUCodegenOptions : CodegenOptions {
   // Instruments memory reads and writes in dispatches for address tracking.
   bool instrumentMemoryAccesses = false;
 
+  // Enables experimental vectorization to transfer_gather.
+  bool enableTransferGather = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
 };
