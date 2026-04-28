@@ -226,3 +226,217 @@ func.func @flex_attn_return_lse_and_maxscores(%arg0: !torch.vtensor<[2,4,8,16],f
 // CHECK:             arith.addf
 // Return all three results.
 // CHECK:           return {{.*}} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8],f32>, !torch.vtensor<[2,4,8],f32>
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_2d_dim1
+func.func @argmax_2d_dim1(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3],si64> {
+  %int1 = torch.constant.int 1
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int1, %false : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  return %0 : !torch.vtensor<[3],si64>
+}
+// CHECK:           torch_c.to_builtin_tensor
+// CHECK:           linalg.fill
+// CHECK:           linalg.fill
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpf ogt
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           linalg.generic
+// CHECK:             arith.extsi {{.*}} : i32 to i64
+// CHECK:           torch_c.from_builtin_tensor
+
+// -----
+
+// CHECK-LABEL: func.func @argmin_2d_dim0
+func.func @argmin_2d_dim0(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[4],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmin %arg0, %int0, %false : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[4],si64>
+  return %0 : !torch.vtensor<[4],si64>
+}
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf olt
+// CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_dim_none
+func.func @argmax_dim_none(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[],si64> {
+  %none = torch.constant.none
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %none, %false : !torch.vtensor<[3,4],f32>, !torch.none, !torch.bool -> !torch.vtensor<[],si64>
+  return %0 : !torch.vtensor<[],si64>
+}
+// CHECK:           torch.aten.flatten.using_ints
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf ogt
+// CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_keepdim
+func.func @argmax_keepdim(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3,1],si64> {
+  %int1 = torch.constant.int 1
+  %true = torch.constant.bool true
+  %0 = torch.aten.argmax %arg0, %int1, %true : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3,1],si64>
+  return %0 : !torch.vtensor<[3,1],si64>
+}
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:           torch.aten.unsqueeze
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_neg_dim
+func.func @argmax_neg_dim(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3],si64> {
+  %int-1 = torch.constant.int -1
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int-1, %false : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  return %0 : !torch.vtensor<[3],si64>
+}
+// Negative dim should be normalized to dim=1.
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_int_input
+func.func @argmax_int_input(%arg0: !torch.vtensor<[5],si32>) -> !torch.vtensor<[],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int0, %false : !torch.vtensor<[5],si32>, !torch.int, !torch.bool -> !torch.vtensor<[],si64>
+  return %0 : !torch.vtensor<[],si64>
+}
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpi sgt
+// CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @argmax_dim_none_keepdim
+func.func @argmax_dim_none_keepdim(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[1,1],si64> {
+  %none = torch.constant.none
+  %true = torch.constant.bool true
+  %0 = torch.aten.argmax %arg0, %none, %true : !torch.vtensor<[3,4],f32>, !torch.none, !torch.bool -> !torch.vtensor<[1,1],si64>
+  return %0 : !torch.vtensor<[1,1],si64>
+}
+// CHECK:           torch.aten.flatten.using_ints
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf ogt
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           torch.aten.view
+
+// -----
+
+// torch-mlir lowers `onnx.ArgMax{select_last_index=1}` to a flip-then-argmax
+// chain followed by `(size-1) - idx` post-processing. Detect the chain and
+// fold it into a single `arg_compare` with non-strict `oge` on the un-flipped
+// input.
+// CHECK-LABEL: func.func @argmax_select_last_index_2d_keepdim
+func.func @argmax_select_last_index_2d_keepdim(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3,1],si64> {
+  %int1 = torch.constant.int 1
+  %true = torch.constant.bool true
+  %int3 = torch.constant.int 3
+  %int1_alpha = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %int1 : (!torch.int) -> !torch.list<int>
+  %flipped = torch.aten.flip %arg0, %dims : !torch.vtensor<[3,4],f32>, !torch.list<int> -> !torch.vtensor<[3,4],f32>
+  %argmax = torch.aten.argmax %flipped, %int1, %true : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3,1],si64>
+  %sub = torch.aten.sub.Scalar %argmax, %int3, %int1_alpha : !torch.vtensor<[3,1],si64>, !torch.int, !torch.int -> !torch.vtensor<[3,1],si64>
+  %abs = torch.aten.abs %sub : !torch.vtensor<[3,1],si64> -> !torch.vtensor<[3,1],si64>
+  return %abs : !torch.vtensor<[3,1],si64>
+}
+// CHECK-NOT:       torch.aten.flip
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpf oge
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           torch.aten.unsqueeze
+// CHECK-NOT:       torch.aten.sub.Scalar
+// CHECK-NOT:       torch.aten.abs
+
+// -----
+
+// Argmin variant: non-strict comparator becomes `ole`.
+// CHECK-LABEL: func.func @argmin_select_last_index_2d
+func.func @argmin_select_last_index_2d(%arg0: !torch.vtensor<[5,3],f32>) -> !torch.vtensor<[3],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %int4 = torch.constant.int 4
+  %int1 = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %int0 : (!torch.int) -> !torch.list<int>
+  %flipped = torch.aten.flip %arg0, %dims : !torch.vtensor<[5,3],f32>, !torch.list<int> -> !torch.vtensor<[5,3],f32>
+  %argmin = torch.aten.argmin %flipped, %int0, %false : !torch.vtensor<[5,3],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  %sub = torch.aten.sub.Scalar %argmin, %int4, %int1 : !torch.vtensor<[3],si64>, !torch.int, !torch.int -> !torch.vtensor<[3],si64>
+  %abs = torch.aten.abs %sub : !torch.vtensor<[3],si64> -> !torch.vtensor<[3],si64>
+  return %abs : !torch.vtensor<[3],si64>
+}
+// CHECK-NOT:       torch.aten.flip
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf ole
+// CHECK:             iree_linalg_ext.yield
+// CHECK-NOT:       torch.aten.sub.Scalar
+// CHECK-NOT:       torch.aten.abs
+
+// -----
+
+// Negative-axis flip-and-argmax: dim normalization makes the flip dim and
+// argmax dim equal, so the chain still folds.
+// CHECK-LABEL: func.func @argmax_select_last_index_negative_axis
+func.func @argmax_select_last_index_negative_axis(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3],si64> {
+  %int-1 = torch.constant.int -1
+  %false = torch.constant.bool false
+  %int3 = torch.constant.int 3
+  %int1 = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %int-1 : (!torch.int) -> !torch.list<int>
+  %flipped = torch.aten.flip %arg0, %dims : !torch.vtensor<[3,4],f32>, !torch.list<int> -> !torch.vtensor<[3,4],f32>
+  %argmax = torch.aten.argmax %flipped, %int-1, %false : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  %sub = torch.aten.sub.Scalar %argmax, %int3, %int1 : !torch.vtensor<[3],si64>, !torch.int, !torch.int -> !torch.vtensor<[3],si64>
+  %abs = torch.aten.abs %sub : !torch.vtensor<[3],si64> -> !torch.vtensor<[3],si64>
+  return %abs : !torch.vtensor<[3],si64>
+}
+// CHECK-NOT:       torch.aten.flip
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpf oge
+
+// -----
+
+// Negative test: flip is along a different dim than argmax. The fold must
+// NOT trigger because the post-processing `(size-1) - idx` would not be a
+// valid mapping. The flip stays, the comparator stays strict, and the
+// sub/abs chain is preserved (to be lowered later by ConvertTorchToLinalg).
+// CHECK-LABEL: func.func @argmax_flip_other_dim_not_folded
+func.func @argmax_flip_other_dim_not_folded(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3,1],si64> {
+  %int0 = torch.constant.int 0
+  %int1 = torch.constant.int 1
+  %true = torch.constant.bool true
+  %int3 = torch.constant.int 3
+  %int1_alpha = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %int0 : (!torch.int) -> !torch.list<int>
+  %flipped = torch.aten.flip %arg0, %dims : !torch.vtensor<[3,4],f32>, !torch.list<int> -> !torch.vtensor<[3,4],f32>
+  %argmax = torch.aten.argmax %flipped, %int1, %true : !torch.vtensor<[3,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[3,1],si64>
+  %sub = torch.aten.sub.Scalar %argmax, %int3, %int1_alpha : !torch.vtensor<[3,1],si64>, !torch.int, !torch.int -> !torch.vtensor<[3,1],si64>
+  %abs = torch.aten.abs %sub : !torch.vtensor<[3,1],si64> -> !torch.vtensor<[3,1],si64>
+  return %abs : !torch.vtensor<[3,1],si64>
+}
+// CHECK:           torch.aten.flip
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpf ogt
+// CHECK:             iree_linalg_ext.yield
+// CHECK:           torch.aten.sub.Scalar
+// CHECK:           torch.aten.abs
+
+// -----
+
+// Dynamic non-reduction axis: the conversion must materialize a `tensor.dim`
+// for the dynamic dim and pass it to `tensor.empty` for the result buffers.
+// CHECK-LABEL: func.func @argmax_dynamic_batch
+func.func @argmax_dynamic_batch(%arg0: !torch.vtensor<[?,4],f32>) -> !torch.vtensor<[?],si64> {
+  %int1 = torch.constant.int 1
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int1, %false : !torch.vtensor<[?,4],f32>, !torch.int, !torch.bool -> !torch.vtensor<[?],si64>
+  return %0 : !torch.vtensor<[?],si64>
+}
+// CHECK:           tensor.dim
+// CHECK:           tensor.empty({{.*}}) : tensor<?xf32>
+// CHECK:           tensor.empty({{.*}}) : tensor<?xi32>
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpf ogt
+// CHECK:             iree_linalg_ext.yield
