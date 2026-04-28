@@ -105,9 +105,10 @@ TEST_P(SemaphoreSubmissionTest,
   }
 
   iree_hal_buffer_t* source_buffer = NULL;
-  CreateDeviceBufferWithData(source_data.data(), kBufferSize, &source_buffer);
+  IREE_ASSERT_OK(CreateDeviceBufferWithData(source_data.data(), kBufferSize,
+                                            &source_buffer));
   iree_hal_buffer_t* target_buffer = NULL;
-  CreateZeroedDeviceBuffer(kBufferSize, &target_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, &target_buffer));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(

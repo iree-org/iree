@@ -54,7 +54,8 @@ class DispatchConstantsTest : public CtsTestBase<> {
 TEST_P(DispatchConstantsTest, DispatchWithDispatchConstants) {
   // Create output buffer.
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer);
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer));
 
   // Set up bindings for direct or indirect recording mode.
   iree_hal_buffer_ref_t binding_refs[1];

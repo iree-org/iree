@@ -25,7 +25,7 @@ class CommandBufferFillBufferTest : public CtsTestBase<> {
                          iree_host_size_t pattern_length,
                          std::vector<uint8_t>& out_data) {
     iree_hal_buffer_t* device_buffer = NULL;
-    CreateZeroedDeviceBuffer(buffer_size, &device_buffer);
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, &device_buffer));
 
     const bool indirect = recording_mode() == RecordingMode::kIndirect;
     const iree_host_size_t binding_capacity = indirect ? 1 : 0;

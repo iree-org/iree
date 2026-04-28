@@ -31,7 +31,7 @@ class CommandBufferStressTest : public CtsTestBase<> {};
 TEST_P(CommandBufferStressTest, RapidFillSubmit) {
   const iree_device_size_t buffer_size = 4096;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   for (int i = 0; i < 200; ++i) {
     uint32_t pattern = (uint32_t)(0xBEEF0000 | i);
@@ -63,8 +63,8 @@ TEST_P(CommandBufferStressTest, RapidCopySubmit) {
   const iree_device_size_t buffer_size = 4096;
   Ref<iree_hal_buffer_t> source;
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, source.out());
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, source.out()));
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   for (int i = 0; i < 200; ++i) {
     // Fill source with pattern via host mapping.
@@ -111,7 +111,7 @@ TEST_P(CommandBufferStressTest, LargeFillCommandBuffer) {
   static constexpr uint32_t kFillCount = 512;
   const iree_device_size_t buffer_size = kFillCount * sizeof(uint32_t);
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(

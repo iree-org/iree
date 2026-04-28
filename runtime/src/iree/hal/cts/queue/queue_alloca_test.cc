@@ -301,7 +301,8 @@ TEST_P(QueueAllocaTest, ExplicitTLSFPoolTransferAllocaDealloca) {
   ASSERT_NE(source_buffer.get(), nullptr);
 
   Ref<iree_hal_buffer_t> target_buffer;
-  CreateZeroedDeviceBuffer(allocation_size, target_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(allocation_size, target_buffer.out()));
 
   SemaphoreList fill_signal(device_, {0}, {1});
   uint32_t pattern = 0x711FA110u;

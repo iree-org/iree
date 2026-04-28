@@ -68,13 +68,14 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindings) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -119,13 +120,14 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -171,13 +173,14 @@ TEST_P(QueueDispatchTest, DispatchHostQueueEventProfiling) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -260,13 +263,14 @@ TEST_P(QueueDispatchTest, DispatchDeviceQueueEventProfiling) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -347,13 +351,14 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -394,14 +399,14 @@ TEST_P(QueueDispatchTest, NoopDispatchSignalsAndDoesNotTouchBuffers) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateFilledDeviceBuffer(4 * sizeof(uint32_t), uint32_t{99},
-                           output_buffer.out());
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer(4 * sizeof(uint32_t), uint32_t{99},
+                                          output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -434,14 +439,14 @@ TEST_P(QueueDispatchTest, DeferredNoopDispatch) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateFilledDeviceBuffer(4 * sizeof(uint32_t), uint32_t{99},
-                           output_buffer.out());
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer(4 * sizeof(uint32_t), uint32_t{99},
+                                          output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -482,13 +487,14 @@ TEST_P(QueueDispatchTest, DeferredWaitBeforeSignalDispatch) {
   Ref<iree_hal_buffer_t> input_buffer;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(input_data[0]),
-                               input_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
   }
 
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out());
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
 
   iree_hal_buffer_ref_t binding_refs[2];
   MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
@@ -563,24 +569,24 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
     CtsTestBase::TearDown();
   }
 
-  void CreateIndirectParameterBuffer(iree_hal_buffer_t** out_buffer) {
+  iree_status_t CreateIndirectParameterBuffer(iree_hal_buffer_t** out_buffer) {
     iree_hal_buffer_params_t params = {0};
     params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
                    IREE_HAL_BUFFER_USAGE_TRANSFER;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        device_allocator_, params, kParameterByteLength, out_buffer));
+    return iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                              kParameterByteLength, out_buffer);
   }
 
   void RunIndirectQueueDispatch(
       iree_hal_dispatch_flags_t flags,
       iree_device_size_t parameter_ref_length = kParameterByteLength) {
     Ref<iree_hal_buffer_t> output_buffer;
-    CreateFilledDeviceBuffer(kOutputByteLength, kSentinelValue,
-                             output_buffer.out());
+    IREE_ASSERT_OK(CreateFilledDeviceBuffer(kOutputByteLength, kSentinelValue,
+                                            output_buffer.out()));
 
     Ref<iree_hal_buffer_t> parameter_buffer;
-    CreateIndirectParameterBuffer(parameter_buffer.out());
+    IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
     const uint32_t parameter_data[3] = {
         kDispatchedWorkgroupCount,

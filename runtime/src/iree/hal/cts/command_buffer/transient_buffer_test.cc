@@ -231,7 +231,8 @@ TEST_P(TransientBufferTest, FillTransientBuffer1Byte) {
 TEST_P(TransientBufferTest, CopyToTransientBuffer) {
   const iree_device_size_t buffer_size = 512;
   Ref<iree_hal_buffer_t> source;
-  CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xAAAAAAAAu, source.out());
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xAAAAAAAAu,
+                                                    source.out()));
 
   iree_hal_buffer_t* raw = nullptr;
   IREE_ASSERT_OK(AllocateTransient(buffer_size, &raw));
@@ -268,7 +269,7 @@ TEST_P(TransientBufferTest, CopyFromTransientBuffer) {
 
   // Copy from transient to a regular buffer.
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {
     return iree_hal_command_buffer_copy_buffer(
@@ -299,7 +300,7 @@ TEST_P(TransientBufferTest, FillThenCopyInSingleCommandBuffer) {
   Ref<iree_hal_buffer_t> transient(raw);
 
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(buffer_size, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output.out()));
 
   uint32_t pattern = 0x11223344;
   IREE_ASSERT_OK(SubmitTransferAndWait([&](iree_hal_command_buffer_t* cmd) {

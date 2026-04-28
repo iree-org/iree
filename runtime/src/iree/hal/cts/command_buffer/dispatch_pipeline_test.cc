@@ -85,6 +85,12 @@ class DispatchPipelineTest : public CtsTestBase<> {
 
   // Records a full barrier between dispatch/transfer stages.
   void RecordBarrier(iree_hal_command_buffer_t* cmd) {
+    const iree_hal_memory_barrier_t memory_barrier = {
+        IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
+            IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE |
+            IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE,
+        IREE_HAL_ACCESS_SCOPE_DISPATCH_READ | IREE_HAL_ACCESS_SCOPE_MEMORY_READ,
+    };
     IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
         cmd,
         IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
@@ -92,7 +98,7 @@ class DispatchPipelineTest : public CtsTestBase<> {
         IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
             IREE_HAL_EXECUTION_STAGE_DISPATCH |
             IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 1, &memory_barrier, 0, nullptr));
   }
 
   iree_hal_executable_cache_t* executable_cache_ = nullptr;
@@ -105,9 +111,10 @@ class DispatchPipelineTest : public CtsTestBase<> {
 TEST_P(DispatchPipelineTest, UpdateThenDispatch) {
   std::vector<uint32_t> input_data = {1, 2, 3, 4};
   Ref<iree_hal_buffer_t> input;
-  CreateDeviceBufferWithData(input_data.data(), kBufferSize, input.out());
+  IREE_ASSERT_OK(
+      CreateDeviceBufferWithData(input_data.data(), kBufferSize, input.out()));
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(kBufferSize, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, output.out()));
 
   // Record: dispatch scale=2, offset=5.
   Ref<iree_hal_command_buffer_t> cmd;
@@ -139,11 +146,12 @@ TEST_P(DispatchPipelineTest, UpdateThenDispatch) {
 TEST_P(DispatchPipelineTest, ChainedDispatches) {
   std::vector<uint32_t> input_data = {1, 2, 3, 4};
   Ref<iree_hal_buffer_t> input;
-  CreateDeviceBufferWithData(input_data.data(), kBufferSize, input.out());
+  IREE_ASSERT_OK(
+      CreateDeviceBufferWithData(input_data.data(), kBufferSize, input.out()));
   Ref<iree_hal_buffer_t> intermediate;
-  CreateZeroedDeviceBuffer(kBufferSize, intermediate.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, intermediate.out()));
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(kBufferSize, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, output.out()));
 
   // Record: dispatch A → barrier → dispatch B.
   // Dispatch A: intermediate[i] = input[i] * 2 + 0 = [2, 4, 6, 8]
@@ -189,11 +197,11 @@ TEST_P(DispatchPipelineTest, ChainedDispatches) {
 // transitions.
 TEST_P(DispatchPipelineTest, FillDispatchDispatchPipeline) {
   Ref<iree_hal_buffer_t> input;
-  CreateZeroedDeviceBuffer(kBufferSize, input.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, input.out()));
   Ref<iree_hal_buffer_t> intermediate;
-  CreateZeroedDeviceBuffer(kBufferSize, intermediate.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, intermediate.out()));
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(kBufferSize, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, output.out()));
 
   // Record: fill → barrier → dispatch A → barrier → dispatch B.
   Ref<iree_hal_command_buffer_t> cmd;
@@ -266,7 +274,7 @@ TEST_P(DispatchPipelineTest, TransientInputPipeline) {
 
   // Persistent output buffer.
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(kBufferSize, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, output.out()));
 
   // Dispatch: output = transient_input * 4 + 1 = [21, 41, 61, 81]
   Ref<iree_hal_command_buffer_t> cmd;
@@ -333,11 +341,12 @@ TEST_P(DispatchPipelineTest, ReusablePipelineWithDifferentInputs) {
 
   for (size_t i = 0; i < IREE_ARRAYSIZE(cases); ++i) {
     Ref<iree_hal_buffer_t> input;
-    CreateDeviceBufferWithData(cases[i].input.data(), kBufferSize, input.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(cases[i].input.data(),
+                                              kBufferSize, input.out()));
     Ref<iree_hal_buffer_t> intermediate;
-    CreateZeroedDeviceBuffer(kBufferSize, intermediate.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, intermediate.out()));
     Ref<iree_hal_buffer_t> output;
-    CreateZeroedDeviceBuffer(kBufferSize, output.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBufferSize, output.out()));
 
     iree_hal_buffer_binding_t table[3] = {
         {input, 0, kBufferSize},

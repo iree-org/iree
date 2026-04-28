@@ -94,7 +94,7 @@ class QueueTransferTest : public CtsTestBase<> {
 TEST_P(QueueTransferTest, FillEntireBuffer_1Byte) {
   const iree_device_size_t buffer_size = 1024;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   uint8_t pattern = 0xAB;
   QueueFillAndWait(buffer, 0, buffer_size, &pattern, sizeof(pattern));
@@ -108,7 +108,7 @@ TEST_P(QueueTransferTest, FillEntireBuffer_1Byte) {
 TEST_P(QueueTransferTest, FillEntireBuffer_2Byte) {
   const iree_device_size_t buffer_size = 1024;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   uint16_t pattern = 0xBEEF;
   QueueFillAndWait(buffer, 0, buffer_size, &pattern, sizeof(pattern));
@@ -122,7 +122,7 @@ TEST_P(QueueTransferTest, FillEntireBuffer_2Byte) {
 TEST_P(QueueTransferTest, FillEntireBuffer_4Byte) {
   const iree_device_size_t buffer_size = 4096;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   uint32_t pattern = 0xDEADCAFE;
   QueueFillAndWait(buffer, 0, buffer_size, &pattern, sizeof(pattern));
@@ -138,7 +138,7 @@ TEST_P(QueueTransferTest, FillSubrange) {
   const iree_device_size_t fill_offset = 64;
   const iree_device_size_t fill_length = 128;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   uint32_t pattern = 0xCAFEF00D;
   QueueFillAndWait(buffer, fill_offset, fill_length, &pattern, sizeof(pattern));
@@ -164,7 +164,7 @@ TEST_P(QueueTransferTest, FillSubrange) {
 TEST_P(QueueTransferTest, FillLargeBuffer) {
   const iree_device_size_t buffer_size = 256 * 1024;  // 256KB
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   uint32_t pattern = 0x12345678;
   QueueFillAndWait(buffer, 0, buffer_size, &pattern, sizeof(pattern));
@@ -242,7 +242,7 @@ TEST_P(QueueTransferTest, FillSizeAlignmentAndPatternClasses) {
     const iree_device_size_t buffer_size =
         test_case.target_offset + test_case.fill_length + 16;
     Ref<iree_hal_buffer_t> buffer;
-    CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
     QueueFillAndWait(buffer, test_case.target_offset, test_case.fill_length,
                      &test_case.pattern, test_case.pattern_length);
@@ -264,7 +264,7 @@ TEST_P(QueueTransferTest, UpdateEntireBuffer) {
   const iree_device_size_t element_count = 64;
   const iree_device_size_t buffer_size = element_count * sizeof(uint32_t);
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   // Create host data with a recognizable sequence.
   std::vector<uint32_t> host_data(element_count);
@@ -282,7 +282,7 @@ TEST_P(QueueTransferTest, UpdateSubrange) {
   const iree_device_size_t update_offset = 32;
   const iree_device_size_t update_length = 64;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   // Source data: sequential bytes.
   std::vector<uint8_t> source(update_length);
@@ -307,7 +307,7 @@ TEST_P(QueueTransferTest, UpdateSubrange) {
 TEST_P(QueueTransferTest, UpdateWithSourceOffset) {
   const iree_device_size_t buffer_size = 64;
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   // Source has a header we want to skip.
   std::vector<uint8_t> source(128);
@@ -333,7 +333,7 @@ TEST_P(QueueTransferTest, UpdateLargerThanCommandBufferLimit) {
 
   std::vector<uint8_t> source = MakeDeterministicBytes(source_size);
   Ref<iree_hal_buffer_t> buffer;
-  CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
   QueueUpdateAndWait(source.data(), source_offset, buffer, target_offset,
                      update_length);
@@ -371,7 +371,7 @@ TEST_P(QueueTransferTest, UpdateSizeAndAlignmentClasses) {
     std::vector<uint8_t> source = MakeDeterministicBytes(source_size);
 
     Ref<iree_hal_buffer_t> buffer;
-    CreateZeroedDeviceBuffer(buffer_size, buffer.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
 
     QueueUpdateAndWait(source.data(), test_case.source_offset, buffer,
                        test_case.target_offset, test_case.update_length);
@@ -392,9 +392,10 @@ TEST_P(QueueTransferTest, UpdateSizeAndAlignmentClasses) {
 TEST_P(QueueTransferTest, CopyEntireBuffer) {
   const iree_device_size_t buffer_size = 512;
   Ref<iree_hal_buffer_t> source;
-  CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xAAAAAAAAu, source.out());
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xAAAAAAAAu,
+                                                    source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   QueueCopyAndWait(source, 0, target, 0, buffer_size);
 
@@ -413,10 +414,11 @@ TEST_P(QueueTransferTest, CopyWithOffsets) {
   std::vector<uint32_t> source_data(buffer_size / sizeof(uint32_t));
   std::iota(source_data.begin(), source_data.end(), 0u);
   Ref<iree_hal_buffer_t> source;
-  CreateDeviceBufferWithData(source_data.data(), buffer_size, source.out());
+  IREE_ASSERT_OK(CreateDeviceBufferWithData(source_data.data(), buffer_size,
+                                            source.out()));
 
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   QueueCopyAndWait(source, source_offset, target, target_offset, copy_length);
 
@@ -440,9 +442,10 @@ TEST_P(QueueTransferTest, CopyWithOffsets) {
 TEST_P(QueueTransferTest, CopyLargeBuffer) {
   const iree_device_size_t buffer_size = 256 * 1024;  // 256KB
   Ref<iree_hal_buffer_t> source;
-  CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xFEEDFACEu, source.out());
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer<uint32_t>(buffer_size, 0xFEEDFACEu,
+                                                    source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   QueueCopyAndWait(source, 0, target, 0, buffer_size);
 
@@ -482,9 +485,10 @@ TEST_P(QueueTransferTest, CopySizeAndAlignmentClasses) {
 
     std::vector<uint8_t> source_data = MakeDeterministicBytes(buffer_size);
     Ref<iree_hal_buffer_t> source;
-    CreateDeviceBufferWithData(source_data.data(), buffer_size, source.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(source_data.data(), buffer_size,
+                                              source.out()));
     Ref<iree_hal_buffer_t> target;
-    CreateZeroedDeviceBuffer(buffer_size, target.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
     QueueCopyAndWait(source, source_offset, target, target_offset, length);
 
@@ -510,9 +514,10 @@ TEST_P(QueueTransferTest, CopySizeAndAlignmentClasses) {
 // operations that have no explicit semaphore dependencies.
 TEST_P(QueueTransferTest, BurstCopySubmit) {
   Ref<iree_hal_buffer_t> source;
-  CreateZeroedDeviceBuffer(kBurstCopySize, source.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBurstCopySize, source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(kBurstCopySize * kBurstSubmitCount, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kBurstCopySize * kBurstSubmitCount,
+                                          target.out()));
 
   for (int iteration = 0; iteration < kBurstSubmitIterations; ++iteration) {
     uint32_t pattern = (uint32_t)(0xC0DE0000 | iteration);
@@ -551,9 +556,9 @@ TEST_P(QueueTransferTest, BurstCopySubmit) {
 TEST_P(QueueTransferTest, FillAndCopyHostQueueEventProfiling) {
   const iree_device_size_t buffer_size = 128;
   Ref<iree_hal_buffer_t> source;
-  CreateZeroedDeviceBuffer(buffer_size, source.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   TestProfileSink sink = {};
   TestProfileSinkInitialize(&sink);
@@ -646,9 +651,9 @@ TEST_P(QueueTransferTest, FillAndCopyHostQueueEventProfiling) {
 TEST_P(QueueTransferTest, ChainedFillThenCopy) {
   const iree_device_size_t buffer_size = 512;
   Ref<iree_hal_buffer_t> source;
-  CreateZeroedDeviceBuffer(buffer_size, source.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   // Fill signals semaphore at value 1.
   SemaphoreList fill_signal(device_, {0}, {1});
@@ -680,9 +685,9 @@ TEST_P(QueueTransferTest, ChainedUpdateThenCopy) {
   const iree_device_size_t element_count = 32;
   const iree_device_size_t buffer_size = element_count * sizeof(uint32_t);
   Ref<iree_hal_buffer_t> source;
-  CreateZeroedDeviceBuffer(buffer_size, source.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   std::vector<uint32_t> host_data(element_count);
   std::iota(host_data.begin(), host_data.end(), 42u);
@@ -712,9 +717,9 @@ TEST_P(QueueTransferTest, ChainedUpdateThenCopy) {
 TEST_P(QueueTransferTest, ChainedFillCopyFill) {
   const iree_device_size_t buffer_size = 256;
   Ref<iree_hal_buffer_t> buffer_a;
-  CreateZeroedDeviceBuffer(buffer_size, buffer_a.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer_a.out()));
   Ref<iree_hal_buffer_t> buffer_b;
-  CreateZeroedDeviceBuffer(buffer_size, buffer_b.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer_b.out()));
 
   SemaphoreList empty_wait;
 
@@ -771,9 +776,9 @@ TEST_P(QueueTransferTest, BarrierSignals) {
 TEST_P(QueueTransferTest, BarrierPreservesOrdering) {
   const iree_device_size_t buffer_size = 256;
   Ref<iree_hal_buffer_t> source;
-  CreateZeroedDeviceBuffer(buffer_size, source.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, source.out()));
   Ref<iree_hal_buffer_t> target;
-  CreateZeroedDeviceBuffer(buffer_size, target.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target.out()));
 
   SemaphoreList empty_wait;
 

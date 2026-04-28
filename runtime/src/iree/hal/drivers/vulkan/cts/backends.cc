@@ -119,17 +119,6 @@ static bool vulkan_registered_ =
           },
           /*expected_failures=*/
           {
-              {"DispatchIndirectParametersTest.DynamicParametersFromUpdate",
-               "The AMD Vulkan path does not observe dynamic indirect "
-               "dispatch parameters written by a preceding command-buffer "
-               "update before the indirect dispatch."},
-              {"DispatchIndirectParametersTest.DynamicParametersFromDispatch",
-               "The AMD Vulkan path does not observe dynamic indirect "
-               "dispatch parameters written by a preceding dispatch before "
-               "the consuming indirect dispatch."},
-              {"DispatchPipelineTest.FillDispatchDispatchPipeline",
-               "The AMD Vulkan path observes the pre-dispatch fill but not "
-               "the following dispatch result in the same command buffer."},
               {"QueueAllocaTest.FailedDeallocaWaitDoesNotDealloca",
                "Vulkan queue_execute does not yet propagate failed wait "
                "dependencies before encoding GPU waits, so a failed wait can "

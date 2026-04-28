@@ -155,7 +155,7 @@ TEST_P(DispatchReuseTest, ResubmitWithDifferentBindings) {
   // Submit 3 times, each with a different output buffer.
   for (int iteration = 0; iteration < 3; ++iteration) {
     Ref<iree_hal_buffer_t> output;
-    CreateZeroedDeviceBuffer(buffer_size, output.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output.out()));
 
     iree_hal_buffer_binding_t bindings[1] = {{
         /*buffer=*/output,
@@ -187,7 +187,7 @@ TEST_P(DispatchReuseTest, LargeWorkgroupCount) {
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
   Ref<iree_hal_buffer_t> output;
-  CreateZeroedDeviceBuffer(buffer_size, output.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output.out()));
 
   iree_hal_buffer_binding_t bindings[1] = {{output, 0, buffer_size}};
   iree_hal_buffer_binding_table_t binding_table = {1, bindings};
@@ -209,10 +209,12 @@ TEST_P(DispatchReuseTest, MixedDirectAndIndirectBindings) {
       kElementCount * sizeof(float);
 
   Ref<iree_hal_buffer_t> input;
-  CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, input.out());
+  IREE_ASSERT_OK(
+      CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, input.out()));
 
   Ref<iree_hal_buffer_t> output;
-  CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out());
+  IREE_ASSERT_OK(
+      CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -266,10 +268,11 @@ TEST_P(DispatchReuseTest, DeferredExecuteRetainsDispatchBindingTable) {
       kElementCount * sizeof(float);
 
   iree_hal_buffer_t* input = nullptr;
-  CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, &input);
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer<float>(kByteLength, -2.5f, &input));
 
   Ref<iree_hal_buffer_t> output;
-  CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out());
+  IREE_ASSERT_OK(
+      CreateFilledDeviceBuffer<float>(kByteLength, -9.0f, output.out()));
 
   iree_hal_command_buffer_t* command_buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -530,9 +533,9 @@ TEST_P(DispatchReuseTest, MultipleDispatchesInSingleCommandBuffer) {
 
   // Submit with two different output buffers in the binding table.
   Ref<iree_hal_buffer_t> output_a;
-  CreateZeroedDeviceBuffer(buffer_size, output_a.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output_a.out()));
   Ref<iree_hal_buffer_t> output_b;
-  CreateZeroedDeviceBuffer(buffer_size, output_b.out());
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output_b.out()));
 
   iree_hal_buffer_binding_t table_bindings[2] = {
       {output_a, 0, buffer_size},
@@ -607,9 +610,9 @@ TEST_P(DispatchReuseTest, MultiDispatchMultiResubmit) {
   // Submit 5 times with different buffer pairs each time.
   for (int iteration = 0; iteration < 5; ++iteration) {
     Ref<iree_hal_buffer_t> out_a;
-    CreateZeroedDeviceBuffer(buffer_size, out_a.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, out_a.out()));
     Ref<iree_hal_buffer_t> out_b;
-    CreateZeroedDeviceBuffer(buffer_size, out_b.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, out_b.out()));
 
     iree_hal_buffer_binding_t table_bindings[2] = {
         {out_a, 0, buffer_size},

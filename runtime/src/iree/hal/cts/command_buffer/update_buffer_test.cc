@@ -50,7 +50,7 @@ TEST_P(CommandBufferUpdateBufferTest, WholeBuffer) {
                                      0xA5, 0xA6, 0xA7, 0xA8};
 
   iree_hal_buffer_t* device_buffer = NULL;
-  CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -86,7 +86,7 @@ TEST_P(CommandBufferUpdateBufferTest, LargerPayload) {
   }
 
   iree_hal_buffer_t* device_buffer = NULL;
-  CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -122,7 +122,7 @@ TEST_P(CommandBufferUpdateBufferTest, WithOffsets) {
                                      0xA5, 0xA6, 0xA7, 0xA8};
 
   iree_hal_buffer_t* device_buffer = NULL;
-  CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer));
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -162,7 +162,7 @@ TEST_P(CommandBufferUpdateBufferTest, Subspan) {
                                      0xA5, 0xA6, 0xA7, 0xA8};
 
   iree_hal_buffer_t* device_buffer = NULL;
-  CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(target_buffer_size, &device_buffer));
 
   // Create a subspan of the device buffer.
   iree_device_size_t subspan_length = 8;

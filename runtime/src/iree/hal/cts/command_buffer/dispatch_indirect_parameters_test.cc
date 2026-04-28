@@ -69,18 +69,19 @@ class DispatchIndirectParametersTest : public CtsTestBase<> {
     CtsTestBase::TearDown();
   }
 
-  void CreateIndirectParameterBuffer(iree_hal_buffer_t** out_buffer) {
+  iree_status_t CreateIndirectParameterBuffer(iree_hal_buffer_t** out_buffer) {
     iree_hal_buffer_params_t params = {0};
     params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
                    IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        device_allocator_, params, kParameterByteLength, out_buffer));
+    return iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                              kParameterByteLength, out_buffer);
   }
 
-  void CreateSentinelOutputBuffer(iree_hal_buffer_t** out_buffer) {
-    CreateFilledDeviceBuffer(kOutputByteLength, kSentinelValue, out_buffer);
+  iree_status_t CreateSentinelOutputBuffer(iree_hal_buffer_t** out_buffer) {
+    return CreateFilledDeviceBuffer(kOutputByteLength, kSentinelValue,
+                                    out_buffer);
   }
 
   iree_host_size_t binding_capacity() const {
@@ -157,16 +158,25 @@ class DispatchIndirectParametersTest : public CtsTestBase<> {
   }
 
   void RecordFullExecutionBarrier(iree_hal_command_buffer_t* command_buffer) {
+    const iree_hal_memory_barrier_t memory_barrier = {
+        IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
+            IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE |
+            IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE,
+        IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ |
+            IREE_HAL_ACCESS_SCOPE_DISPATCH_READ |
+            IREE_HAL_ACCESS_SCOPE_MEMORY_READ,
+    };
     IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
         command_buffer,
         /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |
             IREE_HAL_EXECUTION_STAGE_TRANSFER |
             IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
         /*target_stage_mask=*/IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
+            IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS |
             IREE_HAL_EXECUTION_STAGE_DISPATCH |
             IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/0,
-        /*memory_barriers=*/nullptr,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/1,
+        /*memory_barriers=*/&memory_barrier,
         /*buffer_barrier_count=*/0, /*buffer_barriers=*/nullptr));
   }
 
@@ -192,10 +202,10 @@ class DispatchIndirectParametersTest : public CtsTestBase<> {
 
 TEST_P(DispatchIndirectParametersTest, StaticParametersFromQueueUpdate) {
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateSentinelOutputBuffer(output_buffer.out());
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
 
   Ref<iree_hal_buffer_t> parameter_buffer;
-  CreateIndirectParameterBuffer(parameter_buffer.out());
+  IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -237,10 +247,10 @@ TEST_P(DispatchIndirectParametersTest, StaticParametersFromQueueUpdate) {
 
 TEST_P(DispatchIndirectParametersTest, WholeBufferParameterRef) {
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateSentinelOutputBuffer(output_buffer.out());
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
 
   Ref<iree_hal_buffer_t> parameter_buffer;
-  CreateIndirectParameterBuffer(parameter_buffer.out());
+  IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -283,10 +293,10 @@ TEST_P(DispatchIndirectParametersTest, WholeBufferParameterRef) {
 
 TEST_P(DispatchIndirectParametersTest, DynamicParametersFromUpdate) {
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateSentinelOutputBuffer(output_buffer.out());
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
 
   Ref<iree_hal_buffer_t> parameter_buffer;
-  CreateIndirectParameterBuffer(parameter_buffer.out());
+  IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -312,10 +322,10 @@ TEST_P(DispatchIndirectParametersTest, DynamicParametersFromUpdate) {
 
 TEST_P(DispatchIndirectParametersTest, DynamicParametersFromFill) {
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateSentinelOutputBuffer(output_buffer.out());
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
 
   Ref<iree_hal_buffer_t> parameter_buffer;
-  CreateIndirectParameterBuffer(parameter_buffer.out());
+  IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -345,10 +355,10 @@ TEST_P(DispatchIndirectParametersTest, DynamicParametersFromFill) {
 
 TEST_P(DispatchIndirectParametersTest, DynamicParametersFromDispatch) {
   Ref<iree_hal_buffer_t> output_buffer;
-  CreateSentinelOutputBuffer(output_buffer.out());
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
 
   Ref<iree_hal_buffer_t> parameter_buffer;
-  CreateIndirectParameterBuffer(parameter_buffer.out());
+  IREE_ASSERT_OK(CreateIndirectParameterBuffer(parameter_buffer.out()));
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(

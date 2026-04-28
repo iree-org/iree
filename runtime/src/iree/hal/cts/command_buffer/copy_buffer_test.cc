@@ -65,10 +65,10 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
 
     std::vector<uint8_t> source_data = MakeDeterministicBytes(buffer_size);
     Ref<iree_hal_buffer_t> source_buffer;
-    CreateDeviceBufferWithData(source_data.data(), buffer_size,
-                               source_buffer.out());
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(source_data.data(), buffer_size,
+                                              source_buffer.out()));
     Ref<iree_hal_buffer_t> target_buffer;
-    CreateZeroedDeviceBuffer(buffer_size, target_buffer.out());
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target_buffer.out()));
 
     Ref<iree_hal_command_buffer_t> command_buffer;
     IREE_ASSERT_OK(iree_hal_command_buffer_create(
