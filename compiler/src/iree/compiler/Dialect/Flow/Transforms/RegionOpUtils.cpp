@@ -920,6 +920,11 @@ hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
         isa<IREE::Flow::DispatchRegionOp>(dispatchOp)) {
       return true;
     }
+
+    if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(user);
+        insertSlice && use.get() == insertSlice.getDest()) {
+      return true;
+    }
   }
   return false;
 }
