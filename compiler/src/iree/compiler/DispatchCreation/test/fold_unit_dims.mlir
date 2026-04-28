@@ -549,3 +549,52 @@ util.func public @no_fold_attention_with_non_collapsible_encoding(%arg0 : tensor
 //  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]]
 //  CHECK-SAME:     outs(%[[EMPTY]]
 //       CHECK:   util.return %[[ATTN]]
+
+// -----
+
+util.func public @online_attention_unit_m_dim(
+    %arg0: tensor<8x4x1x128xf32>,
+    %arg1: tensor<?x32x8x128xf32>,
+    %arg2: tensor<?x32x8x128xf32>,
+    %arg3: f32,
+    %arg4: tensor<8x4x1x128xf32>,
+    %arg5: tensor<8x4x1xf32>,
+    %arg6: tensor<8x4x1xf32>) -> (tensor<8x4x1x128xf32>, tensor<8x4x1xf32>, tensor<8x4x1xf32>) {
+  %result:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d4)>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]}
+    ins(%arg0, %arg1, %arg2, %arg3
+      : tensor<8x4x1x128xf32>, tensor<?x32x8x128xf32>,
+        tensor<?x32x8x128xf32>, f32)
+    outs(%arg4, %arg5, %arg6
+      : tensor<8x4x1x128xf32>, tensor<8x4x1xf32>, tensor<8x4x1xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<8x4x1x128xf32>, tensor<8x4x1xf32>, tensor<8x4x1xf32>
+  util.return %result#0, %result#1, %result#2
+    : tensor<8x4x1x128xf32>, tensor<8x4x1xf32>, tensor<8x4x1xf32>
+}
+// CHECK-LABEL: func public @online_attention_unit_m_dim
+//       CHECK:   %[[ATTN:.+]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d0, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d0, d2)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1)>
+//  CHECK-SAME:     ins({{.+}} : tensor<8x4x128xf32>, tensor<?x32x8x128xf32>, tensor<?x32x8x128xf32>, f32)
+//  CHECK-SAME:     outs({{.+}} : tensor<8x4x128xf32>, tensor<8x4xf32>, tensor<8x4xf32>)
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ATTN]]#0
+//  CHECK-SAME:     tensor<8x4x128xf32> into tensor<8x4x1x128xf32>
+//       CHECK:   %[[EXPAND1:.+]] = tensor.expand_shape %[[ATTN]]#1
+//  CHECK-SAME:     tensor<8x4xf32> into tensor<8x4x1xf32>
+//       CHECK:   %[[EXPAND2:.+]] = tensor.expand_shape %[[ATTN]]#2
+//  CHECK-SAME:     tensor<8x4xf32> into tensor<8x4x1xf32>
+//       CHECK:   util.return %[[EXPAND]], %[[EXPAND1]], %[[EXPAND2]]

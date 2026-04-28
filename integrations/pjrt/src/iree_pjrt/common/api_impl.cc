@@ -901,8 +901,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       {1, &transfer_timeline_, &wait_transfer_start},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length,
-      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      /*pool=*/NULL, params, byte_length, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Queue up the buffer fill for splatting:
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
@@ -978,8 +977,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceZeroDim(
       {1, &transfer_timeline_, &wait_transfer_start},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params,
-      iree_hal_element_dense_byte_count(element_type),
+      /*pool=*/NULL, params, iree_hal_element_dense_byte_count(element_type),
       IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Wrap in a buffer view and return.
@@ -1244,8 +1242,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
       {1, &transfer_timeline_, &wait_transfer_start},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_alloca_complete},
-      IREE_HAL_ALLOCATOR_POOL_DEFAULT, params, byte_length,
-      IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
+      /*pool=*/NULL, params, byte_length, IREE_HAL_ALLOCA_FLAG_NONE, &buffer));
 
   // Queue up the transfer command.
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;

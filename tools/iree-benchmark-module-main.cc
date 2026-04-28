@@ -153,6 +153,8 @@ IREE_FLAG_CALLBACK(
     parse_time_unit, print_time_unit, &FLAG_time_unit, time_unit,
     "The time unit to be printed in the results. Can be 'ms', 'us', or 'ns'.");
 
+static iree_hal_profiling_from_flags_t* g_profiling = nullptr;
+
 namespace iree {
 namespace {
 
@@ -182,7 +184,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
     IREE_TRACE_ZONE_END(z1);
     if (device) {
       state.PauseTiming();
-      IREE_CHECK_OK(iree_hal_device_profiling_flush(device));
+      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(g_profiling));
       state.ResumeTiming();
     }
   }
@@ -338,7 +340,7 @@ static void BenchmarkAsyncFunction(
 
     IREE_TRACE_ZONE_END(z1);
     if (device) {
-      IREE_CHECK_OK(iree_hal_device_profiling_flush(device));
+      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(g_profiling));
     }
     state.ResumeTiming();
   }
@@ -630,9 +632,11 @@ static int runMain(int argc, char** argv) {
     IREE_TRACE_ZONE_END(z0);
     return exit_code;
   }
-  IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(iree_benchmark.device()));
+  IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(
+      iree_benchmark.device(), iree_allocator_system(), &g_profiling));
   ::benchmark::RunSpecifiedBenchmarks();
-  IREE_CHECK_OK(iree_hal_end_profiling_from_flags(iree_benchmark.device()));
+  IREE_CHECK_OK(iree_hal_end_profiling_from_flags(g_profiling));
+  g_profiling = nullptr;
 
   IREE_TRACE_ZONE_END(z0);
   return EXIT_SUCCESS;

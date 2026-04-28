@@ -92,12 +92,12 @@ iree_async_frontier_comparison_t iree_async_frontier_compare(
   return IREE_ASYNC_FRONTIER_EQUAL;
 }
 
-iree_status_t iree_async_frontier_merge(iree_async_frontier_t* target,
-                                        uint8_t target_capacity,
-                                        const iree_async_frontier_t* source) {
+bool iree_async_frontier_merge(iree_async_frontier_t* target,
+                               uint8_t target_capacity,
+                               const iree_async_frontier_t* source) {
   // Path 1: source empty — nothing to merge.
   if (source->entry_count == 0) {
-    return iree_ok_status();
+    return true;
   }
 
   // Path 2: same axis set — epoch-max in place, zero entry movement.
@@ -116,7 +116,7 @@ iree_status_t iree_async_frontier_merge(iree_async_frontier_t* target,
           target->entries[k].epoch = source->entries[k].epoch;
         }
       }
-      return iree_ok_status();
+      return true;
     }
   }
 
@@ -142,10 +142,7 @@ iree_status_t iree_async_frontier_merge(iree_async_frontier_t* target,
   }
 
   if (merged_count > target_capacity) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "frontier merge would produce %" PRIu16
-                            " entries but target capacity is %" PRIu8,
-                            merged_count, target_capacity);
+    return false;
   }
 
   // Second pass: merge right-to-left (in-place, no scratch buffer).
@@ -185,7 +182,7 @@ iree_status_t iree_async_frontier_merge(iree_async_frontier_t* target,
   // which equals 0..wi at this point — no movement needed.
 
   target->entry_count = (uint8_t)merged_count;
-  return iree_ok_status();
+  return true;
 }
 
 bool iree_async_frontier_is_satisfied(

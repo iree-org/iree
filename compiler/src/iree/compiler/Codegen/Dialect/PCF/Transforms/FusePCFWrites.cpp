@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFTypes.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -15,6 +16,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
+
+#include <cassert>
 
 #define DEBUG_TYPE "iree-pcf-fuse-pcf-writes"
 
@@ -63,6 +66,53 @@ void FusePCFWritesPass::runOnOperation() {
 }
 
 } // namespace
+
+void composeNestedSliceParameters(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> outerOffsets,
+    ArrayRef<OpFoldResult> outerSizes, ArrayRef<OpFoldResult> outerStrides,
+    ArrayRef<OpFoldResult> innerOffsets, ArrayRef<OpFoldResult> innerSizes,
+    ArrayRef<OpFoldResult> innerStrides,
+    SmallVectorImpl<OpFoldResult> &composedOffsets,
+    SmallVectorImpl<OpFoldResult> &composedSizes,
+    SmallVectorImpl<OpFoldResult> &composedStrides) {
+  assert(outerOffsets.size() == outerSizes.size() &&
+         "outer slice offsets/sizes length mismatch");
+  assert(outerOffsets.size() == outerStrides.size() &&
+         "outer slice offsets/strides length mismatch");
+  assert(innerOffsets.size() == innerSizes.size() &&
+         "inner slice offsets/sizes length mismatch");
+  assert(innerOffsets.size() == innerStrides.size() &&
+         "inner slice offsets/strides length mismatch");
+  assert(outerOffsets.size() >= innerOffsets.size() &&
+         "inner slice rank cannot exceed outer slice rank");
+
+  composedOffsets.clear();
+  composedSizes.clear();
+  composedStrides.clear();
+  composedOffsets.reserve(outerOffsets.size());
+  composedSizes.reserve(outerOffsets.size());
+  composedStrides.reserve(outerOffsets.size());
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr composeOffExpr = s0 + s1 * s2;
+  AffineExpr mulExpr = s0 * s1;
+
+  for (int64_t i = 0, e = innerOffsets.size(); i < e; ++i) {
+    composedOffsets.push_back(affine::makeComposedFoldedAffineApply(
+        rewriter, loc, composeOffExpr,
+        {outerOffsets[i], innerOffsets[i], outerStrides[i]}));
+    composedSizes.push_back(innerSizes[i]);
+    composedStrides.push_back(affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulExpr, {outerStrides[i], innerStrides[i]}));
+  }
+
+  for (int64_t i = innerOffsets.size(), e = outerOffsets.size(); i < e; ++i) {
+    composedOffsets.push_back(outerOffsets[i]);
+    composedSizes.push_back(outerSizes[i]);
+    composedStrides.push_back(outerStrides[i]);
+  }
+}
 
 FailureOr<PCF::WriteSliceOp>
 composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
@@ -133,47 +183,24 @@ composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
   // - sizes: insertSlice.sizes
   // - strides: writeSlice.strides * insertSlice.strides
 
-  SmallVector<OpFoldResult> composedOffsets;
-  SmallVector<OpFoldResult> composedSizes = insertSliceOp.getMixedSizes();
-  SmallVector<OpFoldResult> composedStrides;
-
   OpBuilder::InsertionGuard guard(rewriter);
   // Insert before the in_parallel terminator, not inside it.
   rewriter.setInsertionPoint(inParallelOp);
 
   SmallVector<OpFoldResult> writeOffsets = writeSliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> writeSizes = writeSliceOp.getMixedSizes();
   SmallVector<OpFoldResult> insertOffsets = insertSliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> insertSizes = insertSliceOp.getMixedSizes();
   SmallVector<OpFoldResult> writeStrides = writeSliceOp.getMixedStrides();
   SmallVector<OpFoldResult> insertStrides = insertSliceOp.getMixedStrides();
 
-  // Compose offsets: writeOffset + insertOffset * writeStride.
-  for (auto [writeOffset, insertOffset, writeStride] :
-       llvm::zip_equal(writeOffsets, insertOffsets, writeStrides)) {
-    Value writeOffsetVal = getValueOrCreateConstantIndexOp(
-        rewriter, insertSliceOp.getLoc(), writeOffset);
-    Value insertOffsetVal = getValueOrCreateConstantIndexOp(
-        rewriter, insertSliceOp.getLoc(), insertOffset);
-    Value writeStrideVal = getValueOrCreateConstantIndexOp(
-        rewriter, insertSliceOp.getLoc(), writeStride);
-
-    Value scaled = rewriter.createOrFold<arith::MulIOp>(
-        insertSliceOp.getLoc(), insertOffsetVal, writeStrideVal);
-    Value composed = rewriter.createOrFold<arith::AddIOp>(
-        insertSliceOp.getLoc(), writeOffsetVal, scaled);
-    composedOffsets.push_back(composed);
-  }
-
-  // Compose strides: writeStride * insertStride.
-  for (auto [writeStride, insertStride] :
-       llvm::zip_equal(writeStrides, insertStrides)) {
-    Value writeStrideVal = getValueOrCreateConstantIndexOp(
-        rewriter, insertSliceOp.getLoc(), writeStride);
-    Value insertStrideVal = getValueOrCreateConstantIndexOp(
-        rewriter, insertSliceOp.getLoc(), insertStride);
-    Value composed = rewriter.createOrFold<arith::MulIOp>(
-        insertSliceOp.getLoc(), writeStrideVal, insertStrideVal);
-    composedStrides.push_back(composed);
-  }
+  SmallVector<OpFoldResult> composedOffsets;
+  SmallVector<OpFoldResult> composedSizes;
+  SmallVector<OpFoldResult> composedStrides;
+  composeNestedSliceParameters(rewriter, insertSliceOp.getLoc(), writeOffsets,
+                               writeSizes, writeStrides, insertOffsets,
+                               insertSizes, insertStrides, composedOffsets,
+                               composedSizes, composedStrides);
 
   // Handle rank-reduced parallel_insert_slice sources.
   // The source may have fewer dimensions than the destination sref (e.g.,

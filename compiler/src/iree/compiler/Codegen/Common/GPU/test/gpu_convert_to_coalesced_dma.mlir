@@ -605,12 +605,56 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 
   // Source row size (121 * 2 = 242 bytes) is not DWORD-aligned.
   // Coalesced DMA bails out to avoid partial OOB in per-DWORD range checking.
-  // The linalg.copy should remain unchanged.
+  // The copy is downgraded from use_global_load_dma to derived_thread_config.
   // CHECK: tensor.pad
-  // CHECK: linalg.copy
+  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
 
   return %result : tensor<4x124xf16>
+}
+
+// -----
+
+// Negative test: Dynamic innermost dimension fails DWORD alignment check.
+
+#gpu_target_pad_dynamic_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_pad_dynamic_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_dynamic_inner}>
+#translation_pad_dynamic_inner = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_with_tensor_pad_dynamic_inner_dim
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<457x330xi8>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x256xi8>
+func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %init: tensor<4x256xi8>, %off: index, %sz_m: index, %sz_k: index, %high_m: index, %high_k: index) -> tensor<4x256xi8>
+  attributes {hal.executable.target = #exec_target_pad_dynamic_inner, translation_info = #translation_pad_dynamic_inner} {
+  // Extract a dynamic slice where both dimensions are dynamic.
+  %extracted = tensor.extract_slice %source[%off, 0] [%sz_m, %sz_k] [1, 1]
+      : tensor<457x330xi8> to tensor<?x?xi8>
+
+  // Pad to static size.
+  %cst = arith.constant 0 : i8
+  %padded = tensor.pad %extracted low[0, 0] high[%high_m, %high_k] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : i8
+  } : tensor<?x?xi8> to tensor<4x256xi8>
+
+  // Copy from padded tensor.
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<4x256xi8>)
+    outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
+
+  // The copy is downgraded from use_global_load_dma to derived_thread_config.
+  // CHECK: tensor.pad
+  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<4x256xi8>
 }
 
 // -----

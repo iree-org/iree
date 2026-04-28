@@ -1017,5 +1017,474 @@ TEST(GroundTruthInvarianceTest, AllBufferSizesProduceIdenticalOutput) {
   iree_tokenizer_free(tokenizer);
 }
 
+//===----------------------------------------------------------------------===//
+// Pair Encoding Tests (BERT TemplateProcessing)
+//===----------------------------------------------------------------------===//
+
+// Helper: batch-encode a single (text, text_pair) item with ADD_SPECIAL_TOKENS.
+// Returns {token_ids, type_ids} vectors.
+struct PairEncodeResult {
+  std::vector<iree_tokenizer_token_id_t> token_ids;
+  std::vector<uint8_t> type_ids;
+};
+
+struct PairEncodeDetailedResult {
+  std::vector<iree_tokenizer_token_id_t> token_ids;
+  std::vector<uint8_t> type_ids;
+  std::vector<iree_tokenizer_offset_t> token_offsets;
+};
+
+static StatusOr<PairEncodeResult> EncodePair(iree_tokenizer_t* tokenizer,
+                                             iree_string_view_t text,
+                                             iree_string_view_t text_pair) {
+  iree_host_size_t state_size = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_tokenizer_encode_state_calculate_size(tokenizer, &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+
+  std::vector<iree_tokenizer_token_id_t> token_ids(256);
+  std::vector<uint8_t> type_ids(256, 0xFF);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = text;
+  item.text_pair = text_pair;
+  item.flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  item.output = iree_tokenizer_make_token_output(token_ids.data(), nullptr,
+                                                 type_ids.data(), 256);
+  item.out_token_count = 0;
+
+  IREE_RETURN_IF_ERROR(iree_tokenizer_encode_batch(
+      tokenizer, &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty()));
+
+  token_ids.resize(item.out_token_count);
+  type_ids.resize(item.out_token_count);
+  return PairEncodeResult{std::move(token_ids), std::move(type_ids)};
+}
+
+static StatusOr<PairEncodeDetailedResult> EncodePairDetailed(
+    iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_string_view_t text_pair, iree_host_size_t output_capacity,
+    bool track_offsets) {
+  iree_host_size_t state_size = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_tokenizer_encode_state_calculate_size(tokenizer, &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+  std::vector<iree_tokenizer_offset_run_t> offset_runs(256);
+
+  iree_host_size_t storage_capacity = output_capacity > 0 ? output_capacity : 1;
+  std::vector<iree_tokenizer_token_id_t> token_ids(storage_capacity);
+  std::vector<uint8_t> type_ids(storage_capacity, 0xFF);
+  std::vector<iree_tokenizer_offset_t> token_offsets(storage_capacity);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = text;
+  item.text_pair = text_pair;
+  item.flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  item.output = iree_tokenizer_make_token_output(
+      token_ids.data(), track_offsets ? token_offsets.data() : nullptr,
+      type_ids.data(), output_capacity);
+
+  iree_tokenizer_offset_run_list_t offset_run_list = {
+      /*.capacity=*/offset_runs.size(),
+      /*.values=*/offset_runs.data(),
+  };
+  IREE_RETURN_IF_ERROR(iree_tokenizer_encode_batch(
+      tokenizer, &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      track_offsets ? offset_run_list
+                    : iree_tokenizer_offset_run_list_empty()));
+
+  token_ids.resize(item.out_token_count);
+  type_ids.resize(item.out_token_count);
+  token_offsets.resize(track_offsets ? item.out_token_count : 0);
+  return PairEncodeDetailedResult{std::move(token_ids), std::move(type_ids),
+                                  std::move(token_offsets)};
+}
+
+// Helper: batch-encode single-sequence with ADD_SPECIAL_TOKENS.
+static StatusOr<std::vector<iree_tokenizer_token_id_t>> EncodeSingle(
+    iree_tokenizer_t* tokenizer, iree_string_view_t text) {
+  iree_host_size_t state_size = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_tokenizer_encode_state_calculate_size(tokenizer, &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+
+  std::vector<iree_tokenizer_token_id_t> token_ids(256);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = text;
+  item.output =
+      iree_tokenizer_make_token_output(token_ids.data(), nullptr, nullptr, 256);
+  item.out_token_count = 0;
+
+  IREE_RETURN_IF_ERROR(iree_tokenizer_encode_batch(
+      tokenizer, &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty()));
+
+  token_ids.resize(item.out_token_count);
+  return token_ids;
+}
+
+TEST(PairEncode, BertSingleSequence) {
+  // Verify single-sequence encoding still works with the BERT pair tokenizer.
+  // Expected: [CLS]=101, "hello"=7592, [SEP]=102
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto ids,
+                            EncodeSingle(tokenizer.get(), IREE_SV("hello")));
+
+  ASSERT_EQ(ids.size(), 3u);
+  EXPECT_EQ(ids[0], 101);   // [CLS]
+  EXPECT_EQ(ids[1], 7592);  // hello
+  EXPECT_EQ(ids[2], 102);   // [SEP]
+}
+
+TEST(PairEncode, BertPairSequence) {
+  // BERT pair: [CLS] query [SEP] document [SEP]
+  // Input: text="hello", text_pair="world"
+  // Expected token_ids: [101, 7592, 102, 2088, 102]
+  // Expected type_ids:  [  0,    0,   0,    1,   1]
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto result,
+      EncodePair(tokenizer.get(), IREE_SV("hello"), IREE_SV("world")));
+
+  ASSERT_EQ(result.token_ids.size(), 5u);
+  EXPECT_EQ(result.token_ids[0], 101);   // [CLS]
+  EXPECT_EQ(result.token_ids[1], 7592);  // hello
+  EXPECT_EQ(result.token_ids[2], 102);   // [SEP] (infix)
+  EXPECT_EQ(result.token_ids[3], 2088);  // world
+  EXPECT_EQ(result.token_ids[4], 102);   // [SEP] (suffix)
+
+  ASSERT_EQ(result.type_ids.size(), 5u);
+  EXPECT_EQ(result.type_ids[0], 0);  // [CLS] prefix type_id
+  EXPECT_EQ(result.type_ids[1], 0);  // sequence A type_id
+  EXPECT_EQ(result.type_ids[2], 0);  // [SEP] infix type_id
+  EXPECT_EQ(result.type_ids[3], 1);  // sequence B type_id
+  EXPECT_EQ(result.type_ids[4], 1);  // [SEP] suffix type_id
+}
+
+TEST(PairEncode, BertPairAllowsEmptySecondSequence) {
+  // Empty sequence B is still a pair: [CLS] hello [SEP] [SEP].
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto result,
+      EncodePair(tokenizer.get(), IREE_SV("hello"), iree_string_view_empty()));
+
+  ASSERT_EQ(result.token_ids.size(), 4u);
+  EXPECT_EQ(result.token_ids[0], 101);   // [CLS]
+  EXPECT_EQ(result.token_ids[1], 7592);  // hello
+  EXPECT_EQ(result.token_ids[2], 102);   // [SEP] (infix)
+  EXPECT_EQ(result.token_ids[3], 102);   // [SEP] (suffix)
+
+  ASSERT_EQ(result.type_ids.size(), 4u);
+  EXPECT_EQ(result.type_ids[0], 0);
+  EXPECT_EQ(result.type_ids[1], 0);
+  EXPECT_EQ(result.type_ids[2], 0);
+  EXPECT_EQ(result.type_ids[3], 1);
+}
+
+TEST(PairEncode, BertPairMultiWord) {
+  // Multi-word pair encoding: "deep learning" / "the weather today"
+  // Expected token_ids: [101, 2784, 4083, 102, 1996, 4633, 2651, 102]
+  // Expected type_ids:  [  0,    0,    0,   0,    1,    1,    1,   1]
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto result, EncodePair(tokenizer.get(), IREE_SV("deep learning"),
+                              IREE_SV("the weather today")));
+
+  ASSERT_EQ(result.token_ids.size(), 8u);
+  EXPECT_EQ(result.token_ids[0], 101);   // [CLS]
+  EXPECT_EQ(result.token_ids[1], 2784);  // deep
+  EXPECT_EQ(result.token_ids[2], 4083);  // learning
+  EXPECT_EQ(result.token_ids[3], 102);   // [SEP]
+  EXPECT_EQ(result.token_ids[4], 1996);  // the
+  EXPECT_EQ(result.token_ids[5], 4633);  // weather
+  EXPECT_EQ(result.token_ids[6], 2651);  // today
+  EXPECT_EQ(result.token_ids[7], 102);   // [SEP]
+
+  // Type IDs: 0 for CLS+query+infix-SEP, 1 for document+suffix-SEP.
+  for (size_t i = 0; i <= 3; ++i) {
+    EXPECT_EQ(result.type_ids[i], 0) << "type_ids[" << i << "]";
+  }
+  for (size_t i = 4; i <= 7; ++i) {
+    EXPECT_EQ(result.type_ids[i], 1) << "type_ids[" << i << "]";
+  }
+}
+
+TEST(PairEncode, BatchMixedSingleAndPair) {
+  // Batch with one single-sequence item and one pair item.
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  iree_host_size_t state_size = 0;
+  IREE_ASSERT_OK(
+      iree_tokenizer_encode_state_calculate_size(tokenizer.get(), &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+
+  // Item 0: single-sequence "hello"
+  std::vector<iree_tokenizer_token_id_t> ids0(256);
+  std::vector<uint8_t> type_ids0(256, 0xFF);
+  iree_tokenizer_encode_batch_item_t items[2] = {};
+  items[0].text = IREE_SV("hello");
+  items[0].output = iree_tokenizer_make_token_output(ids0.data(), nullptr,
+                                                     type_ids0.data(), 256);
+
+  // Item 1: pair "hello" / "world"
+  std::vector<iree_tokenizer_token_id_t> ids1(256);
+  std::vector<uint8_t> type_ids1(256, 0xFF);
+  items[1].text = IREE_SV("hello");
+  items[1].text_pair = IREE_SV("world");
+  items[1].flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  items[1].output = iree_tokenizer_make_token_output(ids1.data(), nullptr,
+                                                     type_ids1.data(), 256);
+
+  IREE_ASSERT_OK(iree_tokenizer_encode_batch(
+      tokenizer.get(), items, 2, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty()));
+
+  // Item 0: [CLS] hello [SEP]
+  ASSERT_EQ(items[0].out_token_count, 3u);
+  EXPECT_EQ(ids0[0], 101);   // [CLS]
+  EXPECT_EQ(ids0[1], 7592);  // hello
+  EXPECT_EQ(ids0[2], 102);   // [SEP]
+  EXPECT_EQ(type_ids0[0], 0);
+  EXPECT_EQ(type_ids0[1], 0);
+  EXPECT_EQ(type_ids0[2], 0);
+
+  // Item 1: [CLS] hello [SEP] world [SEP]
+  ASSERT_EQ(items[1].out_token_count, 5u);
+  EXPECT_EQ(ids1[0], 101);   // [CLS]
+  EXPECT_EQ(ids1[1], 7592);  // hello
+  EXPECT_EQ(ids1[2], 102);   // [SEP]
+  EXPECT_EQ(ids1[3], 2088);  // world
+  EXPECT_EQ(ids1[4], 102);   // [SEP]
+  EXPECT_EQ(type_ids1[0], 0);
+  EXPECT_EQ(type_ids1[1], 0);
+  EXPECT_EQ(type_ids1[2], 0);
+  EXPECT_EQ(type_ids1[3], 1);
+  EXPECT_EQ(type_ids1[4], 1);
+}
+
+TEST(PairEncode, BatchPairThenSingleResetsPostprocessor) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  iree_host_size_t state_size = 0;
+  IREE_ASSERT_OK(
+      iree_tokenizer_encode_state_calculate_size(tokenizer.get(), &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+
+  std::vector<iree_tokenizer_token_id_t> ids0(256);
+  std::vector<uint8_t> type_ids0(256, 0xFF);
+  std::vector<iree_tokenizer_token_id_t> ids1(256);
+  std::vector<uint8_t> type_ids1(256, 0xFF);
+
+  iree_tokenizer_encode_batch_item_t items[2] = {};
+  items[0].text = IREE_SV("hello");
+  items[0].text_pair = IREE_SV("world");
+  items[0].flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  items[0].output = iree_tokenizer_make_token_output(ids0.data(), nullptr,
+                                                     type_ids0.data(), 256);
+  items[1].text = IREE_SV("world");
+  items[1].output = iree_tokenizer_make_token_output(ids1.data(), nullptr,
+                                                     type_ids1.data(), 256);
+
+  IREE_ASSERT_OK(iree_tokenizer_encode_batch(
+      tokenizer.get(), items, 2, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty()));
+
+  ASSERT_EQ(items[0].out_token_count, 5u);
+  EXPECT_EQ(ids0[0], 101);
+  EXPECT_EQ(ids0[1], 7592);
+  EXPECT_EQ(ids0[2], 102);
+  EXPECT_EQ(ids0[3], 2088);
+  EXPECT_EQ(ids0[4], 102);
+  EXPECT_EQ(type_ids0[3], 1);
+  EXPECT_EQ(type_ids0[4], 1);
+
+  ASSERT_EQ(items[1].out_token_count, 3u);
+  EXPECT_EQ(ids1[0], 101);
+  EXPECT_EQ(ids1[1], 2088);
+  EXPECT_EQ(ids1[2], 102);
+  EXPECT_EQ(type_ids1[0], 0);
+  EXPECT_EQ(type_ids1[1], 0);
+  EXPECT_EQ(type_ids1[2], 0);
+}
+
+TEST(PairEncode, PairWithoutAddSpecialTokens) {
+  // Without ADD_SPECIAL_TOKENS, pair encoding should produce just the
+  // concatenated model tokens (no [CLS], [SEP], or type_ids assignment).
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  iree_host_size_t state_size = 0;
+  IREE_ASSERT_OK(
+      iree_tokenizer_encode_state_calculate_size(tokenizer.get(), &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+
+  std::vector<iree_tokenizer_token_id_t> token_ids(256);
+  std::vector<uint8_t> type_ids(256, 0xFF);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = IREE_SV("hello");
+  item.text_pair = IREE_SV("world");
+  item.flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  item.output = iree_tokenizer_make_token_output(token_ids.data(), nullptr,
+                                                 type_ids.data(), 256);
+
+  IREE_ASSERT_OK(iree_tokenizer_encode_batch(
+      tokenizer.get(), &item, 1, IREE_TOKENIZER_ENCODE_FLAG_NONE,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty()));
+
+  // Without special tokens: just "hello" + "world" (no [CLS]/[SEP]).
+  // Type IDs should all be 0xFF (untouched) since the postprocessor is IDLE.
+  ASSERT_EQ(item.out_token_count, 2u);
+  EXPECT_EQ(token_ids[0], 7592);  // hello
+  EXPECT_EQ(token_ids[1], 2088);  // world
+  EXPECT_EQ(type_ids[0], 0xFF);   // Untouched (IDLE postprocessor).
+  EXPECT_EQ(type_ids[1], 0xFF);
+}
+
+TEST(PairEncode, TextPairRequiresFlag) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  iree_host_size_t state_size = 0;
+  IREE_ASSERT_OK(
+      iree_tokenizer_encode_state_calculate_size(tokenizer.get(), &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+  std::vector<iree_tokenizer_token_id_t> token_ids(16);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = IREE_SV("hello");
+  item.text_pair = IREE_SV("world");
+  item.output = iree_tokenizer_make_token_output(token_ids.data(), nullptr,
+                                                 nullptr, token_ids.size());
+
+  iree_status_t status = iree_tokenizer_encode_batch(
+      tokenizer.get(), &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+}
+
+TEST(PairEncode, UnknownItemFlagsRejected) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  iree_host_size_t state_size = 0;
+  IREE_ASSERT_OK(
+      iree_tokenizer_encode_state_calculate_size(tokenizer.get(), &state_size));
+  std::vector<uint8_t> state_storage(state_size);
+  std::vector<uint8_t> transform_buffer(4096);
+  std::vector<iree_tokenizer_token_id_t> token_ids(16);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = IREE_SV("hello");
+  item.flags = 0x80000000u;
+  item.output = iree_tokenizer_make_token_output(token_ids.data(), nullptr,
+                                                 nullptr, token_ids.size());
+
+  iree_status_t status = iree_tokenizer_encode_batch(
+      tokenizer.get(), &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(state_storage.data(), state_storage.size()),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+}
+
+TEST(PairEncode, InvalidStateStorageReturnsStatus) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  uint8_t state_storage = 0;
+  std::vector<uint8_t> transform_buffer(4096);
+  std::vector<iree_tokenizer_token_id_t> token_ids(16);
+
+  iree_tokenizer_encode_batch_item_t item = {};
+  item.text = IREE_SV("hello");
+  item.text_pair = IREE_SV("world");
+  item.flags = IREE_TOKENIZER_ENCODE_BATCH_ITEM_FLAG_HAS_TEXT_PAIR;
+  item.output = iree_tokenizer_make_token_output(token_ids.data(), nullptr,
+                                                 nullptr, token_ids.size());
+
+  iree_status_t status = iree_tokenizer_encode_batch(
+      tokenizer.get(), &item, 1, IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS,
+      iree_make_byte_span(&state_storage, 1),
+      iree_make_byte_span(transform_buffer.data(), transform_buffer.size()),
+      iree_tokenizer_offset_run_list_empty());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+}
+
+TEST(PairEncode, OutputBufferTooSmallAtPairBoundaries) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  for (iree_host_size_t capacity = 0; capacity < 5; ++capacity) {
+    auto result = EncodePairDetailed(tokenizer.get(), IREE_SV("hello"),
+                                     IREE_SV("world"), capacity,
+                                     /*track_offsets=*/false);
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, result.status())
+        << "capacity=" << capacity;
+  }
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto result, EncodePairDetailed(tokenizer.get(), IREE_SV("hello"),
+                                      IREE_SV("world"), /*output_capacity=*/5,
+                                      /*track_offsets=*/false));
+  EXPECT_EQ(result.token_ids, (std::vector<iree_tokenizer_token_id_t>{
+                                  101, 7592, 102, 2088, 102}));
+}
+
+TEST(PairEncode, OffsetsAreRelativeToEachSequence) {
+  IREE_ASSERT_OK_AND_ASSIGN(auto tokenizer,
+                            LoadTokenizer("wordpiece_bert_pair_minimal.json"));
+
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto result, EncodePairDetailed(tokenizer.get(), IREE_SV("hello"),
+                                      IREE_SV("world"), /*output_capacity=*/8,
+                                      /*track_offsets=*/true));
+
+  ASSERT_EQ(result.token_offsets.size(), 5u);
+  EXPECT_EQ(result.token_offsets[0].start, 0u);
+  EXPECT_EQ(result.token_offsets[0].end, 0u);
+  EXPECT_EQ(result.token_offsets[1].start, 0u);
+  EXPECT_EQ(result.token_offsets[1].end, 5u);
+  EXPECT_EQ(result.token_offsets[2].start, 0u);
+  EXPECT_EQ(result.token_offsets[2].end, 0u);
+  EXPECT_EQ(result.token_offsets[3].start, 0u);
+  EXPECT_EQ(result.token_offsets[3].end, 5u);
+  EXPECT_EQ(result.token_offsets[4].start, 0u);
+  EXPECT_EQ(result.token_offsets[4].end, 0u);
+}
+
 }  // namespace
 }  // namespace iree::tokenizer

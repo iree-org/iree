@@ -312,6 +312,9 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_map(
   iree_io_file_contents_t* contents = NULL;
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*contents), (void**)&contents);
+  if (iree_status_is_ok(status)) {
+    contents->allocator = host_allocator;
+  }
 
   if (iree_status_is_ok(status)) {
     status =
@@ -324,7 +327,6 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_map(
   iree_io_file_handle_release(handle);
 
   if (iree_status_is_ok(status)) {
-    contents->allocator = host_allocator;
     if (iree_all_bits_set(access, IREE_IO_FILE_ACCESS_WRITE)) {
       contents->buffer = iree_io_file_mapping_contents_rw(contents->mapping);
     } else {

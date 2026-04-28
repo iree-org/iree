@@ -39,7 +39,6 @@ jobs:
               - persistent-cache
               - Linux
               - X64
-              - threadripper
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]

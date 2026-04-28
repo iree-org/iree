@@ -2756,3 +2756,44 @@ util.func public @scatter_chain_dispatch_ordering(
 //      CHECK:     iree_linalg_ext.scatter
 // CHECK-SAME:       outs(%[[S2]]
 //      CHECK:   util.return %[[S3]]
+
+// -----
+
+// Multi-result producer feeds a pack consumer via two operands. Producer
+// result 0 has a non-identity indexing map while result 1 has an identity
+// map, so the pack-identity per-operand check fails on the source operand
+// but passes on the dest operand. Fusion must be rejected.
+
+util.func public @pack_per_operand_rejection(
+    %a: tensor<1x1xf32>, %b: tensor<1x1xf32>) -> tensor<1x1x1x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %eR = tensor.empty() : tensor<1x1xf32>
+  %fR = linalg.fill ins(%cst : f32) outs(%eR : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %R = linalg.matmul ins(%a, %b : tensor<1x1xf32>, tensor<1x1xf32>)
+                    outs(%fR : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %eA = tensor.empty() : tensor<1x1xf32>
+  %eB = tensor.empty() : tensor<1x1x1x1xf32>
+  %X:2 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+      affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%R : tensor<1x1xf32>) outs(%eA, %eB : tensor<1x1xf32>, tensor<1x1x1x1xf32>) {
+  ^bb0(%in: f32, %oA: f32, %oB: f32):
+    linalg.yield %in, %in : f32, f32
+  } -> (tensor<1x1xf32>, tensor<1x1x1x1xf32>)
+  %packed = linalg.pack %X#0 inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %X#1 : tensor<1x1xf32> -> tensor<1x1x1x1xf32>
+  util.return %packed : tensor<1x1x1x1xf32>
+}
+
+//      CHECK-LABEL: @pack_per_operand_rejection
+//            CHECK:   %[[RX:.+]]:2 = flow.dispatch.region
+//            CHECK:     linalg.matmul
+//            CHECK:     linalg.generic
+//            CHECK:     flow.return
+//            CHECK:   flow.dispatch.region
+//            CHECK:     linalg.pack %[[RX]]#0
+//       CHECK-SAME:       into %[[RX]]#1
+//            CHECK:     flow.return

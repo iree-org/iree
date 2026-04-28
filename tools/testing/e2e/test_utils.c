@@ -579,8 +579,10 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
   iree_tooling_module_list_reset(&module_list);
 
   // Begin profiling (if enabled).
+  iree_hal_profiling_from_flags_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_begin_profiling_from_flags(device);
+    status =
+        iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling);
   }
 
   // Run all of the tests in the test module.
@@ -590,8 +592,9 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
   }
 
   // End profiling (if enabled).
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_end_profiling_from_flags(device);
+  if (profiling) {
+    status =
+        iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
   }
 
   iree_hal_device_release(device);

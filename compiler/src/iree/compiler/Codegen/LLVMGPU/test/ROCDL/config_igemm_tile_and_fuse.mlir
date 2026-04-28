@@ -321,7 +321,7 @@ func.func @conv_nhwc_small_channel_size(%arg0: tensor<16x26x19x3xf16>, %arg1: te
 // PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0, 0]
 
 // -----
-// This test is to check that we c promote in such cases since we have codegen issues with this case
+// This test is to check that we don't C promote in such cases. We have had codegen issues with this case
 // see https://github.com/iree-org/iree/issues/23038
 func.func @nhwc_conv_mfma_biasadd(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -341,7 +341,7 @@ func.func @nhwc_conv_mfma_biasadd(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x12
 }
 
 //     CHECK-LABEL: nhwc_conv_mfma_biasadd
-//           CHECK: promote_operands = [0, 1, 2]
+//           CHECK: promote_operands = [0, 1]
 
 // -----
 // Check that we dont c promote if there is no additional operand
@@ -394,7 +394,7 @@ func.func @conv_with_dps_init_producer(
 }
 
 //     CHECK-LABEL: conv_with_dps_init_producer
-//           CHECK: promote_operands = [0, 1, 2]
+//           CHECK: promote_operands = [0, 1]
 
 // -----
 

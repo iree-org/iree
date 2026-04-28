@@ -913,12 +913,69 @@ LogicalResult SortOp::getResultTilePosition(
   return success();
 }
 
+/// Emit one bubble-sort sweep: compare adjacent elements along sortDim and
+/// conditionally swap. compareOperands are fed to the comparator region (as
+/// interleaved pairs); carryOperands are swapped in lockstep but not compared.
+/// Convention: comparator returning true means keep current order (no swap).
+static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
+                                Value one, Value ub, int64_t sortDim,
+                                ValueRange ivs, ValueRange compareOperands,
+                                ValueRange carryOperands,
+                                Region &comparatorRegion) {
+  Block &cmpBlock = comparatorRegion.front();
+  scf::ForOp::create(
+      b, loc, zero, ub, one, /*iterArgs=*/ValueRange{},
+      [&](OpBuilder &b, Location loc, Value j, ValueRange) {
+        // Compare adjacent elements at positions j (lhs) and j+1 (rhs).
+        Value jPlusOne = arith::AddIOp::create(b, loc, j, one);
+        SmallVector<Value> lhsIndices(ivs);
+        lhsIndices[sortDim] = j;
+        SmallVector<Value> rhsIndices(ivs);
+        rhsIndices[sortDim] = jPlusOne;
+
+        SmallVector<Value> cmpArgs;
+        SmallVector<Value> lhsVals, rhsVals;
+        for (Value operand : compareOperands) {
+          Value lhs = memref::LoadOp::create(b, loc, operand, lhsIndices);
+          Value rhs = memref::LoadOp::create(b, loc, operand, rhsIndices);
+          cmpArgs.push_back(lhs);
+          cmpArgs.push_back(rhs);
+          lhsVals.push_back(lhs);
+          rhsVals.push_back(rhs);
+        }
+
+        for (Value operand : carryOperands) {
+          lhsVals.push_back(
+              memref::LoadOp::create(b, loc, operand, lhsIndices));
+          rhsVals.push_back(
+              memref::LoadOp::create(b, loc, operand, rhsIndices));
+        }
+
+        IRMapping sortMap;
+        sortMap.map(cmpBlock.getArguments(), cmpArgs);
+        for (auto &blockOp : cmpBlock.without_terminator()) {
+          b.clone(blockOp, sortMap);
+        }
+        Value keepOrder =
+            sortMap.lookup(cmpBlock.getTerminator()->getOperand(0));
+
+        SmallVector<Value> allOps;
+        allOps.append(compareOperands.begin(), compareOperands.end());
+        allOps.append(carryOperands.begin(), carryOperands.end());
+        for (auto [operand, lhs, rhs] :
+             llvm::zip_equal(allOps, lhsVals, rhsVals)) {
+          Value newLhs = arith::SelectOp::create(b, loc, keepOrder, lhs, rhs);
+          Value newRhs = arith::SelectOp::create(b, loc, keepOrder, rhs, lhs);
+          memref::StoreOp::create(b, loc, newLhs, operand, lhsIndices);
+          memref::StoreOp::create(b, loc, newRhs, operand, rhsIndices);
+        }
+        scf::YieldOp::create(b, loc, /*operands=*/ValueRange{});
+      });
+}
+
 LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
   auto sortDim = getDimension();
-  SmallVector<Value> indices, sortBlkArgs;
-  indices.append(ivs.begin(), ivs.end());
-  // Bubble sort innermost loop.
   Value zero = arith::ConstantIndexOp::create(b, loc, 0);
   Value one = arith::ConstantIndexOp::create(b, loc, 1);
   Value ub;
@@ -929,61 +986,10 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                         getOperandType(0).getDimSize(sortDim));
   }
   ub = arith::SubIOp::create(b, loc, ub, one);
-  auto scfFor = scf::ForOp::create(
-      b, loc, zero, ub, one, ValueRange{},
-      [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
-        SmallVector<Value> indices(ivs);
-        Value ivPlusOne = arith::AddIOp::create(b, loc, iv, one);
-        for (auto output : getDpsInits()) {
-          indices[sortDim] = iv;
-          sortBlkArgs.push_back(
-              memref::LoadOp::create(b, loc, output, indices));
-          indices[sortDim] = ivPlusOne;
-          sortBlkArgs.push_back(
-              memref::LoadOp::create(b, loc, output, indices));
-        }
-      });
-
-  auto &srcBlock = getRegion().front();
-  Region &region = scfFor.getRegion();
-  IRMapping bvm;
-  {
-    OpBuilder::InsertionGuard guard(b);
-    auto &block = region.front();
-    b.setInsertionPointToEnd(&block);
-    for (auto it : llvm::zip_equal(srcBlock.getArguments(), sortBlkArgs)) {
-      bvm.map(std::get<0>(it), std::get<1>(it));
-    }
-    for (auto &blockOp : srcBlock.without_terminator()) {
-      b.clone(blockOp, bvm);
-    }
-  }
-  Value cond = bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0));
-
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPointToEnd(&region.front());
-  scf::IfOp::create(
-      b, loc, cond,
-      [&](OpBuilder &b, Location loc) {
-        // Do not swap the pairs if true.
-        scf::YieldOp::create(b, loc);
-      },
-      [&](OpBuilder &b, Location loc) {
-        // Swap the pairs if false.
-        SmallVector<Value> indices(ivs);
-        Value ivPlusOne =
-            arith::AddIOp::create(b, loc, scfFor.getInductionVar(), one);
-        for (int i = 0, e = getNumDpsInits(); i < e; ++i) {
-          Value v1 = sortBlkArgs[i * 2];
-          Value v2 = sortBlkArgs[i * 2 + 1];
-          indices[sortDim] = scfFor.getInductionVar();
-          memref::StoreOp::create(b, loc, v2, getDpsInits()[i], indices);
-          indices[sortDim] = ivPlusOne;
-          memref::StoreOp::create(b, loc, v1, getDpsInits()[i], indices);
-        }
-        scf::YieldOp::create(b, loc);
-      });
-  scf::YieldOp::create(b, loc);
+  SmallVector<Value> compareOperands(getDpsInits().begin(),
+                                     getDpsInits().end());
+  emitBubbleSortSweep(b, loc, zero, one, ub, sortDim, ivs, compareOperands,
+                      /*carryOperands=*/{}, getRegion());
   return success();
 }
 
@@ -1418,7 +1424,7 @@ SmallVector<utils::IteratorType> TopkOp::getLoopIteratorTypes() {
 
 LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
-  uint64_t kDim = getDimension();
+  int64_t kDim = getDimension();
   Value zero = arith::ConstantIndexOp::create(b, loc, 0);
   Value one = arith::ConstantIndexOp::create(b, loc, 1);
   Value initialValue = memref::LoadOp::create(b, loc, getValues(), ivs);
@@ -1467,14 +1473,10 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);
     b.setInsertionPointToEnd(&scfFor.getRegion().front());
-    SmallVector<Value> forwardValues{loopCarryValues[0], kValue};
-    SmallVector<Value> reverseValues{kValue, loopCarryValues[0]};
-    for (auto it : llvm::zip_equal(srcBlock.getArguments(), forwardValues)) {
-      bvmF.map(std::get<0>(it), std::get<1>(it));
-    }
-    for (auto it : llvm::zip_equal(srcBlock.getArguments(), reverseValues)) {
-      bvmR.map(std::get<0>(it), std::get<1>(it));
-    }
+    SmallVector<Value> forwardValues = {loopCarryValues[0], kValue};
+    SmallVector<Value> reverseValues = {kValue, loopCarryValues[0]};
+    bvmF.map(srcBlock.getArguments(), forwardValues);
+    bvmR.map(srcBlock.getArguments(), reverseValues);
     for (auto &blockOp : srcBlock.without_terminator()) {
       b.clone(blockOp, bvmF);
       b.clone(blockOp, bvmR);
@@ -1582,6 +1584,242 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
 }
 
 LogicalResult TopkOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
+                            getDimension());
+  resultSizes[getDimension()] = getAsOpFoldResult(kSize);
+  return success();
+}
+
+/// Emit a full bubble sort over K output positions using the shared sweep
+/// helper. The outer double loop provides the O(k^2) passes needed for a
+/// complete sort.
+static void emitBubbleSort(OpBuilder &b, Location loc, Value ub, Value zero,
+                           Value one, int64_t kDim, ValueRange ivs,
+                           Value outputValues, Value outputIndices,
+                           Region &comparatorRegion) {
+  Value kMinus1 = arith::SubIOp::create(b, loc, ub, one);
+  SmallVector<Value> carryOps;
+  if (outputIndices) {
+    carryOps.push_back(outputIndices);
+  }
+  scf::ForOp::create(
+      b, loc, zero, kMinus1, one, /*iterArgs=*/ValueRange{},
+      [&](OpBuilder &b, Location loc, Value i, ValueRange) {
+        Value innerUb = arith::SubIOp::create(b, loc, kMinus1, i);
+        emitBubbleSortSweep(b, loc, zero, one, innerUb, kDim, ivs,
+                            /*compareOperands=*/{outputValues}, carryOps,
+                            comparatorRegion);
+        scf::YieldOp::create(b, loc, /*operands=*/ValueRange{});
+      });
+}
+
+//===----------------------------------------------------------------------===//
+// TopkV2Op
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> TopkV2Op::getIterationDomain(OpBuilder &builder) {
+  unsigned rank = getInputType().getRank();
+  SmallVector<Range> loopBounds(rank);
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  Value source = getValues();
+  for (unsigned idx = 0; idx < rank; ++idx) {
+    loopBounds[idx].offset = zero;
+    loopBounds[idx].size = getDim(builder, loc, source, idx);
+    loopBounds[idx].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType> TopkV2Op::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
+  return iteratorTypes;
+}
+
+LogicalResult TopkV2Op::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                     ValueRange ivs) {
+  int64_t kDim = getDimension();
+  Value zero = arith::ConstantIndexOp::create(b, loc, 0);
+  Value one = arith::ConstantIndexOp::create(b, loc, 1);
+  Value inputValues = getValues();
+  Value outputValues = getOutputValues();
+  Value outputIndices = getOutputIndices();
+  Value initialValue = memref::LoadOp::create(b, loc, inputValues, ivs);
+
+  // Compute K (ub) from the selected dim of the output.
+  Value ub = memref::DimOp::create(b, loc, outputValues, kDim);
+
+  SmallVector<Value> initValues = {initialValue};
+  if (outputIndices) {
+    Value initialIndex;
+    Value inputIndices = getInputIndices();
+    if (inputIndices) {
+      initialIndex = memref::LoadOp::create(b, loc, inputIndices, ivs);
+    } else {
+      Type indexElemTy =
+          cast<ShapedType>(outputIndices.getType()).getElementType();
+      initialIndex = arith::IndexCastOp::create(b, loc, indexElemTy, ivs[kDim]);
+    }
+    initValues.push_back(initialIndex);
+  }
+
+  Block &srcBlock = getRegion().front();
+  scf::ForOp::create(
+      b, loc, zero, ub, one, initValues,
+      [&](OpBuilder &b, Location loc, Value iv, ValueRange loopCarryValues) {
+        SmallVector<Value> indices(ivs);
+        indices[kDim] = iv;
+        Value kValue = memref::LoadOp::create(b, loc, outputValues, indices);
+        Value kIndex;
+        if (outputIndices) {
+          kIndex = memref::LoadOp::create(b, loc, outputIndices, indices);
+        }
+
+        // Clone the comparator region with forward mapping f(x,y).
+        IRMapping bvmF;
+        SmallVector<Value> forwardValues = {loopCarryValues[0], kValue};
+        bvmF.map(srcBlock.getArguments(), forwardValues);
+        for (auto &blockOp : srcBlock.without_terminator()) {
+          b.clone(blockOp, bvmF);
+        }
+        Value forwardCmpRes =
+            bvmF.lookup(srcBlock.getTerminator()->getOperand(0));
+
+        Value resultKValue = arith::SelectOp::create(
+            b, loc, forwardCmpRes, loopCarryValues[0], kValue);
+        memref::StoreOp::create(b, loc, resultKValue, outputValues, indices);
+        Value resultCarryValue = arith::SelectOp::create(
+            b, loc, forwardCmpRes, kValue, loopCarryValues[0]);
+
+        SmallVector<Value> yieldValues = {resultCarryValue};
+
+        // With output indices, also clone the reverse mapping f(y,x) for
+        // strict weak ordering tie-breaking.
+        if (outputIndices) {
+          IRMapping bvmR;
+          SmallVector<Value> reverseValues = {kValue, loopCarryValues[0]};
+          bvmR.map(srcBlock.getArguments(), reverseValues);
+          for (auto &blockOp : srcBlock.without_terminator()) {
+            b.clone(blockOp, bvmR);
+          }
+          Value reverseCmpRes =
+              bvmR.lookup(srcBlock.getTerminator()->getOperand(0));
+
+          // Strict weak ordering tie-breaking:
+          //   f(x,y) --> forwardCmpRes.
+          //   f(y,x) --> reverseCmpRes.
+          //   If forwardCmpRes == reverseCmpRes, select which came first.
+          Value cmpValuesEqual = arith::CmpIOp::create(
+              b, loc, arith::CmpIPredicate::eq, forwardCmpRes, reverseCmpRes);
+          Value cmpFirstIndex = arith::CmpIOp::create(
+              b, loc, arith::CmpIPredicate::slt, loopCarryValues[1], kIndex);
+          Value combinedCmpEqRes =
+              arith::AndIOp::create(b, loc, cmpValuesEqual, cmpFirstIndex);
+          Value indexCmpRes =
+              arith::OrIOp::create(b, loc, forwardCmpRes, combinedCmpEqRes);
+          Value resultKIndex = arith::SelectOp::create(
+              b, loc, indexCmpRes, loopCarryValues[1], kIndex);
+          memref::StoreOp::create(b, loc, resultKIndex, outputIndices, indices);
+          Value resultCarryIndex = arith::SelectOp::create(
+              b, loc, indexCmpRes, kIndex, loopCarryValues[1]);
+          yieldValues.push_back(resultCarryIndex);
+        }
+
+        scf::YieldOp::create(b, loc, yieldValues);
+      });
+
+  // When is_sorted is true, add a bubble sort pass after each insertion to
+  // ensure the output buffer is sorted regardless of its initial state. The
+  // insertion-sort-style K loop above maintains sorted order only if the
+  // output buffer was already sorted; this pass fixes any initial disorder.
+  if (getIsSorted()) {
+    emitBubbleSort(b, loc, ub, zero, one, kDim, ivs, outputValues,
+                   outputIndices, getRegion());
+  }
+
+  return success();
+}
+
+FailureOr<TilingResult>
+TopkV2Op::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  int64_t kDim = getDimension();
+  Value outputValues = getOutputValues();
+  Value outputIndices = getOutputIndices();
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return {};
+  }
+
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> slices;
+
+  // Input values.
+  Operation *valuesSlice =
+      getSlice(builder, loc, getValues(), offsets, sizes, strides);
+  tiledOperands.emplace_back(valuesSlice->getResult(0));
+  slices.push_back(valuesSlice);
+
+  // Optional input indices.
+  Value inputIndices = getInputIndices();
+  if (inputIndices) {
+    Operation *indicesSlice =
+        getSlice(builder, loc, inputIndices, offsets, sizes, strides);
+    tiledOperands.emplace_back(indicesSlice->getResult(0));
+    slices.push_back(indicesSlice);
+  }
+
+  // Replace the tile size for the K dimension to use the output size instead of
+  // the input size.
+  Value kSize = getDimValue(builder, loc, outputValues, kDim);
+  outputSizes[kDim] = getAsOpFoldResult(kSize);
+
+  // Output values.
+  Operation *outputValuesSlice =
+      getSlice(builder, loc, outputValues, outputOffsets, outputSizes, strides);
+  tiledOperands.emplace_back(outputValuesSlice->getResult(0));
+  slices.push_back(outputValuesSlice);
+
+  // Optional output indices.
+  Operation *outputIndicesSlice = nullptr;
+  if (outputIndices) {
+    outputIndicesSlice = getSlice(builder, loc, outputIndices, outputOffsets,
+                                  outputSizes, strides);
+    tiledOperands.emplace_back(outputIndicesSlice->getResult(0));
+    slices.push_back(outputIndicesSlice);
+  }
+
+  SmallVector<Type, 2> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValuesSlice->getResult(0).getType());
+    if (outputIndicesSlice) {
+      resultTypes.push_back(outputIndicesSlice->getResult(0).getType());
+    }
+  }
+
+  Operation *tiledTopkV2Op =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  return TilingResult{
+      {tiledTopkV2Op}, SmallVector<Value>(tiledTopkV2Op->getResults()), slices};
+}
+
+LogicalResult TopkV2Op::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {

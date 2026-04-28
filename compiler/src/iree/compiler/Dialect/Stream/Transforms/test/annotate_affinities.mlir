@@ -1732,6 +1732,61 @@ util.func public @stream_yield_consumer_affinity_tied(%size: index) -> !stream.r
 
 // -----
 
+// Tests that update result placement follows the tied target storage and does
+// not acquire the update op's execution affinity as a producer placement.
+
+// CHECK-LABEL: @stream_update_tied_result_affinity
+util.func public @stream_update_tied_result_affinity(%size: index) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %target = stream.async.constant on(#hal.device.promise<@dev_a>) : !stream.resource<transient>{%size} = dense<0> : tensor<8xi32>
+  %update = stream.async.constant on(#hal.device.promise<@dev_b>) : !stream.resource<transient>{%size} = dense<1> : tensor<8xi32>
+  // CHECK: stream.async.update on(#hal.device.promise<@dev_b>)
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_b>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>]]
+  %result = stream.async.update on(#hal.device.promise<@dev_b>) %update, %target[%c0 to %size] : !stream.resource<transient>{%size} -> %target as !stream.resource<transient>{%size}
+  util.return %result : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that loop-carried tied dispatch results preserve both the tied
+// operand's storage placement and the dispatch's execution placement.
+
+// CHECK-LABEL: @scf_for_tied_dispatch_result_affinity
+util.func public @scf_for_tied_dispatch_result_affinity(%size: index) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %input = stream.async.constant on(#hal.device.promise<@dev_a>) : !stream.resource<transient>{%size} = dense<0> : tensor<8xi32>
+  // CHECK: scf.for
+  %loop0 = scf.for %i = %c0 to %c2 step %c1 iter_args(%arg0 = %input) -> !stream.resource<transient> {
+    // CHECK: stream.async.dispatch on(#hal.device.promise<@dev_b>)
+    // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    %result0 = stream.async.dispatch on(#hal.device.promise<@dev_b>) @executable::@dispatch(%arg0[%c0 to %size for %size]) : (!stream.resource<transient>{%size}) -> %arg0{%size}
+    scf.yield %result0 : !stream.resource<transient>
+  }
+  // CHECK: scf.for
+  %loop1 = scf.for %i = %c0 to %c2 step %c1 iter_args(%arg1 = %loop0) -> !stream.resource<transient> {
+    // CHECK: stream.async.dispatch on(#hal.device.promise<@dev_b>)
+    // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_b>]
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.operands.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    // CHECK-SAME{LITERAL}: stream.affinities.results.usage = [[#hal.device.promise<@dev_a>, #hal.device.promise<@dev_b>]]
+    %result1 = stream.async.dispatch on(#hal.device.promise<@dev_b>) @executable::@dispatch(%arg1[%c0 to %size for %size]) : (!stream.resource<transient>{%size}) -> %arg1{%size}
+    scf.yield %result1 : !stream.resource<transient>
+  }
+  util.return %loop1 : !stream.resource<transient>
+}
+
+// -----
+
 // Tests that pinning a value will always result in a valid analysis result even
 // if we couldn't exhaustively analyze the value. Here %arg0 has producers (in
 // the callers) and consumers (in the callers after return) we don't know about

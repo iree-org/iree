@@ -15,7 +15,6 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -89,66 +88,6 @@ struct PromoteContractOperands final
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
     return arith::ExtSIOp::create(rewriter, loc, promotedType, v);
-  }
-};
-
-/// true: vector
-/// false: vector
-/// pred: i1
-///
-/// select(pred, true, false) -> broadcast(pred)
-/// select(pred, false, true) -> broadcast(not(pred))
-///
-/// Ideally, this would be a canonicalization pattern on arith::SelectOp, but
-/// we cannot have arith depending on vector. Also, it would implicitly force
-/// users only using arith and vector dialect to use vector dialect. Since
-/// upstream does not have a mechanism of registering canonicalization without
-/// adding dependencies like this, we manually add it where it is needed.
-struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(arith::SelectOp selectOp,
-                                PatternRewriter &rewriter) const override {
-    auto vecType = dyn_cast<VectorType>(selectOp.getType());
-    if (!vecType || !vecType.getElementType().isInteger(1)) {
-      return failure();
-    }
-
-    // Vector conditionals do not need broadcast and are already handled by
-    // the arith.select folder.
-    Value pred = selectOp.getCondition();
-    if (isa<VectorType>(pred.getType())) {
-      return failure();
-    }
-
-    std::optional<int64_t> trueInt =
-        getConstantIntValue(selectOp.getTrueValue());
-    std::optional<int64_t> falseInt =
-        getConstantIntValue(selectOp.getFalseValue());
-    if (!trueInt || !falseInt) {
-      return failure();
-    }
-
-    // Redundant selects are already handled by arith.select canonicalizations.
-    if (trueInt.value() == falseInt.value()) {
-      return failure();
-    }
-
-    // The only remaining possibilities are:
-    //
-    // select(pred, true, false)
-    // select(pred, false, true)
-
-    // select(pred, false, true) -> select(not(pred), true, false)
-    if (trueInt.value() == 0) {
-      // TODO: flip the condition here to handle through the existing path.
-      return failure();
-    }
-
-    /// select(pred, true, false) -> broadcast(pred)
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        selectOp, vecType.clone(rewriter.getI1Type()), pred);
-    return success();
   }
 };
 
@@ -507,54 +446,6 @@ private:
   }
 };
 
-struct UnrollElementwiseOps final : RewritePattern {
-  UnrollElementwiseOps(MLIRContext *context, PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op) ||
-        op->getNumResults() != 1) {
-      return failure();
-    }
-
-    Location loc = op->getLoc();
-    VectorType dstVecTy = dyn_cast<VectorType>(op->getResult(0).getType());
-    if (!dstVecTy || dstVecTy.getRank() <= 1) {
-      return failure();
-    }
-    ArrayRef<int64_t> originalSize = dstVecTy.getShape();
-
-    Value result = ub::PoisonOp::create(rewriter, loc, dstVecTy);
-    auto subVecTy =
-        VectorType::get({originalSize.back()}, dstVecTy.getElementType());
-
-    SmallVector<int64_t> tileShape(dstVecTy.getRank() - 1, 1);
-    for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(originalSize.drop_back(), tileShape)) {
-      // Extract from each operand.
-      SmallVector<Value> operands;
-      for (Value val : op->getOperands()) {
-        // Extract subvector if the operand is a vector. This is to handle
-        // things like arith.select which take a scalar conditional but are
-        // otherwise elementwise.
-        if (isa<VectorType>(val.getType())) {
-          val = vector::ExtractOp::create(rewriter, loc, val, offsets);
-        }
-        operands.push_back(val);
-      }
-
-      Operation *clonedOp = clone(rewriter, op, subVecTy, operands);
-      Value subResult = clonedOp->getResult(0);
-      result =
-          vector::InsertOp::create(rewriter, loc, subResult, result, offsets);
-    }
-
-    rewriter.replaceOp(op, result);
-    return success();
-  }
-};
-
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -616,9 +507,8 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorMultiReductionUnrollingPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
-      contractLoweringPatterns.add<UnrollElementwiseOps>(funcOp->getContext());
-      // Unroll transfer_gather/scatter ops to rank 1 and lower contiguous ones
-      // to vector.transfer_read/write.
+      // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
+      // vector.transfer_read.
       IREE::VectorExt::populateVectorTransferGatherScatterLoweringPatterns(
           contractLoweringPatterns);
       IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(
@@ -641,20 +531,6 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(vectorToLoopsPatterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    // Cleanup canonicalization for masking and other basic vector operations.
-    {
-      RewritePatternSet patterns(ctx);
-      vector::CreateMaskOp::getCanonicalizationPatterns(patterns, ctx);
-      vector::ConstantMaskOp::getCanonicalizationPatterns(patterns, ctx);
-      vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
-      vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
-      arith::SelectOp::getCanonicalizationPatterns(patterns, ctx);
-      patterns.add<FoldI1SelectToBroadcast>(ctx);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

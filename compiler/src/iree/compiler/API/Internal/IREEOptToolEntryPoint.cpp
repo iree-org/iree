@@ -84,7 +84,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   std::string helpHeader = (toolName + "\nAvailable Dialects: ").str();
   {
     llvm::raw_string_ostream os(helpHeader);
-    interleaveComma(registry.getDialectNames(), os,
+    interleaveComma(registry.getRegisteredDialectNames(), os,
                     [&](auto name) { os << name; });
   }
 
@@ -126,7 +126,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // printRegisteredDialects and printRegisteredPassesAndReturn
   if (config.shouldShowDialects()) {
     llvm::outs() << "Available Dialects: ";
-    interleave(registry.getDialectNames(), llvm::outs(), ",");
+    interleave(registry.getRegisteredDialectNames(), llvm::outs(), ",");
     llvm::outs() << "\n";
     return success();
   }

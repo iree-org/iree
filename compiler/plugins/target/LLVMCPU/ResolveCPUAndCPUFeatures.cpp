@@ -7,6 +7,7 @@
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/TargetParser/AArch64TargetParser.h"
@@ -67,8 +68,29 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
     }
     llvm::SmallVector<llvm::StringRef> features;
     llvm::X86::getFeaturesForCPU(cpu, features, /*NeedPlus=*/false);
-    for (const auto &feature : features) {
-      targetCpuFeatures.AddFeature(feature);
+    // llvm::X86::getFeaturesForCPU returns only the features literally stored
+    // on the ProcInfo entry (i.e. the "leaf" features). For microarchitecture
+    // levels like x86-64-v{2,3,4}, that notably excludes the transitively
+    // implied features: e.g. x86-64-v4 lists {avx512bw, avx512cd, avx512dq,
+    // avx512vl} but not avx512f, avx2, avx, the earlier sse versions, etc.
+    // Clang's X86TargetInfo::initFeatureMap expands those implications by
+    // running each feature through llvm::X86::updateImpliedFeatures; do the
+    // same here so downstream consumers (including IREE's own hasFeature
+    // string-based checks) see the full transitive set, matching the behavior
+    // of `clang -march=<cpu>`.
+    llvm::StringMap<bool> featureMap;
+    for (llvm::StringRef feature : features) {
+      featureMap[feature] = true;
+      llvm::X86::updateImpliedFeatures(feature, /*Enabled=*/true, featureMap);
+    }
+    // Sort for a deterministic feature string.
+    llvm::SmallVector<llvm::StringRef> sortedFeatures =
+        llvm::to_vector_of<llvm::StringRef>(featureMap.keys());
+    llvm::sort(sortedFeatures);
+    for (llvm::StringRef feature : sortedFeatures) {
+      if (featureMap.lookup(feature)) {
+        targetCpuFeatures.AddFeature(feature);
+      }
     }
   } else if (triple.isRISCV64()) {
     if (!llvm::RISCV::parseCPU(cpu, triple.isRISCV64())) {

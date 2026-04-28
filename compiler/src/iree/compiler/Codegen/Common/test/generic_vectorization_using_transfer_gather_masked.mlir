@@ -257,6 +257,7 @@ func.func @dynamic_paged_gather_read(
 // CHECK:         %[[IND_VEC:.+]] = vector.transfer_read %[[IND_SLICE]][%[[C0]]], {{.*}}, %[[MASK_1D]]
 // CHECK:         %[[IDX_CAST:.+]] = arith.index_cast %[[IND_VEC]] : vector<128xi64> to vector<128xindex>
 // CHECK:         iree_vector_ext.transfer_gather %[[STORAGE]]
+// CHECK-SAME:      [%[[IDX_CAST]] : vector<128xindex>]
 // CHECK:         vector.transfer_write
 
 // -----

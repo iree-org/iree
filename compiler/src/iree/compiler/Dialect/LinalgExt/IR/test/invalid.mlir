@@ -1242,6 +1242,24 @@ func.func @topk_v2_input_indices_without_output_indices(
 
 // -----
 
+func.func @topk_v2_indices_element_type_mismatch(
+    %arg0: tensor<4x128xf32>, %arg1: tensor<4x128xi32>)
+    -> (tensor<4x128xf32>, tensor<4x128xi64>) {
+  %out_values = tensor.empty() : tensor<4x128xf32>
+  %out_indices = tensor.empty() : tensor<4x128xi64>
+  // expected-error@+1 {{expected input/output indices element types to be identical}}
+  %0:2 = iree_linalg_ext.topk_v2 dimension(1)
+      ins(%arg0, %arg1 : tensor<4x128xf32>, tensor<4x128xi32>)
+      outs(%out_values, %out_indices : tensor<4x128xf32>, tensor<4x128xi64>) {
+      ^bb0(%lhs: f32, %rhs: f32):
+        %cmp = arith.cmpf oge, %lhs, %rhs : f32
+        iree_linalg_ext.yield %cmp : i1
+      } -> tensor<4x128xf32>, tensor<4x128xi64>
+  return %0#0, %0#1 : tensor<4x128xf32>, tensor<4x128xi64>
+}
+
+// -----
+
 func.func @exp_reduction_non_zero(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
@@ -2055,7 +2073,7 @@ func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
       iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
       outs(%arg0: tensor<?xindex>) {
     ^bb0(%b0 : tensor<?xindex>):
-      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing CustomOp}}
+      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing operation}}
       %1 = iree_linalg_ext.index 1 : index
       %2 = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>],

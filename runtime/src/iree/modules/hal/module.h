@@ -61,6 +61,10 @@ enum iree_hal_module_flag_bits_t {
 
   // Forces HAL methods to block instead of yielding as a coroutine.
   IREE_HAL_MODULE_FLAG_SYNCHRONOUS = 1u << 0,
+
+  // Forces VM-created command buffers to retain command and dispatch metadata
+  // required by rich device profiling.
+  IREE_HAL_MODULE_FLAG_RETAIN_COMMAND_BUFFER_PROFILE_METADATA = 1u << 1,
 };
 typedef uint32_t iree_hal_module_flags_t;
 

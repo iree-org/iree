@@ -411,15 +411,13 @@ iree_hal_topology_edge_from_capabilities(
   // NUMA distance (queried from ACPI SLIT table via platform APIs).
   if (src_caps->numa_node != dst_caps->numa_node) {
     uint8_t slit_distance = 0;
-    iree_status_t numa_status = iree_hal_platform_query_numa_distance(
-        src_caps->numa_node, dst_caps->numa_node, &slit_distance);
     uint32_t scaled_distance;
-    if (iree_status_is_ok(numa_status)) {
+    if (iree_hal_platform_try_query_numa_distance(
+            src_caps->numa_node, dst_caps->numa_node, &slit_distance)) {
       // Normalize SLIT distance (10=same, 20=1hop, 30=2hop, ...) to 0-15 scale.
       // Subtract the "same node" base of 10, divide by 2 to compress range.
       scaled_distance = slit_distance > 10 ? (slit_distance - 10) / 2 : 0;
     } else {
-      iree_status_ignore(numa_status);
       // Platform doesn't support SLIT queries; use a conservative default
       // for cross-node distance. This will be refined by driver-specific logic
       // via refine_topology_edge.

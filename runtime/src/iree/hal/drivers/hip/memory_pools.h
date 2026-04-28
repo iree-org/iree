@@ -71,8 +71,7 @@ iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
 // result in a wait until the allocation is available.
 iree_status_t iree_hal_hip_memory_pools_prepare_buffer(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
 // Asynchronously deallocates a buffer from its pool.

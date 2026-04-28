@@ -218,6 +218,35 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_file
+  HDRS
+    "profile_file.h"
+  SRCS
+    "profile_file.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::io::file_handle
+    iree::io::stream
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    profile_file_test
+  SRCS
+    "profile_file_test.cc"
+  DEPS
+    ::profile_file
+    iree::base
+    iree::hal
+    iree::io::file_handle
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     queue_emulation
   HDRS
     "queue_emulation.h"
@@ -243,6 +272,32 @@ iree_cc_library(
     iree::base::internal::arena
     iree::hal
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    statistics_sink
+  HDRS
+    "statistics_sink.h"
+  SRCS
+    "statistics_sink.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    statistics_sink_test
+  SRCS
+    "statistics_sink_test.cc"
+  DEPS
+    ::statistics_sink
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_binary_benchmark(

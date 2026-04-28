@@ -143,15 +143,20 @@ iree_status_t iree_hal_sync_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
+  device->frontier_tracker = create_params->frontier.base_axis != 0
+                                 ? create_params->frontier.tracker
+                                 : NULL;
   device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
-                              device->axis, /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(
+        device->frontier_tracker, device->axis, /*semaphore=*/NULL);
   }
-  iree_status_t status =
-      iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
+  }
 
   if (iree_status_is_ok(status)) {
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
@@ -374,9 +379,14 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  if (IREE_UNLIKELY(pool)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "local-sync device does not support queue allocation pools");
+  }
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   iree_status_t status = iree_hal_semaphore_list_wait(
       wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
@@ -611,15 +621,8 @@ static iree_status_t iree_hal_sync_device_queue_flush(
 static iree_status_t iree_hal_sync_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  // Unimplemented (and that's ok).
-  // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
-  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
-  // Capturing things like:
-  //   PERF_COUNT_HW_CPU_CYCLES / PERF_COUNT_HW_INSTRUCTIONS
-  //   PERF_COUNT_HW_CACHE_REFERENCES / PERF_COUNT_HW_CACHE_MISSES
-  //   etc
-  // TODO(benvanik): shared iree/hal/local/profiling implementation of this.
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local-sync HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_sync_device_profiling_flush(
@@ -632,6 +635,21 @@ static iree_status_t iree_hal_sync_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_sync_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "local-sync external capture provider '%.*s' is not implemented",
+      (int)options->provider.size, options->provider.data);
+}
+
+static iree_status_t iree_hal_sync_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local-sync external capture is not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
@@ -669,4 +687,6 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .profiling_begin = iree_hal_sync_device_profiling_begin,
     .profiling_flush = iree_hal_sync_device_profiling_flush,
     .profiling_end = iree_hal_sync_device_profiling_end,
+    .external_capture_begin = iree_hal_sync_device_external_capture_begin,
+    .external_capture_end = iree_hal_sync_device_external_capture_end,
 };

@@ -280,6 +280,15 @@ static iree_status_t iree_tooling_load_hal_async_module(
 
   // Create HAL module wrapping the device group.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
+  if (iree_status_is_ok(status)) {
+    bool retain_profile_metadata = false;
+    status =
+        iree_hal_profiling_from_flags_requires_retained_command_buffer_metadata(
+            &retain_profile_metadata);
+    if (iree_status_is_ok(status) && retain_profile_metadata) {
+      flags |= IREE_HAL_MODULE_FLAG_RETAIN_COMMAND_BUFFER_PROFILE_METADATA;
+    }
+  }
   iree_vm_module_t* module = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(

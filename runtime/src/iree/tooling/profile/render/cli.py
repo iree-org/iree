@@ -1,0 +1,95 @@
+"""Command line interface for iree-profile-render."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+from typing import Any
+
+from . import backends
+from . import common
+
+
+def format_descriptions() -> str:
+    lines = ["Formats:"]
+    for backend in backends.BACKENDS.values():
+        lines.append(f"  {backend.name:<10} {backend.description}")
+    return "\n".join(lines)
+
+
+def parse_arguments(arguments: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="iree-profile-render",
+        description=(
+            "Renders ireeperf-jsonl emitted by iree-profile into external "
+            "analysis formats."
+        ),
+        epilog=(
+            f"{format_descriptions()}\n\n"
+            "One-shot Perfetto dependency invocation:\n"
+            "  uvx --with perfetto --with protobuf python "
+            "$(command -v iree-profile-render) --format=perfetto "
+            "INPUT.ireeperf.jsonl -o OUTPUT.pftrace\n\n"
+            "Pipeline:\n"
+            "  iree-profile export --format=ireeperf-jsonl "
+            "--output=- run.ireeprof | \\\n"
+            "    uvx --with perfetto --with protobuf python "
+            "$(command -v iree-profile-render) --format=perfetto - -o run.pftrace"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        default="perfetto",
+        choices=tuple(backends.BACKENDS),
+        help="Render format. Default: perfetto.",
+    )
+    parser.add_argument(
+        "input",
+        help="Input ireeperf-jsonl file, or '-' to read from stdin.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Output path for the selected render format.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print the conversion summary.",
+    )
+    return parser.parse_args(arguments)
+
+
+def render(args: argparse.Namespace) -> Any:
+    records = common.read_jsonl(args.input)
+    common.validate_schema(records)
+    return backends.BACKENDS[args.format].render(records, Path(args.output))
+
+
+def print_summary(
+    output_path: str,
+    render_format: str,
+    stats: Any,
+) -> None:
+    backend = backends.BACKENDS[render_format]
+    fields = ", ".join(
+        f"{name}={value}" for name, value in backend.summary_fields(stats)
+    )
+    print(
+        "wrote "
+        f"{output_path} ({stats.output_byte_count} bytes, "
+        f"format={render_format}, {fields})",
+        file=sys.stderr,
+    )
+
+
+def main(arguments: list[str] | None = None) -> int:
+    args = parse_arguments(arguments)
+    stats = render(args)
+    if not args.quiet:
+        print_summary(args.output, args.format, stats)
+    return 0

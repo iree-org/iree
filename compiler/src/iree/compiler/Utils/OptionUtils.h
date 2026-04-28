@@ -35,7 +35,6 @@ struct opt_initializer {
                   const Ty &val)
       : parentName(parentName), init(val), optLevel(opt) {}
   void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
-    assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
     if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel()) {
       val = init;
     }

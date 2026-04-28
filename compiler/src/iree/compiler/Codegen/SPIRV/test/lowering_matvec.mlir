@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass, func.func(iree-spirv-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan \
+// RUN:   --iree-codegen-spirv-configuration-pipeline \
+// RUN:   --iree-codegen-linalg-to-spirv-pipeline='include-spirv-lowering=false' \
+// RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -45,8 +48,7 @@ func.func @i4_dequant_matvec_f32() {
 
 //   CHECK-LABEL:  func.func @i4_dequant_matvec_f32()
 
-//         CHECK:   scf.forall (%arg0) in (4096)
-//         CHECK:     %[[FOR:.+]] = scf.for %arg1 = %c0 to %c86 step %c2 iter_args(%arg2 = {{.+}}) -> (vector<1x4xf32>)
+//         CHECK:     %[[FOR:.+]] = scf.for %arg0 = %c0 to %c86 step %c2 iter_args(%arg1 = {{.+}}) -> (vector<1x4xf32>)
 //         CHECK:       %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x86x128xi4, #hal.descriptor_type<storage_buffer>>, vector<4xi4>
 //         CHECK:       %[[READ1:.+]] = vector.transfer_read {{.+}} : memref<4096x86xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
 //         CHECK:       %[[READ2:.+]] = vector.transfer_read {{.+}} : memref<4096x86xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
@@ -59,7 +61,7 @@ func.func @i4_dequant_matvec_f32() {
 //         CHECK:       %[[BROADCAST1:.+]] = vector.broadcast %[[EXTRACT1]] : f32 to vector<4xf32>
 //         CHECK:       %[[MUL0:.+]] = arith.mulf %[[SUB]], %[[BROADCAST1]] : vector<4xf32>
 //         CHECK:       %[[MUL1:.+]] = arith.mulf %[[READ3]], %[[MUL0]] : vector<4xf32>
-//         CHECK:       %[[SHAPE_CAST:.+]] = vector.shape_cast %arg2 : vector<1x4xf32> to vector<4xf32>
+//         CHECK:       %[[SHAPE_CAST:.+]] = vector.shape_cast %arg1 : vector<1x4xf32> to vector<4xf32>
 //         CHECK:       %[[ADD:.+]] = arith.addf %[[MUL1]], %[[SHAPE_CAST]] : vector<4xf32>
 //         CHECK:       %[[SHAPE_CAST2:.+]] = vector.shape_cast %[[ADD]] : vector<4xf32> to vector<1x4xf32>
 //         CHECK:       scf.yield %[[SHAPE_CAST2]] : vector<1x4xf32>
@@ -69,4 +71,3 @@ func.func @i4_dequant_matvec_f32() {
 //         CHECK:     gpu.subgroup_reduce add %[[REDUCE]] : (f32) -> f32
 //         CHECK:     scf.if
 //         CHECK:       vector.transfer_write
-//         CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}

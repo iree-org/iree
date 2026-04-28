@@ -37,6 +37,7 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertForallToPCF.cpp",
         "ConvertSRefToMemRef.cpp",
+        "FoldForallIntoPCFLoop.cpp",
         "FuseConsumers.cpp",
         "FusePCFWrites.cpp",
         "FuseProducers.cpp",

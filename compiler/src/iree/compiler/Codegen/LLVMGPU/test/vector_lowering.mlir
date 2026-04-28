@@ -39,34 +39,6 @@ module {
 
 // -----
 
-// Test to check if masked transfer reads masked on an outer dimension lowers
-// to:
-//  cond = dim >= id
-//  vector.maskedload mem[..., id, ...] broadcast(cond)
-func.func @partial_masked_transfer_read(%mem : memref<16x?x32xf16>) -> vector<1x2x16xf16> {
-  %cst = ub.poison : f16
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c16 = arith.constant 16 : index
-  %dim = memref.dim %mem, %c1 : memref<16x?x32xf16>
-  %mask = vector.create_mask %c1, %dim, %c16 : vector<1x2x16xi1>
-  %read = vector.transfer_read %mem[%c0, %c0, %c0], %cst, %mask {in_bounds = [true, true, true]} : memref<16x?x32xf16>, vector<1x2x16xf16>
-  return %read : vector<1x2x16xf16>
-}
-
-// CHECK-LABEL: func.func @partial_masked_transfer_read
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[DIM:.+]] = memref.dim
-// CHECK-DAG: %[[COND:.+]] = arith.cmpi sgt, %[[DIM]], %[[C0]] : index
-// CHECK-DAG: %[[COND1:.+]] = arith.cmpi sgt, %[[DIM]], %[[C1]] : index
-// CHECK-DAG: %[[MASK:.+]] = vector.broadcast %[[COND]] : i1 to vector<16xi1>
-// CHECK-DAG: %[[MASK1:.+]] = vector.broadcast %[[COND1]] : i1 to vector<16xi1>
-// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C0]], %[[C0]]], %[[MASK]]
-// CHECK: vector.maskedload %{{.*}}[%[[C0]], %[[C1]], %[[C0]]], %[[MASK1]]
-
-// -----
-
 // Test multi_reduction lowering.
 
 func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
@@ -80,18 +52,14 @@ func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> 
 
 // CHECK-LABEL: func.func @multi_reduction_f32
 // CHECK-SAME: %[[ARG0:.+]]: vector<2x1x8xf32>, %[[ARG1:.+]]: vector<2x1x8xf32>)
-// CHECK-DAG: %[[LHS0:.+]] = vector.extract %[[ARG0]][0, 0]
-// CHECK-DAG: %[[RHS0:.+]] = vector.extract %[[ARG1]][0, 0]
-// CHECK-DAG: %[[LHS1:.+]] = vector.extract %[[ARG0]][1, 0]
-// CHECK-DAG: %[[RHS1:.+]] = vector.extract %[[ARG1]][1, 0]
-// CHECK-DAG: %[[FMA1:.+]] = math.fma %[[LHS0]], %[[RHS0]], %{{.*}} fastmath<contract> : vector<8xf32>
-// CHECK-DAG: %[[FMA2:.+]] = math.fma %[[LHS1]], %[[RHS1]], %{{.*}} fastmath<contract> : vector<8xf32>
+// CHECK-DAG: %[[FMA:.+]] = math.fma %[[ARG0]], %[[ARG1]], %{{.*}} fastmath<contract> : vector<2x1x8xf32>
+// CHECK-DAG: %[[FMA1:.+]] = vector.extract %[[FMA]][0, 0] : vector<8xf32> from vector<2x1x8xf32>
 // CHECK-DAG: %[[RED1:.+]] = vector.reduction <add>, %[[FMA1]], %{{.*}} : vector<8xf32> into f32
+// CHECK-DAG: %[[FMA2:.+]] = vector.extract %[[FMA]][1, 0] : vector<8xf32> from vector<2x1x8xf32>
 // CHECK-DAG: %[[RED2:.+]] = vector.reduction <add>, %[[FMA2]], %{{.*}} : vector<8xf32> into f32
 // CHECK: vector.from_elements %[[RED1]], %[[RED2]] : vector<2x1xf32>
 
 // -----
-
 
 func.func @multi_reduction_no_uplift(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
   %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
@@ -103,13 +71,7 @@ func.func @multi_reduction_no_uplift(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32
 }
 
 // CHECK-LABEL: func.func @multi_reduction_no_uplift
-// CHECK-SAME: %[[ARG0:.+]]: vector<2x1x8xf32>, %[[ARG1:.+]]: vector<2x1x8xf32>)
-// CHECK-DAG: %[[LHS0:.+]] = vector.extract %[[ARG0]][0, 0]
-// CHECK-DAG: %[[RHS0:.+]] = vector.extract %[[ARG1]][0, 0]
-// CHECK-DAG: %[[LHS1:.+]] = vector.extract %[[ARG0]][1, 0]
-// CHECK-DAG: %[[RHS1:.+]] = vector.extract %[[ARG1]][1, 0]
-// CHECK-DAG: arith.mulf %[[LHS0]], %[[RHS0]] fastmath<fast> : vector<8xf32>
-// CHECK-DAG: arith.mulf %[[LHS1]], %[[RHS1]] fastmath<fast> : vector<8xf32>
+// CHECK: arith.mulf %{{.*}}, %{{.*}} fastmath<fast>
 // CHECK-NOT: math.fma
 
 // -----

@@ -320,7 +320,6 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "getUndistributedTileTypes",
         "getDistributedTileTypes",
         "getUndistributedTileDimExpansion",
-        "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
         "getOperandIteratorTypes",
@@ -360,17 +359,6 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
           .getUndistributedTileDimExpansion(operandIndex, logicalDim);
     }
 
-    LogicalResult $cppClass::populateOperandOffsetsSizesStrides(
-        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
-        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
-        SmallVectorImpl<OpFoldResult> &sizes,
-        SmallVectorImpl<OpFoldResult> &strides) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .populateOperandOffsetsSizesStrides(builder, loc, operandIndex,
-                                              laneId, permutation, offsets,
-                                              sizes, strides);
-    }
-
     Attribute $cppClass::getDistributionMappingKind() const {
       return cast<DataTiledMMAInterfaceAttr>(*this)
           .getDistributionMappingKind();
@@ -393,6 +381,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "populateOperandOffsetsSizesStrides",
     "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
@@ -466,6 +455,7 @@ def IREEGPU_DataTiledScaledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations"
   ]>
 ]> {

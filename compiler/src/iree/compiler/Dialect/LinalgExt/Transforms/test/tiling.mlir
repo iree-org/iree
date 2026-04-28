@@ -788,6 +788,248 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @topk_v2_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tensor<?x?xi32>, %out_values: tensor<?x3xf32> , %out_indices: tensor<?x3xi32>) -> (tensor<?x3xf32>, tensor<?x3xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2
+        dimension(1)
+        ins(%input_values, %input_indices : tensor<?x?xf32> , tensor<?x?xi32>)
+        outs(%out_values, %out_indices : tensor<?x3xf32>, tensor<?x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<?x3xf32>, tensor<?x3xi32>
+  return %0#0, %0#1 : tensor<?x3xf32>, tensor<?x3xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @topk_v2_tile_tensor
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[ARG5:.+]] = %[[ARG2]], %[[ARG6:.+]] = %[[ARG3]])
+// CHECK:           %[[D3:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[D0]]]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D5:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
+// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           %[[D8:.+]]:2 = iree_linalg_ext.topk_v2
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[D4]], %[[D5]]
+// CHECK-SAME:      outs(%[[D6]], %[[D7]]
+// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           scf.yield %[[D9]], %[[D10]]
+// CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_tile_tensor_no_input_indices(%input_values: tensor<20x10xf32>, %out_values: tensor<20x3xf32> , %out_indices: tensor<20x3xi32>) -> (tensor<20x3xf32>, tensor<20x3xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2
+        dimension(1)
+        ins(%input_values : tensor<20x10xf32>)
+        outs(%out_values, %out_indices : tensor<20x3xf32>, tensor<20x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<20x3xf32>, tensor<20x3xi32>
+  return %0#0, %0#1 : tensor<20x3xf32>, tensor<20x3xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @topk_v2_tile_tensor_no_input_indices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C20]] step %[[C10]] iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
+// CHECK:           %[[D2:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0] [10, 10] [1, 1]
+// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG4]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D5:.+]]:2 = iree_linalg_ext.topk_v2
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%[[D2]]
+// CHECK-SAME:        outs(%[[D3]], %[[D4]]
+// CHECK:           %[[D6:.+]] = tensor.insert_slice %[[D5]]#0 into %[[ARG4]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D5]]#1 into %[[ARG5]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           scf.yield %[[D6]], %[[D7]]
+// CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @topk_v2_tile_tensor_values_only(%input_values: tensor<20x10xf32>, %out_values: tensor<20x3xf32>) -> tensor<20x3xf32> {
+  %0 = iree_linalg_ext.topk_v2
+        dimension(1)
+        ins(%input_values : tensor<20x10xf32>)
+        outs(%out_values : tensor<20x3xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<20x3xf32>
+  return %0 : tensor<20x3xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @topk_v2_tile_tensor_values_only
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[RESULT:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C20]] step %[[C10]] iter_args(%[[ARG3:.+]] = %[[ARG1]])
+// CHECK:           %[[D1:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG2]], 0] [10, 10] [1, 1]
+// CHECK:           %[[D2:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG2]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D3:.+]] = iree_linalg_ext.topk_v2
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%[[D1]]
+// CHECK-SAME:        outs(%[[D2]]
+// CHECK:           %[[D4:.+]] = tensor.insert_slice %[[D3]] into %[[ARG3]][%[[ARG2]], 0] [10, 3] [1, 1]
+// CHECK:           scf.yield %[[D4]]
+// CHECK:           return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memref<?x?xi32>, %out_values: memref<?x3xf32>, %out_indices: memref<?x3xi32>) {
+  iree_linalg_ext.topk_v2
+        dimension(1)
+        ins(%input_values, %input_indices : memref<?x?xf32> , memref<?x?xi32>)
+        outs(%out_values, %out_indices : memref<?x3xf32>, memref<?x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK:       func.func @topk_v2_tile_memref
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = memref.dim %[[ARG0:.+]], %[[C0]]
+// CHECK:         %[[D1:.+]] = memref.dim %[[ARG0:.+]], %[[C1]]
+// CHECK:         scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
+// CHECK:           %[[D2:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[D0]]]
+// CHECK:           %[[D3:.+]] = memref.subview %[[ARG0]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D4:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
+// CHECK:           %[[D5:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0] [%[[D2]], 3] [1, 1]
+// CHECK:           %[[D6:.+]] = memref.subview %[[ARG3]][%[[ARG4]], 0] [%[[D2]], 3] [1, 1]
+// CHECK:           iree_linalg_ext.topk_v2
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%[[D3]], %[[D4]]
+// CHECK-SAME:        outs(%[[D5]], %[[D6]]
+// CHECK:           return
+
+// -----
+
+func.func @topk_v2_tile_1d_reduction(%input: tensor<128xf32>,
+    %out_values: tensor<3xf32>) -> tensor<3xf32> {
+  %0 = iree_linalg_ext.topk_v2
+        dimension(0)
+        ins(%input : tensor<128xf32>)
+        outs(%out_values : tensor<3xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0]
+         : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+//      CHECK: func.func @topk_v2_tile_1d_reduction(
+// CHECK-SAME:   %[[INPUT:.+]]: tensor<128xf32>
+// CHECK-SAME:   %[[OUTV:.+]]: tensor<3xf32>
+//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.topk_v2
+// CHECK-SAME:       ins(%[[INPUT]] :
+// CHECK-SAME:       outs(%[[OUTV]] :
+//      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @topk_v2_tile_tensor_is_sorted(%input_values: tensor<20x10xf32>,
+    %out_values: tensor<20x3xf32>,
+    %out_indices: tensor<20x3xi32>)
+    -> (tensor<20x3xf32>, tensor<20x3xi32>) {
+  %0:2 = iree_linalg_ext.topk_v2
+        dimension(1) is_sorted
+        ins(%input_values : tensor<20x10xf32>)
+        outs(%out_values, %out_indices : tensor<20x3xf32>, tensor<20x3xi32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
+          iree_linalg_ext.yield %0 : i1
+        } -> tensor<20x3xf32>, tensor<20x3xi32>
+  return %0#0, %0#1 : tensor<20x3xf32>, tensor<20x3xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk_v2"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @topk_v2_tile_tensor_is_sorted
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C20]] step %[[C10]] iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
+// CHECK:           %[[D2:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0] [10, 10] [1, 1]
+// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG4]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D5:.+]]:2 = iree_linalg_ext.topk_v2
+// CHECK-SAME:        dimension(1) is_sorted
+// CHECK-SAME:        ins(%[[D2]]
+// CHECK-SAME:        outs(%[[D3]], %[[D4]]
+// CHECK:           %[[D6:.+]] = tensor.insert_slice %[[D5]]#0 into %[[ARG4]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D5]]#1 into %[[ARG5]][%[[ARG3]], 0] [10, 3] [1, 1]
+// CHECK:           scf.yield %[[D6]], %[[D7]]
+// CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
 func.func @arg_compare_tile_tensor(
     %input: tensor<?x?xf32>,
     %outv: tensor<?xf32>,

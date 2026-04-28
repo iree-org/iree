@@ -269,6 +269,47 @@ endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
 iree_cc_binary(
   NAME
+    iree-profile
+  SRCS
+    "iree-profile-main.c"
+  DEPS
+    iree::base
+    iree::base::tooling::flags
+    iree::tooling::profile::commands
+    iree::tooling::profile::help
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+if(IREE_HAL_DRIVER_AMDGPU)
+  target_compile_definitions(iree-profile PRIVATE IREE_PROFILE_HAVE_AMDGPU_ATT=1)
+  target_link_libraries(iree-profile PRIVATE iree::tooling::profile::att)
+else()
+  target_compile_definitions(iree-profile PRIVATE IREE_PROFILE_HAVE_AMDGPU_ATT=0)
+endif()
+
+install(
+  PROGRAMS
+    "iree-profile-render"
+  DESTINATION
+    bin
+  COMPONENT
+    IREETools-Runtime
+)
+
+install(
+  DIRECTORY
+    "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render"
+  DESTINATION
+    "share/iree/profile"
+  COMPONENT
+    IREETools-Runtime
+  FILES_MATCHING
+    PATTERN "*.py"
+)
+
+iree_cc_binary(
+  NAME
     iree-run-module
   SRCS
     "iree-run-module-main.c"

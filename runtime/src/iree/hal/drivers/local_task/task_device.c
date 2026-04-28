@@ -127,7 +127,9 @@ iree_status_t iree_hal_task_device_create(
                              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
                                                        &identifier_offset)));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&device));
+      z0, iree_allocator_malloc_aligned(host_allocator, total_size,
+                                        iree_alignof(iree_hal_task_device_t),
+                                        /*offset=*/0, (void**)&device));
   memset(device, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_task_device_vtable, &device->resource);
   iree_string_view_append_to_buffer(identifier, &device->identifier,
@@ -140,7 +142,9 @@ iree_status_t iree_hal_task_device_create(
   // borrowed from the pool based on its executor's node assignment.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
+  device->frontier_tracker = create_params->frontier.base_axis != 0
+                                 ? create_params->frontier.tracker
+                                 : NULL;
 
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
@@ -183,10 +187,9 @@ iree_status_t iree_hal_task_device_create(
 
       // Register the queue's axis in the frontier tracker's axis table.
       if (device->frontier_tracker) {
-        int32_t table_index = iree_async_axis_table_add(
-            &device->frontier_tracker->axis_table, queue_axis,
-            /*semaphore=*/NULL);
-        (void)table_index;
+        status = iree_async_frontier_tracker_register_axis(
+            device->frontier_tracker, queue_axis, /*semaphore=*/NULL);
+        if (!iree_status_is_ok(status)) break;
       }
 
       iree_hal_task_queue_initialize(
@@ -226,7 +229,7 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
 
-  iree_allocator_free(host_allocator, device);
+  iree_allocator_free_aligned(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -481,9 +484,14 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  if (IREE_UNLIKELY(pool)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "local-task device does not support queue allocation pools");
+  }
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
@@ -616,15 +624,8 @@ static iree_status_t iree_hal_task_device_queue_flush(
 static iree_status_t iree_hal_task_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  // Unimplemented (and that's ok).
-  // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
-  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
-  // Capturing things like:
-  //   PERF_COUNT_HW_CPU_CYCLES / PERF_COUNT_HW_INSTRUCTIONS
-  //   PERF_COUNT_HW_CACHE_REFERENCES / PERF_COUNT_HW_CACHE_MISSES
-  //   etc
-  // TODO(benvanik): shared iree/hal/local/profiling implementation of this.
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local-task HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_task_device_profiling_flush(
@@ -637,6 +638,21 @@ static iree_status_t iree_hal_task_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_task_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "local-task external capture provider '%.*s' is not implemented",
+      (int)options->provider.size, options->provider.data);
+}
+
+static iree_status_t iree_hal_task_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local-task external capture is not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
@@ -674,4 +690,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .profiling_begin = iree_hal_task_device_profiling_begin,
     .profiling_flush = iree_hal_task_device_profiling_flush,
     .profiling_end = iree_hal_task_device_profiling_end,
+    .external_capture_begin = iree_hal_task_device_external_capture_begin,
+    .external_capture_end = iree_hal_task_device_external_capture_end,
 };

@@ -23,7 +23,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["lit.cfg.py"])
+exports_files([
+    "iree-profile-render",
+    "lit.cfg.py",
+])
 
 iree_runtime_cc_binary(
     name = "iree-benchmark-executable",
@@ -240,6 +243,24 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/tooling:run_module",
         "//runtime/src/iree/vm",
     ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-profile",
+    srcs = ["iree-profile-main.c"],
+    defines = select({
+        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["IREE_PROFILE_HAVE_AMDGPU_ATT=1"],
+        "//conditions:default": ["IREE_PROFILE_HAVE_AMDGPU_ATT=0"],
+    }),
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/tooling/profile:commands",
+        "//runtime/src/iree/tooling/profile:help",
+    ] + select({
+        "//runtime/src/iree/hal/drivers:amdgpu_enabled": ["//runtime/src/iree/tooling/profile/att"],
+        "//conditions:default": [],
+    }),
 )
 
 iree_compiler_cc_binary(

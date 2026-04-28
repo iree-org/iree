@@ -142,14 +142,18 @@ static iree_status_t iree_hal_metal_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
+  device->frontier_tracker =
+      create_params->frontier.base_axis != 0 ? create_params->frontier.tracker : NULL;
   device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
+  iree_status_t status = iree_ok_status();
   if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table, device->axis,
-                              /*semaphore=*/NULL);
+    status = iree_async_frontier_tracker_register_axis(device->frontier_tracker, device->axis,
+                                                       /*semaphore=*/NULL);
   }
-  iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_device_release((iree_hal_device_t*)device);
     return status;
@@ -401,9 +405,13 @@ static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_
 static iree_status_t iree_hal_metal_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_allocator_pool_t pool,
+    const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  if (IREE_UNLIKELY(pool)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Metal device does not support queue allocation pools");
+  }
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   iree_status_t status = iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
                                                       IREE_ASYNC_WAIT_FLAG_NONE);
@@ -645,35 +653,59 @@ static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_d
 
 static iree_status_t iree_hal_metal_device_profiling_begin(
     iree_hal_device_t* base_device, const iree_hal_device_profiling_options_t* options) {
-  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Metal HAL-native profiling is not implemented");
+}
 
+static iree_status_t iree_hal_metal_device_profiling_flush(iree_hal_device_t* base_device) {
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_device_profiling_end(iree_hal_device_t* base_device) {
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_device_external_capture_begin(
+    iree_hal_device_t* base_device, const iree_hal_device_external_capture_options_t* options) {
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  if (!iree_string_view_equal(options->provider, IREE_SV("metal"))) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Metal external capture provider '%.*s' is not implemented",
+                            (int)options->provider.size, options->provider.data);
+  }
   if (device->capture_manager) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "cannot nest profile capture");
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "cannot nest Metal external capture");
   }
 
-  if (iree_all_bits_set(options->mode, IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
-    device->capture_manager = [[MTLCaptureManager sharedCaptureManager] retain];  // +1
+  MTLCaptureManager* capture_manager = [[MTLCaptureManager sharedCaptureManager] retain];
+  iree_status_t status = iree_ok_status();
 
-    @autoreleasepool {
-      NSURL* capture_url = NULL;
-      if (strlen(options->file_path) != 0) {
-        if (!iree_string_view_ends_with(IREE_SV(options->file_path), IREE_SV(".gputrace"))) {
-          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+  @autoreleasepool {
+    NSURL* capture_url = NULL;
+    iree_string_view_t file_path = options->file_path;
+    if (!iree_string_view_is_empty(file_path)) {
+      if (!iree_string_view_ends_with(file_path, IREE_SV(".gputrace"))) {
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "capture filename must end with .gputrace");
-        }
-        if (![device->capture_manager supportsDestination:MTLCaptureDestinationGPUTraceDocument]) {
-          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+      } else if (![capture_manager supportsDestination:MTLCaptureDestinationGPUTraceDocument]) {
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "unsupported capture to file (if invoking as command-line "
                                   "binary, make sure there is companion Info.plist under the same "
                                   "directory with 'MetalCaptureEnabled' key being true)");
+      } else {
+        NSString* ns_string = [[[NSString alloc] initWithBytes:file_path.data
+                                                        length:file_path.size
+                                                      encoding:NSUTF8StringEncoding] autorelease];
+        if (!ns_string) {
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "capture filename is not UTF-8");
+        } else {
+          NSString* capture_path = ns_string.stringByStandardizingPath;
+          capture_url = [NSURL fileURLWithPath:capture_path isDirectory:false];
         }
-
-        NSString* ns_string = [NSString stringWithCString:options->file_path
-                                                 encoding:[NSString defaultCStringEncoding]];
-        NSString* capture_path = ns_string.stringByStandardizingPath;
-        capture_url = [NSURL fileURLWithPath:capture_path isDirectory:false];
       }
+    }
 
+    if (iree_status_is_ok(status)) {
       MTLCaptureDescriptor* capture_descriptor = [[[MTLCaptureDescriptor alloc] init] autorelease];
       capture_descriptor.captureObject = device->device;
       if (capture_url) {
@@ -684,29 +716,33 @@ static iree_status_t iree_hal_metal_device_profiling_begin(
       }
 
       NSError* error = NULL;
-      if (![device->capture_manager startCaptureWithDescriptor:capture_descriptor error:&error]) {
-        iree_status_t status =
-            iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to start profile capture");
-        const char* ns_c_error = [error.localizedDescription
-            cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
-        return iree_status_annotate_f(status, "with NSError: %s", ns_c_error);
+      if (![capture_manager startCaptureWithDescriptor:capture_descriptor error:&error]) {
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to start external capture");
+        const char* ns_c_error = error ? [error.localizedDescription
+                                             cStringUsingEncoding:[NSString defaultCStringEncoding]]
+                                       : "unknown error";
+        status = iree_status_annotate_f(status, "with NSError: %s",
+                                        ns_c_error ? ns_c_error : "unknown error");
       }
     }
   }
-  return iree_ok_status();
-}
 
-static iree_status_t iree_hal_metal_device_profiling_flush(iree_hal_device_t* base_device) {
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_device_profiling_end(iree_hal_device_t* base_device) {
-  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  if (device->capture_manager) {
-    [device->capture_manager stopCapture];
-    [device->capture_manager release];  // -1
-    device->capture_manager = NULL;
+  if (!iree_status_is_ok(status)) {
+    [capture_manager release];
+    return status;
   }
+  device->capture_manager = capture_manager;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_device_external_capture_end(iree_hal_device_t* base_device) {
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  if (!device->capture_manager) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "no Metal external capture is active");
+  }
+  [device->capture_manager stopCapture];
+  [device->capture_manager release];
+  device->capture_manager = NULL;
   return iree_ok_status();
 }
 
@@ -743,4 +779,6 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .profiling_begin = iree_hal_metal_device_profiling_begin,
     .profiling_flush = iree_hal_metal_device_profiling_flush,
     .profiling_end = iree_hal_metal_device_profiling_end,
+    .external_capture_begin = iree_hal_metal_device_external_capture_begin,
+    .external_capture_end = iree_hal_metal_device_external_capture_end,
 };

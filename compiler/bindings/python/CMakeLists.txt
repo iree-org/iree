@@ -105,6 +105,7 @@ declare_mlir_dialect_python_bindings(
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IREECodegenBinding.td
   GEN_ENUM_BINDINGS
+  GEN_ENUM_BINDINGS_TD_FILE dialects/IREECodegenEnumBinding.td
   SOURCES dialects/iree_codegen.py
   DIALECT_NAME iree_codegen
 )
@@ -114,6 +115,7 @@ declare_mlir_dialect_python_bindings(
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IREEGPUBinding.td
   GEN_ENUM_BINDINGS
+  GEN_ENUM_BINDINGS_TD_FILE dialects/IREEGPUEnumBinding.td
   SOURCES dialects/iree_gpu.py
   DIALECT_NAME iree_gpu
 )

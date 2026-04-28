@@ -61,8 +61,11 @@ void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &modulePassManager);
 
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
-/// the structured ops path.
-void buildSPIRVCodegenPassPipeline(OpPassManager &modulePassManager);
+/// the structured ops path. When `includeSPIRVLowering` is false, the MemRef
+/// lowering and SPIR-V conversion passes are skipped, leaving the output at
+/// the vector/memref level.
+void buildSPIRVCodegenPassPipeline(OpPassManager &modulePassManager,
+                                   bool includeSPIRVLowering = true);
 
 /// Populates passes needed to link HAL executables across SPIRV targets.
 void buildSPIRVLinkingPassPipeline(OpPassManager &modulePassManager);

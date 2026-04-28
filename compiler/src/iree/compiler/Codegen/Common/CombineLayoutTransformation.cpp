@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -606,6 +607,9 @@ static void collectRelayoutChain(Operation *relayoutOp,
 /// collapse_shape).
 /// - The chain must contain at least one op that is not extract_slice or a
 /// reshape op.
+/// - The chain must not contain any op that carries a `lowering_config`
+/// attribute, since such ops are roots for downstream transformations (e.g.
+/// tiling) and should not be folded into a MapLoad.
 static bool isComplexRelayoutChain(Operation *relayoutOp) {
   assert(isSupportedSingleInputRelayoutOpForSource(relayoutOp) &&
          "expected a supported relayout op");
@@ -621,7 +625,14 @@ static bool isComplexRelayoutChain(Operation *relayoutOp) {
   bool allReshapeOrExtractSlice = llvm::all_of(
       chain, llvm::IsaPred<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
                            tensor::ExtractSliceOp>);
-  return hasReshape && !allReshapeOrExtractSlice;
+  if (!hasReshape || allReshapeOrExtractSlice) {
+    return false;
+  }
+  if (llvm::any_of(chain,
+                   [](Operation *op) { return getLoweringConfig(op); })) {
+    return false;
+  }
+  return true;
 }
 
 /// Collects direct relayout op users of `loadResult` that start complex
