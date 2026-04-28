@@ -1,0 +1,12 @@
+// RUN: ( iree-run-replay --help || [[ $? == 1 ]] ) | FileCheck %s --check-prefix=RUN-REPLAY
+// RUN: ( iree-benchmark-replay --help || [[ $? == 1 ]] ) | FileCheck %s --check-prefix=BENCH-REPLAY
+// RUN: ( iree-dump-replay --help || [[ $? == 1 ]] ) | FileCheck %s --check-prefix=DUMP-REPLAY
+
+// RUN-REPLAY: IREE: iree-run-replay
+// RUN-REPLAY: Executes an IREE HAL replay file
+
+// BENCH-REPLAY: IREE: iree-benchmark-replay
+// BENCH-REPLAY: Benchmarks deterministic execution of an IREE HAL replay file
+
+// DUMP-REPLAY: IREE: iree-dump-replay
+// DUMP-REPLAY: Dumps information from an IREE HAL replay file

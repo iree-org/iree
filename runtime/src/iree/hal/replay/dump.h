@@ -21,8 +21,6 @@ typedef enum iree_hal_replay_dump_format_e {
   // One JSON object per line. Blob payload bytes are represented as file
   // ranges.
   IREE_HAL_REPLAY_DUMP_FORMAT_JSONL = 1,
-  // Reserved for future C reproducer emission.
-  IREE_HAL_REPLAY_DUMP_FORMAT_C = 2,
 } iree_hal_replay_dump_format_t;
 
 // Options controlling replay dump output.
@@ -46,9 +44,8 @@ typedef struct iree_hal_replay_dump_write_callback_t {
 // Returns default replay dump options.
 static inline iree_hal_replay_dump_options_t
 iree_hal_replay_dump_options_default(void) {
-  iree_hal_replay_dump_options_t options = {
-      .format = IREE_HAL_REPLAY_DUMP_FORMAT_TEXT,
-  };
+  iree_hal_replay_dump_options_t options;
+  options.format = IREE_HAL_REPLAY_DUMP_FORMAT_TEXT;
   return options;
 }
 

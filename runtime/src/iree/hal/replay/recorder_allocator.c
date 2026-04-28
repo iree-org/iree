@@ -81,7 +81,7 @@ static iree_status_t iree_hal_replay_recorder_allocator_begin_operation(
 }
 
 static void iree_hal_replay_recorder_allocator_destroy(
-    iree_hal_allocator_t* base_allocator) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_allocator_t host_allocator = allocator->host_allocator;
@@ -95,14 +95,14 @@ static void iree_hal_replay_recorder_allocator_destroy(
 }
 
 static iree_allocator_t iree_hal_replay_recorder_allocator_host_allocator(
-    const iree_hal_allocator_t* base_allocator) {
+    const iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   const iree_hal_replay_recorder_allocator_t* allocator =
       (const iree_hal_replay_recorder_allocator_t*)base_allocator;
   return iree_hal_allocator_host_allocator(allocator->base_allocator);
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_trim(
-    iree_hal_allocator_t* base_allocator) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -115,8 +115,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_trim(
 }
 
 static void iree_hal_replay_recorder_allocator_query_statistics(
-    iree_hal_allocator_t* base_allocator,
-    iree_hal_allocator_statistics_t* out_statistics) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_allocator_statistics_t* IREE_RESTRICT out_statistics) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_allocator_query_statistics(allocator->base_allocator,
@@ -124,8 +124,10 @@ static void iree_hal_replay_recorder_allocator_query_statistics(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_query_memory_heaps(
-    iree_hal_allocator_t* base_allocator, iree_host_size_t capacity,
-    iree_hal_allocator_memory_heap_t* heaps, iree_host_size_t* out_count) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -141,8 +143,9 @@ static iree_status_t iree_hal_replay_recorder_allocator_query_memory_heaps(
 
 static iree_hal_buffer_compatibility_t
 iree_hal_replay_recorder_allocator_query_buffer_compatibility(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_params_t* params,
-    iree_device_size_t* allocation_size) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t* IREE_RESTRICT allocation_size) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   return IREE_HAL_REPLAY_VTABLE_DISPATCH(allocator->base_allocator,
@@ -152,9 +155,10 @@ iree_hal_replay_recorder_allocator_query_buffer_compatibility(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_allocate_buffer(
-    iree_hal_allocator_t* base_allocator,
-    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   *out_buffer = NULL;
@@ -211,7 +215,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_allocate_buffer(
 }
 
 static void iree_hal_replay_recorder_allocator_deallocate_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_buffer_t* base_buffer =
@@ -226,11 +231,11 @@ static void iree_hal_replay_recorder_allocator_deallocate_buffer(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_import_buffer(
-    iree_hal_allocator_t* base_allocator,
-    const iree_hal_buffer_params_t* params,
-    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   *out_buffer = NULL;
@@ -312,10 +317,11 @@ static iree_status_t iree_hal_replay_recorder_allocator_import_buffer(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_export_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT buffer,
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
-    iree_hal_external_buffer_t* out_external_buffer) {
+    iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -333,7 +339,7 @@ static iree_status_t iree_hal_replay_recorder_allocator_export_buffer(
 }
 
 static bool iree_hal_replay_recorder_allocator_supports_virtual_memory(
-    iree_hal_allocator_t* base_allocator) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   return iree_hal_allocator_supports_virtual_memory(allocator->base_allocator);
@@ -341,9 +347,10 @@ static bool iree_hal_replay_recorder_allocator_supports_virtual_memory(
 
 static iree_status_t
 iree_hal_replay_recorder_allocator_virtual_memory_query_granularity(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_params_t params,
-    iree_device_size_t* out_minimum_page_size,
-    iree_device_size_t* out_recommended_page_size) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -358,9 +365,9 @@ iree_hal_replay_recorder_allocator_virtual_memory_query_granularity(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_reserve(
-    iree_hal_allocator_t* base_allocator,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
-    iree_hal_buffer_t** out_virtual_buffer) {
+    iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   *out_virtual_buffer = NULL;
@@ -409,7 +416,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_reserve(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_release(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* virtual_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -426,9 +434,10 @@ static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_release(
 
 static iree_status_t
 iree_hal_replay_recorder_allocator_physical_memory_allocate(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_params_t params,
-    iree_device_size_t size, iree_allocator_t host_allocator,
-    iree_hal_physical_memory_t** out_physical_memory) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t size,
+    iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -443,8 +452,8 @@ iree_hal_replay_recorder_allocator_physical_memory_allocate(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_physical_memory_free(
-    iree_hal_allocator_t* base_allocator,
-    iree_hal_physical_memory_t* physical_memory) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
   iree_hal_replay_pending_record_t pending_record;
@@ -458,9 +467,10 @@ static iree_status_t iree_hal_replay_recorder_allocator_physical_memory_free(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_map(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* virtual_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset,
-    iree_hal_physical_memory_t* physical_memory,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
     iree_device_size_t physical_offset, iree_device_size_t size) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
@@ -478,7 +488,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_map(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_unmap(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* virtual_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size) {
   iree_hal_replay_recorder_allocator_t* allocator =
       iree_hal_replay_recorder_allocator_cast(base_allocator);
@@ -496,7 +507,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_unmap(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_protect(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* virtual_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_protection_t protection) {
@@ -516,7 +528,8 @@ static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_protect(
 }
 
 static iree_status_t iree_hal_replay_recorder_allocator_virtual_memory_advise(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* virtual_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
     iree_device_size_t virtual_offset, iree_device_size_t size,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
   iree_hal_replay_recorder_allocator_t* allocator =

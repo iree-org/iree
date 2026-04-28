@@ -11,7 +11,7 @@
 #include "iree/hal/replay/dump.h"
 #include "iree/io/file_contents.h"
 
-IREE_FLAG(string, format, "text", "Output format: text, jsonl, or c.");
+IREE_FLAG(string, format, "text", "Output format: text or jsonl.");
 IREE_FLAG(bool, agents_md, false,
           "Prints AGENTS.md guidance for iree-dump-replay and exits.");
 
@@ -21,10 +21,10 @@ static const char kIreeDumpReplayUsage[] =
     "The dumper validates the replay container and emits projections without\n"
     "materializing large payload bytes. Blob data and embedded payloads are\n"
     "reported as byte ranges in the original .ireereplay file so JSONL and\n"
-    "the C projection can reference the capture directly.\n"
+    "text output can reference the capture directly.\n"
     "\n"
     "Usage:\n"
-    "  iree-dump-replay [--format=text|jsonl|c] <capture.ireereplay>\n"
+    "  iree-dump-replay [--format=text|jsonl] <capture.ireereplay>\n"
     "\n"
     "Formats:\n"
     "  text\n"
@@ -32,10 +32,6 @@ static const char kIreeDumpReplayUsage[] =
     "  jsonl\n"
     "      One JSON object per line for jq and automation. Payload bytes are\n"
     "      represented as replay-file ranges.\n"
-    "  c\n"
-    "      Reserved for the C reproducer projection. The flag is accepted so\n"
-    "      scripts can probe support, but current builds return "
-    "UNIMPLEMENTED.\n"
     "\n"
     "Important flags:\n"
     "  --agents_md\n"
@@ -69,11 +65,7 @@ static void iree_dump_replay_print_agent_markdown(FILE* file) {
       "```\n"
       "\n"
       "Rows carry object ids, operation ids, queue wait/signal lists, buffer\n"
-      "binding tables, file references, and replay-file byte ranges. "
-      "`--format=c`\n"
-      "is reserved for a future C reproducer projection and fails loudly in "
-      "current\n"
-      "builds instead of emitting a partial file.\n"
+      "binding tables, file references, and replay-file byte ranges.\n"
       "\n"
       "For replay execution, executable substitution, file remapping, and the\n"
       "shared replay failure contract, pipe `iree-run-replay --agents_md` "
@@ -91,12 +83,9 @@ static iree_status_t iree_dump_replay_parse_format(
   } else if (iree_string_view_equal(format, IREE_SV("jsonl"))) {
     *out_format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
     return iree_ok_status();
-  } else if (iree_string_view_equal(format, IREE_SV("c"))) {
-    *out_format = IREE_HAL_REPLAY_DUMP_FORMAT_C;
-    return iree_ok_status();
   }
   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                          "unsupported --format=%s; expected text, jsonl, or c",
+                          "unsupported --format=%s; expected text or jsonl",
                           value);
 }
 

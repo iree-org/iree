@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "iree-link-bundle.mlir"
     "iree-link-executable-source.mlir"
     "iree-link.mlir"
+    "iree-replay-tools.txt"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
     "iree-run-module-in-place.mlir"
@@ -54,14 +55,17 @@ iree_lit_test_suite(
     FileCheck
     iree-benchmark-executable
     iree-benchmark-module
+    iree-benchmark-replay
     iree-compile
     iree-convert-parameters
     iree-dump-module
     iree-dump-parameters
+    iree-dump-replay
     iree-link
     iree-opt
     iree-run-mlir
     iree-run-module
+    iree-run-replay
     iree-tblgen
     iree-tokenize
     not

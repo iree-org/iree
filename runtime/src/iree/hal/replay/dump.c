@@ -2620,11 +2620,6 @@ iree_hal_replay_dump_file(iree_const_byte_span_t file_contents,
                           iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(options);
   IREE_ASSERT_ARGUMENT(write_callback.fn);
-  if (options->format == IREE_HAL_REPLAY_DUMP_FORMAT_C) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "C replay dump emission is reserved for the replay range reader");
-  }
   if (IREE_UNLIKELY(options->format != IREE_HAL_REPLAY_DUMP_FORMAT_TEXT &&
                     options->format != IREE_HAL_REPLAY_DUMP_FORMAT_JSONL)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

@@ -468,28 +468,21 @@ options.executable_substitution_callback.user_data = &replacement_library;
 
 Replacement data only needs to remain valid for the prepare call made by replay.
 
-## Appendix: C projection
-
-`iree-dump-replay --format=c` is reserved for a generated C reproducer
-projection. Current builds accept the flag so scripts can probe support, but
-return `UNIMPLEMENTED` instead of emitting a partial C file.
-
-The intended projection will reference byte ranges in the original
-`.ireereplay` file for large payloads, matching the JSONL dumper's range-based
-model.
-
 ## Appendix: Agent-oriented help
 
-Replay tools can print a compact Markdown playbook from the exact binary in
-your build tree:
+Replay tools can print Markdown guidance from the exact binary in your build
+tree. `iree-run-replay --agents_md` owns the shared replay playbook intended
+for direct inclusion in an AGENTS.md file; the other tools print focused notes
+for their capture, benchmark, or dump-specific behavior:
 
 ```shell
 iree-run-module --agents_md
+iree-benchmark-module --agents_md
 iree-run-replay --agents_md
 iree-benchmark-replay --agents_md
 iree-dump-replay --agents_md
 ```
 
-Use this when integrating replay into scripts, CI reproducers, or agent
+Use these when integrating replay into scripts, CI reproducers, or agent
 workflows that need the current flag list and diagnostics without reading the
 source tree.

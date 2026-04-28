@@ -417,7 +417,8 @@ iree_hal_replay_object_id_t iree_hal_replay_recorder_file_id_or_none(
              : IREE_HAL_REPLAY_OBJECT_ID_NONE;
 }
 
-static void iree_hal_replay_recorder_file_destroy(iree_hal_file_t* base_file) {
+static void iree_hal_replay_recorder_file_destroy(
+    iree_hal_file_t* IREE_RESTRICT base_file) {
   iree_hal_replay_recorder_file_t* file =
       iree_hal_replay_recorder_file_cast(base_file);
   iree_allocator_t host_allocator = file->host_allocator;

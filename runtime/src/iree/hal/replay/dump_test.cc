@@ -29,8 +29,8 @@ static iree_status_t DumpReplayToString(
     iree_const_byte_span_t file_contents,
     const iree_hal_replay_dump_options_t* options, std::string* output) {
   iree_hal_replay_dump_write_callback_t write_callback = {
-      .fn = AppendToString,
-      .user_data = output,
+      /*.fn=*/AppendToString,
+      /*.user_data=*/output,
   };
   return iree_hal_replay_dump_file(file_contents, options, write_callback,
                                    iree_allocator_system());
