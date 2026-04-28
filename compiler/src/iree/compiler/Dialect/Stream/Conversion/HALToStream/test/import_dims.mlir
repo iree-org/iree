@@ -13,7 +13,13 @@ util.func public @importBufferViewWithConsumerDims(%view: !hal.buffer_view, %sto
   // CHECK-DAG: %[[IMPORT_SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32>{%[[C4]], %[[C8]]} : index
   // CHECK: %[[RESOURCE:.+]] = stream.tensor.import %[[VIEW]]
   // CHECK-SAME: tensor<?x?xf32>{%[[C4]], %[[C8]]} in !stream.resource<external>{%[[IMPORT_SIZE]]}
-  // CHECK: stream.async.clone %[[RESOURCE]]
+  // CHECK: %[[TENSOR:.+]] = stream.async.cast %[[RESOURCE]]
+  // CHECK-DAG: %[[STORAGE_SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32>{%[[C4]], %[[C8]]} : index
+  // CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import consume %[[STORAGE]]
+  // CHECK-SAME: tensor<?x?xf32>{%[[C4]], %[[C8]]} in !stream.resource<external>{%[[STORAGE_SIZE]]}
+  // CHECK: %[[UPDATE:.+]] = stream.async.update %[[TENSOR]], %[[STORAGE_RESOURCE]]
+  // CHECK: %[[SLICE:.+]] = stream.async.slice %[[UPDATE]]
+  // CHECK: stream.async.clone %[[SLICE]]
   %imported = hal.tensor.import %view : !hal.buffer_view -> tensor<?x?xf32>{%dim0, %dim1}
   %aliased = hal.tensor.alias %imported : tensor<?x?xf32>{%c4, %c8} to %storage : !hal.buffer
   // CHECK: util.return
