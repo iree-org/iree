@@ -60,6 +60,7 @@ iree_check_single_backend_test_suite(
     "softmax.mlir"
     "split_reduction_using_tiling.mlir"
     "strided_slice.mlir"
+    "trailing_barrier_hang_issue_20166.mlir"
     "transpose.mlir"
   TARGET_BACKEND
     "llvm-cpu"
