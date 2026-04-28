@@ -342,6 +342,12 @@ LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
   b.setInsertionPoint(emptyOp);
   SmallVector<OpOperand *> uses = llvm::map_to_vector(
       emptyOp->getUses(), [](OpOperand &use) { return &use; });
+  // Keep the original op for the first use; clone for the rest. If the empty
+  // op has zero or one uses there's nothing to duplicate, and `std::next` on
+  // an empty vector's begin is past-end UB.
+  if (uses.size() < 2) {
+    return success();
+  }
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
     Operation *user = use->getOwner();
