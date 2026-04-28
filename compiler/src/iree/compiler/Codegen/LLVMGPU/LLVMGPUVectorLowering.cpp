@@ -4,11 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -129,6 +131,20 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
     return success();
   }
 };
+
+static bool isNaturalF32(Value value) {
+  if (!getElementTypeOrSelf(value.getType()).isF32()) {
+    return false;
+  }
+  return !value.getDefiningOp<arith::ExtFOp>();
+}
+
+static LogicalResult preferDotContract(vector::ContractionOp op) {
+  // Prefer Dot lowering unless both inputs are already naturally f32. Sub-f32
+  // inputs, including values that have been explicitly extended to f32, get
+  // first refusal by Dot; natural f32 falls through to OuterProduct.
+  return success(!isNaturalF32(op.getLhs()) || !isNaturalF32(op.getRhs()));
+}
 
 // Rewrites vector.contracts into a chain of math.fma ops when possible.
 // Starting from the innermost position of the reduction dimension,
@@ -454,6 +470,7 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<vector::VectorDialect>();
     registry.insert<scf::SCFDialect>();
     registry.insert<math::MathDialect>();
+    registry.insert<amdgpu::AMDGPUDialect>();
   }
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
@@ -481,31 +498,36 @@ struct LLVMGPUVectorLoweringPass final
       // Lower high level vector operations like contract or multidim reduce ops
       // to lower level vector ops.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::Dot);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractLoweringPatterns);
       vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
                                                        funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns, options.vectorContractLowering);
+      // Prefer Dot lowering unless both input operands are naturally f32. If
+      // the filter rejects or the Dot pattern does not match, the original
+      // contract remains available for the lower-benefit OuterProduct and
+      // generic fallback patterns.
+      vector::populateVectorContractToDotPatterns(
+          contractLoweringPatterns, preferDotContract, PatternBenefit(3));
+      vector::populateVectorContractToOuterProductPatterns(
+          contractLoweringPatterns,
+          vector::acceptAllVectorContractLoweringFilter, PatternBenefit(2));
+      vector::populateVectorContractGenericLoweringPatterns(
+          contractLoweringPatterns,
+          vector::acceptAllVectorContractLoweringFilter, PatternBenefit(1));
+      vector::populateVectorOuterProductLoweringPatterns(
+          contractLoweringPatterns);
+      // Run promotion before Dot so sub-f32 contracts accumulating into f32
+      // become explicit extf operands. The Dot filter still rejects naturally
+      // f32 operands because they are not defined by extf.
       contractLoweringPatterns.add<PromoteContractOperands>(
-          funcOp->getContext());
-<<<<<<< Updated upstream
-      contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
-                                                       PatternBenefit(2));
-=======
-      // Pattern-benefit ordering for vector.contract:
-      //   ContractToChainDot (3) — preferred for ≤16-bit float, supported
-      //   chipset ContractToChainFMA (2) — preferred for float otherwise
-      //   upstream contract lowerings (1) — fallback (OuterProduct mode here)
+          funcOp->getContext(), PatternBenefit(4));
+      // Historical local vector.contract chain lowering hooks. Upstream split
+      // contract lowering above now provides the Dot-vs-OuterProduct selection.
       // contractLoweringPatterns.add<ContractToChainFMA>(
       //     funcOp->getContext(), PatternBenefit(kChainFMAPatternBenefit));
       // contractLoweringPatterns.add<ContractToChainDot>(
       //     funcOp->getContext(), PatternBenefit(kChainDotPatternBenefit));
->>>>>>> Stashed changes
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
@@ -529,6 +551,30 @@ struct LLVMGPUVectorLoweringPass final
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(contractLoweringPatterns)))) {
         return signalPassFailure();
+      }
+    }
+
+    {
+      // Dot contract lowering creates arith.mul + vector.reduction chains.
+      // Lower the AMDGPU-compatible reductions to amdgpu.dot while those
+      // reductions are still present.
+      IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+      if (target && target.isAMD()) {
+        FailureOr<amdgpu::Chipset> chipset =
+            amdgpu::Chipset::parse(target.getArch());
+        if (failed(chipset)) {
+          funcOp.emitError() << "failed to parse amdgpu chipset from target "
+                             << target.getArch();
+          return signalPassFailure();
+        }
+
+        RewritePatternSet amdgpuDotPatterns(ctx);
+        amdgpu::populateAmdgpuVectorReductionToDotPatterns(amdgpuDotPatterns,
+                                                           *chipset);
+        if (failed(
+                applyPatternsGreedily(funcOp, std::move(amdgpuDotPatterns)))) {
+          return signalPassFailure();
+        }
       }
     }
 
