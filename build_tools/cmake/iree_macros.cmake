@@ -54,6 +54,10 @@ if(EMSCRIPTEN)
   # This is the one case where the IREE_ARCH CMake variable is currently
   # inconsistent with the IREE_ARCH C preprocessor token.
   set(IREE_ARCH "")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "wasm32")
+  set(IREE_ARCH "wasm_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "wasm64")
+  set(IREE_ARCH "wasm_64")
 elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64e") OR

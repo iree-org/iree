@@ -13,8 +13,8 @@
 // Only compiles when:
 // - cpuinfo is not available
 // - Not on a platform with a dedicated implementation
-#if !defined(IREE_TASK_USE_CPUINFO) && !defined(IREE_PLATFORM_APPLE) &&      \
-    !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
+#if !defined(IREE_TASK_USE_CPUINFO) && !defined(IREE_PLATFORM_APPLE) && \
+    !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM) &&  \
     !defined(IREE_PLATFORM_LINUX)
 
 #include <string.h>

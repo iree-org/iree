@@ -6,9 +6,11 @@
 
 #include "iree/task/topology.h"
 
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_WASM)
 
-#include <emscripten/threading.h>
+// Provided by the JS host (navigator.hardwareConcurrency or equivalent).
+// Declared as a Wasm import rather than using Emscripten APIs.
+extern int iree_wasm_logical_core_count(void);
 
 void iree_task_topology_query_default_caches(
     iree_task_topology_caches_t* out_caches) {
@@ -76,13 +78,13 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_performance_level_t performance_level,
     iree_task_topology_distribution_t distribution,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
-  // NOTE: emscripten implementation doesn't support cache-domain-aware
-  // distribution strategies. The distribution parameter is accepted for API
-  // compatibility but ignored.
+  // Wasm doesn't expose cache topology information, so cache-domain-aware
+  // distribution strategies are not possible. The distribution parameter is
+  // accepted for API compatibility but ignored.
   (void)distribution;
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_group_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_core_count);
 
   // Divide by 2 if there are an even number of cores assuming that most users
   // have SMT enabled. This physical cores initialization routine is intended to
@@ -91,7 +93,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   // SMT disabled we won't select all cores but it's better than oversubscribing
   // a machine with SMT enabled, especially in the browser. Hosting applications
   // can always assign a topology with their own logic/user settings/etc.
-  iree_host_size_t group_count = emscripten_num_logical_cores();
+  iree_host_size_t group_count = iree_wasm_logical_core_count();
   if (group_count > 1 && (group_count % 2) == 0) {
     group_count /= 2;
   }
@@ -102,4 +104,4 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   return iree_ok_status();
 }
 
-#endif  // IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_WASM

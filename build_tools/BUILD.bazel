@@ -19,6 +19,9 @@ iree_cc_library(
         "//build_tools/bazel:iree_is_android": [
             # Android provides its own pthreads support with no linking required.
         ],
+        "//build_tools/bazel:iree_is_wasm": [
+            # Wasm threading is opt-in and does not use a pthreads library.
+        ],
         "//conditions:default": [
             # Just include libraries that should be presumed in 2020.
             "-lpthread",

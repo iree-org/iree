@@ -31,7 +31,7 @@ extern "C" {
 //   Windows:       BCryptGenRandom (system preferred RNG)
 //   macOS/BSD:     arc4random_buf
 //   Linux/Android: getrandom() syscall (requires kernel 3.17+)
-//   Emscripten:    crypto.getRandomValues
+//   Web:           crypto.getRandomValues (via Wasm import bridge)
 
 // Fills |buffer| with cryptographically random data.
 //
