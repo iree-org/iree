@@ -130,6 +130,26 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
+static void getReductionAndParallelLoopDims(ArrayAttr iters,
+                                            SmallVectorImpl<int64_t> &red,
+                                            SmallVectorImpl<int64_t> &par) {
+  for (auto [idx, attr] : llvm::enumerate(iters)) {
+    if (vector::isReductionIterator(attr)) {
+      red.push_back(idx);
+    } else {
+      par.push_back(idx);
+    }
+  }
+}
+
+static int64_t productOfDims(VectorType vt, unsigned lo, unsigned hi) {
+  int64_t p = 1;
+  for (unsigned i = lo; i < hi; ++i) {
+    p *= vt.getDimSize(i);
+  }
+  return p;
+}
+
 // Transposes the operands of a vector.contract so that LHS and RHS have
 // [reduction..., parallel...] physical layout, and the acc (if vector) has
 // parallel dims in the canonical order. Emits vector.broadcast for missing
@@ -372,18 +392,6 @@ private:
     return inv;
   }
 
-  static void getReductionAndParallelLoopDims(ArrayAttr iters,
-                                              SmallVectorImpl<int64_t> &red,
-                                              SmallVectorImpl<int64_t> &par) {
-    for (auto [idx, attr] : llvm::enumerate(iters)) {
-      if (vector::isReductionIterator(attr)) {
-        red.push_back(idx);
-      } else {
-        par.push_back(idx);
-      }
-    }
-  }
-
   static SmallVector<int64_t>
   getPermutationFromIndexingMap(AffineMap map, ArrayRef<int64_t> indices) {
     SmallVector<int64_t> dimToRes(map.getNumDims());
@@ -426,22 +434,30 @@ private:
 //
 // ==>
 // ```mlir
-// %34 = math.fma %32, %33, %cst : vector<2xf16>
-// %37 = math.fma %35, %36, %34 : vector<2xf16>
-// ...
-// %55 = math.fma %53, %54, %52 : vector<2xf16>
+// %lhs_flat = vector.shape_cast %lhs
+//     : vector<8x2x1xf16> to vector<8x2xf16>
+// %rhs_flat = vector.shape_cast %rhs
+//     : vector<8x2x1xf16> to vector<8x2xf16>
+// %acc_flat = vector.shape_cast %cst
+//     : vector<2x1xf16> to vector<2xf16>
+// #map2 = affine_map<(d0, d1) -> (d0, d1)>
+// #map3 = affine_map<(d0, d1) -> (d1)>
+// %result_flat = vector.contract {
+//    indexing_maps = [#map2, #map2, #map3],
+//    iterator_types = ["reduction", "parallel"],
+//    kind = #vector.kind<add>
+// } %lhs_flat, %rhs_flat, %acc_flat
+//     : vector<8x2xf16>, vector<8x2xf16> into vector<2xf16>
+// %result = vector.shape_cast %result_flat
+//     : vector<2xf16> to vector<2x1xf16>
 // ```
-//
-// Previously, contracts of the same form lowered to elementwise multiplies
-// followed by a vector.reduce. This lowering elides the need to reduce the
-// result of the elementwise operations separately and instead accumulates
-// directly result via FMAs, offering more profitable instruction level
-// scheduling on GPUs.
-struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
+struct FlattenContractOperands final : OpRewritePattern<vector::ContractionOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
+    // TODO: Add a rewrite to support relevant contractions nested in
+    // vector.mask.
     if (op.isMasked() || op.getKind() != vector::CombiningKind::ADD) {
       return failure();
     }
@@ -468,18 +484,24 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     // Check that the contract is in normalized [reduction..., parallel...] form
     // with identity maps on LHS/RHS.
-    ArrayAttr iteratorTypes = op.getIteratorTypes();
-    unsigned numDims = iteratorTypes.size();
-    unsigned numRedDims = 0;
-    for (unsigned i = 0; i < numDims; ++i) {
-      if (vector::isReductionIterator(iteratorTypes[i])) {
-        if (i != numRedDims) {
-          return failure();
-        }
-        ++numRedDims;
+    SmallVector<int64_t> redDims, parDims;
+    getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
+    if (redDims.empty()) {
+      return failure();
+    }
+    unsigned numRedDims = redDims.size();
+    unsigned numParDims = parDims.size();
+    unsigned numDims = numRedDims + numParDims;
+
+    // Verify reduction dims come first (normalized form).
+    for (unsigned i = 0; i < numRedDims; ++i) {
+      if (redDims[i] != static_cast<int64_t>(i)) {
+        return failure();
       }
     }
-    if (numRedDims == 0) {
+
+    // Already 2D (one reduction + one parallel) — nothing to flatten.
+    if (numRedDims <= 1 && numParDims <= 1) {
       return failure();
     }
 
@@ -490,8 +512,139 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    auto elemType = getElementTypeOrSelf(op.getAccType());
+    Location loc = op.getLoc();
+    MLIRContext *ctx = op.getContext();
 
+    int64_t redSize = productOfDims(lhsVecType, 0, numRedDims);
+    int64_t parSize = productOfDims(lhsVecType, numRedDims, numDims);
+
+    // Shape-cast LHS/RHS to 2D {redSize, parSize}.
+    auto lhsElemType = lhsVecType.getElementType();
+    auto rhsElemType = rhsVecType.getElementType();
+    auto flat2DLhsType = VectorType::get({redSize, parSize}, lhsElemType);
+    auto flat2DRhsType = VectorType::get({redSize, parSize}, rhsElemType);
+    Value lhsFlat =
+        vector::ShapeCastOp::create(rewriter, loc, flat2DLhsType, op.getLhs());
+    Value rhsFlat =
+        vector::ShapeCastOp::create(rewriter, loc, flat2DRhsType, op.getRhs());
+
+    // Shape-cast or broadcast acc to 1D {parSize}.
+    auto accElemType = getElementTypeOrSelf(op.getAccType());
+    auto flatAccType = VectorType::get({parSize}, accElemType);
+    Value accFlat;
+    if (maybeAccVecType) {
+      accFlat =
+          vector::ShapeCastOp::create(rewriter, loc, flatAccType, op.getAcc());
+    } else {
+      accFlat =
+          vector::BroadcastOp::create(rewriter, loc, flatAccType, op.getAcc());
+    }
+
+    // Build 2D contract: (d0=reduction, d1=parallel).
+    AffineMap newLhsMap = AffineMap::getMultiDimIdentityMap(2, ctx);
+    AffineMap newRhsMap = newLhsMap;
+    AffineMap newAccMap = AffineMap::get(2, 0, {getAffineDimExpr(1, ctx)}, ctx);
+
+    SmallVector<Attribute> newIterTypes = {
+        vector::IteratorTypeAttr::get(ctx, vector::IteratorType::reduction),
+        vector::IteratorTypeAttr::get(ctx, vector::IteratorType::parallel),
+    };
+
+    auto newContract = vector::ContractionOp::create(
+        rewriter, loc, lhsFlat, rhsFlat, accFlat,
+        rewriter.getAffineMapArrayAttr({newLhsMap, newRhsMap, newAccMap}),
+        ArrayAttr::get(ctx, newIterTypes), op.getKind());
+
+    // Shape-cast result back to original type.
+    Value result = newContract.getResult();
+    if (maybeAccVecType) {
+      result =
+          vector::ShapeCastOp::create(rewriter, loc, maybeAccVecType, result);
+    } else {
+      result = vector::ExtractOp::create(rewriter, loc, result,
+                                         SmallVector<int64_t>{0});
+    }
+
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+// Rewrites a 2D vector.contract (one reduction dim, one parallel dim) in
+// normalized form into a chain of math.fma ops. Expects the contract to
+// have identity maps and iterator types ["reduction", "parallel"].
+// The TransposeContractOperands and FlattenContractOperands patterns should
+// run first to bring contracts into this form.
+//
+// Starting from the innermost position of the reduction dimension,
+// the lowering emits a single nested FMA chain as follows:
+// fma(a0 ,b0, fma(a1, b1, fma(a2, b2, fma(a3, b3, acc))))
+// where ai and bi are the elements extracted from lhs and rhs vectors
+// respectively along the reduction dimension.
+//
+// Example (after Transpose + Flatten):
+// ```mlir
+// #map = affine_map<(d0, d1) -> (d0, d1)>
+// #map1 = affine_map<(d0, d1) -> (d1)>
+// vector.contract {
+//    indexing_maps = [#map, #map, #map1],
+//    iterator_types = ["reduction", "parallel"],
+//    kind = #vector.kind<add>
+// } %lhs, %rhs, %acc : vector<8x2xf16>, vector<8x2xf16>
+//                       into vector<2xf16>
+// ```
+//
+// ==>
+// ```mlir
+// %34 = math.fma %32, %33, %acc : vector<2xf16>
+// %37 = math.fma %35, %36, %34 : vector<2xf16>
+// ...
+// %55 = math.fma %53, %54, %52 : vector<2xf16>
+// ```
+//
+// Previously, contracts of the same form lowered to elementwise multiplies
+// followed by a vector.reduce. This lowering elides the need to reduce the
+// result of the elementwise operations separately and instead accumulates
+// directly result via FMAs, offering more profitable instruction level
+// scheduling on GPUs.
+struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::ContractionOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO: Add a rewrite to support relevant contractions nested in
+    // vector.mask.
+    if (op.isMasked() || op.getKind() != vector::CombiningKind::ADD) {
+      return failure();
+    }
+
+    VectorType lhsVecType = op.getLhsType();
+    VectorType rhsVecType = op.getRhsType();
+    if (lhsVecType.isScalable() || rhsVecType.isScalable()) {
+      return failure();
+    }
+
+    if (!isa<FloatType>(lhsVecType.getElementType())) {
+      return failure();
+    }
+
+    // Expect exactly 2D: iterator_types = ["reduction", "parallel"],
+    // identity maps on LHS/RHS, produced by Transpose + Flatten.
+    ArrayAttr iteratorTypes = op.getIteratorTypes();
+    if (iteratorTypes.size() != 2 ||
+        !vector::isReductionIterator(iteratorTypes[0]) ||
+        vector::isReductionIterator(iteratorTypes[1])) {
+      return failure();
+    }
+
+    SmallVector<AffineMap, 4> maps = op.getIndexingMapsArray();
+    MLIRContext *ctx = op.getContext();
+    AffineMap identityMap = AffineMap::getMultiDimIdentityMap(2, ctx);
+    if (maps[0] != identityMap || maps[1] != identityMap) {
+      return failure();
+    }
+
+    auto elemType = getElementTypeOrSelf(op.getAccType());
     Location loc = op.getLoc();
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
@@ -499,64 +652,25 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     if (lhsVecType.getElementType() != elemType) {
       Type promotedType = lhsVecType.clone(elemType);
       lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
-      lhsVecType = cast<VectorType>(lhs.getType());
     }
 
     if (rhsVecType.getElementType() != elemType) {
       Type promotedType = rhsVecType.clone(elemType);
       rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
-      rhsVecType = cast<VectorType>(rhs.getType());
     }
 
-    int64_t redSize = productOfDims(lhsVecType, 0, numRedDims);
-    int64_t parSize =
-        productOfDims(lhsVecType, numRedDims, lhsVecType.getRank());
-
-    auto flattened2DType = VectorType::get({redSize, parSize}, elemType);
-    Value lhs2D =
-        vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);
-    Value rhs2D =
-        vector::ShapeCastOp::create(rewriter, loc, flattened2DType, rhs);
-
-    Value flattenedAcc;
-    auto flatAccVecType = VectorType::get({parSize}, elemType);
-
-    if (maybeAccVecType) {
-      flattenedAcc = vector::ShapeCastOp::create(rewriter, loc, flatAccVecType,
-                                                 op.getAcc());
-    } else {
-      flattenedAcc = vector::BroadcastOp::create(rewriter, loc, flatAccVecType,
-                                                 op.getAcc());
-    }
-
-    Value resultFlat =
-        buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc, redSize);
-
-    Value result;
-    if (maybeAccVecType) {
-      result = vector::ShapeCastOp::create(rewriter, loc, maybeAccVecType,
-                                           resultFlat);
-    } else {
-      result = vector::ExtractOp::create(rewriter, loc, resultFlat, 0);
-    }
+    int64_t K = lhsVecType.getDimSize(0);
+    Value acc = op.getAcc();
+    Value result = buildFMAChain(rewriter, loc, lhs, rhs, acc, K);
 
     rewriter.replaceOp(op, result);
     return success();
   }
 
 private:
-  static int64_t productOfDims(VectorType vt, unsigned lo, unsigned hi) {
-    int64_t p = 1;
-    for (unsigned i = lo; i < hi; ++i) {
-      p *= vt.getDimSize(i);
-    }
-    return p;
-  }
-
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,
-                             Value lhs2D, Value rhs2D, Value accFlat,
-                             int64_t K) {
-    Value current = accFlat;
+                             Value lhs2D, Value rhs2D, Value acc, int64_t K) {
+    Value current = acc;
 
     for (int64_t k = K - 1; k >= 0; --k) {
       Value a = vector::ExtractOp::create(rewriter, loc, lhs2D, k);
@@ -615,6 +729,8 @@ struct LLVMGPUVectorLoweringPass final
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
       contractLoweringPatterns.add<TransposeContractOperands>(
+          funcOp->getContext(), PatternBenefit(2));
+      contractLoweringPatterns.add<FlattenContractOperands>(
           funcOp->getContext(), PatternBenefit(2));
       contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
                                                        PatternBenefit(2));
