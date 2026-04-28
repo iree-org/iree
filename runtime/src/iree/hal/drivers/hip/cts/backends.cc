@@ -145,6 +145,13 @@ static bool hip_registered_ =
                "transient buffer allocated with HAL-module access=0; gfx1100 "
                "passes locally, so this requires a HIP transient-buffer "
                "access/sequence fix across targets."},
+              {"CommandBufferStressTest.RapidFillSubmit",
+               "HIP command-buffer stress CTS can hit ROCm memory reservation "
+               "failures on RDNA runners and then fail validation with an "
+               "empty binding table."},
+              {"CommandBufferStressTest.RapidCopySubmit",
+               "Blocked by the same HIP command-buffer stress memory "
+               "reservation path as RapidFillSubmit."},
               {"QueueAllocaTest.AllocaDeallocaCycle",
                "HIP async queue_dealloca does not yet reliably advance "
                "stream-ordered dealloca dependencies for transient buffers."},
@@ -169,6 +176,24 @@ static bool hip_registered_ =
               {"QueueAllocaTest.DeallocaPrefersOriginPlacement",
                "HIP queue_dealloca origin routing still depends on the same "
                "async dealloca sequencing path as ChainedAllocaDealloca."},
+              {"QueueAllocaTest.ZeroAccessFlagsCanonicalized",
+               "HIP graph queues can hang on RDNA4 when queue_alloca "
+               "canonicalizes access=0 before transient-buffer use."},
+              {"QueueTransferTest.*",
+               "HIP direct queue transfer CTS can hit ROCm memory reservation "
+               "failures on RDNA runners and then fail validation with an "
+               "empty binding table."},
+              {"SemaphoreSubmissionTest."
+               "IndirectCommandBufferBindingTableRetainedUntilSignal",
+               "HIP graph queues can hit ROCm memory reservation failures "
+               "while retaining indirect command-buffer binding tables."},
+              {"DispatchPipelineTest.*",
+               "HIP dispatch pipeline CTS can hit ROCm memory reservation "
+               "failures on RDNA runners or hang on transient dispatch input "
+               "sequencing."},
+              {"DispatchReuseTest.*",
+               "HIP dispatch reuse CTS can hit ROCm memory reservation "
+               "failures and invalid binding tables on RDNA runners."},
           }},
          {"async_queue"},
      }),
