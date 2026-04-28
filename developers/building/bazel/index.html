@@ -6674,6 +6674,9 @@ iree-bazel-test<span class="w"> </span>//...
 <span class="c1"># Reconfigure to enable multiple drivers</span>
 <span class="nv">IREE_HAL_DRIVER_CUDA</span><span class="o">=</span>ON<span class="w"> </span><span class="nv">IREE_HAL_DRIVER_VULKAN</span><span class="o">=</span>ON<span class="w"> </span>iree-bazel-configure
 
+<span class="c1"># Reconfigure compiler plugins</span>
+<span class="nv">IREE_COMPILER_PLUGINS</span><span class="o">=</span><span class="s2">&quot;all,-input_torch&quot;</span><span class="w"> </span>iree-bazel-configure
+
 <span class="c1"># Run tool from current directory</span>
 iree-bazel-run<span class="w"> </span>//tools:iree-compile<span class="w"> </span>--<span class="w"> </span>input.mlir<span class="w"> </span>-o<span class="w"> </span>output.vmfb
 
@@ -6713,6 +6716,19 @@ building, allowing parallel builds in other shells.</p>
 <li>Values: ON/YES/TRUE/Y/1 or OFF/NO/FALSE/N/0</li>
 </ul>
 </li>
+<li><code>IREE_COMPILER_PLUGINS</code>: Select statically linked compiler plugins
+    (configure-time, default: <code>all</code> buildable plugins)<ul>
+<li><code>IREE_COMPILER_PLUGINS=all</code>: Enable every plugin whose prerequisites are
+  available</li>
+<li><code>IREE_COMPILER_PLUGINS=all,-input_torch</code>: Enable all buildable plugins
+  except <code>input_torch</code></li>
+<li><code>IREE_COMPILER_PLUGINS=hal_target_llvm_cpu,input_tosa</code>: Enable only the
+  listed plugins</li>
+</ul>
+</li>
+<li><code>VULKAN_SDK</code>: Vulkan SDK root for Bazel repository rules. If unset,
+    <code>iree-bazel-configure</code> probes <code>vulkaninfo</code> and common SDK install paths and
+    writes a detected SDK path to <code>configured.bazelrc</code>.</li>
 <li><code>IREE_FUZZ_CACHE</code>: Fuzzer corpus cache
     (default: <code>~/.cache/iree-fuzz-cache</code>)</li>
 <li><code>IREE_FUZZ_CORPUS</code>: Fuzzer dictionaries
