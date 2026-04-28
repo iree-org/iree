@@ -1012,7 +1012,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[C:.*]] = arith.extf %[[B]]
 // CHECK-NEXT: %[[D:.*]] = vector.extract %[[ARG0]][]
 // Local reduction
-// CHECK: vector.multi_reduction <add>, %[[C]], %{{.*}} [0, 1, 2, 3, 4, 5] : vector<2x2x1x1x1x4xf32> to f32
+// CHECK: %[[COMPACT:.+]] = vector.shape_cast %[[C]] : vector<2x2x1x1x1x4xf32> to vector<2x8xf32>
+// CHECK: vector.multi_reduction <add>, %[[COMPACT]], %{{.*}} [0, 1] : vector<2x8xf32> to f32
 // Global reduction
 // CHECK: gpu.subgroup_reduce add %{{.*}} cluster(size = 16) : (f32) -> f32
 // CHECK-NEXT: gpu.subgroup_reduce add %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
@@ -1061,7 +1062,10 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @contraction_32x32_alldims
 // Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x2x1x1x1x4xf32> into f32
+// CHECK: vector.contract
+// CHECK-SAME: iterator_types = ["reduction", "reduction"]
+// CHECK-SAME: kind = #vector.kind<maxnumf>
+// CHECK-SAME: vector<2x8xf32>, vector<2x8xf32> into f32
 // Global reduction
 // CHECK: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 16) : (f32) -> f32
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
@@ -1128,7 +1132,10 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[C:.*]] = arith.extf %[[B]]
 // CHECK-NEXT: %[[D:.*]] = vector.extract %[[ARG0]][]
 // Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x2x1x1x1x4xf32> into f32
+// CHECK: vector.contract
+// CHECK-SAME: iterator_types = ["reduction", "reduction"]
+// CHECK-SAME: kind = #vector.kind<maxnumf>
+// CHECK-SAME: vector<2x8xf32>, vector<2x8xf32> into f32
 // Global reduction
 // CHECK: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 16) : (f32) -> f32
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
@@ -1200,14 +1207,215 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @contraction_dim1
 // Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x1x4xf32> into vector<2x1x1xf32>
+// CHECK: vector.contract
+// CHECK-SAME: iterator_types = ["parallel", "reduction"]
+// CHECK-SAME: kind = #vector.kind<maxnumf>
+// CHECK-SAME: vector<2x8xf32>, vector<8xf32> into vector<2xf32>
 // Global reduction
-// CHECK: vector.extract %{{.*}}[0, 0, 0]
+// CHECK: vector.extract %{{.*}}[0]
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: vector.extract %{{.*}}[1, 0, 0]
+// CHECK: vector.extract %{{.*}}[1]
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
 // Accumulator reduction
-// CHECK: arith.maxnumf %{{.*}}, %{{.*}} : vector<2x1x1xf32>
+// CHECK: arith.maxnumf %{{.*}}, %{{.*}} : vector<2xf32>
+
+// -----
+
+#contraction_accesses = [
+  affine_map<(m, k) -> (m, k)>,
+  affine_map<(m, k) -> (k)>,
+  affine_map<(m, k) -> (m)>
+]
+
+#contraction_trait = {
+  indexing_maps = #contraction_accesses,
+  iterator_types = ["parallel", "reduction"],
+  kind = #vector.kind<add>
+}
+
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [2],
+  outer_tile = [1],
+  thread_tile = [4],
+  element_tile = [4],
+
+  subgroup_strides = [1],
+  thread_strides = [16]
+>
+
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [2],
+  outer_tile = [1],
+  thread_tile = [16],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+func.func @contraction_dim1_add_compact(%a: vector<32x32xf32>, %b: vector<32xf32>, %init: vector<32xf32>) -> vector<32xf32> {
+  %al = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<32x32xf32>
+  %bl = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<32xf32>
+  %output = vector.contract #contraction_trait %al, %bl, %init : vector<32x32xf32>, vector<32xf32>, vector<32xf32> into vector<32xf32>
+  %0 = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32xf32>
+  return %0 : vector<32xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @contraction_dim1_add_compact
+// Local contraction
+// CHECK: vector.contract
+// CHECK-SAME: iterator_types = ["parallel", "reduction"]
+// CHECK-SAME: kind = #vector.kind<add>
+// CHECK-SAME: vector<2x8xf32>, vector<8xf32> into vector<2xf32>
+// Global reduction
+// CHECK: gpu.subgroup_reduce add %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// Accumulator reduction
+// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<2xf32>
+
+// -----
+
+#matvec_accesses = [
+  affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+  affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
+  affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+]
+
+#matvec_trait = {
+  indexing_maps = #matvec_accesses,
+  iterator_types = ["parallel", "parallel", "parallel", "reduction"],
+  kind = #vector.kind<add>
+}
+
+#layout_lhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1],
+  batch_tile = [4, 1, 1],
+  outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 4],
+  element_tile = [1, 1, 4],
+
+  subgroup_strides = [0, 0, 0],
+  thread_strides = [0, 0, 1]
+>
+
+#layout_rhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1],
+  batch_tile = [1, 1, 1],
+  outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 4],
+  element_tile = [1, 1, 4],
+
+  subgroup_strides = [0, 0, 0],
+  thread_strides = [0, 0, 1]
+>
+
+#layout_acc = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1],
+  batch_tile = [4, 1, 1],
+  outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 1],
+  element_tile = [1, 1, 1],
+
+  subgroup_strides = [0, 0, 0],
+  thread_strides = [0, 0, 0]
+>
+
+func.func @contraction_matvec_drop_unit_parallel_dims(%a: vector<4x1x16xf32>, %b: vector<1x1x16xf32>, %init: vector<4x1x1xf32>) -> vector<4x1x1xf32> {
+  %al = iree_vector_ext.to_layout %a to layout(#layout_lhs) : vector<4x1x16xf32>
+  %bl = iree_vector_ext.to_layout %b to layout(#layout_rhs) : vector<1x1x16xf32>
+  %initl = iree_vector_ext.to_layout %init to layout(#layout_acc) : vector<4x1x1xf32>
+  %output = vector.contract #matvec_trait %al, %bl, %initl : vector<4x1x16xf32>, vector<1x1x16xf32>, vector<4x1x1xf32> into vector<4x1x1xf32>
+  %0 = iree_vector_ext.to_layout %output to layout(#layout_acc) : vector<4x1x1xf32>
+  return %0 : vector<4x1x1xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @contraction_matvec_drop_unit_parallel_dims
+// Local contraction
+// CHECK: vector.contract
+// CHECK-SAME: iterator_types = ["parallel", "reduction"]
+// CHECK-SAME: kind = #vector.kind<add>
+// CHECK-SAME: vector<4x4xf32>, vector<4xf32> into vector<4xf32>
+// Partial thread reduction
+// CHECK: gpu.subgroup_reduce add %{{.*}} cluster(size = 4) : (f32) -> f32
+
+// -----
+
+#layout_src = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+#layout_acc = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [2],
+  outer_tile = [1],
+  thread_tile = [16],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+func.func @multi_reduction_dim1_maxnumf_compact(%src: vector<32x32xf32>, %init: vector<32xf32>) -> vector<32xf32> {
+  %srcl = iree_vector_ext.to_layout %src to layout(#layout_src) : vector<32x32xf32>
+  %initl = iree_vector_ext.to_layout %init to layout(#layout_acc) : vector<32xf32>
+  %output = vector.multi_reduction <maxnumf>, %srcl, %initl [1] : vector<32x32xf32> to vector<32xf32>
+  %0 = iree_vector_ext.to_layout %output to layout(#layout_acc) : vector<32xf32>
+  return %0 : vector<32xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @multi_reduction_dim1_maxnumf_compact
+// Local reduction
+// CHECK: vector.multi_reduction <maxnumf>, %{{.*}}, %{{.*}} [1] : vector<2x8xf32> to vector<2xf32>
+// Global reduction
+// CHECK: vector.extract %{{.*}}[0]
+// CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// CHECK: vector.extract %{{.*}}[1]
+// CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
+// Accumulator reduction
+// CHECK: arith.maxnumf %{{.*}}, %{{.*}} : vector<2xf32>
 
 // -----
 
@@ -1242,7 +1450,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:  %[[SIMT_ACC:.+]] = iree_vector_ext.to_simt %[[ACC]] : vector<f32> -> vector<f32>
 // CHECK-DAG:  %[[SCALAR:.+]] = vector.extract %[[SIMT_ACC]][] : f32 from vector<f32>
 // CHECK-DAG:  %[[SIMT:.+]] = iree_vector_ext.to_simt %[[VEC]] : vector<64xf32> -> vector<1x1x2xf32>
-// CHECK:      %[[LOCAL:.+]] = vector.multi_reduction <add>, %[[SIMT]], %{{.*}}
+// CHECK:      %[[COMPACT:.+]] = vector.shape_cast %[[SIMT]] : vector<1x1x2xf32> to vector<2xf32>
+// CHECK:      %[[LOCAL:.+]] = vector.multi_reduction <add>, %[[COMPACT]], %{{.*}}
 // CHECK:      gpu.subgroup_reduce add %[[LOCAL]]
 // Accumulator addition
 // CHECK:      %[[BROADCASTED:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<1xf32>

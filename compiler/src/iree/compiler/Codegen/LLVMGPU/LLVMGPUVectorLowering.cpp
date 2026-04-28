@@ -483,7 +483,7 @@ struct LLVMGPUVectorLoweringPass final
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
+              vector::VectorContractLowering::Dot);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           contractLoweringPatterns);
       vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
@@ -493,8 +493,19 @@ struct LLVMGPUVectorLoweringPass final
           contractLoweringPatterns, options.vectorContractLowering);
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
+<<<<<<< Updated upstream
       contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
                                                        PatternBenefit(2));
+=======
+      // Pattern-benefit ordering for vector.contract:
+      //   ContractToChainDot (3) — preferred for ≤16-bit float, supported
+      //   chipset ContractToChainFMA (2) — preferred for float otherwise
+      //   upstream contract lowerings (1) — fallback (OuterProduct mode here)
+      // contractLoweringPatterns.add<ContractToChainFMA>(
+      //     funcOp->getContext(), PatternBenefit(kChainFMAPatternBenefit));
+      // contractLoweringPatterns.add<ContractToChainDot>(
+      //     funcOp->getContext(), PatternBenefit(kChainDotPatternBenefit));
+>>>>>>> Stashed changes
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
