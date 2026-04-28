@@ -270,6 +270,7 @@ struct DispatchCreationOptions {
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
   bool enableSplitReduction = false;
+  bool splitReductionLowParallelism = false;
 
   // Enables data tiling in dispatch creation phase.
   bool dataTiling = false;

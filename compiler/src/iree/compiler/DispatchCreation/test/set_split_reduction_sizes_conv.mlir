@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{low-parallelism=true}))" --split-input-file %s | FileCheck %s --check-prefix=RDNA
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 + d4, d5, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d0)>
@@ -16,7 +17,29 @@ module {
 }
 
 // CHECK-LABEL: @conv_1d_chn_chf
-//       CHECK: iree_linalg_ext.split_reduction = [1 : index, 12 : index, 32 : index]
+//       CHECK: iree_linalg_ext.split_reduction = [1 : index, 48 : index, 32 : index]
+// RDNA-LABEL: @conv_1d_chn_chf
+//       RDNA: iree_linalg_ext.split_reduction = [2 : index, 48 : index, 32 : index]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 + d4, d5, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d0)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+util.func public @conv_1d_chn_chf_mid_red(%arg0: tensor<16x130x32x96xf32>, %arg1: tensor<16x128x32x96xf32>, %arg2: tensor<96x3x96xf32>) -> tensor<96x3x96xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x130x32x96xf32>, tensor<16x128x32x96xf32>) outs(%arg2 : tensor<96x3x96xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<96x3x96xf32>
+  util.return %0 : tensor<96x3x96xf32>
+}
+
+// CHECK-LABEL: @conv_1d_chn_chf_mid_red
+//       CHECK: iree_linalg_ext.split_reduction = [1 : index, 64 : index, 32 : index]
+// RDNA-LABEL: @conv_1d_chn_chf_mid_red
+//       RDNA: iree_linalg_ext.split_reduction = [1 : index, 128 : index, 32 : index]
 
 // -----
 
