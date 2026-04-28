@@ -59,13 +59,13 @@ def LLVMCPUAssignWorkgroupLocalMemoryPass :
   let description = [{
     Scans entry-block memref.alloc operations whose memory space is
     #iree_codegen.workgroup_local, computes a static byte layout using the
-    target data layout, and annotates each alloc with its byte range in the
-    dispatch workgroup local memory buffer.
+    target data layout, and rewrites each alloc to a memref.view into one packed
+    byte allocation in the same memory space.
 
-    The pass also sets the corresponding hal.executable.export
-    workgroup_local_memory attribute so the runtime provides enough local
-    memory for the converted dispatch. Existing local-memory assignments and
-    predeclared export requirements are rejected instead of being overwritten.
+    The pass also sets the corresponding iree_codegen.dispatch_config
+    workgroup_local_memory attribute so propagation to hal.executable.export
+    follows the normal dispatch metadata path. Existing local-memory
+    requirements are rejected instead of being overwritten.
   }];
 }
 

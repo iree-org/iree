@@ -695,7 +695,8 @@ def IREECodegen_DispatchConfigOp :
     Example:
     ```mlir
     iree_codegen.dispatch_config @matmul
-        workgroup_size = [64, 16, 1] subgroup_size = 64 {
+        workgroup_size = [64, 16, 1] subgroup_size = 64
+        workgroup_local_memory = 4096 {
       ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
         %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 256)>()[%w2]
         %c1 = arith.constant 1 : index
@@ -707,7 +708,8 @@ def IREECodegen_DispatchConfigOp :
   let arguments = (ins
     FlatSymbolRefAttr:$function_ref,
     OptionalAttr<DenseI64ArrayAttr>:$workgroup_size,
-    OptionalAttr<I64Attr>:$subgroup_size
+    OptionalAttr<I64Attr>:$subgroup_size,
+    OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
   let regions = (region SizedRegion<1>:$body);
 
@@ -719,6 +721,7 @@ def IREECodegen_DispatchConfigOp :
     $function_ref
     (`workgroup_size` `=` $workgroup_size^)?
     (`subgroup_size` `=` $subgroup_size^)?
+    (`workgroup_local_memory` `=` $workgroup_local_memory^)?
     $body attr-dict
   }];
   let extraClassDeclaration = [{

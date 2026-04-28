@@ -349,6 +349,11 @@ struct ConvertWorkgroupLocalAllocOp
             memRefType.getMemorySpace())) {
       return failure();
     }
+    if (!memRefType.getElementType().isInteger(8)) {
+      return allocOp.emitOpError(
+          "workgroup local memory allocations must be packed into an i8 "
+          "allocation before LLVM conversion");
+    }
     if (!memRefType.hasStaticShape()) {
       return allocOp.emitOpError(
           "workgroup local memory allocations must have static shape");
@@ -362,27 +367,14 @@ struct ConvertWorkgroupLocalAllocOp
           "workgroup local memory allocations must have static layout");
     }
 
-    auto rangeAttr = allocOp->getAttrOfType<DenseI64ArrayAttr>(
-        kWorkgroupLocalMemoryRangeAttrName);
-    if (!rangeAttr || rangeAttr.size() != 2 || rangeAttr[0] < 0 ||
-        rangeAttr[1] < 0) {
-      return allocOp.emitOpError(
-          "missing valid iree_codegen.local_memory_range annotation");
-    }
-
     Location loc = allocOp.getLoc();
     Value basePtr = abi.loadWorkgroupLocalMemoryPtr(allocOp, rewriter);
-    Value byteOffset = LLVM::ConstantOp::create(
-        rewriter, loc, rewriter.getI64Type(), rangeAttr[0]);
-    Value offsetPtr = LLVM::GEPOp::create(
-        rewriter, loc, basePtr.getType(), rewriter.getI8Type(), basePtr,
-        byteOffset, LLVM::GEPNoWrapFlags::inbounds);
 
     MemRefType strippedType =
         MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                         memRefType.getLayout());
     auto desc = MemRefDescriptor::fromStaticShape(
-        rewriter, loc, *getTypeConverter(), strippedType, offsetPtr);
+        rewriter, loc, *getTypeConverter(), strippedType, basePtr);
     rewriter.replaceOp(allocOp, {desc});
     return success();
   }

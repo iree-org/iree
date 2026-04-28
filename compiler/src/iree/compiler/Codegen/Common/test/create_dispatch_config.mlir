@@ -85,6 +85,26 @@ hal.executable private @no_count_region {
 
 // -----
 
+// Export metadata is preserved on the dispatch_config.
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @export_metadata {
+  hal.executable.variant public @variant target(#hal.executable.target<"", "">) {
+    hal.executable.export public @entry_point layout(#pipeline_layout)
+        attributes {workgroup_local_memory = 4096 : index}
+    builtin.module {
+      func.func @entry_point() {
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: hal.executable private @export_metadata
+//       CHECK:   iree_codegen.dispatch_config @entry_point workgroup_local_memory = 4096
+
+// -----
+
 // Test that dispatch_config placed after its function.
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>

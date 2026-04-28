@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -27,16 +28,20 @@ constexpr int64_t kMinWorkgroupLocalAlignment = 16;
 struct LLVMCPUAssignWorkgroupLocalMemoryPass
     : impl::LLVMCPUAssignWorkgroupLocalMemoryPassBase<
           LLVMCPUAssignWorkgroupLocalMemoryPass> {
-  using impl::LLVMCPUAssignWorkgroupLocalMemoryPassBase<
-      LLVMCPUAssignWorkgroupLocalMemoryPass>::
-      LLVMCPUAssignWorkgroupLocalMemoryPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 
-static bool hasWorkgroupLocalMemorySpace(memref::AllocOp allocOp) {
-  return isa_and_nonnull<IREE::Codegen::WorkgroupLocalMemoryAttr>(
-      allocOp.getType().getMemorySpace());
-}
+struct LocalAllocLayout {
+  memref::AllocOp allocOp;
+  int64_t byteOffset = 0;
+  int64_t elementFootprint = 0;
+};
+
+struct AllocationSize {
+  int64_t elementFootprint = 0;
+  int64_t byteSize = 0;
+};
 
 static bool hasWorkgroupLocalMemorySpace(Type type) {
   auto memRefType = dyn_cast<BaseMemRefType>(type);
@@ -56,6 +61,18 @@ static LogicalResult checkedMul(int64_t lhs, int64_t rhs, int64_t &result) {
     return failure();
   }
   return success();
+}
+
+static LogicalResult checkedAlignTo(int64_t value, int64_t alignment,
+                                    int64_t &result) {
+  assert(value >= 0);
+  assert(alignment > 0);
+  int64_t remainder = value % alignment;
+  if (remainder == 0) {
+    result = value;
+    return success();
+  }
+  return checkedAdd(value, alignment - remainder, result);
 }
 
 static FailureOr<int64_t>
@@ -109,7 +126,8 @@ computeStaticElementFootprint(memref::AllocOp allocOp) {
   return footprint;
 }
 
-static FailureOr<int64_t> computeAllocationByteSize(memref::AllocOp allocOp) {
+static FailureOr<AllocationSize>
+computeAllocationSize(memref::AllocOp allocOp) {
   MemRefType type = allocOp.getType();
   FailureOr<int64_t> elementFootprint = computeStaticElementFootprint(allocOp);
   if (failed(elementFootprint)) {
@@ -136,7 +154,10 @@ static FailureOr<int64_t> computeAllocationByteSize(memref::AllocOp allocOp) {
     allocOp.emitOpError("workgroup local memory allocation size overflow");
     return failure();
   }
-  return totalBytes;
+  AllocationSize allocationSize;
+  allocationSize.elementFootprint = *elementFootprint;
+  allocationSize.byteSize = totalBytes;
+  return allocationSize;
 }
 
 static FailureOr<int64_t> computeAlignment(memref::AllocOp allocOp) {
@@ -163,7 +184,8 @@ static FailureOr<int64_t> computeAlignment(memref::AllocOp allocOp) {
 }
 
 static LogicalResult
-rejectUnsupportedWorkgroupLocalMemoryUses(mlir::FunctionOpInterface funcOp) {
+collectWorkgroupLocalAllocs(mlir::FunctionOpInterface funcOp,
+                            SmallVectorImpl<memref::AllocOp> &localAllocs) {
   if (llvm::any_of(
           funcOp.getArgumentTypes(),
           [](Type type) { return hasWorkgroupLocalMemorySpace(type); }) ||
@@ -175,12 +197,31 @@ rejectUnsupportedWorkgroupLocalMemoryUses(mlir::FunctionOpInterface funcOp) {
   }
 
   WalkResult result = funcOp.walk([&](Operation *op) -> WalkResult {
-    if (auto allocaOp = dyn_cast<memref::AllocaOp>(op)) {
-      if (hasWorkgroupLocalMemorySpace(allocaOp.getType())) {
-        allocaOp.emitOpError(
-            "workgroup local memory is only supported for memref.alloc");
+    for (Region &region : op->getRegions()) {
+      for (Block &block : region) {
+        if (llvm::any_of(block.getArgumentTypes(), [](Type type) {
+              return hasWorkgroupLocalMemorySpace(type);
+            })) {
+          op->emitOpError(
+              "workgroup local memory is only supported for memref.alloc "
+              "results");
+          return WalkResult::interrupt();
+        }
+      }
+    }
+
+    for (Value result : op->getResults()) {
+      if (!hasWorkgroupLocalMemorySpace(result.getType())) {
+        continue;
+      }
+      auto allocOp = dyn_cast<memref::AllocOp>(op);
+      if (!allocOp || result != allocOp.getMemref()) {
+        op->emitOpError(
+            "workgroup local memory is only supported for memref.alloc "
+            "results");
         return WalkResult::interrupt();
       }
+      localAllocs.push_back(allocOp);
     }
     return WalkResult::advance();
   });
@@ -194,35 +235,30 @@ void LLVMCPUAssignWorkgroupLocalMemoryPass::runOnOperation() {
   if (funcOp.getFunctionBody().empty()) {
     return;
   }
-  if (failed(rejectUnsupportedWorkgroupLocalMemoryUses(funcOp))) {
-    return signalPassFailure();
-  }
 
   SmallVector<memref::AllocOp> localAllocs;
-  funcOp.walk([&](memref::AllocOp allocOp) {
-    if (hasWorkgroupLocalMemorySpace(allocOp)) {
-      localAllocs.push_back(allocOp);
-    }
-  });
+  if (failed(collectWorkgroupLocalAllocs(funcOp, localAllocs))) {
+    return signalPassFailure();
+  }
   if (localAllocs.empty()) {
     return;
   }
 
-  std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (!exportOp) {
+  IREE::Codegen::DispatchConfigOp configOp = getDispatchConfigOp(funcOp);
+  if (!configOp) {
     localAllocs.front().emitOpError(
-        "workgroup local memory allocations are only supported in HAL "
-        "executable exports");
+        "workgroup local memory allocations require an "
+        "iree_codegen.dispatch_config op");
     return signalPassFailure();
   }
-  if (exportOp.value()->hasAttr(exportOp->getWorkgroupLocalMemoryAttrName())) {
-    exportOp.value()->emitOpError(
-        "already has a workgroup local memory requirement");
+  if (configOp.getWorkgroupLocalMemoryAttr()) {
+    configOp.emitOpError("already has a workgroup local memory requirement");
     return signalPassFailure();
   }
 
-  OpBuilder builder(funcOp.getContext());
   int64_t currentOffset = 0;
+  SmallVector<LocalAllocLayout> layouts;
+  layouts.reserve(localAllocs.size());
   Block &entryBlock = funcOp.getFunctionBody().front();
   for (auto allocOp : localAllocs) {
     if (allocOp->getBlock() != &entryBlock) {
@@ -231,13 +267,9 @@ void LLVMCPUAssignWorkgroupLocalMemoryPass::runOnOperation() {
           "block");
       return signalPassFailure();
     }
-    if (allocOp->hasAttr(kWorkgroupLocalMemoryRangeAttrName)) {
-      allocOp.emitOpError("already has a workgroup local memory assignment");
-      return signalPassFailure();
-    }
 
-    FailureOr<int64_t> byteSize = computeAllocationByteSize(allocOp);
-    if (failed(byteSize)) {
+    FailureOr<AllocationSize> allocationSize = computeAllocationSize(allocOp);
+    if (failed(allocationSize)) {
       return signalPassFailure();
     }
 
@@ -245,25 +277,61 @@ void LLVMCPUAssignWorkgroupLocalMemoryPass::runOnOperation() {
     if (failed(alignment)) {
       return signalPassFailure();
     }
-    uint64_t alignedOffset = llvm::alignTo(static_cast<uint64_t>(currentOffset),
-                                           static_cast<uint64_t>(*alignment));
-    if (alignedOffset >
-        static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+    if (failed(checkedAlignTo(currentOffset, *alignment, currentOffset))) {
       allocOp.emitOpError("workgroup local memory allocation size overflow");
       return signalPassFailure();
     }
-    currentOffset = static_cast<int64_t>(alignedOffset);
-    allocOp->setAttr(kWorkgroupLocalMemoryRangeAttrName,
-                     builder.getDenseI64ArrayAttr({currentOffset, *byteSize}));
+    layouts.push_back(LocalAllocLayout{
+        /*allocOp=*/allocOp,
+        /*byteOffset=*/currentOffset,
+        /*elementFootprint=*/allocationSize->elementFootprint,
+    });
 
-    if (failed(checkedAdd(currentOffset, *byteSize, currentOffset))) {
+    if (failed(checkedAdd(currentOffset, allocationSize->byteSize,
+                          currentOffset))) {
       allocOp.emitOpError("workgroup local memory allocation size overflow");
       return signalPassFailure();
     }
   }
 
-  exportOp.value()->setAttr(exportOp->getWorkgroupLocalMemoryAttrName(),
-                            builder.getIndexAttr(currentOffset));
+  OpBuilder builder(funcOp.getContext());
+  builder.setInsertionPointToStart(&entryBlock);
+  Attribute memorySpace = localAllocs.front().getType().getMemorySpace();
+  MemRefType packedType = MemRefType::get({currentOffset}, builder.getI8Type(),
+                                          AffineMap(), memorySpace);
+  Value packedAlloc =
+      memref::AllocOp::create(builder, funcOp.getLoc(), packedType);
+  for (const LocalAllocLayout &layout : layouts) {
+    memref::AllocOp allocOp = layout.allocOp;
+    MemRefType allocType = allocOp.getType();
+    MemRefType viewType = allocType;
+    if (!allocType.getLayout().isIdentity()) {
+      viewType =
+          MemRefType::get({layout.elementFootprint}, allocType.getElementType(),
+                          AffineMap(), allocType.getMemorySpace());
+    }
+    builder.setInsertionPoint(allocOp);
+    Value byteOffset = arith::ConstantIndexOp::create(builder, allocOp.getLoc(),
+                                                      layout.byteOffset);
+    Value view = memref::ViewOp::create(builder, allocOp.getLoc(), viewType,
+                                        packedAlloc, byteOffset, ValueRange{});
+    if (viewType != allocType) {
+      SmallVector<int64_t> strides;
+      int64_t offset = 0;
+      if (failed(allocType.getStridesAndOffset(strides, offset))) {
+        allocOp.emitOpError(
+            "workgroup local memory allocations must have static layout");
+        return signalPassFailure();
+      }
+      view = memref::ReinterpretCastOp::create(builder, allocOp.getLoc(),
+                                               allocType, view, offset,
+                                               allocType.getShape(), strides);
+    }
+    allocOp.replaceAllUsesWith(view);
+    allocOp.erase();
+  }
+
+  configOp.setWorkgroupLocalMemoryAttr(builder.getIndexAttr(currentOffset));
 }
 
 } // namespace mlir::iree_compiler

@@ -135,12 +135,12 @@ def WorkgroupLocalMemoryAttr :
     Memory space attribute indicating that an allocation uses per-workgroup
     local memory supplied by the target runtime instead of the thread stack.
 
-    LLVMCPU dispatch lowering rewrites `memref.alloc` operations marked with
-    this memory space to use the HAL dispatch ABI local-memory pointer. Matching
-    `memref.dealloc` operations are erased because the storage is owned by the
-    dispatch frame. The allocation layout is assigned before final LLVM
-    conversion and exported as the dispatch `workgroup_local_memory`
-    requirement.
+    LLVMCPU dispatch lowering packs `memref.alloc` operations marked with this
+    memory space into one byte allocation and rewrites the original allocations
+    to `memref.view` slices. The packed allocation is lowered to the HAL
+    dispatch ABI local-memory pointer. Matching `memref.dealloc` operations are
+    erased because the storage is owned by the dispatch frame. The aggregate
+    byte size is exported as the dispatch `workgroup_local_memory` requirement.
 
     Example:
     ```mlir

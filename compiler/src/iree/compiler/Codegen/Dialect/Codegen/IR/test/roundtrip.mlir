@@ -361,7 +361,8 @@ func.func @smt_lookup_sparse(%arg0: index) {
 // -----
 
 iree_codegen.dispatch_config @matmul
-    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+    workgroup_size = [64, 16, 1] subgroup_size = 64
+    workgroup_local_memory = 4096 {
   ^bb0(%w0: index, %w1: index):
     %c1 = arith.constant 1 : index
     iree_codegen.yield %w0, %w1, %c1 : index, index, index
@@ -369,6 +370,7 @@ iree_codegen.dispatch_config @matmul
 // CHECK-LABEL: iree_codegen.dispatch_config @matmul
 // CHECK-SAME:    workgroup_size = [64, 16, 1]
 // CHECK-SAME:    subgroup_size = 64
+// CHECK-SAME:    workgroup_local_memory = 4096
 // CHECK:       ^bb0(%[[W0:.+]]: index, %[[W1:.+]]: index):
 // CHECK:         %[[C1:.+]] = arith.constant 1 : index
 // CHECK:         iree_codegen.yield %[[W0]], %[[W1]], %[[C1]] : index, index, index
