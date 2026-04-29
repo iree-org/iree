@@ -52,8 +52,9 @@ static Value inlineCombiner(RewriterBase &rewriter, Location loc,
 ///
 struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
   LowerSubgroupScan(MLIRContext *ctx, unsigned subgroupSize,
-                    PatternBenefit benefit)
-      : OpRewritePattern(ctx, benefit), subgroupSize(subgroupSize) {}
+                    unsigned shuffleBitwidth, PatternBenefit benefit)
+      : OpRewritePattern(ctx, benefit), subgroupSize(subgroupSize),
+        shuffleBitwidth(shuffleBitwidth) {}
 
   LogicalResult matchAndRewrite(IREE::GPU::SubgroupScanOp op,
                                 PatternRewriter &rewriter) const override {
@@ -63,8 +64,6 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
     uint32_t clusterStride = op.getClusterStride();
     Type valTy = val.getType();
     unsigned bitwidth = valTy.getIntOrFloatBitWidth();
-
-    constexpr unsigned shuffleBitwidth = 32;
 
     if (!valTy.isIntOrFloat() || bitwidth > shuffleBitwidth) {
       return rewriter.notifyMatchFailure(
@@ -215,6 +214,7 @@ struct LowerSubgroupScan : OpRewritePattern<IREE::GPU::SubgroupScanOp> {
 
 private:
   unsigned subgroupSize;
+  unsigned shuffleBitwidth;
 };
 
 struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
@@ -244,7 +244,8 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
         patterns, /* maxShuffleBitwidth=*/32, PatternBenefit(3));
     populateGpuLowerClusteredSubgroupReduceToShufflePatterns(
         patterns, *subgroupSize, /* shuffleBitwidth=*/32, PatternBenefit(1));
-    patterns.add<LowerSubgroupScan>(ctx, *subgroupSize, PatternBenefit(1));
+    patterns.add<LowerSubgroupScan>(ctx, *subgroupSize, /*shuffleBitwidth=*/32,
+                                    PatternBenefit(1));
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
