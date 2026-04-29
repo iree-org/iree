@@ -43,10 +43,10 @@
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
 
 static llvm::cl::opt<bool> clNoHoistDataOperandsScaledMMA(
-    "test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma",
+    "iree-dispatch-creation-experimental-no-hoist-data-operands-scaled-mma",
     llvm::cl::desc(
-        "Use unswizzled data operands for scaled matmuls: data operands "
-        "are pack-only (row-major), scales are fully shuffled."),
+        "Experimental flag that prevents hoisting data operand encodings for "
+        "scaled matmuls, scales are still hoisted."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace mlir::iree_compiler::DispatchCreation {
@@ -323,10 +323,6 @@ void HoistEncodingOpsPass::runOnOperation() {
     if (isa_and_nonnull<IREE::Encoding::PaddingAttr>(encoding)) {
       return;
     }
-    // When --test-iree-dispatch-creation-no-hoist-data-operands-scaled-mma is
-    // set, data operands benefit from staying fused in the dispatch (identity
-    // permute loads) while scale operands benefit from pre-encoding via
-    // hoisting.
     if (clNoHoistDataOperandsScaledMMA) {
       if (auto encodingAttr =
               dyn_cast_or_null<IREE::Encoding::EncodingAttr>(encoding)) {
