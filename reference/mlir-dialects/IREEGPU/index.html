@@ -8497,8 +8497,7 @@ handle the implied cross-subgroup reduction.</p>
   int64_t,   # subgroups_k
   DenseI64ArrayAttr,   # operands_interleaving_intrinsics_m
   DenseI64ArrayAttr,   # operands_interleaving_intrinsics_n
-  DenseI64ArrayAttr,   # operands_interleaving_intrinsics_k
-  DenseI64ArrayAttr   # unswizzled_operands
+  DenseI64ArrayAttr   # operands_interleaving_intrinsics_k
 &gt;
 </code></pre></div>
 <p>This mma variant represents scaled MMA ops with data-tiling details. The
@@ -8508,11 +8507,6 @@ targeted by the data-tiling.</p>
 element types of the LHS, RHS, and ACC operands respectively. The element
 types for the scales operands are always Float8E8M0FNUType, so they are not
 specified on the attribute.</p>
-<p>The optional |unswizzled_operands| field lists operand indices whose data
-layout is unswizzled (pack and expand only, no transpose). When set, those
-operands get an identity permutation in the swizzle and use a distribution
-swizzle for thread ID delinearization. Other operands are fully swizzled as
-usual. When empty (default), all operands are fully data-tiled.</p>
 <p>The other fields are similar to DataTiledMMAAttr, refer to its documentation.</p>
 <h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
@@ -8588,11 +8582,6 @@ usual. When empty (default), all operands are fully data-tiled.</p>
 <td style="text-align: center;">operands_interleaving_intrinsics_k</td>
 <td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
 <td></td>
-</tr>
-<tr>
-<td style="text-align: center;">unswizzled_operands</td>
-<td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
-<td>Operand indices with row-major (unswizzled) layout.</td>
 </tr>
 </tbody>
 </table>
