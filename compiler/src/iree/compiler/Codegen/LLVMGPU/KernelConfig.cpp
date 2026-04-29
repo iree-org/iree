@@ -1113,13 +1113,22 @@ static LogicalResult setAttentionReductionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  // Bail out on shapes this path cannot tile cleanly. K2 below the skinny-dim
-  // threshold leaves attention as a large elementwise; the intrinsic and
-  // reduction paths have nothing to offer. All three cases fall through to the
-  // BaseLowering scalar fallback.
+  // Bail out on shapes this path cannot tile cleanly; all three cases fall
+  // through to the BaseLowering scalar fallback:
+  //   * K1 must be a multiple of `keyVectorSize`. The per-thread K1 tile is
+  //     pinned to that size below, so a non-multiple leaves a partial vector
+  //     and produces a vector op shape the layout engine cannot distribute.
+  //   * N must be a multiple of `numValueVectors * valueVectorSize`. The
+  //     inner-N workgroup tile factors that product, so a non-multiple lands
+  //     a tile boundary mid-vector and likewise breaks layout inference.
+  //   * K2 must exceed `kVerySkinnyDimThreshold`; smaller K2 collapses the
+  //     reduction below what this path is tuned for.
   int64_t k1Size = bounds[opInfo.getK1Dims().back()];
   int64_t nSize = bounds[opInfo.getNDims().back()];
-  int64_t k2Size = bounds[opInfo.getK2Dims().back()];
+  // K2 may be empty; treat it as size 1, which trips the skinny-K2 check
+  // below.
+  int64_t k2Size =
+      opInfo.getK2Dims().empty() ? 1 : bounds[opInfo.getK2Dims().back()];
   int64_t nWorkgroupTile = seeds.numValueVectors * seeds.valueVectorSize;
   if (!ShapedType::isDynamic(k1Size) && k1Size % seeds.keyVectorSize != 0) {
     LDBG() << "Bailing out: K1 not a multiple of key vector size ("
