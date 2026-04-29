@@ -526,6 +526,10 @@ static FailureOr<MapStoreOp> foldUnpackIntoMapStore(RewriterBase &rewriter,
          "expected unPackOp to be the producer of mapStoreOp");
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(unPackOp);
+  // lowerUnpadLikeWithExtractSlice=false ensures "like unpad" unpacks go
+  // through the full transpose → collapse_shape → extract_slice chain instead
+  // of being lowered to a single rank-reducing extract_slice, which
+  // foldExtractSliceIntoMapStore does not support.
   auto result = linalg::lowerUnPack(rewriter, unPackOp,
                                     /*lowerUnpadLikeWithExtractSlice=*/false);
   if (failed(result)) {
@@ -1336,6 +1340,10 @@ static FailureOr<MapLoadOp> foldUnpackIntoMapLoad(RewriterBase &rewriter,
          "expected mapLoadOp to be the producer of unPackOp input");
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(unPackOp);
+  // lowerUnpadLikeWithExtractSlice=false ensures "like unpad" unpacks go
+  // through the full transpose → collapse_shape → extract_slice chain instead
+  // of being lowered to a single rank-reducing extract_slice, which
+  // foldExtractSliceIntoMapLoad does not support.
   auto result = linalg::lowerUnPack(rewriter, unPackOp,
                                     /*lowerUnpadLikeWithExtractSlice=*/false);
   if (failed(result)) {
