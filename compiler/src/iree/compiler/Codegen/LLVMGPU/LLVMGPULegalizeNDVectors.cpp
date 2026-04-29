@@ -714,8 +714,8 @@ struct ConvertVectorBitcast final
 /// split into flat 1-D vectors by the type converter; create a 1-D interleave
 /// for each corresponding pair.
 struct ConvertVectorInterleave final
-    : public OpConversionPattern<vector::InterleaveOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : OpConversionPattern<vector::InterleaveOp> {
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(vector::InterleaveOp op, OneToNOpAdaptor adaptor,
@@ -726,15 +726,14 @@ struct ConvertVectorInterleave final
     }
 
     Location loc = op.getLoc();
-    SmallVector<Value> lhsValues(adaptor.getLhs());
-    SmallVector<Value> rhsValues(adaptor.getRhs());
 
     VectorType resultType = op.getResultVectorType();
     auto result1DType = VectorType::get({resultType.getShape().back()},
                                         resultType.getElementType());
 
     SmallVector<Value> results;
-    for (auto [lhs, rhs] : llvm::zip_equal(lhsValues, rhsValues)) {
+    for (auto [lhs, rhs] :
+         llvm::zip_equal(adaptor.getLhs(), adaptor.getRhs())) {
       results.push_back(
           vector::InterleaveOp::create(rewriter, loc, result1DType, lhs, rhs));
     }
@@ -748,8 +747,8 @@ struct ConvertVectorInterleave final
 /// for each and group results so that all res1 values come first, then all
 /// res2 values.
 struct ConvertVectorDeinterleave final
-    : public OpConversionPattern<vector::DeinterleaveOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : OpConversionPattern<vector::DeinterleaveOp> {
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(vector::DeinterleaveOp op, OneToNOpAdaptor adaptor,
