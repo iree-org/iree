@@ -620,7 +620,7 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
 static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
     RewriterBase &rewriter, linalg::GenericOp linalgOp,
     ArrayRef<int64_t> vectorSizes, ArrayRef<bool> scalableVecDims,
-    bool vectorizeNDExtract) {
+    bool vectorizeNDExtract, DenseMap<Value, Value> &tensorToVector) {
 
   // Since upstream vectorization does not support hooks to vectorize individual
   // operations inside a linalg.generic, we take an alternate approach here,
@@ -697,7 +697,8 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   SmallVector<Value> origPreResults(preOp.getResults());
   FailureOr<SmallVector<Value>> preResult =
       vectorizeGatherLikeGenericToTransferGather(
-          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract,
+          tensorToVector);
   if (failed(preResult)) {
     return failure();
   }
@@ -729,7 +730,11 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   // unmasked and the outer transfer_write of the gather result is masked,
   // so OOB-lane indices are never observed. Masking the gather itself
   // (see TODO below) must preserve this invariant.
-  DenseMap<Value, Value> preTensorToVector;
+  //
+  // Entries are merged into the caller-provided `tensorToVector` map so
+  // that recursive calls for subsequent extracts can directly reuse these
+  // vector values instead of reading them back from intermediate tensors.
+  // This avoids materializing tensor.empty<...xindex> intermediaries.
   for (Value repl : *preResult) {
     vector::TransferWriteOp writeOp;
     if (auto maskOp = repl.getDefiningOp<vector::MaskOp>()) {
@@ -738,7 +743,7 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
       writeOp = repl.getDefiningOp<vector::TransferWriteOp>();
     }
     if (writeOp) {
-      preTensorToVector[repl] = writeOp.getVector();
+      tensorToVector[repl] = writeOp.getVector();
     }
   }
 
@@ -774,12 +779,13 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
 
     auto [tensor, map] = tensorMap[index];
 
-    // Prefer the vector SSA value produced by the vectorized preOp; fall
-    // back to a transfer_read for tensors not produced by preOp (e.g.,
-    // original linalgOp operands directly referenced by the extract).
+    // Prefer the vector SSA value from any ancestor or current-level
+    // vectorization; fall back to a transfer_read for tensors that have
+    // no known vector equivalent (e.g., original linalgOp operands
+    // directly referenced by the extract).
     Value indexVec;
-    if (preTensorToVector.contains(tensor)) {
-      indexVec = preTensorToVector[tensor];
+    if (tensorToVector.contains(tensor)) {
+      indexVec = tensorToVector[tensor];
     } else {
       Type elemType = getElementTypeOrSelf(index);
       AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
@@ -839,13 +845,15 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   tensorMap[extractOp.getResult()] = {
       writeOp.getResult(),
       rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size())};
+  tensorToVector[writeOp.getResult()] = transferGatherOp.getResult();
 
   // Build the postExtract linalg.generic.
   linalg::GenericOp postOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, postExtract, tensorMap);
 
   auto postResult = vectorizeGatherLikeGenericToTransferGather(
-      rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+      rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract,
+      tensorToVector);
   if (failed(postResult)) {
     return failure();
   }
@@ -1095,10 +1103,11 @@ struct LinalgStructuredOpVectorizationModel
         if (succeeded(implicitGatherResult)) {
           return *implicitGatherResult;
         }
+        DenseMap<Value, Value> tensorToVector;
         FailureOr<SmallVector<Value>> gatherResult =
             vectorizeGatherLikeGenericToTransferGather(
                 rewriter, genericOp, vectorSizes, scalableDims,
-                vectorizeNDExtract);
+                vectorizeNDExtract, tensorToVector);
         if (succeeded(gatherResult)) {
           return *gatherResult;
         }
