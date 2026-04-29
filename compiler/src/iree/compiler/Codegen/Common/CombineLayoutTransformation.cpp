@@ -473,6 +473,97 @@ static FailureOr<MapStoreOp> foldTransposeGenericIntoMapStore(
                                        genericOp.getDpsInputs()[0], mapStoreOp);
 }
 
+/// Decompose a `packOp` and fold all resulting ops into the consumer
+/// `mapStoreOp` in one shot. lowerPack produces: source → [pad] →
+/// expand_shape → transpose. We fold transpose then expand_shape into the
+/// map_store. Identity pads are removed; non-identity pads are left for
+/// FoldPadOpIntoMapStorePattern to handle on the next greedy iteration.
+static FailureOr<MapStoreOp> foldPackIntoMapStore(RewriterBase &rewriter,
+                                                  linalg::PackOp packOp,
+                                                  MapStoreOp mapStoreOp) {
+  assert(mapStoreOp.getInput() == packOp->getResult(0) &&
+         "expected packOp to be the producer of mapStoreOp");
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(packOp);
+  auto result = linalg::lowerPack(rewriter, packOp,
+                                  /*lowerPadLikeWithInsertSlice=*/false);
+  if (failed(result)) {
+    return failure();
+  }
+
+  // After lowerPack the chain is: source → [pad] → expand_shape → transpose.
+  // The map_store input is now transpose.result.
+  mapStoreOp =
+      foldTransposeIntoMapStore(rewriter, result->transposeOp, mapStoreOp);
+
+  auto foldResult =
+      foldExpandShapeIntoMapStore(rewriter, result->expandShapeOp, mapStoreOp);
+  if (failed(foldResult)) {
+    return failure();
+  }
+  mapStoreOp = *foldResult;
+
+  if (result->padOp) {
+    if (areAllConstantIntValue(result->padOp.getMixedLowPad(), 0) &&
+        areAllConstantIntValue(result->padOp.getMixedHighPad(), 0)) {
+      rewriter.replaceOp(result->padOp, result->padOp.getSource());
+    }
+    // Non-identity pad left for FoldPadOpIntoMapStorePattern.
+  }
+
+  return mapStoreOp;
+}
+
+/// Decompose an `unPackOp` and fold all resulting ops into the consumer
+/// `mapStoreOp` in one shot. lowerUnPack (with lowerUnpadLikeWithExtractSlice
+/// = false) produces: source → transpose → collapse_shape → extract_slice →
+/// copy. We fold copy, extract_slice, collapse_shape, then transpose into the
+/// map_store from innermost to outermost.
+static FailureOr<MapStoreOp> foldUnpackIntoMapStore(RewriterBase &rewriter,
+                                                    linalg::UnPackOp unPackOp,
+                                                    MapStoreOp mapStoreOp) {
+  assert(mapStoreOp.getInput() == unPackOp->getResult(0) &&
+         "expected unPackOp to be the producer of mapStoreOp");
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(unPackOp);
+  auto result = linalg::lowerUnPack(rewriter, unPackOp,
+                                    /*lowerUnpadLikeWithExtractSlice=*/false);
+  if (failed(result)) {
+    return failure();
+  }
+
+  // After lowerUnPack the chain is:
+  //   source → transpose → collapse_shape → extract_slice → copy
+  // The map_store input is now copy.result.
+  // Fold from innermost (closest to map_store) to outermost.
+
+  // 1. Fold copy (identity-like) into map_store.
+  mapStoreOp =
+      foldIdentityLikeOpIntoMapStore(rewriter, result->copyOp, mapStoreOp);
+
+  // 2. Fold extract_slice into map_store.
+  auto extractFold = foldExtractSliceIntoMapStore(
+      rewriter, result->extractSliceOp, mapStoreOp);
+  if (failed(extractFold)) {
+    return failure();
+  }
+  mapStoreOp = *extractFold;
+
+  // 3. Fold collapse_shape into map_store.
+  auto collapseFold = foldCollapseShapeIntoMapStore(
+      rewriter, result->collapseShapeOp, mapStoreOp);
+  if (failed(collapseFold)) {
+    return failure();
+  }
+  mapStoreOp = *collapseFold;
+
+  // 4. Fold transpose into map_store.
+  mapStoreOp =
+      foldTransposeIntoMapStore(rewriter, result->transposeOp, mapStoreOp);
+
+  return mapStoreOp;
+}
+
 FailureOr<MapStoreOp> foldIntoMapStore(RewriterBase &rewriter, Operation *op,
                                        MapStoreOp mapStoreOp) {
   return llvm::TypeSwitch<Operation *, FailureOr<MapStoreOp>>(op)
@@ -492,17 +583,11 @@ FailureOr<MapStoreOp> foldIntoMapStore(RewriterBase &rewriter, Operation *op,
         return foldExtractSliceIntoMapStore(rewriter, extractSliceOp,
                                             mapStoreOp);
       })
-      .Case([&](linalg::PackOp packOp) -> FailureOr<MapStoreOp> {
-        if (failed(linalg::lowerPack(rewriter, packOp))) {
-          return failure();
-        }
-        return mapStoreOp;
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
+        return foldPackIntoMapStore(rewriter, packOp, mapStoreOp);
       })
-      .Case([&](linalg::UnPackOp unPackOp) -> FailureOr<MapStoreOp> {
-        if (failed(linalg::lowerUnPack(rewriter, unPackOp))) {
-          return failure();
-        }
-        return mapStoreOp;
+      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unPackOp) {
+        return foldUnpackIntoMapStore(rewriter, unPackOp, mapStoreOp);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
@@ -1188,6 +1273,113 @@ foldTransposeGenericIntoMapLoad(RewriterBase &rewriter,
   return foldTransposePermIntoMapLoad(rewriter, genericOp, perm, mapLoadOp);
 }
 
+/// Decompose a consumer `packOp` and fold all resulting ops into the producer
+/// `mapLoadOp` in one shot. lowerPack produces: source → [pad] →
+/// expand_shape → transpose. We fold pad, expand_shape, then transpose into
+/// the map_load from outermost to innermost.
+static FailureOr<MapLoadOp> foldPackIntoMapLoad(RewriterBase &rewriter,
+                                                linalg::PackOp packOp,
+                                                MapLoadOp mapLoadOp) {
+  assert(packOp.getSource() == mapLoadOp.getResult(0) &&
+         "expected mapLoadOp to be the producer of packOp input");
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(packOp);
+  auto result = linalg::lowerPack(rewriter, packOp,
+                                  /*lowerPadLikeWithInsertSlice=*/false);
+  if (failed(result)) {
+    return failure();
+  }
+
+  // After lowerPack the chain is: map_load → [pad] → expand_shape → transpose.
+  // Fold from outermost (closest to map_load) to innermost.
+
+  // 1. Handle pad.
+  if (result->padOp) {
+    if (areAllConstantIntValue(result->padOp.getMixedLowPad(), 0) &&
+        areAllConstantIntValue(result->padOp.getMixedHighPad(), 0)) {
+      rewriter.replaceOp(result->padOp, result->padOp.getSource());
+    } else {
+      auto padFold = foldPadIntoMapLoad(rewriter, result->padOp, mapLoadOp);
+      if (failed(padFold)) {
+        return failure();
+      }
+      mapLoadOp = *padFold;
+    }
+  }
+
+  // 2. Fold expand_shape into map_load.
+  auto expandFold =
+      foldExpandShapeIntoMapLoad(rewriter, result->expandShapeOp, mapLoadOp);
+  if (failed(expandFold)) {
+    return failure();
+  }
+  mapLoadOp = *expandFold;
+
+  // 3. Fold transpose into map_load.
+  auto transposeFold =
+      foldTransposeIntoMapLoad(rewriter, result->transposeOp, mapLoadOp);
+  if (failed(transposeFold)) {
+    return failure();
+  }
+  mapLoadOp = *transposeFold;
+  return mapLoadOp;
+}
+
+/// Decompose a consumer `unPackOp` and fold all resulting ops into the producer
+/// `mapLoadOp` in one shot. lowerUnPack (with lowerUnpadLikeWithExtractSlice
+/// = false) produces: source → transpose → collapse_shape → extract_slice →
+/// copy. We fold from outermost (closest to map_load) to innermost.
+static FailureOr<MapLoadOp> foldUnpackIntoMapLoad(RewriterBase &rewriter,
+                                                  linalg::UnPackOp unPackOp,
+                                                  MapLoadOp mapLoadOp) {
+  assert(unPackOp.getSource() == mapLoadOp.getResult(0) &&
+         "expected mapLoadOp to be the producer of unPackOp input");
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(unPackOp);
+  auto result = linalg::lowerUnPack(rewriter, unPackOp,
+                                    /*lowerUnpadLikeWithExtractSlice=*/false);
+  if (failed(result)) {
+    return failure();
+  }
+
+  // After lowerUnPack the chain is:
+  //   map_load → transpose → collapse_shape → extract_slice → copy
+  // Fold from outermost (closest to map_load) to innermost.
+
+  // 1. Fold transpose into map_load.
+  auto transposeFold =
+      foldTransposeIntoMapLoad(rewriter, result->transposeOp, mapLoadOp);
+  if (failed(transposeFold)) {
+    return failure();
+  }
+  mapLoadOp = *transposeFold;
+
+  // 2. Fold collapse_shape into map_load.
+  auto collapseFold = foldCollapseShapeIntoMapLoad(
+      rewriter, result->collapseShapeOp, mapLoadOp);
+  if (failed(collapseFold)) {
+    return failure();
+  }
+  mapLoadOp = *collapseFold;
+
+  // 3. Fold extract_slice into map_load.
+  auto extractFold =
+      foldExtractSliceIntoMapLoad(rewriter, result->extractSliceOp, mapLoadOp);
+  if (failed(extractFold)) {
+    return failure();
+  }
+  mapLoadOp = *extractFold;
+
+  // 4. Fold copy (identity-like) into map_load.
+  auto copyFold =
+      foldIdentityLikeOpIntoMapLoad(rewriter, result->copyOp, mapLoadOp);
+  if (failed(copyFold)) {
+    return failure();
+  }
+  mapLoadOp = *copyFold;
+  return mapLoadOp;
+}
+
 /// Fold a consumer relayout op into a producer map_load.
 FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
                                      MapLoadOp mapLoadOp) {
@@ -1210,19 +1402,12 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
       .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
         return foldPadIntoMapLoad(rewriter, padOp, mapLoadOp);
       })
-      .Case<linalg::PackOp>([&](linalg::PackOp packOp) -> FailureOr<MapLoadOp> {
-        if (failed(linalg::lowerPack(rewriter, packOp))) {
-          return failure();
-        }
-        return mapLoadOp;
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
+        return foldPackIntoMapLoad(rewriter, packOp, mapLoadOp);
       })
-      .Case<linalg::UnPackOp>(
-          [&](linalg::UnPackOp unPackOp) -> FailureOr<MapLoadOp> {
-            if (failed(linalg::lowerUnPack(rewriter, unPackOp))) {
-              return failure();
-            }
-            return mapLoadOp;
-          })
+      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unPackOp) {
+        return foldUnpackIntoMapLoad(rewriter, unPackOp, mapLoadOp);
+      })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
           return foldTransposeGenericIntoMapLoad(rewriter, genericOp, *perm,
