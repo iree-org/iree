@@ -30,10 +30,16 @@ struct LLVMCPULowerInnerTiledPass final
     // generic vectorization pass via the `VectorizableOpInterface` external
     // model in `compiler/src/iree/compiler/Codegen/Interfaces/`.
     //
-    // (1) Drop the (now-unit) iter domain so the lowered op's iter bounds are
-    //     empty, satisfying the precondition of (2).
+    // (1) Unroll any iter dim that exceeds the intrinsic's native shape
+    //     (i.e. all dims, since the intrinsic is rank 0 on the iter side)
+    //     into copies whose iter bounds are all unit. This handles cases
+    //     where the CPU lowering strategy didn't tile a reduction dim
+    //     (typically K) down to 1.
+    IREE::GPU::populateIREEGPUVectorUnrollPatterns(patterns);
+    // (2) Drop the (now-unit) iter domain so the lowered op's iter bounds
+    //     are empty, satisfying the precondition of (3).
     IREE::GPU::populateIREEGPUDropUnitDimsPatterns(patterns);
-    // (2) Replace the iter-free vector-semantics inner_tiled with the
+    // (3) Replace the iter-free vector-semantics inner_tiled with the
     //     per-intrinsic ops emitted by `buildUnderlyingOperations`. The
     //     pattern is interface-driven and picks up CPU's DataTiledMMAAttr
     //     transparently.
