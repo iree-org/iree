@@ -1,9 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_data_tiling}))" \
 // RUN:   --iree-gpu-test-target=gfx950 \
-// RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_data_tiling}))" \
-// RUN:   --iree-gpu-test-target=gfx950 --test-iree-data-tiling-alternate-heuristic \
-// RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK-ALL,PDT
+// RUN:   --split-input-file %s | FileCheck %s
 
 // Contains tests that differ from gfx942/MI-300
 
@@ -21,7 +18,7 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x64_I8(
   return %0 : tensor<255x513xi8, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x64_I8
+// CHECK-LABEL: func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x64_I8
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -47,7 +44,7 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x64_I8(
   return %0 : tensor<255x513xi8, #encoding>
 }
 
-// CHECK-ALL-LABEL: func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x64_I8
+// CHECK-LABEL: func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x64_I8
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]] padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
@@ -74,7 +71,7 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8(
   return %0 : tensor<255x513xi32, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8
+// CHECK-LABEL: func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]] padding_value(%{{.+}} : i32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
@@ -101,7 +98,7 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8(
   return %0 : tensor<255x513xi32>
 }
 
-// CHECK-ALL-LABEL:   func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8
+// CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
 // CHECK-SAME:       ins(%[[ARG0]] : tensor<16x33x4x16x4xi32>)
@@ -140,7 +137,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK-ALL:     func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
+// CHECK:     func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x2x4x4x16x16xi8>
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x2x4x4x16x16xi8>
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x2x2x4x4x4x16x4xi32>
@@ -179,7 +176,7 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-ALL:     func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
+// CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x32xf8E4M3FN>
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x32xf8E4M3FN>
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
@@ -214,7 +211,7 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-// CHECK-ALL:     func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
+// CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x8xbf16>
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x8xbf16>
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
@@ -248,7 +245,7 @@ func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x127x
   return %0 : tensor<255x127x32xf4E2M1FN, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(
+// CHECK-LABEL: func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
@@ -262,16 +259,6 @@ func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x127x
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x1x4x4x16x32xf4E2M1FN>)
 // CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
-//
-// PDT:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
-// PDT-SAME:      outer_dims_perm = [0, 1, 2]
-// PDT-SAME:      inner_dims_pos = [0, 1, 2]
-// PDT-SAME:      inner_tiles = [16, 8, 32]
-// PDT-SAME:      : tensor<255x127x32xf4E2M1FN> -> tensor<16x16x1x16x8x32xf4E2M1FN>
-// PDT:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// PDT-SAME:       : tensor<16x16x1x16x8x32xf4E2M1FN> into tensor<16x16x1x16x2x4x32xf4E2M1FN>
-// PDT-NOT:     linalg.transpose
-// PDT:         return %[[EXPANDED]]
 
 // -----
 
@@ -292,7 +279,7 @@ func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<513x127x
   return %0 : tensor<513x127x32xf4E2M1FN, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(
+// CHECK-LABEL: func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
@@ -306,16 +293,6 @@ func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<513x127x
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x1x4x4x16x32xf4E2M1FN>)
 // CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
-//
-// PDT:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
-// PDT-SAME:      outer_dims_perm = [0, 1, 2]
-// PDT-SAME:      inner_dims_pos = [0, 1, 2]
-// PDT-SAME:      inner_tiles = [16, 8, 32]
-// PDT-SAME:      : tensor<513x127x32xf4E2M1FN> -> tensor<33x16x1x16x8x32xf4E2M1FN>
-// PDT:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// PDT-SAME:       : tensor<33x16x1x16x8x32xf4E2M1FN> into tensor<33x16x1x16x2x4x32xf4E2M1FN>
-// PDT-NOT:     linalg.transpose
-// PDT:         return %[[EXPANDED]]
 
 // -----
 
@@ -336,7 +313,7 @@ func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<2
   return %0 : tensor<255x127xf8E8M0FNU, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(
+// CHECK-LABEL: func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -350,19 +327,6 @@ func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<2
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x4x16x4xf8E8M0FNU>)
 // CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
-//
-// PDT:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
-// PDT-SAME:      outer_dims_perm = [0, 1]
-// PDT-SAME:      inner_dims_pos = [0, 1]
-// PDT-SAME:      inner_tiles = [16, 8]
-// PDT-SAME:      : tensor<255x127xf8E8M0FNU> -> tensor<16x16x16x8xf8E8M0FNU>
-// PDT:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// PDT-SAME:       : tensor<16x16x16x8xf8E8M0FNU> into tensor<16x16x16x2x4xf8E8M0FNU>
-// PDT:         %[[TRANSPOSE:.*]] = linalg.transpose
-// PDT-SAME:       ins(%[[EXPANDED]] : tensor<16x16x16x2x4xf8E8M0FNU>)
-// PDT-SAME:       outs({{.*}} : tensor<16x16x4x16x2xf8E8M0FNU>)
-// PDT-SAME:       permutation = [0, 1, 4, 2, 3]
-// PDT:         return %[[TRANSPOSE]]
 
 // -----
 
@@ -383,7 +347,7 @@ func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<5
   return %0 : tensor<513x127xf8E8M0FNU, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(
+// CHECK-LABEL: func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -397,19 +361,6 @@ func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<5
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x4x16x4xf8E8M0FNU>)
 // CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
-//
-// PDT:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
-// PDT-SAME:      outer_dims_perm = [0, 1]
-// PDT-SAME:      inner_dims_pos = [0, 1]
-// PDT-SAME:      inner_tiles = [16, 8]
-// PDT-SAME:      : tensor<513x127xf8E8M0FNU> -> tensor<33x16x16x8xf8E8M0FNU>
-// PDT:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// PDT-SAME:       : tensor<33x16x16x8xf8E8M0FNU> into tensor<33x16x16x2x4xf8E8M0FNU>
-// PDT:         %[[TRANSPOSE:.*]] = linalg.transpose
-// PDT-SAME:       ins(%[[EXPANDED]] : tensor<33x16x16x2x4xf8E8M0FNU>)
-// PDT-SAME:       outs({{.*}} : tensor<33x16x4x16x2xf8E8M0FNU>)
-// PDT-SAME:       permutation = [0, 1, 4, 2, 3]
-// PDT:         return %[[TRANSPOSE]]
 
 // -----
 
@@ -430,7 +381,7 @@ func.func @set_encoding_ACC_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x513x
   return %0 : tensor<255x513xf32, #encoding>
 }
 
-// CHECK-ALL-LABEL:   func.func @set_encoding_ACC_scaled_matmul_f4_f4_f8_f8_f32(
+// CHECK-LABEL: func.func @set_encoding_ACC_scaled_matmul_f4_f4_f8_f8_f32(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -483,12 +434,12 @@ func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
   return %0 : tensor<1024x2048xf32, #encoding_result>
 }
 
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
-// CHECK-ALL-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-// CHECK-ALL-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-// CHECK-ALL:     func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK:     func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<16x8x1x2x2x4x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<32x8x1x2x2x4x4x16x32xf4E2M1FN>
 // CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<16x8x2x2x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<32x8x2x2x4x16x4xf8E8M0FNU>
 // CHECK-SAME:  %[[RESULT:.+]]: tensor<16x32x2x2x2x2x4x16x4xf32>
@@ -498,15 +449,6 @@ func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
-//
-// PDT-SAME:  %[[LHS:.+]]: tensor<4x32x1x4x4x16x4x32xf4E2M1FN>, %[[RHS:.+]]: tensor<8x32x1x2x8x16x4x32xf4E2M1FN>
-// PDT-SAME:  %[[LHS_SCALES:.+]]: tensor<4x32x4x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<8x32x2x4x16x8xf8E8M0FNU>
-// PDT-SAME:  %[[RESULT:.+]]: tensor<4x8x4x2x4x8x4x16x4xf32>
-// PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
-// PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
-// PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
-// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 
 // -----
@@ -547,12 +489,12 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
   return %0 : tensor<?x?xf32, #encoding_result>
 }
 
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
-// CHECK-ALL-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-// CHECK-ALL-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-// CHECK-ALL:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x4x4x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x4x2x4x4x16x32xf4E2M1FN>
 // CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x4x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x4x2x4x16x4xf8E8M0FNU>
 // CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x4x4x2x4x16x4xf32>
@@ -562,14 +504,6 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 4, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
-//
-// PDT-SAME:  %[[LHS:.+]]: tensor<?x?x1x4x16x4x4x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x4x2x16x4x4x32xf4E2M1FN>
-// PDT-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x4x16x4x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x4x4x16x2x4xf8E8M0FNU>
-// PDT-SAME:  %[[RESULT:.+]]: tensor<?x?x4x4x2x4x16x4xf32>
-// PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
-// PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
-// PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
@@ -609,12 +543,12 @@ func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
   return %0 : tensor<?x?xf32, #encoding_result>
 }
 
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
-// CHECK-ALL-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-// CHECK-ALL-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-// CHECK-ALL:     func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK:     func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x4x4x16x32xf8E4M3FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x4x4x16x32xf8E4M3FN>
 // CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x2x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x2x4x16x4xf8E8M0FNU>
 // CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x16x4xf32>
@@ -624,14 +558,6 @@ func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
-//
-// PDT-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x16x4x4x32xf8E4M3FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x16x4x4x32xf8E4M3FN>
-// PDT-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x4x16x2x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x4x16x2x4xf8E8M0FNU>
-// PDT-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x16x4xf32>
-// PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
-// PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
-// PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
@@ -690,12 +616,12 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
   return %0 : tensor<?x?xf32, #encoding_result>
 }
 
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
-// CHECK-ALL-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-// CHECK-ALL-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-// CHECK-ALL:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x4x2x32x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x4x2x32x32xf4E2M1FN>
 // CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x2x2x32x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x2x2x32x4xf8E8M0FNU>
 // CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x2x32x4xf32>
@@ -705,14 +631,6 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
-//
-// PDT-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x32x4x2x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x32x4x2x32xf4E2M1FN>
-// PDT-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x2x32x2x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x2x32x2x4xf8E8M0FNU>
-// PDT-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x2x32x4xf32>
-// PDT:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
-// PDT-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
-// PDT-SAME:    outs(%[[RESULT]])
-// PDT-SAME:    kind = {{.*}}unswizzled_operands = [0, 1]>
 
 // -----
 
@@ -733,11 +651,10 @@ func.func @matvec_lowering_f16f16f32(
     -> tensor<16xf32, #encoding_result>
   return %result : tensor<16xf32, #encoding_result>
 }
-
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK-ALL:     func.func @matvec_lowering_f16f16f32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK:     func.func @matvec_lowering_f16f16f32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<1x1x4x16x8xf16>
 // CHECK-SAME:  %[[RHS:.+]]: tensor<1x4x16x8xf16>
 // CHECK-SAME:  %[[INIT:.+]]: tensor<1x4x16x4xf32>
@@ -768,11 +685,10 @@ func.func @vecmat_lowering_f32f32f32(
     outs(%init: tensor<15xf32, #encoding_result>) -> tensor<15xf32, #encoding_result>
   return %result : tensor<15xf32, #encoding_result>
 }
-
-// CHECK-ALL-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-ALL-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-ALL-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK-ALL:     func.func @vecmat_lowering_f32f32f32(
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK:     func.func @vecmat_lowering_f32f32f32(
 // CHECK-SAME:  %[[LHS:.+]]: tensor<2x4x16x4xf32>
 // CHECK-SAME:  %[[RHS:.+]]: tensor<1x2x4x16x4xf32>
 // CHECK-SAME:  %[[INIT:.+]]: tensor<1x4x16x4xf32>
@@ -816,7 +732,7 @@ func.func @generic_with_linalg_index(
   } -> tensor<123x456xf32, #encoding>
   return %1 : tensor<123x456xf32, #encoding>
 }
-// CHECK-ALL-LABEL:   func.func @generic_with_linalg_index(
+// CHECK-LABEL: func.func @generic_with_linalg_index(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<8x29x4x16x4xf32>
 // CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
