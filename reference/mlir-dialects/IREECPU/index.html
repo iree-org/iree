@@ -6471,7 +6471,8 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
   ::mlir::iree_compiler::IREE::CPU::MMAIntrinsic,   # intrinsic
   int64_t,   # intrinsics_m
   int64_t,   # intrinsics_n
-  int64_t   # intrinsics_k
+  int64_t,   # intrinsics_k
+  bool   # transposed_intrinsic
 &gt;
 </code></pre></div>
 <p>CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
@@ -6479,6 +6480,11 @@ iree_codegen.inner_tiled. Like the GPU case, this wraps an intrinsic-enum and
 some intrinsics_{m,n,k} unrolling factor. Unlike the GPU case, there is no
 thread-distribution, no concept of subgroups and no interleaving of
 intrinsics' layout.</p>
+<p>The <code>transposed_intrinsic</code> boolean toggles between the intrinsic's natural
+orientation and an M↔N-swapped orientation (same hardware instruction with
+LHS/RHS roles exchanged, accumulator laid out column-major). Orthogonal to
+the intrinsic itself: any intrinsic may be used transposed, including
+square ones where the effect is only the accumulator layout change.</p>
 <p>Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
 here but are unused.</p>
 <h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
@@ -6510,6 +6516,11 @@ here but are unused.</p>
 <td style="text-align: center;">intrinsics_k</td>
 <td style="text-align: center;"><code>int64_t</code></td>
 <td>Intrinsic count along the K dimension.</td>
+</tr>
+<tr>
+<td style="text-align: center;">transposed_intrinsic</td>
+<td style="text-align: center;"><code>bool</code></td>
+<td>If true, the intrinsic is used in an M↔N-swapped orientation (LHS/RHS roles exchanged, accumulator column-major).</td>
 </tr>
 </tbody>
 </table>
@@ -6706,6 +6717,11 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <td style="text-align: center;">None</td>
 <td style="text-align: center;"><code>0</code></td>
 <td>None</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX2_FMA_1x8x1_F32_F32</td>
+<td style="text-align: center;"><code>4624</code></td>
+<td>MMA_X86_AVX2_FMA_1x8x1_F32_F32</td>
 </tr>
 <tr>
 <td style="text-align: center;">MMA_X86_AVX512_1x8x1_F64_F64</td>
