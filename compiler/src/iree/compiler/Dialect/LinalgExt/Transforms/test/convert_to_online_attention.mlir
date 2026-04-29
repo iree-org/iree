@@ -34,7 +34,6 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 // CHECK-NEXT:             ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
 // CHECK-NEXT:               iree_linalg_ext.yield %[[SCORE]] : f32
 // CHECK-NEXT:        }
-// Unmasked: sum > 0 strictly, no denominator guard.
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
 // CHECK: arith.divf
