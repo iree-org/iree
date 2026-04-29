@@ -288,3 +288,101 @@ func.func @dynamic_contiguous_gather_read(
 // CHECK:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[STORAGE]]
 // CHECK-SAME:      : tensor<8192x8xf16>, vector<64x8xf16>
 // CHECK:         vector.transfer_write %[[GATHER]]
+
+// -----
+
+// Multiple chained gathers: the index vectors computed for the first two
+// gathers (and the clamp ops derived from their results) must be reused
+// directly as vector SSA values by subsequent gathers, without materializing
+// tensor.empty<...xindex> intermediaries and write-read chains.
+
+#m_3d = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#m_2d = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+func.func @three_gathers_no_index_tensor(
+    %in0: tensor<1x8x8xf32>,
+    %in1: tensor<1x8xf32>, %in2: tensor<1x8xf32>,
+    %out_init: tensor<1x8x8xf32>,
+    %indir_table: tensor<50x32x25x2xi32>,
+    %lut: tensor<50x40x40xi8>,
+    %arg0: index, %arg2: index, %arg4: index, %arg6: index)
+    -> tensor<1x8x8xf32> {
+  %c0    = arith.constant 0   : index
+  %c1    = arith.constant 1   : index
+  %c39   = arith.constant 39  : index
+  %c0_i8 = arith.constant 0   : i8
+  %cst   = arith.constant 0.0 : f32
+  %0 = linalg.generic {
+        indexing_maps = [#m_3d, #m_2d, #m_2d, #m_3d],
+        iterator_types = ["parallel", "parallel", "parallel"]
+      } ins(%in0, %in1, %in2 : tensor<1x8x8xf32>, tensor<1x8xf32>, tensor<1x8xf32>)
+        outs(%out_init : tensor<1x8x8xf32>) {
+  ^bb0(%in: f32, %a: f32, %b: f32, %out: f32):
+    %m1 = arith.divf %a, %b : f32
+    %p  = arith.cmpf une, %in, %cst : f32
+    %v  = arith.select %p, %m1, %cst : f32
+    %i0 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%arg0, %arg2)
+    %d1 = linalg.index 1 : index
+    %i1 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg4)[%d1]
+    %d2 = linalg.index 2 : index
+    %i2 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg6)[%d2]
+    // Gather #1 and #2: identical outer indices, last index differs.
+    %ea = tensor.extract %indir_table[%i0, %i1, %i2, %c0] : tensor<50x32x25x2xi32>
+    %ea_idx = arith.index_cast %ea : i32 to index
+    %eb = tensor.extract %indir_table[%i0, %i1, %i2, %c1] : tensor<50x32x25x2xi32>
+    %eb_idx = arith.index_cast %eb : i32 to index
+    %ea_max = arith.maxsi %ea_idx, %c0  : index
+    %ea_min = arith.minui %ea_max, %c39 : index
+    %eb_max = arith.maxsi %eb_idx, %c0  : index
+    %eb_min = arith.minui %eb_max, %c39 : index
+    // Gather #3: depends on results of #1 and #2.
+    %ec = tensor.extract %lut[%i0, %ea_min, %eb_min] : tensor<50x40x40xi8>
+    %gate = arith.cmpi ugt, %ec, %c0_i8 : i8
+    %r = arith.select %gate, %v, %cst : f32
+    linalg.yield %r : f32
+  } -> tensor<1x8x8xf32>
+  return %0 : tensor<1x8x8xf32>
+}
+// Verify three transfer_gather ops are produced. Index vectors from the first
+// two gathers (and the clamp ops on their results) feed directly into the
+// third gather as vector SSA values — no tensor.empty<...xindex> or
+// write-read chains.
+//
+// CHECK-LABEL: func.func @three_gathers_no_index_tensor
+// CHECK-SAME:    %[[IN0:[a-zA-Z0-9]+]]: tensor<1x8x8xf32>
+// CHECK-SAME:    %[[IN1:[a-zA-Z0-9]+]]: tensor<1x8xf32>
+// CHECK-SAME:    %[[IN2:[a-zA-Z0-9]+]]: tensor<1x8xf32>
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x8x8xf32>
+// CHECK-SAME:    %[[TABLE:[a-zA-Z0-9]+]]: tensor<50x32x25x2xi32>
+// CHECK-SAME:    %[[LUT:[a-zA-Z0-9]+]]: tensor<50x40x40xi8>
+//
+//     No index-typed tensors should appear anywhere in the output.
+// CHECK-NOT:     tensor<{{.*}}xindex>
+//
+//     Gather #1 from %indir_table — index vecs consumed directly.
+// CHECK:         %[[G1:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
+// CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK:         %[[G1_IDX:.+]] = arith.index_cast %[[G1]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+//
+//     Gather #2 from %indir_table — reuses the same index vecs as #1.
+// CHECK:         %[[G2:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
+// CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK:         %[[G2_IDX:.+]] = arith.index_cast %[[G2]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+//
+//     Clamp results of gather #1 and #2 — pure vector ops, no tensor roundtrip.
+//     G1_IDX -> maxsi -> minui = CLAMP_A, G2_IDX -> maxsi -> minui = CLAMP_B.
+// CHECK:         %[[G1_MAX:.+]] = arith.maxsi %[[G1_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[CLAMP_A:.+]] = arith.minui %[[G1_MAX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[G2_MAX:.+]] = arith.maxsi %[[G2_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[CLAMP_B:.+]] = arith.minui %[[G2_MAX]], {{.*}} : vector<1x8x8xindex>
+//
+//     Gather #3 from %lut — takes clamped results directly as index vectors.
+// CHECK:         %[[G3:.+]] = iree_vector_ext.transfer_gather %[[LUT]]
+// CHECK-SAME:      [{{.*}}, %[[CLAMP_A]], %[[CLAMP_B]] : {{.*}}]
+// CHECK-SAME:      : tensor<50x40x40xi8>, vector<1x8x8xi8>
+//
+//     Final select + write.
+// CHECK:         %[[GATE:.+]] = arith.cmpi ugt, %[[G3]]
+// CHECK:         %[[RES:.+]] = arith.select %[[GATE]]
+// CHECK:         vector.transfer_write %[[RES]], %[[OUT]]
+// CHECK-NOT:     tensor<{{.*}}xindex>
