@@ -21,6 +21,25 @@ func.func @group_two_loads(%a: memref<256xf32, #amdgpu.address_space<fat_raw_buf
 
 // -----
 
+// The second load's index is computed in the gap, but it only depends on
+// values available before the first load. The pass hoists that address
+// computation before the first load so the buffer loads can be adjacent.
+// CHECK-LABEL: func.func @hoists_independent_index_before_load_group
+// CHECK:         %[[OFF1:.+]] = arith.addi
+// CHECK-NEXT:    %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
+// CHECK-NEXT:    %[[L1:.+]] = vector.load %{{.+}}[%[[OFF1]]]
+// CHECK-NEXT:    return %[[L0]], %[[L1]]
+func.func @hoists_independent_index_before_load_group(%a: memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>,
+                                                      %off: index,
+                                                      %stride: index) -> (vector<4xf32>, vector<4xf32>) {
+  %v0 = vector.load %a[%off] : memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
+  %off1 = arith.addi %off, %stride : index
+  %v1 = vector.load %a[%off1] : memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
+  return %v0, %v1 : vector<4xf32>, vector<4xf32>
+}
+
+// -----
+
 // The second load reads from the same buffer that an intervening vector.store
 // writes to (fat_raw_buffer write). Hoisting the load above the store would
 // change observable memory, so the pass must leave the loads in place.

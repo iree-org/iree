@@ -48,6 +48,25 @@ static void collectDepsInRange(Operation *op, Operation *boundary,
   }
 }
 
+/// Returns true if `op` can be moved before `boundary` while preserving SSA
+/// dominance. `movedDeps` contains earlier dependencies that will also be
+/// moved before `boundary`.
+static bool canMoveBeforeBoundary(
+    Operation *op, Operation *boundary,
+    const llvm::SetVector<Operation *> &movedDeps) {
+  for (Value operand : op->getOperands()) {
+    Operation *defOp = operand.getDefiningOp();
+    if (!defOp || defOp->getBlock() != op->getBlock()) {
+      continue;
+    }
+    if (defOp->isBeforeInBlock(boundary) || movedDeps.contains(defOp)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 /// Returns true if `op` writes to buffer or global memory. Used to decide
 /// whether a non-dependent op left between the previous buffer load and the
 /// load being hoisted would invalidate the load by changing observable
@@ -146,8 +165,25 @@ static void groupBufferLoadsInBlock(Block &block) {
       return a->isBeforeInBlock(b);
     });
 
-    Operation *insertAfter = prevBufferLoad;
+    // If an address-computation dependency does not depend on the previous
+    // buffer load, move it before that load. That lets the buffer loads become
+    // adjacent while preserving the dependency order.
+    llvm::SetVector<Operation *> depsBeforePrevLoad;
+    SmallVector<Operation *> depsAfterPrevLoad;
     for (Operation *dep : sortedDeps) {
+      if (canMoveBeforeBoundary(dep, prevBufferLoad, depsBeforePrevLoad)) {
+        depsBeforePrevLoad.insert(dep);
+        continue;
+      }
+      depsAfterPrevLoad.push_back(dep);
+    }
+
+    for (Operation *dep : depsBeforePrevLoad) {
+      dep->moveBefore(prevBufferLoad);
+    }
+
+    Operation *insertAfter = prevBufferLoad;
+    for (Operation *dep : depsAfterPrevLoad) {
       dep->moveAfter(insertAfter);
       insertAfter = dep;
     }
