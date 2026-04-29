@@ -393,6 +393,15 @@ def IREEGPU_AsyncDMAOp : Op<IREEGPU_Dialect, "async_dma", [
     result that aliases the `dest` operand and can be used in combination with
     `iree_gpu.value_barrier` to synchronize with the data movement. In memref
     form, the operation has no result and writes directly to the `dest` memref.
+
+    Example:
+    ```mlir
+    %result = iree_gpu.async_dma %src[%i, %j] to %dst[%c0], vector<64xf16>
+        permutation_map affine_map<(d0, d1) -> (d1)>
+        in_bounds [true]
+        : tensor<20x256xf16>, tensor<128xf16, #gpu.address_space<workgroup>>
+        -> tensor<128xf16, #gpu.address_space<workgroup>>
+    ```
   }];
 
   let arguments = (ins
