@@ -368,6 +368,14 @@ void addMmt4dTilingExpertPassPipeline(
     }
   }
 
+  // Lower any iree_codegen.inner_tiled ops produced by the data-tiled MMA
+  // path. GenericVectorization above lifts them to vector-semantics via the
+  // VectorizableOpInterface external model; this pass then drops their unit
+  // iter dims and emits the per-intrinsic ops via
+  // `DataTiledMMAAttr::buildUnderlyingOperations`. If the dispatch has no
+  // inner_tiled ops the pass is a no-op.
+  funcPassManager.addPass(createLLVMCPULowerInnerTiledPass());
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 

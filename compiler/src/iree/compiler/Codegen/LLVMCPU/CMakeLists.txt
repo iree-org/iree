@@ -60,6 +60,7 @@ iree_cc_library(
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
+    "LLVMCPULowerInnerTiled.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSelectLoweringStrategy.cpp"
@@ -158,6 +159,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface

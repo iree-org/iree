@@ -95,6 +95,31 @@ def LLVMCPULowerExecutableTargetPass :
   ];
 }
 
+def LLVMCPULowerInnerTiledPass : InterfacePass<"iree-llvmcpu-lower-inner-tiled",
+                                               "mlir::FunctionOpInterface"> {
+  let summary =
+      "Lower iree_codegen.inner_tiled ops to llvm.call_intrinsic on CPU.";
+  let description = [{
+    Runs three pattern sets in sequence on the function body:
+      (1) `populateVectorizeInnerTiledPatterns`: lift tensor-semantics
+          inner_tiled ops to vector semantics.
+      (2) `populateIREEGPUDropUnitDimsPatterns`: drop the (now-unit) iteration
+          domain so the lowered op has empty iter bounds.
+      (3) `populateIREEGPULowerInnerTiledPatterns`: replace the vector-
+          semantics, iter-domain-free inner_tiled with the per-intrinsic
+          `llvm.call_intrinsic` ops emitted by
+          `DataTiledMMAAttr::buildUnderlyingOperations`.
+    Despite the `IREEGPU` names, patterns (2) and (3) are interface-driven and
+    work for any `InnerTileDescAttrInterface` kind, including CPU's
+    `IREE::CPU::DataTiledMMAAttr`.
+  }];
+  let dependentDialects = ["::mlir::arith::ArithDialect",
+                           "::mlir::LLVM::LLVMDialect",
+                           "::mlir::vector::VectorDialect",
+                           "::mlir::iree_compiler::IREE::Util::UtilDialect",
+  ];
+}
+
 def LLVMCPUMmt4dVectorLoweringPass
     : InterfacePass<"iree-llvmcpu-mmt4d-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Apply vector lowering logic to vector ops";

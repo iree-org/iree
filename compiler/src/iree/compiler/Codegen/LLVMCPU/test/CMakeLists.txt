@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
+    "lower_inner_tiled.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
