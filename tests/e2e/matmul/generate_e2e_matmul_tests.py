@@ -85,6 +85,11 @@ def get_test_shapes(shapes_id: ShapesId, accumulate=True):
         return [
             TestShape(m=512, k=128, n=512, accumulate=True),
             TestShape(m=512, k=128, n=512, accumulate=False),
+            # unaligned cases.
+            TestShape(m=457, k=128, n=512, accumulate=True),
+            TestShape(m=457, k=128, n=512, accumulate=False),
+            TestShape(m=1000, k=256, n=1001, accumulate=True),
+            TestShape(m=1001, k=256, n=1000, accumulate=False),
         ]
     if shapes_id == ShapesId.CUSTOM_MNK:
         # This is used for custom shapes specified by the --mnk= flag.
