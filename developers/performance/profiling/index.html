@@ -4575,6 +4575,8 @@
       
         
       
+        
+      
     
     
     
@@ -4724,6 +4726,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#device-profiling-and-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device profiling and replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cpu-cache-and-other-cpu-event-profiling" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4782,6 +4795,36 @@
     
   
     Device profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-replay/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Device replay
   
 
     
@@ -6051,6 +6094,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#device-profiling-and-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device profiling and replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cpu-cache-and-other-cpu-event-profiling" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6113,6 +6167,16 @@
 view of program performance at specific levels of granularity. To analyze system
 behavior in more depth, there are various ways to
 <a href="https://en.wikipedia.org/wiki/Profiling_(computer_programming)">profile</a> IREE.</p>
+<h2 id="device-profiling-and-replay">Device profiling and replay<a class="headerlink" href="#device-profiling-and-replay" title="Permanent link">link</a></h2>
+<p><a href="../device-profiling/">Device profiling</a> captures HAL-native <code>.ireeprof</code>
+bundles from the devices executing a workload. Use it to inspect queue
+operations, dispatch timings, memory events, executable metadata, device
+metrics, and backend-specific counters or traces.</p>
+<p><a href="../device-replay/">Device replay</a> captures HAL work into <code>.ireereplay</code>
+reproducers that can be run, benchmarked, profiled, and inspected without
+re-running the original application. Replay is especially useful when you need
+to capture a workload once and repeatedly benchmark or profile the same device
+operation stream.</p>
 <h2 id="cpu-cache-and-other-cpu-event-profiling">CPU cache and other CPU event profiling<a class="headerlink" href="#cpu-cache-and-other-cpu-event-profiling" title="Permanent link">link</a></h2>
 <p>For some advanced CPU profiling needs such as querying CPU cache and other
 events, one may need to use some OS-specific profilers. See

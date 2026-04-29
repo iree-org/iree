@@ -4577,6 +4577,8 @@
       
         
       
+        
+      
     
     
     
@@ -4702,6 +4704,36 @@
     
   
     Device profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-replay/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6H4a8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Device replay
   
 
     
@@ -6198,21 +6230,22 @@ like Tracy, vendor-specific tools can be used.</p>
 <h2 id="renderdoc">RenderDoc<a class="headerlink" href="#renderdoc" title="Permanent link">link</a></h2>
 <p>Support for <a href="https://github.com/baldurk/renderdoc">RenderDoc</a> can be enabled by
 configuring cmake with <code>-DIREE_ENABLE_RENDERDOC_PROFILING=ON</code>. When built in to
-IREE the profiling functionality is available for programmatic use via the
-<code>iree_hal_device_profiling_begin</code> and <code>iree_hal_device_profiling_end</code> APIs.</p>
+IREE the capture functionality is available for programmatic use via the
+<code>iree_hal_device_external_capture_begin</code> and
+<code>iree_hal_device_external_capture_end</code> APIs.</p>
 <p>When using one of the standard IREE tools (<code>iree-run-module</code>,
-<code>iree-benchmark-module</code>, etc) the <code>--device_profiling_mode=queue</code> flag can be
+<code>iree-benchmark-module</code>, etc) the <code>--device_capture_tool=renderdoc</code> flag can be
 passed to enable capture around the entire invocation (be careful when
-benchmarking as the recordings can be quite large!). The default capture file
-name can be specified with <code>--device_profiling_file=foo.rdc</code>.</p>
+benchmarking as the recordings can be quite large!). The capture file name can
+be specified with <code>--device_capture_file=foo.rdc</code>.</p>
 <p>Capturing in the RenderDoc UI can be done by specifying the IREE tool or
 embedding application (<code>iree-run-module</code>, etc) as the launch executable and
 adding all arguments as normal.</p>
 <p>Capturing from the command line can be done using <code>renderdoccmd</code> with the
 specified file appearing (by default) in the executable directory:</p>
-<div class="highlight"><pre><span></span><code>renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_profiling_mode<span class="o">=</span>queue<span class="w"> </span>--device_profiling_file<span class="o">=</span>foo.rdc<span class="w"> </span>...
+<div class="highlight"><pre><span></span><code>renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_capture_tool<span class="o">=</span>renderdoc<span class="w"> </span>--device_capture_file<span class="o">=</span>foo.rdc<span class="w"> </span>...
 stat<span class="w"> </span>tools/foo.rdc
-renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_profiling_mode<span class="o">=</span>queue<span class="w"> </span>--device_profiling_file<span class="o">=</span>/some/path/foo.rdc<span class="w"> </span>...
+renderdoccmd<span class="w"> </span>capture<span class="w"> </span>tools/iree-run-module<span class="w"> </span>--device_capture_tool<span class="o">=</span>renderdoc<span class="w"> </span>--device_capture_file<span class="o">=</span>/some/path/foo.rdc<span class="w"> </span>...
 stat<span class="w"> </span>/some/path/foo.rdc
 </code></pre></div>
 <h2 id="android-gpus">Android GPUs<a class="headerlink" href="#android-gpus" title="Permanent link">link</a></h2>
