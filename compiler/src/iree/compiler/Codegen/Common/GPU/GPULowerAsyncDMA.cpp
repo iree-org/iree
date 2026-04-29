@@ -211,10 +211,11 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
       return rewriter.notifyMatchFailure(op, "no DMA sizes available");
     }
 
-    // Derive the transfer shape from the layout attached to the async_dma
-    // rather than the memref shape, so dynamic dest memrefs are supported.
-    auto computeLayout = cast<NestedLayoutAttr>(op.getLayout());
-    SmallVector<int64_t> transferShape = computeLayout.getUndistributedShape();
+    // Derive the transfer shape from the transfer size attached to the
+    // async_dma rather than the memref shape, so dynamic dest memrefs are
+    // supported.
+    auto transferVectorType = cast<VectorType>(op.getTransferType());
+    SmallVector<int64_t> transferShape(transferVectorType.getShape());
 
     int64_t elementBitWidth = destType.getElementTypeBitWidth();
     MLIRContext *context = op.getContext();

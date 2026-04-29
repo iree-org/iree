@@ -101,7 +101,8 @@ def GPULowerAsyncDMAPass :
     "::mlir::affine::AffineDialect",
     "::mlir::amdgpu::AMDGPUDialect",
     "::mlir::arith::ArithDialect",
-    "::mlir::gpu::GPUDialect"
+    "::mlir::gpu::GPUDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
   ];
 }
 

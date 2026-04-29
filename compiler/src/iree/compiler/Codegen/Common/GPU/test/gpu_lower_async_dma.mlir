@@ -13,16 +13,6 @@
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     dma_sizes = [32, 128]>>}>
 
-#layout = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [16, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
-
 #translation = #iree_codegen.translation_info<
   pipeline = #iree_gpu.pipeline<VectorDistribute>
   workgroup_size = [64, 1, 1]
@@ -54,7 +44,7 @@ func.func @lower_async_dma_basic(
     hal.executable.target = #executable_target,
     translation_info = #translation} {
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
-  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], #layout
+  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<16x64xf16>
       : memref<16x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
         memref<16x64xf16, #gpu.address_space<workgroup>>
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
@@ -73,16 +63,6 @@ func.func @lower_async_dma_basic(
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     dma_sizes = [32, 128]>>}>
-
-#layout_2 = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [64, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
 
 #translation_2 = #iree_codegen.translation_info<
   pipeline = #iree_gpu.pipeline<VectorDistribute>
@@ -120,7 +100,7 @@ func.func @lower_async_dma_multi_subgroup(
     hal.executable.target = #executable_target_2,
     translation_info = #translation_2} {
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
-  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], #layout_2
+  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<64x64xf16>
       : memref<64x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
         memref<64x64xf16, #gpu.address_space<workgroup>>
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
@@ -139,16 +119,6 @@ func.func @lower_async_dma_multi_subgroup(
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     dma_sizes = [32, 128]>>}>
-
-#layout_3 = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 64],
-  element_tile = [2, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 1]
->
 
 #translation_3 = #iree_codegen.translation_info<
   pipeline = #iree_gpu.pipeline<VectorDistribute>
@@ -169,7 +139,7 @@ func.func @lower_async_dma_fallback_dma_size(
     hal.executable.target = #executable_target_3,
     translation_info = #translation_3} {
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
-  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], #layout_3
+  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<2x64xf16>
       : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
         memref<2x64xf16, #gpu.address_space<workgroup>>
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
