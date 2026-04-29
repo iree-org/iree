@@ -1972,3 +1972,55 @@ func.func @lower_dma_swizzle_combined_base_and_access_width(
   } {mapping = [#iree_gpu.lane_id<0>]}
   return
 }
+
+// -----
+
+// Test: Strided source caps per-lane DMA width.
+// Source is memref<256x4xf8E8M0FNU, strided<[256, 1]>>.
+// Inner contiguous dimension is only 4 elements. 128-bit DMA would read
+// 16 elements/lane, crossing row boundaries. The pass must cap to 32-bit
+// DMA (4 elements/lane = 4 bytes).
+//
+// Dest: memref<256x4xf8E8M0FNU> fully contiguous, linearSize = 1024.
+// Source contiguous trailing size = 4, so maxElementsPerLane = min(4, 1024) = 4.
+// With 32-bit DMA (4 bytes = 4 f8 elements/lane), 64 lanes:
+//   elementsPerTransfer = 64 * 4 = 256, numTransfers = 1024 / 256 = 4.
+
+#executable_target_rocm_hsaco_fb_strided = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_strided = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_strided_source_caps_width
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>
+func.func @lower_dma_strided_source_caps_width(
+    %source: memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_strided,
+    translation_info = #translation_strided} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // 32-bit DMA: 4 elements/lane (not 16 from 128-bit).
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4 : index
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // 4 transfers (1024 elements / 256 elements per transfer).
+    // CHECK-COUNT-4: amdgpu.gather_to_lds %[[SRC]]{{.*}}, %[[DST]]{{.*}} : vector<4xf8E8M0FNU>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane) :
+      memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
