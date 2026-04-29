@@ -251,6 +251,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:BuiltinTypesIncGen",
         "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
