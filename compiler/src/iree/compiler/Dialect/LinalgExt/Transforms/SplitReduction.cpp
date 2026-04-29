@@ -387,55 +387,6 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   return success();
 }
 
-struct ArgmaxCombinerOps {
-  Operation *maxOp = nullptr;    // arith.maximumf
-  Operation *selectOp = nullptr; // arith.select
-  Operation *cmpOp = nullptr;    // arith.cmpf
-};
-
-// Matches the combiner pattern in a linalg.generic argmax-style reduction:
-// Example MLIR:
-// %4:2 = linalg.generic {
-//     indexing_maps = [...],
-//     iterator_types = ["parallel", "reduction"]
-//   } ins(%arg0 : tensor<?x128xbf16>) outs(%1, %3 : tensor<?xbf16>,
-//   tensor<?xi64>) {
-// ^bb0(%in: bf16, %out: bf16, %out_0: i64):
-//   %5 = linalg.index 1 : index
-//   %6 = arith.index_cast %5 : index to i64
-//   %7 = arith.maximumf %in, %out : bf16
-//   %8 = arith.cmpf ogt, %in, %out : bf16
-//   %9 = arith.select %8, %6, %out_0 : i64
-//   linalg.yield %7, %9 : bf16, i64
-// } -> (tensor<?xbf16>, tensor<?xi64>)
-//
-// This function extracts the `arith.maximumf`, `arith.cmpf`, and `arith.select`
-// operations from the body to facilitate transformations such as split
-// reduction.
-static ArgmaxCombinerOps collectArgmaxCombinerOps(linalg::GenericOp genericOp) {
-  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
-
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-
-  // Extract max value producer: arith.maximumf.
-  Value maxResult = yieldOp.getOperand(0);
-  auto maxOp = cast<arith::MaximumFOp>(maxResult.getDefiningOp());
-
-  // Extract index result producer: arith.select.
-  Value indexResult = yieldOp.getOperand(1);
-  auto selectOp = cast<arith::SelectOp>(indexResult.getDefiningOp());
-
-  // Extract the condition of the select, expected to be arith.cmpf with
-  // predicate OGT.
-  auto cmpOp = cast<arith::CmpFOp>(selectOp.getCondition().getDefiningOp());
-
-  ArgmaxCombinerOps ops;
-  ops.maxOp = maxOp;
-  ops.selectOp = selectOp;
-  ops.cmpOp = cmpOp;
-  return ops;
-}
-
 static Value expandValue(OpBuilder &builder, Location loc, Value value,
                          RankedTensorType expandedType) {
   RankedTensorType originalType = cast<RankedTensorType>(value.getType());
@@ -521,7 +472,8 @@ static Value getSplitReductionInit(OpBuilder &builder, Location loc,
 FailureOr<linalg::SplitReductionResult>
 splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn) {
-  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
+  std::optional<ArgmaxKind> argmaxKind = getArgmaxKind(genericOp);
+  assert(argmaxKind && "expected operation to be an argmax op");
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(genericOp);
@@ -568,13 +520,43 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                                        "compared to intermediate tensor size");
   }
 
-  ArgmaxCombinerOps combinerOps = collectArgmaxCombinerOps(genericOp);
-  Operation *reductionOp = combinerOps.maxOp;
-  std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
-  if (!identity.has_value()) {
+  auto valueType =
+      dyn_cast<FloatType>(genericOp.getRegionOutputArgs()[0].getType());
+  if (!valueType) {
     return rewriter.notifyMatchFailure(
         genericOp, "Unknown identity value for the reduction");
   }
+  auto identity = FloatAttr::get(
+      valueType, APFloat::getInf(valueType.getFloatSemantics(), true));
+
+  bool selectStyleArgmax = *argmaxKind == ArgmaxKind::StableHloSelectStyle;
+
+  auto buildArgmaxCombiner = [](OpBuilder &b, Location loc, Value val,
+                                Value idx, Value outVal, Value outIdx,
+                                bool selectStyleArgmax) {
+    if (!selectStyleArgmax) {
+      Value maxVal = arith::MaximumFOp::create(b, loc, val, outVal);
+      Value cmp =
+          arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
+      Value selIdx = arith::SelectOp::create(b, loc, cmp, idx, outIdx);
+      return std::pair<Value, Value>{maxVal, selIdx};
+    }
+
+    Value greater =
+        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
+    Value isNan =
+        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::UNE, val, val);
+    Value valueCond = arith::OrIOp::create(b, loc, greater, isNan);
+    Value equal =
+        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, val, outVal);
+    Value lowerIndex =
+        arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, idx, outIdx);
+    Value tieCond = arith::AndIOp::create(b, loc, equal, lowerIndex);
+    Value indexCond = arith::OrIOp::create(b, loc, valueCond, tieCond);
+    Value maxVal = arith::SelectOp::create(b, loc, valueCond, val, outVal);
+    Value selIdx = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
+    return std::pair<Value, Value>{maxVal, selIdx};
+  };
 
   SmallVector<Value> newInputs;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
@@ -611,7 +593,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   OpOperand *indexInit = genericOp.getDpsInitOperand(1);
   // Value identity.
   Value identityValue =
-      getSplitReductionInit(rewriter, loc, valueInit->get(), *identity,
+      getSplitReductionInit(rewriter, loc, valueInit->get(), identity,
                             outputDimSize, insertSplitIndex);
   // Index identity.
   Type indexElemType = genericOp.getRegionOutputArgs()[1].getType();
@@ -638,17 +620,16 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     }
   }
 
-  // Step 1: Create a a structurally strict argmax that performs a partial
-  // reduction over the split (tile) dimension. The argmax matches the pattern
-  // expected by isArgmaxOp (maximumf, cmpf, select with index from
-  // linalg.index). The result yields the local maximum values and their
+  // Step 1: Create an argmax that performs a partial reduction over the split
+  // (tile) dimension. The result yields the local maximum values and their
   // corresponding local indices within each tile. These local indices will be
   // adjusted to global indices in step 2.
   auto partialArgmax = linalg::GenericOp::create(
       rewriter, loc,
       TypeRange{identityValue.getType(), identityIndex.getType()}, newInputs,
       ValueRange{identityValue, identityIndex}, newMaps, newIteratorTypes,
-      [reductionDim](OpBuilder &b, Location loc, ValueRange args) {
+      [reductionDim, selectStyleArgmax,
+       buildArgmaxCombiner](OpBuilder &b, Location loc, ValueRange args) {
         Value in = args[0];
         Value outVal = args[1];
         Value outIdx = args[2];
@@ -669,11 +650,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
           inCast = arith::TruncFOp::create(b, loc, outVal.getType(), in);
         }
 
-        Value maxVal = arith::MaximumFOp::create(b, loc, inCast, outVal);
-        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT,
-                                          inCast, outVal);
-        Value selIdx =
-            arith::SelectOp::create(b, loc, cmp, reductionIdx, outIdx);
+        auto [maxVal, selIdx] = buildArgmaxCombiner(
+            b, loc, inCast, reductionIdx, outVal, outIdx, selectStyleArgmax);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 
@@ -703,8 +681,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       rewriter, loc, genericOp.getResultTypes(),
       ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
-      [combinerOps, tileSize, insertSplitDimension](OpBuilder &b, Location loc,
-                                                    ValueRange inputs) {
+      [tileSize, insertSplitDimension, selectStyleArgmax,
+       buildArgmaxCombiner](OpBuilder &b, Location loc, ValueRange inputs) {
         Value val = inputs[0];
         Value local = inputs[1];
         Value outVal = inputs[2];
@@ -716,15 +694,9 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         }
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
-        Operation *clonedMax = b.clone(*combinerOps.maxOp);
-        clonedMax->setOperands({val, outVal});
-        Operation *clonedCmp = b.clone(*combinerOps.cmpOp);
-        clonedCmp->setOperands({val, outVal});
-        Operation *clonedSel = b.clone(*combinerOps.selectOp);
-        clonedSel->setOperands({clonedCmp->getResult(0), gidx, outIdx});
-        linalg::YieldOp::create(
-            b, loc,
-            ValueRange{clonedMax->getResult(0), clonedSel->getResult(0)});
+        auto [maxVal, selIdx] = buildArgmaxCombiner(b, loc, val, gidx, outVal,
+                                                    outIdx, selectStyleArgmax);
+        linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 
   rewriter.replaceOp(genericOp, finalReduction.getResults());

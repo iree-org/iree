@@ -1283,25 +1283,161 @@ bool isaHorizontallyFusedContraction(Operation *op) {
   return true;
 }
 
-bool isArgmaxOp(linalg::GenericOp genericOp) {
-  // Check for 2 results(value, index), and 1 input
-  if (genericOp.getNumDpsInits() != 2) {
+static Value stripFloatCast(Value value) {
+  if (auto extOp = value.getDefiningOp<arith::ExtFOp>()) {
+    return extOp.getIn();
+  }
+  if (auto truncOp = value.getDefiningOp<arith::TruncFOp>()) {
+    return truncOp.getIn();
+  }
+  return value;
+}
+
+static bool isCurrentReductionIndex(Value value, unsigned reductionDim) {
+  if (auto castOp = value.getDefiningOp<arith::IndexCastOp>()) {
+    value = castOp.getIn();
+  }
+  auto indexOp = value.getDefiningOp<linalg::IndexOp>();
+  return indexOp && indexOp.getDim() == reductionDim;
+}
+
+static bool isIncomingValue(Value value, Value inVal) {
+  return stripFloatCast(value) == inVal;
+}
+
+static bool isCurrentMaxValue(Value value, Value outVal) {
+  return stripFloatCast(value) == outVal;
+}
+
+static bool matchFloatCompare(Value value, arith::CmpFPredicate predicate,
+                              Value lhs, Value rhs) {
+  auto cmpOp = value.getDefiningOp<arith::CmpFOp>();
+  if (!cmpOp || cmpOp.getPredicate() != predicate) {
+    return false;
+  }
+  return stripFloatCast(cmpOp->getOperand(0)) == lhs &&
+         stripFloatCast(cmpOp->getOperand(1)) == rhs;
+}
+
+template <typename OpTy>
+static bool matchCommutativeBinary(Value value,
+                                   llvm::function_ref<bool(Value)> matchLhs,
+                                   llvm::function_ref<bool(Value)> matchRhs) {
+  auto op = value.getDefiningOp<OpTy>();
+  if (!op) {
+    return false;
+  }
+  Value lhs = op->getOperand(0);
+  Value rhs = op->getOperand(1);
+  return (matchLhs(lhs) && matchRhs(rhs)) || (matchLhs(rhs) && matchRhs(lhs));
+}
+
+static bool matchCanonicalArgmax(linalg::GenericOp genericOp,
+                                 unsigned reductionDim) {
+  Block *body = genericOp.getBody();
+  Value inVal = body->getArgument(0);
+  Value outVal = body->getArgument(1);
+  Value outIdx = body->getArgument(2);
+  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
+
+  auto maxOp = yieldOp.getOperand(0).getDefiningOp<arith::MaximumFOp>();
+  if (!maxOp) {
+    return false;
+  }
+  Value maxLhs = maxOp->getOperand(0);
+  Value maxRhs = maxOp->getOperand(1);
+  if (!((isIncomingValue(maxLhs, inVal) && isCurrentMaxValue(maxRhs, outVal)) ||
+        (isIncomingValue(maxRhs, inVal) &&
+         isCurrentMaxValue(maxLhs, outVal)))) {
     return false;
   }
 
-  if (genericOp.getNumDpsInputs() != 1) {
+  auto indexSelect = yieldOp.getOperand(1).getDefiningOp<arith::SelectOp>();
+  if (!indexSelect) {
     return false;
+  }
+  if (!matchFloatCompare(indexSelect.getCondition(), arith::CmpFPredicate::OGT,
+                         inVal, outVal)) {
+    return false;
+  }
+  return isCurrentReductionIndex(indexSelect.getTrueValue(), reductionDim) &&
+         indexSelect.getFalseValue() == outIdx;
+}
+
+static bool matchStableHloSelectStyleArgmax(linalg::GenericOp genericOp,
+                                            unsigned reductionDim) {
+  Block *body = genericOp.getBody();
+  Value inVal = body->getArgument(0);
+  Value outVal = body->getArgument(1);
+  Value outIdx = body->getArgument(2);
+  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
+
+  auto valueSelect = yieldOp.getOperand(0).getDefiningOp<arith::SelectOp>();
+  auto indexSelect = yieldOp.getOperand(1).getDefiningOp<arith::SelectOp>();
+  if (!valueSelect || !indexSelect) {
+    return false;
+  }
+  if (!isIncomingValue(valueSelect.getTrueValue(), inVal) ||
+      !isCurrentMaxValue(valueSelect.getFalseValue(), outVal)) {
+    return false;
+  }
+  if (!isCurrentReductionIndex(indexSelect.getTrueValue(), reductionDim) ||
+      indexSelect.getFalseValue() != outIdx) {
+    return false;
+  }
+
+  auto matchGreaterThan = [&](Value value) {
+    return matchFloatCompare(value, arith::CmpFPredicate::OGT, inVal, outVal);
+  };
+  auto matchInputIsNan = [&](Value value) {
+    return matchFloatCompare(value, arith::CmpFPredicate::UNE, inVal, inVal);
+  };
+  auto matchValueCondition = [&](Value value) {
+    return matchCommutativeBinary<arith::OrIOp>(value, matchGreaterThan,
+                                                matchInputIsNan);
+  };
+  auto matchEqual = [&](Value value) {
+    return matchFloatCompare(value, arith::CmpFPredicate::OEQ, inVal, outVal);
+  };
+  auto matchLowerIndex = [&](Value value) {
+    auto cmpOp = value.getDefiningOp<arith::CmpIOp>();
+    if (!cmpOp || cmpOp.getPredicate() != arith::CmpIPredicate::slt) {
+      return false;
+    }
+    return isCurrentReductionIndex(cmpOp->getOperand(0), reductionDim) &&
+           cmpOp->getOperand(1) == outIdx;
+  };
+  auto matchTieCondition = [&](Value value) {
+    return matchCommutativeBinary<arith::AndIOp>(value, matchEqual,
+                                                 matchLowerIndex);
+  };
+
+  if (!matchValueCondition(valueSelect.getCondition())) {
+    return false;
+  }
+  return matchCommutativeBinary<arith::OrIOp>(
+      indexSelect.getCondition(), matchValueCondition, matchTieCondition);
+}
+
+std::optional<ArgmaxKind> getArgmaxKind(linalg::GenericOp genericOp) {
+  // Check for 2 results(value, index), and 1 input
+  if (genericOp.getNumDpsInits() != 2) {
+    return std::nullopt;
+  }
+
+  if (genericOp.getNumDpsInputs() != 1) {
+    return std::nullopt;
   }
 
   // Argmax will require 1D reduction.
   if (genericOp.getNumReductionLoops() != 1) {
-    return false;
+    return std::nullopt;
   }
 
   // TODO: Add better affine map checks.
   auto indexingMaps = genericOp.getIndexingMapsArray();
   if (!indexingMaps[0].isIdentity()) {
-    return false;
+    return std::nullopt;
   }
 
   // Check that initial value is negative Infinite.
@@ -1310,80 +1446,28 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
   Value initVal = genericOp.getDpsInitOperand(0)->get();
   auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
   if (!fillOp) {
-    return false;
+    return std::nullopt;
   }
   Value fillVal = fillOp.getDpsInputOperand(0)->get();
   if (!matchPattern(fillVal, m_NegInfFloat())) {
-    return false;
+    return std::nullopt;
   }
 
-  // Work back from linalg.yield and check body of genericOp.
-  // The genericOp should yield the result of an arith.select,
-  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  Value producerOutput;
-  Operation *producer;
+  SmallVector<unsigned> reductionDims;
+  genericOp.getReductionDims(reductionDims);
+  unsigned reductionDim = reductionDims[0];
 
-  // Producer of linalg.yield 1st arg is arith.maximumf
-  {
-    producerOutput = yieldOp->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return false;
-    }
-    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
-      return false;
-    }
+  if (matchCanonicalArgmax(genericOp, reductionDim)) {
+    return ArgmaxKind::Canonical;
   }
-
-  // Producer of linalg.yield op 2nd arg is arith.select
-  // TODO: Add check that select is selecting between linalg.index and index of
-  // current max.
-  {
-    producerOutput = yieldOp->getOperand(1);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return false;
-    }
-    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
-      return false;
-    }
-    auto selectOp = cast<arith::SelectOp>(producerOutput.getDefiningOp());
-    Value trueVal = selectOp.getTrueValue();
-    if (auto castOp = trueVal.getDefiningOp<arith::IndexCastOp>()) {
-      trueVal = castOp.getIn();
-    }
-
-    // Ensure the true value is directly produced by linalg.index.
-    auto indexOp = trueVal.getDefiningOp<linalg::IndexOp>();
-    if (!indexOp) {
-      return false;
-    }
+  if (matchStableHloSelectStyleArgmax(genericOp, reductionDim)) {
+    return ArgmaxKind::StableHloSelectStyle;
   }
+  return std::nullopt;
+}
 
-  // Producer of arith.select op is arith.cmpf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return false;
-    }
-    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
-    if (!producerCmpFOp ||
-        producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
-      return false;
-    }
-
-    // Check that in and out of cmpf are loop variables.
-    // Currently first operand is disabled because it may be mixed type
-    // which would lead it to be extf(%arg0).
-    // TODO: Add better mixed type support check.
-    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return false;
-    }
-  }
-
-  return true;
+bool isArgmaxOp(linalg::GenericOp genericOp) {
+  return getArgmaxKind(genericOp).has_value();
 }
 
 bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {

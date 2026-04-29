@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
+#include <optional>
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -241,6 +242,14 @@ bool isGatherlikeOp(Operation *op);
 /// The expectation is that the LHS is common, and all the operands are
 /// different RHS.
 bool isaHorizontallyFusedContraction(Operation *op);
+
+enum class ArgmaxKind {
+  Canonical,
+  StableHloSelectStyle,
+};
+
+/// Returns the argmax kind represented by the given linalg.generic, if any.
+std::optional<ArgmaxKind> getArgmaxKind(linalg::GenericOp genericOp);
 
 /// Check if a linalg.generic is representing an argmax operation.
 bool isArgmaxOp(linalg::GenericOp genericOp);
