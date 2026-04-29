@@ -2390,6 +2390,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpuasync_dma-gpuasyncdmaop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.async_dma (GPU::AsyncDMAOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2511,7 +2522,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -6931,6 +6942,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_gpuasync_dma-gpuasyncdmaop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.async_dma (GPU::AsyncDMAOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7052,7 +7074,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
+  <a href="#attributes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -7832,6 +7854,7 @@ SPIR-V/LLVM are handled separately.</p>
 <ul>
 <li><a href="#iree_gpu-dialect">'iree_gpu' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
+<li><a href="#iree_gpuasync_dma-gpuasyncdmaop">iree_gpu.async_dma (GPU::AsyncDMAOp)</a></li>
 <li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
 <li><a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop">iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)</a></li>
 <li><a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop">iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)</a></li>
@@ -7846,7 +7869,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_1">Attributes</a><ul>
+<li><a href="#attributes_2">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
 <li><a href="#conditionaltransposeattr">ConditionalTransposeAttr</a></li>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
@@ -7939,6 +7962,97 @@ SPIR-V/LLVM are handled separately.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
+<h3 id="iree_gpuasync_dma-gpuasyncdmaop"><code>iree_gpu.async_dma</code> (GPU::AsyncDMAOp)<a class="headerlink" href="#iree_gpuasync_dma-gpuasyncdmaop" title="Permanent link">link</a></h3>
+<p><em>Asynchronous data movement</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.async_dma` $source `[` $source_indices `]` `to` $dest `[` $dest_indices `]` `,`
+              $transfer_type
+              oilist(
+              `permutation_map` $permutation_map |
+              `in_bounds` $in_bounds
+              )
+              attr-dict `:` type($source)
+              ``
+              custom&lt;AsyncDMASourceIndexTypes&gt;(ref($source_indices), type($source_indices))
+              `` `,` type($dest) ( `-&gt;` type($result)^ )?
+</code></pre></div>
+<p>Represents an asynchronous data movement from one memory to another without
+intermediate materialization of the values in registers.</p>
+<p>The <code>transfer_type</code> attribute is a <code>VectorType</code> describing the shape and
+element type of the transfer. The shape is used to determine the transfer
+tile and to validate gather indices.</p>
+<p>Each source index can be either a scalar <code>index</code> (contiguous read starting
+at that offset) or a <code>vector&lt;Nxindex&gt;</code> (gather: read N elements at the
+positions specified by the vector). When a source index is a vector, its
+size must match the transfer_type size in the corresponding destination
+dimension.</p>
+<p>Source and destination ranks may differ. When they do, a <code>permutation_map</code>
+must be provided to map source dimensions to destination/layout dimensions.
+When omitted, identity mapping is assumed (requires equal ranks).</p>
+<p>This operation exists in two forms: tensor-based (value-semantic) and
+buffer-based (memref-semantic). In tensor form, the operation returns a
+result that aliases the <code>dest</code> operand and can be used in combination with
+<code>iree_gpu.value_barrier</code> to synchronize with the data movement. In memref
+form, the operation has no result and writes directly to the <code>dest</code> memref.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%result = iree_gpu.async_dma %src[%i, %j] to %dst[%c0], vector&lt;64xf16&gt;
+    permutation_map affine_map&lt;(d0, d1) -&gt; (d1)&gt;
+    in_bounds [true]
+    : tensor&lt;20x256xf16&gt;, tensor&lt;128xf16, #gpu.address_space&lt;workgroup&gt;&gt;
+    -&gt; tensor&lt;128xf16, #gpu.address_space&lt;workgroup&gt;&gt;
+</code></pre></div></p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>MemoryEffectOpInterface</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>transfer_type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
+<tr><td><code>permutation_map</code></td><td>::mlir::AffineMapAttr</td><td>AffineMap attribute</td></tr>
+<tr><td><code>in_bounds</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
+</table>
+
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_indices</code></td>
+<td>variadic of index or vector of index values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>dest</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>dest_indices</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_gpubarrier_region-gpubarrierregionop"><code>iree_gpu.barrier_region</code> (GPU::BarrierRegionOp)<a class="headerlink" href="#iree_gpubarrier_region-gpubarrierregionop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes workers on a region of shared code.</em></p>
 <p>Syntax:</p>
@@ -8000,7 +8114,7 @@ and flexible.
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableRegionOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8015,7 +8129,7 @@ and flexible.
 </tr>
 </tbody>
 </table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8048,7 +8162,7 @@ effort and has no verification or failure modes.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8067,7 +8181,7 @@ effort and has no verification or failure modes.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8169,13 +8283,13 @@ dimension, and no padding is needed.</p>
   } {mapping = [#gpu.lane_id&lt;linear_dim_0&gt;]}
 </code></pre></div></p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ParallelCombiningOpInterface</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>in_bounds</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
 </table>
 
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8202,7 +8316,7 @@ dimension, and no padding is needed.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8246,7 +8360,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8261,7 +8375,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8285,7 +8399,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8300,7 +8414,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
+<h2 id="attributes_2">Attributes<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h2>
 <h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
 <p><em>Supported bitwidths for compute</em></p>
 <p>Syntax:</p>
@@ -8497,7 +8611,8 @@ handle the implied cross-subgroup reduction.</p>
   int64_t,   # subgroups_k
   DenseI64ArrayAttr,   # operands_interleaving_intrinsics_m
   DenseI64ArrayAttr,   # operands_interleaving_intrinsics_n
-  DenseI64ArrayAttr   # operands_interleaving_intrinsics_k
+  DenseI64ArrayAttr,   # operands_interleaving_intrinsics_k
+  DenseI64ArrayAttr   # unswizzled_operands
 &gt;
 </code></pre></div>
 <p>This mma variant represents scaled MMA ops with data-tiling details. The
@@ -8507,6 +8622,11 @@ targeted by the data-tiling.</p>
 element types of the LHS, RHS, and ACC operands respectively. The element
 types for the scales operands are always Float8E8M0FNUType, so they are not
 specified on the attribute.</p>
+<p>The optional |unswizzled_operands| field lists operand indices whose data
+layout is unswizzled (pack and expand only, no transpose). When set, those
+operands get an identity permutation in the swizzle and use a distribution
+swizzle for thread ID delinearization. Other operands are fully swizzled as
+usual. When empty (default), all operands are fully data-tiled.</p>
 <p>The other fields are similar to DataTiledMMAAttr, refer to its documentation.</p>
 <h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
@@ -8582,6 +8702,11 @@ specified on the attribute.</p>
 <td style="text-align: center;">operands_interleaving_intrinsics_k</td>
 <td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
 <td></td>
+</tr>
+<tr>
+<td style="text-align: center;">unswizzled_operands</td>
+<td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
+<td>Operand indices with row-major (unswizzled) layout.</td>
 </tr>
 </tbody>
 </table>
