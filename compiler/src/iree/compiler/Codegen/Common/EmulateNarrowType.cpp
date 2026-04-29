@@ -22,6 +22,7 @@
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -189,10 +190,17 @@ LogicalResult emulateNarrowType(
   populateBranchOpInterfaceTypeConversionPattern(patterns, typeConverter);
   populateFunctionOpInterfaceAllBlocksTypeConversionPattern<func::FuncOp>(
       patterns, typeConverter);
-  target.addDynamicallyLegalDialect<cf::ControlFlowDialect>([&typeConverter](
-                                                                Operation *op) {
-    return isLegalForBranchOpInterfaceTypeConversionPattern(op, typeConverter);
-  });
+  target.addDynamicallyLegalDialect<cf::ControlFlowDialect>(
+      [&typeConverter](Operation *op) -> bool {
+        // Only apply legality check to BranchOpInterface ops; other cf ops
+        // (e.g. cf.assert) have no successor-block-arg conversion concern
+        // and should remain legal.
+        if (!isa<BranchOpInterface>(op)) {
+          return true;
+        }
+        return isLegalForBranchOpInterfaceTypeConversionPattern(op,
+                                                                typeConverter);
+      });
   if (populateCallback) {
     populateCallback.value()(typeConverter, patterns, target);
   }
