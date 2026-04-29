@@ -1696,12 +1696,15 @@ func.func @lower_dma_with_dest_swizzle(
     // Transfer 1: linearOffset = 0, source gets XOR-swizzled offset.
     // CHECK: %[[C0:.+]] = arith.constant 0 : index
     // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
-    // XOR swizzle: extractCol, extractRow, xori, updateCol, diff, add.
+    // Access-width alignment: strip remainder, swizzle, apply diff to original.
+    // CHECK: %[[REM0:.+]] = arith.remui %[[SRC_LIN0]], %[[C4]]
+    // CHECK: %[[ALIGNED0:.+]] = arith.subi %[[SRC_LIN0]], %[[REM0]]
+    // XOR swizzle: extractCol, extractRow, xori, updateCol.
     // CHECK: %[[COL0:.+]] = affine.apply
     // CHECK: %[[ROW0:.+]] = affine.apply
     // CHECK: %[[XOR0:.+]] = arith.xori %[[ROW0]], %[[COL0]]
     // CHECK: %[[UCOL0:.+]] = affine.apply
-    // CHECK: %[[DIFF0:.+]] = arith.subi %[[UCOL0]], %[[SRC_LIN0]]
+    // CHECK: %[[DIFF0:.+]] = arith.subi %[[UCOL0]], %[[ALIGNED0]]
     // CHECK: %[[SWIZZLED0:.+]] = arith.addi %[[SRC_LIN0]], %[[DIFF0]]
     // Source delinearized from swizzled offset.
     // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SWIZZLED0]] into (4, 128)
@@ -1903,10 +1906,11 @@ func.func @lower_dma_swizzle_access_width_align(
   scf.forall (%lane) in (64) {
     // elementsPerLane=2 < accessWidth=8: remainder stripped and restored.
     // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-    // CHECK: %[[REM:.+]] = arith.remui {{.*}}, %[[C8]]
-    // CHECK: arith.subi {{.*}}, %[[REM]]
+    // CHECK: %[[REM:.+]] = arith.remui %[[SRC_LIN:.+]], %[[C8]]
+    // CHECK: %[[ALIGNED:.+]] = arith.subi %[[SRC_LIN]], %[[REM]]
     // CHECK: arith.xori
-    // CHECK: arith.addi {{.*}}, %[[REM]]
+    // CHECK: %[[DIFF:.+]] = arith.subi {{.*}}, %[[ALIGNED]]
+    // CHECK: arith.addi %[[SRC_LIN]], %[[DIFF]]
     // CHECK: amdgpu.gather_to_lds
     iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
         : memref<8x64xbf16, #amdgpu.address_space<fat_raw_buffer>>,
@@ -1953,12 +1957,13 @@ func.func @lower_dma_swizzle_combined_base_and_access_width(
   scf.forall (%lane) in (64) {
     // Base offset 256 added, then access-width remainder stripped/restored.
     // CHECK: %[[C256:.+]] = arith.constant 256 : index
-    // CHECK: arith.addi %[[C256]],
+    // CHECK: %[[SRC_LIN:.+]] = arith.addi %[[C256]],
     // CHECK: %[[C8:.+]] = arith.constant 8 : index
-    // CHECK: %[[REM:.+]] = arith.remui {{.*}}, %[[C8]]
-    // CHECK: arith.subi {{.*}}, %[[REM]]
+    // CHECK: %[[REM:.+]] = arith.remui %[[SRC_LIN]], %[[C8]]
+    // CHECK: %[[ALIGNED:.+]] = arith.subi %[[SRC_LIN]], %[[REM]]
     // CHECK: arith.xori
-    // CHECK: arith.addi {{.*}}, %[[REM]]
+    // CHECK: %[[DIFF:.+]] = arith.subi {{.*}}, %[[ALIGNED]]
+    // CHECK: arith.addi %[[SRC_LIN]], %[[DIFF]]
     // CHECK: arith.subi {{.*}}, %[[C256]]
     // CHECK: amdgpu.gather_to_lds
     iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)

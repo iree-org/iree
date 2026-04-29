@@ -1372,8 +1372,7 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
 
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
-    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements,
-    int64_t elementsPerLane, Value dest) {
+    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements, Value dest) {
   // Compute the subgroup's base offset within the full allocation by tracing
   // through view-like ops and accumulating the linear element offset.
   Value swizzleBaseOffset;
@@ -1411,25 +1410,9 @@ Value applyInverseXorSwizzleToDMASourceOffset(
         arith::AddIOp::create(builder, loc, swizzleBaseOffset, srcLinearOffset);
   }
 
-  // Subtract the accessWidth remainder.
-  int64_t accessWidth = swizzle.getAccessElementCount();
-  Value remainder;
-  if (elementsPerLane < accessWidth) {
-    Value accessWidthVal =
-        arith::ConstantIndexOp::create(builder, loc, accessWidth);
-    remainder =
-        arith::RemUIOp::create(builder, loc, swizzleInput, accessWidthVal);
-    swizzleInput = arith::SubIOp::create(builder, loc, swizzleInput, remainder);
-  }
-
-  // Apply the actual swizzle.
+  // Apply the swizzle (handles access-width alignment internally).
   Value swizzled = getValueOrCreateConstantIndexOp(
       builder, loc, swizzle.swizzleOffset(builder, loc, swizzleInput, dest));
-
-  // Add the remainder back.
-  if (remainder) {
-    swizzled = arith::AddIOp::create(builder, loc, swizzled, remainder);
-  }
 
   // Subtract the subgroup base offset.
   if (swizzleBaseOffset) {

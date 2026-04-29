@@ -546,7 +546,7 @@ private:
             int64_t destElements = ShapedType::getNumElements(destShape);
             srcLinearOffset = applyInverseXorSwizzleToDMASourceOffset(
                 rewriter, loc, srcLinearOffset, *destSwizzle, destElements,
-                segment.elementsPerLane, dest);
+                dest);
           }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);

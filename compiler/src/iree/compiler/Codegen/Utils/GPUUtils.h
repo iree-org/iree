@@ -286,11 +286,9 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 /// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
 /// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
 ///
-/// Two adjustments are needed beyond the swizzle itself:
-///
-/// 1. Subgroup base offset: when the subgroup transfer size is not a
-///    multiple of the swizzle period, we add the subgroup's base offset
-///    within the full allocation before swizzling and subtract it after.
+/// When the subgroup transfer size is not a multiple of the swizzle period,
+/// we add the subgroup's base offset within the full allocation before
+/// swizzling and subtract it after.
 ///
 ///    Example: xor_shuffle<64, 8>, period = 64*64/8 = 512 elements.
 ///    Workgroup tile = 32x32, 4 subgroups of 8x32 = 256 each.
@@ -301,22 +299,9 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 ///           different rows in the full allocation.
 ///      FIX: swizzle(local + base) - base
 ///    ```
-///
-/// 2. Access-width alignment: when elementsPerLane < accessWidth, we
-///    strip the sub-accessWidth remainder before swizzling and add it
-///    back after.
-///
-///    Example: xor_shuffle<64, 8>, elementsPerLane = 2 (< 8).
-///    ```
-///      BUG: swizzle(offset)
-///           swizzle(0) == swizzle(2) == swizzle(6) because swizzle
-///           divides by accessWidth, truncating all three to the same group.
-///      FIX: swizzle(offset - rem) + rem, where rem = offset % accessWidth
-///    ```
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
-    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements,
-    int64_t elementsPerLane, Value dest);
+    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements, Value dest);
 
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
