@@ -164,6 +164,14 @@ void populateCombineRelayoutOpPatterns(
 /// Populate patterns to fuse tilable consumers of forall ops into it.
 void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
 
+/// Populate a pattern that lifts a tensor-semantics `iree_codegen.inner_tiled`
+/// op to vector semantics by reading each operand with `vector.transfer_read`,
+/// replacing the op with a vector-semantics `inner_tiled`, and writing each
+/// result back with `vector.transfer_write`. Used by the LLVM-CPU pipeline,
+/// which (unlike GPU's lane-distribution path) has no separate hook for
+/// turning tensor-semantics inner_tiled ops into vector-semantics ones.
+void populateVectorizeInnerTiledPatterns(RewritePatternSet &patterns);
+
 //===----------------------------------------------------------------------===//
 // Utilities for iteration space expansion transformations
 //===----------------------------------------------------------------------===//

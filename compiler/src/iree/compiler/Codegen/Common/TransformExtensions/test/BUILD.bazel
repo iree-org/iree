@@ -21,6 +21,7 @@ iree_lit_test_suite(
         [
             "bufferization.mlir",
             "fuse_consumer.mlir",
+            "vectorize_inner_tiled.mlir",
         ],
         include = ["*.mlir"],
     ),

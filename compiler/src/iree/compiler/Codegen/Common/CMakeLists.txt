@@ -172,6 +172,7 @@ iree_cc_library(
     "UserConfig.cpp"
     "VectorLayoutAnalysis.cpp"
     "VectorTransferLowering.cpp"
+    "VectorizeInnerTiled.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyPipelineConstraints.cpp"
     "VerifyWorkgroupDistribution.cpp"

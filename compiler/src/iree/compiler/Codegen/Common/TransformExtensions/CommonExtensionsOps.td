@@ -186,6 +186,21 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyVectorizeInnerTiledPatternsOp
+    : Op<Transform_Dialect, "apply_patterns.iree.vectorize_inner_tiled",
+         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+          ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate the pattern that lifts a tensor-semantics
+    `iree_codegen.inner_tiled` op to vector semantics by reading each operand
+    with `vector.transfer_read`, replacing the op with a vector-semantics
+    `inner_tiled`, and writing each result back with `vector.transfer_write`.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def CopyTensorOperandOp :  Op<Transform_Dialect, "iree.copy_tensor_operand",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      FunctionalStyleTransformOpTrait,

@@ -189,6 +189,15 @@ void transform_dialect::ApplyUnrollVectorsGpuWmmaSyncPatternsOp::
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyVectorizeInnerTiledPatternsOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyVectorizeInnerTiledPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  populateVectorizeInnerTiledPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // Remaining Apply...PatternsOp
 //===---------------------------------------------------------------------===//
 

@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "bufferization.mlir"
     "fuse_consumer.mlir"
+    "vectorize_inner_tiled.mlir"
   TOOLS
     FileCheck
     iree-opt
