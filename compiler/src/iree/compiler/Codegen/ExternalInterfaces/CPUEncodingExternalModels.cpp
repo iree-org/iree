@@ -611,9 +611,13 @@ static Operation *lowerContractionToInnerTiled(
   AffineExpr d0 = builder.getAffineDimExpr(0);
   AffineExpr d1 = builder.getAffineDimExpr(1);
   AffineExpr d2 = builder.getAffineDimExpr(2);
+  // RHS uses (d1, d2) i.e. (N_iter, K_iter) outer ordering — mmt4d-style — to
+  // match the packed RHS operand shape produced upstream (the RHS pack uses
+  // `outer_dims_perm = [1, 0]` so its outer dims come out as N_iter, K_iter,
+  // not K_iter, N_iter).
   SmallVector<AffineMap> indexingMaps = {
       AffineMap::get(3, 0, {d0, d2}, ctx),
-      AffineMap::get(3, 0, {d2, d1}, ctx),
+      AffineMap::get(3, 0, {d1, d2}, ctx),
       AffineMap::get(3, 0, {d0, d1}, ctx),
   };
   SmallVector<utils::IteratorType> iteratorTypes = {
