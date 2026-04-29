@@ -5,8 +5,10 @@
 // GenericVectorization via the VectorizableOpInterface external model):
 //   1. drop the (now-unit) iter domain,
 //   2. lower the iter-free vector inner_tiled to llvm.call_intrinsic.
-// On a single-tile AVX-512 1x16x1 f32 matmul the end result is one
-// `llvm.fma.v16f32` call.
+// It then calls `IREE::Util::eliminateHoistableConversions` to cancel the
+// conversion pairs the lowering patterns leave around the ACC.
+// On a single-tile AVX-512 1x16x1 f32 matmul, the end result is one
+// `llvm.fma.v16f32` call with no surviving `util.hoistable_conversion`s.
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
@@ -29,4 +31,5 @@ func.func @lower_avx512_1x16x1_f32(
 
 // CHECK-LABEL: func @lower_avx512_1x16x1_f32
 //   CHECK-NOT:   iree_codegen.inner_tiled
+//   CHECK-NOT:   util.hoistable_conversion
 //       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>

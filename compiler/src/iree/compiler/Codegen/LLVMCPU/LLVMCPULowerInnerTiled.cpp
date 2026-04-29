@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -38,6 +39,16 @@ struct LLVMCPULowerInnerTiledPass final
     //     transparently.
     IREE::GPU::populateIREEGPULowerInnerTiledPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+      return signalPassFailure();
+    }
+
+    // The lowering patterns above wrap the per-intrinsic ACC distribute and
+    // reassemble in `IREE::Util::HoistableConversionOp` pairs (tagged with
+    // `kDataTiledAcc{Distribute,Reassemble}` etc.) so that the conversion can
+    // sink/hoist out of any reduction loop wrapping it. Cancel the surviving
+    // pairs in this function — anything that didn't get hoisted out becomes a
+    // trivial round-trip and folds away here.
+    if (failed(IREE::Util::eliminateHoistableConversions(getOperation()))) {
       return signalPassFailure();
     }
   }
