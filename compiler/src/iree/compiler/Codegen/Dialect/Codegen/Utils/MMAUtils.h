@@ -87,14 +87,17 @@ using DataTiledMMAIntrinsicEmitter = llvm::function_ref<Value(
 /// `inputs` are LHS and RHS in that order. `outputs[0]` is the accumulator.
 /// Operand vector ranks may be either the swizzle's full expanded form (GPU)
 /// or the 2-D (outer × inner) collapsed form (CPU); the helper reshapes as
-/// needed.
+/// needed. `accCrossIntrinsicTransposed` reflects whether the ACC swizzle's
+/// cross-intrinsic dims are stored as (intrinsicsN, intrinsicsM) instead of
+/// (intrinsicsM, intrinsicsN) — set by CPU's `transposed_intrinsic` flag and
+/// always false for GPU.
 LogicalResult buildDataTiledMMAUnderlyingOperations(
     OpBuilder &builder, Location loc, const TileSwizzle &lhsSwizzle,
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
     int64_t intrinsicsM, int64_t intrinsicsN, int64_t intrinsicsK,
     ValueRange inputs, ValueRange outputs,
-    DataTiledMMAIntrinsicEmitter emitIntrinsic,
-    SmallVectorImpl<Value> &results);
+    DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
+    bool accCrossIntrinsicTransposed = false);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

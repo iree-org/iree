@@ -1109,9 +1109,21 @@ private:
 
   /// Intrinsic-first path for `iree_codegen.inner_tiled`: pick a
   /// `DataTiledMMAAttr` (same decision the lowering will make) and derive the
-  /// packed-layout tile shape from it. No narrow-N transpose: unlike the
-  /// legacy mmt4d path, the inner_tiled lowering handles narrow dims natively
-  /// via `intrinsics_m` / `intrinsics_n`.
+  /// packed-layout tile shape from it. The narrow-dim case is handled natively
+  /// via `intrinsics_m` / `intrinsics_n` (no narrow-N→narrow-M *matmul-level*
+  /// transpose like the legacy mmt4d path) — but when the cost model picks
+  /// `transposed_intrinsic = true` (intrinsic with M/N roles swapped), the
+  /// ACC swizzle stores its inner tile in (N, M) physical order, so the ACC
+  /// pack info must swap its (M, N) inner tile to (N, M) to match. Only the
+  /// inner part of the ACC pack is affected — the outer dims still iterate as
+  /// (M_outer, N_outer) per the inner_tiled op's indexing maps, so we leave
+  /// `outerDimsPerm` alone (unlike the legacy mmt4d narrow-N path, which
+  /// swaps the matmul-level M and N globally and therefore swaps the outer
+  /// dims too). LHS (M, K) and RHS (N, K) keep their physical layout — only
+  /// the ACC needs the swap. Without this, the `InnerTiledOp` verifier
+  /// rejects the materialized op with "operand #2 inner tile
+  /// 'tensor<M_pack x N_pack>' is incompatible with expected MMA tile type
+  /// 'vector<N x M>'".
   static MaterializeEncodingInfo getInnerTiledEncodingInfo(
       MLIRContext *ctx, IREE::Encoding::EncodingAttr encoding,
       const linalg::ContractionDimensions &cDims, DictionaryAttr config) {
@@ -1131,6 +1143,19 @@ private:
         getScalableTileFlags(cDims, encoding, config);
     if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
+    }
+    if (mma.getTransposedIntrinsic() &&
+        encoding.getOperandIndex().getValue() ==
+            IREE::Encoding::MATMUL_RESULT &&
+        info.innerTileSizes.size() >= 2) {
+      auto transposeInner = [](auto &a) {
+        std::swap(a[a.size() - 2], a[a.size() - 1]);
+      };
+      transposeInner(info.innerDimsPos);
+      transposeInner(info.innerTileSizes);
+      if (info.scalableTiles) {
+        transposeInner(info.scalableTiles.value());
+      }
     }
     return info;
   }

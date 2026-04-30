@@ -250,6 +250,80 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 
 // -----
 
+// Narrow-N (`transposed_intrinsic = true`): with `iteration_sizes = [_, 8, _]`
+// the cost model picks the M↔N-swapped orientation of
+// MMA_X86_AVX512_1x16x1_F32_F32 (16x1x1 lane layout) over the natural 1x16x1
+// — the static N=8 caps natural usefulOps to 8, while the transposed
+// orientation fully utilizes its M=16 lanes. Unrolling lands on
+// (intrinsics_m=2, intrinsics_n=8), giving M_inner=32, N_inner=8.
+//
+// The accumulator swizzle is then stored in (N, M) physical order, so
+// materialize-encoding swaps the ACC pack's *inner* tile to (N_inner=8,
+// M_inner=32) and routes its inner_dims_pos to [1, 0]. LHS (M, K) and
+// RHS (N, K) packs keep their natural inner order — only the ACC swap is
+// needed. Without that surgical (ACC-only, inner-only) swap, the
+// inner_tiled verifier rejects the materialized op.
+
+#map_t = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_t1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_t2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_t_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_t, #map_t1, #map_t2], iteration_sizes = [127, 8, ?]>
+#encoding_t_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_t, #map_t1, #map_t2], iteration_sizes = [127, 8, ?]>
+#encoding_t_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_t, #map_t1, #map_t2], iteration_sizes = [127, 8, ?]>
+func.func @set_encoding_LHS_inner_tiled_avx512_narrow_n(%arg0: tensor<127x255xf32>, %k: index) -> tensor<127x255xf32, #encoding_t_lhs> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32> -> tensor<127x255xf32, #encoding_t_lhs>
+  return %0 : tensor<127x255xf32, #encoding_t_lhs>
+}
+func.func @set_encoding_RHS_inner_tiled_avx512_narrow_n(%arg0: tensor<127x255xf32>, %k: index) -> tensor<127x255xf32, #encoding_t_rhs> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32> -> tensor<127x255xf32, #encoding_t_rhs>
+  return %0 : tensor<127x255xf32, #encoding_t_rhs>
+}
+func.func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(%arg0: tensor<127x255xf32, #encoding_t_res>, %k: index) -> tensor<127x255xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32, #encoding_t_res> -> tensor<127x255xf32>
+  return %0 : tensor<127x255xf32>
+}
+// LHS pack: natural (M, K) inner order, M_inner = intrinsicM * intrinsics_m
+// = 16 * 2 = 32, K_inner = 1.
+// CHECK-LABEL: func @set_encoding_LHS_inner_tiled_avx512_narrow_n(
+//  CHECK-SAME:   %[[INPUT_T_L:[a-zA-Z0-9]+]]: tensor<127x255xf32>
+//       CHECK:   %[[EMPTY_T_L:.+]] = tensor.empty() : tensor<4x255x32x1xf32>
+//       CHECK:   %[[PACK_T_L:.+]] = linalg.pack %[[INPUT_T_L]]
+//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 1]
+//  CHECK-SAME:     into %[[EMPTY_T_L]] : tensor<127x255xf32> -> tensor<4x255x32x1xf32>
+//       CHECK:   return %[[PACK_T_L]] : tensor<4x255x32x1xf32>
+
+// RHS pack: natural (N, K) inner order, N_inner = intrinsicN * intrinsics_n
+// = 1 * 8 = 8, K_inner = 1.
+// CHECK-LABEL: func @set_encoding_RHS_inner_tiled_avx512_narrow_n(
+//  CHECK-SAME:   %[[INPUT_T_R:[a-zA-Z0-9]+]]: tensor<127x255xf32>
+//       CHECK:   %[[EMPTY_T_R:.+]] = tensor.empty() : tensor<32x127x8x1xf32>
+//       CHECK:   %[[PACK_T_R:.+]] = linalg.pack %[[INPUT_T_R]]
+//  CHECK-SAME:     outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 1]
+//  CHECK-SAME:     into %[[EMPTY_T_R]] : tensor<127x255xf32> -> tensor<32x127x8x1xf32>
+//       CHECK:   return %[[PACK_T_R]] : tensor<32x127x8x1xf32>
+
+// ACC unpack: outer dims still iterate as (M_outer, N_outer) per the
+// inner_tiled op's indexing maps (outer_dims_perm = [0, 1]) — only the
+// inner tile is swapped. inner_dims_pos = [1, 0] points at (N, M) and
+// inner_tiles = [8, 32] gives N_inner = 8, M_inner = 32, i.e. the ACC
+// is stored in physical (N, M) order. The packed input shape is
+// tensor<4x32x8x32xf32> = (M_outer=4, N_outer=32, N_inner=8, M_inner=32).
+// CHECK-LABEL: func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(
+//  CHECK-SAME:   %[[PACKED_T:[a-zA-Z0-9]+]]: tensor<4x32x8x32xf32>
+//       CHECK:   %[[EMPTY_T_U:.+]] = tensor.empty() : tensor<127x255xf32>
+//       CHECK:   %[[UNPACK_T:.+]] = linalg.unpack %[[PACKED_T]]
+//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [1, 0] inner_tiles = [8, 32]
+//  CHECK-SAME:     into %[[EMPTY_T_U]] : tensor<4x32x8x32xf32> -> tensor<127x255xf32>
+//       CHECK:   return %[[UNPACK_T]]
+
+// -----
+
 // It tests with bindings and checks that the reshape ops are folded into bindings.
 
 #executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>

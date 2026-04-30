@@ -96,8 +96,8 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
     int64_t intrinsicsM, int64_t intrinsicsN, int64_t intrinsicsK,
     ValueRange inputs, ValueRange outputs,
-    DataTiledMMAIntrinsicEmitter emitIntrinsic,
-    SmallVectorImpl<Value> &results) {
+    DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
+    bool accCrossIntrinsicTransposed) {
   if (inputs.size() != 2 || outputs.size() != 1) {
     return failure();
   }
@@ -126,13 +126,21 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
       });
   SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
 
-  // Loop over the unroll_{m,n,k} dimensions to emit per-intrinsic ops.
+  // Loop over the unroll_{m,n,k} dimensions to emit per-intrinsic ops. The
+  // ACC index follows the swizzle's cross-intrinsic ordering: normally
+  // (intrinsicsM, intrinsicsN) → idx = mu * intrinsicsN + nu, but under CPU's
+  // `transposed_intrinsic` the ACC swizzle stores them as (intrinsicsN,
+  // intrinsicsM) so the index becomes nu * intrinsicsM + mu.
+  auto accIndex = [&](int64_t mu, int64_t nu) -> int64_t {
+    return accCrossIntrinsicTransposed ? nu * intrinsicsM + mu
+                                       : mu * intrinsicsN + nu;
+  };
   for (int64_t mu = 0; mu < intrinsicsM; ++mu) {
     for (int64_t nu = 0; nu < intrinsicsN; ++nu) {
       for (int64_t ku = 0; ku < intrinsicsK; ++ku) {
         Value lhsPiece = intrinsicsLhs[mu * intrinsicsK + ku];
         Value rhsPiece = intrinsicsRhs[nu * intrinsicsK + ku];
-        Value &acc = intrinsicsAcc[mu * intrinsicsN + nu];
+        Value &acc = intrinsicsAcc[accIndex(mu, nu)];
         Value newAcc = emitIntrinsic(builder, loc, lhsPiece, rhsPiece, acc);
         if (!newAcc) {
           return failure();

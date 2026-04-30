@@ -635,17 +635,16 @@ DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
 // Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
 // additional ops (potentially broadcasting or widening LHS/RHS or creating an
 // add op if the intrinsic isn't already adding the accumulator).
-//
-// Currently assumes that if one of LHS or RHS needs to be broadcasted, then it
-// musst be LHS. This corresponds to the fact that transposed intrinsics are not
-// currently handled by the caller, which is just a temporary limitation.
 static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                                        MMAIntrinsic intrinsic, Value lhs,
                                        Value rhs, Value acc) {
-  // Replicate LHS (M=1, K elements) across RHS's N lanes so both have the
-  // intrinsic's flat lane width. Going through a (N, K) 2-D form keeps the
-  // K-pair contiguous; a final shape_cast collapses to the flat 1-D vector
-  // the LLVM intrinsic expects. All x86 LLVM intrinsics we target here
+  // Replicate the narrower of LHS/RHS across the wider operand's lanes so
+  // both have the intrinsic's flat lane width. In the natural orientation
+  // that's the LHS (M=1, K elements) broadcast across the N lanes of the
+  // RHS; under `transposed_intrinsic` the roles swap and the RHS is the
+  // narrower one. Going through a (lanes, K) 2-D form keeps the K-pair
+  // contiguous; a final shape_cast collapses to the flat 1-D vector the
+  // LLVM intrinsic expects. All x86 LLVM intrinsics we target here
   // (AVX-512 FMA, VNNI vpdpwssd, BF16 dpbf16ps, integer pmaddwd) take same-
   // width vector operands — there is no narrow-input variant. The ISA-level
   // `{1toN}` broadcast-from-memory form is recovered later by the x86
@@ -659,11 +658,15 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   auto lhsType = cast<VectorType>(lhs.getType());
   auto rhsType = cast<VectorType>(rhs.getType());
   if (lhsType.getNumElements() != rhsType.getNumElements()) {
-    int64_t replicate = rhsType.getNumElements() / lhsType.getNumElements();
-    auto bcastType = VectorType::get({replicate, lhsType.getNumElements()},
-                                     lhsType.getElementType());
-    Value bcast = vector::BroadcastOp::create(builder, loc, bcastType, lhs);
-    lhs = vector::ShapeCastOp::create(builder, loc, rhsType, bcast);
+    bool lhsIsNarrow = lhsType.getNumElements() < rhsType.getNumElements();
+    Value &narrow = lhsIsNarrow ? lhs : rhs;
+    VectorType narrowType = lhsIsNarrow ? lhsType : rhsType;
+    VectorType wideType = lhsIsNarrow ? rhsType : lhsType;
+    int64_t replicate = wideType.getNumElements() / narrowType.getNumElements();
+    auto bcastType = VectorType::get({replicate, narrowType.getNumElements()},
+                                     narrowType.getElementType());
+    Value bcast = vector::BroadcastOp::create(builder, loc, bcastType, narrow);
+    narrow = vector::ShapeCastOp::create(builder, loc, wideType, bcast);
   }
 
   // Sign-/float-extend a vector to a wider element type. Used by the
@@ -729,14 +732,6 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
-  // TODO: handle `transposed_intrinsic`. When set, LHS and RHS swap roles
-  // (narrow-N case), and the broadcast in `createCpuMmaIntrinsicCall` would
-  // need to broadcast whichever operand is narrower rather than always LHS.
-  // Bail for now so we don't silently produce wrong code.
-  if (getTransposedIntrinsic()) {
-    return failure();
-  }
-
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
   if (inputs.size() != 2 || outputs.size() != 1 ||
@@ -754,7 +749,8 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
       builder, loc, getSwizzle(*this, /*operandIdx=*/0),
       getSwizzle(*this, /*operandIdx=*/1), getSwizzle(*this, /*operandIdx=*/2),
       getIntrinsicsM(), getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
-      emitIntrinsic, results);
+      emitIntrinsic, results,
+      /*accCrossIntrinsicTransposed=*/getTransposedIntrinsic());
 }
 
 //===----------------------------------------------------------------------===//
