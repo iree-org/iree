@@ -23,7 +23,7 @@
 #enc4 = #iree_encoding.encoding<operand_index = 4 : index, op_type = scaled_matmul,
   element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32],
   user_indexing_maps = [#sm0, #sm1, #sm2, #sm3, #sm4]>
-util.func public @gfx950_hoist_scales_only(
+util.func public @scaled_gemm_hoist_scales_only(
     %lhs: tensor<256x128x32xf4E2M1FN>, %rhs: tensor<512x128x32xf4E2M1FN>,
     %lscale: tensor<256x128xf8E8M0FNU>, %rscale: tensor<512x128xf8E8M0FNU>)
     -> tensor<256x512xf32> {
@@ -51,7 +51,7 @@ util.func public @gfx950_hoist_scales_only(
 }
 // With the flag: scale set_encodings (operands 2, 3)
 // hoisted; data set_encodings (0, 1) stay inside the dispatch.
-// CHECK-LABEL: @gfx950_hoist_scales_only
+// CHECK-LABEL: @scaled_gemm_hoist_scales_only
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<{{.+}}f4E2M1FN>, %[[RHS:.+]]: tensor<{{.+}}f4E2M1FN>,
 // CHECK-SAME:     %[[LS:.+]]: tensor<{{.+}}f8E8M0FNU>, %[[RS:.+]]: tensor<{{.+}}f8E8M0FNU>)
 // CHECK-DAG:   %[[ENC_LS:.+]] = iree_encoding.set_encoding %[[LS]]
