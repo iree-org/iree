@@ -250,23 +250,24 @@ preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
         op, "expected query heads to be a multiple of key and value heads");
   }
 
-  SmallVector<int64_t> keyResultShape(keyType.getSizes());
-  keyResultShape[rank - 3] = qNumHeads;
-  Type keyResultType = keyType.getWithSizesAndDtype(
-      ArrayRef<int64_t>(keyResultShape), keyType.getOptionalDtype());
-  FailureOr<Value> repeatedKey = repeatTensorElementsForDim(
-      rewriter, op, keyResultType, key, qNumHeads / kNumHeads, rank - 3);
-  if (failed(repeatedKey)) {
-    return failure();
-  }
+  auto repeatToQueryHeadCount = [&](Value input,
+                                    torch::Torch::ValueTensorType inputType,
+                                    int64_t inputNumHeads) -> FailureOr<Value> {
+    SmallVector<int64_t> resultShape(inputType.getSizes());
+    resultShape[rank - 3] = qNumHeads;
+    Type resultType = inputType.getWithSizesAndDtype(
+        ArrayRef<int64_t>(resultShape), inputType.getOptionalDtype());
+    return repeatTensorElementsForDim(rewriter, op, resultType, input,
+                                      qNumHeads / inputNumHeads, rank - 3);
+  };
 
-  SmallVector<int64_t> valueResultShape(valueType.getSizes());
-  valueResultShape[rank - 3] = qNumHeads;
-  Type valueResultType = valueType.getWithSizesAndDtype(
-      ArrayRef<int64_t>(valueResultShape), valueType.getOptionalDtype());
-  FailureOr<Value> repeatedValue = repeatTensorElementsForDim(
-      rewriter, op, valueResultType, value, qNumHeads / vNumHeads, rank - 3);
-  if (failed(repeatedValue)) {
+  FailureOr<Value> repeatedKey =
+      repeatToQueryHeadCount(key, keyType, kNumHeads);
+
+  FailureOr<Value> repeatedValue =
+      repeatToQueryHeadCount(value, valueType, vNumHeads);
+
+  if (failed(repeatedKey) || failed(repeatedValue)) {
     return failure();
   }
 
