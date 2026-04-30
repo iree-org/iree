@@ -39,6 +39,7 @@ jobs:
               - persistent-cache
               - Linux
               - X64
+              - rdna3 # We only have one rdna4 machine but three rdna3 machines
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
