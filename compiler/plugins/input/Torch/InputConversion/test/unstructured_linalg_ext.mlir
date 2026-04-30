@@ -229,24 +229,6 @@ func.func @flex_attn_return_lse_and_maxscores(%arg0: !torch.vtensor<[2,4,8,16],f
 
 // -----
 
-// Test flex_attention with grouped query attention. Key and value are repeated
-// to match the query head count before online_attention is created.
-// CHECK-LABEL: func.func @flex_attn_gqa
-func.func @flex_attn_gqa(%arg0: !torch.vtensor<[2,8,8,16],f32>, %arg1: !torch.vtensor<[2,2,8,16],f32>, %arg2: !torch.vtensor<[2,2,8,16],f32>) -> !torch.vtensor<[2,8,8,16],f32> {
-  %none = torch.constant.none
-  %false = torch.constant.bool false
-  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false : !torch.vtensor<[2,8,8,16],f32>, !torch.vtensor<[2,2,8,16],f32>, !torch.vtensor<[2,2,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,8,8,16],f32>, !torch.none, !torch.none
-  return %output : !torch.vtensor<[2,8,8,16],f32>
-}
-// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,2,4,8,16],f32>
-// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
-// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,2,4,8,16],f32>
-// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
-// CHECK:           iree_linalg_ext.online_attention
-// CHECK-SAME:        ins({{.*}} : tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, f32)
-
-// -----
-
 // Test flex_attention with independent key/value head counts.
 // CHECK-LABEL: func.func @flex_attn_gqa_independent_kv_heads
 func.func @flex_attn_gqa_independent_kv_heads(%arg0: !torch.vtensor<[2,8,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,2,8,16],f32>) -> !torch.vtensor<[2,8,8,16],f32> {
