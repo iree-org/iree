@@ -161,23 +161,23 @@ iree_symlink_tool(
 )
 
 if(IREE_BUILD_BENCHMARKS)
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-executable
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-executable
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
+  )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-module
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-module
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
+  )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-replay
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-replay
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
+  )
 endif()
 
 iree_symlink_tool(

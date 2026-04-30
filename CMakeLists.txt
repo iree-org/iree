@@ -87,8 +87,10 @@ option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using instal
 option(IREE_BUILD_CLANG_TOOLS_EXTRA "Enables building the 'clang-tools-extra' LLVM targets." OFF)
 option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
 
-# IREE_BUILD_BENCHMARKS is required when IREE_BUILD_TESTS=ON because test
-# targets transitively depend on the bundled google benchmark target.
+# When IREE_BUILD_TESTS=OFF, IREE_BUILD_BENCHMARKS is ON by default but is
+# configurable. Several test targets transitively depend on the bundled google
+# benchmark target, so when IREE_BUILD_TESTS=ON, IREE_BUILD_BENCHMARKS is forced
+# ON.
 cmake_dependent_option(IREE_BUILD_BENCHMARKS "Builds IREE benchmarks." ON
     "NOT IREE_BUILD_TESTS" ON)
 
