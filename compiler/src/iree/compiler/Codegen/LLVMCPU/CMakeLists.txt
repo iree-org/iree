@@ -127,6 +127,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRPass
