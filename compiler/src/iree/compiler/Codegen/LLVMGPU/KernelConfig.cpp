@@ -1113,22 +1113,10 @@ static LogicalResult setAttentionReductionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  // Bail out on shapes this path cannot tile cleanly; all three cases fall
-  // through to the BaseLowering scalar fallback:
-  //   * K1 must be a multiple of `keyVectorSize`. The per-thread K1 tile is
-  //     pinned to that size below, so a non-multiple leaves a partial vector
-  //     and produces a vector op shape the layout engine cannot distribute.
-  //   * N must be a multiple of `numValueVectors * valueVectorSize`. The
-  //     inner-N workgroup tile factors that product, so a non-multiple lands
-  //     a tile boundary mid-vector and likewise breaks layout inference.
-  //   * K2 must exceed `kVerySkinnyDimThreshold`; smaller K2 collapses the
-  //     reduction below what this path is tuned for.
+  // TODO: Remove the K1/N alignment checks once masked VectorDistribute tails
+  // are verified for non-aligned attention shapes.
   int64_t k1Size = bounds[opInfo.getK1Dims().back()];
   int64_t nSize = bounds[opInfo.getNDims().back()];
-  // K2 may be empty; treat it as size 1, which trips the skinny-K2 check
-  // below.
-  int64_t k2Size =
-      opInfo.getK2Dims().empty() ? 1 : bounds[opInfo.getK2Dims().back()];
   int64_t nWorkgroupTile = seeds.numValueVectors * seeds.valueVectorSize;
   if (!ShapedType::isDynamic(k1Size) && k1Size % seeds.keyVectorSize != 0) {
     LDBG() << "Bailing out: K1 not a multiple of key vector size ("
@@ -1140,6 +1128,13 @@ static LogicalResult setAttentionReductionConfig(
            << nWorkgroupTile << "): " << nSize;
     return failure();
   }
+
+  // Bail out on very skinny K2 shapes; smaller K2 collapses the reduction below
+  // what this path is tuned for.
+  // K2 may be empty; treat it as size 1, which trips the skinny-K2 check
+  // below.
+  int64_t k2Size =
+      opInfo.getK2Dims().empty() ? 1 : bounds[opInfo.getK2Dims().back()];
   if (!ShapedType::isDynamic(k2Size) && k2Size <= kVerySkinnyDimThreshold) {
     LDBG() << "Bailing out due to very skinny K2 dimension: " << k2Size;
     return failure();
@@ -1458,21 +1453,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                          /*valueVectorSize=*/valueVectorSize};
 
   return setAttentionReductionConfig(seeds, target, entryPoint, op);
-}
-
-/// Fallback attention config that lowers the op via the scalar base-lowering
-/// pipeline. Used when the vector-distribute attention paths bail out on
-/// shapes they cannot handle (skinny M/K2, head dim below vector width, etc.).
-static LogicalResult
-setAttentionBaseLoweringConfig(FunctionOpInterface entryPoint,
-                               IREE::LinalgExt::OnlineAttentionOp op) {
-  MLIRContext *context = op.getContext();
-  SmallVector<int64_t, 3> workgroupSize = {1, 1, 1};
-  auto translationInfo =
-      getGPUTranslationInfo(context, GPUPipeline::BaseLowering, workgroupSize);
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, IREE::Codegen::LoweringConfigAttrInterface(),
-      translationInfo);
 }
 
 static LogicalResult
@@ -2528,10 +2508,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
-      .Case([&](IREE::LinalgExt::OnlineAttentionOp attnOp) {
-        LDBG() << "Attention BaseLowering Config";
-        return setAttentionBaseLoweringConfig(entryPointFn, attnOp);
-      })
       .Case([&](IREE::LinalgExt::FftOp fftOp) {
         LDBG() << "FFT Config";
         return setFftConfig(target, entryPointFn, fftOp);
