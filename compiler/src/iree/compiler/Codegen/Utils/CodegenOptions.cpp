@@ -12,18 +12,17 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 namespace mlir::iree_compiler {
 
 namespace {
-
-// Applies the opt-level default cascade using a local binder.
-template <typename CodegenOptionsT>
-void applyOptLevelDefaults(CodegenOptionsT &opts,
-                           llvm::OptimizationLevel level) {
-  auto binder = OptionsBinder::local();
-  // Anchor the opt-level hierarchy so applyOptimizationDefaults can walk it.
-  binder.topLevelOpt("opt-level", level);
-  opts.bindOptions(binder);
-  binder.applyOptimizationDefaults();
+// Single instance per option category, shared across all bind* methods so
+// that splitting bindOptions across functions does not register duplicate
+// categories with LLVM's command-line machinery.
+llvm::cl::OptionCategory &commonCategory() {
+  static llvm::cl::OptionCategory category("IREE Codegen Options");
+  return category;
 }
-
+llvm::cl::OptionCategory &cpuCategory() {
+  static llvm::cl::OptionCategory category("IREE CPU Codegen Options");
+  return category;
+}
 } // namespace
 
 std::string CodegenOptions::tuningSpecPath = "";
@@ -47,7 +46,7 @@ mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel) {
 }
 
 void CodegenOptions::bindOptions(OptionsBinder &binder) {
-  static llvm::cl::OptionCategory category("IREE Codegen Options");
+  llvm::cl::OptionCategory &category = commonCategory();
 
   binder.opt<std::string>(
       "iree-codegen-tuning-spec-path", tuningSpecPath, llvm::cl::cat(category),
@@ -73,25 +72,26 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
                      "Implies --iree-codegen-add-tuner-attributes."));
 }
 
-void CPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
-  applyOptLevelDefaults(*this, level);
-}
-
-CPUCodegenOptions
-CPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel level) {
-  CPUCodegenOptions opts;
-  opts.setWithOptLevel(level);
-  return opts;
-}
-
-void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
-  static llvm::cl::OptionCategory category("IREE CPU Codegen Options");
-  CodegenOptions::bindOptions(binder);
+void CPUCodegenOptions::bindOptLevelCascadeOptions(OptionsBinder &binder) {
+  llvm::cl::OptionCategory &category = cpuCategory();
 
   auto initAtOpt = binder.optimizationLevel(
       "iree-llvmcpu-mlir-opt-level", optLevel,
       llvm::cl::desc("Optimization level for MLIR codegen passes."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
+                   reassociateFpReductions,
+                   {initAtOpt(llvm::OptimizationLevel::O0, false),
+                    initAtOpt(llvm::OptimizationLevel::O2, true)},
+                   llvm::cl::desc("Enables reassociation for FP reductions."),
+                   llvm::cl::cat(category));
+}
+
+void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
+  llvm::cl::OptionCategory &category = cpuCategory();
+  CodegenOptions::bindOptions(binder);
+  bindOptLevelCascadeOptions(binder);
 
   binder.opt<bool>("iree-llvmcpu-disable-distribution", disableDistribution,
                    llvm::cl::desc("Disable thread distribution in codegen."),
@@ -103,13 +103,6 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Fail if the upper bound of dynamic stack allocation "
                      "cannot be solved."),
       llvm::cl::cat(category));
-
-  binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
-                   reassociateFpReductions,
-                   {initAtOpt(llvm::OptimizationLevel::O0, false),
-                    initAtOpt(llvm::OptimizationLevel::O2, true)},
-                   llvm::cl::desc("Enables reassociation for FP reductions."),
-                   llvm::cl::cat(category));
 
   binder.opt<bool>(
       "iree-llvmcpu-use-fast-min-max-ops", useFastMinMaxOps,
@@ -148,8 +141,38 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::cat(category));
 }
 
+void CPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
+  // Run the opt-level cascade on a local binder restricted to this instance's
+  // opt-level-sensitive fields. All bound storage lives on `*this` (a local
+  // object on the caller's stack), so concurrent invocations from parallel
+  // pass option defaults write only to thread-local memory.
+  auto binder = OptionsBinder::local();
+  binder.topLevelOpt("opt-level", level);
+  bindOptLevelCascadeOptions(binder);
+  binder.applyOptimizationDefaults();
+}
+
+CPUCodegenOptions
+CPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel level) {
+  CPUCodegenOptions opts;
+  opts.setWithOptLevel(level);
+  return opts;
+}
+
+void GPUCodegenOptions::bindOptLevelCascadeOptions(OptionsBinder & /*binder*/) {
+  // No GPU-specific opt-level-sensitive fields yet.
+}
+
+void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
+  CodegenOptions::bindOptions(binder);
+  bindOptLevelCascadeOptions(binder);
+}
+
 void GPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
-  applyOptLevelDefaults(*this, level);
+  auto binder = OptionsBinder::local();
+  binder.topLevelOpt("opt-level", level);
+  bindOptLevelCascadeOptions(binder);
+  binder.applyOptimizationDefaults();
 }
 
 GPUCodegenOptions
@@ -157,10 +180,6 @@ GPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel level) {
   GPUCodegenOptions opts;
   opts.setWithOptLevel(level);
   return opts;
-}
-
-void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
-  CodegenOptions::bindOptions(binder);
 }
 
 } // namespace mlir::iree_compiler

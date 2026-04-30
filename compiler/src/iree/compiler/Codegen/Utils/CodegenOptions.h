@@ -28,9 +28,12 @@ mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel);
 // different backends (e.g., CPU and GPU). Derived classes can add
 // backend-specific options as needed.
 //
-// Note: We need static members because they are shared across all derived
-// instances to bind LLVM cl::opt registration at the single storage when
-// multiple backends inherit from this class.
+// Note: We keep a few members static so that CPU and GPU subclasses' global
+// CLI bindings share the same storage (and so dedup-by-name works across the
+// two FromFlags singletons). Static storage is only safe to bind on the
+// global binder singleton, not on per-instance local binders; see
+// bindOptLevelCascadeOptions() on each subclass for the thread-safe cascade
+// path.
 struct CodegenOptions {
   // Path to a module containing a tuning spec.
   static std::string tuningSpecPath;
@@ -41,6 +44,10 @@ struct CodegenOptions {
   // Whether to emit pipeline constraints for root ops.
   static bool emitPipelineConstraints;
 
+  // Registers the shared CLI flags that back CodegenOptions' static members.
+  // Must only be called on the global binder (via the FromFlags singleton);
+  // binding on a local binder would write through shared static storage and
+  // is not safe under MLIR's parallel pass pipelines.
   void bindOptions(OptionsBinder &binder);
 };
 
@@ -72,28 +79,49 @@ struct CPUCodegenOptions : CodegenOptions {
   // Enables experimental vectorization to transfer_gather.
   bool enableTransferGather = false;
 
+  // Registers all CPU codegen CLI flags, including the opt-level cascade and
+  // the shared CodegenOptions statics. Intended for the FromFlags singleton
+  // on the global binder only.
   void bindOptions(OptionsBinder &binder);
+
+  // Registers only the opt-level-sensitive instance fields on the provided
+  // binder. Safe to call per-instance on a local binder: every bound flag
+  // points at a field on `*this` (thread-local), so concurrent invocations
+  // from pass option defaults do not race.
+  void bindOptLevelCascadeOptions(OptionsBinder &binder);
+
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
 
-  // Applies opt-level-dependent defaults to the current option set.
+  // Applies opt-level-dependent defaults to this instance by running the
+  // binder-driven cascade on a local binder bound solely to this instance's
+  // opt-level-sensitive fields.
   void setWithOptLevel(llvm::OptimizationLevel level);
 
   // Returns a CPUCodegenOptions with all opt-level-dependent defaults derived
-  // from `level`. Uses a local OptionsBinder so the global flags are not
-  // touched.
+  // from `level`.
   static CPUCodegenOptions getWithOptLevel(llvm::OptimizationLevel level);
 };
 
 struct GPUCodegenOptions : CodegenOptions {
+  // Registers all GPU codegen CLI flags, including the shared CodegenOptions
+  // statics. Intended for the FromFlags singleton on the global binder only.
   void bindOptions(OptionsBinder &binder);
+
+  // Registers only the opt-level-sensitive instance fields on the provided
+  // binder. Today GPU has no opt-level-sensitive fields, so this is a no-op.
+  // Kept parallel to the CPU side so both backends share the same cascade
+  // shape; extend here when GPU adds opt-level-sensitive defaults.
+  void bindOptLevelCascadeOptions(OptionsBinder &binder);
+
   using FromFlags = OptionsFromFlags<GPUCodegenOptions>;
 
-  // Applies opt-level-dependent defaults to the current option set.
+  // Applies opt-level-dependent defaults to this instance by running the
+  // binder-driven cascade on a local binder bound solely to this instance's
+  // opt-level-sensitive fields.
   void setWithOptLevel(llvm::OptimizationLevel level);
 
   // Returns a GPUCodegenOptions with all opt-level-dependent defaults derived
-  // from `level`. Uses a local OptionsBinder so the global flags are not
-  // touched.
+  // from `level`.
   static GPUCodegenOptions getWithOptLevel(llvm::OptimizationLevel level);
 };
 
