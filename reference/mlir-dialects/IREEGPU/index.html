@@ -2495,6 +2495,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpusubgroup_scan-gpusubgroupscanop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.subgroup_scan (GPU::SubgroupScanOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2522,7 +2533,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -7047,6 +7058,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpusubgroup_scan-gpusubgroupscanop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iree_gpu.subgroup_scan (GPU::SubgroupScanOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7074,7 +7096,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Attributes
@@ -7865,11 +7887,12 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#in-bounds-attribute">In-Bounds Attribute</a></li>
 <li><a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode</a><ul>
 <li><a href="#iree_gpuglobal_subgroup_barrier-gpuglobalsubgroupbarrierop">iree_gpu.global_subgroup_barrier (GPU::GlobalSubgroupBarrierOp)</a></li>
+<li><a href="#iree_gpusubgroup_scan-gpusubgroupscanop">iree_gpu.subgroup_scan (GPU::SubgroupScanOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_2">Attributes</a><ul>
+<li><a href="#attributes_3">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
 <li><a href="#conditionaltransposeattr">ConditionalTransposeAttr</a></li>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
@@ -8343,6 +8366,96 @@ to it. Fences are handled separately.</p>
 <p>This operation operates on a single, global workgroup-wide barrier object
 that can implement such dynamic join and must not be used if such a barrier
 isn't available.</p>
+<h3 id="iree_gpusubgroup_scan-gpusubgroupscanop"><code>iree_gpu.subgroup_scan</code> (GPU::SubgroupScanOp)<a class="headerlink" href="#iree_gpusubgroup_scan-gpusubgroupscanop" title="Permanent link">link</a></h3>
+<p><em>Prefix scan across subgroup lanes with total.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.subgroup_scan` (`inclusive` $inclusive^)?
+              `(` $value (`,` `identity` `=` $identity^ `:` type($identity))? `)`
+              (`cluster` `(` `size` `=` $cluster_size^
+              (`,` `stride` `=` $cluster_stride^)? `)`)?
+              $combiner attr-dict `:` type($value)
+</code></pre></div>
+<p>Performs a prefix scan of a scalar value across lanes within a subgroup
+cluster, and returns the cluster total as a second result. The scan can
+be either inclusive or exclusive:</p>
+<ul>
+<li><strong>Inclusive</strong> (<code>inclusive</code> keyword present): lane at logical position <code>p</code>
+  receives <code>val_0 op val_1 op ... op val_p</code>. No identity is needed.</li>
+<li><strong>Exclusive</strong> (default, no <code>inclusive</code> keyword): lane at position <code>p</code>
+  receives <code>identity op val_0 op ... op val_{p-1}</code>. Lane 0 receives the
+  identity. The <code>identity</code> operand is required for exclusive mode.</li>
+</ul>
+<p>The combiner is specified by the region body, which takes two arguments
+of the value type and yields one result.</p>
+<p>The subgroup is divided into clusters of <code>size</code> lanes starting at lane 0
+with inter-lane <code>stride</code>.</p>
+<p>The second result <code>total</code> is the reduction of all values in the cluster:
+<code>val_0 op val_1 op ... op val_{size-1}</code>.</p>
+<p>The combiner must be associative. It does not need to be commutative.</p>
+<p>Examples:
+<div class="highlight"><pre><span></span><code>// Exclusive scan:
+%scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32)
+    cluster(size = 4, stride = 2) {
+^bb0(%lhs: f32, %rhs: f32):
+  %add = arith.addf %lhs, %rhs : f32
+  iree_gpu.yield %add : f32
+} : f32
+
+// Inclusive scan:
+%scan, %total = iree_gpu.subgroup_scan inclusive (%x)
+    cluster(size = 4) {
+^bb0(%lhs: f32, %rhs: f32):
+  %add = arith.addf %lhs, %rhs : f32
+  iree_gpu.yield %add : f32
+} : f32
+</code></pre></div></p>
+<p>Traits: <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>inclusive</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+<tr><td><code>cluster_size</code></td><td>::mlir::IntegerAttr</td><td>32-bit signless integer attribute</td></tr>
+<tr><td><code>cluster_stride</code></td><td>::mlir::IntegerAttr</td><td>32-bit signless integer attribute</td></tr>
+</table>
+
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>signless integer or floating-point</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>identity</code></td>
+<td>signless integer or floating-point</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>signless integer or floating-point</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>total</code></td>
+<td>signless integer or floating-point</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
 <p>Syntax:</p>
@@ -8360,7 +8473,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8375,7 +8488,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8396,10 +8509,10 @@ produces.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` attr-dict ($values^ `:` type($values))?
 </code></pre></div>
 <p>This operation is used to yield values from a within a region.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp, ::mlir::iree_compiler::IREE::GPU::SubgroupScanOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8414,7 +8527,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_2">Attributes<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h2>
+<h2 id="attributes_3">Attributes<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h2>
 <h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
 <p><em>Supported bitwidths for compute</em></p>
 <p>Syntax:</p>
