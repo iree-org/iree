@@ -204,6 +204,45 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ]
 )]
 
+# LLVMCPU, data-tiling lowering matmul to iree_codegen.inner_tiled
+# (the new MMA-intrinsic path) instead of linalg.mmt4d.
+[iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_%s_%s" % (lhs_rhs_type, acc_type),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        # `easy_large_static` is a small set of M=N=512, K=128 cases that
+        # avoid two known limitations on the inner_tiled path:
+        #   * narrow-N matmuls hit a `transposed_intrinsic = true` packing
+        #     bug in materialize-encoding (op-verifier rejects the inner
+        #     tile shape order),
+        #   * the current 1-inner-tile-per-workgroup distribution heuristic
+        #     blows out the per-function stack budget on shapes with very
+        #     large K. A cost-model-driven sizing port from mmt4d is the
+        #     follow-up that unlocks the broader `default` shape set.
+        "--shapes=easy_large_static",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    # Only AVX-512 for now: that's what the per-intrinsic CPU emitter has
+    # been validated against. Adding AVX2 / AVX-512-FP16 / AVX-512-BF16 /
+    # AVX-512-VNNI variants follows the same pattern as the existing
+    # `e2e_matmul_cpu_dt_*` tests.
+    target_cpu_features_variants = [
+        "x86_64:avx512:" + ",".join(X86_64_AVX512),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+) for (lhs_rhs_type, acc_type) in [
+    ("f32", "f32"),
+]]
+
 # LLVMCPU, data-tiling, data-tiling + ukernels + late materialization.
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_cpu_experimental_dt%s_%s_%s" % (
