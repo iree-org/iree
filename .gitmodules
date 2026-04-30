@@ -4,6 +4,7 @@
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
 	url = https://github.com/iree-org/llvm-project.git
+	branch = users/lialan/emulate_fp4
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
