@@ -57,9 +57,6 @@ def LLVMGPUGroupGlobalLoadsPass :
     preceding load's result. This enables the GPU backend to issue multiple
     global loads before waiting, instead of serializing each load behind its
     own waitcount.
-
-    This pass is target-agnostic within LLVMGPU, but is currently only added to
-    the ROCDL lowering pipeline.
   }];
 }
 
