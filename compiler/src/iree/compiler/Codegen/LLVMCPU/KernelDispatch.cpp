@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
@@ -3019,6 +3020,69 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Default));
 }
 
+/// Sets the lowering configuration for a dispatch region rooted at an
+/// `iree_codegen.inner_tiled` op. The op already has the inner-tile shape
+/// baked into the operand layout (one inner tile per iteration of its
+/// iter domain), so each iter dim should be tiled to a single iteration:
+///   * `vector_common_parallel` tiles the M and N parallel iter dims to 1,
+///     turning the outer parallel loops into a single forall body.
+///   * `vector_reduction` tiles the K reduction iter dim to 1, leaving an
+///     scf.for around the inner_tiled body.
+/// With all iter bounds collapsed to 1, the unit-iter-dim drop and per-
+/// intrinsic lower patterns in `LLVMCPULowerInnerTiledPass` fire on a
+/// single-tile op rather than getting fully unrolled over K. Distribution
+/// is parallel-only (M, N).
+///
+/// We route through `Mmt4dTilingExpert` rather than `DataTiling` because
+/// the former has the modern lowerings (tile-and-fuse, vectorization via
+/// the `VectorizableOpInterface` external model, generic vector lowering
+/// after bufferize) that data-tiled MMA dispatches need; `DataTiling` was
+/// designed for pack/unpack ops and not all of those passes kick in there.
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::Codegen::InnerTiledOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+  SmallVector<int64_t> bounds;
+  op.getIterationBounds(bounds);
+  unsigned numLoops = bounds.size();
+  assert(numLoops >= 2 && "inner_tiled iter domain must have at least M, N");
+
+  SmallVector<utils::IteratorType> iteratorTypes;
+  for (Attribute it : op.getIteratorTypes()) {
+    iteratorTypes.push_back(cast<linalg::IteratorTypeAttr>(it).getValue());
+  }
+  assert(iteratorTypes.size() == numLoops);
+
+  // Distribution: one inner tile per workgroup along each parallel iter
+  // dim; reduction dims are not distributed. The same constant 1 works for
+  // static and dynamic outer extents — for static, it caps the workgroup
+  // tile at one inner tile (smaller than the matmul); for dynamic, it lets
+  // the workgroup count scale with the runtime extent. Larger workgroup
+  // tiles are a perf optimization; the mmt4d cost model is the template
+  // for porting that to inner_tiled in a follow-up.
+  SmallVector<int64_t> distTileSizes(numLoops, 0);
+  for (auto [i, kind] : llvm::enumerate(iteratorTypes)) {
+    if (kind == utils::IteratorType::parallel) {
+      distTileSizes[i] = 1;
+    }
+  }
+
+  // Vector tiling: every iter dim down to a single inner tile. The
+  // generator's `splitParallelAndReductionTiles` lifts the parallel entries
+  // into `vector_common_parallel` and the reduction entries into
+  // `vector_reduction`.
+  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+
+  LoweringConfigGenerator generator(op);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG() << "Set lowering_config for inner_tiled op: " << loweringConfig;
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, loweringConfig,
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
+}
+
 /// Redirects to methods that set the configuration based on operation type.
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
@@ -3032,7 +3096,8 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           })
           .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
                 IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
-                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp,
+                IREE::Codegen::InnerTiledOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,
                 IREE::LinalgExt::WinogradInputTransformOp,
