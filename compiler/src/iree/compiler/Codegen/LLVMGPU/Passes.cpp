@@ -1049,10 +1049,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
                 clLLVMGPUEnableSmallFloatEmulation});
       });
 
-  // Group buffer loads together to improve AMDGPU instruction scheduling.
+  // Group global loads together to improve AMDGPU instruction scheduling.
+  // The transformation is target-agnostic, but currently only enabled for
+  // ROCDL targets.
   // This must run after SCF->CF lowering and memref optimizations, but before
   // the func-level adaptor is committed.
-  funcPassManager.addPredicatedPass(forROCDL, createROCDLGroupBufferLoadsPass);
+  funcPassManager.addPredicatedPass(forROCDL, createLLVMGPUGroupGlobalLoadsPass);
 
   // Commit the func-level adaptor before adding module-level passes.
   funcPassManager.commitPass();

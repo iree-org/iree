@@ -10,23 +10,23 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#define DEBUG_TYPE "iree-codegen-rocdl-group-buffer-loads"
+#define DEBUG_TYPE "iree-codegen-llvmgpu-group-global-loads"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_ROCDLGROUPBUFFERLOADSPASS
-#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h.inc"
+#define GEN_PASS_DEF_LLVMGPUGROUPGLOBALLOADSPASS
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
 
-/// Returns true if the operation is a vector.load from a fat raw buffer.
-static bool isBufferLoad(Operation *op) {
+/// Returns true if the operation is a vector.load from global memory.
+static bool isGlobalLoad(Operation *op) {
   auto loadOp = dyn_cast<vector::LoadOp>(op);
   if (!loadOp) {
     return false;
   }
   auto memrefType = dyn_cast<MemRefType>(loadOp.getBase().getType());
-  return memrefType && hasAMDGPUFatRawBufferAddressSpace(memrefType);
+  return memrefType && hasGlobalMemoryAddressSpace(memrefType);
 }
 
 /// Collects all ops in the same block that `op` transitively depends on
@@ -39,7 +39,7 @@ static void collectDepsInRange(Operation *op, Operation *boundary,
     if (!defOp || defOp->getBlock() != op->getBlock()) {
       continue;
     }
-    if (!boundary->isBeforeInBlock(defOp) || !defOp->isBeforeInBlock(op)) {
+    if (!boundary->isBeforeInBlock(defOp)) {
       continue;
     }
     if (deps.insert(defOp)) {
@@ -51,9 +51,9 @@ static void collectDepsInRange(Operation *op, Operation *boundary,
 /// Returns true if `op` can be moved before `boundary` while preserving SSA
 /// dominance. `movedDeps` contains earlier dependencies that will also be
 /// moved before `boundary`.
-static bool canMoveBeforeBoundary(
-    Operation *op, Operation *boundary,
-    const llvm::SetVector<Operation *> &movedDeps) {
+static bool
+canMoveBeforeBoundary(Operation *op, Operation *boundary,
+                      const llvm::SetVector<Operation *> &movedDeps) {
   for (Value operand : op->getOperands()) {
     Operation *defOp = operand.getDefiningOp();
     if (!defOp || defOp->getBlock() != op->getBlock()) {
@@ -67,11 +67,11 @@ static bool canMoveBeforeBoundary(
   return true;
 }
 
-/// Returns true if `op` writes to buffer or global memory. Used to decide
-/// whether a non-dependent op left between the previous buffer load and the
+/// Returns true if `op` writes to global memory. Used to decide
+/// whether a non-dependent op left between the previous global load and the
 /// load being hoisted would invalidate the load by changing observable
 /// memory.
-static bool writesToBufferOrGlobalMemory(Operation *op) {
+static bool writesToGlobalMemory(Operation *op) {
   if (isPure(op)) {
     return false;
   }
@@ -103,57 +103,57 @@ static bool writesToBufferOrGlobalMemory(Operation *op) {
   return false;
 }
 
-/// Groups buffer loads within each block by hoisting each load (along with
+/// Groups global loads within each block by hoisting each load (along with
 /// its pure address-computation dependencies) to be adjacent to the
-/// preceding buffer load.
-static void groupBufferLoadsInBlock(Block &block) {
-  SmallVector<Operation *> bufferLoads;
+/// preceding global load.
+static void groupGlobalLoadsInBlock(Block &block) {
+  SmallVector<Operation *> globalLoads;
   for (Operation &op : block) {
-    if (isBufferLoad(&op)) {
-      bufferLoads.push_back(&op);
+    if (isGlobalLoad(&op)) {
+      globalLoads.push_back(&op);
     }
   }
 
-  Operation *prevBufferLoad = nullptr;
-  for (Operation *load : bufferLoads) {
-    if (!prevBufferLoad) {
-      prevBufferLoad = load;
+  Operation *prevGlobalLoad = nullptr;
+  for (Operation *load : globalLoads) {
+    if (!prevGlobalLoad) {
+      prevGlobalLoad = load;
       continue;
     }
 
-    if (!prevBufferLoad->isBeforeInBlock(load)) {
-      prevBufferLoad = load;
+    if (!prevGlobalLoad->isBeforeInBlock(load)) {
+      prevGlobalLoad = load;
       continue;
     }
 
-    // Collect the ops between `prevBufferLoad` and `load` that the load
+    // Collect the ops between `prevGlobalLoad` and `load` that the load
     // transitively depends on and would need to be hoisted alongside it.
     llvm::SetVector<Operation *> deps;
-    collectDepsInRange(load, prevBufferLoad, deps);
+    collectDepsInRange(load, prevGlobalLoad, deps);
 
     // The dependencies move with the load, but they must be pure so that
     // hoisting them above unrelated ops in the range is safe.
     if (!llvm::all_of(deps, [](Operation *op) { return isPure(op); })) {
-      prevBufferLoad = load;
+      prevGlobalLoad = load;
       continue;
     }
 
-    // Non-dependent ops in (prevBufferLoad, load) are left in place after the
-    // load is hoisted. If any of them writes to buffer or global memory the
+    // Non-dependent ops in (prevGlobalLoad, load) are left in place after the
+    // load is hoisted. If any of them writes to global memory the
     // hoisted load could observe stale memory, so the move is unsafe.
     bool unsafe = false;
-    for (Operation *cur = prevBufferLoad->getNextNode(); cur && cur != load;
+    for (Operation *cur = prevGlobalLoad->getNextNode(); cur && cur != load;
          cur = cur->getNextNode()) {
       if (deps.contains(cur)) {
         continue;
       }
-      if (writesToBufferOrGlobalMemory(cur)) {
+      if (writesToGlobalMemory(cur)) {
         unsafe = true;
         break;
       }
     }
     if (unsafe) {
-      prevBufferLoad = load;
+      prevGlobalLoad = load;
       continue;
     }
 
@@ -166,12 +166,12 @@ static void groupBufferLoadsInBlock(Block &block) {
     });
 
     // If an address-computation dependency does not depend on the previous
-    // buffer load, move it before that load. That lets the buffer loads become
+    // global load, move it before that load. That lets the global loads become
     // adjacent while preserving the dependency order.
     llvm::SetVector<Operation *> depsBeforePrevLoad;
     SmallVector<Operation *> depsAfterPrevLoad;
     for (Operation *dep : sortedDeps) {
-      if (canMoveBeforeBoundary(dep, prevBufferLoad, depsBeforePrevLoad)) {
+      if (canMoveBeforeBoundary(dep, prevGlobalLoad, depsBeforePrevLoad)) {
         depsBeforePrevLoad.insert(dep);
         continue;
       }
@@ -179,25 +179,25 @@ static void groupBufferLoadsInBlock(Block &block) {
     }
 
     for (Operation *dep : depsBeforePrevLoad) {
-      dep->moveBefore(prevBufferLoad);
+      dep->moveBefore(prevGlobalLoad);
     }
 
-    Operation *insertAfter = prevBufferLoad;
+    Operation *insertAfter = prevGlobalLoad;
     for (Operation *dep : depsAfterPrevLoad) {
       dep->moveAfter(insertAfter);
       insertAfter = dep;
     }
     load->moveAfter(insertAfter);
 
-    prevBufferLoad = load;
+    prevGlobalLoad = load;
   }
 }
 
-struct ROCDLGroupBufferLoadsPass final
-    : impl::ROCDLGroupBufferLoadsPassBase<ROCDLGroupBufferLoadsPass> {
+struct LLVMGPUGroupGlobalLoadsPass final
+    : impl::LLVMGPUGroupGlobalLoadsPassBase<LLVMGPUGroupGlobalLoadsPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    funcOp.walk([](Block *block) { groupBufferLoadsInBlock(*block); });
+    funcOp.walk([](Block *block) { groupGlobalLoadsInBlock(*block); });
   }
 };
 

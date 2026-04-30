@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-rocdl-group-buffer-loads))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-group-global-loads))' %s | FileCheck %s
 
-// Two buffer loads separated by a pure (arith.addf) op that doesn't depend on
+// Two global loads separated by a pure (arith.addf) op that doesn't depend on
 // either load. The pass hoists the second load to sit immediately after the
 // first load.
 // CHECK-LABEL: func.func @group_two_loads
@@ -23,7 +23,7 @@ func.func @group_two_loads(%a: memref<256xf32, #amdgpu.address_space<fat_raw_buf
 
 // The second load's index is computed in the gap, but it only depends on
 // values available before the first load. The pass hoists that address
-// computation before the first load so the buffer loads can be adjacent.
+// computation before the first load so the global loads can be adjacent.
 // CHECK-LABEL: func.func @hoists_independent_index_before_load_group
 // CHECK:         %[[OFF1:.+]] = arith.addi
 // CHECK-NEXT:    %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
@@ -40,8 +40,8 @@ func.func @hoists_independent_index_before_load_group(%a: memref<256xf32, #amdgp
 
 // -----
 
-// The second load reads from the same buffer that an intervening vector.store
-// writes to (fat_raw_buffer write). Hoisting the load above the store would
+// The second load reads from the same fat raw buffer that an intervening
+// vector.store writes to. Hoisting the load above the store would
 // change observable memory, so the pass must leave the loads in place.
 // CHECK-LABEL: func.func @blocked_by_buffer_write
 // CHECK:         vector.load
@@ -59,8 +59,8 @@ func.func @blocked_by_buffer_write(%a: memref<256xf32, #amdgpu.address_space<fat
 
 // -----
 
-// Plain (non-fat) global memref store between two buffer loads — also a
-// global-memory write so hoisting must be blocked.
+// Plain global memref store between two global loads is a global-memory write,
+// so hoisting must be blocked.
 // CHECK-LABEL: func.func @blocked_by_global_write
 // CHECK:         vector.load
 // CHECK-NEXT:    vector.store
@@ -78,8 +78,8 @@ func.func @blocked_by_global_write(%a: memref<256xf32, #amdgpu.address_space<fat
 
 // -----
 
-// A write to workgroup (shared) memory between the loads is not on the buffer
-// or global address space, so hoisting is allowed.
+// A write to workgroup (shared) memory between the loads is not on the global
+// address space, so hoisting is allowed.
 // CHECK-LABEL: func.func @allowed_through_shared_write
 // CHECK:         %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
 // CHECK-NEXT:    %[[L1:.+]] = vector.load %{{.+}}[%{{.+}}]
@@ -124,26 +124,27 @@ func.func @hoists_index_dependencies(%a: memref<256xf32, #amdgpu.address_space<f
 
 // -----
 
-// vector.load from a non-buffer memref is not a buffer load, so the pass
-// ignores it and the surrounding ops keep their order.
-// CHECK-LABEL: func.func @ignores_non_buffer_load
-// CHECK:         vector.load
+// vector.load from a plain memref is also a global load, so the pass groups
+// these loads just like fat raw buffer loads.
+// CHECK-LABEL: func.func @groups_plain_global_loads
+// CHECK:         %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
+// CHECK-NEXT:    %[[L1:.+]] = vector.load %{{.+}}[%{{.+}}]
 // CHECK-NEXT:    arith.addf
-// CHECK-NEXT:    vector.load
-func.func @ignores_non_buffer_load(%a: memref<256xf32>,
-                                   %b: memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>,
-                                   %x: f32, %y: f32) -> (vector<4xf32>, vector<4xf32>) {
+// CHECK-NEXT:    return %[[L0]], %[[L1]]
+func.func @groups_plain_global_loads(%a: memref<256xf32>,
+                                     %b: memref<256xf32>,
+                                     %x: f32, %y: f32) -> (vector<4xf32>, vector<4xf32>) {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   %v0 = vector.load %a[%c0] : memref<256xf32>, vector<4xf32>
   %sum = arith.addf %x, %y : f32
-  %v1 = vector.load %b[%c4] : memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
+  %v1 = vector.load %b[%c4] : memref<256xf32>, vector<4xf32>
   return %v0, %v1 : vector<4xf32>, vector<4xf32>
 }
 
 // -----
 
-// Two adjacent buffer loads (no ops between them) — the pass should be a
+// Two adjacent global loads (no ops between them) — the pass should be a
 // no-op and not perturb the IR.
 // CHECK-LABEL: func.func @already_adjacent
 // CHECK:         %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
@@ -161,7 +162,7 @@ func.func @already_adjacent(%a: memref<256xf32, #amdgpu.address_space<fat_raw_bu
 
 // -----
 
-// Three buffer loads with pure ops scattered between them. All three should
+// Three global loads with pure ops scattered between them. All three should
 // end up grouped at the position of the first load.
 // CHECK-LABEL: func.func @group_three_loads
 // CHECK:         %[[L0:.+]] = vector.load %{{.+}}[%{{.+}}]
