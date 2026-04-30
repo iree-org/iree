@@ -196,6 +196,7 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRBytecodeWriter
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFuncTransforms
