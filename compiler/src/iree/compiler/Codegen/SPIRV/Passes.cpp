@@ -227,6 +227,16 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
   modulePassManager.addPass(createFlattenMemRefSubspanPass());
 
   FunctionLikeNest(modulePassManager)
+      // FlattenMemRefSubspan rewrites subspan-with-offset as
+      // `subspan(offset=0) + memref.subview(at=%offset)`. SPIR-V can't lower
+      // memref.subview, so first expand it to memref.reinterpret_cast +
+      // index arithmetic, then fold the offset into consumer load indices.
+      .addPass([]() {
+        IREEExpandStridedMetadataPassOptions options;
+        options.allowSubviewExpansion = true;
+        return createIREEExpandStridedMetadataPass(options);
+      })
+      .addPass(memref::createElideReinterpretCastPass)
       .addPass(createSPIRVEraseStorageBufferStaticShapePass)
       .addPass(createCSEPass);
 }

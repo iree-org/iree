@@ -175,13 +175,17 @@ func.func @i4_dequant_matvec_f16_subgroup_64() attributes {
 
 //         CHECK: spirv.mlir.loop
 
-// Load the quantized weight and get 4xi4 out of it. Ensure that the offset
-// calculation avoids excessive scaling down in computing the element offset.
+// Load the quantized weight and get 4xi4 out of it. The offset (STREAMBINDING)
+// is added to the linearized index *before* the final SDiv-by-4 i4-pack
+// scaling, so no precision is lost. The intermediate `*2 / 2` round-trip on
+// STREAMBINDING is a byte<->i4-element unit conversion from upstream MLIR's
+// narrow-type emulation (it's exact for byte-aligned offsets).
 //         CHECK:   spirv.IMul %{{.*}}, %[[C64]] {no_signed_wrap} : i32
-//         CHECK:   spirv.IAdd %{{.*}}, %[[STREAMBINDING]] : i32
 //         CHECK:   spirv.IMul %{{.*}}, %[[C5504]] {no_signed_wrap} : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %{{.*}} : i32
-//         CHECK:   spirv.IMul %[[WIDX]], %[[C2]] {no_signed_wrap} : i32
+//         CHECK:   spirv.IMul %{{.*}}, %[[C2]] {no_signed_wrap} : i32
+//         CHECK:   spirv.IAdd %{{.*}}, %{{.*}} : i32
+//         CHECK:   spirv.SDiv %{{.*}}, %[[C2]] : i32
 //         CHECK:   spirv.IAdd %{{.*}}, %{{.*}} : i32
 //         CHECK:   %[[OFFSET:.+]] = spirv.SDiv %{{.*}}, %[[C4]] : i32
 //         CHECK:   %[[ACCESS:.+]] = spirv.AccessChain %[[RADDR]][{{.*}}, %[[OFFSET]]] : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>, i32, i32
