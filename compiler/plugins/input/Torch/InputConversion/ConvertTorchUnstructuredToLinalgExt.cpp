@@ -183,6 +183,111 @@ static Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
       rewriter, loc, tensorType.toBuiltinTensor(), torchTensor);
 }
 
+static FailureOr<Value> repeatTensorElementsForDim(PatternRewriter &rewriter,
+                                                   Operation *op, Type resType,
+                                                   Value self, int64_t repeats,
+                                                   int64_t dim) {
+  Location loc = op->getLoc();
+  MLIRContext *context = op->getContext();
+  auto selfType = cast<torch::Torch::ValueTensorType>(self.getType());
+
+  int64_t inputRank = selfType.getSizes().size();
+  dim += dim < 0 ? inputRank : 0;
+
+  Value dimValue = torch::Torch::ConstantIntOp::create(
+      rewriter, loc, rewriter.getI64IntegerAttr(dim));
+  Value dimValuePlusOne = torch::Torch::ConstantIntOp::create(
+      rewriter, loc, rewriter.getI64IntegerAttr(dim + 1));
+
+  SmallVector<int64_t> unsqueezedShape(selfType.getSizes());
+  unsqueezedShape.insert(unsqueezedShape.begin() + dim + 1, 1);
+  Type unsqueezedType = selfType.getWithSizesAndDtype(
+      ArrayRef<int64_t>(unsqueezedShape), selfType.getOptionalDtype());
+  self = torch::Torch::AtenUnsqueezeOp::create(rewriter, loc, unsqueezedType,
+                                               self, dimValuePlusOne);
+
+  Value constMinusOne = torch::Torch::ConstantIntOp::create(
+      rewriter, loc, rewriter.getI64IntegerAttr(-1));
+  SmallVector<Value> expandShapeValueList(inputRank + 1, constMinusOne);
+  expandShapeValueList[dim + 1] = torch::Torch::ConstantIntOp::create(
+      rewriter, loc, rewriter.getI64IntegerAttr(repeats));
+  Value expandShapeList = torch::Torch::PrimListConstructOp::create(
+      rewriter, loc,
+      torch::Torch::ListType::get(torch::Torch::IntType::get(context)),
+      expandShapeValueList);
+
+  SmallVector<int64_t> expandShape(inputRank + 1);
+  for (int64_t i = 0; i <= dim; ++i) {
+    expandShape[i] = selfType.getSizes()[i];
+  }
+  expandShape[dim + 1] = repeats;
+  for (int64_t i = dim + 1; i < inputRank; ++i) {
+    expandShape[i + 1] = selfType.getSizes()[i];
+  }
+
+  Type expandType = selfType.getWithSizesAndDtype(
+      ArrayRef<int64_t>(expandShape), selfType.getOptionalDtype());
+  Value expanded = torch::Torch::AtenBroadcastToOp::create(
+      rewriter, loc, expandType, self, expandShapeList);
+
+  return torch::Torch::PrimsCollapseOp::create(rewriter, loc, resType, expanded,
+                                               dimValue, dimValuePlusOne)
+      .getResult();
+}
+
+static LogicalResult
+preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
+                                    PatternRewriter &rewriter, Value query,
+                                    Value &key, Value &value) {
+  auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
+  auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
+  auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
+
+  int64_t rank = queryType.getSizes().size();
+  int64_t qNumHeads = queryType.getSizes()[rank - 3];
+  int64_t kNumHeads = keyType.getSizes()[rank - 3];
+  int64_t vNumHeads = valueType.getSizes()[rank - 3];
+
+  if (llvm::any_of(ArrayRef<int64_t>{qNumHeads, kNumHeads, vNumHeads},
+                   [](int64_t d) { return d == torch::Torch::kUnknownSize; })) {
+    return rewriter.notifyMatchFailure(
+        op, "expected statically known attention head counts");
+  }
+
+  if (qNumHeads == kNumHeads && qNumHeads == vNumHeads) {
+    return success();
+  }
+
+  if (qNumHeads % kNumHeads != 0 || qNumHeads % vNumHeads != 0) {
+    return rewriter.notifyMatchFailure(
+        op, "expected query heads to be a multiple of key and value heads");
+  }
+
+  SmallVector<int64_t> keyResultShape(keyType.getSizes());
+  keyResultShape[rank - 3] = qNumHeads;
+  Type keyResultType = keyType.getWithSizesAndDtype(
+      ArrayRef<int64_t>(keyResultShape), keyType.getOptionalDtype());
+  FailureOr<Value> repeatedKey = repeatTensorElementsForDim(
+      rewriter, op, keyResultType, key, qNumHeads / kNumHeads, rank - 3);
+  if (failed(repeatedKey)) {
+    return failure();
+  }
+
+  SmallVector<int64_t> valueResultShape(valueType.getSizes());
+  valueResultShape[rank - 3] = qNumHeads;
+  Type valueResultType = valueType.getWithSizesAndDtype(
+      ArrayRef<int64_t>(valueResultShape), valueType.getOptionalDtype());
+  FailureOr<Value> repeatedValue = repeatTensorElementsForDim(
+      rewriter, op, valueResultType, value, qNumHeads / vNumHeads, rank - 3);
+  if (failed(repeatedValue)) {
+    return failure();
+  }
+
+  key = *repeatedKey;
+  value = *repeatedValue;
+  return success();
+}
+
 /// Inline a single-block torch function's body at the current insertion point.
 /// Falls back to func.call for multi-block or external functions.
 static SmallVector<Value> inlineTorchFunction(PatternRewriter &rewriter,
@@ -334,7 +439,12 @@ struct FlexAttentionOpConversion
           op, "expected return_max_scores to be a constant bool");
     }
 
-    // Extract shapes from Q, K, V.
+    if (failed(preProcessGroupQueryAttentionInputs(op, rewriter, query, key,
+                                                   value))) {
+      return failure();
+    }
+
+    // Extract shapes from preprocessed Q, K, V.
     auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
     auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
 
