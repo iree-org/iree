@@ -52,6 +52,7 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/AffineMap.h"
@@ -469,11 +470,76 @@ chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   return best;
 }
 
+/// Power-of-two cap on one unroll dim. For a static matmul extent
+/// `matmulSize` divided by `intrinsicSize`, we floor the cover count to a
+/// power of two. For dynamic dims we fall back to `fallback`, which callers
+/// set to something at least as large as the register budget — that budget
+/// itself terminates the enumeration below, so no tighter static cap is
+/// needed.
+static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
+                            int64_t fallback) {
+  if (ShapedType::isDynamic(matmulSize)) {
+    return fallback;
+  }
+  uint64_t cover =
+      std::max<int64_t>(1, llvm::divideCeil(matmulSize, intrinsicSize));
+  return llvm::bit_floor(cover);
+}
+
+// Phase 2 of `chooseCpuInnerTiledMmaForEncoding`: for an already-chosen
+// (intrinsic, transposed) pair, pick the largest power-of-two unroll
+// factors (intrinsicsM, intrinsicsN) such that the three tiles
+// (ACC + LHS + RHS) still fit in the target's vector register file,
+// breaking ties with arithmetic intensity (effM*effN)/(effM+effN) so
+// approximately-square tiles win.
+//
+// Returns nullopt if no feasible (im, in) exists. The returned pair is
+// (intrinsicsM, intrinsicsN).
+static std::optional<std::pair<int64_t, int64_t>>
+chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
+                IREE::CPU::MMAIntrinsic intr, bool transposed,
+                const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
+  std::optional<IntrinsicInfo> info =
+      getIntrinsicInfo(ctx, elementTypes, intr, transposed);
+  if (!info) {
+    return std::nullopt;
+  }
+  int64_t regBitBudget = IREE::CPU::getRegisterSpaceBytes(intr) * 8;
+  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, regBitBudget);
+  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, regBitBudget);
+  int64_t accTerm = info->intrinsicM * info->intrinsicN * info->accBits;
+  int64_t lhsTerm = info->intrinsicM * info->intrinsicK * info->lhsBits;
+  int64_t rhsTerm = info->intrinsicN * info->intrinsicK * info->rhsBits;
+  std::optional<std::pair<int64_t, int64_t>> best;
+  double bestIntensity = -1.0;
+  // Enumerate power-of-two intrinsicsM; for each, pick the largest feasible
+  // power-of-two intrinsicsN under the bit budget and the static N cap.
+  // The budget bounds im on its own (im*lhsTerm alone must be < budget),
+  // which terminates the loop without any numRegs-style cap.
+  for (int64_t im = 1; im <= capMPo2; im *= 2) {
+    int64_t remaining = regBitBudget - im * lhsTerm;
+    if (remaining <= 0) {
+      break;
+    }
+    int64_t inMaxBudget = remaining / (im * accTerm + rhsTerm);
+    uint64_t inCap = std::min<int64_t>(capNPo2, inMaxBudget);
+    if (inCap < 1) {
+      continue;
+    }
+    int64_t in = llvm::bit_floor(inCap);
+    double effM = static_cast<double>(im) * info->intrinsicM;
+    double effN = static_cast<double>(in) * info->intrinsicN;
+    double intensity = effM * effN / (effM + effN);
+    if (intensity > bestIntensity) {
+      bestIntensity = intensity;
+      best = {im, in};
+    }
+  }
+  return best;
+}
+
 // Picks a CPU `DataTiledMMAAttr` for `iree_codegen.inner_tiled` given an
-// encoding and target config. Picks the best (intrinsic, transposed)
-// orientation via `chooseIntrinsic`, but leaves unroll factors at 1: an
-// actual cost model for intrinsics_m/intrinsics_n is added in a follow-up
-// commit.
+// encoding and target config.
 static IREE::CPU::DataTiledMMAAttr
 chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
                                   IREE::Encoding::EncodingAttr encoding,
@@ -493,8 +559,13 @@ chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
     return {};
   }
   auto [intr, transposed] = *intrChoice;
-  return IREE::CPU::DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
-                                          /*intrinsics_n=*/1,
+  std::optional<std::pair<int64_t, int64_t>> unroll =
+      chooseUnrolling(ctx, elementTypes, intr, transposed, *matmulSizes);
+  if (!unroll) {
+    return {};
+  }
+  auto [intrinsicsM, intrinsicsN] = *unroll;
+  return IREE::CPU::DataTiledMMAAttr::get(ctx, intr, intrinsicsM, intrinsicsN,
                                           /*intrinsics_k=*/1, transposed);
 }
 

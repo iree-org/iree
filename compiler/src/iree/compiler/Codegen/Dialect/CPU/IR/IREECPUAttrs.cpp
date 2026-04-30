@@ -352,6 +352,28 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   }
 }
 
+int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
+  // Total architectural vector register file size, in bytes. The inner-tiled
+  // cost model uses this as the capacity for the union of the ACC, LHS and
+  // RHS tiles. For scalable ISAs we treat the vector length as its minimum
+  // (1 × 128 bits = 16 bytes per register); this is a deliberate
+  // simplification — the resulting `intrinsics_m`/`intrinsics_n` choices are
+  // good enough in practice and avoid propagating scalability into the cost
+  // model.
+  uint32_t arch = static_cast<uint32_t>(intrinsic) & 0xFF00;
+  switch (arch) {
+  case 0x1200: // AVX/AVX2: 16 YMM × 32 B.
+    return 16 * 32;
+  case 0x1300: // AVX-512: 32 ZMM × 64 B.
+    return 32 * 64;
+  case 0x2200: // Arm SVE/SVE2: 32 Z × (VL treated as 128 bits).
+    return 32 * 16;
+  default:
+    // Plausible default, but override it on each arch you care for.
+    return 16 * 32;
+  }
+}
+
 /// Helper for `getIntrinsicSwizzle`:
 /// Ensures every `expandShape` row has at least one piece (unit
 /// dims that received no explicit `expand` get a non-scalable size-1 Internal
