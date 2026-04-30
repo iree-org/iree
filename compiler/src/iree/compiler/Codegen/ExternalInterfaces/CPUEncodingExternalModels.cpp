@@ -1077,8 +1077,15 @@ struct CPUEncodingPackedLayoutMaterializerAttr
 
     DictionaryAttr config = layoutAttr.getConfiguration();
     if (getEnableInnerTiledFromConfig(config)) {
-      return getInnerTiledEncodingInfo(type.getContext(), encoding, *cDims,
-                                       config);
+      MaterializeEncodingInfo innerTiledInfo = getInnerTiledEncodingInfo(
+          type.getContext(), encoding, *cDims, config);
+      // If the inner_tiled path did not find a compatible MMA intrinsic for
+      // this target/encoding, fall back to the legacy mmt4d path so that
+      // `--iree-llvmcpu-enable-inner-tiled` degrades gracefully on
+      // configurations the per-intrinsic emitter does not (yet) cover.
+      if (!innerTiledInfo.innerTileSizes.empty()) {
+        return innerTiledInfo;
+      }
     }
     return getMmt4dEncodingInfo(encoding, *cDims, config);
   }
@@ -1175,9 +1182,14 @@ struct CPUEncodingResolverMaterializerAttr final
     if (linalg::isaContractionOpInterface(linalgOp)) {
       DictionaryAttr config = layoutAttr.getConfiguration();
       if (getEnableInnerTiledFromConfig(config)) {
-        return lowerContractionToInnerTiled(
-            b, linalgOp, convertedOperands,
-            cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+        if (Operation *innerTiled = lowerContractionToInnerTiled(
+                b, linalgOp, convertedOperands,
+                cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr))) {
+          return innerTiled;
+        }
+        // Fall through to the mmt4d path when inner_tiled does not apply
+        // (e.g., no compatible MMA intrinsic for the target). The encoding
+        // info side falls back the same way, keeping the two consistent.
       }
       return lowerContractionOpWithEncoding(
           b, linalgOp, convertedOperands,
