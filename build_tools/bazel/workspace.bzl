@@ -8,6 +8,7 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
+IREE_INPUT_TORCH_ENV_KEY = "IREE_INPUT_TORCH"
 CUDA_TOOLKIT_ROOT_ENV_KEY = "IREE_CUDA_TOOLKIT_ROOT"
 
 # Our CI docker images use a stripped down CUDA directory tree in some
@@ -66,6 +67,78 @@ cuda_auto_configure = repository_rule(
         "iree_repo_alias": attr.string(default = "@iree_core"),
     },
 )
+
+def torch_mlir_auto_configure_impl(repository_ctx):
+    """Conditionally configures torch-mlir based on IREE_INPUT_TORCH env var."""
+    env = repository_ctx.os.environ
+    iree_repo_alias = repository_ctx.attr.iree_repo_alias
+    enabled = env.get(IREE_INPUT_TORCH_ENV_KEY, "OFF").upper() in ["ON", "TRUE", "1", "YES"]
+
+    if enabled:
+        # Run torch-mlir's configure to create the overlay.
+        # We need to find the torch-mlir source and run its overlay script.
+        torch_mlir_path = repository_ctx.path(
+            Label("%s//:third_party/torch-mlir/CMakeLists.txt" % iree_repo_alias),
+        ).dirname
+        bazel_path = torch_mlir_path.get_child("utils").get_child("bazel")
+        overlay_path = bazel_path.get_child("torch-mlir-overlay")
+        script_path = bazel_path.get_child("overlay_directories.py")
+
+        python_bin = repository_ctx.which("python3")
+        if not python_bin:
+            python_bin = repository_ctx.which("python")
+        if not python_bin:
+            fail("Failed to find python3 binary for torch-mlir configuration")
+
+        cmd = [
+            python_bin,
+            script_path,
+            "--src",
+            torch_mlir_path,
+            "--overlay",
+            overlay_path,
+            "--target",
+            ".",
+        ]
+        exec_result = repository_ctx.execute(cmd, timeout = 60)
+
+        if exec_result.return_code != 0:
+            fail(("Failed to configure torch-mlir: '{cmd}'\n" +
+                  "Exited with code {return_code}\n" +
+                  "stdout:\n{stdout}\n" +
+                  "stderr:\n{stderr}\n").format(
+                cmd = " ".join([str(arg) for arg in cmd]),
+                return_code = exec_result.return_code,
+                stdout = exec_result.stdout,
+                stderr = exec_result.stderr,
+            ))
+    else:
+        # Create stub repository when torch-mlir is disabled.
+        repository_ctx.file(
+            "BUILD.bazel",
+            content = """# Stub: torch-mlir disabled (IREE_INPUT_TORCH != ON)
+package(default_visibility = ["//visibility:public"])
+
+# Provide empty targets that dependent code can reference.
+# These will fail at build time if actually used.
+""",
+        )
+
+torch_mlir_auto_configure = repository_rule(
+    environ = [IREE_INPUT_TORCH_ENV_KEY],
+    implementation = torch_mlir_auto_configure_impl,
+    local = True,
+    attrs = {
+        "iree_repo_alias": attr.string(default = "@iree_core"),
+    },
+)
+
+def configure_iree_torch_mlir_deps(iree_repo_alias = None):
+    maybe(
+        torch_mlir_auto_configure,
+        name = "torch-mlir",
+        iree_repo_alias = iree_repo_alias,
+    )
 
 def configure_iree_cuda_deps(iree_repo_alias = None):
     maybe(

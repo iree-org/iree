@@ -686,11 +686,26 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
 
 IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
                                                iree_status_t new_status) {
-  // TODO(benvanik): annotate |base_status| with |new_status| so we see it?
-  // This is intended for failure handling and usually the first failure is the
-  // root cause and most important to see.
   if (!iree_status_is_ok(base_status)) {
-    iree_status_ignore(new_status);
+    if (!iree_status_is_ok(new_status)) {
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+      iree_allocator_t allocator = iree_allocator_system();
+      char* message = NULL;
+      iree_host_size_t message_length = 0;
+      if (iree_status_to_string(new_status, &allocator, &message,
+                                &message_length)) {
+        base_status =
+            iree_status_annotate_f(base_status, "additional failure: %.*s",
+                                   (int)message_length, message);
+        iree_allocator_free(allocator, message);
+      } else {
+        base_status = iree_status_annotate_f(
+            base_status, "additional failure: %s",
+            iree_status_code_string(iree_status_code(new_status)));
+      }
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+      iree_status_free(new_status);
+    }
     return base_status;
   }
   return new_status;

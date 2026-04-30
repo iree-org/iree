@@ -92,11 +92,15 @@ iree_async_frontier_comparison_t iree_async_frontier_compare(
   return IREE_ASYNC_FRONTIER_EQUAL;
 }
 
-bool iree_async_frontier_merge(iree_async_frontier_t* target,
-                               uint8_t target_capacity,
-                               const iree_async_frontier_t* source) {
+static bool iree_async_frontier_merge_impl(iree_async_frontier_t* target,
+                                           uint8_t target_capacity,
+                                           const iree_async_frontier_t* source,
+                                           bool* out_source_dominates_target) {
   // Path 1: source empty — nothing to merge.
   if (source->entry_count == 0) {
+    if (out_source_dominates_target != NULL) {
+      *out_source_dominates_target = target->entry_count == 0;
+    }
     return true;
   }
 
@@ -111,10 +115,16 @@ bool iree_async_frontier_merge(iree_async_frontier_t* target,
       }
     }
     if (axes_match) {
+      bool source_dominates_target = true;
       for (uint8_t k = 0; k < target->entry_count; ++k) {
         if (source->entries[k].epoch > target->entries[k].epoch) {
           target->entries[k].epoch = source->entries[k].epoch;
+        } else if (source->entries[k].epoch < target->entries[k].epoch) {
+          source_dominates_target = false;
         }
+      }
+      if (out_source_dominates_target != NULL) {
+        *out_source_dominates_target = source_dominates_target;
       }
       return true;
     }
@@ -125,23 +135,34 @@ bool iree_async_frontier_merge(iree_async_frontier_t* target,
   // First pass: count merged size without mutation (fail-fast on overflow).
   // Use uint16_t because the sum of two uint8_t entry counts can reach 510.
   uint16_t merged_count = 0;
+  bool source_dominates_target = true;
   {
     uint8_t ti = 0, si = 0;
     while (ti < target->entry_count && si < source->entry_count) {
       if (target->entries[ti].axis == source->entries[si].axis) {
+        if (target->entries[ti].epoch > source->entries[si].epoch) {
+          source_dominates_target = false;
+        }
         ++ti;
         ++si;
       } else if (target->entries[ti].axis < source->entries[si].axis) {
+        source_dominates_target = false;
         ++ti;
       } else {
         ++si;
       }
       ++merged_count;
     }
+    if (ti < target->entry_count) {
+      source_dominates_target = false;
+    }
     merged_count += (target->entry_count - ti) + (source->entry_count - si);
   }
 
   if (merged_count > target_capacity) {
+    if (out_source_dominates_target != NULL) {
+      *out_source_dominates_target = false;
+    }
     return false;
   }
 
@@ -182,7 +203,91 @@ bool iree_async_frontier_merge(iree_async_frontier_t* target,
   // which equals 0..wi at this point — no movement needed.
 
   target->entry_count = (uint8_t)merged_count;
+  if (out_source_dominates_target != NULL) {
+    *out_source_dominates_target = source_dominates_target;
+  }
   return true;
+}
+
+bool iree_async_frontier_merge(iree_async_frontier_t* target,
+                               uint8_t target_capacity,
+                               const iree_async_frontier_t* source) {
+  return iree_async_frontier_merge_impl(target, target_capacity, source,
+                                        /*out_source_dominates_target=*/NULL);
+}
+
+bool iree_async_frontier_merge_and_test_source_dominance(
+    iree_async_frontier_t* target, uint8_t target_capacity,
+    const iree_async_frontier_t* source, bool* out_source_dominates_target) {
+  IREE_ASSERT_ARGUMENT(out_source_dominates_target);
+  return iree_async_frontier_merge_impl(target, target_capacity, source,
+                                        out_source_dominates_target);
+}
+
+uint8_t iree_async_frontier_find_undominated(
+    const iree_async_frontier_t* reference, const iree_async_frontier_t* target,
+    uint8_t capacity, iree_async_frontier_entry_t* out_entries) {
+  uint8_t count = 0;
+
+  // Fast path: identical axis sets (common in steady-state).
+  // When both frontiers track the same set of timelines, skip the merge-scan
+  // branching and do a straight epoch comparison loop.
+  if (reference->entry_count == target->entry_count) {
+    bool axes_match = true;
+    for (uint8_t k = 0; k < reference->entry_count; ++k) {
+      if (reference->entries[k].axis != target->entries[k].axis) {
+        axes_match = false;
+        break;
+      }
+    }
+    if (axes_match) {
+      for (uint8_t k = 0; k < target->entry_count; ++k) {
+        if (target->entries[k].epoch > reference->entries[k].epoch) {
+          if (count < capacity) {
+            out_entries[count] = target->entries[k];
+          }
+          ++count;
+        }
+      }
+      return count;
+    }
+  }
+
+  // Slow path: merge-scan of two sorted arrays.
+  uint8_t i = 0, j = 0;
+  while (i < reference->entry_count && j < target->entry_count) {
+    if (reference->entries[i].axis == target->entries[j].axis) {
+      // Same axis: undominated if target has a later epoch.
+      if (target->entries[j].epoch > reference->entries[i].epoch) {
+        if (count < capacity) {
+          out_entries[count] = target->entries[j];
+        }
+        ++count;
+      }
+      ++i;
+      ++j;
+    } else if (reference->entries[i].axis < target->entries[j].axis) {
+      // Reference has an axis that target doesn't — irrelevant.
+      ++i;
+    } else {
+      // Target has an axis that reference doesn't — always undominated.
+      if (count < capacity) {
+        out_entries[count] = target->entries[j];
+      }
+      ++count;
+      ++j;
+    }
+  }
+  // Remaining target entries have no reference counterpart — all undominated.
+  while (j < target->entry_count) {
+    if (count < capacity) {
+      out_entries[count] = target->entries[j];
+    }
+    ++count;
+    ++j;
+  }
+
+  return count;
 }
 
 bool iree_async_frontier_is_satisfied(

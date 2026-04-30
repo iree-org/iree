@@ -17,58 +17,8 @@
 extern "C" {
 #endif  // __cplusplus
 
-//===----------------------------------------------------------------------===//
-// Scheduling word (lo) layout constants
-//===----------------------------------------------------------------------===//
-
-#define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_SHIFT 0
-#define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK 0x3ull
-
-#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_SHIFT 2
-#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK 0x3ull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_SHIFT 4
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK 0x3ull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT 6
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK 0x3ull
-
-#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT 8
-#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK 0xFFFFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT 24
-#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT 28
-#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT 32
-#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT 36
-#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT 40
-#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT 44
-#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK 0x7ull
-
-//===----------------------------------------------------------------------===//
-// Interop word (hi) layout constants
-//===----------------------------------------------------------------------===//
-
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT 0
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK 0xFFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT 8
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK 0xFFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT 16
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK 0xFFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT 24
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK 0xFFull
+// Layout constants are defined in topology.h alongside the type definitions.
+// This header provides setters for constructing scheduling and interop words.
 
 //===----------------------------------------------------------------------===//
 // Scheduling word (lo) setters
@@ -98,27 +48,59 @@ iree_hal_topology_edge_set_signal_mode(
   return word;
 }
 
-// Sets the buffer read interop mode in a scheduling word.
+// Sets the non-coherent buffer read interop mode in a scheduling word.
+// See iree_hal_topology_edge_buffer_read_mode_noncoherent for semantics.
 static inline iree_hal_topology_edge_scheduling_word_t
-iree_hal_topology_edge_set_buffer_read_mode(
+iree_hal_topology_edge_set_buffer_read_mode_noncoherent(
     iree_hal_topology_edge_scheduling_word_t word,
     iree_hal_topology_interop_mode_t mode) {
-  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK
-            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_SHIFT);
-  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK)
-          << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_SHIFT;
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_MASK
+            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_SHIFT);
+  word |= ((uint64_t)mode &
+           IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_MASK)
+          << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_NONCOHERENT_SHIFT;
   return word;
 }
 
-// Sets the buffer write interop mode in a scheduling word.
+// Sets the non-coherent buffer write interop mode in a scheduling word.
+// See iree_hal_topology_edge_buffer_write_mode_noncoherent for semantics.
 static inline iree_hal_topology_edge_scheduling_word_t
-iree_hal_topology_edge_set_buffer_write_mode(
+iree_hal_topology_edge_set_buffer_write_mode_noncoherent(
     iree_hal_topology_edge_scheduling_word_t word,
     iree_hal_topology_interop_mode_t mode) {
-  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK
-            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT);
-  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK)
-          << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT;
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_MASK
+            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_SHIFT);
+  word |= ((uint64_t)mode &
+           IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_MASK)
+          << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_NONCOHERENT_SHIFT;
+  return word;
+}
+
+// Sets the coherent buffer read interop mode in a scheduling word.
+// See iree_hal_topology_edge_buffer_read_mode_coherent for semantics.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_buffer_read_mode_coherent(
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_MASK
+            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_SHIFT);
+  word |=
+      ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_MASK)
+      << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_COHERENT_SHIFT;
+  return word;
+}
+
+// Sets the coherent buffer write interop mode in a scheduling word.
+// See iree_hal_topology_edge_buffer_write_mode_coherent for semantics.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_buffer_write_mode_coherent(
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_MASK
+            << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_SHIFT);
+  word |=
+      ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_MASK)
+      << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_COHERENT_SHIFT;
   return word;
 }
 

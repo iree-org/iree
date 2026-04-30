@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
@@ -55,9 +56,14 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, &create_params, iree_allocator_system(), &device_));
     iree_async_proactor_pool_release(proactor_pool);
+    iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+    IREE_ASSERT_OK(iree_async_frontier_tracker_create(
+        iree_async_frontier_tracker_options_default(), iree_allocator_system(),
+        &frontier_tracker));
     iree_hal_device_group_t* device_group = NULL;
     IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
-        device_, iree_allocator_system(), &device_group));
+        device_, frontier_tracker, iree_allocator_system(), &device_group));
+    iree_async_frontier_tracker_release(frontier_tracker);
     IREE_ASSERT_OK(iree_hal_module_create(
         instance_, iree_hal_module_device_policy_default(), device_group,
         IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink_stdio(stderr),

@@ -9,6 +9,19 @@ view of program performance at specific levels of granularity. To analyze system
 behavior in more depth, there are various ways to
 [profile](https://en.wikipedia.org/wiki/Profiling_(computer_programming)) IREE.
 
+## Device profiling and replay
+
+[Device profiling](./device-profiling.md) captures HAL-native `.ireeprof`
+bundles from the devices executing a workload. Use it to inspect queue
+operations, dispatch timings, memory events, executable metadata, device
+metrics, and backend-specific counters or traces.
+
+[Device replay](./device-replay.md) captures HAL work into `.ireereplay`
+reproducers that can be run, benchmarked, profiled, and inspected without
+re-running the original application. Replay is especially useful when you need
+to capture a workload once and repeatedly benchmark or profile the same device
+operation stream.
+
 ## CPU cache and other CPU event profiling
 
 For some advanced CPU profiling needs such as querying CPU cache and other

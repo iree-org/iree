@@ -450,10 +450,13 @@ IREE_FLAG(
     "HAL device profiling data families as a comma-separated list drawn from\n"
     "['queue-events', 'host-execution', 'device-queue-events',\n"
     "'dispatch-events', 'memory-events', 'device-metrics',\n"
-    "'command-region-events', 'counters', 'executable-metadata',\n"
+    "'command-region-events', 'counters', 'counter-ranges',\n"
+    "'executable-metadata',\n"
     "'executable-traces'] or empty to disable profiling. HAL implementations\n"
     "may require additional flags in order to configure profiling support on\n"
-    "their devices.");
+    "their devices. Tooling may force VM-created command buffers to retain\n"
+    "metadata for modes that need command/dispatch attribution; leave this\n"
+    "empty for production timing runs.");
 IREE_FLAG(
     string, device_profiling_output, "",
     "Path for a raw IREE HAL profiling bundle. Required when\n"
@@ -486,7 +489,13 @@ IREE_FLAG_LIST(
     "Optional implementation-specific hardware counter name to capture. May "
     "be\n"
     "specified multiple times; the selected HAL driver decides which counter\n"
-    "names and combinations are supported.");
+    "names and combinations are supported. Use "
+    "--device_profiling_mode=counters\n"
+    "for dispatch-scoped attribution, which may inject packets around "
+    "selected\n"
+    "dispatches and perturb queue timing. Use\n"
+    "--device_profiling_mode=counter-ranges for low-disturbance range "
+    "samples.");
 IREE_FLAG(
     int64_t, device_profiling_flush_interval_ms, 0,
     "Optional interval in milliseconds for a tooling-owned background thread\n"
@@ -658,6 +667,9 @@ static iree_status_t iree_hal_device_profiling_data_families_from_flags(
           IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS;
     } else if (iree_string_view_equal(family_part, IREE_SV("counters"))) {
       *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES;
+    } else if (iree_string_view_equal(family_part, IREE_SV("counter-ranges")) ||
+               iree_string_view_equal(family_part, IREE_SV("pmc-ranges"))) {
+      *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES;
     } else if (iree_string_view_equal(family_part,
                                       IREE_SV("executable-metadata"))) {
       *out_data_families |= IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
@@ -830,7 +842,8 @@ static iree_status_t iree_hal_profiling_from_flags_stop_periodic_flush(
   iree_atomic_store(&profiling->flush_stop_requested, 1,
                     iree_memory_order_release);
   iree_notification_post(&profiling->flush_notification, IREE_ALL_WAITERS);
-  iree_thread_join(profiling->flush_thread);
+  // Final release joins the thread. Calling iree_thread_join before release
+  // would double-join pthread-backed threads, which is undefined behavior.
   iree_thread_release(profiling->flush_thread);
   profiling->flush_thread = NULL;
 
@@ -889,7 +902,8 @@ static iree_status_t iree_hal_begin_device_list_profiling_from_flags(
     if (counter_names.count != 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "--device_profiling_counter requires "
-                              "--device_profiling_mode=counters");
+                              "--device_profiling_mode=counters or "
+                              "--device_profiling_mode=counter-ranges");
     }
     if (strlen(FLAG_device_profiling_output) != 0) {
       return iree_make_status(
@@ -917,10 +931,12 @@ static iree_status_t iree_hal_begin_device_list_profiling_from_flags(
   }
   if (counter_names.count != 0 &&
       !iree_any_bit_set(options.data_families,
-                        IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES)) {
+                        IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
+                            IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "--device_profiling_counter requires --device_profiling_mode=counters");
+        "--device_profiling_counter requires --device_profiling_mode=counters "
+        "or --device_profiling_mode=counter-ranges");
   }
   if (options.data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
       strlen(FLAG_device_profiling_output) == 0 && !statistics_requested) {

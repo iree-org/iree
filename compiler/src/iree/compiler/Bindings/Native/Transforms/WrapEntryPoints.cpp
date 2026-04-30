@@ -662,13 +662,15 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto consumeAttr =
           exportOp.getArgAttrOfType<UnitAttr>(argIndex, "iree.abi.consume");
+      auto outputAttr =
+          exportOp.getArgAttrOfType<IntegerAttr>(argIndex, "iree.abi.output");
       auto affinityAttr = exportOp.getArgAttr(argIndex, "iree.abi.affinity");
       auto argName = inferArgumentName(entryBuilder.getContext(), argIndex,
                                        exportOp.getArgAttrDict(argIndex));
       auto tensorImportOp = IREE::HAL::TensorImportOp::create(
           entryBuilder, arg.getLoc(), oldType, arg,
           fallback(encodingAttr, TypeAttr::get(oldType)),
-          /*consume=*/consumeAttr ? true : false, waitFence, argName,
+          /*consume=*/consumeAttr || outputAttr, waitFence, argName,
           fallback(affinityAttr, defaultAffinityAttr));
       arguments.push_back(tensorImportOp.getTarget());
     } else {

@@ -961,10 +961,11 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                    bool skipUntunedFallback) {
   FailureOr<XorShuffleParams> xorShuffleAttr =
       getXorShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
-  if (failed(xorShuffleAttr)) {
+  if (failed(xorShuffleAttr) && !skipUntunedFallback) {
     xorShuffleAttr = getXorShuffleParamsForUntunedChipset(
         target, intrinsic, reductionTileSizes, operandIndex);
   }
@@ -976,9 +977,10 @@ FailureOr<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
-  FailureOr<XorShuffleParams> xorShuffleParams =
-      getXorShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                  bool skipUntunedFallback) {
+  FailureOr<XorShuffleParams> xorShuffleParams = getXorShuffleParams(
+      target, intrinsic, reductionTileSizes, operandIndex, skipUntunedFallback);
   if (failed(xorShuffleParams)) {
     return failure();
   }

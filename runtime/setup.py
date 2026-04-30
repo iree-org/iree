@@ -654,13 +654,16 @@ setup(
                 "*.abi3.so",
                 "*.pyd",
                 "iree-run-module*",
+                "iree-run-replay*",
                 "iree-benchmark-executable*",
                 "iree-benchmark-module*",
+                "iree-benchmark-replay*",
                 # These utilities are invariant wrt tracing and are only built for the default runtime.
                 "iree-c-embed-data*",
                 "iree-create-parameters*",
                 "iree-convert-parameters*",
                 "iree-dump-module*",
+                "iree-dump-replay*",
                 "iree-dump-parameters*",
                 "iree-cpuinfo*",
                 "iree-flatcc-cli*",
@@ -675,8 +678,10 @@ setup(
                     "*.abi3.so",
                     "*.pyd",
                     "iree-run-module*",
+                    "iree-run-replay*",
                     "iree-benchmark-executable*",
                     "iree-benchmark-module*",
+                    "iree-benchmark-replay*",
                 ]
                 + (["iree-tracy-capture"] if ENABLE_TRACY_TOOLS else [])
             }
@@ -687,12 +692,15 @@ setup(
     entry_points={
         "console_scripts": [
             "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
+            "iree-run-replay = iree._runtime.scripts.iree_run_replay.__main__:main",
             "iree-benchmark-executable = iree._runtime.scripts.iree_benchmark_executable.__main__:main",
             "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
+            "iree-benchmark-replay = iree._runtime.scripts.iree_benchmark_replay.__main__:main",
             "iree-c-embed-data = iree._runtime.scripts.iree_c_embed_data.__main__:main",
             "iree-create-parameters = iree._runtime.scripts.iree_create_parameters.__main__:main",
             "iree-convert-parameters = iree._runtime.scripts.iree_convert_parameters.__main__:main",
             "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",
+            "iree-dump-replay = iree._runtime.scripts.iree_dump_replay.__main__:main",
             "iree-dump-parameters = iree._runtime.scripts.iree_dump_parameters.__main__:main",
             "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
             "iree-flatcc-cli = iree._runtime.scripts.iree_flatcc_cli.__main__:main",

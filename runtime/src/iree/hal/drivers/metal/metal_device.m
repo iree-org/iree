@@ -44,16 +44,13 @@ typedef struct iree_hal_metal_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
-  iree_hal_device_topology_info_t topology_info;
-
   // Proactor pool retained from create_params; provides async I/O proactors.
   iree_async_proactor_pool_t* proactor_pool;
   // Proactor borrowed from the pool for this device's async operations.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's axis and monotonic epoch counter for frontier tracking.
@@ -79,7 +76,10 @@ typedef struct iree_hal_metal_device_t {
   dispatch_queue_t semaphore_notification_queue;
   MTLSharedEventListener* event_listener;
 
+  // Retained Metal capture manager while an external capture range is active.
   MTLCaptureManager* capture_manager;
+
+  iree_hal_device_topology_info_t topology_info;
 } iree_hal_metal_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_metal_device_vtable;
@@ -99,11 +99,9 @@ static const iree_hal_metal_device_t* iree_hal_metal_device_const_cast(
 // Called at submit time ([commandBuffer commit]) because the Metal command
 // queue is FIFO-ordered: submission order = causal ordering.
 static void iree_hal_metal_device_advance_frontier(iree_hal_metal_device_t* device) {
-  if (device->frontier_tracker) {
-    uint64_t epoch =
-        (uint64_t)iree_atomic_fetch_add(&device->epoch, 1, iree_memory_order_acq_rel) + 1;
-    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis, epoch);
-  }
+  uint64_t epoch =
+      (uint64_t)iree_atomic_fetch_add(&device->epoch, 1, iree_memory_order_acq_rel) + 1;
+  iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis, epoch);
 }
 
 void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out_params) {
@@ -142,18 +140,8 @@ static iree_status_t iree_hal_metal_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker =
-      create_params->frontier.base_axis != 0 ? create_params->frontier.tracker : NULL;
-  device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
-  iree_status_t status = iree_ok_status();
-  if (device->frontier_tracker) {
-    status = iree_async_frontier_tracker_register_axis(device->frontier_tracker, device->axis,
-                                                       /*semaphore=*/NULL);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
-  }
+  iree_status_t status = iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
   if (!iree_status_is_ok(status)) {
     iree_hal_device_release((iree_hal_device_t*)device);
     return status;
@@ -220,6 +208,17 @@ iree_status_t iree_hal_metal_device_create(iree_string_view_t identifier,
   return status;
 }
 
+static void iree_hal_metal_device_clear_topology_info(iree_hal_metal_device_t* device) {
+  if (device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(device->frontier_tracker, device->axis,
+                                            iree_status_from_code(IREE_STATUS_CANCELLED));
+    iree_async_frontier_tracker_release(device->frontier_tracker);
+    device->frontier_tracker = NULL;
+    device->axis = 0;
+  }
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -229,6 +228,8 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
   dispatch_release(device->semaphore_notification_queue);
 
   iree_hal_metal_builtin_executable_destroy(device->builtin_executable);
+
+  iree_hal_metal_device_clear_topology_info(device);
 
   iree_hal_allocator_release(device->device_allocator);
   [device->command_buffer_descriptor release];  // -1
@@ -266,6 +267,12 @@ static void iree_hal_metal_replace_device_allocator(iree_hal_device_t* base_devi
   iree_hal_allocator_retain(new_allocator);
   iree_hal_allocator_release(device->device_allocator);
   device->device_allocator = new_allocator;
+}
+
+static void iree_hal_metal_replace_channel_provider(iree_hal_device_t* base_device,
+                                                    iree_hal_channel_provider_t* new_provider) {
+  (void)base_device;
+  (void)new_provider;
 }
 
 static iree_status_t iree_hal_metal_device_trim(iree_hal_device_t* base_device) {
@@ -316,7 +323,18 @@ static iree_status_t iree_hal_metal_device_refine_topology_edge(iree_hal_device_
 static iree_status_t iree_hal_metal_device_assign_topology_info(
     iree_hal_device_t* base_device, const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  if (!topology_info) {
+    iree_hal_metal_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker = topology_info->frontier.tracker;
+  iree_async_axis_t axis = topology_info->frontier.base_axis;
+  IREE_RETURN_IF_ERROR(
+      iree_async_frontier_tracker_register_axis(frontier_tracker, axis, /*semaphore=*/NULL));
   device->topology_info = *topology_info;
+  device->frontier_tracker = frontier_tracker;
+  device->axis = axis;
+  iree_async_frontier_tracker_retain(device->frontier_tracker);
   return iree_ok_status();
 }
 
@@ -402,17 +420,24 @@ static iree_hal_semaphore_compatibility_t iree_hal_metal_device_query_semaphore_
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_metal_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Metal queue pool backend not implemented");
+}
+
 static iree_status_t iree_hal_metal_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_hal_pool_t* pool,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  if (IREE_UNLIKELY(pool)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "Metal device does not support queue allocation pools");
-  }
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  if (IREE_UNLIKELY(pool != NULL)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Metal custom queue alloca pools not implemented");
+  }
+
   iree_status_t status = iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
                                                       IREE_ASYNC_WAIT_FLAG_NONE);
   if (iree_status_is_ok(status)) {
@@ -653,6 +678,8 @@ static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_d
 
 static iree_status_t iree_hal_metal_device_profiling_begin(
     iree_hal_device_t* base_device, const iree_hal_device_profiling_options_t* options) {
+  (void)base_device;
+  (void)options;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "Metal HAL-native profiling is not implemented");
 }
@@ -673,11 +700,12 @@ static iree_status_t iree_hal_metal_device_external_capture_begin(
                             "Metal external capture provider '%.*s' is not implemented",
                             (int)options->provider.size, options->provider.data);
   }
+
   if (device->capture_manager) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "cannot nest Metal external capture");
   }
 
-  MTLCaptureManager* capture_manager = [[MTLCaptureManager sharedCaptureManager] retain];
+  MTLCaptureManager* capture_manager = [[MTLCaptureManager sharedCaptureManager] retain];  // +1
   iree_status_t status = iree_ok_status();
 
   @autoreleasepool {
@@ -720,7 +748,7 @@ static iree_status_t iree_hal_metal_device_external_capture_begin(
         status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to start external capture");
         const char* ns_c_error = error ? [error.localizedDescription
                                              cStringUsingEncoding:[NSString defaultCStringEncoding]]
-                                       : "unknown error";
+                                       : "unknown error";  // autoreleased
         status = iree_status_annotate_f(status, "with NSError: %s",
                                         ns_c_error ? ns_c_error : "unknown error");
       }
@@ -728,7 +756,7 @@ static iree_status_t iree_hal_metal_device_external_capture_begin(
   }
 
   if (!iree_status_is_ok(status)) {
-    [capture_manager release];
+    [capture_manager release];  // -1
     return status;
   }
   device->capture_manager = capture_manager;
@@ -741,7 +769,7 @@ static iree_status_t iree_hal_metal_device_external_capture_end(iree_hal_device_
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "no Metal external capture is active");
   }
   [device->capture_manager stopCapture];
-  [device->capture_manager release];
+  [device->capture_manager release];  // -1
   device->capture_manager = NULL;
   return iree_ok_status();
 }
@@ -752,6 +780,7 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .host_allocator = iree_hal_metal_device_host_allocator,
     .device_allocator = iree_hal_metal_device_allocator,
     .replace_device_allocator = iree_hal_metal_replace_device_allocator,
+    .replace_channel_provider = iree_hal_metal_replace_channel_provider,
     .trim = iree_hal_metal_device_trim,
     .query_i64 = iree_hal_metal_device_query_i64,
     .query_capabilities = iree_hal_metal_device_query_capabilities,
@@ -765,6 +794,7 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .import_file = iree_hal_metal_device_import_file,
     .create_semaphore = iree_hal_metal_device_create_semaphore,
     .query_semaphore_compatibility = iree_hal_metal_device_query_semaphore_compatibility,
+    .query_queue_pool_backend = iree_hal_metal_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_metal_device_queue_alloca,
     .queue_dealloca = iree_hal_metal_device_queue_dealloca,
     .queue_fill = iree_hal_device_queue_emulated_fill,
