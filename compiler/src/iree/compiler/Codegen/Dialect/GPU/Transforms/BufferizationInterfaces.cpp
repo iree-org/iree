@@ -516,7 +516,6 @@ struct AsyncDMAOpBufferizationInterface
       return failure();
     }
 
-    rewriter.setInsertionPoint(dmaOp);
     IREE::GPU::AsyncDMAOp::create(
         rewriter, dmaOp.getLoc(), TypeRange{}, *sourceBuffer,
         dmaOp.getSourceIndices(), *destBuffer, dmaOp.getDestIndices(),
