@@ -1690,23 +1690,28 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_write_dispatch_tail(
       return iree_ok_status();
     }
     case IREE_HAL_AMDGPU_COMMAND_BUFFER_KERNARG_STRATEGY_CUSTOM_DIRECT: {
-      // Callers may provide a larger buffer than the kernel's declared
-      // kernarg_segment_size (e.g. rocBLAS/Tensile pads with an extra
-      // scalar). The kernel will only read layout->total_kernarg_size bytes,
-      // so clamp the copy to avoid overflowing the allocation.
+      // Callers pack only the explicit kernel args; the runtime is
+      // responsible for populating (or zero-initializing) the implicit args
+      // suffix that the LLVM AMDGPU backend appends to the kernarg segment.
+      //   - rocBLAS/Tensile may pad beyond the declared size with extra
+      //     scalars; trailing bytes past total_kernarg_size are ignored.
+      //   - HIP-compiled kernels (e.g. PyTorch's distribution_elementwise)
+      //     rely on implicit args (gridDim/blockDim/etc.) to perform any
+      //     work at all; if those are zero the kernel is a silent no-op.
+      // Zero the tail region first so the implicit region starts clean even
+      // when the caller provides only the explicit prefix, then memcpy the
+      // caller-provided explicit bytes, then overlay implicit args when the
+      // kernel metadata tells us where they live.
+      memset(tail_payload, 0, layout->total_kernarg_size);
+      const iree_host_size_t max_explicit_bytes =
+          kernel_args->implicit_args_offset != UINT16_MAX
+              ? (iree_host_size_t)kernel_args->implicit_args_offset
+              : layout->total_kernarg_size;
       const iree_host_size_t copy_bytes =
-          iree_min(constants.data_length, layout->total_kernarg_size);
+          iree_min(constants.data_length, max_explicit_bytes);
       if (copy_bytes > 0) {
         memcpy(tail_payload, constants.data, copy_bytes);
       }
-      // HIP-compiled kernels (e.g. PyTorch's distribution_elementwise
-      // grid-stride kernels) read gridDim/blockDim through the implicit
-      // kernel args suffix that the LLVM AMDGPU backend appends to the
-      // kernarg segment. Callers using CUSTOM_DIRECT pack only the explicit
-      // args and leave the implicit region zero-initialized; the kernel
-      // would then see gridDim=0 and silently produce no output. Populate
-      // the implicit args from the dispatch config when the kernel metadata
-      // tells us where they live.
       if (kernel_args->implicit_args_offset != UINT16_MAX &&
           (size_t)kernel_args->implicit_args_offset +
                   sizeof(iree_amdgpu_kernel_implicit_args_t) <=
@@ -2042,18 +2047,26 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_prepare_dispatch_plan(
 
   if (iree_hal_amdgpu_aql_dispatch_plan_uses_custom_direct_arguments(
           out_plan)) {
-    // Callers (e.g. rocBLAS/Tensile) sometimes pad the kernarg buffer beyond
-    // the kernel's declared kernarg_segment_size with extra trailing scalars.
-    // The kernel only reads its declared size, so trailing bytes are ignored
-    // and the memcpy in write_dispatch_tail clamps to the declared size.
+    // Callers pack only the explicit kernel args; the runtime populates the
+    // implicit args suffix itself when the kernel has one. If the kernel has
+    // implicit args the required caller-provided length is just the explicit
+    // prefix (implicit_args_offset). Otherwise the entire kernarg segment is
+    // explicit and the caller must supply it all. Callers (e.g.
+    // rocBLAS/Tensile) sometimes pad the kernarg buffer beyond the declared
+    // kernarg_segment_size with extra trailing scalars; the kernel only reads
+    // its declared size, so trailing bytes are ignored and the memcpy in
+    // write_dispatch_tail clamps to the declared size.
+    const uint32_t required_explicit_bytes =
+        out_plan->descriptor->kernel_args.implicit_args_offset != UINT16_MAX
+            ? out_plan->descriptor->kernel_args.implicit_args_offset
+            : out_plan->descriptor->kernel_args.kernarg_size;
     if (IREE_UNLIKELY(inputs->constants.data_length <
-                      out_plan->descriptor->kernel_args.kernarg_size)) {
+                      required_explicit_bytes)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "custom dispatch argument length too short; expected at least %u "
           "but got %" PRIhsz,
-          out_plan->descriptor->kernel_args.kernarg_size,
-          inputs->constants.data_length);
+          required_explicit_bytes, inputs->constants.data_length);
     }
     out_plan->layout = &out_plan->descriptor->custom_kernarg_layout;
     out_plan->kernarg_block_count =

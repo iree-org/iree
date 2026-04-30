@@ -1388,7 +1388,6 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
 
   iree_host_size_t parameter_index = 0;
   iree_host_size_t name_storage_offset = 0;
-  uint16_t binding_ordinal = 0;
   for (iree_host_size_t i = 0; i < kernel->arg_count; ++i) {
     const iree_hal_amdgpu_hsaco_metadata_arg_t* arg = &kernel->args[i];
     if (iree_hal_amdgpu_hsaco_metadata_arg_kind_is_hidden(arg->kind)) {
@@ -1410,18 +1409,23 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
       parameter->name = iree_string_view_empty();
     }
 
+    // Use the real kernarg byte offset recorded in HSACO metadata for both
+    // |offset| and |kernarg_offset|. Upstream IREE's contract is that for
+    // BINDING parameters |offset| is a binding ordinal (index into the
+    // bindings list), but the N-th BINDING parameter encountered when
+    // walking this array is always bindings[N], so consumers can recover
+    // the ordinal by iteration if they need it. Carrying the byte offset
+    // here lets CUSTOM_DIRECT_ARGUMENTS callers (HRX) pack the kernarg
+    // blob without consulting a second field, and matches what the
+    // BY_VALUE path has always done.
+    parameter->offset = (uint16_t)arg->offset;
     parameter->kernarg_offset = (uint16_t)arg->offset;
     switch (arg->kind) {
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_GLOBAL_BUFFER:
         parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
-        parameter->offset = binding_ordinal++;
         break;
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE:
-        // Use the real kernarg byte offset recorded in HSACO metadata so
-        // the HAL writes each value at the exact slot the compiled kernel
-        // expects (including any compiler-inserted padding).
         parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
-        parameter->offset = (uint16_t)arg->offset;
         break;
       default:
         return iree_make_status(

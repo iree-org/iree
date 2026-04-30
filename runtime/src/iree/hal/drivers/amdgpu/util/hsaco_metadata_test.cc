@@ -410,28 +410,34 @@ TEST(HsacoMetadataTest, PopulatesDefaultExportParameters) {
           &kernel, parameters.size(), parameters.data(), name_storage.size(),
           name_storage.data()));
 
+  // |offset| now carries the kernarg byte offset for all parameter types
+  // (matches |kernarg_offset|). Bindings are recovered by iteration order.
   EXPECT_EQ(parameters[0].type,
             IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
   EXPECT_EQ(parameters[0].size, 8);
   EXPECT_EQ(parameters[0].offset, 0);
+  EXPECT_EQ(parameters[0].kernarg_offset, 0);
   EXPECT_EQ(ToString(parameters[0].name), "lhs");
 
   EXPECT_EQ(parameters[1].type,
             IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
   EXPECT_EQ(parameters[1].size, 8);
-  EXPECT_EQ(parameters[1].offset, 1);
+  EXPECT_EQ(parameters[1].offset, 8);
+  EXPECT_EQ(parameters[1].kernarg_offset, 8);
   EXPECT_EQ(ToString(parameters[1].name), "rhs");
 
   EXPECT_EQ(parameters[2].type,
             IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT);
   EXPECT_EQ(parameters[2].size, 4);
-  EXPECT_EQ(parameters[2].offset, 0);
+  EXPECT_EQ(parameters[2].offset, 16);
+  EXPECT_EQ(parameters[2].kernarg_offset, 16);
   EXPECT_EQ(ToString(parameters[2].name), "n");
 
   EXPECT_EQ(parameters[3].type,
             IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT);
   EXPECT_EQ(parameters[3].size, 4);
-  EXPECT_EQ(parameters[3].offset, 4);
+  EXPECT_EQ(parameters[3].offset, 20);
+  EXPECT_EQ(parameters[3].kernarg_offset, 20);
   EXPECT_EQ(ToString(parameters[3].name), "alpha");
 
   IREE_EXPECT_STATUS_IS(

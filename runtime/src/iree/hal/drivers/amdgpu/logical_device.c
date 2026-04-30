@@ -1644,6 +1644,21 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
                    system->topology.gpu_agent_queue_count;
       return iree_ok_status();
     }
+    if (iree_string_view_equal(key, IREE_SV("warp_size")) ||
+        iree_string_view_equal(key, IREE_SV("wavefront_size"))) {
+      // Report the hardware wavefront size for the first physical device.
+      // Frameworks (e.g. PyTorch) use this as their runtime warp_size, and
+      // getting it wrong causes silent reduction bugs in kernels that use
+      // __shfl_xor and cooperate across the whole warp. RDNA parts (gfx10+)
+      // run wave32; CDNA/GCN run wave64.
+      if (logical_device->physical_device_count == 0) {
+        return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                "logical device has no physical devices");
+      }
+      *out_value =
+          (int64_t)logical_device->physical_devices[0]->wavefront_size;
+      return iree_ok_status();
+    }
     if (iree_string_view_equal(key, IREE_SV("gfxip"))) {
       // Returns the gfxip version of the first physical device encoded as:
       //   (major << 16) | (minor << 8) | stepping
@@ -1656,9 +1671,11 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
       const iree_hal_amdgpu_physical_device_t* physical_device =
           logical_device->physical_devices[0];
       *out_value =
-          ((int64_t)(physical_device->gfxip_version.major & 0xFF) << 16) |
-          ((int64_t)(physical_device->gfxip_version.minor & 0xFF) << 8) |
-          ((int64_t)(physical_device->gfxip_version.stepping & 0xFF));
+          ((int64_t)(physical_device->isa.target_id.version.major & 0xFF)
+           << 16) |
+          ((int64_t)(physical_device->isa.target_id.version.minor & 0xFF)
+           << 8) |
+          ((int64_t)(physical_device->isa.target_id.version.stepping & 0xFF));
       return iree_ok_status();
     }
     if (iree_string_view_equal(key, IREE_SV("memory.total")) ||

@@ -865,6 +865,7 @@ iree_hal_amdgpu_physical_device_initialize_device_library_and_blit_context(
         "%" PRIhsz " (expected 32 or 64)",
         wavefront_size, device_ordinal);
   }
+  out_physical_device->wavefront_size = wavefront_size;
   iree_hal_amdgpu_device_buffer_transfer_context_initialize(
       &out_physical_device->device_kernels, compute_unit_count, wavefront_size,
       &out_physical_device->buffer_transfer_context);

@@ -104,8 +104,18 @@ void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
     const void* IREE_AMDGPU_RESTRICT custom_kernarg_ptr,
     void* IREE_AMDGPU_RESTRICT kernarg_ptr) {
   if (layout->total_kernarg_size > 0) {
-    iree_amdgpu_memcpy(kernarg_ptr, custom_kernarg_ptr,
-                       layout->total_kernarg_size);
+    // Zero the segment first so the implicit region is well-defined even if
+    // the caller provided only the explicit prefix. The explicit bytes are
+    // overwritten by the memcpy below; the implicit region is then filled
+    // from kernel_args/config when present.
+    iree_amdgpu_memset(kernarg_ptr, 0, layout->total_kernarg_size);
+    const uint32_t explicit_bytes =
+        (kernel_args && kernel_args->implicit_args_offset != (uint16_t)0xFFFFu)
+            ? (uint32_t)kernel_args->implicit_args_offset
+            : layout->total_kernarg_size;
+    if (explicit_bytes > 0) {
+      iree_amdgpu_memcpy(kernarg_ptr, custom_kernarg_ptr, explicit_bytes);
+    }
   }
   // HIP-compiled kernels (e.g. PyTorch's distribution_elementwise grid-stride
   // kernels) read gridDim/blockDim through the implicit kernel args suffix
