@@ -144,6 +144,26 @@ func.func @groups_plain_global_loads(%a: memref<256xf32>,
 
 // -----
 
+// memref.load is also a global load, so the pass groups it with other global
+// loads.
+// CHECK-LABEL: func.func @groups_memref_loads
+// CHECK:         %[[L0:.+]] = memref.load %{{.+}}[%{{.+}}]
+// CHECK-NEXT:    %[[L1:.+]] = memref.load %{{.+}}[%{{.+}}]
+// CHECK-NEXT:    arith.addf
+// CHECK-NEXT:    return %[[L0]], %[[L1]]
+func.func @groups_memref_loads(%a: memref<256xf32>,
+                               %b: memref<256xf32>,
+                               %x: f32, %y: f32) -> (f32, f32) {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %v0 = memref.load %a[%c0] : memref<256xf32>
+  %sum = arith.addf %x, %y : f32
+  %v1 = memref.load %b[%c4] : memref<256xf32>
+  return %v0, %v1 : f32, f32
+}
+
+// -----
+
 // Two adjacent global loads (no ops between them) — the pass should be a
 // no-op and not perturb the IR.
 // CHECK-LABEL: func.func @already_adjacent

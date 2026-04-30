@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
@@ -19,14 +20,18 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Returns true if the operation is a vector.load from global memory.
+/// Returns true if the operation is a load from global memory.
 static bool isGlobalLoad(Operation *op) {
-  auto loadOp = dyn_cast<vector::LoadOp>(op);
-  if (!loadOp) {
+  Type memrefType;
+  if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
+    memrefType = loadOp.getBase().getType();
+  } else if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
+    memrefType = loadOp.getMemref().getType();
+  } else {
     return false;
   }
-  auto memrefType = dyn_cast<MemRefType>(loadOp.getBase().getType());
-  return memrefType && hasGlobalMemoryAddressSpace(memrefType);
+  auto memref = dyn_cast<MemRefType>(memrefType);
+  return memref && hasGlobalMemoryAddressSpace(memref);
 }
 
 /// Collects all ops in the same block that `op` transitively depends on

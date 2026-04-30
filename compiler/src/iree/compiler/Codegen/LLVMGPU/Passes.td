@@ -52,11 +52,11 @@ def LLVMGPUGroupGlobalLoadsPass :
     InterfacePass<"iree-llvmgpu-group-global-loads", "mlir::FunctionOpInterface"> {
   let summary = "Group adjacent global loads to improve GPU instruction scheduling";
   let description = [{
-    Moves vector.load operations from global-memory memrefs next to each other
-    when they are separated only by operations that do not depend on the
-    preceding load's result. This enables the GPU backend to issue multiple
-    global loads before waiting, instead of serializing each load behind its
-    own waitcount.
+    Moves vector.load and memref.load operations from global-memory memrefs next
+    to each other when they are separated only by operations that do not depend
+    on the preceding load's result. This enables the GPU backend to issue
+    multiple global loads before waiting, instead of serializing each load
+    behind its own waitcount.
   }];
 }
 
