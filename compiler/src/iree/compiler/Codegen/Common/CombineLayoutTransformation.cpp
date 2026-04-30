@@ -74,17 +74,6 @@ static MapStoreOp foldTransposePermIntoMapStore(RewriterBase &rewriter,
   return mapStoreOp;
 }
 
-/// Fold a `transposeOp` into a consumer `mapStoreOp`, by transposing the
-/// uses of the `mapStoreOp`s transformation_region block arguments.
-static MapStoreOp foldTransposeIntoMapStore(RewriterBase &rewriter,
-                                            linalg::TransposeOp transposeOp,
-                                            MapStoreOp mapStoreOp) {
-  assert(mapStoreOp.getInput() == transposeOp->getResult(0) &&
-         "expected transposeOp to be the producer of mapStoreOp");
-  return foldTransposePermIntoMapStore(rewriter, transposeOp.getPermutation(),
-                                       transposeOp.getInput(), mapStoreOp);
-}
-
 /// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
 /// `mapStoreOp`, by linearizing and then delinearizing the source indices
 /// of the `mapStoreOp`s index transformation.
@@ -462,27 +451,30 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
   return mapStoreOp;
 }
 
-/// Fold a transpose-like `genericOp` producer into a consumer `mapStoreOp`.
-/// Same as foldTransposeIntoMapStore but extracts perm from indexing maps.
-static FailureOr<MapStoreOp> foldTransposeGenericIntoMapStore(
-    RewriterBase &rewriter, linalg::GenericOp genericOp, ArrayRef<int64_t> perm,
-    MapStoreOp mapStoreOp) {
-  assert(mapStoreOp.getInput() == genericOp->getResult(0) &&
-         "expected genericOp to be the producer of mapStoreOp");
-  return foldTransposePermIntoMapStore(rewriter, perm,
-                                       genericOp.getDpsInputs()[0], mapStoreOp);
-}
-
 /// Decompose a `packOp` and fold all resulting ops into the consumer
 /// `mapStoreOp` in one shot. lowerPack produces: source → [pad] →
 /// expand_shape → transpose. We fold transpose then expand_shape into the
-/// map_store. Identity pads are removed; non-identity pads are left for
-/// FoldPadOpIntoMapStorePattern to handle on the next greedy iteration.
-static FailureOr<MapStoreOp> foldPackIntoMapStore(RewriterBase &rewriter,
-                                                  linalg::PackOp packOp,
-                                                  MapStoreOp mapStoreOp) {
+/// map_store. Identity pads are removed; non-identity pads are folded directly
+/// using `foldPadIntoMapStore` when a `padDistributionConfigFn` is provided.
+///
+/// The behavior depends on whether a `padDistributionConfigFn` is supplied:
+/// - If provided: always decompose and fold (non-identity pads are folded
+///   directly via `foldPadIntoMapStore`).
+/// - If not provided and the pack has no padding semantics: decompose and fold
+///   (the pad from decomposition, if any, is a no-op and can be folded away).
+/// - If not provided and the pack has padding semantics: return failure.
+FailureOr<MapStoreOp>
+foldPackIntoMapStore(RewriterBase &rewriter, linalg::PackOp packOp,
+                     MapStoreOp mapStoreOp,
+                     PadDistributionConfigFn padDistributionConfigFn) {
   assert(mapStoreOp.getInput() == packOp->getResult(0) &&
          "expected packOp to be the producer of mapStoreOp");
+  if (!padDistributionConfigFn && packOp.getPaddingValue()) {
+    return rewriter.notifyMatchFailure(
+        packOp, "pack has padding semantics but no PadDistributionConfigFn "
+                "was provided");
+  }
+
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(packOp);
   auto result = linalg::lowerPack(rewriter, packOp,
@@ -493,8 +485,9 @@ static FailureOr<MapStoreOp> foldPackIntoMapStore(RewriterBase &rewriter,
 
   // After lowerPack the chain is: source → [pad] → expand_shape → transpose.
   // The map_store input is now transpose.result.
-  mapStoreOp =
-      foldTransposeIntoMapStore(rewriter, result->transposeOp, mapStoreOp);
+  mapStoreOp = foldTransposePermIntoMapStore(
+      rewriter, result->transposeOp.getPermutation(),
+      result->transposeOp.getInput(), mapStoreOp);
 
   auto foldResult =
       foldExpandShapeIntoMapStore(rewriter, result->expandShapeOp, mapStoreOp);
@@ -507,8 +500,14 @@ static FailureOr<MapStoreOp> foldPackIntoMapStore(RewriterBase &rewriter,
     if (areAllConstantIntValue(result->padOp.getMixedLowPad(), 0) &&
         areAllConstantIntValue(result->padOp.getMixedHighPad(), 0)) {
       rewriter.replaceOp(result->padOp, result->padOp.getSource());
+    } else {
+      auto padFold = foldPadIntoMapStore(rewriter, result->padOp, mapStoreOp,
+                                         padDistributionConfigFn);
+      if (failed(padFold)) {
+        return failure();
+      }
+      mapStoreOp = *padFold;
     }
-    // Non-identity pad left for FoldPadOpIntoMapStorePattern.
   }
 
   return mapStoreOp;
@@ -562,8 +561,9 @@ static FailureOr<MapStoreOp> foldUnpackIntoMapStore(RewriterBase &rewriter,
   mapStoreOp = *collapseFold;
 
   // 4. Fold transpose into map_store.
-  mapStoreOp =
-      foldTransposeIntoMapStore(rewriter, result->transposeOp, mapStoreOp);
+  mapStoreOp = foldTransposePermIntoMapStore(
+      rewriter, result->transposeOp.getPermutation(),
+      result->transposeOp.getInput(), mapStoreOp);
 
   return mapStoreOp;
 }
@@ -575,7 +575,10 @@ FailureOr<MapStoreOp> foldIntoMapStore(RewriterBase &rewriter, Operation *op,
         return foldIdentityLikeOpIntoMapStore(rewriter, copyOp, mapStoreOp);
       })
       .Case([&](linalg::TransposeOp transposeOp) {
-        return foldTransposeIntoMapStore(rewriter, transposeOp, mapStoreOp);
+        FailureOr<MapStoreOp> res = foldTransposePermIntoMapStore(
+            rewriter, transposeOp.getPermutation(), transposeOp.getInput(),
+            mapStoreOp);
+        return res;
       })
       .Case([&](tensor::ExpandShapeOp expandOp) {
         return foldExpandShapeIntoMapStore(rewriter, expandOp, mapStoreOp);
@@ -588,15 +591,17 @@ FailureOr<MapStoreOp> foldIntoMapStore(RewriterBase &rewriter, Operation *op,
                                             mapStoreOp);
       })
       .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
-        return foldPackIntoMapStore(rewriter, packOp, mapStoreOp);
+        return foldPackIntoMapStore(rewriter, packOp, mapStoreOp,
+                                    /*padDistributionConfigFn=*/nullptr);
       })
       .Case<linalg::UnPackOp>([&](linalg::UnPackOp unPackOp) {
         return foldUnpackIntoMapStore(rewriter, unPackOp, mapStoreOp);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
-          return foldTransposeGenericIntoMapStore(rewriter, genericOp, *perm,
-                                                  mapStoreOp);
+          FailureOr<MapStoreOp> res = foldTransposePermIntoMapStore(
+              rewriter, perm.value(), genericOp.getDpsInputs()[0], mapStoreOp);
+          return res;
         }
         return FailureOr<MapStoreOp>(failure());
       })
@@ -1265,18 +1270,6 @@ static FailureOr<MapLoadOp> foldPadIntoMapLoad(RewriterBase &rewriter,
                                      indexTransformBuilder, padValue);
 }
 
-/// Fold a consumer transpose-like `genericOp` into a producer `mapLoadOp`.
-/// Same as foldTransposeIntoMapLoad but extracts the permutation from the
-/// generic's indexing maps via isaTransposeOpInterface.
-static FailureOr<MapLoadOp>
-foldTransposeGenericIntoMapLoad(RewriterBase &rewriter,
-                                linalg::GenericOp genericOp,
-                                ArrayRef<int64_t> perm, MapLoadOp mapLoadOp) {
-  assert(genericOp->getOperand(0) == mapLoadOp.getResult(0) &&
-         "expected mapLoadOp to be the producer of genericOp input");
-  return foldTransposePermIntoMapLoad(rewriter, genericOp, perm, mapLoadOp);
-}
-
 /// Decompose a consumer `packOp` and fold all resulting ops into the producer
 /// `mapLoadOp` in one shot. lowerPack produces: source → [pad] →
 /// expand_shape → transpose. We fold pad, expand_shape, then transpose into
@@ -1320,8 +1313,9 @@ static FailureOr<MapLoadOp> foldPackIntoMapLoad(RewriterBase &rewriter,
   mapLoadOp = *expandFold;
 
   // 3. Fold transpose into map_load.
-  auto transposeFold =
-      foldTransposeIntoMapLoad(rewriter, result->transposeOp, mapLoadOp);
+  auto transposeFold = foldTransposePermIntoMapLoad(
+      rewriter, result->transposeOp, result->transposeOp.getPermutation(),
+      mapLoadOp);
   if (failed(transposeFold)) {
     return failure();
   }
@@ -1355,8 +1349,9 @@ static FailureOr<MapLoadOp> foldUnpackIntoMapLoad(RewriterBase &rewriter,
   // Fold from outermost (closest to map_load) to innermost.
 
   // 1. Fold transpose into map_load.
-  auto transposeFold =
-      foldTransposeIntoMapLoad(rewriter, result->transposeOp, mapLoadOp);
+  auto transposeFold = foldTransposePermIntoMapLoad(
+      rewriter, result->transposeOp, result->transposeOp.getPermutation(),
+      mapLoadOp);
   if (failed(transposeFold)) {
     return failure();
   }
@@ -1396,7 +1391,8 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
         return foldIdentityLikeOpIntoMapLoad(rewriter, copyOp, mapLoadOp);
       })
       .Case<linalg::TransposeOp>([&](linalg::TransposeOp transposeOp) {
-        return foldTransposeIntoMapLoad(rewriter, transposeOp, mapLoadOp);
+        return foldTransposePermIntoMapLoad(
+            rewriter, transposeOp, transposeOp.getPermutation(), mapLoadOp);
       })
       .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
         return foldExpandShapeIntoMapLoad(rewriter, expandOp, mapLoadOp);
@@ -1418,8 +1414,8 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
         if (auto perm = linalg::isaTransposeOpInterface(genericOp)) {
-          return foldTransposeGenericIntoMapLoad(rewriter, genericOp, *perm,
-                                                 mapLoadOp);
+          return foldTransposePermIntoMapLoad(rewriter, genericOp, perm.value(),
+                                              mapLoadOp);
         }
         if (linalg::isaBroadcastOpInterface(genericOp)) {
           return foldBroadcastIntoMapLoad(
