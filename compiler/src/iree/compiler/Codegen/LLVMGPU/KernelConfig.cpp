@@ -1113,8 +1113,8 @@ static LogicalResult setAttentionReductionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  // TODO: Remove the K1/N alignment checks once masked VectorDistribute tails
-  // are verified for non-aligned attention shapes.
+  // Avoid the known misaligned K1/N tail cases in this reduction path.
+  // TODO: Remove the K1/N alignment checks once masked tails are verified.
   int64_t k1Size = bounds[opInfo.getK1Dims().back()];
   int64_t nSize = bounds[opInfo.getNDims().back()];
   int64_t nWorkgroupTile = seeds.numValueVectors * seeds.valueVectorSize;
