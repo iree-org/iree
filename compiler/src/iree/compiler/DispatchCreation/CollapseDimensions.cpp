@@ -221,23 +221,36 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
-  // Skip collapse for scatter-like generics that use tensor.extract with
-  // linalg.index-based addressing. These are strided scatter patterns where
-  // 1D collapse introduces expensive delinearization (div/mod chains) that
-  // dominates execution. Keeping the multi-dimensional iteration space
-  // allows direct workgroup tiling without delinearization.
-  {
-    bool hasTensorExtract = false;
+  // Skip collapse for strided-scatter-like generics that use tensor.extract
+  // with linalg.index-based addressing. These generics have a very specific
+  // shape that makes 1D collapse pessimal:
+  //   1. No DPS input operands — the source is captured by a `tensor.extract`
+  //      inside the body rather than passed as an `ins` operand. The op is a
+  //      pure scatter into a fresh destination.
+  //   2. `linalg.index` ops feed arithmetic that computes a multi-dimensional
+  //      strided index into the captured source tensor.
+  //   3. An `arith.select` (driven by bounds-check `arith.cmpi`/`arith.andi`)
+  //      picks between the extracted value and a constant zero default.
+  // For these ops, 1D collapse introduces expensive delinearization (div/mod
+  // chains) on the extract indices that dominates execution; keeping the
+  // multi-dimensional iteration space allows direct workgroup tiling without
+  // delinearization.
+  if (genericOp.getNumDpsInputs() == 0) {
     bool hasLinalgIndex = false;
+    bool extractFeedsSelect = false;
     genericOp.getBlock()->walk([&](Operation *inner) {
-      if (isa<tensor::ExtractOp>(inner)) {
-        hasTensorExtract = true;
-      }
       if (isa<linalg::IndexOp>(inner)) {
         hasLinalgIndex = true;
+      } else if (auto extractOp = dyn_cast<tensor::ExtractOp>(inner)) {
+        for (Operation *user : extractOp.getResult().getUsers()) {
+          if (isa<arith::SelectOp>(user)) {
+            extractFeedsSelect = true;
+            break;
+          }
+        }
       }
     });
-    if (hasTensorExtract && hasLinalgIndex) {
+    if (hasLinalgIndex && extractFeedsSelect) {
       return false;
     }
   }
