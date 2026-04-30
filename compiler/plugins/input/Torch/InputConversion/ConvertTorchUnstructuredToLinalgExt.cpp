@@ -21,6 +21,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
+#include "torch-mlir/Dialect/Torch/Utils/Utils.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
@@ -188,42 +189,28 @@ static FailureOr<Value> repeatTensorElementsForDim(PatternRewriter &rewriter,
                                                    Value self, int64_t repeats,
                                                    int64_t dim) {
   Location loc = op->getLoc();
-  MLIRContext *context = op->getContext();
   auto selfType = cast<torch::Torch::ValueTensorType>(self.getType());
 
   int64_t inputRank = selfType.getSizes().size();
-  dim += dim < 0 ? inputRank : 0;
+  dim = torch::Torch::toPositiveDim(dim, inputRank);
 
-  Value dimValue = torch::Torch::ConstantIntOp::create(
-      rewriter, loc, rewriter.getI64IntegerAttr(dim));
-  Value dimValuePlusOne = torch::Torch::ConstantIntOp::create(
-      rewriter, loc, rewriter.getI64IntegerAttr(dim + 1));
+  Value dimValue = torch::Torch::ConstantIntOp::create(rewriter, loc, dim);
+  Value dimValuePlusOne =
+      torch::Torch::ConstantIntOp::create(rewriter, loc, dim + 1);
 
-  SmallVector<int64_t> unsqueezedShape(selfType.getSizes());
-  unsqueezedShape.insert(unsqueezedShape.begin() + dim + 1, 1);
-  Type unsqueezedType = selfType.getWithSizesAndDtype(
-      ArrayRef<int64_t>(unsqueezedShape), selfType.getOptionalDtype());
-  self = torch::Torch::AtenUnsqueezeOp::create(rewriter, loc, unsqueezedType,
-                                               self, dimValuePlusOne);
-
-  Value constMinusOne = torch::Torch::ConstantIntOp::create(
-      rewriter, loc, rewriter.getI64IntegerAttr(-1));
-  SmallVector<Value> expandShapeValueList(inputRank + 1, constMinusOne);
-  expandShapeValueList[dim + 1] = torch::Torch::ConstantIntOp::create(
-      rewriter, loc, rewriter.getI64IntegerAttr(repeats));
-  Value expandShapeList = torch::Torch::PrimListConstructOp::create(
-      rewriter, loc,
-      torch::Torch::ListType::get(torch::Torch::IntType::get(context)),
-      expandShapeValueList);
-
-  SmallVector<int64_t> expandShape(inputRank + 1);
-  for (int64_t i = 0; i <= dim; ++i) {
-    expandShape[i] = selfType.getSizes()[i];
+  FailureOr<Value> unsqueezed =
+      torch::Torch::unsqueezeTensor(rewriter, op, self, dimValuePlusOne);
+  if (failed(unsqueezed)) {
+    return failure();
   }
-  expandShape[dim + 1] = repeats;
-  for (int64_t i = dim + 1; i < inputRank; ++i) {
-    expandShape[i + 1] = selfType.getSizes()[i];
-  }
+  self = *unsqueezed;
+
+  SmallVector<int64_t> expandShape(selfType.getSizes());
+  expandShape.insert(expandShape.begin() + dim + 1, repeats);
+  SmallVector<int64_t> expandShapeForBroadcast(expandShape.size(), -1);
+  expandShapeForBroadcast[dim + 1] = repeats;
+  Value expandShapeList =
+      torch::Torch::toIntListConstruct(rewriter, loc, expandShapeForBroadcast);
 
   Type expandType = selfType.getWithSizesAndDtype(
       ArrayRef<int64_t>(expandShape), selfType.getOptionalDtype());
