@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/hal/api.h"
 #include "iree/io/file_contents.h"
@@ -91,11 +92,18 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
 
   // Add the HAL module; it is always required when using the runtime API.
   // Lower-level usage of the VM can avoid the HAL if it's not required.
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_async_frontier_tracker_create(
+        iree_async_frontier_tracker_options_default(), host_allocator,
+        &frontier_tracker);
+  }
   iree_hal_device_group_t* device_group = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_device_group_create_from_device(device, host_allocator,
-                                                      &device_group);
+    status = iree_hal_device_group_create_from_device(
+        device, frontier_tracker, host_allocator, &device_group);
   }
+  iree_async_frontier_tracker_release(frontier_tracker);
   iree_vm_module_t* hal_module = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(iree_runtime_instance_vm_instance(instance),

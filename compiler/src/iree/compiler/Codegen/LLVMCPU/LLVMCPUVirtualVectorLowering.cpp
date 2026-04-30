@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -73,6 +75,19 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+
+    // Unroll ND transfer_gather/scatter to rank 1, lower contiguous ones to
+    // vector.transfer_read/write, lower rank-1 non-contiguous ones to
+    // vector.gather/scatter.
+    IREE::VectorExt::populateVectorTransferGatherScatterLoweringPatterns(
+        patterns);
+    IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(patterns,
+                                                                   ctx);
+    IREE::VectorExt::TransferScatterOp::getCanonicalizationPatterns(patterns,
+                                                                    ctx);
+    IREE::VectorExt::populateLowerTransferGatherScatterToVectorPatterns(
+        patterns);
+
     // RVV should be able to lower most of the gather / scatter with indexed
     // load / store.
     if (!targetConfig || !isRISCV(targetConfig) ||

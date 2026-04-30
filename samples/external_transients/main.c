@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
@@ -105,9 +106,14 @@ iree_status_t Run() {
 
   iree_hal_device_t* device = NULL;
   IREE_CHECK_OK(create_sample_device(host_allocator, &device), "create device");
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  IREE_CHECK_OK(iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker));
   iree_hal_device_group_t* device_group = NULL;
-  IREE_CHECK_OK(iree_hal_device_group_create_from_device(device, host_allocator,
-                                                         &device_group));
+  IREE_CHECK_OK(iree_hal_device_group_create_from_device(
+      device, frontier_tracker, host_allocator, &device_group));
+  iree_async_frontier_tracker_release(frontier_tracker);
   iree_vm_module_t* hal_module = NULL;
   IREE_CHECK_OK(iree_hal_module_create(
       instance, iree_hal_module_device_policy_default(), device_group,

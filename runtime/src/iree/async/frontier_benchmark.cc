@@ -700,4 +700,173 @@ static void BM_Scenario_WaiterCheck(benchmark::State& state) {
 }
 BENCHMARK(BM_Scenario_WaiterCheck)->Arg(1)->Arg(4)->Arg(8)->Arg(16)->Arg(32);
 
+//===----------------------------------------------------------------------===//
+// FindUndominated benchmarks
+//===----------------------------------------------------------------------===//
+// Benchmarks for iree_async_frontier_find_undominated: the combined tier 1/2
+// extraction for wait resolution. Measures how quickly we can identify which
+// axes in a semaphore's frontier are not yet dominated by the queue's frontier.
+//
+// The hot path is the fast path (identical axis sets) which fires when the
+// same set of queues has been signaling the semaphore in steady state.
+// The slow path fires when topologies change (new queue joins, device added).
+
+// Output storage for undominated entries. Reused across iterations.
+static iree_async_frontier_entry_t g_undominated_entries[kMaxEntries];
+
+// Fast path: reference dominates all entries (all epochs >=).
+// This is the best case for same-queue sequential work: the queue's frontier
+// is ahead on every axis, so all waits are FIFO-elided.
+static void BM_FindUndominated_FastPath_AllDominated(benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  PopulateFrontier(storage_ref.frontier(), entry_count, 0, 200, 10);
+  PopulateFrontier(storage_tgt.frontier(), entry_count, 0, 100, 10);
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_FastPath_AllDominated)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128);
+
+// Fast path: all entries undominated (target ahead on every axis).
+// This is the worst case for the fast path: every entry triggers a write.
+// Measures the combined comparison + output write cost.
+static void BM_FindUndominated_FastPath_AllUndominated(
+    benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  PopulateFrontier(storage_ref.frontier(), entry_count, 0, 100, 10);
+  PopulateFrontier(storage_tgt.frontier(), entry_count, 0, 200, 10);
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_FastPath_AllUndominated)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128);
+
+// Fast path: alternating dominated/undominated entries.
+// Worst case for branch prediction on the output write.
+static void BM_FindUndominated_FastPath_HalfUndominated(
+    benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  // Reference: even indices have high epochs, odd have low.
+  PopulateFrontier(storage_ref.frontier(), entry_count, 0, 100, 10);
+  PopulateFrontier(storage_tgt.frontier(), entry_count, 0, 100, 10);
+  // Make alternating entries undominated.
+  for (int i = 0; i < entry_count; ++i) {
+    if (i % 2 == 0) {
+      storage_tgt.frontier()->entries[i].epoch =
+          storage_ref.frontier()->entries[i].epoch + 50;
+    }
+  }
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_FastPath_HalfUndominated)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128);
+
+// Slow path: completely disjoint axis sets (ref on machine 0, tgt on machine
+// 1). All target entries are undominated. Maximum output write volume.
+static void BM_FindUndominated_SlowPath_Disjoint(benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  PopulateFrontier(storage_ref.frontier(), entry_count, 0, 100, 10);
+  PopulateFrontier(storage_tgt.frontier(), entry_count, 1, 100, 10);
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_SlowPath_Disjoint)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128);
+
+// Slow path: interleaved axes (ref on even devices, tgt on odd devices).
+// Every merge-scan step takes the target-only branch. Worst case for branch
+// prediction in the 3-way merge scan.
+static void BM_FindUndominated_SlowPath_Interleaved(benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  PopulateFrontierEvenAxes(storage_ref.frontier(), entry_count, 0, 100);
+  PopulateFrontierOddAxes(storage_tgt.frontier(), entry_count, 0, 100);
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_SlowPath_Interleaved)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64);
+
+// Slow path: half-overlap pattern. First half of target shares axes with
+// reference (mixed dominated/undominated), second half is unique (always
+// undominated). Realistic topology-change scenario.
+static void BM_FindUndominated_SlowPath_HalfOverlap(benchmark::State& state) {
+  const int entry_count = static_cast<int>(state.range(0));
+  FrontierStorage storage_ref, storage_tgt;
+  PopulateFrontier(storage_ref.frontier(), entry_count, 0, 100, 10);
+  PopulateFrontierHalfOverlap(storage_tgt.frontier(), entry_count, 0,
+                              entry_count, 200);
+  for (auto _ : state) {
+    uint8_t count = iree_async_frontier_find_undominated(
+        storage_ref.frontier(), storage_tgt.frontier(),
+        static_cast<uint8_t>(entry_count), g_undominated_entries);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_FindUndominated_SlowPath_HalfOverlap)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64);
+
 }  // namespace

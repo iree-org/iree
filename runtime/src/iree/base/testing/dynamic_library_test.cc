@@ -6,16 +6,15 @@
 
 #include "iree/base/internal/dynamic_library.h"
 
-#include <cstdlib>
 #include <iostream>
 #include <ostream>
-#include <string>
 
 #include "iree/base/api.h"
 #include "iree/base/testing/dynamic_library_test_library_embed.h"
 #include "iree/io/file_contents.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/testing/temp_file.h"
 
 namespace iree {
 namespace {
@@ -26,23 +25,6 @@ static const char* kUnknownName = "library_that_does_not_exist.so";
 
 class DynamicLibraryTest : public ::testing::Test {
  public:
-  static std::string GetTempFilename(const char* suffix) {
-    static int unique_id = 0;
-    char* test_tmpdir = getenv("TEST_TMPDIR");
-    if (!test_tmpdir) {
-      test_tmpdir = getenv("TMPDIR");
-    }
-    if (!test_tmpdir) {
-      test_tmpdir = getenv("TEMP");
-    }
-    if (!test_tmpdir) {
-      std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
-      exit(1);
-    }
-    return test_tmpdir + std::string("/iree_test_") +
-           std::to_string(unique_id++) + suffix;
-  }
-
   static void SetUpTestCase() {
     // Making files available to tests, particularly across operating systems
     // and build tools (Bazel/CMake) is complicated. Rather than include a test
@@ -56,29 +38,29 @@ class DynamicLibraryTest : public ::testing::Test {
 #else
     static constexpr const char* ext = ".so";
 #endif
-    library_temp_path_ = GetTempFilename(ext);
+    library_temp_path_ =
+        iree::testing::TempFilePath("iree_dynamic_library_test", ext);
 
     const struct iree_file_toc_t* file_toc =
         dynamic_library_test_library_create();
     IREE_ASSERT_OK(iree_io_file_contents_write(
-        iree_make_string_view(library_temp_path_.data(),
-                              library_temp_path_.size()),
+        library_temp_path_.path_view(),
         iree_make_const_byte_span(file_toc->data, file_toc->size),
         iree_allocator_system()));
 
     std::cout << "Embedded test library written to temp path: "
-              << library_temp_path_ << "\n";
+              << library_temp_path_.path() << "\n";
   }
 
-  static std::string library_temp_path_;
+  static iree::testing::TempFilePath library_temp_path_;
 };
 
-std::string DynamicLibraryTest::library_temp_path_;
+iree::testing::TempFilePath DynamicLibraryTest::library_temp_path_;
 
 TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library));
   iree_dynamic_library_release(library);
 }
@@ -95,10 +77,10 @@ TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
   iree_dynamic_library_t* library1 = NULL;
   iree_dynamic_library_t* library2 = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library1));
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library2));
   iree_dynamic_library_release(library1);
   iree_dynamic_library_release(library2);
@@ -107,7 +89,7 @@ TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
 TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library));
 
   int (*fn_ptr)(int);
@@ -122,7 +104,7 @@ TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
 TEST_F(DynamicLibraryTest, GetSymbolFailure) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library));
 
   int (*fn_ptr)(int);
@@ -137,7 +119,7 @@ TEST_F(DynamicLibraryTest, GetSymbolFailure) {
 TEST_F(DynamicLibraryTest, TryLookupSymbolSuccess) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library));
 
   void* symbol = iree_dynamic_library_try_lookup_symbol(library, "times_two");
@@ -153,7 +135,7 @@ TEST_F(DynamicLibraryTest, TryLookupSymbolSuccess) {
 TEST_F(DynamicLibraryTest, TryLookupSymbolNotFound) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
-      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      library_temp_path_.path().c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
       iree_allocator_system(), &library));
 
   void* symbol = iree_dynamic_library_try_lookup_symbol(library, "unknown");

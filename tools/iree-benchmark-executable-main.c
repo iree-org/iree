@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
@@ -366,6 +367,21 @@ static iree_status_t iree_benchmark_executable_from_flags(
   iree_async_proactor_pool_release(proactor_pool);
   IREE_RETURN_IF_ERROR(device_status);
 
+  // Queue operations require devices to be assigned to a causal frontier. Keep
+  // the single-device group alive for the benchmark so direct queue execution
+  // has the same ordering contract as VM HAL module execution.
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  iree_status_t topology_status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker);
+  iree_hal_device_group_t* device_group = NULL;
+  if (iree_status_is_ok(topology_status)) {
+    topology_status = iree_hal_device_group_create_from_device(
+        device, frontier_tracker, host_allocator, &device_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
+  IREE_RETURN_IF_ERROR(topology_status);
+
   // We'll reuse the same executable cache so that once we load the executable
   // we'll be able to reuse any driver-side optimizations.
   iree_hal_executable_cache_t* executable_cache = NULL;
@@ -478,6 +494,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
   iree_hal_executable_release(executable);
   iree_io_file_contents_free(file_contents);
   iree_hal_executable_cache_release(executable_cache);
+  iree_hal_device_group_release(device_group);
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 

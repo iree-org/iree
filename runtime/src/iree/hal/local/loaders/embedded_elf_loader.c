@@ -80,7 +80,16 @@ static iree_status_t iree_hal_elf_executable_query_library(
 
   executable->identifier = iree_make_cstring_view(header->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+#if defined(IREE_PLATFORM_WINDOWS) && defined(IREE_ARCH_X86_64)
+  // Embedded ELF exports use the SysV x86-64 ABI while the Windows host uses
+  // the Microsoft x64 ABI. Calls must go through iree_elf_call_i_ppp so the
+  // argument registers are bridged correctly.
+  executable->base.dispatch_ptrs = NULL;
+#else
   executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
+#endif  // IREE_PLATFORM_WINDOWS && IREE_ARCH_X86_64
+  executable->base.export_count = executable->library.v0->exports.count;
+  executable->base.export_names = executable->library.v0->exports.names;
   return iree_ok_status();
 }
 

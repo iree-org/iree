@@ -703,7 +703,6 @@ static iree_status_t iree_hal_tlsf_pool_acquire_reservation(
     iree_hal_pool_acquire_info_t* out_info,
     iree_hal_pool_acquire_result_t* out_result) {
   iree_hal_tlsf_pool_t* pool = (iree_hal_tlsf_pool_t*)base_pool;
-  (void)flags;
 
   if (size == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -743,6 +742,7 @@ static iree_status_t iree_hal_tlsf_pool_acquire_reservation(
   iree_hal_pool_acquire_result_t selected_result =
       IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
   bool has_selected_allocation = false;
+  bool growth_required = false;
 
   iree_slim_mutex_lock(&pool->mutex);
   iree_hal_tlsf_pool_drain_pending_releases(pool);
@@ -772,15 +772,19 @@ static iree_status_t iree_hal_tlsf_pool_acquire_reservation(
   }
 
   if (iree_status_is_ok(status) && !has_selected_allocation) {
-    uint16_t slab_index = 0;
-    status = iree_hal_tlsf_pool_append_slab(pool, &slab_index);
-    if (iree_status_is_ok(status)) {
-      status = iree_hal_tlsf_pool_try_acquire_from_slab(
-          pool, slab_index, size, requester_frontier,
-          /*record_reuse_miss=*/true, &selected_allocation, &selected_result);
-      has_selected_allocation =
-          selected_result == IREE_HAL_POOL_ACQUIRE_OK ||
-          selected_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH;
+    if (iree_all_bits_set(flags, IREE_HAL_POOL_RESERVE_FLAG_DISALLOW_GROWTH)) {
+      growth_required = true;
+    } else {
+      uint16_t slab_index = 0;
+      status = iree_hal_tlsf_pool_append_slab(pool, &slab_index);
+      if (iree_status_is_ok(status)) {
+        status = iree_hal_tlsf_pool_try_acquire_from_slab(
+            pool, slab_index, size, requester_frontier,
+            /*record_reuse_miss=*/true, &selected_allocation, &selected_result);
+        has_selected_allocation =
+            selected_result == IREE_HAL_POOL_ACQUIRE_OK ||
+            selected_result == IREE_HAL_POOL_ACQUIRE_OK_FRESH;
+      }
     }
   }
 
@@ -815,6 +819,9 @@ static iree_status_t iree_hal_tlsf_pool_acquire_reservation(
                             iree_memory_order_relaxed);
       memset(out_reservation, 0, sizeof(*out_reservation));
       memset(out_info, 0, sizeof(*out_info));
+      if (growth_required) {
+        out_info->flags |= IREE_HAL_POOL_ACQUIRE_FLAG_GROWTH_REQUIRED;
+      }
       *out_result = IREE_HAL_POOL_ACQUIRE_EXHAUSTED;
       iree_hal_tlsf_pool_uncharge_reservation(pool, charged_length);
       charged_length = 0;

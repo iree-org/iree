@@ -19,6 +19,8 @@ iree_cc_library(
     iree::hal
     iree::hal::cts::util::test_base
     iree::io::file_handle
+    iree::io::stream
+    iree::testing::temp_file
   TESTONLY
   ALWAYSLINK
   PUBLIC

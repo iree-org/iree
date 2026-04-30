@@ -503,6 +503,17 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT bool iree_async_semaphore_merge_frontier(
+    iree_async_semaphore_t* semaphore, const iree_async_frontier_t* frontier) {
+  IREE_ASSERT_ARGUMENT(frontier);
+  if (frontier->entry_count == 0) return true;
+  iree_slim_mutex_lock(&semaphore->mutex);
+  bool merged = iree_async_frontier_merge(
+      semaphore->frontier, semaphore->frontier_capacity, frontier);
+  iree_slim_mutex_unlock(&semaphore->mutex);
+  return merged;
+}
+
 IREE_API_EXPORT uint64_t
 iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore) {
   return (uint64_t)iree_atomic_load(&semaphore->last_untainted_value,

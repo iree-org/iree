@@ -84,6 +84,7 @@ iree_cc_library(
   DEPS
     ::device_util
     ::parameter_util
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal::path
@@ -92,6 +93,7 @@ iree_cc_library(
     iree::hal
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration
+    iree::hal::replay::recorder
     iree::io::file_handle
     iree::modules::hal
     iree::modules::hal::inline
@@ -262,6 +264,7 @@ iree_cc_library(
     iree::base
     iree::base::tooling::flags
     iree::hal
+    iree::hal::replay::recorder
     iree::io::stream
     iree::modules::hal::types
     iree::vm

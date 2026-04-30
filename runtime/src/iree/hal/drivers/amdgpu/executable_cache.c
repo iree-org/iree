@@ -14,10 +14,16 @@
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_executable_cache_t {
+  // HAL resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for cache lifetime.
   iree_allocator_t host_allocator;
+  // Borrowed HSA API table used for executable loading.
   const iree_hal_amdgpu_libhsa_t* libhsa;
+  // Borrowed topology describing the physical devices to load onto.
   const iree_hal_amdgpu_topology_t* topology;
+  // Borrowed logical-device profiling metadata registry.
+  iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata;
 } iree_hal_amdgpu_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -31,8 +37,9 @@ iree_hal_amdgpu_executable_cache_cast(iree_hal_executable_cache_t* base_value) {
 
 iree_status_t iree_hal_amdgpu_executable_cache_create(
     const iree_hal_amdgpu_libhsa_t* libhsa,
-    const iree_hal_amdgpu_topology_t* topology, iree_string_view_t identifier,
-    iree_allocator_t host_allocator,
+    const iree_hal_amdgpu_topology_t* topology,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
+    iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -56,6 +63,7 @@ iree_status_t iree_hal_amdgpu_executable_cache_create(
   executable_cache->host_allocator = host_allocator;
   executable_cache->libhsa = libhsa;
   executable_cache->topology = topology;
+  executable_cache->profile_metadata = profile_metadata;
 
   *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
   IREE_TRACE_ZONE_END(z0);
@@ -80,10 +88,12 @@ static iree_status_t iree_hal_amdgpu_executable_cache_infer_format(
     iree_const_byte_span_t executable_data,
     iree_host_size_t executable_format_capacity, char* executable_format,
     iree_host_size_t* out_inferred_size) {
+  iree_hal_amdgpu_executable_cache_t* executable_cache =
+      iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_amdgpu_executable_infer_format(
       executable_data, executable_format_capacity, executable_format,
-      out_inferred_size);
+      executable_cache->host_allocator, out_inferred_size);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -95,9 +105,15 @@ static bool iree_hal_amdgpu_executable_cache_can_prepare_format(
   iree_hal_amdgpu_executable_cache_t* executable_cache =
       iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
   bool is_supported = false;
-  IREE_IGNORE_ERROR(iree_hal_amdgpu_executable_format_supported(
+  iree_status_t status = iree_hal_amdgpu_executable_format_supported(
       executable_cache->libhsa, executable_cache->topology->gpu_agents[0],
-      executable_format, &is_supported, /*out_isa=*/NULL));
+      executable_format, &is_supported, /*out_isa=*/NULL);
+  if (!iree_status_is_ok(status)) {
+    // The HAL cache predicate has no status channel; query failures mean the
+    // format cannot be prepared by this cache.
+    iree_status_free(status);
+    return false;
+  }
   return is_supported;
 }
 
@@ -109,7 +125,8 @@ static iree_status_t iree_hal_amdgpu_executable_cache_prepare_executable(
       iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
   return iree_hal_amdgpu_executable_create(
       executable_cache->libhsa, executable_cache->topology, executable_params,
-      executable_cache->host_allocator, out_executable);
+      executable_cache->profile_metadata, executable_cache->host_allocator,
+      out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t

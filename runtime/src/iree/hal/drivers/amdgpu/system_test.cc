@@ -28,7 +28,7 @@ struct SystemTest : public ::testing::Test {
         host_allocator, &libhsa);
     if (!iree_status_is_ok(status)) {
       iree_status_fprint(stderr, status);
-      iree_status_ignore(status);
+      iree_status_free(status);
       GTEST_SKIP() << "HSA not available, skipping tests";
     }
     IREE_ASSERT_OK(
@@ -53,7 +53,6 @@ TEST_F(SystemTest, Lifetime) {
 
   iree_hal_amdgpu_system_options_t options = {0};
   options.exclusive_execution = 0;
-  options.trace_execution = 0;
 
   iree_hal_amdgpu_system_t* system = NULL;
   IREE_ASSERT_OK(iree_hal_amdgpu_system_allocate(&libhsa, &topology, options,

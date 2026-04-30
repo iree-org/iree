@@ -591,6 +591,28 @@ stream.executable private @ex {
 
 // -----
 
+// Tests that async.cast is treated as a tied passthrough when deciding whether
+// a clone result is mutated. The clone should still inherit the source's
+// external lifetime through the cast before feeding a read-only dispatch.
+
+// CHECK-LABEL: @clone_external_cast_inherits_source
+util.func private @clone_external_cast_inherits_source(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK-NOT: stream.async.cast
+  %cast = stream.async.cast on(#hal.device.affinity<@device>)
+      %clone : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.async.dispatch {{.*}}(%[[CLONE]]{{.*}}) : (!stream.resource<external>{{.*}}) -> !stream.resource<transient>
+  %result = stream.async.dispatch on(#hal.device.affinity<@device>)
+      @ex::@dispatch(%cast[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
 // Tests that a clone of an external resource whose result IS mutated (tied
 // use from dispatch) gets its own lifetime determined by the result's uses,
 // not the source's lifetime. This is the data-isolation case where the clone
@@ -735,4 +757,37 @@ util.func private @parameter_load_refines_to_constant(%scope: !util.buffer, %key
   %ready = stream.timepoint.await %load_tp => %loaded : !stream.resource<*>{%c1024}
   // CHECK: util.return {{.*}} : !stream.resource<constant>
   util.return %ready : !stream.resource<*>
+}
+
+// -----
+
+// Tests that stream.async.cast propagates its constraint to the source value.
+// The cast asserts the result must be external, so the source (splat) must also
+// become external. After refinement, the cast folds away since types match.
+
+// CHECK-LABEL: @asyncCastPropagation
+util.func public @asyncCastPropagation(%size: index) -> !stream.resource<external> {
+  %c123_i32 = arith.constant 123 : i32
+  // The splat should be refined to external due to the cast constraint.
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32 {{.+}} -> !stream.resource<external>
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // The cast should fold away after the source type is refined to match.
+  // CHECK-NOT: stream.async.cast
+  %cast = stream.async.cast %splat : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[SPLAT]] : !stream.resource<external>
+  util.return %cast : !stream.resource<external>
+}
+
+// -----
+
+// Tests that a cast between incompatible concrete lifetimes becomes a transfer.
+
+// CHECK-LABEL: @asyncCastConcreteMismatchTransfers
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func public @asyncCastConcreteMismatchTransfers(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.async.cast
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %cast = stream.async.cast %source : !stream.resource<constant>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[TRANSFER]] : !stream.resource<external>
+  util.return %cast : !stream.resource<external>
 }

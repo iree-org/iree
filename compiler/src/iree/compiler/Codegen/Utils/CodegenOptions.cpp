@@ -98,6 +98,12 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
           "tracking. Use with --iree-hal-instrument-dispatches=<buffer-size> "
           "and analyze results with iree-dump-instruments."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>("iree-llvmcpu-experimental-vectorize-to-transfer-gather",
+                   enableTransferGather,
+                   llvm::cl::desc("Experimental: enables vectorization to "
+                                  "iree_vector_ext.transfer_gather."),
+                   llvm::cl::cat(category));
 }
 
 void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {

@@ -796,39 +796,26 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
       (iree_hal_vmvx_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // The VM bytecode module stores pointers into its archive contents and may be
+  // destroyed after queue completion has already been signaled. Own a private
+  // copy so executable teardown never depends on the caller's module rodata.
   iree_const_byte_span_t bytecode_module_data =
       executable_params->executable_data;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_clone(executable_loader->host_allocator,
+                               executable_params->executable_data,
+                               (void**)&bytecode_module_data.data));
 
-  // If the caching mode allows for aliasing the existing FlatBuffer data then
-  // we avoid allocations and just pass the pointer on through. The caller
-  // ensures that the data remains valid for the duration the executable is
-  // loaded. Otherwise, we clone it and let the bytecode module take ownership.
-  iree_allocator_t bytecode_module_allocator;
-  bool bytecode_module_data_owned = false;
-  if (iree_all_bits_set(executable_params->caching_mode,
-                        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA)) {
-    // Zero-copy route.
-    bytecode_module_allocator = iree_allocator_null();
-  } else {
-    bytecode_module_allocator = executable_loader->host_allocator;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_clone(executable_loader->host_allocator,
-                                 executable_params->executable_data,
-                                 (void**)&bytecode_module_data.data));
-    bytecode_module_data_owned = true;
-  }
-
-  // Load the user-provided bytecode module. We pass ownership of the data (if
-  // we have it) to the module to manage.
+  // Load the user-provided bytecode module and pass ownership of the cloned
+  // data to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
       executable_loader->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
-      bytecode_module_data, bytecode_module_allocator,
+      bytecode_module_data, executable_loader->host_allocator,
       executable_loader->host_allocator, &bytecode_module);
-  if (!iree_status_is_ok(status) && bytecode_module_data_owned) {
+  if (!iree_status_is_ok(status)) {
     iree_allocator_free(executable_loader->host_allocator,
                         (void*)bytecode_module_data.data);
-    bytecode_module_data_owned = false;
   }
 
   // Executable takes ownership of the entire context (including the bytecode

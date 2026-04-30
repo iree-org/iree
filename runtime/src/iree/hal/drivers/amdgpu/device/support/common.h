@@ -14,66 +14,21 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_DEVICE_SUPPORT_COMMON_H_
 #define IREE_HAL_DRIVERS_AMDGPU_DEVICE_SUPPORT_COMMON_H_
 
+#include "iree/hal/drivers/amdgpu/abi/common.h"  // IWYU pragma: export
+
+#if !defined(IREE_AMDGPU_TARGET_DEVICE)
+#include "iree/base/internal/atomics.h"
+#include "iree/base/threading/thread.h"
+#endif  // !IREE_AMDGPU_TARGET_DEVICE
+
 //===----------------------------------------------------------------------===//
 // Compiler Configuration
 //===----------------------------------------------------------------------===//
 
-#if defined(__AMDGPU__)
-#define IREE_AMDGPU_TARGET_DEVICE 1
-#else
-#define IREE_AMDGPU_TARGET_HOST 1
-#endif  // __AMDGPU__
-
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
-typedef char int8_t;
-typedef unsigned char uint8_t;
-typedef short int16_t;
-typedef unsigned short uint16_t;
-typedef int int32_t;
-typedef unsigned int uint32_t;
-typedef long int64_t;
-typedef unsigned long uint64_t;
-
-typedef int64_t ssize_t;
-typedef uint64_t size_t;
-typedef int64_t intptr_t;
-typedef uint64_t uintptr_t;
-
-#define UINT64_MAX 0xFFFFFFFFFFFFFFFFull
-
-#define NULL ((void*)0)
-
-#else
-
-// NOTE: minimal support for including headers in host code is provided to make
-// sharing enums/structures possible; no code is expected to compile.
-
-#include <stddef.h>
-#include <stdint.h>
-
-#include "iree/base/internal/atomics.h"
-#include "iree/base/threading/thread.h"
-#include "third_party/hsa-runtime-headers/include/hsa/hsa.h"  // IWYU pragma: export
-
-#endif  // IREE_AMDGPU_TARGET_DEVICE
-
-//===----------------------------------------------------------------------===//
-// Attributes
-//===----------------------------------------------------------------------===//
-
-#if defined(IREE_AMDGPU_TARGET_DEVICE)
-
-#define IREE_AMDGPU_RESTRICT __restrict__
-#define IREE_AMDGPU_ALIGNAS(x) __attribute__((aligned(x)))
-#define IREE_AMDGPU_ALIGNOF(x) __alignof__(x)
-
-#define IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
 #define IREE_AMDGPU_ATTRIBUTE_SINGLE_WORK_ITEM
-#define IREE_AMDGPU_ATTRIBUTE_PACKED __attribute__((__packed__))
-
 #define IREE_AMDGPU_ATTRIBUTE_MUSTTAIL [[clang::musttail]]
-
 #define IREE_AMDGPU_ATTRIBUTE_KERNEL \
   [[clang::amdgpu_kernel, gnu::visibility("protected")]]
 
@@ -84,13 +39,7 @@ typedef uint64_t uintptr_t;
 
 #else
 
-#define IREE_AMDGPU_RESTRICT IREE_RESTRICT
-#define IREE_AMDGPU_ALIGNAS(x) iree_alignas(x)
-#define IREE_AMDGPU_ALIGNOF(x) iree_alignof(x)
-
-#define IREE_AMDGPU_ATTRIBUTE_ALWAYS_INLINE IREE_ATTRIBUTE_ALWAYS_INLINE
 #define IREE_AMDGPU_ATTRIBUTE_SINGLE_WORK_ITEM
-#define IREE_AMDGPU_ATTRIBUTE_PACKED IREE_ATTRIBUTE_PACKED
 
 #define IREE_AMDGPU_LIKELY(x) IREE_LIKELY(x)
 #define IREE_AMDGPU_UNLIKELY(x) IREE_UNLIKELY(x)
@@ -134,8 +83,6 @@ static inline bool iree_amdgpu_has_alignment(size_t value, size_t alignment) {
 
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
-#define IREE_AMDGPU_OFFSETOF(type, field) __builtin_offsetof(type, field)
-
 // Returns the number of leading zeros in a 64-bit bitfield.
 // Returns -1 if no bits are set.
 // Commonly used in HIP as `__lastbit_u32_u64`.
@@ -148,8 +95,6 @@ static inline bool iree_amdgpu_has_alignment(size_t value, size_t alignment) {
 #define IREE_AMDGPU_LASTBIT_U64(v) ((v) == 0 ? -1 : __builtin_ctzl(v))
 
 #else
-
-#define IREE_AMDGPU_OFFSETOF(type, field) offsetof(type, field)
 
 #define IREE_AMDGPU_LASTBIT_U64(v) \
   ((v) == 0 ? -1 : iree_math_count_trailing_zeros_u64(v))
@@ -297,11 +242,6 @@ typedef iree_atomic_uint64_t iree_amdgpu_scoped_atomic_uint64_t;
 //===----------------------------------------------------------------------===//
 // Timing
 //===----------------------------------------------------------------------===//
-
-// Tick in the agent domain.
-// This can be converted to the system domain for correlation across agents and
-// the host with hsa_amd_profiling_convert_tick_to_system_domain.
-typedef uint64_t iree_amdgpu_device_tick_t;
 
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 

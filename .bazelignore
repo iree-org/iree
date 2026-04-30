@@ -15,3 +15,6 @@ third_party
 
 # Ignore the bazel directories when this directory is used as a local repository.
 bazel-*
+
+# Ignore local iree-bazel-try snippets and their output base.
+.iree-bazel-try

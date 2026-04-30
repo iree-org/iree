@@ -56,7 +56,9 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_index_provider_create(
 
   provider->scope = iree_make_string_view(
       (const char*)provider + sizeof(*provider), scope.size);
-  memcpy((void*)provider->scope.data, scope.data, scope.size);
+  if (scope.size > 0) {
+    memcpy((void*)provider->scope.data, scope.data, scope.size);
+  }
 
   provider->index = index;
   iree_io_parameter_index_retain(index);
