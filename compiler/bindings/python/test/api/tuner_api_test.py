@@ -278,7 +278,7 @@ def test_igemm_conv_details():
     d0, d1, d2, d3, d4 = [AffineDimExpr.get(i) for i in range(5)]
     assert maps[0] == AffineMap.get(5, 0, [d1, d4]), f"Filter map mismatch: {maps[0]}"
     assert maps[1] == AffineMap.get(
-        5, 0, [d0, d2, d3, d4]
+        5, 0, [d0, d4, d2, d3]
     ), f"Input map mismatch: {maps[1]}"
     assert maps[2] == AffineMap.get(
         5, 0, [d0, d1, d2, d3]
@@ -291,7 +291,12 @@ def test_igemm_conv_details():
         '"parallel"',
         '"reduction"',
     ]
-    assert details.im2col_output_perm == [0, 1, 2, 3]
+    assert details.im2col_output_perm == [
+        0,
+        3,
+        1,
+        2,
+    ], f"im2col output perm mismatch: {details.im2col_output_perm}"
     assert details.filter_reassoc_indices == [[0], [1, 2, 3]]
     assert details.is_output_channel_first
     assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 4}
@@ -324,19 +329,27 @@ def test_igemm_conv_details():
     assert (
         details is not None
     ), "IGEMM details should be valid for generic 1D conv weight backward"
-    assert details.igemm_loop_bounds == [96, 3, 96, 98304]
+    assert details.igemm_loop_bounds == [96, 3, 96, 16, 6144]
     assert len(details.igemm_contraction_maps) == 3
     maps = [map_attr.value for map_attr in details.igemm_contraction_maps]
-    d0, d1, d2, d3 = [AffineDimExpr.get(i) for i in range(4)]
-    assert maps[0] == AffineMap.get(4, 0, [d3, d0]), f"Map 0 mismatch: {maps[0]}"
-    assert maps[1] == AffineMap.get(4, 0, [d1, d3, d2]), f"Map 1 mismatch: {maps[1]}"
-    assert maps[2] == AffineMap.get(4, 0, [d0, d1, d2]), f"Map 2 mismatch: {maps[2]}"
+    d0, d1, d2, d3, d4 = [AffineDimExpr.get(i) for i in range(5)]
+    assert maps[0] == AffineMap.get(5, 0, [d3, d4, d0]), f"Map 0 mismatch: {maps[0]}"
+    assert maps[1] == AffineMap.get(
+        5, 0, [d3, d1, d4, d2]
+    ), f"Map 1 mismatch: {maps[1]}"
+    assert maps[2] == AffineMap.get(5, 0, [d0, d1, d2]), f"Map 2 mismatch: {maps[2]}"
     iter_types = [str(attr) for attr in details.igemm_loop_iterators]
-    assert iter_types == ['"parallel"', '"parallel"', '"parallel"', '"reduction"']
-    assert details.im2col_output_perm == [1, 2, 0]
-    assert details.filter_reassoc_indices == [[0, 1, 2], [3]]
+    assert iter_types == [
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"reduction"',
+        '"reduction"',
+    ]
+    assert details.im2col_output_perm == [2, 1, 3, 0]
+    assert details.filter_reassoc_indices == [[0], [1, 2], [3]]
     assert details.is_output_channel_first
-    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 3, 5: 3}
+    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 4}
 
     # Test with a non-conv operation.
     module_str = """
