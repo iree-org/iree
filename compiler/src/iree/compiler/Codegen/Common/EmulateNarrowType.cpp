@@ -14,12 +14,15 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/NarrowTypeEmulationConverter.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -105,10 +108,10 @@ struct EmulateNarrowTypePass final
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<arith::ArithDialect, func::FuncDialect, memref::MemRefDialect,
-                vector::VectorDialect, affine::AffineDialect,
-                IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect>();
+    registry.insert<arith::ArithDialect, cf::ControlFlowDialect,
+                    func::FuncDialect, memref::MemRefDialect,
+                    vector::VectorDialect, affine::AffineDialect,
+                    IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
@@ -149,7 +152,18 @@ LogicalResult emulateNarrowType(
 
   ConversionTarget target(*ctx);
   target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](Operation *op) {
-    return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
+    auto funcOp = cast<func::FuncOp>(op);
+    if (!typeConverter.isLegal(funcOp.getFunctionType())) {
+      return false;
+    }
+    // Also check that all block arguments in non-entry blocks are legal, so
+    // that FunctionOpInterfaceAllBlocksSignatureConversion fires when needed.
+    for (Block &block : funcOp.getFunctionBody()) {
+      if (!typeConverter.isLegal(block.getArgumentTypes())) {
+        return false;
+      }
+    }
+    return true;
   });
   auto opLegalCallback = [&typeConverter](Operation *op) {
     return typeConverter.isLegal(op);
@@ -173,6 +187,20 @@ LogicalResult emulateNarrowType(
                                                     disableAtomicRMW,
                                                     /*assumeAligned=*/true);
   populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
+  populateBranchOpInterfaceTypeConversionPattern(patterns, typeConverter);
+  populateFunctionOpInterfaceAllBlocksTypeConversionPattern<func::FuncOp>(
+      patterns, typeConverter);
+  target.addDynamicallyLegalDialect<cf::ControlFlowDialect>(
+      [&typeConverter](Operation *op) -> bool {
+        // Only apply legality check to BranchOpInterface ops; other cf ops
+        // (e.g. cf.assert) have no successor-block-arg conversion concern
+        // and should remain legal.
+        if (!isa<BranchOpInterface>(op)) {
+          return true;
+        }
+        return isLegalForBranchOpInterfaceTypeConversionPattern(op,
+                                                                typeConverter);
+      });
   if (populateCallback) {
     populateCallback.value()(typeConverter, patterns, target);
   }
