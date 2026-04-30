@@ -33,13 +33,7 @@ jobs:
           - name: cpu_task
             markers: "cpu"
             config-file: torch_ops_cpu_llvm_sync.json
-            cache-dir: /home/nod/iree_tests_cache
-            runs-on:
-              - self-hosted # Must come first.
-              - persistent-cache
-              - Linux
-              - X64
-              - rdna3 # We only have one rdna4 machine but three rdna3 machines
+            runs-on: ubuntu-24.04
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
