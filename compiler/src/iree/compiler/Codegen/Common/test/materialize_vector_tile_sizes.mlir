@@ -713,9 +713,7 @@ func.func @im2col_tile_sizes_divisibility_assume(
 
 // -----
 
-// Im2col: offset that `IntegerDivisibilityAnalysis` proves is exactly zero.
-// Zero is divisible by every tile size, and this case is not covered by the
-// fallback static `affine.apply` map match.
+// Im2col: offset that `IntegerDivisibilityAnalysis` proves is exactly zero, which is always aligned.
 
 // CHECK-LABEL: @im2col_tile_sizes_divisibility_zero
 func.func @im2col_tile_sizes_divisibility_zero(
@@ -742,8 +740,8 @@ func.func @im2col_tile_sizes_divisibility_zero(
 // argument). The analysis cannot prove contiguity, so no tile sizes attribute
 // is stamped. This is the negative control for the two preceding tests.
 
-// CHECK-LABEL: @im2col_tile_sizes_divisibility_unknown
-func.func @im2col_tile_sizes_divisibility_unknown(
+// CHECK-LABEL: @negative_im2col_tile_sizes_divisibility_unknown
+func.func @negative_im2col_tile_sizes_divisibility_unknown(
     %input: tensor<2x34x34x640xf32>, %m_off: index, %k_off: index
 ) -> tensor<2x2x4xf32> {
   %0 = tensor.empty() : tensor<2x2x4xf32>
