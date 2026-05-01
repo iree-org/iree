@@ -7439,6 +7439,7 @@ operations in tiled/padded layouts.</p>
 <p><em>Set 'iree_linalg_ext.split_reduction' attribute on ops</em></p>
 <h4 id="options_11">Options<a class="headerlink" href="#options_11" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-split-reduction-target-size : Target tile size for split reduction. Inner reduction dimensions are tiled first, with the tile size rounded up until it evenly divides the iteration domain.
+-low-parallelism             : If true, use the low-parallelism split-reduction parameter set tuned for targets with limited concurrent workgroup parallelism (e.g. RDNA-class GPUs); otherwise use the default set tuned for high-parallelism targets (e.g. CDNA-class GPUs).
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-sink-reshapes"><code>-iree-dispatch-creation-sink-reshapes</code><a class="headerlink" href="#-iree-dispatch-creation-sink-reshapes" title="Permanent link">link</a></h3>
 <p><em>Sink reshapes to allow for compute op -&gt; consumer fusion.</em></p>
