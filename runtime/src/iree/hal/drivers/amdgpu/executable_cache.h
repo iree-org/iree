@@ -29,7 +29,7 @@ typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 // Exact code-object image bytes and loader load ranges are retained in profile
 // metadata for every prepared executable.
 iree_status_t iree_hal_amdgpu_executable_cache_create(
-    const iree_hal_amdgpu_libhsa_t* libhsa,
+    iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_string_view_t identifier, iree_allocator_t host_allocator,

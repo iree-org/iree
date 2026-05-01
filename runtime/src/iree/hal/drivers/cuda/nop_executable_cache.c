@@ -18,11 +18,18 @@ typedef struct iree_hal_cuda_nop_executable_cache_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
+  // Host allocator used for executable cache lifetime.
   iree_allocator_t host_allocator;
 
+  // Borrowed HAL device used for buffer placement metadata.
+  iree_hal_device_t* device;
+  // Borrowed CUDA dynamic symbols used for executable loading.
   const iree_hal_cuda_dynamic_symbols_t* symbols;
 
-  CUdevice device;
+  // CUDA device owning the executable modules.
+  CUdevice cu_device;
+  // CUDA context owning the executable modules.
+  CUcontext cu_context;
 } iree_hal_cuda_nop_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -36,9 +43,9 @@ iree_hal_cuda_nop_executable_cache_cast(
 }
 
 iree_status_t iree_hal_cuda_nop_executable_cache_create(
-    iree_string_view_t identifier,
-    const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
-    iree_allocator_t host_allocator,
+    iree_hal_device_t* device, iree_string_view_t identifier,
+    const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice cu_device,
+    CUcontext cu_context, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -52,8 +59,10 @@ iree_status_t iree_hal_cuda_nop_executable_cache_create(
   iree_hal_resource_initialize(&iree_hal_cuda_nop_executable_cache_vtable,
                                &executable_cache->resource);
   executable_cache->host_allocator = host_allocator;
-  executable_cache->symbols = symbols;
   executable_cache->device = device;
+  executable_cache->symbols = symbols;
+  executable_cache->cu_device = cu_device;
+  executable_cache->cu_context = cu_context;
 
   *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
 
@@ -102,8 +111,9 @@ static iree_status_t iree_hal_cuda_nop_executable_cache_prepare_executable(
   iree_hal_cuda_nop_executable_cache_t* executable_cache =
       iree_hal_cuda_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_cuda_native_executable_create(
-      executable_cache->symbols, executable_cache->device, executable_params,
-      executable_cache->host_allocator, out_executable);
+      executable_cache->device, executable_cache->symbols,
+      executable_cache->cu_device, executable_cache->cu_context,
+      executable_params, executable_cache->host_allocator, out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t

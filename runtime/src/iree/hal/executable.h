@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -18,6 +19,7 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_device_t iree_hal_device_t;
+typedef struct iree_hal_buffer_t iree_hal_buffer_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t
@@ -154,6 +156,21 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_export_by_name(
     iree_hal_executable_t* executable, iree_string_view_t name,
     iree_hal_executable_export_ordinal_t* out_export_ordinal);
 
+// Finds the executable global variable with the given |name| and returns a
+// device buffer aliasing its storage.
+//
+// |queue_affinity| selects the device instance for per-device globals. Empty or
+// any affinities select an implementation-defined valid device instance. The
+// returned buffer retains the executable storage it aliases and must be
+// released by the caller.
+//
+// Returns IREE_STATUS_NOT_FOUND when no such global variable exists and
+// IREE_STATUS_UNIMPLEMENTED when the executable format or backend cannot expose
+// globals.
+IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_global_by_name(
+    iree_hal_executable_t* executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t implementation details
 //===----------------------------------------------------------------------===//
@@ -178,6 +195,10 @@ typedef struct iree_hal_executable_vtable_t {
   iree_status_t(IREE_API_PTR* lookup_export_by_name)(
       iree_hal_executable_t* executable, iree_string_view_t name,
       iree_hal_executable_export_ordinal_t* out_export_ordinal);
+
+  iree_status_t(IREE_API_PTR* lookup_global_by_name)(
+      iree_hal_executable_t* executable, iree_string_view_t name,
+      iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer);
 } iree_hal_executable_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_vtable_t);
 

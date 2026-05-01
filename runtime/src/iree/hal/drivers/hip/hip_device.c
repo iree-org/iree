@@ -1076,7 +1076,7 @@ static iree_status_t iree_hal_hip_device_create_executable_cache(
     contexts[i] = device->devices[i].hip_context;
   }
   return iree_hal_hip_nop_executable_cache_create(
-      identifier, device->hip_symbols,
+      base_device, identifier, device->hip_symbols,
       iree_hal_hip_device_make_topology(device), device->host_allocator,
       out_executable_cache);
 }
