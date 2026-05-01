@@ -372,11 +372,11 @@ func.func @conv_nhwc() attributes {hal.executable.target = #executable_target_ro
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-func.func @generic_2x1024x20x64x1280_f16() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation} {
+func.func @generic_2x1024x20x64x1280_f16() attributes {hal.executable.target = #executable_target_rocm, translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
@@ -944,7 +944,7 @@ func.func @online_attention_split_k2() attributes {hal.executable.target = #exec
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
@@ -958,7 +958,7 @@ func.func @online_attention_split_k2() attributes {hal.executable.target = #exec
 #pv_config = {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>, promote_operands = [1], subgroup_basis = [[1, 1, 2, 1, 1, 1], [0, 1, 2, 3, 5]]}>}
 #config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 0, 0, 64], workgroup = [1, 1, 64, 64, 0, 0]}>
 
-func.func @attention_gather_k() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation} {
+func.func @attention_gather_k() attributes {hal.executable.target = #executable_target_rocm, translation_info = #translation} {
   %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x10x4096x64xf16>>
