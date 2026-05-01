@@ -84,6 +84,7 @@ iree_cc_library(
     "LLVMGPUGroupGlobalLoads.cpp"
     "LLVMGPULegalizeNDVectors.cpp"
     "LLVMGPULinkExecutables.cpp"
+    "LLVMGPULower1DVectorOps.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"

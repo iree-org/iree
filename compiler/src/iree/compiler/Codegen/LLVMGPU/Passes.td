@@ -80,6 +80,18 @@ def LLVMGPULegalizeNDVectorsPass :
   ];
 }
 
+def LLVMGPULower1DVectorOpsPass :
+    InterfacePass<"iree-llvmgpu-lower-1d-vector-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Lower 1-D vector operations to simpler ops (e.g. transfer_read/write to load/store).";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "memref::MemRefDialect",
+    "ub::UBDialect",
+    "vector::VectorDialect",
+    "IREE::VectorExt::IREEVectorExtDialect",
+  ];
+}
+
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";

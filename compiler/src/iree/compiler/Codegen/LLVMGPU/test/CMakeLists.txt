@@ -47,6 +47,7 @@ iree_lit_test_suite(
     "link_executables.mlir"
     "llvmgpu_bufferize.mlir"
     "llvmgpu_group_global_loads.mlir"
+    "lower_1d_vector_ops.mlir"
     "nvvm_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "pipeline_coalesced_dma.mlir"

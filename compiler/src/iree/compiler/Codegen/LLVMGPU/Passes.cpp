@@ -998,7 +998,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createLLVMGPULegalizeNDVectorsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
-      .addPass(createVectorTransferLoweringPass);
+      .addPass(createLLVMGPULower1DVectorOpsPass);
 
   funcPassManager.addPass(createReinsertSwizzleHintsPass);
 
