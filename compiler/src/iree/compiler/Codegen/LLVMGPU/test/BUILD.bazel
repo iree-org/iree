@@ -77,6 +77,7 @@ iree_lit_test_suite(
             "transpose_pipeline_test.mlir",
             "vector_flattening.mlir",
             "vector_lowering.mlir",
+            "vector_multi_reduction_lowering.mlir",
             "vector_to_gpu.mlir",
             "winograd_pipeline_test.mlir",
         ],
