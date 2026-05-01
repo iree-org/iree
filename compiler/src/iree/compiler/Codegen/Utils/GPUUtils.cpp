@@ -1372,35 +1372,41 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
 
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
-    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements, Value dest) {
+    IREE::Codegen::XORShuffleAttr swizzle, Value dest) {
   // Compute the subgroup's base offset within the full allocation by tracing
   // through view-like ops and accumulating the linear element offset.
+  Value destTrace = dest;
+  OpFoldResult totalOffset = builder.getIndexAttr(0);
+  while (auto viewOp = destTrace.getDefiningOp<ViewLikeOpInterface>()) {
+    if (auto subviewOp = dyn_cast<memref::SubViewOp>(viewOp.getOperation())) {
+      auto parentType = cast<MemRefType>(subviewOp.getSource().getType());
+      SmallVector<int64_t> strides;
+      int64_t offset;
+      LogicalResult res = parentType.getStridesAndOffset(strides, offset);
+      assert(succeeded(res) && "expected strided layout on subview source");
+      (void)res;
+      SmallVector<OpFoldResult> strideOFRs =
+          getAsIndexOpFoldResult(builder.getContext(), strides);
+      auto &&[expr, values] = computeLinearIndex(totalOffset, strideOFRs,
+                                                 subviewOp.getMixedOffsets());
+      totalOffset =
+          affine::makeComposedFoldedAffineApply(builder, loc, expr, values);
+    } else {
+      assert((isa<memref::ExpandShapeOp, memref::CollapseShapeOp>(
+                 viewOp.getOperation())) &&
+             "unexpected view-like op in dest chain");
+    }
+    destTrace = viewOp.getViewSource();
+  }
+
+  // Only the offset unaligned to the swizzle period affects the XOR
+  // computation.
+  auto cst = getConstantIntValue(totalOffset);
   Value swizzleBaseOffset;
-  int64_t swizzlePeriod = swizzle.getRowWidth() *
-                          (swizzle.getRowWidth() / swizzle.getAccessWidth());
-  if (destElements % swizzlePeriod != 0) {
-    Value destTrace = dest;
-    OpFoldResult totalOffset = builder.getIndexAttr(0);
-    while (auto viewOp = destTrace.getDefiningOp<ViewLikeOpInterface>()) {
-      if (auto subviewOp = dyn_cast<memref::SubViewOp>(viewOp.getOperation())) {
-        auto parentType = cast<MemRefType>(subviewOp.getSource().getType());
-        SmallVector<int64_t> strides;
-        int64_t offset;
-        if (succeeded(parentType.getStridesAndOffset(strides, offset))) {
-          SmallVector<OpFoldResult> strideOFRs =
-              getAsIndexOpFoldResult(builder.getContext(), strides);
-          auto &&[expr, values] = computeLinearIndex(
-              totalOffset, strideOFRs, subviewOp.getMixedOffsets());
-          totalOffset =
-              affine::makeComposedFoldedAffineApply(builder, loc, expr, values);
-        }
-      }
-      destTrace = viewOp.getViewSource();
-    }
-    if (!isConstantIntValue(totalOffset, 0)) {
-      swizzleBaseOffset =
-          getValueOrCreateConstantIndexOp(builder, loc, totalOffset);
-    }
+  int64_t swizzlePeriod = swizzle.getSwizzlePeriod();
+  if (!cst || (*cst % swizzlePeriod != 0)) {
+    swizzleBaseOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, totalOffset);
   }
 
   // Add the subgroup's base offset within the full allocation.

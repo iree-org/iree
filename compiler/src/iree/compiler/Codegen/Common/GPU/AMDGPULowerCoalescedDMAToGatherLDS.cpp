@@ -543,10 +543,8 @@ private:
           // Apply inverse source swizzle when destination has XOR swizzle.
           // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
           if (destSwizzle) {
-            int64_t destElements = ShapedType::getNumElements(destShape);
             srcLinearOffset = applyInverseXorSwizzleToDMASourceOffset(
-                rewriter, loc, srcLinearOffset, *destSwizzle, destElements,
-                dest);
+                rewriter, loc, srcLinearOffset, *destSwizzle, dest);
           }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);

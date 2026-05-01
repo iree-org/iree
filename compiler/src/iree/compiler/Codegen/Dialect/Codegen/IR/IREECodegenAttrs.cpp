@@ -662,10 +662,8 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // to get the simplest offset possible in case we are accessing values from
   // successive rows. This allows us to CSE the swizzling computation more
   // effectively.
-  int64_t rotationInvariant =
-      getRowWidth() * (getRowWidth() / getAccessWidth());
   OpFoldResult id =
-      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+      getMinimumConstantOffsetValue(b, loc, offset, getSwizzlePeriod());
 
   // Number of elements per row.
   Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
@@ -793,14 +791,12 @@ static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
 OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
                                            OpFoldResult offset,
                                            Value src) const {
-  int64_t rotationInvariant =
-      getRowWidth() * (getRowWidth() / getAccessWidth());
   int64_t rowStride =
       getRowStride() != int64_t() ? getRowStride() : getRowWidth();
   int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
 
   OpFoldResult id =
-      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+      getMinimumConstantOffsetValue(b, loc, offset, getSwizzlePeriod());
 
   // Strip the sub-access_width remainder to align the offset, since the
   // swizzle operates at access_width granularity.

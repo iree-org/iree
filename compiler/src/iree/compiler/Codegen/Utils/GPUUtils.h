@@ -301,7 +301,7 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 ///    ```
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
-    IREE::Codegen::XORShuffleAttr swizzle, int64_t destElements, Value dest);
+    IREE::Codegen::XORShuffleAttr swizzle, Value dest);
 
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
