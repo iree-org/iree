@@ -40,6 +40,36 @@
 // CHECK-INNER-TILED-FLAG-SAME: [#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
 // CHECK-INNER-TILED-FLAG-SAME: enable_inner_tiled = true
 
+// Targeting an x86 microarchitecture level like x86-64-v4 must expand to the
+// full transitive set of implied CPU features (matching `clang -march=...`),
+// not just the "leaf" features directly listed in LLVM's ProcInfo table for
+// that CPU. The features listed below are a mix of leaves (+avx2, +avx512bw,
+// +sse4.2, ...) and transitively-implied features (+avx, +avx512f, earlier
+// +sse versions, ...) that must all be present. They are sorted because the
+// resolver emits features in sorted order, which `CHECK-SAME` relies on.
+//
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN:              --iree-llvmcpu-target-cpu=x86-64-v4 \
+// RUN: | FileCheck %s --check-prefix=CHECK-X86-64-V4
+//
+// CHECK-X86-64-V4: #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
+// CHECK-X86-64-V4-SAME: cpu = "x86-64-v4"
+// CHECK-X86-64-V4-SAME: cpu_features = "
+// CHECK-X86-64-V4-SAME: +avx,
+// CHECK-X86-64-V4-SAME: +avx2,
+// CHECK-X86-64-V4-SAME: +avx512bw,
+// CHECK-X86-64-V4-SAME: +avx512cd,
+// CHECK-X86-64-V4-SAME: +avx512dq,
+// CHECK-X86-64-V4-SAME: +avx512f,
+// CHECK-X86-64-V4-SAME: +avx512vl,
+// CHECK-X86-64-V4-SAME: +fma,
+// CHECK-X86-64-V4-SAME: +sse,
+// CHECK-X86-64-V4-SAME: +sse2,
+// CHECK-X86-64-V4-SAME: +sse3,
+// CHECK-X86-64-V4-SAME: +sse4.1,
+// CHECK-X86-64-V4-SAME: +sse4.2,
+// CHECK-X86-64-V4-SAME: +ssse3
+
 module {
   util.func public @foo(%arg0: tensor<?xf32>) -> tensor<?xf32> {
     util.return %arg0 : tensor<?xf32>

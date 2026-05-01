@@ -158,6 +158,13 @@ class AsyncOp {
     fprintf(stdout, "ASYNC: BEFORE SIGNAL\n");
     fflush(stdout);
 
+    // Completion is the caller-visible teardown point. Release async-owned
+    // references before signaling so device teardown cannot race this thread's
+    // final buffer releases after the fence is observed.
+    source_view_.reset();
+    target_view_.reset();
+    wait_fence_.reset();
+
     // Try to signal completion so that downstream consumers of the result
     // can get scheduled.
     if (status.ok()) {

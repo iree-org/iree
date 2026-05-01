@@ -662,6 +662,10 @@ public:
     }
     Operation *newOp =
         layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    if (!newOp) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported operation for encoding materialization");
+    }
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

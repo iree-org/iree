@@ -102,6 +102,26 @@ TEST(StatusMacro, AssignOrReturn) {
   IREE_EXPECT_OK(assignOrReturn("foo"));
 }
 
+TEST(StatusJoin, OkBaseReturnsNewStatus) {
+  Status status = iree_status_join(
+      iree_ok_status(),
+      iree_make_status(IREE_STATUS_UNAVAILABLE, "secondary failure"));
+  EXPECT_THAT(status, StatusIs(StatusCode::kUnavailable));
+  CHECK_STATUS_MESSAGE(status, "secondary failure");
+}
+
+TEST(StatusJoin, FailedBaseKeepsPrimaryAndPreservesSecondary) {
+  Status status = iree_status_join(
+      iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "primary failure"),
+      iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "secondary failure"));
+  EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument));
+  CHECK_STATUS_MESSAGE(status, "primary failure");
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+  CHECK_STATUS_MESSAGE(status, "additional failure");
+  CHECK_STATUS_MESSAGE(status, "secondary failure");
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+}
+
 // Helper: collects iree_status_format_to output into a std::string.
 static std::string FormatStatusTo(iree_status_t status) {
   std::string result;

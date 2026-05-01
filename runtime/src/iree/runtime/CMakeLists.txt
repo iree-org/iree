@@ -33,6 +33,7 @@ iree_cc_library(
     "instance.c"
     "session.c"
   DEPS
+    iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal

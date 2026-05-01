@@ -243,6 +243,11 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     }
 
+    if (!global.loadOps.size()) {
+      // Nothing to inline.
+      return GlobalAction::PRESERVE;
+    }
+
     // Inline initial value into all loads.
     auto inliningPolicy = global.op.getGlobalInliningPolicy();
     SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps = global.loadOps;

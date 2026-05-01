@@ -480,8 +480,10 @@ IREE_API_EXPORT void iree_status_free(iree_status_t status);
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
 
 // Returns a new status that is |base_status| if not OK and otherwise returns
-// |new_status|. This allows for chaining failure handling code that may also
-// return statuses.
+// |new_status|. If both statuses failed then |new_status| is attached to
+// |base_status| as diagnostic context when status annotations are enabled. This
+// allows for chaining failure handling code that may also return statuses
+// without discarding secondary cleanup failures.
 //
 // Example:
 //   iree_status_t status = do_something();

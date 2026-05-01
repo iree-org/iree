@@ -15,6 +15,8 @@ iree_cc_library(
     hal
   HDRS
     "api.h"
+  TEXTUAL_HDRS
+    "profile_metrics.inc"
   SRCS
     "allocator.c"
     "allocator.h"
@@ -60,6 +62,13 @@ iree_cc_library(
     "pool.h"
     "pool_set.c"
     "pool_set.h"
+    "profile_metrics.c"
+    "profile_metrics.h"
+    "profile_options.c"
+    "profile_options.h"
+    "profile_schema.h"
+    "profile_sink.c"
+    "profile_sink.h"
     "queue.h"
     "resource.h"
     "semaphore.c"
@@ -83,13 +92,24 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    pool_test
+    device_test
   SRCS
-    "pool_test.cc"
+    "device_test.cc"
   DEPS
     ::hal
-    iree::async
-    iree::async::platform
+    iree::base
+    iree::hal::testing::mock_device
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    profile_metrics_test
+  SRCS
+    "profile_metrics_test.cc"
+  DEPS
+    ::hal
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
@@ -104,6 +124,32 @@ iree_cc_test(
     ::hal
     iree::base
     iree::base::internal::span
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    buffer_view_util_test
+  SRCS
+    "buffer_view_util_test.cc"
+  DEPS
+    ::hal
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    pool_test
+  SRCS
+    "pool_test.cc"
+  DEPS
+    ::hal
+    iree::async
+    iree::async::platform
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -139,6 +185,7 @@ iree_cc_test(
     "device_group_test.cc"
   DEPS
     ::hal
+    iree::async
     iree::base
     iree::hal::testing::mock_device
     iree::testing::gtest

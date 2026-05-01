@@ -12,11 +12,56 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    queue_alloca_test
+  SRCS
+    "queue_alloca_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+    iree::hal::memory::fixed_block_pool
+    iree::hal::memory::passthrough_pool
+    iree::hal::memory::tlsf_pool
+    iree::io::file_handle
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_dispatch_test
+  SRCS
+    "queue_dispatch_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::profile_test_util
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     queue_host_call_test
   SRCS
     "queue_host_call_test.cc"
   DEPS
     iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_transfer_test
+  SRCS
+    "queue_transfer_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::profile_test_util
     iree::hal::cts::util::test_base
   TESTONLY
   ALWAYSLINK
@@ -40,7 +85,10 @@ iree_cc_library(
   NAME
     all_tests
   DEPS
+    ::queue_alloca_test
+    ::queue_dispatch_test
     ::queue_host_call_test
+    ::queue_transfer_test
     ::semaphore_submission_test
   TESTONLY
   PUBLIC

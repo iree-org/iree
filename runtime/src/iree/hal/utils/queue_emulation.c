@@ -81,40 +81,99 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_update(
     command_buffer_mode |= IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION;
   }
 
-  // TODO(benvanik): support splitting the update into multiple chunks to fit
-  // under the max command buffer update size limit. This provisional API is
-  // intended only for updating dispatch parameters today.
-  if (length > UINT16_MAX) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "queue buffer updates currently limited to 64KB, "
-                            "tried to update %" PRIhsz " bytes",
-                            length);
+  if (length > IREE_HOST_SIZE_MAX - source_offset) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "queue update source range overflows host address space "
+        "(source_offset=%" PRIhsz ", length=%" PRIdsz ")",
+        source_offset, length);
+  }
+  if (length > IREE_DEVICE_SIZE_MAX - target_offset) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "queue update target range overflows device address space "
+        "(target_offset=%" PRIdsz ", length=%" PRIdsz ")",
+        target_offset, length);
   }
 
-  iree_hal_transfer_command_t command = {
-      .type = IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE,
-      .update =
-          {
-              .source_buffer = source_buffer,
-              .source_offset = source_offset,
-              .target_buffer = target_buffer,
-              .target_offset = target_offset,
-              .length = length,
-          },
-  };
+  const iree_device_size_t max_update_length =
+      IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE;
+  // Queue updates are not inherently limited to one command-buffer inline
+  // update. Keep a single queue submission and split oversized host spans into
+  // multiple transfer commands that each satisfy the command-buffer limit.
+  iree_device_size_t transfer_count_device = 1;
+  if (length > max_update_length) {
+    transfer_count_device =
+        iree_device_size_ceil_div(length, max_update_length);
+  }
+  if (transfer_count_device > IREE_HOST_SIZE_MAX) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "queue update requires too many transfer chunks");
+  }
+  const iree_host_size_t transfer_count =
+      (iree_host_size_t)transfer_count_device;
+
+  iree_hal_transfer_command_t inline_command;
+  iree_hal_transfer_command_t* transfer_commands = &inline_command;
+  iree_allocator_t host_allocator = iree_allocator_null();
+  iree_status_t status = iree_ok_status();
+  if (transfer_count > 1) {
+    host_allocator = iree_hal_device_host_allocator(device);
+    iree_host_size_t transfer_commands_size = 0;
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(transfer_count,
+                                                  sizeof(*transfer_commands),
+                                                  &transfer_commands_size))) {
+      status =
+          iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                           "queue update transfer command list is too large");
+    } else {
+      status = iree_allocator_malloc(host_allocator, transfer_commands_size,
+                                     (void**)&transfer_commands);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < transfer_count; ++i) {
+      const iree_device_size_t chunk_offset =
+          (iree_device_size_t)i * max_update_length;
+      const iree_device_size_t chunk_length =
+          iree_min(max_update_length, length - chunk_offset);
+      transfer_commands[i] = (iree_hal_transfer_command_t){
+          .type = IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE,
+          .update =
+              {
+                  .source_buffer = source_buffer,
+                  .source_offset =
+                      source_offset + (iree_host_size_t)chunk_offset,
+                  .target_buffer = target_buffer,
+                  .target_offset = target_offset + chunk_offset,
+                  .length = chunk_length,
+              },
+      };
+    }
+  }
 
   iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_transfer_command_buffer(device, command_buffer_mode,
-                                                  queue_affinity, 1, &command,
-                                                  &command_buffer));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_transfer_command_buffer(
+        device, command_buffer_mode, queue_affinity, transfer_count,
+        transfer_commands, &command_buffer);
+  }
 
-  iree_status_t status = iree_hal_device_queue_execute(
-      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      command_buffer, iree_hal_buffer_binding_table_empty(),
-      IREE_HAL_EXECUTE_FLAG_NONE);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_queue_execute(
+        device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+        command_buffer, iree_hal_buffer_binding_table_empty(),
+        IREE_HAL_EXECUTE_FLAG_NONE);
+  }
 
   iree_hal_command_buffer_release(command_buffer);
+  if (transfer_commands != &inline_command) {
+    iree_allocator_free(host_allocator, transfer_commands);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

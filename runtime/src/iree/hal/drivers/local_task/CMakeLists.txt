@@ -12,39 +12,171 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    block_builder
+  HDRS
+    "block_builder.h"
+  SRCS
+    "block_builder.c"
+  DEPS
+    ::block_isa
+    iree::base
+    iree::base::internal::arena
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_builder_test
+  SRCS
+    "block_builder_test.cc"
+  DEPS
+    ::block_builder
+    ::block_command_ops
+    ::block_isa
+    iree::base::internal::arena
+    iree::hal::local
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    block_command_buffer
+  HDRS
+    "block_command_buffer.h"
+  SRCS
+    "block_command_buffer.c"
+  DEPS
+    ::block_builder
+    ::block_command_ops
+    ::block_isa
+    iree::async
+    iree::base
+    iree::base::internal::arena
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
+    iree::hal::local::executable_loader
+    iree::hal::local::transient_buffer
+    iree::hal::utils::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    block_command_ops
+  HDRS
+    "block_command_ops.h"
+  SRCS
+    "block_command_ops.c"
+  DEPS
+    ::block_builder
+    ::block_isa
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    block_isa
+  HDRS
+    "block_isa.h"
+  DEPS
+    iree::async
+    iree::base
+    iree::hal::local::executable_library
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_isa_test
+  SRCS
+    "block_isa_test.cc"
+  DEPS
+    ::block_isa
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    block_processor
+  HDRS
+    "block_processor.h"
+  SRCS
+    "block_processor.c"
+  DEPS
+    ::block_isa
+    iree::async
+    iree::base
+    iree::base::internal::cpu
+    iree::base::threading
+    iree::base::threading::thread
+    iree::hal::local::executable_loader
+    iree::hal::local::profile
+    iree::task
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    block_processor_test
+  SRCS
+    "block_processor_test.cc"
+  DEPS
+    ::block_builder
+    ::block_isa
+    ::block_processor
+    iree::base::internal::arena
+    iree::base::threading::thread
+    iree::hal::local::executable_loader
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     task_driver
   HDRS
-    "task_command_buffer.h"
     "task_device.h"
     "task_driver.h"
     "task_event.h"
     "task_queue.h"
-    "task_queue_state.h"
     "task_semaphore.h"
   SRCS
-    "task_command_buffer.c"
     "task_device.c"
     "task_driver.c"
     "task_event.c"
     "task_queue.c"
-    "task_queue_state.c"
     "task_semaphore.c"
   DEPS
+    ::block_builder
+    ::block_command_buffer
+    ::block_command_ops
+    ::block_processor
     iree::async
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::atomic_slist
     iree::base::internal::cpu
     iree::base::threading
+    iree::base::threading::thread
     iree::hal
     iree::hal::local
     iree::hal::local::executable_environment
     iree::hal::local::executable_library
-    iree::hal::utils::deferred_command_buffer
-    iree::hal::utils::file_transfer
+    iree::hal::local::profile
+    iree::hal::local::transient_buffer
+    iree::hal::memory::cpu_slab_provider
+    iree::hal::memory::passthrough_pool
+    iree::hal::memory::tlsf_pool
     iree::hal::utils::files
-    iree::hal::utils::queue_emulation
     iree::hal::utils::resource_set
     iree::task
   PUBLIC

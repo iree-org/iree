@@ -11,6 +11,7 @@
 #include <sstream>
 #include <utility>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
@@ -1694,11 +1695,19 @@ iree_status_t ClientInstance::PopulateVMModules(
     iree_hal_device_t* hal_device,
     iree::vm::ref<iree_vm_module_t>& main_module) {
   // HAL module.
+  iree_async_frontier_tracker_t* frontier_tracker = nullptr;
+  iree_status_t status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator(),
+      &frontier_tracker);
   iree_hal_device_group_t* device_group = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(
-      hal_device, host_allocator(), &device_group));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_create_from_device(
+        hal_device, frontier_tracker, host_allocator(), &device_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
+  IREE_RETURN_IF_ERROR(status);
   modules.push_back({});
-  iree_status_t status = iree_hal_module_create(
+  status = iree_hal_module_create(
       vm_instance(), iree_hal_module_device_policy_default(), device_group,
       IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink_stdio(stderr),
       host_allocator(), &modules.back());

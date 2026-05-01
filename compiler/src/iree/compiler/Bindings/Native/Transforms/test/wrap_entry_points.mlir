@@ -127,6 +127,29 @@ util.func public @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {
 
 // -----
 
+// Tests that tensor-typed output storage arguments are imported as consumed.
+// The caller is explicitly providing storage to overwrite and return, so the
+// stream program may update that storage in-place.
+
+// CHECK-LABEL: util.func public @outputTensorStorage
+//  CHECK-SAME: (%[[ARG0:[a-z0-9]+]]: !hal.buffer_view, %[[STORAGE:[a-z0-9]+]]: !hal.buffer_view) -> !hal.buffer_view
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[STORAGE_TENSOR:.+]] = hal.tensor.import consume %[[STORAGE]] "input1" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_outputTensorStorage(%[[ARG0_TENSOR]], %[[STORAGE_TENSOR]])
+//  CHECK-NEXT:   %[[RET_ALIAS:.+]] = hal.tensor.alias %[[RET_TENSOR]] : tensor<4xf32> to %[[STORAGE]] : !hal.buffer_view
+//  CHECK-NEXT:   %[[RET_VIEW:.+]] = hal.tensor.export %[[RET_ALIAS]] "output0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]]
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_outputTensorStorage(
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
+util.func public @outputTensorStorage(%arg0: tensor<4xf32>, %storage: tensor<4xf32> {iree.abi.output = 0 : index}) -> tensor<4xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
 // Tests that functions already wrapped (iree.abi.stub present) are ignored.
 
 // CHECK-LABEL: util.func public @wrappedAlready

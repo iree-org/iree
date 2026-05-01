@@ -75,6 +75,7 @@ iree_runtime_cc_library(
     deps = [
         ":device_util",
         ":parameter_util",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:path",
@@ -83,6 +84,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local/loaders/registration",
         "//runtime/src/iree/hal/local/plugins/registration",
+        "//runtime/src/iree/hal/replay:recorder",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/modules/hal/inline",
@@ -100,12 +102,17 @@ iree_runtime_cc_library(
     hdrs = ["device_util.h"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers",
         "//runtime/src/iree/hal/utils:allocators",
         "//runtime/src/iree/hal/utils:mpi_channel_provider",
+        "//runtime/src/iree/hal/utils:profile_file",
+        "//runtime/src/iree/hal/utils:statistics_sink",
+        "//runtime/src/iree/io:file_handle",
     ],
 )
 
@@ -224,6 +231,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:recorder",
         "//runtime/src/iree/io:stream",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/vm",

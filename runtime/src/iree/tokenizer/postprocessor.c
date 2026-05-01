@@ -57,6 +57,7 @@ iree_status_t iree_tokenizer_postprocessor_initialize(
   if (pair_template) {
     memcpy(&out_postprocessor->pair, pair_template,
            sizeof(iree_tokenizer_postprocessor_template_t));
+    out_postprocessor->has_pair = true;
   }
 
   out_postprocessor->flags = flags;
@@ -122,12 +123,34 @@ iree_host_size_t iree_tokenizer_postprocessor_emit_prefix(
   return emitted;
 }
 
+iree_host_size_t iree_tokenizer_postprocessor_emit_infix(
+    iree_tokenizer_postprocessor_encode_state_t* state,
+    iree_tokenizer_token_output_t output, iree_host_size_t output_offset) {
+  if (state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX) return 0;
+  uint8_t base = state->active_template->prefix_count;
+  iree_host_size_t emitted = iree_tokenizer_postprocessor_emit_phase(
+      state->active_template, base, state->active_template->infix_count,
+      &state->position, output, output_offset);
+  if (state->position >= state->active_template->infix_count) {
+    state->phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B;
+    state->position = 0;
+  }
+  return emitted;
+}
+
 void iree_tokenizer_postprocessor_assign_type_ids(
     const iree_tokenizer_postprocessor_encode_state_t* state,
     iree_tokenizer_token_output_t output, iree_host_size_t offset,
     iree_host_size_t count) {
   if (!output.type_ids || count == 0) return;
-  if (state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A) return;
+  uint8_t type_id = 0;
+  if (state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A) {
+    type_id = state->active_template->sequence_a_type_id;
+  } else if (state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B) {
+    type_id = state->active_template->sequence_b_type_id;
+  } else {
+    return;
+  }
   // Bounds check with overflow protection: offset + count must not exceed
   // capacity and must not overflow.
   iree_host_size_t end = 0;
@@ -135,8 +158,7 @@ void iree_tokenizer_postprocessor_assign_type_ids(
       end > output.capacity) {
     return;  // Overflow or out of bounds.
   }
-  memset(&output.type_ids[offset], state->active_template->sequence_a_type_id,
-         count);
+  memset(&output.type_ids[offset], type_id, count);
 }
 
 iree_host_size_t iree_tokenizer_postprocessor_emit_suffix(

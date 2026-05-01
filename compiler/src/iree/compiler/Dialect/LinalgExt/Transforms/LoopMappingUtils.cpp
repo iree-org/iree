@@ -113,10 +113,12 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
       if (failed(composedMap) || (resultMap && composedMap != resultMap)) {
         return failure();
       }
-      // Reject mappings that are all zeros (e.g., affine_map<(d0) -> (0)>).
-      // A zero-dimensional map like affine_map<() -> ()> is a valid
-      // scalar-to-scalar mapping and should not be rejected.
-      if (composedMap->getNumResults() > 0 &&
+      // In the composed map, a result of 0 means that candidate dim does not
+      // map to any root parallel loop and is therefore rejected. Skip this
+      // check when the root has no parallel loops: the map is trivially
+      // all-zero (e.g. `() -> (0, 0)` for a consumer broadcasting a scalar
+      // reduction's result), so it carries no signal here.
+      if (composedMap->getNumDims() > 0 &&
           composedMap->getNumResults() == composedMap->getNumOfZeroResults()) {
         return failure();
       }

@@ -6,6 +6,9 @@
 
 #include "iree/hal/device.h"
 
+#include <inttypes.h>
+#include <string.h>
+
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
@@ -100,7 +103,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(topology_info);
   return _VTABLE_DISPATCH(device, assign_topology_info)(device, topology_info);
 }
 
@@ -111,6 +113,24 @@ iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
   IREE_ASSERT_ARGUMENT(semaphore);
   return _VTABLE_DISPATCH(device, query_semaphore_compatibility)(device,
                                                                  semaphore);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_query_queue_pool_backend(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_backend);
+  memset(out_backend, 0, sizeof(*out_backend));
+  const iree_hal_device_topology_info_t* topology_info =
+      iree_hal_device_topology_info(device);
+  if (!topology_info->topology || !topology_info->frontier.tracker) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "device queue pool backends are unavailable before the device is "
+        "assigned to a device group");
+  }
+  return _VTABLE_DISPATCH(device, query_queue_pool_backend)(
+      device, queue_affinity, out_backend);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
@@ -451,6 +471,103 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(options);
+
+  const iree_hal_device_profiling_flags_t supported_flags =
+      IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  if (iree_any_bit_set(options->flags, ~supported_flags)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported profile option flags 0x%x",
+                            options->flags & ~supported_flags);
+  }
+  const iree_hal_profile_capture_filter_flags_t supported_filter_flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_PHYSICAL_DEVICE_ORDINAL |
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL;
+  if (iree_any_bit_set(options->capture_filter.flags,
+                       ~supported_filter_flags)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unsupported profile capture filter bits 0x%x",
+        options->capture_filter.flags & ~supported_filter_flags);
+  }
+  if (options->capture_filter.reserved0 != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture filter reserved fields must be zero");
+  }
+  if (iree_any_bit_set(
+          options->capture_filter.flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN) &&
+      iree_string_view_is_empty(
+          options->capture_filter.executable_export_pattern)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture executable export filter must not be empty");
+  }
+  if (iree_any_bit_set(
+          options->capture_filter.flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID) &&
+      options->capture_filter.command_buffer_id == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "profile capture command buffer filter must be nonzero");
+  }
+
+  if (options->counter_set_count != 0) {
+    if (!options->counter_sets) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "hardware counter set selections require a counter_sets array");
+    }
+    if (!iree_hal_device_profiling_options_requests_counters(options)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "hardware counter set selections require a counter profiling data "
+          "family");
+    }
+    for (iree_host_size_t i = 0; i < options->counter_set_count; ++i) {
+      const iree_hal_profile_counter_set_selection_t* counter_set =
+          &options->counter_sets[i];
+      if (counter_set->counter_name_count == 0 || !counter_set->counter_names) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "hardware counter set %" PRIhsz
+                                " must request at least one counter name",
+                                i);
+      }
+      for (iree_host_size_t j = 0; j < counter_set->counter_name_count; ++j) {
+        iree_string_view_t counter_name = counter_set->counter_names[j];
+        if (iree_string_view_is_empty(counter_name) || !counter_name.data) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "hardware counter set %" PRIhsz
+              " has an empty counter name at index %" PRIhsz,
+              i, j);
+        }
+      }
+    }
+  }
+  if (iree_hal_device_profiling_options_requests_counters(options) &&
+      options->counter_set_count == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "counter profiling requires at least one counter set selection");
+  }
+
+  const bool data_requested =
+      options->data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
+      iree_hal_device_profiling_options_requests_lightweight_statistics(
+          options);
+  if (data_requested && !options->sink) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "HAL-native profiling with requested data requires a profile sink");
+  }
+  if (!data_requested) {
+    return iree_ok_status();
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       _VTABLE_DISPATCH(device, profiling_begin)(device, options);
@@ -472,6 +589,32 @@ iree_hal_device_profiling_end(iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, profiling_end)(device);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_external_capture_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_external_capture_options_t* options) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(options);
+  if (iree_string_view_is_empty(options->provider)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "external capture provider must be specified");
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(device, external_capture_begin)(device, options);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_device_external_capture_end(iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, external_capture_end)(device);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

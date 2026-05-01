@@ -10,6 +10,10 @@
 #include <nanobind/intrusive/counter.h>
 
 #include <functional>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "./binding.h"
@@ -124,14 +128,53 @@ class HalBufferView
 
 class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
  public:
+  HalDevice() = default;
+  HalDevice(const HalDevice& other)
+      : ApiRefCounted<HalDevice, iree_hal_device_t>(other),
+        device_group_(other.device_group_) {
+    iree_hal_device_group_retain(device_group_);
+  }
+  HalDevice(HalDevice&& other)
+      : ApiRefCounted<HalDevice, iree_hal_device_t>(std::move(other)),
+        device_group_(other.device_group_) {
+    other.device_group_ = nullptr;
+  }
+  HalDevice& operator=(const HalDevice&) = delete;
+  HalDevice& operator=(HalDevice&&) = delete;
+  ~HalDevice() {
+    if (device_group_ && py::is_alive()) {
+      iree_hal_device_group_release(device_group_);
+    }
+  }
+
+  static HalDevice StealFromRawPtrAndDeviceGroup(
+      iree_hal_device_t* retained_device,
+      iree_hal_device_group_t* retained_device_group) {
+    HalDevice device = HalDevice::StealFromRawPtr(retained_device);
+    device.device_group_ = retained_device_group;
+    return device;
+  }
+
   iree_hal_allocator_t* allocator() {
     return iree_hal_device_allocator(raw_ptr());
   }
 
-  void BeginProfiling(std::optional<std::string> mode,
-                      std::optional<std::string> file_path);
+  iree_hal_device_group_t* device_group() {
+    if (!device_group_) {
+      throw std::invalid_argument(
+          "HAL device has no device group/frontier tracker; create devices "
+          "through HalDriver so queue ordering can be tracked");
+    }
+    return device_group_;
+  }
+
+  void BeginProfiling(std::optional<std::string> mode);
   void FlushProfiling();
   void EndProfiling();
+  void BeginExternalCapture(std::string provider,
+                            std::optional<std::string> file_path,
+                            std::optional<std::string> label);
+  void EndExternalCapture();
   HalSemaphore CreateSemaphore(uint64_t initial_value);
   HalBuffer QueueAlloca(uint64_t allocation_size, py::handle wait_semaphores,
                         py::handle signal_semaphores);
@@ -144,6 +187,9 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
   HalBufferView FromDLPackCapsule(py::object capsule);
   py::object CreateDLPackCapsule(HalBufferView& bufferView,
                                  int device_type_code, int device_id);
+
+ private:
+  iree_hal_device_group_t* device_group_ = nullptr;
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {

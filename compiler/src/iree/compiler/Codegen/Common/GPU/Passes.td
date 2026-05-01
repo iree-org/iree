@@ -476,7 +476,8 @@ def ExpandGPUOpsPass :
     InterfacePass<"iree-codegen-expand-gpu-ops", "mlir::FunctionOpInterface"> {
   let summary = "Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.";
   let dependentDialects = [
-    "::mlir::gpu::GPUDialect"
+    "::mlir::arith::ArithDialect",
+    "::mlir::gpu::GPUDialect",
   ];
 }
 

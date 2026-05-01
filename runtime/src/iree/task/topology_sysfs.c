@@ -10,6 +10,9 @@
 // Documentation:
 // https://docs.kernel.org/admin-guide/abi-stable-files.html#abi-file-stable-sysfs-devices-system-cpu
 
+// Must define _GNU_SOURCE before includes to get CPU_* macros from sched.h.
+#define _GNU_SOURCE
+
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/sysfs.h"
 #include "iree/task/topology.h"
@@ -19,6 +22,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -81,6 +85,21 @@ static uint32_t iree_sysfs_query_processor_count(void) {
   }
 
   return 0;  // Unknown.
+}
+
+// Queries the CPU set currently available to the calling thread.
+// Returns false if the platform query fails, in which case callers should not
+// constrain sysfs topology discovery to an affinity mask.
+static bool iree_sysfs_query_current_affinity(cpu_set_t* out_cpu_set) {
+  CPU_ZERO(out_cpu_set);
+  return sched_getaffinity(/*pid=*/0, sizeof(*out_cpu_set), out_cpu_set) == 0;
+}
+
+// Returns true if |processor| is currently available to the calling thread.
+static bool iree_sysfs_is_processor_available(
+    uint32_t processor, const cpu_set_t* current_affinity) {
+  if (!current_affinity) return true;
+  return processor < CPU_SETSIZE && CPU_ISSET(processor, current_affinity);
 }
 
 // Reads the core ID for a specific logical processor.
@@ -268,23 +287,16 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
     return 1;
   }
 
-  // Track unique cluster IDs and count them as we discover new ones. Cluster
-  // IDs are sparse sysfs values, not bounded cpu_set_t indices.
-  uint32_t cluster_ids[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+  // Track unique cluster IDs and count them as we discover new ones.
+  cpu_set_t cluster_set;
+  CPU_ZERO(&cluster_set);
   iree_host_size_t unique_clusters = 0;
   for (uint32_t cpu = 0; cpu < processor_count; ++cpu) {
     uint32_t cluster_id = 0;
     if (iree_sysfs_try_query_cluster_id(cpu, &cluster_id) &&
         iree_sysfs_is_valid_cluster(cluster_id)) {
-      bool cluster_seen = false;
-      for (iree_host_size_t i = 0; i < unique_clusters; ++i) {
-        if (cluster_ids[i] == cluster_id) {
-          cluster_seen = true;
-          break;
-        }
-      }
-      if (!cluster_seen && unique_clusters < IREE_ARRAYSIZE(cluster_ids)) {
-        cluster_ids[unique_clusters] = cluster_id;
+      if (!CPU_ISSET(cluster_id, &cluster_set)) {
+        CPU_SET(cluster_id, &cluster_set);
         ++unique_clusters;
       }
     }
@@ -320,7 +332,7 @@ typedef struct {
 } iree_sysfs_sharing_context_t;
 
 // Callback for iree_sysfs_parse_cpu_list that maps CPU ranges to group indices.
-// O(ranges_in_list x group_count) per group; both are small.
+// O(ranges_in_list x group_count) per group — both are small.
 static bool iree_sysfs_accumulate_sharing_groups(uint32_t start_cpu,
                                                  uint32_t end_cpu,
                                                  void* user_data) {
@@ -328,7 +340,8 @@ static bool iree_sysfs_accumulate_sharing_groups(uint32_t start_cpu,
   for (iree_host_size_t i = 0; i < ctx->topology->group_count; ++i) {
     uint32_t processor = ctx->topology->groups[i].processor_index;
     if (processor >= start_cpu && processor < end_cpu) {
-      ctx->group_mask |= 1ull << ctx->topology->groups[i].group_index;
+      iree_task_affinity_set_set_index(&ctx->group_mask,
+                                       ctx->topology->groups[i].group_index);
     }
   }
   return true;  // Continue enumeration.
@@ -356,7 +369,7 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
   // Parse CPU list directly into group mask.
   iree_sysfs_sharing_context_t ctx = {
       .topology = topology,
-      .group_mask = 0,
+      .group_mask = iree_task_affinity_set_empty(),
   };
   const bool valid =
       iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
@@ -371,8 +384,8 @@ static bool iree_sysfs_read_cache_shared_cpu_list(
 static bool iree_sysfs_find_sharing_cache_mask(
     uint32_t processor, const iree_task_topology_t* topology,
     iree_task_topology_group_mask_t* out_group_mask) {
-  iree_task_topology_group_mask_t l3_mask = 0;
-  iree_task_topology_group_mask_t l2_mask = 0;
+  iree_task_topology_group_mask_t l3_mask = iree_task_affinity_set_empty();
+  iree_task_topology_group_mask_t l2_mask = iree_task_affinity_set_empty();
   bool found_l3 = false;
   bool found_l2 = false;
 
@@ -428,7 +441,7 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     iree_task_topology_group_t* group = &topology->groups[i];
 
     // Find groups that share L3 (or L2 as fallback) cache with this group.
-    iree_task_topology_group_mask_t group_mask = 0;
+    iree_task_topology_group_mask_t group_mask = iree_task_affinity_set_empty();
     iree_sysfs_find_sharing_cache_mask(group->processor_index, topology,
                                        &group_mask);
 
@@ -442,11 +455,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_host_size_t cpu_count, const uint32_t* cpu_ids,
     iree_task_topology_t* out_topology) {
   // Validate input.
-  if (cpu_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            cpu_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
   uint32_t processor_count = iree_sysfs_query_processor_count();
   if (processor_count == 0) {
@@ -500,33 +513,37 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 // Cache domain enumeration
 //===----------------------------------------------------------------------===//
 
-// Context for building an index mask over a bounded core_map from a CPU list.
+// Context for building a processor bitmask from a CPU list.
+// Used by the cache domain enumeration path which needs cpu_set_t for domain
+// grouping. Note: cpu_set_t is limited to CPU_SETSIZE (glibc 1024) — this is
+// acceptable for domain enumeration since IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT
+// bounds the number of cores we enumerate, but processor IDs themselves could
+// exceed 1024 on large machines. The constructive sharing mask path above
+// avoids cpu_set_t entirely.
 typedef struct {
-  const uint32_t* core_map;
-  iree_host_size_t core_count;
-  iree_task_topology_group_mask_t core_mask;
-} iree_sysfs_core_mask_context_t;
+  cpu_set_t processor_mask;
+} iree_sysfs_processor_mask_context_t;
 
-// Callback to accumulate CPU ranges into a mask of core_map indices.
-static bool iree_sysfs_accumulate_core_mask(uint32_t start_cpu,
-                                            uint32_t end_cpu, void* user_data) {
-  iree_sysfs_core_mask_context_t* ctx =
-      (iree_sysfs_core_mask_context_t*)user_data;
-  for (iree_host_size_t i = 0; i < ctx->core_count; ++i) {
-    uint32_t processor = ctx->core_map[i];
-    if (processor >= start_cpu && processor < end_cpu) {
-      ctx->core_mask |= UINT64_C(1) << i;
+// Callback to accumulate processor IDs into a cpu_set_t bitmask.
+static bool iree_sysfs_accumulate_processor_mask(uint32_t start_cpu,
+                                                 uint32_t end_cpu,
+                                                 void* user_data) {
+  iree_sysfs_processor_mask_context_t* ctx =
+      (iree_sysfs_processor_mask_context_t*)user_data;
+  for (uint32_t cpu = start_cpu; cpu < end_cpu; ++cpu) {
+    if (cpu < CPU_SETSIZE) {
+      CPU_SET(cpu, &ctx->processor_mask);
     }
   }
   return true;  // Continue enumeration.
 }
 
-// Reads shared_cpu_list for a given cache index into a core index mask.
+// Reads shared_cpu_list for a given cache index into a processor bitmask.
 // Returns true if successful, false if the file doesn't exist or can't be
 // parsed.
-static bool iree_sysfs_read_cache_shared_core_mask(
-    uint32_t processor, uint32_t cache_index, iree_host_size_t core_count,
-    const uint32_t* core_map, iree_task_topology_group_mask_t* out_mask) {
+static bool iree_sysfs_read_cache_shared_processor_mask(uint32_t processor,
+                                                        uint32_t cache_index,
+                                                        cpu_set_t* out_mask) {
   char path[256];
   iree_snprintf(path, sizeof(path),
                 "%s/cpu/cpu%u/cache/index%u/shared_cpu_list",
@@ -538,27 +555,24 @@ static bool iree_sysfs_read_cache_shared_core_mask(
     return false;
   }
 
-  // Parse the CPU list directly into a bounded core index mask.
-  iree_sysfs_core_mask_context_t ctx = {
-      .core_map = core_map,
-      .core_count = core_count,
-      .core_mask = 0,
-  };
-  const bool valid =
+  // Parse CPU list into bitmask.
+  iree_sysfs_processor_mask_context_t ctx;
+  CPU_ZERO(&ctx.processor_mask);
+  const bool valid_bitmask =
       iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
-                                    iree_sysfs_accumulate_core_mask, &ctx);
-  *out_mask = ctx.core_mask;
-  return valid;
+                                    iree_sysfs_accumulate_processor_mask, &ctx);
+  *out_mask = ctx.processor_mask;
+  return valid_bitmask;
 }
 
-// Finds the best cache level for domain grouping and returns a core index mask.
+// Finds the best cache level for domain grouping and returns a processor mask.
 // Prefers L3 Data/Unified, falls back to L2 Data/Unified.
 // Returns true if a mask was found, false otherwise.
-static bool iree_sysfs_find_sharing_core_mask(
-    uint32_t processor, iree_host_size_t core_count, const uint32_t* core_map,
-    iree_task_topology_group_mask_t* out_mask) {
-  iree_task_topology_group_mask_t l3_mask = 0;
-  iree_task_topology_group_mask_t l2_mask = 0;
+static bool iree_sysfs_find_sharing_processor_mask(uint32_t processor,
+                                                   cpu_set_t* out_mask) {
+  cpu_set_t l3_mask, l2_mask;
+  CPU_ZERO(&l3_mask);
+  CPU_ZERO(&l2_mask);
   bool found_l3 = false;
   bool found_l2 = false;
 
@@ -575,9 +589,9 @@ static bool iree_sysfs_find_sharing_core_mask(
       continue;
     }
 
-    iree_task_topology_group_mask_t shared_mask = 0;
-    if (iree_sysfs_read_cache_shared_core_mask(
-            processor, cache_index, core_count, core_map, &shared_mask)) {
+    cpu_set_t shared_mask;
+    if (iree_sysfs_read_cache_shared_processor_mask(processor, cache_index,
+                                                    &shared_mask)) {
       if (cache.level == 3) {
         l3_mask = shared_mask;
         found_l3 = true;
@@ -602,21 +616,11 @@ static bool iree_sysfs_find_sharing_core_mask(
 
 // Cache domain descriptor grouping cores that share L3 cache.
 typedef struct {
-  // Mask of core_map indices in this domain.
-  iree_task_topology_group_mask_t core_mask;
-  // Mask of core_map indices sharing this domain's cache.
-  iree_task_topology_group_mask_t sharing_mask;
+  // All cores in this domain.
+  cpu_set_t cores;
+  // Processor bitmask defining this domain.
+  cpu_set_t sharing_mask;
 } iree_sysfs_cache_domain_t;
-
-// Returns the lowest processor ID in |core_mask| for deterministic sorting.
-static uint32_t iree_sysfs_find_first_domain_processor(
-    iree_task_topology_group_mask_t core_mask, iree_host_size_t core_count,
-    const uint32_t* core_map) {
-  for (iree_host_size_t i = 0; i < core_count; ++i) {
-    if (core_mask & (UINT64_C(1) << i)) return core_map[i];
-  }
-  return UINT32_MAX;
-}
 
 // Groups cores into cache domains based on L3 sharing masks.
 // Returns the number of domains found. If cache info is unavailable, returns 1
@@ -630,26 +634,27 @@ static iree_host_size_t iree_sysfs_enumerate_cache_domains(
   iree_host_size_t domain_count = 0;
   for (iree_host_size_t i = 0; i < core_count; ++i) {
     uint32_t processor = core_map[i];
-    iree_task_topology_group_mask_t sharing_mask = 0;
-    const bool has_mask = iree_sysfs_find_sharing_core_mask(
-        processor, core_count, core_map, &sharing_mask);
+    cpu_set_t sharing_mask;
+    CPU_ZERO(&sharing_mask);
+    const bool has_mask =
+        iree_sysfs_find_sharing_processor_mask(processor, &sharing_mask);
 
-    // If no cache info is available, keep the original core order.
+    // If no cache info available, put all cores in one domain.
     if (!has_mask) {
-      out_domains[0].core_mask = 0;
+      CPU_ZERO(&out_domains[0].cores);
       for (iree_host_size_t j = 0; j < core_count; ++j) {
-        out_domains[0].core_mask |= UINT64_C(1) << j;
+        CPU_SET(core_map[j], &out_domains[0].cores);
       }
-      out_domains[0].sharing_mask = out_domains[0].core_mask;
+      CPU_ZERO(&out_domains[0].sharing_mask);
       return 1;  // Single domain fallback.
     }
 
     // Check if this sharing mask matches an existing domain.
     bool found_domain = false;
     for (iree_host_size_t d = 0; d < domain_count; ++d) {
-      if (out_domains[d].sharing_mask == sharing_mask) {
+      if (CPU_EQUAL(&out_domains[d].sharing_mask, &sharing_mask)) {
         // Add to existing domain.
-        out_domains[d].core_mask |= UINT64_C(1) << i;
+        CPU_SET(processor, &out_domains[d].cores);
         found_domain = true;
         break;
       }
@@ -657,20 +662,25 @@ static iree_host_size_t iree_sysfs_enumerate_cache_domains(
 
     // Create new domain if this is a unique sharing mask.
     if (!found_domain && domain_count < max_domains) {
-      out_domains[domain_count].core_mask = UINT64_C(1) << i;
+      CPU_ZERO(&out_domains[domain_count].cores);
+      CPU_SET(processor, &out_domains[domain_count].cores);
       out_domains[domain_count].sharing_mask = sharing_mask;
       ++domain_count;
     }
   }
 
   // Sort domains by lowest core ID for deterministic ordering.
+  // Find the lowest set bit in each domain's cores cpu_set_t.
   for (iree_host_size_t i = 0; i < domain_count - 1; ++i) {
     for (iree_host_size_t j = i + 1; j < domain_count; ++j) {
-      const uint32_t first_i = iree_sysfs_find_first_domain_processor(
-          out_domains[i].core_mask, core_count, core_map);
-      const uint32_t first_j = iree_sysfs_find_first_domain_processor(
-          out_domains[j].core_mask, core_count, core_map);
-      if (first_j < first_i) {
+      // Find first set CPU in each domain.
+      int first_i = -1, first_j = -1;
+      for (int cpu = 0; cpu < CPU_SETSIZE && (first_i < 0 || first_j < 0);
+           ++cpu) {
+        if (first_i < 0 && CPU_ISSET(cpu, &out_domains[i].cores)) first_i = cpu;
+        if (first_j < 0 && CPU_ISSET(cpu, &out_domains[j].cores)) first_j = cpu;
+      }
+      if (first_j >= 0 && first_i >= 0 && first_j < first_i) {
         iree_sysfs_cache_domain_t temp = out_domains[i];
         out_domains[i] = out_domains[j];
         out_domains[j] = temp;
@@ -694,7 +704,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     return iree_ok_status();
   }
 
-  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
 
   // Detect heterogeneous systems (ARM big.LITTLE) by scanning CPU capacities.
   // Capacity values are normalized to 1024 for the highest-performance cores.
@@ -718,12 +728,25 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
 
   iree_task_topology_initialize(out_topology);
 
+  // Sysfs describes the host machine, not necessarily the processor set this
+  // process is allowed to run on. Constrain topology discovery with the current
+  // affinity mask so cgroups, cpusets, taskset, and qemu-user test runners do
+  // not create worker groups that can never execute.
+  cpu_set_t current_affinity;
+  const cpu_set_t* current_affinity_ptr =
+      iree_sysfs_query_current_affinity(&current_affinity) ? &current_affinity
+                                                           : NULL;
+
   // Find unique cores by enumerating processors and grouping by core_id.
   // We build a simple map of core_id -> first processor in that core.
-  uint32_t core_map[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+  uint32_t core_map[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
   iree_host_size_t core_count = 0;
   for (uint32_t cpu = 0; cpu < processor_count && core_count < max_core_count;
        ++cpu) {
+    if (!iree_sysfs_is_processor_available(cpu, current_affinity_ptr)) {
+      continue;
+    }
+
     uint32_t core_id = 0;
     if (!iree_sysfs_try_query_core_id(cpu, &core_id)) {
       continue;  // Skip CPUs we can't query.
@@ -781,30 +804,29 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   if (core_count > 1 &&
       distribution == IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER) {
     // Enumerate cache domains from the cores we found.
-    iree_sysfs_cache_domain_t domains[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+    iree_sysfs_cache_domain_t domains[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
     const iree_host_size_t domain_count = iree_sysfs_enumerate_cache_domains(
         core_count, core_map, domains, IREE_ARRAYSIZE(domains));
     if (domain_count > 1) {
       // SCATTER: Distribute cores evenly across domains using round-robin.
       // This maximizes memory bandwidth by utilizing multiple controllers.
-      uint32_t new_core_map[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+      uint32_t new_core_map[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
       iree_host_size_t new_core_count = 0;
 
-      // Track next core_map index to check for each domain.
-      iree_host_size_t domain_next_index[IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT];
+      // Track next CPU to check for each domain.
+      int domain_next_cpu[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
       for (iree_host_size_t d = 0; d < domain_count; ++d) {
-        domain_next_index[d] = 0;
+        domain_next_cpu[d] = 0;
       }
 
       while (new_core_count < core_count) {
         bool assigned_any = false;
         for (iree_host_size_t d = 0; d < domain_count; ++d) {
-          // Find next set core in this domain.
-          for (iree_host_size_t core_index = domain_next_index[d];
-               core_index < core_count; ++core_index) {
-            if (domains[d].core_mask & (UINT64_C(1) << core_index)) {
-              new_core_map[new_core_count++] = core_map[core_index];
-              domain_next_index[d] = core_index + 1;
+          // Find next set CPU in this domain.
+          for (int cpu = domain_next_cpu[d]; cpu < CPU_SETSIZE; ++cpu) {
+            if (CPU_ISSET(cpu, &domains[d].cores)) {
+              new_core_map[new_core_count++] = (uint32_t)cpu;
+              domain_next_cpu[d] = cpu + 1;  // Start after this next time.
               assigned_any = true;
               break;
             }
