@@ -1,9 +1,9 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target)))))" \
-// RUN:   %s | FileCheck %s
+// RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
 
 // Test ArgCompareOp with VectorDistribute pipeline.
 
+#executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 // Use a simple config with only lane-level reduction (64 threads, 64 elements per thread)
 // to avoid needing subgroup-level reduction across multiple subgroups.
 #config = #iree_gpu.lowering_config<{
@@ -29,32 +29,22 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-hal.executable private @argcompare_pipeline_test {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @argcompare_argmax ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @argcompare_argmax() attributes {translation_info = #translation} {
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>>
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xf32>>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xi32>>
-        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
-        %4 = tensor.empty() : tensor<1xf32>
-        %5 = tensor.empty() : tensor<1xi32>
-        %6:2 = iree_linalg_ext.arg_compare {lowering_config = #config} dimension(1) ins(%3 : tensor<1x256xf32>) outs(%4, %5 : tensor<1xf32>, tensor<1xi32>) {
-          ^bb0(%a: f32, %b: f32):
-            %cmp = arith.cmpf ogt, %a, %b : f32
-            iree_linalg_ext.yield %cmp : i1
-        } -> tensor<1xf32>, tensor<1xi32>
-        iree_tensor_ext.dispatch.tensor.store %6#0, %1, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xf32>>
-        iree_tensor_ext.dispatch.tensor.store %6#1, %2, offsets = [0], sizes = [1], strides = [1] : tensor<1xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xi32>>
-        return
-      }
-    }
-  }
+func.func @argcompare_argmax() attributes {hal.executable.target = #executable_target_rocm, translation_info = #translation} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xi32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
+  %4 = tensor.empty() : tensor<1xf32>
+  %5 = tensor.empty() : tensor<1xi32>
+  %6:2 = iree_linalg_ext.arg_compare {lowering_config = #config} dimension(1) ins(%3 : tensor<1x256xf32>) outs(%4, %5 : tensor<1xf32>, tensor<1xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<1xf32>, tensor<1xi32>
+  iree_tensor_ext.dispatch.tensor.store %6#0, %1, offsets = [0], sizes = [1], strides = [1] : tensor<1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xf32>>
+  iree_tensor_ext.dispatch.tensor.store %6#1, %2, offsets = [0], sizes = [1], strides = [1] : tensor<1xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1xi32>>
+  return
 }
 
 // CHECK-LABEL: func.func @argcompare_argmax
