@@ -741,7 +741,7 @@ struct ConvertVectorMultiReduction final
                   ConversionPatternRewriter &rewriter) const override {
 
     VectorType srcType = cast<VectorType>(op.getSource().getType());
-    if (srcType.getRank() <= 1) {
+    if (srcType.getRank() != 2) {
       return failure();
     }
 
