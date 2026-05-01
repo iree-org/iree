@@ -75,6 +75,108 @@ enum class ContainerType {
   HSACO,
 };
 
+enum class AMDGPUTargetFeatureMode {
+  // Feature mode is not specified by the target ID.
+  Any,
+  // Feature is explicitly disabled.
+  Off,
+  // Feature is explicitly enabled.
+  On,
+};
+
+struct AMDGPUTargetFeatureModes {
+  // SRAM ECC target feature mode.
+  AMDGPUTargetFeatureMode sramecc = AMDGPUTargetFeatureMode::Any;
+  // XNACK target feature mode.
+  AMDGPUTargetFeatureMode xnack = AMDGPUTargetFeatureMode::Any;
+};
+
+static LogicalResult
+setAMDGPUTargetFeatureMode(Location loc, StringRef featureName,
+                           AMDGPUTargetFeatureMode featureMode,
+                           AMDGPUTargetFeatureMode &targetFeatureMode) {
+  if (targetFeatureMode != AMDGPUTargetFeatureMode::Any) {
+    return emitError(loc, "duplicate ROCM target feature '")
+           << featureName << "'";
+  }
+  targetFeatureMode = featureMode;
+  return success();
+}
+
+static FailureOr<AMDGPUTargetFeatureModes>
+parseAMDGPUTargetFeatureModes(Location loc, StringRef targetFeatures) {
+  AMDGPUTargetFeatureModes modes;
+  SmallVector<StringRef> features;
+  llvm::SplitString(targetFeatures, features, ",");
+  for (StringRef rawFeature : features) {
+    AMDGPUTargetFeatureMode featureMode = AMDGPUTargetFeatureMode::Any;
+    StringRef feature = rawFeature;
+    if (feature.consume_front("+")) {
+      featureMode = AMDGPUTargetFeatureMode::On;
+    } else if (feature.consume_front("-")) {
+      featureMode = AMDGPUTargetFeatureMode::Off;
+    } else {
+      emitError(loc, "ROCM target feature must be prefixed with '+' or '-'; "
+                     "but seen '")
+          << rawFeature << "'";
+      return failure();
+    }
+    if (feature == "sramecc") {
+      if (failed(setAMDGPUTargetFeatureMode(loc, feature, featureMode,
+                                            modes.sramecc))) {
+        return failure();
+      }
+    } else if (feature == "xnack") {
+      if (failed(setAMDGPUTargetFeatureMode(loc, feature, featureMode,
+                                            modes.xnack))) {
+        return failure();
+      }
+    } else {
+      // We only support these two features to be set explicitly. Features like
+      // wavefrontsize are controlled and tuned by the compiler.
+      emitError(loc,
+                "ROCM target feature can only be 'sramecc' or 'xnack'; but "
+                "seen '")
+          << feature << "'";
+      return failure();
+    }
+  }
+  return modes;
+}
+
+static void appendAMDGPUTargetFeatureSuffix(std::string &targetID,
+                                            StringRef featureName,
+                                            AMDGPUTargetFeatureMode mode) {
+  switch (mode) {
+  case AMDGPUTargetFeatureMode::Any:
+    return;
+  case AMDGPUTargetFeatureMode::Off:
+    targetID += ":";
+    targetID += featureName;
+    targetID += "-";
+    return;
+  case AMDGPUTargetFeatureMode::On:
+    targetID += ":";
+    targetID += featureName;
+    targetID += "+";
+    return;
+  }
+}
+
+static FailureOr<std::string> buildAMDGPUTargetID(Location loc,
+                                                  StringRef targetArch,
+                                                  StringRef targetFeatures) {
+  FailureOr<AMDGPUTargetFeatureModes> modes =
+      parseAMDGPUTargetFeatureModes(loc, targetFeatures);
+  if (failed(modes)) {
+    return failure();
+  }
+  std::string targetID = targetArch.str();
+  appendAMDGPUTargetFeatureSuffix(targetID, "sramecc", modes->sramecc);
+  appendAMDGPUTargetFeatureSuffix(targetID, "xnack", modes->xnack);
+  return targetID;
+}
+
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
@@ -264,24 +366,9 @@ struct ROCMOptions {
       return emitError(builder.getUnknownLoc(), "Unknown ROCM target '")
              << target << "'";
     }
-    SmallVector<StringRef> features;
-    llvm::SplitString(targetFeatures, features, ",");
-    for (StringRef f : features) {
-      if (!(f.starts_with("+") || f.starts_with("-"))) {
-        return emitError(builder.getUnknownLoc(),
-                         "ROCM target feature must be prefixed with '+' or "
-                         "'-'; but seen '")
-               << f << "'";
-      }
-      StringRef feature = f.substr(1);
-      if (feature != "sramecc" && feature != "xnack") {
-        // We only support these two features to be set explicitly. Features
-        // like wavefrontsize is controlled and tuned by the compiler.
-        return emitError(builder.getUnknownLoc(),
-                         "ROCM target feature can only be 'sramecc' or "
-                         "'xnack'; but seen '")
-               << feature << "'";
-      }
+    if (failed(parseAMDGPUTargetFeatureModes(builder.getUnknownLoc(),
+                                             targetFeatures))) {
+      return failure();
     }
     return success();
   }
@@ -392,7 +479,13 @@ public:
     addConfig("abi", b.getStringAttr(deviceID));
     std::string format;
     if (deviceID == "amdgpu") {
-      format = targetOptions.target;
+      FailureOr<std::string> targetID =
+          buildAMDGPUTargetID(b.getUnknownLoc(), targetOptions.target,
+                              targetOptions.targetFeatures);
+      if (failed(targetID)) {
+        return nullptr;
+      }
+      format = *targetID;
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
@@ -922,6 +1015,7 @@ public:
     }
 
     // Wrap the HSACO ELF binary in the requested container type (if any).
+    StringAttr executableBinaryFormat = variantOp.getTarget().getFormat();
     FailureOr<DenseIntElementsAttr> binaryContainer;
     switch (containerType) {
     case ContainerType::Auto: {
@@ -930,8 +1024,14 @@ public:
       break;
     }
     case ContainerType::AMDGPU: {
+      FailureOr<std::string> targetID =
+          buildAMDGPUTargetID(variantOp.getLoc(), targetArch, targetFeatures);
+      if (failed(targetID)) {
+        return failure();
+      }
+      executableBinaryFormat = executableBuilder.getStringAttr(*targetID);
       binaryContainer = serializeAMDGPUBinaryContainer(
-          serializationOptions, variantOp, exportOps, targetHSACO);
+          serializationOptions, variantOp, exportOps, *targetID, targetHSACO);
       break;
     }
     case ContainerType::HIP: {
@@ -957,7 +1057,7 @@ public:
     // Add the binary data to the target executable.
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
-        variantOp.getTarget().getFormat(), binaryContainer.value());
+        executableBinaryFormat, binaryContainer.value());
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
@@ -968,7 +1068,7 @@ protected:
   FailureOr<DenseIntElementsAttr> serializeAMDGPUBinaryContainer(
       const SerializationOptions &serializationOptions,
       IREE::HAL::ExecutableVariantOp variantOp,
-      ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
+      ArrayRef<IREE::HAL::ExecutableExportOp> exportOps, StringRef targetID,
       StringRef hsacoModule) {
     iree_compiler::FlatbufferBuilder builder;
     iree_hal_amdgpu_ExecutableDef_start_as_root(builder);
@@ -1043,7 +1143,7 @@ protected:
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
 
-    auto isaRef = builder.createString(variantOp.getTarget().getFormat());
+    auto isaRef = builder.createString(targetID);
     iree_hal_amdgpu_ExecutableDef_isa_add(builder, isaRef);
     iree_hal_amdgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_amdgpu_ExecutableDef_modules_add(builder, modulesRef);

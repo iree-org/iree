@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -221,21 +223,56 @@ InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
   return success();
 }
 
-static bool tileShapesMatch(ArrayRef<int64_t> operandTile,
-                            ArrayRef<int64_t> mmaTile, bool opaque) {
-  if (opaque) {
-    // Opaque tiles: only compare element counts.
-    return llvm::product_of(operandTile) == llvm::product_of(mmaTile);
+// Returns true when the operand's inner tile (`tensorTileType`) matches
+// the MMA vector tile `vectorType`:
+//   - element types must match;
+//   - If `opaqueSemantics` and the tiles are static/non-scalable, the
+//     element counts must match.
+//   - Otherwise, the shapes must match after dropping non-scalable unit extents
+//     from each side.
+static bool matchTileTypes(RankedTensorType tensorTileType,
+                           VectorType vectorType, bool opaqueSemantics) {
+  if (tensorTileType.getElementType() != vectorType.getElementType()) {
+    return false;
   }
-  // Compare tile shapes for equality modulo unit dims.
-  auto nonUnitDim = [](int64_t n) { return n != 1; };
-  return llvm::filter_to_vector(operandTile, nonUnitDim) ==
-         llvm::filter_to_vector(mmaTile, nonUnitDim);
+
+  if (opaqueSemantics) {
+    // Opaque semantics are only used on GPU. No scalable vectors.
+    return tensorTileType.hasStaticShape() && !vectorType.isScalable() &&
+           llvm::product_of(tensorTileType.getShape()) ==
+               llvm::product_of(vectorType.getShape());
+  }
+
+  // Keep only non-unit extents on the tensor side, and non-unit-or-scalable
+  // extents (paired with their scalable flag) on the MMA side.
+  auto tensorDims = llvm::filter_to_vector(tensorTileType.getShape(),
+                                           [](int64_t d) { return d != 1; });
+  auto vectorDims = llvm::filter_to_vector(
+      llvm::zip_equal(vectorType.getShape(), vectorType.getScalableDims()),
+      [](auto dim) {
+        auto [size, scalable] = dim;
+        return scalable || size != 1;
+      });
+
+  if (tensorDims.size() != vectorDims.size()) {
+    return false;
+  }
+  for (auto [tensorSize, vecDim] : llvm::zip_equal(tensorDims, vectorDims)) {
+    auto [vecSize, scalable] = vecDim;
+    if (scalable && ShapedType::isStatic(tensorSize)) {
+      return false;
+    }
+    if (!scalable && tensorSize != vecSize) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static LogicalResult verifyOperandTypes(InnerTiledOp tiledOp) {
   SmallVector<VectorType> mmaVectorTypes;
   tiledOp.getSemantics().getTileTypes(tiledOp.getKind(), mmaVectorTypes);
+  const bool opaque = tiledOp.getSemantics().getOpaque();
 
   for (auto [index, tuple] : llvm::enumerate(llvm::zip_equal(
            tiledOp.getOperandTypes(),
@@ -244,44 +281,28 @@ static LogicalResult verifyOperandTypes(InnerTiledOp tiledOp) {
     auto [opType, map, mmaVectorType] = tuple;
     ShapedType operandShapedType = cast<ShapedType>(opType);
     Type operandElemType = operandShapedType.getElementType();
-    Type mmaElemType = mmaVectorType.getElementType();
-    if (operandElemType != mmaElemType) {
-      return tiledOp.emitOpError(
-          llvm::formatv("operand element type {} does not match expected MMA "
-                        "tile element type {}",
-                        operandElemType, mmaElemType));
-    }
-    ArrayRef<int64_t> operandShape = cast<ShapedType>(opType).getShape();
+
+    ArrayRef<int64_t> operandShape = operandShapedType.getShape();
     ArrayRef<int64_t> operandTileShape(
         operandShape.drop_front(map.getNumResults()));
-    ArrayRef<int64_t> mmaTileShape = mmaVectorType.getShape();
-    SmallVector<int64_t> permutedMmaTileShape(mmaTileShape);
+    auto tensorTileType =
+        RankedTensorType::get(operandTileShape, operandElemType);
+    SmallVector<int64_t> mmaShape(mmaVectorType.getShape());
+    SmallVector<bool> mmaScalable(mmaVectorType.getScalableDims());
     std::optional<ArrayAttr> permutations = tiledOp.getPermutations();
-    bool opaque = tiledOp.getSemantics().getOpaque();
     if (permutations && !opaque) {
       ArrayRef<int64_t> perm =
-          cast<DenseI64ArrayAttr>(permutations.value()[index]).asArrayRef();
-      applyPermutationToVector(permutedMmaTileShape, perm);
+          cast<DenseI64ArrayAttr>((*permutations)[index]).asArrayRef();
+      applyPermutationToVector(mmaShape, perm);
+      applyPermutationToVector(mmaScalable, perm);
     }
-    if (!tileShapesMatch(operandTileShape, permutedMmaTileShape, opaque)) {
-      VectorType operandTileType =
-          VectorType::get(operandTileShape, operandElemType);
-      VectorType permutedMmaTileType =
-          VectorType::get(permutedMmaTileShape, operandElemType);
+    auto vectorType =
+        VectorType::get(mmaShape, mmaVectorType.getElementType(), mmaScalable);
 
-      std::string permutationNote;
-      if (permutations) {
-        permutationNote = llvm::formatv(
-            " Note: the permuted InnerTiledDescAttr tile type {} comes from "
-            "applying the permutation {} to the original InnerTiledDescAttr "
-            "tile type {}.",
-            permutedMmaTileType, permutations.value()[index], mmaVectorType);
-      }
-      return tiledOp->emitOpError(llvm::formatv(
-          "operand type {}, implying tile type {}, is incompatible with "
-          "permuted InnerTiledDescAttr tile type {} under semantics {}.{}",
-          opType, operandTileType, permutedMmaTileType, tiledOp.getSemantics(),
-          permutationNote));
+    if (!matchTileTypes(tensorTileType, vectorType, opaque)) {
+      return tiledOp.emitOpError()
+             << "operand #" << index << " inner tile " << tensorTileType
+             << " is incompatible with expected MMA tile type " << vectorType;
     }
   }
   return success();
@@ -299,6 +320,15 @@ LogicalResult InnerTiledOp::verify() {
     return emitOpError("number of outputs (" + Twine(getNumOutputs()) +
                        ") doesn't match expected number from kind (" +
                        Twine(expectedNumOuts) + ")");
+  }
+
+  StringRef kindNs = cast<Attribute>(getKind()).getDialect().getNamespace();
+  StringRef semNs = cast<Attribute>(getSemantics()).getDialect().getNamespace();
+  if (kindNs != semNs) {
+    return emitOpError(
+        llvm::formatv("kind attribute (dialect '{0}') and semantics attribute "
+                      "(dialect '{1}') must use the same dialect namespace",
+                      kindNs, semNs));
   }
 
   SmallVector<ShapedType> opTypes =
@@ -336,14 +366,6 @@ LogicalResult InnerTiledOp::verify() {
     if (!map.isProjectedPermutation()) {
       return emitOpError("expected indexing map ")
              << index << " to be a projected permutation";
-    }
-
-    for (int64_t size :
-         shapedType.getShape().take_back(rank - map.getNumResults())) {
-      if (ShapedType::isDynamic(size)) {
-        return emitOpError("Unexpected dynamic inner dim for operand ")
-               << index << " of type " << shapedType;
-      }
     }
   }
 

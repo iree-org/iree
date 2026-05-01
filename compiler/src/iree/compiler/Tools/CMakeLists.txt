@@ -151,6 +151,7 @@ iree_cc_library(
     "init_llvmir_translations.h"
   DEPS
     MLIRArmNeonToLLVMIRTranslation
+    MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMToLLVMIRTranslation
   PUBLIC
 )

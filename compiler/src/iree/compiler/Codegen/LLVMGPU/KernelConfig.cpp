@@ -80,15 +80,6 @@ static llvm::cl::opt<bool> clGPUEnableReductionVectorDistribution(
         "enable the usage of the reduction vector distribution pipeline"),
     llvm::cl::init(true));
 
-// TODO (nirvedhmeshram): Drop this whole path after we have support with
-// TileAndFuse pipeline from completion of
-// https://github.com/iree-org/iree/issues/18858
-static llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
-    "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
-    llvm::cl::desc("enable the usage of the vector distribution pipeline for "
-                   "unaligned GEMMs when supported"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
     llvm::cl::desc(
@@ -869,7 +860,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
       /*m=*/getDimBounds(mDims),
-      /*n=*/getDimBounds(nDims),
+      /*n=*/getDimBounds(k2Dims),
       /*k=*/getDimBounds(k1Dims),
       /*batch=*/getDimBounds(batchDims),
       /*a=*/qElementType,
@@ -2449,8 +2440,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     if (clGPUEnableReductionVectorDistribution) {
       LDBG() << "ReductionVectorDistribution: finding a suitable config...";
-      if (succeeded(
-              IREE::GPU::setReductionConfig(target, entryPointFn, linalgOp))) {
+      if (succeeded(IREE::GPU::setReductionConfig(target, entryPointFn,
+                                                  linalgOp.getOperation()))) {
         LDBG() << "Vector Distribution Subgroup Reduction Config";
         return success();
       }
@@ -2488,6 +2479,14 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       .Case([&](IREE::LinalgExt::SortOp sortOp) {
         LDBG() << "Sort Config";
         return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
+      })
+      .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
+        LDBG() << "ArgCompare Config";
+        if (succeeded(IREE::GPU::setReductionConfig(
+                target, entryPointFn, argCompareOp.getOperation()))) {
+          return success();
+        }
+        return setRootDefaultConfig(target, entryPointFn, computeOp);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp,

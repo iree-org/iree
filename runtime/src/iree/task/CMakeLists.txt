@@ -32,6 +32,7 @@ iree_cc_library(
   DEPS
     ::task
     iree::base
+    iree::base::internal
     iree::base::tooling::flags
   PUBLIC
 )
@@ -42,26 +43,15 @@ iree_cc_library(
   HDRS
     "affinity_set.h"
     "executor.h"
-    "list.h"
-    "pool.h"
-    "queue.h"
+    "process.h"
     "scope.h"
-    "submission.h"
-    "task.h"
     "topology.h"
     "tuning.h"
   SRCS
     "executor.c"
     "executor_impl.h"
-    "list.c"
-    "pool.c"
-    "post_batch.c"
-    "post_batch.h"
-    "queue.c"
+    "process.c"
     "scope.c"
-    "submission.c"
-    "task.c"
-    "task_impl.h"
     "topology.c"
     "topology_cpuinfo.c"
     "topology_darwin.c"
@@ -86,14 +76,14 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    executor_demo
+    process_test
   SRCS
-    "executor_demo.cc"
+    "process_test.cc"
   DEPS
     ::task
     iree::base
-    iree::base::internal::prng
-    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -104,78 +94,6 @@ iree_cc_test(
   DEPS
     ::task
     iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    list_test
-  SRCS
-    "list_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    pool_test
-  SRCS
-    "pool_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    queue_test
-  SRCS
-    "queue_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::base::threading::thread
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    scope_test
-  SRCS
-    "scope_test.cc"
-    "task_impl.h"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    task_tests
-  SRCS
-    "task_test_barrier.cc"
-    "task_test_call.cc"
-    "task_test_dispatch.cc"
-    "task_test_fence.cc"
-    "task_test_nop.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -190,6 +108,19 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    executor_benchmark
+  SRCS
+    "executor_benchmark.cc"
+  DEPS
+    ::task
+    benchmark
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

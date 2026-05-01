@@ -1278,6 +1278,74 @@ func.func @gather_dma_inner_dim_oob_64x62(
 
 // -----
 
+// Test: OOB check when source is a subview of a larger fat_raw_buffer.
+// Parent: 8x128, subview at [2, 0]: 4x128. in_bounds = [false, true].
+// Because the source is a view of a larger buffer, dim 0 must also be
+// bounds-checked: an OOB dim-0 index in the subview still lands in valid
+// parent memory. The sentinel index uses the root buffer's dim-0 size (8),
+// not the subview's (4), to guarantee the linearized offset exceeds the
+// total buffer size.
+
+#executable_target_rocm_hsaco_fb_subview = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_32_subview = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// CHECK-LABEL: func.func @gather_dma_subview_oob
+// CHECK-SAME:    %[[PARENT:[a-zA-Z0-9]+]]: memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x128xf32, #gpu.address_space<workgroup>>
+func.func @gather_dma_subview_oob(
+    %parent: memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x128xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_subview,
+    translation_info = #translation_32_subview} {
+  // CHECK: %[[SUBVIEW:.+]] = memref.subview %[[PARENT]]
+  %subview = memref.subview %parent[2, 0][4, 128][1, 1]
+    : memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+      to memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%lane) in (32) {
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: linearOffset = 0
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 128)
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 128)
+    //
+    // Dim 0 is checked because source is a subview of a larger buffer.
+    // CHECK: %[[FALSE:.+]] = arith.constant false
+    // CHECK: %[[C4_DIM:.+]] = arith.constant 4 : index
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#0, %[[C4_DIM]] : index
+    // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
+    // Sentinel uses root buffer dim-0 size (8), not subview dim-0 (4).
+    // CHECK: %[[C8_OOB:.+]] = arith.constant 8 : index
+    // CHECK: %[[FIXED:.+]] = arith.select %[[OOB]], %[[C8_OOB]], %[[SRC_DELIN0]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SUBVIEW]][%[[FIXED]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
+    //
+    // Transfers 2-4: same pattern
+    // CHECK-COUNT-3: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %subview into %dest lane(%lane) in_bounds [false, true] :
+      memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
 // Fallback tests: these use dma_sizes = [128] (128-bit only) with f32 elements,
 // meaning the fast path (gather_to_lds) needs 128 elements per transfer
 // (32 lanes * 4 elements/lane). All tests below have fewer contiguous elements,

@@ -329,6 +329,54 @@ util.func public @dont_fuse_attention_with_broadcasted_away_n_dim(
 
 // -----
 
+util.func public @dont_fuse_online_attention_with_broadcasted_away_n_dim(
+    %q: tensor<4x32x64x16xf16>,
+    %k: tensor<4x32x64x16xf16>,
+    %v: tensor<4x32x64xf16>,
+    %scale: f16) -> tensor<4x32x64x128xf16> {
+  %empty_v = tensor.empty() : tensor<4x32x64x128xf16>
+  %v_broadcast = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%v : tensor<4x32x64xf16>) outs(%empty_v : tensor<4x32x64x128xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<4x32x64x128xf16>
+  %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
+  %empty_max = tensor.empty() : tensor<4x32x64xf16>
+  %empty_sum = tensor.empty() : tensor<4x32x64xf16>
+  %attention:3 = iree_linalg_ext.online_attention {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]}
+      ins(%q, %k, %v_broadcast, %scale :
+          tensor<4x32x64x16xf16>, tensor<4x32x64x16xf16>,
+          tensor<4x32x64x128xf16>, f16)
+      outs(%empty_out, %empty_max, %empty_sum :
+           tensor<4x32x64x128xf16>, tensor<4x32x64xf16>, tensor<4x32x64xf16>) {
+  ^bb0(%score: f16):
+    iree_linalg_ext.yield %score : f16
+  } -> tensor<4x32x64x128xf16>, tensor<4x32x64xf16>, tensor<4x32x64xf16>
+  util.return %attention#0 : tensor<4x32x64x128xf16>
+}
+// CHECK-LABEL: func public @dont_fuse_online_attention_with_broadcasted_away_n_dim
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[V:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[V_BCAST:.+]] = linalg.generic
+//       CHECK:   %[[ATTENTION:.+]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:     ins(%[[Q]], %[[K]], %[[V_BCAST]], %[[SCALE]] :
+//       CHECK:   util.return %[[ATTENTION]]#0
+
+
+// -----
+
 util.func public @fuse_attention_with_broadcast_transpose(%arg0: tensor<4x?x8x128xf16>, %arg1: tensor<4x8x4x?x32x128xf16>, %arg2: tensor<4x8x4x?x128xf16>, %arg3: f16, %arg4: tensor<4x8x4x?x32x?xf16>, %arg5: tensor<4x8x4x?x32x128xf16>, %arg6: tensor<4x8x4x128x?xf16>) -> tensor<4x8x4x?x32x128xf16> {
   %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d4, d1)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<4x?x8x128xf16>) outs(%arg6 : tensor<4x8x4x128x?xf16>) {
   ^bb0(%in: f16, %out: f16):

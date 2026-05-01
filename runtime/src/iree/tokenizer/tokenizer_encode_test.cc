@@ -3152,6 +3152,106 @@ TEST_F(TokenizerSpecialTokenStreamingTest, FinalizeDoesNotSilentlyDropPartial) {
   iree_tokenizer_free(tokenizer);
 }
 
+// Regression test for a deferred pre-norm special token that causes an infinite
+// loop when the pump enters partial-segment mode.
+//
+// The bug: after a force-complete of ring content (triggered by a pending
+// special token), state_reclaim() returns 0 because the model resets to
+// SEGMENT_START on non-partial completion. The old code required
+// read_position >= write_position to clear partial mode and advance positions,
+// but since reclaim never advanced read_position, this condition was always
+// false — creating an infinite loop re-encoding the same bytes.
+//
+// This test reproduces the real-world trigger: a Replace normalizer that
+// expands " " → "▁" (1 byte → 3 bytes). With a Split segmenter on space
+// (MergedWithPrevious), each word+space is a small segment, but the normalizer
+// expansion means N bytes of input produce up to 3N bytes of normalized output.
+// When enough text with spaces precedes a special token, the normalized output
+// overflows the ring buffer's logical capacity, forcing partial-segment mode.
+// The pending special token then triggers force_complete, exposing the bug.
+//
+// With a 128-byte ring (64-byte logical capacity), ~40 bytes of space-heavy
+// input normalizes to >64 bytes, reliably triggering the overflow.
+TEST_F(TokenizerSpecialTokenStreamingTest,
+       DeferredSpecialTokenDoesNotReplayForcedCompleteSegment) {
+  // ▁ (U+2581) = 0xE2 0x96 0x81 (3 bytes in UTF-8).
+  static const char kMetaspace[] = "\xE2\x96\x81";
+
+  ScopedVocabBuilder vocab_builder(257);
+  for (int i = 0; i < 256; ++i) {
+    char byte_token[2] = {static_cast<char>(i), '\0'};
+    vocab_builder.AddToken(i, byte_token);
+  }
+  // Add ▁ as a token so the BPE model can encode normalized spaces.
+  vocab_builder.AddToken(256, kMetaspace);
+  vocab_builder.AddToken(50256, "<|tool>");
+  ScopedVocab vocab = vocab_builder.Build();
+
+  iree_tokenizer_special_tokens_builder_t st_builder;
+  iree_tokenizer_special_tokens_builder_initialize(iree_allocator_system(),
+                                                   &st_builder);
+  IREE_ASSERT_OK(iree_tokenizer_special_tokens_builder_add(
+      &st_builder, IREE_SV("<|tool>"), 50256,
+      IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_NONE));
+  iree_tokenizer_special_tokens_t special_tokens;
+  IREE_ASSERT_OK(iree_tokenizer_special_tokens_builder_build(
+      &st_builder, iree_allocator_system(), &special_tokens));
+  iree_tokenizer_special_tokens_builder_deinitialize(&st_builder);
+
+  // Replace normalizer: " " → "▁" (1→3 byte expansion, matching Gemma4).
+  iree_tokenizer_normalizer_t* replace_normalizer = nullptr;
+  IREE_ASSERT_OK(iree_tokenizer_normalizer_replace_allocate(
+      IREE_SV(" "), iree_make_string_view(kMetaspace, 3),
+      iree_allocator_system(), &replace_normalizer));
+
+  // Split on literal space with MergedWithPrevious (matching Gemma4 config).
+  iree_tokenizer_segmenter_t* segmenter = CreateSplitSegmenterWithBehavior(
+      " ", IREE_TOKENIZER_UTIL_REGEX_SPLIT_MERGED_WITH_PREVIOUS);
+  ASSERT_NE(segmenter, nullptr);
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_normalizer(builder.get(), replace_normalizer);
+  iree_tokenizer_builder_set_segmenter(builder.get(), segmenter);
+  iree_tokenizer_builder_set_model(builder.get(), CreateBPEModel(vocab.get()));
+  iree_tokenizer_builder_set_special_tokens(builder.get(), &special_tokens);
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Normal text with many spaces. Each space expands from 1→3 bytes after
+  // normalization. With a 128-byte ring (64-byte logical capacity), even this
+  // short text overflows the ring due to normalizer expansion, forcing
+  // partial-segment mode. The special token then triggers force_complete.
+  std::string input =
+      "A knight of powder-horn and shot "
+      "Once fill'd his bag as I would not "
+      "Unless the feelings of my breast "
+      "By poverty were sorely press'd "
+      "With birds and squirrels for the spits "
+      "Of certain gormandizing cits "
+      "With merry heart the fellow went ";
+  input += "<|tool>d";
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto large_tokens,
+                            EncodeWithBufferSize(tokenizer, input, 1024));
+  IREE_ASSERT_OK_AND_ASSIGN(auto small_tokens,
+                            EncodeWithBufferSize(tokenizer, input, 256));
+
+  EXPECT_EQ(small_tokens, large_tokens)
+      << "Small-buffer streaming must match large-buffer streaming when a "
+         "deferred special token follows text with normalizer expansion";
+
+  // Verify the special token and trailing byte are present at the end.
+  ASSERT_GE(small_tokens.size(), 2u);
+  EXPECT_EQ(small_tokens[small_tokens.size() - 2], 50256u);
+  EXPECT_EQ(small_tokens[small_tokens.size() - 1],
+            static_cast<iree_tokenizer_token_id_t>('d'));
+
+  iree_tokenizer_special_tokens_deinitialize(&special_tokens);
+  iree_tokenizer_free(tokenizer);
+}
+
 //===----------------------------------------------------------------------===//
 // Strip Normalizer + Special Token Integration Tests
 //===----------------------------------------------------------------------===//

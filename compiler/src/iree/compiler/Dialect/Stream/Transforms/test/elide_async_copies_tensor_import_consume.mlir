@@ -266,3 +266,119 @@ util.func public @mixed_consume_no_consume(%arg0: !util.buffer, %arg1: !util.buf
   // CHECK: util.return %[[FILL0]], %[[FILL1]], %[[IMPORT1]]
   util.return %fill0, %fill1, %import1 : !stream.resource<external>, !stream.resource<external>, !stream.resource<external>
 }
+
+// -----
+
+// Tests that a non-consuming import remains borrowed even when the imported SSA
+// value has no uses after the clone. The clone protects caller-owned storage
+// from the tied fill mutation and must not be elided by one-use reasoning.
+
+// CHECK-LABEL: @borrowed_import_single_use_preserves_mutating_clone
+// CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
+util.func public @borrowed_import_single_use_preserves_mutating_clone(%arg0: !util.buffer) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %[[BUFFER]]
+  %import = stream.tensor.import %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[IMPORT]]
+  %clone = stream.async.clone %import : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[CLONE]]
+  %fill = stream.async.fill %c123_i32, %clone[%c0 to %c100 for %c100] : i32 -> %clone as !stream.resource<external>{%c100}
+  // CHECK: util.return %[[FILL]]
+  util.return %fill : !stream.resource<external>
+}
+
+// -----
+
+// Tests that borrowed storage is preserved across call boundaries. Even though
+// the imported SSA value is a last-use call operand, the callee argument still
+// aliases non-consuming imported storage and needs its protective clone.
+
+// CHECK-LABEL: util.func private @borrowed_import_last_use_callee
+// CHECK-SAME: (%[[ARG:.+]]: !stream.resource<external>)
+util.func private @borrowed_import_last_use_callee(%arg: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[ARG]]
+  %clone = stream.async.clone %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[CLONE]]
+  %fill = stream.async.fill %c123_i32, %clone[%c0 to %c100 for %c100] : i32 -> %clone as !stream.resource<external>{%c100}
+  // CHECK: util.return %[[FILL]]
+  util.return %fill : !stream.resource<external>
+}
+
+// CHECK-LABEL: @borrowed_import_last_use_caller
+// CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
+util.func public @borrowed_import_last_use_caller(%arg0: !util.buffer) -> !stream.resource<external> {
+  %c100 = arith.constant 100 : index
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %[[BUFFER]]
+  %import = stream.tensor.import %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
+  // CHECK: %[[RESULT:.+]] = util.call @borrowed_import_last_use_callee(%[[IMPORT]])
+  %result = util.call @borrowed_import_last_use_callee(%import) : (!stream.resource<external>) -> !stream.resource<external>
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// Tests that borrowed imports still permit clone elision when the clone result
+// is read-only. Non-consuming imports only require protective clones when the
+// clone would otherwise shield caller-owned storage from mutation.
+
+stream.executable private @ex_borrowed_readonly {
+  stream.executable.export public @read_only workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @borrowed_import_readonly_elides_clone
+// CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
+util.func public @borrowed_import_readonly_elides_clone(%arg0: !util.buffer) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %[[BUFFER]]
+  %import = stream.tensor.import %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %import : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex_borrowed_readonly::@read_only(%[[IMPORT]]
+  %result = stream.async.dispatch @ex_borrowed_readonly::@read_only(%clone[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// Tests that borrowed storage remains borrowed through a same-lifetime transfer
+// that topology analysis cannot remove. The transfer may move the storage
+// between devices, but it does not create an owned copy with a new lifetime.
+
+module @test attributes {
+  stream.topology = #hal.device.topology<links = [
+    (@dev_a -> @dev_c = {})
+  ]>
+} {
+
+// CHECK-LABEL: @borrowed_import_transfer_preserves_mutating_clone
+// CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
+util.func public @borrowed_import_transfer_preserves_mutating_clone(%arg0: !util.buffer) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import on(#hal.device.promise<@dev_a>) %[[BUFFER]]
+  %import = stream.tensor.import on(#hal.device.promise<@dev_a>) %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[IMPORT]]
+  // CHECK-SAME: from(#hal.device.promise<@dev_a>) -> to(#hal.device.promise<@dev_c>)
+  %transfer = stream.async.transfer %import : !stream.resource<external>{%c100}
+      from(#hal.device.promise<@dev_a>) -> to(#hal.device.promise<@dev_c>) !stream.resource<external>{%c100}
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[TRANSFER]]
+  %clone = stream.async.clone %transfer : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[CLONE]]
+  %fill = stream.async.fill %c123_i32, %clone[%c0 to %c100 for %c100] : i32 -> %clone as !stream.resource<external>{%c100}
+  // CHECK: util.return %[[FILL]]
+  util.return %fill : !stream.resource<external>
+}
+
+} // module

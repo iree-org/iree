@@ -267,158 +267,101 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
         "getTiledImplementation",
         "getResultTilePosition"]>
     ]> {
-  let summary = [{Models an inner-tiled operation that may perform contractions.}];
+  let summary = [{Generic operation on tiled operands based on an intrinsic.}];
   let description = [{
-    Represents an operation that updates "inner tiles" (vector slices) of its accumulator
-    outputs using inner tiles of its input operands. The way the inner tiles are
-    used is determined by the semantics of the `kind` attribute. These inner tiles
-    are the trailing dimensions of the tensor/vector operands that are not present
-    in the indexing maps.
+    Each operand's shape is viewed as `outer_dims x inner_tile`:
+    - The outer dims are those described by the operand's indexing map; they
+      are iterated by an outer loop nest specified by `iterator_types` and
+      `indexing_maps`, with the same conventions as `vector.contract`.
+    - The remaining trailing dims form the operand's inner tile. At each
+      outer iteration point, the output inner tiles are updated from the
+      input inner tiles by the intrinsic named by `kind`.
 
-    In the case of a matrix-multiply-accumulate (MMA) inner tiled operation,
-    the semantics logically match `vector.contraction`. However, instead of a
-    combiner type, it has a intrinsic description that specifies how the inner tiles
-    are combined.
+    Operands may be tensors, memrefs or vectors. Inner-tile dims are generally
+    static, the only exception being scalable vectors dimensions which
+    correspond to dynamic tensor dimensions.
 
-    Similar to `vector.contract`, an iterator type attribute list must be
-    specified, where each element of the list represents an iterator over one
-    of the outer dimensions. Iteration of inner dimensions is defined solely by
-    the intrinsic and may be opaque.
+    ### Attributes
 
-    An indexing map attribute list must be specified with an entry for input and
-    output arguments. An indexing map attribute specifies a mapping from each
-    outer loop iterator in the iterator type list, to each dimension of each
-    operand.
+    - `kind` (`InnerTileDescAttrInterface`): names the intrinsic. It fixes
+      the number of inputs/outputs and, together with `semantics`, the
+      canonical inner-tile vector type of each operand.
+    - `semantics` (`InnerTiledSemanticsAttrInterface`): controls how strictly
+      operand inner tiles are checked against `kind`. Different `semantics`
+      attributes from different dialects may adopt different conventions, but
+      there are generally two main modes:
+      * `opaque = true`: only the element type and total element count of
+        each inner tile must match the canonical vector type. Shape and
+        rank are otherwise free. Scalable vectors and dynamic tensor dims
+        are not allowed in this mode.
+      * Default / `opaque = false`: after dropping non-scalable unit dims, the
+        operand inner-tile shape must match the (permuted) canonical shape
+        one-to-one. Scalable vector dimensions are supported and must correspond
+        to dynamic tensor dimensions. Every other tensor dimension must be static.
+    - `indexing_maps`: one projected-permutation `AffineMap` per operand
+      (inputs first, then outputs), all sharing the same number of dims
+      (equal to `iterator_types.size()`) and no symbols.
+    - `iterator_types`: one of `parallel` / `reduction` for each outer
+      iterator dim.
+    - `permutations` (optional): If present, there is one entry per operand,
+      each a permutation vector
+      `p` of length equal to that operand's inner rank, giving the
+      relationship between the canonical inner-tile shape `C` (from
+      `kind`/`semantics`) and the operand's actual inner-tile shape `S`:
+      `S[i] == C[p[i]]`.
 
-    Example:
+    ### Examples
 
-    ```mlir
-    #contraction_accesses = [
-     affine_map<(i, j, k) -> (i, k)>,
-     affine_map<(i, j, k) -> (k, j)>,
-     affine_map<(i, j, k) -> (i, j)>
-    ]
-    #contraction_trait = {
-      indexing_maps = #contraction_accesses,
-      iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-      distributed = true,
-      opaque = false
-    }
-    %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
-      : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
-
-    // Takes tensors as well, however the inner dimensions must always be
-    // static.
-    %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
-      : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
-    ```
-
-    The example above can be logically lowered directly to loops like this
-    (ignoring type conversions from tensor to vector needed for the mfma).
-    ```
-    %outer_m = tensor.dim %6, %c0 : index
-    %outer_n = tensor.dim %6, %c1 : index
-    %outer_k = tensor.dim %4, %c1 : index
-    %7 = scf.for %i = %c0 to %outer_m iter_args(%arg0 = %6) {
-      %8 = scf.for %j = %c0 to %outer_n iter_args(%arg1 = %arg0) {
-        %9 = scf.for %k = %c0 to %outer_k iter_args(%arg2 = %arg1) {
-          %lhs = tensor.extract_slice %4 [%i, %k, 0] [1, 1, 4] [1, 1, 1] : tensor<4xf16>
-          %rhs = tensor.extract_slice %5 [%k, %j, 0] [1, 1, 4] [1, 1, 1] : tensor<4xf16>
-          %acc = tensor.extract_slice %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor<4xf32>
-          %res = amdgpu.mfma %lhs, %rhs, %acc : tensor<4xf32>
-          %ret = tensor.insert_slice %acc into %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor<?x?x4xf32>
-          scf.yield %ret : tensor<?x?x4xf32>
-        }
-        scf.yield %9 : tensor<?x?x4xf32>
-      }
-      scf.yield %8 : tensor<?x?x4xf32>
-    }
-    ```
-
-    Or alternatively unrolled to a single intrinsic when operating on vectors.
-    ```mlir
-    #contraction_accesses = [
-     affine_map<() -> ()>,
-     affine_map<() -> ()>,
-     affine_map<() -> ()>
-    ]
-    #contraction_trait = {
-      indexing_maps = #contraction_accesses,
-      iterator_types = [],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-      distributed = true,
-      opaque = false
-    }
-    %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
-      : vector<4xf16>, vector<4xf16> into vector<4xf32>
-    ```
-
-    This operation can represent an intrinsic both in undistributed
-    (workgroup/subgroup/warp) and distributed (thread) level. This is indicated
-    by the `distributed` boolean attribute. The same `kind` attribute may be
-    used in both cases.
-
-    The inner-tile shapes of tensor operands (defined as above as the trailing
-    dimensions not present in the indexing maps) must agree with the shapes of
-    the vector tiles implied by the intrinsic specified in `kind`. The exact
-    criterion depends on the `opaque` boolean attribute:
-    * When `opaque = true`, the only requirement is that they have the same
-      number of elements.
-    * When `opaque = false`, the shapes must match exactly after omitting any
-      unit-dimensions.
-
-    Note that different `kind` attributes may adopt different conventions as to
-    the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
-    and it may be necessary to use `opaque = true` to accommodate them. Others
-    may use higher-rank vectors with shapes reflecting semantics, allowing to
-    use `opaque = false`, which is preferable when possible at all thanks to the
-    stricter semantics. However, that is not only a function of the `kind`
-    attribute: using `opaque = false` also requires the tensor operands to have
-    appropriate shapes.
-
-    In some cases, variations on the inner tiled operations can be expressed
-    with the permutations attribute. This attribute represents the permutation
-    from that intrinsic's "canonical" layout (in the case of matrix multiplication,
-    this is row-major storage of the inner tile) to the format of the inner tile
-    in the arguments, with a permutation specified for each argument.
-
-    For example, an MMT product of inner dimensions with warp semantics can be
-    represented with the following.
+    Subgroup-level (undistributed) MMA on tensors using the AMD MFMA
+    intrinsic `MFMA_F32_32x32x8_F16`, whose canonical per-operand inner
+    tiles are LHS = `32x8` (M, K), RHS = `8x32` (K, N) and ACC = `32x32`
+    (M, N). In practice the RHS is typically stored with its inner dims
+    swapped (the matmul is really an MMT at the tile level); this is
+    expressed by the `[1, 0]` entry in `permutations` on the RHS operand,
+    which makes its inner-tile shape `canonical[1] x canonical[0]` =
+    `N x K` = `32 x 8`.
 
     ```mlir
-    #contraction_accesses = [
-     affine_map<(i, j, k) -> (i, k)>,
-     affine_map<(i, j, k) -> (k, j)>,
-     affine_map<(i, j, k) -> (i, j)>
-    ]
-    #contraction_trait = {
-      indexing_maps = #contraction_accesses,
-      iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-      permutations = [[0, 1], [1, 0], [0, 1]]
-    }
-    %7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
-      : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+        indexing_maps = [
+          affine_map<(m, n, k) -> (m, k)>,
+          affine_map<(m, n, k) -> (n, k)>,
+          affine_map<(m, n, k) -> (m, n)>
+        ],
+        iterator_types = [
+          #linalg.iterator_type<parallel>,
+          #linalg.iterator_type<parallel>,
+          #linalg.iterator_type<reduction>
+        ],
+        kind         = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+        semantics    = #iree_gpu.mma_semantics<distributed = false, opaque = false>,
+        permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+      } : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16>
+          into tensor<?x?x32x32xf32>
     ```
 
-    #### Motivation, Design Choices, and Pitfalls
+    After distribution across the 64 lanes of a wave, the per-operand
+    inner tiles become the canonical *per-lane* shares of the intrinsic:
+    `256 / 64 = 4` f16 elements per lane for LHS and RHS, `1024 / 64 = 16`
+    f32 elements per lane for ACC.
 
-    This operation grew out of a general representation for matrix multiplication
-    intrinsics on GPUs, where the inner tiles would be the tiles of the A, B,
-    and C matrices that were computed by an entire GPU workgroup or subgroup. It
-    is now used for generalizations of such multiplications. Currently,
-    the only usage is for scaled matrix-multiply-accumulate, where block scales
-    must be passed in as additional inputs, but it's possible more uses
-    will be possible in the future.
-
-    The idea behind this operation is to decouple the layout setting/tiling
-    required to target certain intrinsics from the lowering to them. Because
-    typically tiling of this sort happens on tensor operands, however the target
-    intrinsics operate on vectors, we use this operation to bridge the gap. The
-    choice for a shared operation is intended to ease the lowering process and
-    allow for different transformations at different stages of the pipeline
-    without needing to essentially clone this op.
+    ```mlir
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+        indexing_maps = [
+          affine_map<(m, n, k) -> (m, k)>,
+          affine_map<(m, n, k) -> (n, k)>,
+          affine_map<(m, n, k) -> (m, n)>
+        ],
+        iterator_types = [
+          #linalg.iterator_type<parallel>,
+          #linalg.iterator_type<parallel>,
+          #linalg.iterator_type<reduction>
+        ],
+        kind      = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+      } : tensor<?x?x4xf16>, tensor<?x?x4xf16>
+          into tensor<?x?x16xf32>
+    ```
   }];
 
   let arguments = (ins Variadic<AnyRankedTensorOrVector>:$inputs,

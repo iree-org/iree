@@ -265,6 +265,16 @@ private:
 };
 const char ValueProducerAffinityPVS::ID = 0;
 
+static bool canTieResultToExplicitOpAffinity(Operation *op) {
+  // Tied dispatch results are produced by executing work at the dispatch
+  // affinity even though they preserve the tied storage chain. Only explicit
+  // dispatch affinities are placement anchors; inferred/default op affinities
+  // can be consequences of the same tied result and must not feed back into
+  // producer placement.
+  auto dispatchOp = dyn_cast<IREE::Stream::AsyncDispatchOp>(op);
+  return dispatchOp && dispatchOp.getAffinityAttr();
+}
+
 class GlobalAffinityPVS
     : public DFX::StateWrapper<
           DFX::PotentialValuesState<IREE::Stream::AffinityAttr>,
@@ -717,12 +727,38 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
             if (!isPinned || valuePVS.isValidState()) {
               newState ^= valuePVS;
             }
+            // Tied results inherit the tied operand's placement. A dispatch
+            // with an explicit affinity also materially writes the result at
+            // that affinity, which is a real producer-placement fact. Do not
+            // use inferred/default op affinity here: it may be derived from
+            // the tied result itself and feeding it back into producer
+            // placement makes partitioning see placements that are not real
+            // anchors.
+            Operation *definingOp = result.getDefiningOp();
+            if (canTieResultToExplicitOpAffinity(definingOp)) {
+              auto affinityOp =
+                  cast<IREE::Stream::AffinityOpInterface>(definingOp);
+              auto &opPVS = solver.getElementFor<OpAffinityPVS>(
+                  *this, Position::forOperation(affinityOp),
+                  DFX::Resolution::REQUIRED);
+              LLVM_DEBUG({
+                llvm::dbgs() << "[ValueProducerAffinityPVS] value ";
+                value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs()
+                    << " affinity also using explicit tied dispatch affinity ";
+                opPVS.print(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              if (!isPinned || opPVS.isValidState()) {
+                newState ^= opPVS;
+              }
+            }
             return WalkResult::advance();
           }
         }
 
-        // If the value is produced by the defining op then assume that the
-        // execution affinity dictates the result affinity.
+        // If the value is produced by a non-tied affinity-aware op then assume
+        // that the execution affinity dictates the result affinity.
         if (auto affinityOp =
                 dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
                     result.getDefiningOp())) {

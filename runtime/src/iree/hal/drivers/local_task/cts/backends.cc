@@ -11,22 +11,21 @@
 // The factory uses the driver registry to create drivers identically to how
 // applications create them (via iree_hal_register_all_available_drivers).
 
-#include "iree/async/util/proactor_pool.h"
-#include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
-static iree_status_t CreateLocalTaskDevice(iree_hal_driver_t** out_driver,
-                                           iree_hal_device_t** out_device) {
+static iree_status_t CreateLocalTaskDevice(
+    const iree_hal_device_create_params_t* create_params,
+    iree_hal_driver_t** out_driver, iree_hal_device_t** out_device) {
   // Register the driver module with the global registry. Subsequent calls
-  // return ALREADY_EXISTS which we ignore — only true errors propagate.
+  // return ALREADY_EXISTS; only true errors propagate.
   iree_status_t status = iree_hal_local_task_driver_module_register(
       iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
-    iree_status_ignore(status);
+    iree_status_free(status);
     status = iree_ok_status();
   }
 
@@ -39,28 +38,12 @@ static iree_status_t CreateLocalTaskDevice(iree_hal_driver_t** out_driver,
         iree_make_cstring_view("local-task"), iree_allocator_system(), &driver);
   }
 
-  // Create a proactor pool for async I/O. The pool is lazy — no threads are
-  // spawned until a driver actually requests a proactor.
-  iree_async_proactor_pool_t* proactor_pool = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_async_proactor_pool_create(
-        iree_numa_node_count(), /*node_ids=*/NULL,
-        iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool);
-  }
-
   // Create the default device from the driver.
   iree_hal_device_t* device = nullptr;
   if (iree_status_is_ok(status)) {
-    iree_hal_device_create_params_t create_params =
-        iree_hal_device_create_params_default();
-    create_params.proactor_pool = proactor_pool;
     status = iree_hal_driver_create_default_device(
-        driver, &create_params, iree_allocator_system(), &device);
+        driver, create_params, iree_allocator_system(), &device);
   }
-
-  // The device retains the pool — caller can release immediately.
-  iree_async_proactor_pool_release(proactor_pool);
 
   if (iree_status_is_ok(status)) {
     *out_driver = driver;
@@ -74,12 +57,17 @@ static iree_status_t CreateLocalTaskDevice(iree_hal_driver_t** out_driver,
 
 // Registration at static init time. The comma operator evaluates
 // RegisterBackend() for its side effect and yields true for the bool.
-static bool local_task_registered_ = (CtsRegistry::RegisterBackend({
-                                          "local_task",
-                                          {"local_task", CreateLocalTaskDevice},
-                                          {"async_queue", "events", "file_io",
-                                           "host_calls", "mapping", "indirect"},
-                                      }),
-                                      true);
+static bool local_task_registered_ =
+    (CtsRegistry::RegisterBackend({
+         "local_task",
+         {"local_task", CreateLocalTaskDevice,
+          /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr, RecordingMode::kDirect,
+          /*unsupported_tests=*/{},
+          /*expected_failures=*/{}},
+         {"async_queue", "events", "file_io", "host_calls", "mapping",
+          "indirect"},
+     }),
+     true);
 
 }  // namespace iree::hal::cts

@@ -881,16 +881,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid LDS bank conflicts.
+    // TODO(#24255): Fix untuned swizzle logic for DMA.
     if (lhsElemType.isBF16() && !transposedLhs) {
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
-          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
+          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
+          /*skipUntunedFallback=*/true);
       if (succeeded(lhsSwizzleAttr)) {
         lhsAttr = *lhsSwizzleAttr;
       }
     }
     if (rhsElemType.isBF16() && transposedRhs) {
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
-          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
+          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
+          /*skipUntunedFallback=*/true);
       if (succeeded(rhsSwizzleAttr)) {
         rhsAttr = *rhsSwizzleAttr;
       }

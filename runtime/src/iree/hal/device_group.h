@@ -45,11 +45,45 @@ extern "C" {
 // concurrently from any thread without synchronization.
 typedef struct iree_hal_device_group_t iree_hal_device_group_t;
 
+// Callback function used to produce a replacement for one device in a source
+// group.
+//
+// |source_device| is borrowed from |source_group| at |device_index|. On success
+// |out_replacement_device| must contain a device retained for the caller.
+// create_with_replacements consumes that reference whether group creation later
+// succeeds or fails.
+typedef iree_status_t(IREE_API_PTR* iree_hal_device_group_replacement_fn_t)(
+    iree_hal_device_group_t* source_group, iree_host_size_t device_index,
+    iree_hal_device_t* source_device, void* user_data,
+    iree_hal_device_t** out_replacement_device);
+
+// Callback used to replace devices while preserving a source group topology.
+typedef struct iree_hal_device_group_replacement_callback_t {
+  // Function called once for each source-group device in topology order.
+  iree_hal_device_group_replacement_fn_t fn;
+  // Opaque caller-owned value passed to |fn|.
+  void* user_data;
+} iree_hal_device_group_replacement_callback_t;
+
 // Creates a single-device group.
 // Equivalent to initializing a builder, adding the device, and finalizing.
 IREE_API_EXPORT iree_status_t iree_hal_device_group_create_from_device(
-    iree_hal_device_t* device, iree_allocator_t host_allocator,
-    iree_hal_device_group_t** out_group);
+    iree_hal_device_t* device, iree_async_frontier_tracker_t* frontier_tracker,
+    iree_allocator_t host_allocator, iree_hal_device_group_t** out_group);
+
+// Creates a device group by replacing the devices in |source_group| while
+// preserving the source topology and frontier tracker.
+//
+// |replacement_callback| is invoked once for each source device in topology
+// order. The new group retains all replacement devices and assigns topology
+// information derived from the copied source topology.
+//
+// This is intended for instrumentation and policy wrappers that must preserve a
+// precomputed topology while changing the device objects exposed to consumers.
+IREE_API_EXPORT iree_status_t iree_hal_device_group_create_with_replacements(
+    iree_hal_device_group_t* source_group,
+    iree_hal_device_group_replacement_callback_t replacement_callback,
+    iree_allocator_t host_allocator, iree_hal_device_group_t** out_group);
 
 // Retains the given |group| for the caller.
 IREE_API_EXPORT void iree_hal_device_group_retain(
@@ -87,20 +121,30 @@ IREE_API_EXPORT const iree_hal_topology_t* iree_hal_device_group_topology(
 //
 // Usage:
 //   iree_hal_device_group_builder_t builder;
-//   iree_hal_device_group_builder_initialize(&builder);
+//   iree_hal_device_group_builder_initialize(&builder, frontier_tracker);
 //   iree_hal_device_group_builder_add_device(&builder, device_a);
 //   iree_hal_device_group_builder_add_device(&builder, device_b);
 //   iree_hal_device_group_t* group = NULL;
 //   iree_hal_device_group_builder_finalize(&builder, allocator, &group);
 //   // builder is now zeroed — use group.
 typedef struct iree_hal_device_group_builder_t {
+  // Frontier tracker retained for the builder lifetime and transferred to the
+  // finalized device group.
+  iree_async_frontier_tracker_t* frontier_tracker;
+
+  // Number of devices currently added to the builder.
   iree_host_size_t count;
+
+  // Borrowed devices to retain when the device group is finalized.
   iree_hal_device_t* devices[IREE_HAL_TOPOLOGY_MAX_DEVICE_COUNT];
 } iree_hal_device_group_builder_t;
 
 // Initializes a device group builder. The builder should be stack-allocated.
+// |frontier_tracker| is retained until builder deinitialization or transferred
+// to the finalized device group.
 IREE_API_EXPORT void iree_hal_device_group_builder_initialize(
-    iree_hal_device_group_builder_t* builder);
+    iree_hal_device_group_builder_t* builder,
+    iree_async_frontier_tracker_t* frontier_tracker);
 
 // Deinitializes a device group builder. Safe to call on an already-finalized
 // (zeroed) builder.

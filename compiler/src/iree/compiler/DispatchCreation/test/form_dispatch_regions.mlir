@@ -1870,7 +1870,9 @@ util.func public @no_fusion_use_from_above(%arg0 : tensor<?x?xf32>,
 
 // -----
 
-util.func public @dont_fuse_no_shared_parallel_loops(%arg0: tensor<16x16x24xf32>, %arg1: tensor<64x3x32xf32>) -> (tensor<64x3x32xf32>, tensor<32x64x3xf32>) {
+// A full reduction to a scalar feeding a parallel consumer fuses even
+// when they share no input.
+util.func public @fuse_no_shared_parallel_loops(%arg0: tensor<16x16x24xf32>, %arg1: tensor<64x3x32xf32>) -> (tensor<64x3x32xf32>, tensor<32x64x3xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<f32>
   %1 = tensor.empty() : tensor<64x3x32xf32>
@@ -1889,18 +1891,18 @@ util.func public @dont_fuse_no_shared_parallel_loops(%arg0: tensor<16x16x24xf32>
   } -> (tensor<64x3x32xf32>, tensor<32x64x3xf32>)
   util.return %5#0, %5#1 : tensor<64x3x32xf32>, tensor<32x64x3xf32>
 }
-// CHECK-LABEL: util.func public @dont_fuse_no_shared_parallel_loops(
+// CHECK-LABEL: util.func public @fuse_no_shared_parallel_loops(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<16x16x24xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<64x3x32xf32>)
-//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
-//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[ARG0]]
-//       CHECK:     flow.return %[[REDUCTION]]
-//       CHECK:   %[[DISPATCH1:.+]]:2 = flow.dispatch.region
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["reduction", "reduction", "reduction"]
+//  CHECK-SAME:         ins(%[[ARG0]]
 //       CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
-//  CHECK-SAME:       ins(%[[ARG1]], %[[DISPATCH0]]
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:         ins(%[[ARG1]], %[[REDUCTION]]
 //       CHECK:     flow.return %[[GENERIC]]#0, %[[GENERIC]]#1
-//       CHECK:   util.return %[[DISPATCH1]]#0, %[[DISPATCH1]]#1
+//       CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
 
 // -----
 
@@ -2366,6 +2368,43 @@ util.func public @fuse_scalar_reduction_with_scalar_consumer(
 
 // -----
 
+// Check that a full reduction producing a scalar fuses with a parallel
+// elementwise consumer when they share an input tensor.
+util.func public @fuse_scalar_reduction_with_parallel_consumer_shared_input(
+    %arg0: tensor<4xf32>, %init: tensor<f32>) -> tensor<4xf32> {
+  %sum = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
+      iterator_types = ["reduction"]
+  } ins(%arg0 : tensor<4xf32>) outs(%init : tensor<f32>) {
+  ^bb0(%in: f32, %acc: f32):
+    %0 = arith.addf %in, %acc : f32
+    linalg.yield %0 : f32
+  } -> tensor<f32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %res = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> ()>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]
+  } ins(%arg0, %sum : tensor<4xf32>, tensor<f32>) outs(%empty : tensor<4xf32>) {
+  ^bb0(%x: f32, %s: f32, %out: f32):
+    %0 = arith.divf %x, %s : f32
+    linalg.yield %0 : f32
+  } -> tensor<4xf32>
+  util.return %res : tensor<4xf32>
+}
+// CHECK-LABEL: util.func public @fuse_scalar_reduction_with_parallel_consumer_shared_input
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["reduction"]
+//       CHECK:     %[[NORM:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//  CHECK-SAME:         ins({{.*}}%[[REDUCE]]
+//       CHECK:     flow.return %[[NORM]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
 // Producer blocked: tensor.extract result captured from above by root's body.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 util.func public @no_producer_fusion_with_extract_use_from_above(
@@ -2756,3 +2795,44 @@ util.func public @scatter_chain_dispatch_ordering(
 //      CHECK:     iree_linalg_ext.scatter
 // CHECK-SAME:       outs(%[[S2]]
 //      CHECK:   util.return %[[S3]]
+
+// -----
+
+// Multi-result producer feeds a pack consumer via two operands. Producer
+// result 0 has a non-identity indexing map while result 1 has an identity
+// map, so the pack-identity per-operand check fails on the source operand
+// but passes on the dest operand. Fusion must be rejected.
+
+util.func public @pack_per_operand_rejection(
+    %a: tensor<1x1xf32>, %b: tensor<1x1xf32>) -> tensor<1x1x1x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %eR = tensor.empty() : tensor<1x1xf32>
+  %fR = linalg.fill ins(%cst : f32) outs(%eR : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %R = linalg.matmul ins(%a, %b : tensor<1x1xf32>, tensor<1x1xf32>)
+                    outs(%fR : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %eA = tensor.empty() : tensor<1x1xf32>
+  %eB = tensor.empty() : tensor<1x1x1x1xf32>
+  %X:2 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+      affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%R : tensor<1x1xf32>) outs(%eA, %eB : tensor<1x1xf32>, tensor<1x1x1x1xf32>) {
+  ^bb0(%in: f32, %oA: f32, %oB: f32):
+    linalg.yield %in, %in : f32, f32
+  } -> (tensor<1x1xf32>, tensor<1x1x1x1xf32>)
+  %packed = linalg.pack %X#0 inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %X#1 : tensor<1x1xf32> -> tensor<1x1x1x1xf32>
+  util.return %packed : tensor<1x1x1x1xf32>
+}
+
+//      CHECK-LABEL: @pack_per_operand_rejection
+//            CHECK:   %[[RX:.+]]:2 = flow.dispatch.region
+//            CHECK:     linalg.matmul
+//            CHECK:     linalg.generic
+//            CHECK:     flow.return
+//            CHECK:   flow.dispatch.region
+//            CHECK:     linalg.pack %[[RX]]#0
+//       CHECK-SAME:       into %[[RX]]#1
+//            CHECK:     flow.return
