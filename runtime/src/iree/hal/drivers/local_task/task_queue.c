@@ -692,10 +692,29 @@ static void iree_hal_task_queue_op_advance_frontier(
                                       operation->axis, epoch);
 }
 
+// Releases the resource_set retained for the duration of the operation.
+// Must be called before signaling the operation's signal semaphores so that
+// any thread waiting on the signal observes the resource refs already
+// dropped: otherwise a waiter can race ahead and tear down dependent objects
+// (e.g. a VM context whose modules' rodata is bound here) while the
+// resource_set is still alive, causing a refcount-still-held abort during
+// teardown of those dependent objects.
+static void iree_hal_task_queue_op_release_retained_resources(
+    iree_hal_task_queue_op_t* operation) {
+  if (operation->resource_set) {
+    iree_hal_resource_set_free(operation->resource_set);
+    operation->resource_set = NULL;
+  }
+}
+
 static void iree_hal_task_queue_op_complete_with_epoch(
     iree_hal_task_queue_op_t* operation, uint64_t epoch) {
   iree_status_t status = iree_hal_task_queue_op_unmap_binding_mappings(
       operation, iree_ok_status());
+  // Release the retained resources before signaling so that waiters observing
+  // completion cannot race ahead and tear down dependent objects while we
+  // still hold refs to command buffers / binding-table buffers.
+  iree_hal_task_queue_op_release_retained_resources(operation);
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(operation->signal_semaphores,
                                             /*frontier=*/NULL);
@@ -715,6 +734,10 @@ static void iree_hal_task_queue_op_complete(
     iree_hal_task_queue_op_t* operation) {
   iree_status_t status = iree_hal_task_queue_op_unmap_binding_mappings(
       operation, iree_ok_status());
+  // Release the retained resources before signaling so that waiters observing
+  // completion cannot race ahead and tear down dependent objects while we
+  // still hold refs to command buffers / binding-table buffers.
+  iree_hal_task_queue_op_release_retained_resources(operation);
   if (iree_status_is_ok(status)) {
     // Signal all semaphores to their new values.
     status = iree_hal_semaphore_list_signal(operation->signal_semaphores,

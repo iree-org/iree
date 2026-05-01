@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <numeric>
 #include <vector>
 
@@ -391,6 +392,116 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
   EXPECT_EQ(0, sink.dispatch_event_count);
   EXPECT_TRUE(sink.dispatch_events.empty());
   EXPECT_FALSE(sink.write_after_end);
+}
+
+// Release callback that flips a flag the first time it is invoked.
+// Used below to detect when the HAL buffer's last ref has been dropped.
+static void FlagReleaseCallback(void* user_data,
+                                iree_hal_buffer_t* /*buffer*/) {
+  *static_cast<bool*>(user_data) = true;
+}
+
+// Verifies that by the time a dispatch's signal semaphore is observed, the
+// queue has already released its retained refs to the binding-table buffers.
+//
+// Otherwise a thread waiting on the signal could race past the wait and tear
+// down dependent objects (e.g. a VM context whose modules' rodata is bound
+// here), only to abort because the queue still holds those refs. We hit this
+// in practice with iree-run-mlir on local-task + vmvx: see the fix in
+// runtime/src/iree/hal/drivers/local_task/task_queue.c that releases the
+// op->resource_set before signaling.
+//
+// The window between "worker signals" and "worker drops its retained refs"
+// is microseconds, so a single iteration is unreliable: usually the worker
+// finishes both before the test thread wakes up. We loop the dispatch many
+// times so the test deterministically catches the bug if the ordering is
+// wrong.
+TEST_P(QueueDispatchTest, BindingBuffersReleasedBeforeSignalIsObserved) {
+  iree_hal_buffer_params_t input_params = {};
+  input_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  input_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  input_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ |
+                       IREE_HAL_BUFFER_USAGE_TRANSFER |
+                       IREE_HAL_BUFFER_USAGE_MAPPING;
+  constexpr iree_device_size_t kInputBytes = 4 * sizeof(uint32_t);
+  iree_device_size_t compat_size = kInputBytes;
+  iree_hal_buffer_params_t compat_params = input_params;
+  if (!iree_all_bits_set(iree_hal_allocator_query_buffer_compatibility(
+                             iree_hal_device_allocator(device_), input_params,
+                             kInputBytes, &compat_params, &compat_size),
+                         IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)) {
+    GTEST_SKIP() << "Allocator does not support importing host allocations";
+  }
+
+  constexpr int kIterations = 10000;
+  for (int iter = 0; iter < kIterations; ++iter) {
+    SCOPED_TRACE(::testing::Message() << "iteration " << iter);
+
+    // Build the input buffer as an imported host allocation so we can attach
+    // a release callback that fires when the HAL buffer's last ref is
+    // dropped.
+    void* host_ptr = nullptr;
+    IREE_ASSERT_OK(iree_allocator_malloc_aligned(
+        iree_allocator_system(), kInputBytes, /*min_alignment=*/64,
+        /*offset=*/0, &host_ptr));
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    std::memcpy(host_ptr, input_data.data(), kInputBytes);
+
+    bool input_released = false;
+    iree_hal_buffer_release_callback_t release_callback = {};
+    release_callback.fn = FlagReleaseCallback;
+    release_callback.user_data = &input_released;
+
+    iree_hal_external_buffer_t ext = {};
+    ext.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
+    ext.size = kInputBytes;
+    ext.handle.host_allocation.ptr = host_ptr;
+
+    iree_hal_buffer_t* input_buffer = nullptr;
+    IREE_ASSERT_OK(iree_hal_allocator_import_buffer(
+        iree_hal_device_allocator(device_), input_params, &ext,
+        release_callback, &input_buffer));
+    ASSERT_NE(nullptr, input_buffer);
+
+    Ref<iree_hal_buffer_t> output_buffer;
+    IREE_ASSERT_OK(CreateFilledDeviceBuffer(4 * sizeof(uint32_t), uint32_t{99},
+                                            output_buffer.out()));
+
+    iree_hal_buffer_ref_t binding_refs[2];
+    MakeScaleAndOffsetBindings(input_buffer, output_buffer.get(), binding_refs);
+    iree_hal_buffer_ref_list_t bindings = {
+        /*.count=*/IREE_ARRAYSIZE(binding_refs),
+        /*.values=*/binding_refs,
+    };
+
+    const uint32_t constant_data[] = {3, 10};
+    iree_const_byte_span_t constants =
+        iree_make_const_byte_span(constant_data, sizeof(constant_data));
+
+    SemaphoreList empty_wait;
+    SemaphoreList dispatch_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+        executable_, /*export_ordinal=*/0,
+        iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+        IREE_HAL_DISPATCH_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+    // The signal has fired. If the queue has already released its retained
+    // ref on `input_buffer` (correct ordering), our drop below is the last
+    // release and the callback fires synchronously. If the queue still holds
+    // its ref (the regression), the callback does not fire on our drop and
+    // we catch the bug.
+    iree_hal_buffer_release(input_buffer);
+    input_buffer = nullptr;
+    ASSERT_TRUE(input_released)
+        << "queue still held a binding-buffer ref after signaling completion; "
+           "this is the regression in iree_hal_task_queue_op_complete that "
+           "caused intermittent rodata-refcount aborts during VM teardown";
+
+    iree_allocator_free_aligned(iree_allocator_system(), host_ptr);
+  }
 }
 
 // Zero-workgroup dispatches are no-ops that still participate in semaphore
