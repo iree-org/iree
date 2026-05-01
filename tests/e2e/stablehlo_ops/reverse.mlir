@@ -23,10 +23,9 @@ func.func @xla_reverse() {
 
 // Regression test for https://github.com/iree-org/iree/issues/23637.
 //
-// TODO: re-enable once the RISC-V vector miscompile is fixed. When the fused
+// TODO(24342): re-enable once the RISC-V vector miscompile is fixed. When the fused
 // slice + reverse `linalg.generic` is collapsed to a 1-D iteration space,
-// RISC-V vector codegen produces wrong values; tracked in
-// https://github.com/iree-org/iree/issues/24342.
+// RISC-V vector codegen produces wrong values.
 //
 // func.func @xla_reverse_after_slice() {
 //   %t1 = util.unfoldable_constant dense<[

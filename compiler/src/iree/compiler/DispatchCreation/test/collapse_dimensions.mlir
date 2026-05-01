@@ -993,30 +993,33 @@ util.func public @no_collapse_scatter_generic(%src: tensor<1x25x25x32xf16>) -> t
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c25 = arith.constant 25 : index
-  %empty = tensor.empty() : tensor<1x52x52x32xf16>
-  %result = linalg.generic {
-    indexing_maps = [#map],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-  } outs(%empty : tensor<1x52x52x32xf16>) {
-  ^bb0(%out: f16):
-    %n = linalg.index 0 : index
-    %h = linalg.index 1 : index
-    %w = linalg.index 2 : index
-    %c_idx = linalg.index 3 : index
-    %sh = arith.subi %h, %c1 : index
-    %rem_h = arith.remsi %sh, %c2 : index
-    %div_h = arith.divsi %sh, %c2 : index
-    %ge = arith.cmpi sge, %sh, %c0 : index
-    %eq = arith.cmpi eq, %rem_h, %c0 : index
-    %lt = arith.cmpi slt, %div_h, %c25 : index
-    %valid = arith.andi %ge, %eq : i1
-    %valid2 = arith.andi %valid, %lt : i1
-    %clamped = arith.maxsi %div_h, %c0 : index
-    %extracted = tensor.extract %src[%n, %clamped, %w, %c_idx] : tensor<1x25x25x32xf16>
-    %val = arith.select %valid2, %extracted, %zero : f16
-    linalg.yield %val : f16
-  } -> tensor<1x52x52x32xf16>
-  util.return %result : tensor<1x52x52x32xf16>
+  %0 = flow.dispatch.region -> (tensor<1x52x52x32xf16>) {
+    %empty = tensor.empty() : tensor<1x52x52x32xf16>
+    %result = linalg.generic {
+      indexing_maps = [#map],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+    } outs(%empty : tensor<1x52x52x32xf16>) {
+    ^bb0(%out: f16):
+      %n = linalg.index 0 : index
+      %h = linalg.index 1 : index
+      %w = linalg.index 2 : index
+      %c_idx = linalg.index 3 : index
+      %sh = arith.subi %h, %c1 : index
+      %rem_h = arith.remsi %sh, %c2 : index
+      %div_h = arith.divsi %sh, %c2 : index
+      %ge = arith.cmpi sge, %sh, %c0 : index
+      %eq = arith.cmpi eq, %rem_h, %c0 : index
+      %lt = arith.cmpi slt, %div_h, %c25 : index
+      %valid = arith.andi %ge, %eq : i1
+      %valid2 = arith.andi %valid, %lt : i1
+      %clamped = arith.maxsi %div_h, %c0 : index
+      %extracted = tensor.extract %src[%n, %clamped, %w, %c_idx] : tensor<1x25x25x32xf16>
+      %val = arith.select %valid2, %extracted, %zero : f16
+      linalg.yield %val : f16
+    } -> tensor<1x52x52x32xf16>
+    flow.return %result : tensor<1x52x52x32xf16>
+  }
+  util.return %0 : tensor<1x52x52x32xf16>
 }
 
 // CHECK-LABEL: @no_collapse_scatter_generic
