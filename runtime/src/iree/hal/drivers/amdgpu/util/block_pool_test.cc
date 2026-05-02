@@ -316,9 +316,7 @@ TEST_F(BlockPoolTest, Trimming) {
 // iree_hal_amdgpu_block_arena_t
 //===----------------------------------------------------------------------===//
 
-using BlockArenaTest = BlockPoolTest;
-
-TEST_F(BlockArenaTest, LifetimeEmpty) {
+TEST_F(BlockPoolTest, ArenaLifetimeEmpty) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t gpu_agent = topology.gpu_agents[0];
@@ -344,7 +342,7 @@ TEST_F(BlockArenaTest, LifetimeEmpty) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockArenaTest, Allocation) {
+TEST_F(BlockPoolTest, ArenaAllocation) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -403,7 +401,7 @@ TEST_F(BlockArenaTest, Allocation) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockArenaTest, Reset) {
+TEST_F(BlockPoolTest, ArenaReset) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -454,7 +452,7 @@ TEST_F(BlockArenaTest, Reset) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockArenaTest, ReleaseBlocks) {
+TEST_F(BlockPoolTest, ArenaReleaseBlocks) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -517,9 +515,7 @@ TEST_F(BlockArenaTest, ReleaseBlocks) {
 // iree_hal_amdgpu_block_allocator_t
 //===----------------------------------------------------------------------===//
 
-using BlockAllocatorTest = BlockPoolTest;
-
-TEST_F(BlockAllocatorTest, LifetimeEmpty) {
+TEST_F(BlockPoolTest, AllocatorLifetimeEmpty) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -546,7 +542,7 @@ TEST_F(BlockAllocatorTest, LifetimeEmpty) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, PageSizeCheck) {
+TEST_F(BlockPoolTest, AllocatorPageSizeCheck) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -578,7 +574,7 @@ TEST_F(BlockAllocatorTest, PageSizeCheck) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, Allocate) {
+TEST_F(BlockPoolTest, AllocatorAllocate) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -629,7 +625,7 @@ TEST_F(BlockAllocatorTest, Allocate) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, AllocateFullBlocks) {
+TEST_F(BlockPoolTest, AllocatorAllocateFullBlocks) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -672,7 +668,7 @@ TEST_F(BlockAllocatorTest, AllocateFullBlocks) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, AllocateSpillBlock) {
+TEST_F(BlockPoolTest, AllocatorAllocateSpillBlock) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -723,7 +719,7 @@ TEST_F(BlockAllocatorTest, AllocateSpillBlock) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, AllocateFragmented) {
+TEST_F(BlockPoolTest, AllocatorAllocateFragmented) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
@@ -768,7 +764,7 @@ TEST_F(BlockAllocatorTest, AllocateFragmented) {
   iree_hal_amdgpu_block_pool_deinitialize(&block_pool);
 }
 
-TEST_F(BlockAllocatorTest, AllocateEntireBlock) {
+TEST_F(BlockPoolTest, AllocatorAllocateEntireBlock) {
   IREE_TRACE_SCOPE();
 
   hsa_agent_t cpu_agent = topology.cpu_agents[0];
