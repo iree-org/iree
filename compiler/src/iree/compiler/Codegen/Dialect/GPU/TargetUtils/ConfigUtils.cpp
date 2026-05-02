@@ -1084,22 +1084,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
-    // innermost (contiguous reads) to avoid LDS bank conflicts.
-    // TODO(#24255): Fix untuned swizzle logic for DMA.
+    // innermost (contiguous reads) to avoid shared memory bank conflicts.
     if (!transposedLhs) {
-      FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
-          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
-          /*skipUntunedFallback=*/true);
-      if (succeeded(lhsSwizzleAttr)) {
-        lhsAttr = *lhsSwizzleAttr;
+      if (std::optional<Attribute> swizzle = getXorShuffleAttr(
+              context, lhsAttr, target, kind, kMMAOperandLhs,
+              /*isTransposed=*/false, /*useDirectLoad=*/true)) {
+        lhsAttr = *swizzle;
       }
     }
     if (transposedRhs) {
-      FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
-          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
-          /*skipUntunedFallback=*/true);
-      if (succeeded(rhsSwizzleAttr)) {
-        rhsAttr = *rhsSwizzleAttr;
+      if (std::optional<Attribute> swizzle = getXorShuffleAttr(
+              context, rhsAttr, target, kind, kMMAOperandRhs,
+              /*isTransposed=*/true, /*useDirectLoad=*/true)) {
+        rhsAttr = *swizzle;
       }
     }
     promotionArray = {lhsAttr, rhsAttr};
@@ -1115,18 +1112,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
     } else {
       // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-      FailureOr<Attribute> lhsSwizzleAttr =
+      Attribute lhsPromotion =
           getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                            schedule->kTileSizes, kMMAOperandLhs);
-      FailureOr<Attribute> rhsSwizzleAttr =
+                            kMMAOperandLhs, /*isTransposed=*/transposedLhs)
+              .value_or(defaultConfigAttr);
+      Attribute rhsPromotion =
           getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                            schedule->kTileSizes, kMMAOperandRhs);
-      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-        promotionArray = {};
-      } else {
-        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                          defaultConfigAttr};
-      }
+                            kMMAOperandRhs, /*isTransposed=*/transposedRhs)
+              .value_or(defaultConfigAttr);
+      promotionArray = {lhsPromotion, rhsPromotion, defaultConfigAttr,
+                        defaultConfigAttr};
     }
   }
 

@@ -32,6 +32,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <numeric>
 #include <optional>
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
@@ -804,57 +805,6 @@ getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
          llvm::product_of(layout.element);
 }
 
-static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    switch (smma.getIntrinsic()) {
-    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return XorShuffleParams({/*rowElems=*/256,
-                               /*accessElems=*/32});
-    default:
-      // TODO(muzasyed): Add more intrinsics for gfx950.
-      return failure();
-    }
-  }
-  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
-    switch (mma.getIntrinsic()) {
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_F16:
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_32x32x16_F16:
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_BF16:
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_32x32x16_BF16:
-      return XorShuffleParams({/*rowElems=*/64,
-                               /*accessElems=*/8});
-    default:
-      return failure();
-    }
-  }
-  return failure();
-}
-
-/// Validate the XOR shuffle parameters for the given intrinsic and operand
-/// index. If the parameters produce an XOR Shuffle that is not valid, return
-/// failure. Else, return the swizzle parameters.
-static FailureOr<XorShuffleParams>
-validateXorShuffle(FailureOr<XorShuffleParams> swizzle,
-                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                   int operandIndex) {
-  FailureOr<int64_t> maybeTotalTileElems =
-      getTotalTileElems(intrinsic, operandIndex);
-  if (failed(maybeTotalTileElems)) {
-    return failure();
-  }
-  int64_t totalTileElems = *maybeTotalTileElems;
-  if (!isXORShuffleValid(swizzle->rowElems, swizzle->accessElems,
-                         totalTileElems)) {
-    return failure();
-  }
-  return swizzle;
-}
-
-// Disabling clang-tidy for the following functions, as it will be externally
-// linked to the CAPI in a future PR.
-// NOLINTBEGIN(misc-use-internal-linkage)
 FailureOr<XorShuffleBounds>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
@@ -868,19 +818,19 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   return XorShuffleBounds{*maybeMinimumAccessElems, *maybeTotalTileElems};
 }
 
-bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+bool isXorShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                        int64_t totalTileElems) {
   // The number of total tile elements we want to swizzle must be greater than
   // or equal to the number of elements in a row.
   if (totalTileElems < numRowElems) {
     LDBG()
-        << "The number of row elements exceed the total elements in the tile";
+        << "The number of row elements exceeds the total elements in the tile";
     return false;
   }
   // We need at least one column of access elements to swizzle within a row.
   if (numRowElems < numAccessElems) {
-    LDBG()
-        << "The number of access elements exceed the total elements in the row";
+    LDBG() << "The number of access elements exceeds the total elements in the "
+              "row";
     return false;
   }
   // The size of a row must evenly divide the total number of tile elements.
@@ -906,93 +856,308 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
   return true;
 }
 
-FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
-  FailureOr<amdgpu::Chipset> maybeChipset =
-      amdgpu::Chipset::parse(target.getArch());
-  if (failed(maybeChipset)) {
-    return failure();
+// Permute an MMASingleSubgroupLayout so that its arrays reflect the physical
+// shared memory dimension order rather than the canonical semantic order.
+// For LHS, the M (parallel) dim is rotated to the end so K becomes outermost.
+// For RHS, the N (parallel) dim is rotated to the front so K becomes innermost.
+// This mirrors the convention in GPUTileSwizzleUtils.cpp for TileSwizzle
+// construction.
+static void permuteLayoutPerConfig(IREE::GPU::MMASingleSubgroupLayout &layout,
+                                   int operandIndex) {
+  static_assert(IREE::GPU::kMMAOperandLhs == IREE::GPU::kScaledMMAOperandLhs,
+                "MMA and ScaledMMA LHS operand indices must match");
+  static_assert(IREE::GPU::kMMAOperandRhs == IREE::GPU::kScaledMMAOperandRhs,
+                "MMA and ScaledMMA RHS operand indices must match");
+  bool isLhs = (operandIndex == IREE::GPU::kMMAOperandLhs);
+  bool isRhs = (operandIndex == IREE::GPU::kMMAOperandRhs);
+  assert((isLhs || isRhs) &&
+         "permuteLayoutPerConfig only applies to LHS/RHS operands");
+  auto applyAll = [&](auto fn) {
+    fn(layout.outer);
+    fn(layout.thread);
+    fn(layout.tstrides);
+    fn(layout.element);
+  };
+  if (isLhs) {
+    applyAll([](MutableArrayRef<int64_t> v) {
+      std::rotate(v.begin(), v.begin() + 1, v.end());
+    });
+  } else if (isRhs) {
+    applyAll([](MutableArrayRef<int64_t> v) {
+      std::rotate(v.begin(), v.end() - 1, v.end());
+    });
   }
-  if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
-    return validateXorShuffle(getXorShuffleParamsForGfx950(target, intrinsic),
-                              intrinsic, operandIndex);
-  }
-  return failure();
 }
 
-FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
-  // Compute XOR shuffle swizzle parameters for bank conflict avoidance.
-  // - rowElems: Select entirety of K Tile size, may not prevent bank
-  //              conflicts if the K tile size is too small.
-  // - accessElems: number of contiguous elements each thread accesses,
-  //                 derived from the MMA intrinsic's element layout.
-  int64_t numAccessElems = getNumAccessElems(intrinsic, operandIndex).value();
-
-  // Calculate K tile size (total K elements in shared memory) to use as row
-  // width. For small K tiles, this may not reduce bank conflicts effectively.
-  int64_t kTileSize =
-      llvm::product_of(reductionTileSizes) * getKSize(intrinsic).value();
-
-  // Figure out how many elements can fit across all banks of LDS.
-  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
-  FailureOr<int64_t> bitwidth = getOperandBitwidth(intrinsic, operandIndex);
-  if (failed(bitwidth)) {
+// Analytically predict whether the given intrinsic operand layout is free of
+// LDS bank conflicts. The layout must already be permuted so that the last
+// dimension is LDS-contiguous (via permuteLayoutPerConfig).
+//
+// phaseSchedule selects the hardware's thread-to-phase schedule for wide
+// ds_read instructions. Returns failure when the phase schedule is None
+// (unknown phase grouping).
+//
+// swizzleParams, if provided, applies XOR byte-offset remapping before
+// bank checking. This lets callers test whether a candidate XOR swizzle
+// resolves conflicts.
+//
+// Returns success() if the layout is conflict-free, failure() if conflicts
+// are detected or the analysis cannot determine (bail-out).
+static LogicalResult hasNoBankConflicts(
+    const IREE::GPU::MMASingleSubgroupLayout &layout, int64_t numBanks,
+    int64_t elemBits, IREE::GPU::SharedMemoryModel sharedMemModel,
+    std::optional<XorShuffleParams> swizzleParams = std::nullopt) {
+  // TODO: Handle outer > 1 layouts (repeated non-contiguous tiles).
+  if (llvm::any_of(layout.outer, [](int64_t o) { return o != 1; })) {
     return failure();
   }
+  int64_t rank = layout.tstrides.size();
+
+  // Compute the number of elements between consecutive positions along dim d.
+  SmallVector<int64_t> ldsElemStride(rank, 1);
+  for (int64_t i = rank - 1; i > 0; --i) {
+    ldsElemStride[i - 1] =
+        ldsElemStride[i] * layout.thread[i] * layout.element[i];
+  }
+
+  // Compute byte strides used to linearize thread coordinates.
+  SmallVector<int64_t> ldsByteStride(rank);
+  for (int64_t d = 0; d < rank; ++d) {
+    ldsByteStride[d] = layout.element[d] * ldsElemStride[d] * elemBits / 8;
+  }
+  // NOTE: mlir::delinearize assumes decreasing (sorted) strides, but
+  // layout.tstrides may be in arbitrary order, so we delinearize each
+  // dimension independently.
+  auto getThreadByteOffset = [&](int64_t threadId) -> int64_t {
+    SmallVector<int64_t> coords(rank);
+    for (int64_t d = 0; d < rank; ++d) {
+      coords[d] = (threadId / layout.tstrides[d]) % layout.thread[d];
+    }
+    return mlir::linearize(coords, ldsByteStride);
+  };
+
+  // Build a local XOR swizzle remapping lambda from the params.
+  auto applySwizzle = [&](int64_t byteOffset) -> int64_t {
+    if (!swizzleParams) {
+      return byteOffset;
+    }
+    int64_t accessBytes =
+        std::max<int64_t>(1, swizzleParams->accessElems * elemBits / 8);
+    int64_t rowBytes =
+        std::max<int64_t>(1, swizzleParams->rowElems * elemBits / 8);
+    int64_t numCols = rowBytes / accessBytes;
+    if (numCols <= 1) {
+      return byteOffset;
+    }
+    int64_t row = byteOffset / rowBytes;
+    int64_t withinRow = byteOffset % rowBytes;
+    int64_t col = withinRow / accessBytes;
+    int64_t inGroup = withinRow % accessBytes;
+    int64_t newCol = col ^ (row % numCols);
+    return row * rowBytes + newCol * accessBytes + inGroup;
+  };
+
+  auto hasNoBankConflictsForReadWidth =
+      [&](int64_t readWidth, int64_t numThreads) -> LogicalResult {
+    auto phases =
+        IREE::GPU::getPhaseGroups(sharedMemModel, readWidth, numThreads);
+    if (!phases) {
+      return failure();
+    }
+    int64_t banksUsedPerThread =
+        std::max<int64_t>(1, readWidth / IREE::GPU::kSharedMemBankWidth);
+    // Map each bank to the address that first accessed it.
+    // Same bank + different address = conflict.
+    // Same bank + same address = broadcast.
+    llvm::DenseMap<int64_t, int64_t> bankToAddress;
+    for (const auto &phase : *phases) {
+      bankToAddress.clear();
+      for (int64_t t : phase) {
+        int64_t byteOffset = applySwizzle(getThreadByteOffset(t));
+        int64_t startBank =
+            (byteOffset / IREE::GPU::kSharedMemBankWidth) % numBanks;
+        for (int64_t b = 0; b < banksUsedPerThread; ++b) {
+          int64_t bank = (startBank + b) % numBanks;
+          int64_t addr = byteOffset + b * IREE::GPU::kSharedMemBankWidth;
+          auto [it, inserted] = bankToAddress.try_emplace(bank, addr);
+          if (!inserted && it->second != addr) {
+            return failure();
+          }
+        }
+      }
+    }
+    return success();
+  };
+  int64_t readBytes =
+      std::max<int64_t>(1, layout.element[rank - 1] * elemBits / 8);
+  int64_t numThreads = llvm::product_of(layout.thread);
+  int64_t largestPowerOf2 = llvm::bit_floor(static_cast<uint64_t>(readBytes));
+  // Decompose the total read into power-of-2 sub-reads (largest first) and
+  // check each for bank conflicts.  Widths at or below kSharedMemBankWidth
+  // all touch a single bank and share identical phase groupings, so we stop
+  // there to avoid redundant checks.
+  for (int64_t w = largestPowerOf2;
+       w >= IREE::GPU::kSharedMemBankWidth && readBytes > 0; w /= 2) {
+    if (w > readBytes) {
+      continue;
+    }
+    if (failed(hasNoBankConflictsForReadWidth(w, numThreads))) {
+      return failure();
+    }
+    readBytes %= w;
+  }
+  return success();
+}
+
+// Wrapper that extracts target/intrinsic parameters, permutes the layout
+// to match the physical LDS dimension order, and checks for bank conflicts.
+static LogicalResult
+hasNoBankConflicts(IREE::GPU::TargetAttr target,
+                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex, bool isTransposed,
+                   std::optional<XorShuffleParams> swizzleParams) {
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  if (isTransposed) {
+    permuteLayoutPerConfig(layout, operandIndex);
+  }
+
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   IREE::GPU::SharedMemoryModel sharedMemModel =
       wgp.getSharedMemModel().getValue();
   if (sharedMemModel == IREE::GPU::SharedMemoryModel::None) {
     return failure();
   }
-  int64_t bankCount = IREE::GPU::getSharedMemBankCount(sharedMemModel);
-  int64_t bankWidthBits = IREE::GPU::getSharedMemBankWidth(sharedMemModel) * 8;
-  int64_t ldsBankWidthBits = (bankCount * bankWidthBits) / *bitwidth;
+  int64_t numBanks = IREE::GPU::getSharedMemBankCount(sharedMemModel);
 
-  // Row width must be less than or equal to the row size (in elements) of LDS
-  // bank width to prevent bank conflicts.
-  int64_t effectiverowElems = std::min(ldsBankWidthBits, kTileSize);
+  FailureOr<int64_t> maybeBitwidth =
+      getOperandBitwidth(intrinsic, operandIndex);
+  if (failed(maybeBitwidth)) {
+    return failure();
+  }
+  int64_t elemBits = maybeBitwidth.value();
 
-  // Ensure row width is at least access width (minimum 1 column).
-  effectiverowElems = std::max(effectiverowElems, numAccessElems);
-  return validateXorShuffle(XorShuffleParams({/*rowElems=*/effectiverowElems,
-                                              /*accessElems=*/numAccessElems}),
-                            intrinsic, operandIndex);
+  return hasNoBankConflicts(layout, numBanks, elemBits, sharedMemModel,
+                            swizzleParams);
 }
 
-FailureOr<XorShuffleParams>
+std::optional<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                    bool skipUntunedFallback) {
-  FailureOr<XorShuffleParams> xorShuffleAttr =
-      getXorShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
-  if (failed(xorShuffleAttr) && !skipUntunedFallback) {
-    xorShuffleAttr = getXorShuffleParamsForUntunedChipset(
-        target, intrinsic, reductionTileSizes, operandIndex);
+                    int operandIndex, bool isTransposed, bool useDirectLoad) {
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeTotalTileElems)) {
+    LDBG() << "failed to get total tile elements for operand " << operandIndex;
+    return std::nullopt;
   }
-  return xorShuffleAttr;
-}
-// NOLINTEND(misc-use-internal-linkage)
+  int64_t totalTileElems = *maybeTotalTileElems;
+  FailureOr<int64_t> bitwidth = getOperandBitwidth(intrinsic, operandIndex);
+  if (failed(bitwidth)) {
+    LDBG() << "failed to get bitwidth for operand " << operandIndex;
+    return std::nullopt;
+  }
+  int64_t elemBits = *bitwidth;
 
-FailureOr<Attribute>
+  // Step 1: Create criteria for target XOR shuffle parameters. Check whether a
+  // candidate XOR shuffle is geometrically valid and, if DMA is active,
+  // compatible with all DMA segment widths. The DMA lowering
+  // (AMDGPULowerCoalescedDMAToGatherLDS) requires accessElems % elementsPerLane
+  // == 0 for every segment it might choose; we check all available DMA sizes
+  // conservatively.
+  SmallVector<int64_t> dmaElementsPerLane;
+  if (useDirectLoad) {
+    DenseI64ArrayAttr dmaSizesAttr = wgp.getDmaSizes();
+    if (dmaSizesAttr && !dmaSizesAttr.empty()) {
+      for (int64_t dmaSize : dmaSizesAttr.asArrayRef()) {
+        if (dmaSize % elemBits == 0) {
+          dmaElementsPerLane.push_back(dmaSize / elemBits);
+        }
+      }
+    }
+  }
+  auto isValidCandidate = [&](XorShuffleParams params) -> LogicalResult {
+    if (!isXorShuffleValid(params.rowElems, params.accessElems,
+                           totalTileElems)) {
+      return failure();
+    }
+    // TODO: Instead of rejecting swizzles incompatible with the largest DMA
+    // width, consider constraining the DMA lowering to use only compatible
+    // (smaller) segment sizes. Eliminating bank conflicts may outweigh the
+    // cost of narrower DMA loads when the shared memory tile is read many
+    // times (once per MMA K-step) but written only once.
+    for (int64_t epl : dmaElementsPerLane) {
+      if (params.accessElems % epl != 0) {
+        return failure();
+      }
+    }
+    return success();
+  };
+
+  // Step 2: If the operand is transposed, permute the layout to match the
+  // physical shared memory dimension order.
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  if (isTransposed) {
+    permuteLayoutPerConfig(layout, operandIndex);
+  }
+
+  // Step 3: Compute access elements needed for identity swizzle and search.
+  FailureOr<int64_t> maybeNumAccessElems =
+      getNumAccessElems(intrinsic, operandIndex);
+  if (failed(maybeNumAccessElems)) {
+    LDBG() << "failed to get access elements for operand " << operandIndex;
+    return std::nullopt;
+  }
+  int64_t numAccessElems = *maybeNumAccessElems;
+
+  // Step 4: Check if bank conflicts are present without swizzle.
+  IREE::GPU::SharedMemoryModel sharedMemModel =
+      wgp.getSharedMemModel().getValue();
+  if (sharedMemModel == IREE::GPU::SharedMemoryModel::None) {
+    LDBG() << "target has no shared memory model";
+    return std::nullopt;
+  }
+  int64_t numBanks = IREE::GPU::getSharedMemBankCount(sharedMemModel);
+  if (succeeded(
+          hasNoBankConflicts(layout, numBanks, elemBits, sharedMemModel))) {
+    LDBG() << "layout is already conflict-free, no swizzle needed, using "
+              "identity swizzle";
+    return XorShuffleParams{numAccessElems, numAccessElems};
+  }
+
+  // Step 5: Iterate power-of-2 rowElems from accessElems up to totalTileElems.
+  // TODO: Currently there is no point to iterating over accessElems because
+  // when the access width is larger than the shared memory read size, the
+  // swizzle gets removed during `OptimizeIntArithmeticPass`. Fix this.
+  for (int64_t rowElems = numAccessElems; rowElems <= totalTileElems;
+       rowElems *= 2) {
+    XorShuffleParams candidate{rowElems, numAccessElems};
+    if (failed(isValidCandidate(candidate))) {
+      continue;
+    }
+    if (succeeded(hasNoBankConflicts(layout, numBanks, elemBits, sharedMemModel,
+                                     candidate))) {
+      return candidate;
+    }
+  }
+  LDBG() << "no valid XOR shuffle found for operand " << operandIndex;
+  return std::nullopt;
+}
+
+std::optional<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                  bool skipUntunedFallback) {
-  FailureOr<XorShuffleParams> xorShuffleParams = getXorShuffleParams(
-      target, intrinsic, reductionTileSizes, operandIndex, skipUntunedFallback);
-  if (failed(xorShuffleParams)) {
-    return failure();
+                  int operandIndex, bool isTransposed, bool useDirectLoad) {
+  std::optional<XorShuffleParams> xorShuffleParams = getXorShuffleParams(
+      target, intrinsic, operandIndex, isTransposed, useDirectLoad);
+  if (!xorShuffleParams) {
+    return std::nullopt;
   }
-  int64_t effectiverowElems = xorShuffleParams.value().rowElems;
-  int64_t numAccessElems = xorShuffleParams.value().accessElems;
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
-      context, effectiverowElems, numAccessElems,
+      context, xorShuffleParams->rowElems, xorShuffleParams->accessElems,
       /*row_stride=*/int64_t(0),
       /*per_phase=*/int64_t(0));
   return IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr,

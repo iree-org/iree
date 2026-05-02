@@ -667,10 +667,11 @@ func.func @matmul_bf16(
 
 // -----
 
-// BF16 1x1 conv (preprocessed to fold unit spatial dims) with DMA. The MMA intrinsic
-// (MFMA_F32_32x32x8_BF16) is not in the tuned swizzle table, so no XOR
-// swizzle should be applied -- only plain use_global_load_dma.
-func.func @conv_1x1_bf16_no_untuned_swizzle(
+// BF16 1x1 conv with DMA. No XOR swizzle is applied because the smallest
+// conflict-free access width (4 BF16 elems = 64b) is not a multiple of the
+// 128-bit DMA segment's elements-per-lane (8 elems), so it would be
+// incompatible with the DMA lowering.
+func.func @conv_bf16_dma_swizzle(
     %arg0: tensor<16x96x64x40xbf16>,
     %arg1: tensor<40x40xbf16>) -> tensor<16x96x64x40xf32> {
   %cst = arith.constant 0.000000e+00 : f32
