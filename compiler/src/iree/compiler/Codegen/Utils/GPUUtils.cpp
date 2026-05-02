@@ -28,6 +28,7 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include <cassert>
+#include <numeric>
 #include <cstdint>
 #include <optional>
 
@@ -916,6 +917,79 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
   return failure();
 }
 
+// Analytically predict whether the given intrinsic operand has LDS bank
+// conflicts when stored with the given dimension ordering in LDS.
+// ldsOrder is a permutation of {0, 1} describing the physical dimension
+// order in LDS. The last element is the physically contiguous (innermost)
+// dimension. 
+// Examples for a 2D operand [dim0, dim1]:
+//   {0, 1} → dim1 contiguous (standard row-major)
+//   {1, 0} → dim0 contiguous (transposed)
+LogicalResult hasBankConflicts(IREE::GPU::TargetAttr target,
+                               IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                               int operandIndex,
+                               ArrayRef<int64_t> ldsOrder) {
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  std::optional<int64_t> maybeBankCount = wgp.getWorkgroupMemoryBankCount();
+  if (!maybeBankCount.has_value()) {
+    LDBG() << "Failed to get workgroup memory bank count";
+    return failure();
+  }
+  int64_t numBanks = *maybeBankCount;
+  constexpr int64_t bankWidth = 4; // always 4 bytes on AMD
+
+  FailureOr<int64_t> maybeBitwidth =
+      getOperandBitwidth(intrinsic, operandIndex);
+  if (failed(maybeBitwidth)) {
+    LDBG() << "Failed to get operand bitwidth";
+    return failure();
+  }
+  int64_t elemBits = *maybeBitwidth;
+  
+  // Each thread reads `element[ldsContiguousDim]` contiguous elements along the
+  // LDS-contiguous dimension. Wider reads span multiple consecutive banks,
+  // reducing the number of independently addressable bank positions.
+  int64_t ldsContiguousDim = ldsOrder.back();
+  int64_t readBits = layout.element[ldsContiguousDim] * elemBits;
+  int64_t readBytes = std::max<int64_t>(1, readBits / 8);
+  int64_t banksPerAccess = std::max<int64_t>(1, readBytes / bankWidth);
+  int64_t activeBanks = numBanks / banksPerAccess;
+  int64_t threadContiguousDim = (layout.tstrides[0] == 1) ? 0 : 1;
+
+  // If 
+  int64_t threadStrideBits = readBits;
+  if (threadContiguousDim != contiguousDim) {
+    // Threads walk perpendicular to LDS contiguity. Each thread step
+    // crosses one full row of the contiguous dimension.
+    int64_t dContiguous = layout.outer[contiguousDim] *
+                          layout.thread[contiguousDim] *
+                          layout.element[contiguousDim];
+    threadStrideBits = dContiguous * elemBits;
+  }
+  int64_t threadStrideBytes = threadStrideBits / 8;
+
+  // Sub-word stride: threads land within the same bank word. The hardware
+  // broadcasts sub-word reads from the same word → no conflict.
+  if (threadStrideBytes < bankWidth) {
+    LDBG() << "Thread stride is less than bank width";
+    return failure();
+  }
+
+  // bankCycle: the number of unique bank positions the thread stride covers
+  // before wrapping around to the same bank.
+  // If activeBanks > bankCycle, threads wrap → N-way conflict.
+  int64_t bankRow = numBanks * bankWidth;
+  int64_t bankCycle = bankRow / std::gcd(threadStrideBytes, bankRow);
+
+  if (activeBanks <= bankCycle)
+    return failure();
+
+  return success();
+}
+
 FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
@@ -947,9 +1021,9 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
   int64_t ldsBankWidthBits =
       (workgroupMemoryBankCount.value() * int64_t(32)) / *bitwidth;
 
-  // Row width must be less than or equal to the row size (in elements) of LDS
-  // bank width to prevent bank conflicts.
-  int64_t effectiverowElems = std::min(ldsBankWidthBits, kTileSize);
+  // Row width must be greater than or equal to the row size (in elements) of
+  // LDS bank width to prevent bank conflicts.
+  int64_t effectiverowElems = std::max(ldsBankWidthBits, kTileSize);
 
   // Ensure row width is at least access width (minimum 1 column).
   effectiverowElems = std::max(effectiverowElems, numAccessElems);
