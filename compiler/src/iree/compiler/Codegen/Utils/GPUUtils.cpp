@@ -943,14 +943,14 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
   if (failed(bitwidth)) {
     return failure();
   }
-  std::optional<int64_t> workgroupMemoryBankCount =
-      wgp.getWorkgroupMemoryBankCount();
-  if (!workgroupMemoryBankCount.has_value()) {
+  IREE::GPU::SharedMemoryModel sharedMemModel =
+      wgp.getSharedMemModel().getValue();
+  if (sharedMemModel == IREE::GPU::SharedMemoryModel::None) {
     return failure();
   }
-  // Assuming each bank is 4 bytes wide (32 bits).
-  int64_t ldsBankWidthBits =
-      (workgroupMemoryBankCount.value() * int64_t(32)) / *bitwidth;
+  int64_t bankCount = IREE::GPU::getSharedMemBankCount(sharedMemModel);
+  int64_t bankWidthBits = IREE::GPU::kSharedMemBankWidth * 8;
+  int64_t ldsBankWidthBits = (bankCount * bankWidthBits) / *bitwidth;
 
   // Row width must be less than or equal to the row size (in elements) of LDS
   // bank width to prevent bank conflicts.
