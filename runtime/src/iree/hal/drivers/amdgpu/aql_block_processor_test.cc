@@ -322,7 +322,9 @@ static DirectDispatchBlock MakeDirectDispatchBlock() {
 }
 
 static IndirectDispatchBlock MakeIndirectDispatchBlock(
-    const uint32_t* workgroup_count) {
+    const uint32_t* workgroup_count,
+    uint8_t command_flags =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_USES_QUEUE_KERNARGS) {
   IndirectDispatchBlock block;
   const uint32_t command_length =
       sizeof(block.dispatch_command) + sizeof(block.return_command);
@@ -340,8 +342,7 @@ static IndirectDispatchBlock MakeIndirectDispatchBlock(
   std::memset(&block.dispatch_command, 0, sizeof(block.dispatch_command));
   block.dispatch_command.header.opcode =
       IREE_HAL_AMDGPU_COMMAND_BUFFER_OPCODE_DISPATCH;
-  block.dispatch_command.header.flags =
-      IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_USES_QUEUE_KERNARGS;
+  block.dispatch_command.header.flags = command_flags;
   block.dispatch_command.header.length_qwords =
       sizeof(block.dispatch_command) /
       IREE_HAL_AMDGPU_COMMAND_BUFFER_RECORD_ALIGNMENT;
@@ -812,9 +813,60 @@ TEST(AqlBlockProcessorTest, IndirectDispatchEmitsPatchThenUnpublishedDispatch) {
                 ((uint32_t)packet_setups[1] << 16));
   EXPECT_TRUE(AqlHeaderHasBarrier(packet_headers[0]));
   EXPECT_EQ(AqlHeaderAcquireScope(packet_headers[0]),
-            IREE_HSA_FENCE_SCOPE_AGENT);
+            IREE_HSA_FENCE_SCOPE_NONE);
   EXPECT_EQ(AqlHeaderReleaseScope(packet_headers[0]),
-            IREE_HSA_FENCE_SCOPE_AGENT);
+            IREE_HSA_FENCE_SCOPE_NONE);
+}
+
+TEST(AqlBlockProcessorTest, IndirectDispatchSplitsCommandBarrierScopes) {
+  const iree_hal_amdgpu_device_kernels_t kernels = MakeTransferKernels();
+  const iree_hal_amdgpu_device_buffer_transfer_context_t transfer_context =
+      MakeTransferContext(&kernels);
+  const uint32_t workgroup_count[3] = {7, 5, 3};
+  IndirectDispatchBlock block = MakeIndirectDispatchBlock(
+      workgroup_count,
+      CommandFlags(
+          IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_USES_QUEUE_KERNARGS |
+              IREE_HAL_AMDGPU_COMMAND_BUFFER_COMMAND_FLAG_HAS_BARRIER,
+          IREE_HSA_FENCE_SCOPE_SYSTEM, IREE_HSA_FENCE_SCOPE_AGENT));
+
+  alignas(64) iree_hal_amdgpu_aql_packet_t packets[8] = {};
+  iree_hal_amdgpu_aql_ring_t ring = {};
+  ring.base = packets;
+  ring.mask = IREE_ARRAYSIZE(packets) - 1u;
+  uint16_t packet_headers[2] = {};
+  uint16_t packet_setups[2] = {};
+  iree_hal_amdgpu_kernarg_block_t kernarg_blocks[2] = {};
+  iree_hal_amdgpu_aql_block_processor_t processor = MakeProcessor(
+      &ring, /*packet_count=*/2, packet_headers, packet_setups, kernarg_blocks,
+      /*kernarg_block_count=*/2, IREE_HAL_AMDGPU_AQL_BLOCK_PROCESSOR_FLAG_NONE,
+      IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
+      IREE_HSA_FENCE_SCOPE_NONE, &transfer_context);
+
+  iree_hal_amdgpu_aql_block_processor_result_t result;
+  IREE_ASSERT_OK(iree_hal_amdgpu_aql_block_processor_invoke(
+      &processor, &block.header, &result));
+
+  ASSERT_EQ(result.packets.recorded, 2u);
+  ASSERT_EQ(result.packets.emitted, 2u);
+
+  const auto* patch_args = reinterpret_cast<
+      const iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t*>(
+      kernarg_blocks[0].data);
+  EXPECT_EQ(patch_args->dispatch_header_setup,
+            (uint32_t)iree_hal_amdgpu_aql_make_header(
+                IREE_HSA_PACKET_TYPE_KERNEL_DISPATCH,
+                iree_hal_amdgpu_aql_packet_control(
+                    /*has_barrier=*/false, IREE_HSA_FENCE_SCOPE_NONE,
+                    IREE_HSA_FENCE_SCOPE_AGENT)) |
+                ((uint32_t)packet_setups[1] << 16));
+
+  EXPECT_TRUE(AqlHeaderHasBarrier(packet_headers[0]));
+  EXPECT_EQ(AqlHeaderAcquireScope(packet_headers[0]),
+            IREE_HSA_FENCE_SCOPE_SYSTEM);
+  EXPECT_EQ(AqlHeaderReleaseScope(packet_headers[0]),
+            IREE_HSA_FENCE_SCOPE_NONE);
+  EXPECT_EQ(packet_headers[1], IREE_HSA_PACKET_TYPE_INVALID);
 }
 
 TEST_F(AqlBlockProcessorRecordedTest, RecordedTransfersEmitBlitPackets) {
