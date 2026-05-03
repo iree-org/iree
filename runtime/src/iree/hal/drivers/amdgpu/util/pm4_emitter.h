@@ -323,10 +323,11 @@ iree_hal_amdgpu_pm4_ib_builder_emit_copy_register32_to_memory(
 // |strategy|, or 0 when the strategy has no packet encoding.
 static inline uint32_t iree_hal_amdgpu_pm4_copy_timestamp_control(
     iree_hal_amdgpu_pm4_timestamp_strategy_t strategy) {
+  // Timestamp records are consumed after the enclosing AQL packet completes, so
+  // per-COPY_DATA write confirmation would only add queue-local readback cost.
   const uint32_t common =
       IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_GPU_CLOCK_COUNT |
-      IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
-      IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS;
   switch (strategy) {
     case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM:
       return common | IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_CACHE_POLICY_STREAM |
