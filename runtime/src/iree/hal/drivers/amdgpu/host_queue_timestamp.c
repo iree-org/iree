@@ -23,7 +23,8 @@ void iree_hal_amdgpu_host_queue_commit_timestamp_start(
       iree_hal_amdgpu_host_queue_pm4_ib_slot(queue, packet_id);
   uint16_t setup = 0;
   const uint16_t header = iree_hal_amdgpu_aql_emit_timestamp_start(
-      &packet->pm4_ib, pm4_ib_slot, packet_control, start_tick, &setup);
+      &packet->pm4_ib, pm4_ib_slot, packet_control,
+      queue->pm4_timestamp_strategy, start_tick, &setup);
   iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
 }
 
@@ -37,8 +38,8 @@ void iree_hal_amdgpu_host_queue_commit_timestamp_end(
       iree_hal_amdgpu_host_queue_pm4_ib_slot(queue, packet_id);
   uint16_t setup = 0;
   const uint16_t header = iree_hal_amdgpu_aql_emit_timestamp_end(
-      &packet->pm4_ib, pm4_ib_slot, packet_control, completion_signal, end_tick,
-      &setup);
+      &packet->pm4_ib, pm4_ib_slot, packet_control,
+      queue->pm4_timestamp_strategy, completion_signal, end_tick, &setup);
   iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
 }
 
@@ -53,7 +54,8 @@ void iree_hal_amdgpu_host_queue_commit_timestamp_range(
       iree_hal_amdgpu_host_queue_pm4_ib_slot(queue, packet_id);
   uint16_t setup = 0;
   const uint16_t header = iree_hal_amdgpu_aql_emit_timestamp_range(
-      &packet->pm4_ib, pm4_ib_slot, packet_control, completion_signal,
-      start_tick, end_tick, &setup);
+      &packet->pm4_ib, pm4_ib_slot, packet_control,
+      queue->pm4_timestamp_strategy, completion_signal, start_tick, end_tick,
+      &setup);
   iree_hal_amdgpu_aql_ring_commit(packet, header, setup);
 }

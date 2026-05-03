@@ -156,6 +156,8 @@ TEST(AqlBlockProcessorTimestampTest,
   processor.command_buffer.metadata.command_buffer_id = 0xCAFEull;
   processor.command_buffer.metadata.block_ordinal = 3;
   processor.command_buffer.target.record = &record;
+  processor.command_buffer.pm4_timestamp_strategy =
+      IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM;
   processor.command_buffer.packets.start.packet = &packets[2];
   processor.command_buffer.packets.start.pm4_ib_slot = &pm4_ib_slots[2];
   processor.command_buffer.packets.start.control =
@@ -192,6 +194,34 @@ TEST(AqlBlockProcessorTimestampTest,
             IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC);
   EXPECT_EQ(result.command_buffer.end.setup, IREE_HSA_AMD_AQL_FORMAT_PM4_IB);
   EXPECT_EQ(packets[6].pm4_ib.completion_signal.handle, 0x1234u);
+}
+
+TEST(AqlBlockProcessorTimestampTest,
+     RejectsMissingCommandBufferTimestampStrategy) {
+  DirectDispatchBlock block = MakeDirectDispatchBlock();
+  alignas(64) iree_hal_amdgpu_aql_packet_t packets[8] = {};
+  iree_hal_amdgpu_aql_ring_t ring = {};
+  ring.base = packets;
+  ring.mask = IREE_ARRAYSIZE(packets) - 1u;
+  iree_hal_amdgpu_pm4_ib_slot_t pm4_ib_slots[8] = {};
+  uint16_t packet_headers[1] = {};
+  uint16_t packet_setups[1] = {};
+  iree_hal_amdgpu_kernarg_block_t kernarg_blocks[1] = {};
+  iree_hal_amdgpu_command_buffer_timestamp_record_t record = {};
+
+  iree_hal_amdgpu_aql_block_processor_timestamp_t processor = {};
+  processor.base =
+      MakeBaseProcessor(&ring, packet_headers, packet_setups, kernarg_blocks);
+  processor.command_buffer.target.record = &record;
+  processor.command_buffer.packets.start.packet = &packets[2];
+  processor.command_buffer.packets.start.pm4_ib_slot = &pm4_ib_slots[2];
+  processor.command_buffer.packets.end.packet = &packets[6];
+  processor.command_buffer.packets.end.pm4_ib_slot = &pm4_ib_slots[6];
+
+  iree_hal_amdgpu_aql_block_processor_timestamp_result_t result;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_hal_amdgpu_aql_block_processor_timestamp_invoke(
+                            &processor, &block.header, &result));
 }
 
 TEST(AqlBlockProcessorTimestampTest,

@@ -84,6 +84,13 @@ iree_hal_amdgpu_aql_block_processor_timestamp_validate_command_buffer(
         "command-buffer timestamp mode requires start and end PM4 packet "
         "storage");
   }
+  if (IREE_UNLIKELY(!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+          processor->command_buffer.pm4_timestamp_strategy))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "command-buffer timestamp mode requires a PM4 timestamp range "
+        "strategy");
+  }
   return iree_ok_status();
 }
 
@@ -105,12 +112,14 @@ static void iree_hal_amdgpu_aql_block_processor_timestamp_emit_command_buffer(
           &processor->command_buffer.packets.start.packet->pm4_ib,
           processor->command_buffer.packets.start.pm4_ib_slot,
           processor->command_buffer.packets.start.control,
+          processor->command_buffer.pm4_timestamp_strategy,
           &record->ticks.start_tick, &out_result->command_buffer.start.setup);
   out_result->command_buffer.end.header =
       iree_hal_amdgpu_aql_emit_timestamp_end(
           &processor->command_buffer.packets.end.packet->pm4_ib,
           processor->command_buffer.packets.end.pm4_ib_slot,
           processor->command_buffer.packets.end.control,
+          processor->command_buffer.pm4_timestamp_strategy,
           processor->command_buffer.packets.end.completion_signal,
           &record->ticks.end_tick, &out_result->command_buffer.end.setup);
 }

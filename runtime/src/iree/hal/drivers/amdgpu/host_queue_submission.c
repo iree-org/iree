@@ -262,8 +262,9 @@ void iree_hal_amdgpu_host_queue_commit_queue_device_start_packet(
   iree_hal_amdgpu_pm4_ib_builder_t builder;
   iree_hal_amdgpu_pm4_ib_builder_initialize(pm4_ib_slot, &builder);
   const bool did_emit =
-      iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
-          &builder, &queue_device_event->start_tick);
+      iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_start_to_memory(
+          &builder, queue->pm4_timestamp_strategy,
+          &queue_device_event->start_tick);
   IREE_ASSERT(did_emit, "PM4 start timestamp must fit profiling IB slot");
   (void)did_emit;
   uint16_t setup = 0;
@@ -287,8 +288,9 @@ void iree_hal_amdgpu_host_queue_commit_queue_device_end_packet(
   iree_hal_amdgpu_pm4_ib_builder_t builder;
   iree_hal_amdgpu_pm4_ib_builder_initialize(pm4_ib_slot, &builder);
   const bool did_emit =
-      iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
-          &builder, &queue_device_event->end_tick);
+      iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_end_to_memory(
+          &builder, queue->pm4_timestamp_strategy,
+          &queue_device_event->end_tick);
   IREE_ASSERT(did_emit, "PM4 end timestamp must fit profiling IB slot");
   (void)did_emit;
   uint16_t setup = 0;
@@ -1229,8 +1231,8 @@ uint64_t iree_hal_amdgpu_host_queue_finish_barrier_submission(
     iree_hal_amdgpu_pm4_ib_builder_initialize(pm4_ib_slot, &builder);
     const bool did_emit =
         iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_range_to_memory(
-            &builder, &queue_device_event->start_tick,
-            &queue_device_event->end_tick);
+            &builder, queue->pm4_timestamp_strategy,
+            &queue_device_event->start_tick, &queue_device_event->end_tick);
     IREE_ASSERT(did_emit, "PM4 timestamp range must fit profiling IB slot");
     (void)did_emit;
     completion_header = iree_hal_amdgpu_aql_emit_pm4_ib(

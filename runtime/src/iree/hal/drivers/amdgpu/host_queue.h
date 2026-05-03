@@ -416,6 +416,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // AMD vendor-packet capabilities selected from the GPU ISA.
   iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities;
 
+  // Queue-local PM4 timestamp strategy selected from the GPU ISA.
+  iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy;
+
   // One-bit logical queue affinity identifying this queue in HAL buffer
   // placements. queue_alloca uses this as the transient wrapper's origin so
   // PREFER_ORIGIN dealloca routes back to the same queue.
@@ -598,6 +601,10 @@ void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
 // when AQL_PM4_IB is available so BARRIER_VALUE-based CDNA queues can still use
 // PM4 snippets for profiling or tiny operations.
 //
+// |pm4_timestamp_strategy| describes the PM4 packet sequence used for
+// queue-device timestamp records. NONE disables profiling paths that need
+// queue-local timestamp ranges.
+//
 // |profiling_signal_block_pool| provides fine-grained GPU-agent memory used for
 // raw iree_amd_signal_t records. The host initializes these records once when
 // timestamp profiling begins; packets only use them for CP-written profiling
@@ -612,6 +619,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     iree_hal_amdgpu_block_pool_t* profiling_signal_block_pool,

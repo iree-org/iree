@@ -453,6 +453,9 @@ static iree_status_t iree_hal_amdgpu_profile_counter_create_packets(
     const iree_hal_amdgpu_profile_aqlprofile_memory_context_t* memory_context,
     iree_hal_amdgpu_aqlprofile_handle_t* out_handle,
     iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t* out_packets) {
+  // aqlprofile owns the architecture-specific PMC PM4 program generation here.
+  // IREE only wraps the returned AQL PM4-IB packet templates so factory splits
+  // such as gfx950, gfx115x, and gfx1201 stay centralized in aqlprofile.
   iree_hal_amdgpu_aqlprofile_pmc_profile_t profile = {
       .agent = counter_set->agent,
       .events = counter_set->events,
@@ -582,10 +585,9 @@ iree_hal_amdgpu_profile_counter_validate_physical_device_support(
           "physical device %" PRIhsz,
           physical_device->device_ordinal);
     }
-    if (IREE_UNLIKELY(
-            capture_queue_ranges &&
-            !iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-                physical_device->vendor_packet_capabilities))) {
+    if (IREE_UNLIKELY(capture_queue_ranges &&
+                      !iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+                          physical_device->pm4_timestamp_strategy))) {
       return iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
           "AMDGPU counter range profiling requires PM4 timestamp range support "
@@ -1113,10 +1115,9 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_counters(
         IREE_STATUS_FAILED_PRECONDITION,
         "AMDGPU counter profiling requires AQL PM4-IB packet support");
   }
-  if (IREE_UNLIKELY(
-          enable_queue_ranges &&
-          !iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-              queue->vendor_packet_capabilities))) {
+  if (IREE_UNLIKELY(enable_queue_ranges &&
+                    !iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+                        queue->pm4_timestamp_strategy))) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,

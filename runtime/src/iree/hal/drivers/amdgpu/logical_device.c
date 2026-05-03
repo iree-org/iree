@@ -316,8 +316,7 @@ static iree_hal_amdgpu_logical_device_t* iree_hal_amdgpu_logical_device_cast(
 static bool iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
     iree_hal_device_profiling_data_families_t data_families) {
   return iree_any_bit_set(data_families,
-                          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
-                              IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+                          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
                               IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
                               IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
 }
@@ -327,7 +326,8 @@ static bool iree_hal_amdgpu_logical_device_profiling_needs_clock_correlations(
   return iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
              data_families) ||
          iree_any_bit_set(data_families,
-                          IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES);
+                          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+                              IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES);
 }
 
 static bool iree_hal_amdgpu_logical_device_supports_queue_device_profiling(
@@ -335,8 +335,8 @@ static bool iree_hal_amdgpu_logical_device_supports_queue_device_profiling(
   for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
     const iree_hal_amdgpu_physical_device_t* physical_device =
         logical_device->physical_devices[i];
-    if (!iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-            physical_device->vendor_packet_capabilities)) {
+    if (!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+            physical_device->pm4_timestamp_strategy)) {
       return false;
     }
   }
@@ -851,6 +851,32 @@ static void iree_hal_amdgpu_logical_device_set_queue_profiling_enabled(
           &physical_device->host_queues[j], flags);
     }
   }
+}
+
+static iree_status_t
+iree_hal_amdgpu_logical_device_ensure_queue_device_profile_event_storage(
+    iree_hal_amdgpu_logical_device_t* logical_device) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       i < logical_device->physical_device_count && iree_status_is_ok(status);
+       ++i) {
+    iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    for (iree_host_size_t j = 0;
+         j < physical_device->host_queue_count && iree_status_is_ok(status);
+         ++j) {
+      iree_hal_amdgpu_host_queue_t* queue = &physical_device->host_queues[j];
+      status = iree_hal_amdgpu_host_queue_ensure_profile_event_storage(queue);
+      if (iree_status_is_ok(status)) {
+        iree_hal_amdgpu_host_queue_clear_profile_events(queue);
+      }
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_set_hsa_profiling_enabled(
@@ -2402,8 +2428,8 @@ iree_hal_amdgpu_logical_device_verify_queue_device_profiling_supported(
   for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
     iree_hal_amdgpu_physical_device_t* physical_device =
         logical_device->physical_devices[i];
-    if (iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-            physical_device->vendor_packet_capabilities)) {
+    if (iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+            physical_device->pm4_timestamp_strategy)) {
       continue;
     }
     return iree_make_status(
@@ -2519,6 +2545,16 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
       iree_hal_amdgpu_profile_event_streams_clear_memory(
           &logical_device->profiling.event_streams);
     }
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_device_profiling_options_requests_data(
+          &session_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS) &&
+      !iree_hal_amdgpu_logical_device_profiling_needs_hsa_timestamps(
+          session_options.data_families)) {
+    status =
+        iree_hal_amdgpu_logical_device_ensure_queue_device_profile_event_storage(
+            logical_device);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_logical_device_write_profile_metadata(

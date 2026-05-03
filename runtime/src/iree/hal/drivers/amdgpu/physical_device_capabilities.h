@@ -217,6 +217,11 @@ iree_status_t iree_hal_amdgpu_select_cpu_visible_device_coarse_memory(
         selection,
     iree_hal_amdgpu_cpu_visible_device_coarse_memory_t* out_memory);
 
+// Selects the queue-local PM4 timestamp packet strategy for |version|.
+iree_hal_amdgpu_pm4_timestamp_strategy_t
+iree_hal_amdgpu_select_pm4_timestamp_strategy(
+    iree_hal_amdgpu_gfxip_version_t version);
+
 // AMDGPU memory-system facts used to derive conservative HAL topology flags.
 typedef struct iree_hal_amdgpu_memory_system_capabilities_t {
   // HSA SVM/HMM process and agent facts.

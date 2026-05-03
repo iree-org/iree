@@ -276,8 +276,8 @@ static void ExpectPm4IbSubmissionPlan(
 
 static bool HostQueueSupportsQueueDeviceProfiling(
     const iree_hal_amdgpu_host_queue_t* queue) {
-  return iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-      queue->vendor_packet_capabilities);
+  return iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+      queue->pm4_timestamp_strategy);
 }
 
 TEST_F(HostQueueSubmissionTest, DispatchPacketAccountingCombinations) {

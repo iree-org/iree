@@ -542,12 +542,19 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsCdnaBarrierValueCapabilities) {
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE));
 
   capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 5, 0));
+  EXPECT_TRUE(iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE));
+
+  capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 4, 3));
-  EXPECT_EQ(capabilities, 0u);
+  EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
 
   capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 5, 3));
-  EXPECT_EQ(capabilities, 0u);
+  EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
 }
 
 TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
@@ -559,8 +566,6 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
@@ -571,12 +576,76 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
 
 TEST_F(PhysicalDeviceCapabilitiesTest,
        LeavesUnvalidatedGfxFamiliesOnBaseAqlPath) {
+  EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(8, 0, 0)),
+            0u);
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(10, 3, 0)),
-            0u);
+            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(11, 0, 1)),
-            0u);
+            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(12, 0, 0)),
+            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
+  EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(13, 0, 0)),
             0u);
+}
+
+TEST_F(PhysicalDeviceCapabilitiesTest,
+       KeepsAqlprofileSpecializedFamiliesOnAqlPm4IbPath) {
+  struct VersionCase {
+    const char* name;
+    iree_hal_amdgpu_gfxip_version_t version;
+  };
+  const std::array<VersionCase, 5> versions = {{
+      {"gfx950", GfxIp(9, 5, 0)},
+      {"gfx1150", GfxIp(11, 5, 0)},
+      {"gfx1170", GfxIp(11, 7, 0)},
+      {"gfx1201", GfxIp(12, 0, 1)},
+      {"gfx1251", GfxIp(12, 5, 1)},
+  }};
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t direct_pm4_families =
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_REGISTER_READBACK |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE;
+  for (const VersionCase& version : versions) {
+    SCOPED_TRACE(version.name);
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+        iree_hal_amdgpu_select_vendor_packet_capabilities(version.version);
+    EXPECT_TRUE(iree_any_bit_set(
+        capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB));
+    EXPECT_FALSE(iree_any_bit_set(capabilities, direct_pm4_families));
+  }
+}
+
+TEST_F(PhysicalDeviceCapabilitiesTest, SelectsPm4TimestampStrategy) {
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(8, 0, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_NONE);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(9, 0, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(9, 5, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(10, 3, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(11, 0, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(11, 5, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(11, 7, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(12, 0, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(12, 0, 1)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(12, 5, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(12, 5, 1)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU);
+  EXPECT_EQ(iree_hal_amdgpu_select_pm4_timestamp_strategy(GfxIp(13, 0, 0)),
+            IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_NONE);
 }
 
 TEST_F(PhysicalDeviceCapabilitiesTest, SelectsWaitBarrierStrategy) {

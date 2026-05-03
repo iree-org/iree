@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_capabilities.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,10 +38,8 @@ enum {
   // PM4-IB AQL envelopes encode the indirect-buffer dword count in 20 bits.
   IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT = 0xFFFFF,
   IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT = 6,
-  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT = 8,
   IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT =
-      IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT +
-      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT,
+      2 * IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT,
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT = 2,
   IREE_HAL_AMDGPU_PM4_SET_REGISTER_DWORD_COUNT = 3,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DWORD_COUNT = 6,
@@ -48,7 +47,6 @@ enum {
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_EVENT_WRITE = 0x46,
-  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM = 0x49,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_SH_REG = 0x76,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_UCONFIG_REG = 0x79,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
@@ -57,7 +55,7 @@ enum {
   IREE_HAL_AMDGPU_PM4_PERSISTENT_SPACE_END = 0x00002FFF,
   IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_START = 0x0000C000,
   IREE_HAL_AMDGPU_PM4_UCONFIG_SPACE_END = 0x0000FFFF,
-  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP = 9 << 0,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_GPU_CLOCK_COUNT = 9 << 0,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 = 2 << 0,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_MEM_MAPPED_REGISTER = 0 << 0,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_PERFCOUNTER = 4 << 0,
@@ -66,14 +64,14 @@ enum {
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM = 5 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_PERFCOUNTER = 4 << 8,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_CACHE_POLICY_STREAM = 1 << 13,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS = 1 << 16,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_TEMPORAL_LU = 3 << 13,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_CACHE_POLICY_STREAM = 1 << 25,
+  IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_TEMPORAL_LU = 3 << 25,
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH = 7 << 0,
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH = 4 << 8,
-  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS = 40 << 0,
-  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE = 5 << 8,
-  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM = 3 << 24,
-  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_DATA_SEL_TIMESTAMP = 3u << 29,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
@@ -126,6 +124,21 @@ static inline uint32_t iree_hal_amdgpu_pm4_ib_builder_dword_count(
 static inline uint32_t iree_hal_amdgpu_pm4_ib_builder_remaining(
     const iree_hal_amdgpu_pm4_ib_builder_t* builder) {
   return IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY - builder->dword_count;
+}
+
+// Returns the PM4 IB dword count required by one timestamp range emitted with
+// |strategy|, or 0 when the strategy has no range packet sequence.
+static inline uint32_t iree_hal_amdgpu_pm4_timestamp_range_dword_count(
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy) {
+  switch (strategy) {
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM:
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU:
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU:
+      return IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT;
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_NONE:
+    default:
+      return 0;
+  }
 }
 
 // Appends |dword_count| uninitialized dwords and returns their start, or NULL
@@ -306,78 +319,96 @@ iree_hal_amdgpu_pm4_ib_builder_emit_copy_register32_to_memory(
   return true;
 }
 
-// Appends a COPY_DATA timestamp write to |target|. This is the RADV-style
-// top-of-pipe/immediate timestamp form and is intended for profiling records,
-// not memory copies. The packet form was probed on gfx1100 AQL compute queues;
-// callers must select it only for architectures where the physical-device
-// capability table says this form is valid.
+// Returns the COPY_DATA control dword for the GPU-clock write selected by
+// |strategy|, or 0 when the strategy has no packet encoding.
+static inline uint32_t iree_hal_amdgpu_pm4_copy_timestamp_control(
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy) {
+  const uint32_t common =
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_GPU_CLOCK_COUNT |
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
+      IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  switch (strategy) {
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM:
+      return common | IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_CACHE_POLICY_STREAM |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_CACHE_POLICY_STREAM;
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU:
+      return common | IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2;
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU:
+      return common | IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_TEMPORAL_LU |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_TEMPORAL_LU;
+    case IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_NONE:
+    default:
+      return 0;
+  }
+}
+
+// Appends a COPY_DATA GPU-clock write to |target|. This is intended for
+// profiling records, not memory copies.
 static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
-    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target) {
-  if (!iree_host_ptr_has_alignment(target, 8)) return false;
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy, void* target) {
+  const uint32_t control = iree_hal_amdgpu_pm4_copy_timestamp_control(strategy);
+  if (control == 0 || !iree_host_ptr_has_alignment(target, 8)) return false;
   const uintptr_t address = (uintptr_t)target;
   uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
       builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
       IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT);
   if (!dword) return false;
-  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TIMESTAMP |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_MEM |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[1] = control;
   dword[2] = 0;
   dword[3] = 0;
-  dword[4] = (uint32_t)address;
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo_8(address);
   dword[5] = iree_hal_amdgpu_pm4_addr_hi(address);
   return true;
 }
 
-// Appends a RELEASE_MEM bottom-of-pipe timestamp write to |target|. This uses
-// only the common timestamp event/data fields and deliberately avoids cache or
-// PWS bits whose layout differs across gfx generations. The packet form was
-// probed on gfx1100 AQL compute queues; callers must select it only for
-// architectures where the physical-device capability table says this form is
-// valid.
-static inline bool
-iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
-    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target) {
-  if (!iree_host_ptr_has_alignment(target, 8)) return false;
-  const uintptr_t address = (uintptr_t)target;
-  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
-      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM,
-      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_TIMESTAMP_DWORD_COUNT);
-  if (!dword) return false;
-  dword[1] = IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_TYPE_BOTTOM_OF_PIPE_TS |
-             IREE_HAL_AMDGPU_PM4_RELEASE_MEM_EVENT_INDEX_END_OF_PIPE;
-  dword[2] =
-      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM |
-      IREE_HAL_AMDGPU_PM4_RELEASE_MEM_DATA_SEL_TIMESTAMP;
-  dword[3] = (uint32_t)address;
-  dword[4] = iree_hal_amdgpu_pm4_addr_hi(address);
-  dword[5] = 0;
-  dword[6] = 0;
-  dword[7] = 0;
-  return true;
+// Appends the COPY_DATA end-timestamp form selected by |strategy|.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_end_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy, void* target) {
+  if (!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(strategy) ||
+      !iree_host_ptr_has_alignment(target, 8)) {
+    return false;
+  }
+  return iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
+      builder, strategy, target);
 }
 
-// Appends a timestamp range around subsequent queue work. The start timestamp
-// is an immediate COPY_DATA timestamp and the end timestamp is a bottom-of-pipe
-// RELEASE_MEM timestamp. The helper preflights all space and alignment so it
-// either appends the complete range marker or leaves |builder| unchanged.
+// Appends the COPY_DATA start-timestamp form selected by |strategy|.
+static inline bool
+iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_start_to_memory(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy, void* target) {
+  if (!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(strategy)) {
+    return false;
+  }
+  return iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(
+      builder, strategy, target);
+}
+
+// Appends a timestamp range around subsequent queue work. The helper preflights
+// all space, strategy, and alignment requirements so it either appends the
+// complete range marker or leaves |builder| unchanged.
 static inline bool
 iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_range_to_memory(
-    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* start_target,
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy, void* start_target,
     void* end_target) {
-  if (!iree_host_ptr_has_alignment(start_target, 8) ||
+  const uint32_t dword_count =
+      iree_hal_amdgpu_pm4_timestamp_range_dword_count(strategy);
+  if (dword_count == 0 || !iree_host_ptr_has_alignment(start_target, 8) ||
       !iree_host_ptr_has_alignment(end_target, 8)) {
     return false;
   }
-  if (iree_hal_amdgpu_pm4_ib_builder_remaining(builder) <
-      IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT) {
+  if (iree_hal_amdgpu_pm4_ib_builder_remaining(builder) < dword_count) {
     return false;
   }
-  iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(builder,
-                                                               start_target);
-  iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
-      builder, end_target);
+  iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_start_to_memory(
+      builder, strategy, start_target);
+  iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_end_to_memory(builder, strategy,
+                                                              end_target);
   return true;
 }
 
@@ -513,18 +544,19 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_pm4_ib(
                                                 completion_signal, out_setup);
 }
 
-// Emits an AQL PM4-IB packet that writes a top-of-pipe timestamp to
-// |start_tick|. The caller owns packet publication.
+// Emits an AQL PM4-IB packet that writes a start timestamp to |start_tick|. The
+// caller owns packet publication.
 static inline uint16_t iree_hal_amdgpu_aql_emit_timestamp_start(
     iree_hsa_amd_aql_pm4_ib_packet_t* packet,
     iree_hal_amdgpu_pm4_ib_slot_t* ib_slot,
-    iree_hal_amdgpu_aql_packet_control_t packet_control, uint64_t* start_tick,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy, uint64_t* start_tick,
     uint16_t* out_setup) {
   iree_hal_amdgpu_pm4_ib_builder_t builder;
   iree_hal_amdgpu_pm4_ib_builder_initialize(ib_slot, &builder);
   const bool did_emit =
-      iree_hal_amdgpu_pm4_ib_builder_emit_copy_timestamp_to_memory(&builder,
-                                                                   start_tick);
+      iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_start_to_memory(
+          &builder, strategy, start_tick);
   IREE_ASSERT(did_emit, "PM4 start timestamp must fit PM4 IB slot");
   (void)did_emit;
   return iree_hal_amdgpu_aql_emit_pm4_ib(
@@ -532,19 +564,20 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_timestamp_start(
       packet_control, iree_hsa_signal_null(), out_setup);
 }
 
-// Emits an AQL PM4-IB packet that writes a bottom-of-pipe timestamp to
-// |end_tick|. The caller owns packet publication.
+// Emits an AQL PM4-IB packet that writes an end timestamp to |end_tick|. The
+// caller owns packet publication.
 static inline uint16_t iree_hal_amdgpu_aql_emit_timestamp_end(
     iree_hsa_amd_aql_pm4_ib_packet_t* packet,
     iree_hal_amdgpu_pm4_ib_slot_t* ib_slot,
     iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy,
     iree_hsa_signal_t completion_signal, uint64_t* end_tick,
     uint16_t* out_setup) {
   iree_hal_amdgpu_pm4_ib_builder_t builder;
   iree_hal_amdgpu_pm4_ib_builder_initialize(ib_slot, &builder);
   const bool did_emit =
-      iree_hal_amdgpu_pm4_ib_builder_emit_release_mem_timestamp_to_memory(
-          &builder, end_tick);
+      iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_end_to_memory(
+          &builder, strategy, end_tick);
   IREE_ASSERT(did_emit, "PM4 end timestamp must fit PM4 IB slot");
   (void)did_emit;
   return iree_hal_amdgpu_aql_emit_pm4_ib(
@@ -558,13 +591,14 @@ static inline uint16_t iree_hal_amdgpu_aql_emit_timestamp_range(
     iree_hsa_amd_aql_pm4_ib_packet_t* packet,
     iree_hal_amdgpu_pm4_ib_slot_t* ib_slot,
     iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t strategy,
     iree_hsa_signal_t completion_signal, uint64_t* start_tick,
     uint64_t* end_tick, uint16_t* out_setup) {
   iree_hal_amdgpu_pm4_ib_builder_t builder;
   iree_hal_amdgpu_pm4_ib_builder_initialize(ib_slot, &builder);
   const bool did_emit =
       iree_hal_amdgpu_pm4_ib_builder_emit_timestamp_range_to_memory(
-          &builder, start_tick, end_tick);
+          &builder, strategy, start_tick, end_tick);
   IREE_ASSERT(did_emit, "PM4 timestamp range must fit PM4 IB slot");
   (void)did_emit;
   return iree_hal_amdgpu_aql_emit_pm4_ib(
