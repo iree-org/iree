@@ -330,43 +330,21 @@ static bool iree_hal_amdgpu_logical_device_profiling_needs_clock_correlations(
                               IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES);
 }
 
-static bool iree_hal_amdgpu_logical_device_supports_queue_device_profiling(
-    const iree_hal_amdgpu_logical_device_t* logical_device) {
-  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
-    const iree_hal_amdgpu_physical_device_t* physical_device =
-        logical_device->physical_devices[i];
-    if (!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
-            physical_device->pm4_timestamp_strategy)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static iree_hal_device_profiling_data_families_t
-iree_hal_amdgpu_logical_device_lightweight_statistics_data_families(
-    const iree_hal_amdgpu_logical_device_t* logical_device) {
-  iree_hal_device_profiling_data_families_t data_families =
-      IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
-      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
-  if (iree_hal_amdgpu_logical_device_supports_queue_device_profiling(
-          logical_device)) {
-    data_families |= IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
-  }
-  return data_families;
+iree_hal_amdgpu_logical_device_lightweight_statistics_data_families(void) {
+  return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
 }
 
 static iree_hal_device_profiling_options_t
 iree_hal_amdgpu_logical_device_resolve_profiling_options(
-    const iree_hal_amdgpu_logical_device_t* logical_device,
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_device_profiling_options_t resolved_options = *options;
   if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
       iree_hal_device_profiling_options_requests_lightweight_statistics(
           options)) {
     resolved_options.data_families =
-        iree_hal_amdgpu_logical_device_lightweight_statistics_data_families(
-            logical_device);
+        iree_hal_amdgpu_logical_device_lightweight_statistics_data_families();
   }
   resolved_options.flags &=
       ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
@@ -2447,8 +2425,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_begin(
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
   iree_hal_device_profiling_options_t resolved_options =
-      iree_hal_amdgpu_logical_device_resolve_profiling_options(logical_device,
-                                                               options);
+      iree_hal_amdgpu_logical_device_resolve_profiling_options(options);
 
   if (iree_hal_device_profiling_options_requests_data(
           &resolved_options,

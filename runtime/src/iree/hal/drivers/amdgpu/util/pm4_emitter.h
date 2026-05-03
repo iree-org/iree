@@ -28,13 +28,13 @@ extern "C" {
 // capacity, so AQL packet id N uses pm4_ib_slots[N & aql_ring.mask].
 typedef struct IREE_AMDGPU_ALIGNAS(64) iree_hal_amdgpu_pm4_ib_slot_t {
   // Encoded PM4 packet words consumed by a PM4-IB AQL packet.
-  uint32_t dwords[16];
+  uint32_t dwords[32];
 } iree_hal_amdgpu_pm4_ib_slot_t;
-IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 64,
-                          "PM4 IB slot must be exactly one cache line");
+IREE_AMDGPU_STATIC_ASSERT(sizeof(iree_hal_amdgpu_pm4_ib_slot_t) == 128,
+                          "PM4 IB slot must be exactly two cache lines");
 
 enum {
-  IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY = 16,
+  IREE_HAL_AMDGPU_PM4_IB_SLOT_DWORD_CAPACITY = 32,
   // PM4-IB AQL envelopes encode the indirect-buffer dword count in 20 bits.
   IREE_HAL_AMDGPU_PM4_IB_MAX_DWORD_COUNT = 0xFFFFF,
   IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT = 6,
@@ -418,6 +418,88 @@ static inline uint32_t iree_hal_amdgpu_pm4_wait_reg_mem_dw1(
          ((operation & 0x3u) << 6);
 }
 
+// Appends a WRITE_DATA packet that writes an immediate 32-bit value into
+// memory visible through TC L2.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_write_data32(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target, uint32_t value) {
+  if (!iree_host_ptr_has_alignment(target, 4)) return false;
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 5);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[4] = value;
+  return true;
+}
+
+// Appends a WRITE_DATA packet that writes an immediate 64-bit value into
+// memory visible through TC L2.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_write_data64(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, void* target, uint64_t value) {
+  if (!iree_host_ptr_has_alignment(target, 4)) return false;
+  const uintptr_t address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 6);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[4] = (uint32_t)value;
+  dword[5] = (uint32_t)(value >> 32);
+  return true;
+}
+
+// Appends a COPY_DATA packet that copies a 32-bit memory value through TC L2.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_copy_data32(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, const void* source,
+    void* target) {
+  if (!iree_host_ptr_has_alignment(source, 4) ||
+      !iree_host_ptr_has_alignment(target, 4)) {
+    return false;
+  }
+  const uintptr_t source_address = (uintptr_t)source;
+  const uintptr_t target_address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo(source_address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo(target_address);
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
+  return true;
+}
+
+// Appends a COPY_DATA packet that copies a 64-bit memory value through TC L2.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_copy_data64(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, const void* source,
+    void* target) {
+  if (!iree_host_ptr_has_alignment(source, 8) ||
+      !iree_host_ptr_has_alignment(target, 8)) {
+    return false;
+  }
+  const uintptr_t source_address = (uintptr_t)source;
+  const uintptr_t target_address = (uintptr_t)target;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
+  if (!dword) return false;
+  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
+             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
+  dword[2] = iree_hal_amdgpu_pm4_addr_lo_8(source_address);
+  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
+  dword[4] = iree_hal_amdgpu_pm4_addr_lo_8(target_address);
+  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
+  return true;
+}
+
 static inline uint32_t iree_hal_amdgpu_pm4_emit_wait_reg_mem64(
     iree_hal_amdgpu_pm4_ib_slot_t* slot, iree_hsa_signal_t epoch_signal,
     iree_hsa_signal_value_t compare_value, iree_hsa_signal_value_t mask) {
@@ -444,70 +526,46 @@ static inline uint32_t iree_hal_amdgpu_pm4_emit_wait_reg_mem64(
 
 static inline uint32_t iree_hal_amdgpu_pm4_emit_write_data32(
     iree_hal_amdgpu_pm4_ib_slot_t* slot, void* target, uint32_t value) {
-  memset(slot, 0, sizeof(*slot));
-  const uintptr_t address = (uintptr_t)target;
-  uint32_t* dword = slot->dwords;
-  dword[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 5);
-  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
-  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
-  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
-  dword[4] = value;
-  return 5;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(slot, &builder);
+  const bool did_emit =
+      iree_hal_amdgpu_pm4_ib_builder_emit_write_data32(&builder, target, value);
+  IREE_ASSERT(did_emit, "PM4 WRITE_DATA32 must fit PM4 IB slot");
+  (void)did_emit;
+  return iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder);
 }
 
 static inline uint32_t iree_hal_amdgpu_pm4_emit_write_data64(
     iree_hal_amdgpu_pm4_ib_slot_t* slot, void* target, uint64_t value) {
-  memset(slot, 0, sizeof(*slot));
-  const uintptr_t address = (uintptr_t)target;
-  uint32_t* dword = slot->dwords;
-  dword[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA, 6);
-  dword[1] = IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
-  dword[2] = iree_hal_amdgpu_pm4_addr_lo(address);
-  dword[3] = iree_hal_amdgpu_pm4_addr_hi(address);
-  dword[4] = (uint32_t)value;
-  dword[5] = (uint32_t)(value >> 32);
-  return 6;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(slot, &builder);
+  const bool did_emit =
+      iree_hal_amdgpu_pm4_ib_builder_emit_write_data64(&builder, target, value);
+  IREE_ASSERT(did_emit, "PM4 WRITE_DATA64 must fit PM4 IB slot");
+  (void)did_emit;
+  return iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder);
 }
 
 static inline uint32_t iree_hal_amdgpu_pm4_emit_copy_data32(
     iree_hal_amdgpu_pm4_ib_slot_t* slot, const void* source, void* target) {
-  memset(slot, 0, sizeof(*slot));
-  const uintptr_t source_address = (uintptr_t)source;
-  const uintptr_t target_address = (uintptr_t)target;
-  uint32_t* dword = slot->dwords;
-  dword[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
-  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
-  dword[2] = iree_hal_amdgpu_pm4_addr_lo(source_address);
-  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
-  dword[4] = iree_hal_amdgpu_pm4_addr_lo(target_address);
-  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
-  return 6;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(slot, &builder);
+  const bool did_emit =
+      iree_hal_amdgpu_pm4_ib_builder_emit_copy_data32(&builder, source, target);
+  IREE_ASSERT(did_emit, "PM4 COPY_DATA32 must fit PM4 IB slot");
+  (void)did_emit;
+  return iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder);
 }
 
 static inline uint32_t iree_hal_amdgpu_pm4_emit_copy_data64(
     iree_hal_amdgpu_pm4_ib_slot_t* slot, const void* source, void* target) {
-  memset(slot, 0, sizeof(*slot));
-  const uintptr_t source_address = (uintptr_t)source;
-  const uintptr_t target_address = (uintptr_t)target;
-  uint32_t* dword = slot->dwords;
-  dword[0] = iree_hal_amdgpu_pm4_make_header(
-      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA, 6);
-  dword[1] = IREE_HAL_AMDGPU_PM4_COPY_DATA_SRC_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_SEL_TC_L2 |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_COUNT_SEL_64_BITS |
-             IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION;
-  dword[2] = iree_hal_amdgpu_pm4_addr_lo_8(source_address);
-  dword[3] = iree_hal_amdgpu_pm4_addr_hi(source_address);
-  dword[4] = iree_hal_amdgpu_pm4_addr_lo_8(target_address);
-  dword[5] = iree_hal_amdgpu_pm4_addr_hi(target_address);
-  return 6;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(slot, &builder);
+  const bool did_emit =
+      iree_hal_amdgpu_pm4_ib_builder_emit_copy_data64(&builder, source, target);
+  IREE_ASSERT(did_emit, "PM4 COPY_DATA64 must fit PM4 IB slot");
+  (void)did_emit;
+  return iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder);
 }
 
 // Emits an AQL PM4-IB envelope referencing |ib_dwords|. The referenced dword
