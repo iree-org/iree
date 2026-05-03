@@ -537,7 +537,9 @@ iree_hal_amdgpu_select_pm4_timestamp_strategy(
     iree_hal_amdgpu_gfxip_version_t version) {
   // COPY_DATA GPU-clock readback is the queue-device timestamp path selected on
   // PM4-IB queues. The destination and cache-policy fields mirror the
-  // aqlprofile command builder for each known packet family.
+  // aqlprofile command builder families: gfx9 including gfx94/gfx95 uses
+  // memory stream, gfx10/gfx11 uses TC_L2 with LRU, and gfx12 uses TC_L2 with
+  // last-use temporal policy.
   switch (version.major) {
     case 9:
       return IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM;
