@@ -917,77 +917,112 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
   return failure();
 }
 
-// Analytically predict whether the given intrinsic operand has LDS bank
-// conflicts when stored with the given dimension ordering in LDS.
-// ldsOrder is a permutation of {0, 1} describing the physical dimension
-// order in LDS. The last element is the physically contiguous (innermost)
-// dimension. 
-// Examples for a 2D operand [dim0, dim1]:
-//   {0, 1} → dim1 contiguous (standard row-major)
-//   {1, 0} → dim0 contiguous (transposed)
+// Analytically predict whether the given intrinsic operand layout has LDS
+// bank conflicts when stored with the given dimension ordering in LDS.
+//
+// ldsOrder is a permutation of dimension indices {0, ..., rank-1} describing
+// the physical dimension order in LDS. The last element is the physically
+// contiguous (innermost) dimension.
+static LogicalResult
+hasBankConflicts(const IREE::GPU::MMASingleSubgroupLayout &layout,
+                 int64_t numBanks, int64_t elemBits,
+                 ArrayRef<int64_t> ldsOrder) {
+  constexpr int64_t bankWidth = 4; // always 4 bytes on AMD
+
+  // This analysis assumes each thread's LDS accesses form a single contiguous
+  // block (element tile). When outer[d] > 1, the thread reads multiple
+  // non-contiguous element tiles and the single-stride check is insufficient.
+  if (llvm::any_of(layout.outer, [](int64_t o) { return o != 1; }))
+    return failure();
+
+  // Calculate the width of an LDS access per thread.
+  int64_t ldsContiguousDim = ldsOrder.back();
+  int64_t readBits = layout.element[ldsContiguousDim] * elemBits;
+  int64_t readBytes = std::max<int64_t>(1, readBits / 8);
+  int64_t banksPerAccess = std::max<int64_t>(1, readBytes / bankWidth);
+  int64_t activeBanks = numBanks / banksPerAccess;
+
+  // Find the thread-contiguous dimension: tstrides[d] == 1 with thread[d] > 1.
+  int64_t rank = layout.tstrides.size();
+  int64_t threadContiguousDim = -1;
+  for (int64_t d = 0; d < rank; ++d) {
+    if (layout.tstrides[d] == 1 && layout.thread[d] > 1) {
+      threadContiguousDim = d;
+      break;
+    }
+  }
+  if (threadContiguousDim == -1)
+    return failure();
+
+  // Compute the LDS stride of the thread-contiguous dimension: the product of
+  // extents of all dimensions physically more contiguous than it in ldsOrder.
+  int64_t ldsStride = 1;
+  for (int64_t d : llvm::reverse(ldsOrder)) {
+    if (d == threadContiguousDim)
+      break;
+    ldsStride *= layout.thread[d] * layout.element[d];
+  }
+  int64_t threadStrideBits =
+      layout.element[threadContiguousDim] * ldsStride * elemBits;
+  int64_t threadStrideBytes = std::max<int64_t>(1, threadStrideBits / 8);
+
+  // Sub-word stride: threads land in the same bank word → hardware broadcasts.
+  if (threadStrideBytes < bankWidth)
+    return failure();
+
+  // bankCycle: unique bank positions before the stride pattern wraps.
+  // If activeBanks > bankCycle, threads wrap → conflict.
+  int64_t bankRow = numBanks * bankWidth;
+  int64_t bankCycle = bankRow / std::gcd(threadStrideBytes, bankRow);
+  if (activeBanks <= bankCycle)
+    return failure();
+
+  return success();
+}
+
+// Wrapper that extracts target/intrinsic parameters and determines ldsOrder
+// from the operand index and whether the RHS is transposed in LDS.
+//
+// Semantic dimensions:
+//   2D MMA   LHS: [M, K]       RHS: [K, N]
+//   3D Scaled LHS: [M, K, Kb]   RHS: [K, Kb, N]
+//
+// Standard LDS layout: last semantic dim is contiguous (identity order).
+// transposeB (RHS only): K-direction becomes contiguous instead of N.
 LogicalResult hasBankConflicts(IREE::GPU::TargetAttr target,
                                IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                               int operandIndex,
-                               ArrayRef<int64_t> ldsOrder) {
+                               int operandIndex, bool transposeB) {
   IREE::GPU::MMASingleSubgroupLayout layout =
       IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
 
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   std::optional<int64_t> maybeBankCount = wgp.getWorkgroupMemoryBankCount();
   if (!maybeBankCount.has_value()) {
-    LDBG() << "Failed to get workgroup memory bank count";
     return failure();
   }
-  int64_t numBanks = *maybeBankCount;
-  constexpr int64_t bankWidth = 4; // always 4 bytes on AMD
+  int64_t numBanks = maybeBankCount.value();
 
   FailureOr<int64_t> maybeBitwidth =
       getOperandBitwidth(intrinsic, operandIndex);
   if (failed(maybeBitwidth)) {
-    LDBG() << "Failed to get operand bitwidth";
     return failure();
   }
-  int64_t elemBits = *maybeBitwidth;
-  
-  // Each thread reads `element[ldsContiguousDim]` contiguous elements along the
-  // LDS-contiguous dimension. Wider reads span multiple consecutive banks,
-  // reducing the number of independently addressable bank positions.
-  int64_t ldsContiguousDim = ldsOrder.back();
-  int64_t readBits = layout.element[ldsContiguousDim] * elemBits;
-  int64_t readBytes = std::max<int64_t>(1, readBits / 8);
-  int64_t banksPerAccess = std::max<int64_t>(1, readBytes / bankWidth);
-  int64_t activeBanks = numBanks / banksPerAccess;
-  int64_t threadContiguousDim = (layout.tstrides[0] == 1) ? 0 : 1;
+  int64_t elemBits = maybeBitwidth.value();
+  int64_t rank = layout.tstrides.size();
 
-  // If 
-  int64_t threadStrideBits = readBits;
-  if (threadContiguousDim != contiguousDim) {
-    // Threads walk perpendicular to LDS contiguity. Each thread step
-    // crosses one full row of the contiguous dimension.
-    int64_t dContiguous = layout.outer[contiguousDim] *
-                          layout.thread[contiguousDim] *
-                          layout.element[contiguousDim];
-    threadStrideBits = dContiguous * elemBits;
+  // Build ldsOrder. Standard layout is identity: {0, 1, ..., rank-1}.
+  // transposeB on RHS rotates the N dim (last) to the outermost position,
+  // making the K-direction contiguous.
+  //   2D: {0, 1} → {1, 0}
+  //   3D: {0, 1, 2} → {2, 0, 1}
+  SmallVector<int64_t> ldsOrder(rank);
+  bool isRhs = (operandIndex == IREE::GPU::kMMAOperandRhs ||
+                operandIndex == IREE::GPU::kScaledMMAOperandRhs);
+  std::iota(ldsOrder.begin(), ldsOrder.end(), 0);
+  if (isRhs && transposeB) {
+    std::rotate(ldsOrder.begin(), ldsOrder.end() - 1, ldsOrder.end());
   }
-  int64_t threadStrideBytes = threadStrideBits / 8;
-
-  // Sub-word stride: threads land within the same bank word. The hardware
-  // broadcasts sub-word reads from the same word → no conflict.
-  if (threadStrideBytes < bankWidth) {
-    LDBG() << "Thread stride is less than bank width";
-    return failure();
-  }
-
-  // bankCycle: the number of unique bank positions the thread stride covers
-  // before wrapping around to the same bank.
-  // If activeBanks > bankCycle, threads wrap → N-way conflict.
-  int64_t bankRow = numBanks * bankWidth;
-  int64_t bankCycle = bankRow / std::gcd(threadStrideBytes, bankRow);
-
-  if (activeBanks <= bankCycle)
-    return failure();
-
-  return success();
+  return hasBankConflicts(layout, numBanks, elemBits, ldsOrder);
 }
 
 FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
