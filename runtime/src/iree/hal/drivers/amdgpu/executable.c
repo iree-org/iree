@@ -626,6 +626,60 @@ static iree_status_t iree_hal_amdgpu_executable_preflight_code_object(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_amdgpu_executable_query_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
+    hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), device_agent, HSA_AGENT_INFO_PROFILE, out_profile));
+  return iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
+                                 HSA_AGENT_INFO_DEFAULT_FLOAT_ROUNDING_MODE,
+                                 out_rounding_mode);
+}
+
+static iree_status_t iree_hal_amdgpu_executable_select_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology,
+    const iree_hal_amdgpu_queue_affinity_physical_device_set_t*
+        physical_devices,
+    hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  bool has_selected_agent = false;
+  for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+    if (!iree_hal_amdgpu_physical_device_mask_contains(
+            physical_devices->physical_device_mask, i)) {
+      continue;
+    }
+
+    hsa_profile_t profile = HSA_PROFILE_BASE;
+    hsa_default_float_rounding_mode_t rounding_mode =
+        HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_executable_query_agent_profile(
+        libhsa, topology->gpu_agents[i], &profile, &rounding_mode));
+    if (!has_selected_agent) {
+      *out_profile = profile;
+      *out_rounding_mode = rounding_mode;
+      has_selected_agent = true;
+      continue;
+    }
+    if (profile != *out_profile || rounding_mode != *out_rounding_mode) {
+      return iree_make_status(
+          IREE_STATUS_INCOMPATIBLE,
+          "selected GPU agents must have matching HSA executable profiles and "
+          "default rounding modes; agent[%" PRIhsz
+          "] has profile %d and rounding mode %d but the executable requires "
+          "profile %d and rounding mode %d",
+          i, (int)profile, (int)rounding_mode, (int)*out_profile,
+          (int)*out_rounding_mode);
+    }
+  }
+  if (!has_selected_agent) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no GPU agents selected for executable load");
+  }
+  return iree_ok_status();
+}
+
 // Loads an executable ELF from memory for selected agents in |topology| and
 // stores the frozen executable in |out_handle|.
 static iree_status_t iree_hal_amdgpu_executable_load_module(
@@ -671,11 +725,18 @@ static iree_status_t iree_hal_amdgpu_executable_load_module(
               code_object_data.data_length, &code_object_reader));
 
   // Create the executable that will hold all of the loaded code objects.
-  // TODO(benvanik): pass profile/rounding mode from queried info.
+  hsa_profile_t executable_profile = HSA_PROFILE_BASE;
+  hsa_default_float_rounding_mode_t executable_rounding_mode =
+      HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+  iree_status_t status = iree_hal_amdgpu_executable_select_agent_profile(
+      libhsa, topology, physical_devices, &executable_profile,
+      &executable_rounding_mode);
   hsa_executable_t handle = {0};
-  iree_status_t status = iree_hsa_executable_create_alt(
-      IREE_LIBHSA(libhsa), HSA_PROFILE_FULL,
-      HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT, options, &handle);
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_executable_create_alt(
+        IREE_LIBHSA(libhsa), executable_profile, executable_rounding_mode,
+        options, &handle);
+  }
 
   // Load the code object for each selected agent.
   for (iree_host_size_t i = 0;
