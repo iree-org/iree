@@ -704,10 +704,11 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
       iree_hal_amdgpu_host_queue_should_profile_queue_device_events(queue);
   iree_hal_amdgpu_profile_queue_device_event_reservation_t
       profile_queue_device_events = {0};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
-          queue, profile_queue_device_event ? 1u : 0u,
-          &profile_queue_device_events));
+  if (profile_queue_device_event) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
+            queue, /*event_count=*/1, &profile_queue_device_events));
+  }
   iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_kernel_submission(
       queue, resolution, signal_semaphore_list, operation_resource_count,
       /*payload_packet_count=*/1, /*kernarg_block_count=*/0, out_ready,
