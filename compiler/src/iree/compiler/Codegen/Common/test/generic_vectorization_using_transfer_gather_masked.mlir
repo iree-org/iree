@@ -296,17 +296,18 @@ func.func @dynamic_contiguous_gather_read(
 // directly as vector SSA values by subsequent gathers, without materializing
 // tensor.empty<...xindex> intermediaries and write-read chains.
 
+#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 8, 0], vector_inner_parallel  = [0, 0, 8]>
 #m_3d = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #m_2d = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-func.func @three_gathers_no_index_tensor(
-    %in0: tensor<1x8x8xf32>,
+func.func @three_gathers_index_materialization(
+    %in0: tensor<1x8x?xf32>,
     %in1: tensor<1x8xf32>, %in2: tensor<1x8xf32>,
-    %out_init: tensor<1x8x8xf32>,
+    %out_init: tensor<1x8x?xf32>,
     %indir_table: tensor<50x32x25x2xi32>,
     %lut: tensor<50x40x40xi8>,
     %arg0: index, %arg2: index, %arg4: index, %arg6: index)
-    -> tensor<1x8x8xf32> {
+    -> tensor<1x8x?xf32> {
   %c0    = arith.constant 0   : index
   %c1    = arith.constant 1   : index
   %c39   = arith.constant 39  : index
@@ -315,12 +316,16 @@ func.func @three_gathers_no_index_tensor(
   %0 = linalg.generic {
         indexing_maps = [#m_3d, #m_2d, #m_2d, #m_3d],
         iterator_types = ["parallel", "parallel", "parallel"]
-      } ins(%in0, %in1, %in2 : tensor<1x8x8xf32>, tensor<1x8xf32>, tensor<1x8xf32>)
-        outs(%out_init : tensor<1x8x8xf32>) {
+      } ins(%in0, %in1, %in2 : tensor<1x8x?xf32>, tensor<1x8xf32>, tensor<1x8xf32>)
+        outs(%out_init : tensor<1x8x?xf32>)
+        attrs = {lowering_config = #config} {
   ^bb0(%in: f32, %a: f32, %b: f32, %out: f32):
+    // Small f32 preExtract chain — needed for the gather-path entry to
+    // engage in the way that produces tensor.empty<...xindex>.
     %m1 = arith.divf %a, %b : f32
     %p  = arith.cmpf une, %in, %cst : f32
     %v  = arith.select %p, %m1, %cst : f32
+    // Per-lane index computation shared across the first two gathers.
     %i0 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%arg0, %arg2)
     %d1 = linalg.index 1 : index
     %i1 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg4)[%d1]
@@ -331,6 +336,7 @@ func.func @three_gathers_no_index_tensor(
     %ea_idx = arith.index_cast %ea : i32 to index
     %eb = tensor.extract %indir_table[%i0, %i1, %i2, %c1] : tensor<50x32x25x2xi32>
     %eb_idx = arith.index_cast %eb : i32 to index
+    // Clamp results — these become inputs to gather #3.
     %ea_max = arith.maxsi %ea_idx, %c0  : index
     %ea_min = arith.minui %ea_max, %c39 : index
     %eb_max = arith.maxsi %eb_idx, %c0  : index
@@ -340,19 +346,20 @@ func.func @three_gathers_no_index_tensor(
     %gate = arith.cmpi ugt, %ec, %c0_i8 : i8
     %r = arith.select %gate, %v, %cst : f32
     linalg.yield %r : f32
-  } -> tensor<1x8x8xf32>
-  return %0 : tensor<1x8x8xf32>
+  } -> tensor<1x8x?xf32>
+  return %0 : tensor<1x8x?xf32>
 }
+
 // Verify three transfer_gather ops are produced. Index vectors from the first
 // two gathers (and the clamp ops on their results) feed directly into the
 // third gather as vector SSA values — no tensor.empty<...xindex> or
 // write-read chains.
 //
-// CHECK-LABEL: func.func @three_gathers_no_index_tensor
-// CHECK-SAME:    %[[IN0:[a-zA-Z0-9]+]]: tensor<1x8x8xf32>
+// CHECK-LABEL: func.func @three_gathers_index_materialization
+// CHECK-SAME:    %[[IN0:[a-zA-Z0-9]+]]: tensor<1x8x?xf32>
 // CHECK-SAME:    %[[IN1:[a-zA-Z0-9]+]]: tensor<1x8xf32>
 // CHECK-SAME:    %[[IN2:[a-zA-Z0-9]+]]: tensor<1x8xf32>
-// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x8x8xf32>
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x8x?xf32>
 // CHECK-SAME:    %[[TABLE:[a-zA-Z0-9]+]]: tensor<50x32x25x2xi32>
 // CHECK-SAME:    %[[LUT:[a-zA-Z0-9]+]]: tensor<50x40x40xi8>
 //
