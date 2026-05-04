@@ -9,23 +9,31 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 
-// Defines the out-of-line parser methods declared by
-// IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION. Paired with the declaration macro
+// Out-of-line definitions for the `llvm::cl::parser` specializations declared
 // in CodegenOptions.h.
-#define IREE_DEFINE_CODEGEN_OPTIONS_PASS_OPTION(TYPE)                          \
-  namespace llvm::cl {                                                         \
-  template class basic_parser<TYPE>;                                           \
-  bool parser<TYPE>::parse(Option &, StringRef, StringRef, TYPE &) {           \
-    return false;                                                              \
-  }                                                                            \
-  void parser<TYPE>::printOptionDiff(const Option &, TYPE, const OptVal &,     \
-                                     size_t) const {}                          \
-  void parser<TYPE>::anchor() {}                                               \
-  } /* namespace llvm::cl */
+namespace llvm::cl {
 
-IREE_DEFINE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::CPUCodegenOptions)
-IREE_DEFINE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::GPUCodegenOptions)
-#undef IREE_DEFINE_CODEGEN_OPTIONS_PASS_OPTION
+template class basic_parser<mlir::iree_compiler::CPUCodegenOptions>;
+bool parser<mlir::iree_compiler::CPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::CPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::CPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::anchor() {}
+
+template class basic_parser<mlir::iree_compiler::GPUCodegenOptions>;
+bool parser<mlir::iree_compiler::GPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::GPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::GPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::anchor() {}
+
+} // namespace llvm::cl
 
 namespace mlir::iree_compiler {
 

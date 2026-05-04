@@ -97,46 +97,58 @@ struct GPUCodegenOptions : CodegenOptions {
   static GPUCodegenOptions getWithOptLevel(llvm::OptimizationLevel level);
 };
 
+// Provide `operator<<` in the associated namespace so MLIR's pass-option
+// printing (which goes through ADL via has_stream_operator) can serialize
+// these values. We print a placeholder because the options are populated
+// programmatically from a session-scoped instance, not from pass pipeline
+// strings; there is no meaningful textual representation to round-trip.
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const CPUCodegenOptions &) {
+  return os << "opaque";
+}
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const GPUCodegenOptions &) {
+  return os << "opaque";
+}
+
 } // namespace mlir::iree_compiler
 
-// Declares the machinery required to use `TYPE` as an MLIR pass option:
+// Specialize `llvm::cl::parser` for the codegen option structs to inherit
+// `basic_parser` instead of the default `generic_parser_base`. This sidesteps
+// `GenericOptionParser::findArgStrForValue`, which `llvm_unreachable`s on
+// struct-typed values that have no registered enum entries.
 //
-//   (1) `operator<<` in the type's associated namespace, so MLIR's pass-option
-//       printing (which goes through ADL via has_stream_operator) can serialize
-//       the value. We print nothing because the options are populated
-//       programmatically from a session-scoped instance, not from pass
-//       pipeline strings.
-//   (2) `llvm::cl::parser<TYPE>` specialized to inherit `basic_parser` instead
-//       of the default `generic_parser_base`. This sidesteps
-//       `GenericOptionParser::findArgStrForValue`, which `llvm_unreachable`s
-//       on struct-typed values that have no registered enum entries.
-//
-// The parse method is a no-op: these options never flow in from strings.
-#define IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(TYPE, VALUE_NAME_STR)         \
-  namespace mlir::iree_compiler {                                              \
-  inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const TYPE &) {  \
-    return os;                                                                 \
-  }                                                                            \
-  } /* namespace mlir::iree_compiler */                                        \
-                                                                               \
-  namespace llvm::cl {                                                         \
-  extern template class basic_parser<TYPE>;                                    \
-  template <>                                                                  \
-  class parser<TYPE> : public basic_parser<TYPE> {                             \
-  public:                                                                      \
-    parser(Option &O) : basic_parser(O) {}                                     \
-    bool parse(Option &O, StringRef ArgName, StringRef Arg, TYPE &Val);        \
-    StringRef getValueName() const override { return VALUE_NAME_STR; }         \
-    void printOptionDiff(const Option &O, TYPE V, const OptVal &Default,       \
-                         size_t GlobalWidth) const;                            \
-    void anchor() override;                                                    \
-  };                                                                           \
-  } /* namespace llvm::cl */
+// The parse methods are no-ops: these options never flow in from strings.
+namespace llvm::cl {
 
-IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::CPUCodegenOptions,
-                                         "cpu codegen options")
-IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION(mlir::iree_compiler::GPUCodegenOptions,
-                                         "gpu codegen options")
-#undef IREE_DECLARE_CODEGEN_OPTIONS_PASS_OPTION
+extern template class basic_parser<mlir::iree_compiler::CPUCodegenOptions>;
+template <>
+class parser<mlir::iree_compiler::CPUCodegenOptions>
+    : public basic_parser<mlir::iree_compiler::CPUCodegenOptions> {
+public:
+  parser(Option &o) : basic_parser(o) {}
+  bool parse(Option &, StringRef, StringRef,
+             mlir::iree_compiler::CPUCodegenOptions &);
+  StringRef getValueName() const override { return "cpu codegen options"; }
+  void printOptionDiff(const Option &, mlir::iree_compiler::CPUCodegenOptions,
+                       const OptVal &, size_t) const;
+  void anchor() override;
+};
+
+extern template class basic_parser<mlir::iree_compiler::GPUCodegenOptions>;
+template <>
+class parser<mlir::iree_compiler::GPUCodegenOptions>
+    : public basic_parser<mlir::iree_compiler::GPUCodegenOptions> {
+public:
+  parser(Option &o) : basic_parser(o) {}
+  bool parse(Option &, StringRef, StringRef,
+             mlir::iree_compiler::GPUCodegenOptions &);
+  StringRef getValueName() const override { return "gpu codegen options"; }
+  void printOptionDiff(const Option &, mlir::iree_compiler::GPUCodegenOptions,
+                       const OptVal &, size_t) const;
+  void anchor() override;
+};
+
+} // namespace llvm::cl
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CODEGENOPTIONS_H_
