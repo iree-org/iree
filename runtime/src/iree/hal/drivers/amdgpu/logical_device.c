@@ -1197,6 +1197,44 @@ static bool iree_hal_amdgpu_logical_device_query_pool_epoch(
   return current_epoch >= epoch;
 }
 
+bool iree_hal_amdgpu_logical_device_lookup_host_queue_epoch_wait(
+    iree_hal_amdgpu_logical_device_t* logical_device, iree_async_axis_t axis,
+    iree_hal_amdgpu_host_queue_epoch_wait_t* out_wait_state) {
+  IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(out_wait_state);
+  memset(out_wait_state, 0, sizeof(*out_wait_state));
+
+  if (!logical_device->host_queue_epoch_table) return false;
+  hsa_signal_t epoch_signal = {0};
+  if (!iree_hal_amdgpu_epoch_signal_table_lookup(
+          logical_device->host_queue_epoch_table, axis, &epoch_signal)) {
+    return false;
+  }
+
+  const uint8_t device_index = iree_async_axis_device_index(axis);
+  if (device_index >= logical_device->physical_device_count) return false;
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      logical_device->physical_devices[device_index];
+
+  const uint8_t queue_index = iree_async_axis_queue_index(axis);
+  if (queue_index >= physical_device->host_queue_count) return false;
+  iree_hal_amdgpu_host_queue_t* queue =
+      &physical_device->host_queues[queue_index];
+
+  uint64_t wait_timeout_hint =
+      logical_device->system->info.timestamp_frequency / 1000;
+  if (wait_timeout_hint == 0) wait_timeout_hint = 1;
+
+  out_wait_state->libhsa = queue->libhsa;
+  out_wait_state->epoch_signal = epoch_signal;
+  out_wait_state->error_status = &queue->error_status;
+  out_wait_state->host_queue = queue;
+  out_wait_state->timestamp_frequency =
+      logical_device->system->info.timestamp_frequency;
+  out_wait_state->wait_timeout_hint = wait_timeout_hint;
+  return true;
+}
+
 static void iree_hal_amdgpu_logical_device_deassign_frontier(
     iree_hal_amdgpu_logical_device_t* logical_device) {
   IREE_TRACE_ZONE_BEGIN(z0);

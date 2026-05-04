@@ -807,7 +807,7 @@ static uint64_t iree_hal_amdgpu_host_queue_commit_signals(
           queue->can_publish_frontier && !is_private_stream_signal;
     }
 
-    // Push notification entry for drain -> signal_untainted on completion.
+    // Push notification entry for drain -> publish_untainted on completion.
     const iree_hal_amdgpu_notification_entry_flags_t notification_flags =
         (is_private_stream_signal || !queue->can_publish_frontier)
             ? IREE_HAL_AMDGPU_NOTIFICATION_ENTRY_FLAG_OMIT_FRONTIER_SNAPSHOT

@@ -655,6 +655,61 @@ TEST(SemaphoreTest, SignalUntaintedAdvancesWatermark) {
   iree_async_semaphore_release(sem);
 }
 
+TEST(SemaphoreTest, PublishUntaintedDispatchesOnce) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  TimepointCallback callback;
+  iree_async_semaphore_timepoint_t timepoint;
+  timepoint.callback = TimepointCallback::Invoke;
+  timepoint.user_data = &callback;
+  IREE_ASSERT_OK(iree_async_semaphore_acquire_timepoint(sem, 10, &timepoint));
+
+  IREE_ASSERT_OK(iree_async_semaphore_publish_untainted(sem, 10, nullptr));
+  EXPECT_EQ(iree_async_semaphore_query(sem), 10u);
+  EXPECT_EQ(iree_async_semaphore_query_untainted_value(sem), 10u);
+  EXPECT_EQ(callback.call_count, 1);
+  EXPECT_EQ(callback.last_status_code, IREE_STATUS_OK);
+
+  IREE_ASSERT_OK(iree_async_semaphore_publish_untainted(sem, 10, nullptr));
+  EXPECT_EQ(callback.call_count, 1);
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(SemaphoreTest, PublishUntaintedPastCurrentIsNoOp) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  IREE_ASSERT_OK(iree_async_semaphore_publish_untainted(sem, 10, nullptr));
+  IREE_ASSERT_OK(iree_async_semaphore_publish_untainted(sem, 5, nullptr));
+
+  EXPECT_EQ(iree_async_semaphore_query(sem), 10u);
+  EXPECT_EQ(iree_async_semaphore_query_untainted_value(sem), 10u);
+
+  iree_async_semaphore_release(sem);
+}
+
+TEST(SemaphoreTest, PublishUntaintedFailedSemaphoreReturnsFailure) {
+  iree_async_semaphore_t* sem = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create(
+      test_proactor(), 0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &sem));
+
+  iree_async_semaphore_fail(sem,
+                            iree_make_status(IREE_STATUS_ABORTED, "failed"));
+
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_ABORTED,
+      iree_async_semaphore_publish_untainted(sem, 10, nullptr));
+
+  iree_async_semaphore_release(sem);
+}
+
 TEST(SemaphoreTest, MarkTaintedAbove) {
   iree_async_semaphore_t* sem = nullptr;
   IREE_ASSERT_OK(iree_async_semaphore_create(

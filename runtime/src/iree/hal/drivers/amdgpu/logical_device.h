@@ -28,6 +28,7 @@ typedef struct iree_hal_amdgpu_profile_device_metrics_session_t
     iree_hal_amdgpu_profile_device_metrics_session_t;
 typedef struct iree_hal_amdgpu_profile_trace_session_t
     iree_hal_amdgpu_profile_trace_session_t;
+typedef struct iree_hal_amdgpu_host_queue_t iree_hal_amdgpu_host_queue_t;
 typedef struct iree_hal_amdgpu_system_t iree_hal_amdgpu_system_t;
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
@@ -48,6 +49,23 @@ typedef struct iree_hal_amdgpu_host_block_pools_t {
   // Used for durable command-buffer recording blocks.
   iree_arena_block_pool_t command_buffer;
 } iree_hal_amdgpu_host_block_pools_t;
+
+// Borrowed state required to observe a host queue's submitted epoch from a
+// non-queue thread.
+typedef struct iree_hal_amdgpu_host_queue_epoch_wait_t {
+  // HSA API table used to load or wait on |epoch_signal|.
+  const iree_hal_amdgpu_libhsa_t* libhsa;
+  // Producer queue completion epoch signal.
+  hsa_signal_t epoch_signal;
+  // Producer queue sticky error status. Borrowed from the queue.
+  iree_atomic_intptr_t* error_status;
+  // Producer host queue. Borrowed from the logical device.
+  iree_hal_amdgpu_host_queue_t* host_queue;
+  // HSA timestamp ticks per second for wait-hint conversion.
+  uint64_t timestamp_frequency;
+  // Maximum HSA wait quantum in timestamp ticks before rechecking host state.
+  uint64_t wait_timeout_hint;
+} iree_hal_amdgpu_host_queue_epoch_wait_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_logical_device_t
@@ -187,6 +205,15 @@ iree_status_t iree_hal_amdgpu_logical_device_options_verify_supported_features(
 // precondition is held by the caller.
 bool iree_hal_amdgpu_logical_device_should_record_profile_memory_events(
     iree_hal_device_t* base_device);
+
+// Looks up the producer queue state needed for host-side epoch observation.
+//
+// Returns false if |axis| is not a local host queue axis registered in this
+// logical device's epoch table. The returned pointers are borrowed and valid
+// only while the logical device and its queues remain live.
+bool iree_hal_amdgpu_logical_device_lookup_host_queue_epoch_wait(
+    iree_hal_amdgpu_logical_device_t* logical_device, iree_async_axis_t axis,
+    iree_hal_amdgpu_host_queue_epoch_wait_t* out_wait_state);
 
 // Returns true when the active profile capture should emit heavy dispatch
 // artifacts for the given executable export and queue location.

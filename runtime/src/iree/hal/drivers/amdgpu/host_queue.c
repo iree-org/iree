@@ -147,8 +147,8 @@ static void iree_hal_amdgpu_host_queue_run_post_drain_actions(
 
 // Drains completed notification entries and reclaims kernarg space. If the GPU
 // queue has faulted (error_status is set), fails all pending entries instead of
-// draining normally.
-static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+// draining normally. Caller must hold completion_drain_mutex.
+static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions_locked(
     iree_hal_amdgpu_host_queue_t* queue) {
   // Check for GPU queue error (set by the HSA error callback on another
   // thread). If the queue has faulted, no further epochs will advance;
@@ -182,7 +182,25 @@ static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
   }
   iree_hal_amdgpu_host_queue_reclaim_queue_owned_positions(queue,
                                                            reclaim_positions);
+  return count;
+}
+
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  iree_slim_mutex_lock(&queue->locks.completion_drain_mutex);
+  iree_host_size_t count =
+      iree_hal_amdgpu_host_queue_drain_completions_locked(queue);
+  iree_slim_mutex_unlock(&queue->locks.completion_drain_mutex);
   iree_hal_amdgpu_host_queue_run_post_drain_actions(queue);
+  return count;
+}
+
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions_for_waiter(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  iree_slim_mutex_lock(&queue->locks.completion_drain_mutex);
+  iree_host_size_t count =
+      iree_hal_amdgpu_host_queue_drain_completions_locked(queue);
+  iree_slim_mutex_unlock(&queue->locks.completion_drain_mutex);
   return count;
 }
 
@@ -310,7 +328,7 @@ static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
 // HSA queue error callback. Called by the HSA runtime (on an internal thread)
 // when the queue encounters an unrecoverable error (page fault, invalid AQL
 // packet, ECC error). Stores the error atomically on the queue so the
-// completion thread can fail pending semaphores with the actual GPU error.
+// completion drain path can fail pending semaphores with the actual GPU error.
 static void iree_hal_amdgpu_host_queue_error_callback(hsa_status_t status,
                                                       hsa_queue_t* source,
                                                       void* data) {
@@ -394,6 +412,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
 
   // Submission pipeline state.
   iree_slim_mutex_initialize(&out_queue->locks.submission_mutex);
+  iree_slim_mutex_initialize(&out_queue->locks.completion_drain_mutex);
   iree_slim_mutex_initialize(&out_queue->locks.post_drain_mutex);
   iree_slim_mutex_initialize(&out_queue->profiling.event_mutex);
   out_queue->profiling.signals.block_pool = profiling_signal_block_pool;
@@ -639,6 +658,7 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   }
 
   iree_slim_mutex_deinitialize(&queue->locks.post_drain_mutex);
+  iree_slim_mutex_deinitialize(&queue->locks.completion_drain_mutex);
   iree_slim_mutex_deinitialize(&queue->profiling.event_mutex);
   iree_slim_mutex_deinitialize(&queue->locks.submission_mutex);
 
@@ -694,7 +714,7 @@ typedef struct iree_hal_amdgpu_host_queue_op_submission_t {
   // Whether the direct submit helper found enough queue capacity.
   bool ready;
 
-  // Whether |deferred_op| should retry on the completion thread after drain.
+  // Whether |deferred_op| should retry after notification-ring drain.
   bool wait_for_capacity;
 } iree_hal_amdgpu_host_queue_op_submission_t;
 
@@ -715,7 +735,7 @@ static inline void iree_hal_amdgpu_host_queue_op_submission_begin(
                                            &out_submission->resolution);
 }
 
-// Marks a captured pending op as retrying after completion-thread drain because
+// Marks a captured pending op as retrying after notification-ring drain because
 // direct submission ran out of queue capacity.
 static inline void iree_hal_amdgpu_host_queue_op_submission_defer_for_capacity(
     iree_hal_amdgpu_host_queue_op_submission_t* submission) {

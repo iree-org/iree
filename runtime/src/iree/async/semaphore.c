@@ -503,6 +503,56 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_async_semaphore_publish_untainted(
+    iree_async_semaphore_t* semaphore, uint64_t value,
+    const iree_async_frontier_t* frontier) {
+  iree_status_t failure = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    return iree_status_clone(failure);
+  }
+
+  // CAS loop to advance the timeline value monotonically. Unlike strict
+  // signal, a concurrent or earlier publication of the same completion is OK.
+  int64_t current_raw = 0;
+  do {
+    current_raw =
+        iree_atomic_load(&semaphore->timeline_value, iree_memory_order_acquire);
+    if (value <= (uint64_t)current_raw) return iree_ok_status();
+  } while (!iree_atomic_compare_exchange_weak(
+      &semaphore->timeline_value, &current_raw, (int64_t)value,
+      iree_memory_order_release, iree_memory_order_relaxed));
+
+  failure = (iree_status_t)iree_atomic_load(&semaphore->failure_status,
+                                            iree_memory_order_acquire);
+  if (IREE_UNLIKELY(!iree_status_is_ok(failure))) {
+    return iree_status_clone(failure);
+  }
+
+  // Merge frontier and conditionally advance the untainted watermark.
+  bool frontier_merged = true;
+  if (frontier != NULL && frontier->entry_count > 0) {
+    iree_slim_mutex_lock(&semaphore->mutex);
+    frontier_merged = iree_async_frontier_merge(
+        semaphore->frontier, semaphore->frontier_capacity, frontier);
+    iree_slim_mutex_unlock(&semaphore->mutex);
+  }
+  if (frontier_merged) {
+    int64_t watermark_raw = 0;
+    do {
+      watermark_raw = iree_atomic_load(&semaphore->last_untainted_value,
+                                       iree_memory_order_acquire);
+      if (value <= (uint64_t)watermark_raw) break;
+    } while (!iree_atomic_compare_exchange_weak(
+        &semaphore->last_untainted_value, &watermark_raw, (int64_t)value,
+        iree_memory_order_release, iree_memory_order_relaxed));
+  }
+
+  iree_async_semaphore_dispatch_timepoints(semaphore, value);
+
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT bool iree_async_semaphore_merge_frontier(
     iree_async_semaphore_t* semaphore, const iree_async_frontier_t* frontier) {
   IREE_ASSERT_ARGUMENT(frontier);

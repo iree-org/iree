@@ -609,7 +609,7 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain_reclaim_positions(
             iree_hal_amdgpu_notification_ring_read_span_frontier(
                 ring, pending_flags, /*has_transition_snapshot=*/true,
                 fallback_frontier);
-        iree_status_t signal_status = iree_async_semaphore_signal_untainted(
+        iree_status_t signal_status = iree_async_semaphore_publish_untainted(
             pending_semaphore, pending_value, frontier);
         if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
           iree_async_semaphore_fail(pending_semaphore, signal_status);
@@ -642,7 +642,7 @@ iree_host_size_t iree_hal_amdgpu_notification_ring_drain_reclaim_positions(
     const iree_async_frontier_t* frontier =
         iree_hal_amdgpu_notification_ring_read_span_frontier(
             ring, pending_flags, has_transition_snapshot, fallback_frontier);
-    iree_status_t signal_status = iree_async_semaphore_signal_untainted(
+    iree_status_t signal_status = iree_async_semaphore_publish_untainted(
         pending_semaphore, pending_value, frontier);
     if (IREE_UNLIKELY(!iree_status_is_ok(signal_status))) {
       iree_async_semaphore_fail(pending_semaphore, signal_status);

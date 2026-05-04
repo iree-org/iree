@@ -76,13 +76,12 @@ typedef struct iree_hal_amdgpu_profile_queue_device_event_reservation_t {
 typedef struct iree_hal_amdgpu_host_queue_post_drain_action_t
     iree_hal_amdgpu_host_queue_post_drain_action_t;
 
-// Callback run by the completion thread after notification-ring drain has
-// published completed entries and reclaimed queue-owned ring state.
+// Callback run after notification-ring drain has published completed entries
+// and reclaimed queue-owned ring state.
 typedef void(IREE_API_PTR* iree_hal_amdgpu_host_queue_post_drain_fn_t)(
     void* user_data);
 
-// Intrusive completion-thread continuation queued by pre-signal reclaim
-// actions.
+// Intrusive continuation queued by pre-signal reclaim actions.
 //
 // Pre-signal actions run while notification-ring drain is still publishing a
 // completion entry. Work that may submit additional AQL packets must instead
@@ -136,7 +135,7 @@ IREE_ASYNC_FIXED_FRONTIER_TYPE(iree_hal_amdgpu_host_queue_frontier_t,
 // The epoch signal (owned by the notification ring) is a single hsa_signal_t
 // set as completion_signal on each submission's last AQL packet. The CP
 // decrements it by 1 on completion. The notification ring maps epochs to
-// semaphore signals that the queue's completion thread drains when the epoch
+// semaphore signals that serialized completion drain publishes when the epoch
 // advances.
 //
 // All queue operations enter through the virtual_queue vtable. There are no
@@ -161,7 +160,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   // Sticky error status from the HSA queue error callback. Non-zero indicates
   // an unrecoverable GPU fault (page fault, invalid packet, ECC error).
   // First-error-wins CAS from the HSA runtime thread; acquire-loaded by the
-  // completion thread to fail pending semaphores instead of signaling.
+  // completion drain path to fail pending semaphores instead of signaling.
   // Owned by the queue (freed in deinit).
   iree_atomic_intptr_t error_status;
 
@@ -187,7 +186,7 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slots;
 
   // Epoch-driven notification ring mapping submission completions to
-  // semaphore signals. The completion thread drains this ring.
+  // semaphore signals. Serialized completion drain consumes this ring.
   iree_hal_amdgpu_notification_ring_t notification_ring;
 
   // Completion-thread state for queue epoch drain and teardown/error wakeups.
@@ -212,11 +211,18 @@ typedef struct iree_hal_amdgpu_host_queue_t {
   //     allocation. Multiple threads may submit to the same queue; the mutex
   //     serializes them. Independent queues do not synchronize.
   //
-  //   Completion thread (single queue-owned host thread):
+  //   Completion drain (single serialized consumer):
   //     Waits on the notification ring epoch signal with
-  //     hsa_amd_signal_wait_any, drains completed entries, checks error_status,
-  //     and reclaims kernargs. Reads the notification ring (SPSC consumer) and
-  //     the atomic error_status. Never writes to submission-path fields.
+  //     hsa_amd_signal_wait_any from the queue-owned completion thread, or is
+  //     entered by a direct host waiter after it independently observes a
+  //     producer epoch. Drains completed entries, checks error_status, reclaims
+  //     kernargs, and advances the queue frontier tracker. Reads the
+  //     notification ring and the atomic error_status under
+  //     completion_drain_mutex, preserving the ring's single-consumer
+  //     representation even though there are multiple possible callers. The
+  //     queue-owned completion thread also runs post-drain continuations after
+  //     the serialized drain; direct host waiters do not. Never writes to
+  //     submission-path fields.
   //
   //   HSA error callback (HSA runtime thread):
   //     Writes error_status via atomic CAS. Signals
@@ -259,6 +265,9 @@ typedef struct iree_hal_amdgpu_host_queue_t {
     // fill, execute, etc.) acquire this before touching submission state and
     // release after signal commit. The proactor thread does not acquire this.
     iree_slim_mutex_t submission_mutex;
+    // Serializes notification-ring drain between the completion thread and
+    // direct host waiters observing a producer epoch.
+    iree_slim_mutex_t completion_drain_mutex;
     // Serializes the post-drain continuation list.
     iree_slim_mutex_t post_drain_mutex;
   } locks;
@@ -558,9 +567,9 @@ iree_status_t iree_hal_amdgpu_host_queue_enqueue_host_action(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count);
 
-// Enqueues |action| to run on the queue completion thread after the current or
-// next notification-ring drain has fully published completed entries. The
-// action storage must remain valid until |action->fn| is invoked.
+// Enqueues |action| to run after the current or next notification-ring drain
+// has fully published completed entries. The action storage must remain valid
+// until |action->fn| is invoked.
 void iree_hal_amdgpu_host_queue_enqueue_post_drain_action(
     iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_amdgpu_host_queue_post_drain_action_t* action,
@@ -638,6 +647,24 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
 // All in-flight work must have completed and been drained before calling.
 // The caller must ensure no concurrent access to the queue during deinit.
 void iree_hal_amdgpu_host_queue_deinitialize(
+    iree_hal_amdgpu_host_queue_t* queue);
+
+// Drains completed notification entries, retires queue-owned resources, runs
+// post-drain continuations, and advances the queue frontier tracker.
+//
+// The queue completion thread calls this after epoch-signal wakeups. Internal
+// serialization keeps notification-ring consumption single-reader.
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+    iree_hal_amdgpu_host_queue_t* queue);
+
+// Drains completed notification entries and retires queue-owned resources after
+// a direct host waiter has independently observed a producer epoch.
+//
+// This intentionally does not run post-drain continuations. Those continuations
+// may submit more AQL, resume command-buffer replay, or drive capacity retries;
+// they belong on the queue-owned completion service thread where device/NUMA
+// affinity policy can be controlled.
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions_for_waiter(
     iree_hal_amdgpu_host_queue_t* queue);
 
 // Enables or disables HSA dispatch timestamp population for this queue.
