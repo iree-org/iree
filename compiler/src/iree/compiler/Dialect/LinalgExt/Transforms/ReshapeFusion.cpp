@@ -1334,6 +1334,27 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
   return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
 }
 
+static void
+replaceUnitDimIndexOps(Block *body,
+                       const llvm::SmallDenseSet<unsigned> &unitDims,
+                       RewriterBase &rewriter) {
+  for (IndexOp indexOp : llvm::make_early_inc_range(body->getOps<IndexOp>())) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(indexOp);
+    if (unitDims.contains(indexOp.getDim())) {
+      rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(indexOp, 0);
+      continue;
+    }
+
+    unsigned droppedDimsBefore = llvm::count_if(
+        unitDims, [&](unsigned dim) { return dim < indexOp.getDim(); });
+    if (droppedDimsBefore != 0) {
+      rewriter.replaceOpWithNewOp<IndexOp>(indexOp, indexOp.getDim() -
+                                                        droppedDimsBefore);
+    }
+  }
+}
+
 template <typename AttentionOpType>
 struct DropAttentionLikeUnitDims final : OpRewritePattern<AttentionOpType> {
   DropAttentionLikeUnitDims(MLIRContext *context,
@@ -1365,6 +1386,8 @@ struct DropAttentionLikeUnitDims final : OpRewritePattern<AttentionOpType> {
         result.setType(type);
       }
       newOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(newIndexingMaps));
+      IRRewriter rewriter(b);
+      replaceUnitDimIndexOps(newOp.getBody(), droppedDims, rewriter);
       return newOp;
     };
     FailureOr<linalg::DropUnitDimsResult> result = linalg::dropUnitDims(
