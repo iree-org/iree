@@ -652,7 +652,7 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   // backend's instruction selector pattern-matching this `vector.broadcast`-
   // of-load into the EVEX broadcast operand, so the explicit broadcast here
   // is what *enables* that, not a perf liability.
-  // TODO(arm): Arm's by-element FMA (`fmla.4s vd, vn, vm[idx]`) is exposed
+  // TODO(24311): Arm's by-element FMA (`fmla.4s vd, vn, vm[idx]`) is exposed
   // via separate intrinsics (e.g. `llvm.aarch64.neon.fma.lane.v4f32`) that
   // take `(vector, vector, lane_idx)`; when we add Arm support, those cases
   // should bypass this broadcast and emit the lane-index intrinsic directly.
