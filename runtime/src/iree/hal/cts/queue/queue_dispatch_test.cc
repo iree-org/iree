@@ -102,6 +102,47 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindings) {
   EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
 }
 
+// Borrowed resource lifetimes are an optimization hint for callers that keep
+// resources live until dispatch completion. The observable dispatch behavior is
+// identical to the default retained mode.
+TEST_P(QueueDispatchTest, DispatchWithBorrowedResourceLifetimes) {
+  Ref<iree_hal_buffer_t> input_buffer;
+  {
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
+  }
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  MakeScaleAndOffsetBindings(input_buffer, output_buffer, binding_refs);
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  const uint32_t constant_data[] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_data, sizeof(constant_data));
+
+  SemaphoreList empty_wait;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+      executable_, /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+  EXPECT_THAT(output_data, ContainerEq(std::vector<uint32_t>{13, 16, 19, 22}));
+}
+
 // Profiling must not perturb direct queue dispatch semantics or completion.
 TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
   TestProfileSink sink = {};
