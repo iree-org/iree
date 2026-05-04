@@ -3029,8 +3029,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 ///   * `vector_reduction` tiles the K reduction iter dim to 1, leaving an
 ///     scf.for around the inner_tiled body.
 /// With all iter bounds collapsed to 1, the unit-iter-dim drop and per-
-/// intrinsic lower patterns in `LLVMCPULowerInnerTiledPass` fire on a
-/// single-tile op rather than getting fully unrolled over K. Distribution
+/// intrinsic lower patterns in `LLVMCPUVirtualVectorLoweringPass` fire on
+/// a single-tile op rather than getting fully unrolled over K. Distribution
 /// is parallel-only (M, N).
 ///
 /// We route through `Mmt4dTilingExpert` rather than `DataTiling` because
