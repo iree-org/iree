@@ -1,5 +1,6 @@
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-async-dma, cse, canonicalize))" \
+// RUN:   --verify-diagnostics \
 // RUN:   %s | FileCheck %s
 
 #executable_target = #hal.executable.target<"rocm",
@@ -142,6 +143,74 @@ func.func @lower_async_dma_fallback_dma_size(
   iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<2x64xf16>
       : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
         memref<2x64xf16, #gpu.address_space<workgroup>>
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  return
+}
+
+// -----
+
+#executable_target_4 = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none,
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    dma_sizes = [32, 128]>>}>
+
+#translation_4 = #iree_codegen.translation_info<
+  pipeline = #iree_gpu.pipeline<VectorDistribute>
+  workgroup_size = [64, 1, 1]
+  subgroup_size = 64>
+
+func.func @lower_async_dma_rejects_oob_in_bounds(
+    %source: memref<16x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<16x64xf16, #gpu.address_space<workgroup>>,
+    %i: index, %j: index)
+  attributes {
+    hal.executable.target = #executable_target_4,
+    translation_info = #translation_4} {
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  // expected-error @+1 {{failed to lower async_dma to gather_to_lds}}
+  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<16x64xf16> in_bounds [false, true]
+      : memref<16x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<16x64xf16, #gpu.address_space<workgroup>>
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  return
+}
+
+// -----
+
+#executable_target_5 = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none,
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    dma_sizes = [32, 128]>>}>
+
+#translation_5 = #iree_codegen.translation_info<
+  pipeline = #iree_gpu.pipeline<VectorDistribute>
+  workgroup_size = [64, 1, 1]
+  subgroup_size = 64>
+
+func.func @lower_async_dma_rejects_noncontiguous_source(
+    %source: memref<64x64xf16, strided<[129, 2]>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<16x64xf16, #gpu.address_space<workgroup>>,
+    %i: index, %j: index)
+  attributes {
+    hal.executable.target = #executable_target_5,
+    translation_info = #translation_5} {
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  // expected-error @+1 {{failed to lower async_dma to gather_to_lds}}
+  iree_gpu.async_dma %source[%i, %j] to %dest[%i, %j], vector<16x64xf16>
+      : memref<64x64xf16, strided<[129, 2]>, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<16x64xf16, #gpu.address_space<workgroup>>
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
   return
 }
