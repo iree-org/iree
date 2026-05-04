@@ -686,8 +686,8 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
         .getResult(0);
   };
 
-  Type f32 = Float32Type::get(builder.getContext());
-  Type i16 = IntegerType::get(builder.getContext(), 16);
+  Type f32 = builder.getF32Type();
+  Type i16 = builder.getI16Type();
   Type accType = acc.getType();
   switch (intrinsic) {
   case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
