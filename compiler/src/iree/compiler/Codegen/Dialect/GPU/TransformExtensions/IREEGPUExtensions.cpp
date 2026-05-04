@@ -69,7 +69,7 @@ void transform_dialect::ApplyLowerValueBarrierOp::populatePatterns(
 
 void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
     RewritePatternSet &patterns) {
-  GPU::populateIREEGPUVectorUnrollPatterns(patterns);
+  IREE::Codegen::populateUnrollInnerTiledPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//

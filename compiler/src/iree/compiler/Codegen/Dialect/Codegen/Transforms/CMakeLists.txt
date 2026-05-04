@@ -18,8 +18,11 @@ iree_cc_library(
   SRCS
     "LowerInnerTiled.cpp"
     "ReshapeFusion.cpp"
+    "UnrollInnerTiled.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
+    MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
@@ -28,6 +31,8 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
+    MLIRVectorTransforms
+    MLIRVectorUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Util::IR
   PUBLIC

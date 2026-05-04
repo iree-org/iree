@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -36,6 +37,19 @@ void populateLowerInnerTiledPatterns(RewritePatternSet &patterns);
 /// hoistable extract/broadcast pairs so the accumulator's intrinsic-register
 /// type becomes loop-carried.
 void populateDropInnerTiledUnitDimsPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns to unroll an `iree_codegen.inner_tiled` op along its
+/// iteration dimensions, with the unroll shape and traversal order specified
+/// by `options`. Wraps the per-intrinsic ACC distribute and reassemble in a
+/// hoistable conversion pair so the loop-carried accumulator type is the
+/// per-intrinsic one.
+void populateUnrollInnerTiledPatterns(
+    RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
+
+/// Convenience overload: unroll to a unit iteration shape, with a matmul-like
+/// traversal order that reuses the LHS register (assumes the LHS is the first
+/// input).
+void populateUnrollInnerTiledPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

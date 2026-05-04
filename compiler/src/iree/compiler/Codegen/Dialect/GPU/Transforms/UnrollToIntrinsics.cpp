@@ -40,7 +40,7 @@ void UnrollToIntrinsicsPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(context);
-    GPU::populateIREEGPUVectorUnrollPatterns(patterns);
+    Codegen::populateUnrollInnerTiledPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

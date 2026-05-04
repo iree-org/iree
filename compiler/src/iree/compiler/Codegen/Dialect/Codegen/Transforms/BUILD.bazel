@@ -17,6 +17,7 @@ iree_compiler_cc_library(
     srcs = [
         "LowerInnerTiled.cpp",
         "ReshapeFusion.cpp",
+        "UnrollInnerTiled.cpp",
     ],
     hdrs = [
         "Transforms.h",
@@ -25,6 +26,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
@@ -34,5 +37,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:VectorUtils",
     ],
 )
