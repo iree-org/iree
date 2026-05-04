@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -32,7 +33,7 @@ transform_dialect::IREEGPUExtensions::IREEGPUExtensions() {
 
 void transform_dialect::ApplyDropInnerTiledOpUnitDims::populatePatterns(
     RewritePatternSet &patterns) {
-  IREE::GPU::populateIREEGPUDropUnitDimsPatterns(patterns);
+  IREE::Codegen::populateDropInnerTiledUnitDimsPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//
@@ -41,7 +42,7 @@ void transform_dialect::ApplyDropInnerTiledOpUnitDims::populatePatterns(
 
 void transform_dialect::ApplyLowerInnerTiledOp::populatePatterns(
     RewritePatternSet &patterns) {
-  IREE::GPU::populateIREEGPULowerInnerTiledPatterns(patterns);
+  IREE::Codegen::populateLowerInnerTiledPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//

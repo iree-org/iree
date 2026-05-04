@@ -23,6 +23,20 @@ void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes);
 
+/// Populate patterns to lower an `iree_codegen.inner_tiled` op with empty
+/// iteration bounds into the per-intrinsic ops emitted by its kind's
+/// `buildUnderlyingOperations` (e.g. `llvm.call_intrinsic` on CPU,
+/// `amdgpu.mfma` / `nvgpu.mma.sync` / etc. on GPU). Inserts shape_casts and
+/// hoistable conversion pairs around the accumulator as needed.
+void populateLowerInnerTiledPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns to drop unit iteration bounds from an
+/// `iree_codegen.inner_tiled` op, preparing it for
+/// `populateLowerInnerTiledPatterns` which expects empty bounds. Inserts
+/// hoistable extract/broadcast pairs so the accumulator's intrinsic-register
+/// type becomes loop-carried.
+void populateDropInnerTiledUnitDimsPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler::IREE::Codegen
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_TRANSFORMS_TRANSFORMS_H_

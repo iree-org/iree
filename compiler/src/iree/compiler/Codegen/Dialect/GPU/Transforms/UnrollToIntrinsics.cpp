@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
@@ -53,7 +54,7 @@ void UnrollToIntrinsicsPass::runOnOperation() {
   // lowerings.
   {
     RewritePatternSet patterns(context);
-    GPU::populateIREEGPUDropUnitDimsPatterns(patterns);
+    Codegen::populateDropInnerTiledUnitDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

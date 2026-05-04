@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Transforms.h"
   SRCS
+    "LowerInnerTiled.cpp"
     "ReshapeFusion.cpp"
   DEPS
     LLVMSupport
@@ -26,7 +27,9 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRVectorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
