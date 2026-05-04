@@ -584,4 +584,3 @@ hal.executable private @attention_4xDx1x32x128xf16 {
 //
 // Warning: the above layout_config for vector distribution on attention goes overboard on the tail part.
 // CHECK:               gpu.subgroup_reduce {{.*}} : (f32) -> f32
-

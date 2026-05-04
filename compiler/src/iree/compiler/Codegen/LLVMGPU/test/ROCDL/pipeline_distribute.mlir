@@ -12,7 +12,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-hal.executable private @attention_skinny_k2_distribute { 
+hal.executable private @attention_skinny_k2_distribute {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @attention_skinny_k2_distribute ordinal(0) layout(#distribute_attention_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()

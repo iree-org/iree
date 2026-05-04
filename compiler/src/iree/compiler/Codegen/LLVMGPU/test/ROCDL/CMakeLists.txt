@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "config_vector_distribute_reduction_gfx950.mlir"
     "configure_buffer_instructions.mlir"
     "pipeline_direct_conv_tile_and_fuse.mlir"
+    "pipeline_distribute.mlir"
     "pipeline_elementwise_f8fnuz.mlir"
     "pipeline_elementwise_f8ocp.mlir"
     "pipeline_full_smoketests.mlir"
