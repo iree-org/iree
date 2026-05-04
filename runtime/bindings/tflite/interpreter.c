@@ -6,6 +6,7 @@
 
 #include "runtime/bindings/tflite/interpreter.h"
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/threading/call_once.h"
 #include "iree/base/threading/numa.h"
@@ -75,9 +76,18 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
                        "failed creating the default device for driver '%.*s'",
                        (int)driver_name.size, driver_name.data);
 
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), interpreter->allocator,
+      &frontier_tracker);
   iree_hal_device_group_t* device_group = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(
-      interpreter->device, interpreter->allocator, &device_group));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_create_from_device(
+        interpreter->device, frontier_tracker, interpreter->allocator,
+        &device_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
+  IREE_RETURN_IF_ERROR(status);
   status = iree_hal_module_create(
       interpreter->instance, iree_hal_module_device_policy_default(),
       device_group, IREE_HAL_MODULE_FLAG_NONE,

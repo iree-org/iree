@@ -80,15 +80,6 @@ static llvm::cl::opt<bool> clGPUEnableReductionVectorDistribution(
         "enable the usage of the reduction vector distribution pipeline"),
     llvm::cl::init(true));
 
-// TODO (nirvedhmeshram): Drop this whole path after we have support with
-// TileAndFuse pipeline from completion of
-// https://github.com/iree-org/iree/issues/18858
-static llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
-    "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
-    llvm::cl::desc("enable the usage of the vector distribution pipeline for "
-                   "unaligned GEMMs when supported"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
     llvm::cl::desc(
@@ -1112,6 +1103,33 @@ static LogicalResult setAttentionReductionConfig(
       IREE::LinalgExt::AttentionOpDetail::get(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
+
+  // Avoid the known misaligned K1/N tail cases in this reduction path.
+  // TODO: Remove the K1/N alignment checks once masked tails are verified.
+  int64_t k1Size = bounds[opInfo.getK1Dims().back()];
+  int64_t nSize = bounds[opInfo.getNDims().back()];
+  int64_t nWorkgroupTile = seeds.numValueVectors * seeds.valueVectorSize;
+  if (!ShapedType::isDynamic(k1Size) && k1Size % seeds.keyVectorSize != 0) {
+    LDBG() << "Bailing out: K1 not a multiple of key vector size ("
+           << seeds.keyVectorSize << "): " << k1Size;
+    return failure();
+  }
+  if (!ShapedType::isDynamic(nSize) && nSize % nWorkgroupTile != 0) {
+    LDBG() << "Bailing out: N not a multiple of value workgroup tile ("
+           << nWorkgroupTile << "): " << nSize;
+    return failure();
+  }
+
+  // Bail out on very skinny K2 shapes; smaller K2 collapses the reduction below
+  // what this path is tuned for.
+  // K2 may be empty; treat it as size 1, which trips the skinny-K2 check
+  // below.
+  int64_t k2Size =
+      opInfo.getK2Dims().empty() ? 1 : bounds[opInfo.getK2Dims().back()];
+  if (!ShapedType::isDynamic(k2Size) && k2Size <= kVerySkinnyDimThreshold) {
+    LDBG() << "Bailing out due to very skinny K2 dimension: " << k2Size;
+    return failure();
+  }
 
   // Distribute the 'available' resource to the basis on the given dimensions.
   // `currDim` tracks number of dims on which resources have already been

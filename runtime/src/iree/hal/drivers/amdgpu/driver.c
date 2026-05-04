@@ -6,7 +6,9 @@
 
 #include "iree/hal/drivers/amdgpu/driver.h"
 
+#include "iree/base/internal/debugging.h"
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_driver_options_t
@@ -32,13 +34,17 @@ IREE_API_EXPORT void iree_hal_amdgpu_driver_options_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_options_parse(
     iree_hal_amdgpu_driver_options_t* options, iree_string_pair_list_t params) {
   IREE_ASSERT_ARGUMENT(options);
-  if (!params.count) return iree_ok_status();  // no-op
+  if (!params.count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): parameters.
+  const iree_string_pair_t* first_param = &params.pairs[0];
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "AMDGPU driver options do not support key/value parameter '%.*s'",
+      (int)first_param->key.size, first_param->key.data);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_amdgpu_driver_options_verify(
@@ -46,11 +52,32 @@ static iree_status_t iree_hal_amdgpu_driver_options_verify(
   IREE_ASSERT_ARGUMENT(options);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): verify that the parameters are within expected ranges and
-  // any requested features are supported.
+  iree_status_t status =
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options->default_device_options);
+  if (iree_status_is_ok(status) && options->libhsa_search_paths.count &&
+      !options->libhsa_search_paths.values) {
+    status =
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "AMDGPU libhsa search path list has count %" PRIhsz
+                         " but no value storage",
+                         options->libhsa_search_paths.count);
+  }
+  for (iree_host_size_t i = 0;
+       i < options->libhsa_search_paths.count && iree_status_is_ok(status);
+       ++i) {
+    const iree_string_view_t search_path =
+        options->libhsa_search_paths.values[i];
+    if (search_path.size && !search_path.data) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "AMDGPU libhsa search path %" PRIhsz
+                                " has a nonzero length and no storage",
+                                i);
+    }
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -200,15 +227,20 @@ static iree_status_t iree_hal_amdgpu_driver_append_topology_device_infos(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_amdgpu_driver_t {
+  // HAL resource header.
   iree_hal_resource_t resource;
+  // Host allocator used for driver-owned allocations.
   iree_allocator_t host_allocator;
 
+  // Stable driver identifier stored inline after this struct.
   iree_string_view_t identifier;
+  // Driver options with retained string views pointing into trailing storage.
   iree_hal_amdgpu_driver_options_t options;
 
+  // Retained HSA runtime handle used for enumeration and device creation.
   iree_hal_amdgpu_libhsa_t libhsa;
 
-  // + trailing identifier string storage
+  // + trailing libhsa_search_paths table, identifier, and search path strings.
 } iree_hal_amdgpu_driver_t;
 
 static const iree_hal_driver_vtable_t iree_hal_amdgpu_driver_vtable;
@@ -245,26 +277,62 @@ IREE_API_EXPORT iree_status_t iree_hal_amdgpu_driver_create(
   *out_driver = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): verify options; this may be moved after any libraries are
-  // loaded so the verification can use underlying implementation queries.
+  // Reject unsupported public options before loading HSA or touching vendor
+  // state. Device-dependent verification happens during logical-device create.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_driver_options_verify(options));
 
+  iree_host_size_t search_path_storage_size = 0;
+  for (iree_host_size_t i = 0; i < options->libhsa_search_paths.count; ++i) {
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            search_path_storage_size,
+            options->libhsa_search_paths.values[i].size,
+            &search_path_storage_size))) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                               "AMDGPU libhsa search path storage overflow"));
+    }
+  }
+
+  iree_host_size_t search_paths_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t search_path_storage_offset = 0;
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              iree_sizeof_struct(iree_hal_amdgpu_driver_t), &total_size,
+              IREE_STRUCT_FIELD(options->libhsa_search_paths.count,
+                                iree_string_view_t, &search_paths_offset),
+              IREE_STRUCT_FIELD(identifier.size, char, &identifier_offset),
+              IREE_STRUCT_FIELD(search_path_storage_size, char,
+                                &search_path_storage_offset)));
+
   iree_hal_amdgpu_driver_t* driver = NULL;
-  iree_host_size_t total_size = sizeof(*driver) + identifier.size;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
+  memset(driver, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_amdgpu_driver_vtable,
                                &driver->resource);
   driver->host_allocator = host_allocator;
-  iree_string_view_append_to_buffer(
-      identifier, &driver->identifier,
-      (char*)driver + total_size - identifier.size);
-
-  // TODO(benvanik): if there are any string fields then they will need to be
-  // retained as well (similar to the identifier they can be tagged on to the
-  // end of the driver struct).
+  iree_string_view_append_to_buffer(identifier, &driver->identifier,
+                                    (char*)driver + identifier_offset);
   memcpy(&driver->options, options, sizeof(*options));
+  if (options->libhsa_search_paths.count) {
+    iree_string_view_t* search_paths =
+        (iree_string_view_t*)((uint8_t*)driver + search_paths_offset);
+    char* search_path_storage = (char*)driver + search_path_storage_offset;
+    for (iree_host_size_t i = 0; i < options->libhsa_search_paths.count; ++i) {
+      const iree_string_view_t source_path =
+          options->libhsa_search_paths.values[i];
+      iree_string_view_append_to_buffer(source_path, &search_paths[i],
+                                        search_path_storage);
+      search_path_storage += source_path.size;
+    }
+    driver->options.libhsa_search_paths = (iree_string_view_list_t){
+        .count = options->libhsa_search_paths.count, .values = search_paths};
+  } else {
+    driver->options.libhsa_search_paths = iree_string_view_list_empty();
+  }
 
   // Load HSA. The HSA runtime shared library may already be loaded and we
   // retain a copy during creation to ensure it doesn't get unloaded.
@@ -301,13 +369,17 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
   *out_device_info_count = 0;
   *out_device_infos = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Query available devices based on the default configuration.
   iree_hal_amdgpu_topology_t topology;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_topology_initialize_with_defaults(
-      &driver->libhsa, &topology));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_topology_initialize_with_defaults(&driver->libhsa,
+                                                            &topology));
   if (topology.gpu_agent_count == 0) {
-    return iree_ok_status();  // no devices
+    iree_hal_amdgpu_topology_deinitialize(&topology);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
   }
 
   // Run the string builder in size calculation mode.
@@ -348,6 +420,7 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   }
 
   iree_string_builder_deinitialize(&builder);
+  iree_hal_amdgpu_topology_deinitialize(&topology);
 
   if (iree_status_is_ok(status)) {
     *out_device_info_count = device_info_count;
@@ -355,6 +428,7 @@ static iree_status_t iree_hal_amdgpu_driver_query_available_devices(
   } else {
     iree_allocator_free(host_allocator, device_infos);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -384,6 +458,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, device_id);
 
   // Use the provided params to overwrite the default options.
   // The format of the params is implementation-defined. The params strings can
@@ -391,11 +467,18 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
   // access them during the create call below.
   iree_hal_amdgpu_logical_device_options_t options =
       driver->options.default_device_options;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_options_parse(
-      &options, (iree_string_pair_list_t){
-                    .count = param_count,
-                    .pairs = params,
-                }));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_logical_device_options_parse(
+              &options, (iree_string_pair_list_t){
+                            .count = param_count,
+                            .pairs = params,
+                        }));
+
+  // ROCR lazily allocates global singleton state during agent enumeration,
+  // memory pool queries, and ISA iteration. These allocations are never freed
+  // (intentional ROCR design). Suppress the resulting LSAN reports for the
+  // entire device creation sequence.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
 
   // Initialize the topology based on the device ID.
   // The ID is a bitfield of device ordinals defined by ROCR_VISIBLE_DEVICES.
@@ -414,6 +497,9 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_id(
   }
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
+
+  IREE_LEAK_CHECK_DISABLE_POP();
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -424,6 +510,8 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_amdgpu_driver_t* driver = iree_hal_amdgpu_driver_cast(base_driver);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, device_path.data, device_path.size);
 
   // Use the provided params to overwrite the default options.
   // The format of the params is implementation-defined. The params strings can
@@ -431,17 +519,25 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
   // access them during the create call below.
   iree_hal_amdgpu_logical_device_options_t options =
       driver->options.default_device_options;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_logical_device_options_parse(
-      &options, (iree_string_pair_list_t){
-                    .count = param_count,
-                    .pairs = params,
-                }));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_logical_device_options_parse(
+              &options, (iree_string_pair_list_t){
+                            .count = param_count,
+                            .pairs = params,
+                        }));
 
   // Load HSA. HSA may already be loaded and we retain a copy during creation to
   // ensure it doesn't get unloaded.
   iree_hal_amdgpu_libhsa_t libhsa;
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_driver_load_libhsa(
-      &driver->options, host_allocator, &libhsa));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_driver_load_libhsa(&driver->options, host_allocator,
+                                             &libhsa));
+
+  // ROCR lazily allocates global singleton state during agent enumeration,
+  // memory pool queries, and ISA iteration. These allocations are never freed
+  // (intentional ROCR design). Suppress the resulting LSAN reports for the
+  // entire device creation sequence.
+  IREE_LEAK_CHECK_DISABLE_PUSH();
 
   // Initialize the topology with the given path. It may indicate multiple
   // devices and use different schemes to determine which devices are included.
@@ -458,6 +554,9 @@ static iree_status_t iree_hal_amdgpu_driver_create_device_by_path(
 
   iree_hal_amdgpu_topology_deinitialize(&topology);
   iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
+
+  IREE_LEAK_CHECK_DISABLE_POP();
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

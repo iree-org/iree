@@ -128,16 +128,19 @@ iree_py_library(
     "iree/_runtime/libs.py"
     "iree/_runtime/scripts/iree_benchmark_executable/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
+    "iree/_runtime/scripts/iree_benchmark_replay/__main__.py"
     "iree/_runtime/scripts/iree_c_embed_data/__main__.py"
     "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
     "iree/_runtime/scripts/iree_convert_parameters/__main__.py"
     "iree/_runtime/scripts/iree_create_parameters/__main__.py"
     "iree/_runtime/scripts/iree_dump_module/__main__.py"
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
+    "iree/_runtime/scripts/iree_dump_replay/__main__.py"
     "iree/_runtime/scripts/iree_flatcc_cli/__main__.py"
     "iree/_runtime/scripts/iree_profile/__main__.py"
     "iree/_runtime/scripts/iree_profile_render/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
+    "iree/_runtime/scripts/iree_run_replay/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
@@ -159,6 +162,12 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-module
   TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-benchmark-replay
+  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
 )
 
 iree_symlink_tool(
@@ -187,6 +196,12 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree-dump-replay
+  TO_EXE_NAME iree/_runtime_libs/iree-dump-replay
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree-dump-parameters
   TO_EXE_NAME iree/_runtime_libs/iree-dump-parameters
 )
@@ -207,6 +222,12 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-module
   TO_EXE_NAME iree/_runtime_libs/iree-run-module
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-run-replay
+  TO_EXE_NAME iree/_runtime_libs/iree-run-replay
 )
 
 set(_PROFILE_RENDER_SOURCE_DIR "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render")
@@ -386,14 +407,17 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-cpuinfo
     iree-benchmark-executable
     iree-benchmark-module
+    iree-benchmark-replay
     iree-c-embed-data
     iree-convert-parameters
     iree-create-parameters
     iree-dump-module
     iree-dump-parameters
+    iree-dump-replay
     iree-flatcc-cli
     iree-profile
     iree-run-module
+    iree-run-replay
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
   COMPONENT \"${_INSTALL_COMPONENT}\"

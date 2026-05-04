@@ -48,6 +48,18 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
+def LLVMGPUGroupGlobalLoadsPass :
+    InterfacePass<"iree-llvmgpu-group-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Group adjacent global loads to improve GPU instruction scheduling";
+  let description = [{
+    Moves vector.load and memref.load operations from global-memory memrefs next
+    to each other when they are separated only by operations that do not depend
+    on the preceding load's result. This enables the GPU backend to issue
+    multiple global loads before waiting, instead of serializing each load
+    behind its own waitcount.
+  }];
+}
+
 def LLVMGPU1DVectorCanonicalizationsPass :
     InterfacePass<"iree-llvmgpu-1d-vector-canonicalizations", "mlir::FunctionOpInterface"> {
   let summary = "Canonicalization patterns for 1-D vectors after legalization.";
@@ -61,6 +73,22 @@ def LLVMGPULegalizeNDVectorsPass :
     "nvgpu::NVGPUDialect",
     "scf::SCFDialect",
     "ub::UBDialect",
+    "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPUVectorFlatteningPass :
+    InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
+  let summary = "Flatten n-D vectors.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPUVectorMultiReductionLoweringPass :
+    InterfacePass<"iree-llvmgpu-vector-multi-reduction-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Lower vector.multi_reduction ops.";
+  let dependentDialects = [
     "vector::VectorDialect",
   ];
 }
@@ -113,8 +141,9 @@ def LLVMGPUSelectLoweringStrategyPass :
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
   let options = [
     Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
-      /*default=*/"GPUCodegenOptions::FromFlags::get()",
-      "Session-scoped GPU codegen options (tuning spec, etc.).">,
+      /*default=*/"GPUCodegenOptions()",
+      "GPU codegen options consumed by this pass; see GPUCodegenOptions for "
+      "the available and default settings.">,
   ];
 }
 

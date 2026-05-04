@@ -134,9 +134,9 @@ struct FoldRelayoutOpIntoMapStorePattern
     if (!op) {
       return failure();
     }
-    // Folding tensor.pad is handled by a separate pattern.
+    // Folding tensor.pad and linalg.pack are handled by separate patterns.
     if (!isSupportedSingleInputRelayoutOpForResult(op) ||
-        isa<tensor::PadOp>(op)) {
+        isa<tensor::PadOp, linalg::PackOp>(op)) {
       return failure();
     }
     if (failed(foldIntoMapStore(rewriter, op, mapStoreOp))) {
@@ -172,12 +172,39 @@ private:
   PadDistributionConfigFn padDistributionConfigFn;
 };
 
+struct FoldPackOpIntoMapStorePattern
+    : OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
+  FoldPackOpIntoMapStorePattern(MLIRContext *context,
+                                PadDistributionConfigFn configFn = nullptr,
+                                PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapStoreOp>(context, benefit),
+        padDistributionConfigFn(configFn) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
+                                PatternRewriter &rewriter) const override {
+    auto packOp = mapStoreOp.getInput().getDefiningOp<linalg::PackOp>();
+    if (!packOp) {
+      return failure();
+    }
+    if (failed(foldPackIntoMapStore(rewriter, packOp, mapStoreOp,
+                                    padDistributionConfigFn))) {
+      return failure();
+    }
+    return success();
+  }
+
+private:
+  PadDistributionConfigFn padDistributionConfigFn;
+};
+
 } // namespace
 
 void populateCombineRelayoutOpPatterns(
     RewritePatternSet &patterns,
     PadDistributionConfigFn padDistributionConfigFn) {
   patterns.add<FoldRelayoutOpIntoMapStorePattern>(patterns.getContext());
+  patterns.add<FoldPackOpIntoMapStorePattern>(patterns.getContext(),
+                                              padDistributionConfigFn);
   if (padDistributionConfigFn) {
     patterns.add<FoldPadOpIntoMapStorePattern>(patterns.getContext(),
                                                padDistributionConfigFn);

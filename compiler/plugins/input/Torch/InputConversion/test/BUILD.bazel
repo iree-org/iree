@@ -1,0 +1,55 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "apply_pdl_patterns_torch.mlir",
+            "assume_strict_symbols.mlir",
+            "attention.mlir",
+            "auto_input_conversion.mlir",
+            "auto_input_conversion_with_transients.mlir",
+            "bind_symbolic_shapes.mlir",
+            "bitcast_tensor.mlir",
+            "func_conversion.mlir",
+            "func_conversion_invalid.mlir",
+            "func_conversion_transients.mlir",
+            "scan.mlir",
+            "scatter.mlir",
+            "sort.mlir",
+            "torch_to_iree.mlir",
+            "unstructured_linalg_ext.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "torch.pdl.mlir",
+        ],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    data = [
+        "torch.pdl.mlir",
+    ],
+    # These RUN lines require iree-opt to be built with the Torch input plugin.
+    target_compatible_with = select({
+        "//compiler/plugins:input_torch_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    tools = [
+        "//tools:iree-compile",
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

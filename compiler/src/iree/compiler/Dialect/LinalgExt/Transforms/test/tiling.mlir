@@ -4283,6 +4283,162 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+// Test producer fusion for arg_compare (generateResultTileValue).
+// Tiles the consumer linalg.generic on the parallel (non-reduction) dim and
+// fuses the arg_compare producer into the loop. The fused arg_compare must
+// receive the full reduction-dim extent on its input slice.
+func.func @arg_compare_producer_fusion(
+    %input: tensor<16x32xf32>, %outv: tensor<32xf32>,
+    %outi: tensor<32xi32>, %out: tensor<32xi32>
+) -> tensor<32xi32> {
+  %res:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<16x32xf32>)
+    outs(%outv, %outi : tensor<32xf32>, tensor<32xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<32xf32>, tensor<32xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%res#1 : tensor<32xi32>) outs(%out : tensor<32xi32>) {
+    ^bb0(%in: i32, %o: i32):
+      %2 = arith.addi %in, %in : i32
+      linalg.yield %2 : i32
+  } -> tensor<32xi32>
+  return %1 : tensor<32xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %producer = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %consumer = transform.structured.match ops{["linalg.generic"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loops = transform.structured.tile_using_forall %consumer tile_sizes [16] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %fused, %_ = transform.structured.fuse_into_containing_op %producer into %loops : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func @arg_compare_producer_fusion
+//  CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<16x32xf32>
+//       CHECK:   scf.forall (%[[IV:.+]]) in (2)
+//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] =
+//       CHECK:     %[[LINEAR_IDX:.+]] = affine.apply
+//  CHECK-SAME:         %[[IV]]
+//       CHECK:     %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]][0, %[[LINEAR_IDX]]] [16, 16] [1, 1]
+//       CHECK:     %[[ARGCMP:.+]]:2 = iree_linalg_ext.arg_compare
+//  CHECK-SAME:       dimension(0)
+//  CHECK-SAME:       ins(%[[INPUT_SLICE]]
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ARGCMP]]#1 :
+//  CHECK-SAME:         outs(%[[OUT_SLICE]] :
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice %[[GENERIC]] into %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+
+// -----
+
+// Test producer fusion with reduction dim on the last axis (dimension(1)).
+func.func @arg_compare_producer_fusion_dim1(
+    %input: tensor<32x16xf32>, %outv: tensor<32xf32>,
+    %outi: tensor<32xi32>, %out: tensor<32xf32>
+) -> tensor<32xf32> {
+  %res:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<32x16xf32>)
+    outs(%outv, %outi : tensor<32xf32>, tensor<32xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<32xf32>, tensor<32xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%res#0 : tensor<32xf32>) outs(%out : tensor<32xf32>) {
+    ^bb0(%in: f32, %o: f32):
+      %2 = arith.addf %in, %in : f32
+      linalg.yield %2 : f32
+  } -> tensor<32xf32>
+  return %1 : tensor<32xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %producer = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %consumer = transform.structured.match ops{["linalg.generic"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loops = transform.structured.tile_using_forall %consumer tile_sizes [16] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %fused, %_ = transform.structured.fuse_into_containing_op %producer into %loops : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func @arg_compare_producer_fusion_dim1
+//  CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<32x16xf32>
+//       CHECK:   scf.forall (%[[IV:.+]]) in (2)
+//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] =
+//       CHECK:     %[[LINEAR_IDX:.+]] = affine.apply
+//  CHECK-SAME:         %[[IV]]
+//       CHECK:     %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[LINEAR_IDX]], 0] [16, 16] [1, 1]
+//       CHECK:     %[[ARGCMP:.+]]:2 = iree_linalg_ext.arg_compare
+//  CHECK-SAME:       dimension(1)
+//  CHECK-SAME:       ins(%[[INPUT_SLICE]]
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ARGCMP]]#0 :
+//  CHECK-SAME:         outs(%[[OUT_SLICE]] :
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice %[[GENERIC]] into %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+
+// -----
+
+// Test producer fusion consuming result #0 (value result) with dim 0 reduction.
+func.func @arg_compare_producer_fusion_result0(
+    %input: tensor<16x32xf32>, %outv: tensor<32xf32>,
+    %outi: tensor<32xi32>, %out: tensor<32xf32>
+) -> tensor<32xf32> {
+  %res:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<16x32xf32>)
+    outs(%outv, %outi : tensor<32xf32>, tensor<32xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<32xf32>, tensor<32xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%res#0 : tensor<32xf32>) outs(%out : tensor<32xf32>) {
+    ^bb0(%in: f32, %o: f32):
+      %2 = arith.addf %in, %in : f32
+      linalg.yield %2 : f32
+  } -> tensor<32xf32>
+  return %1 : tensor<32xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %producer = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %consumer = transform.structured.match ops{["linalg.generic"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loops = transform.structured.tile_using_forall %consumer tile_sizes [16] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %fused, %_ = transform.structured.fuse_into_containing_op %producer into %loops : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func @arg_compare_producer_fusion_result0
+//  CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<16x32xf32>
+//       CHECK:   scf.forall (%[[IV:.+]]) in (2)
+//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] =
+//       CHECK:     %[[LINEAR_IDX:.+]] = affine.apply
+//  CHECK-SAME:         %[[IV]]
+//       CHECK:     %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]][0, %[[LINEAR_IDX]]] [16, 16] [1, 1]
+//       CHECK:     %[[ARGCMP:.+]]:2 = iree_linalg_ext.arg_compare
+//  CHECK-SAME:       dimension(0)
+//  CHECK-SAME:       ins(%[[INPUT_SLICE]]
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ARGCMP]]#0 :
+//  CHECK-SAME:         outs(%[[OUT_SLICE]] :
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice %[[GENERIC]] into %[[OUTS]][%[[LINEAR_IDX]]] [16] [1]
+
+// -----
+
 func.func @concat_dynamic(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
   %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
   return %0 : tensor<?x128xi32>

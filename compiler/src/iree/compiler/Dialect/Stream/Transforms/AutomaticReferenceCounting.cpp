@@ -696,6 +696,17 @@ static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
   LLVM_DEBUG(
       { llvm::dbgs() << "[arc] recognized scf.for with timepoint result\n"; });
 
+  // Resource iter_args are phi-like: the loop result may be the initial
+  // resource when the loop has zero iterations or a yielded resource after one
+  // or more iterations. Ownership therefore transfers to the loop result and
+  // the parent scope must not independently deallocate the initial resource
+  // before entering the loop.
+  for (Value initArg : forOp.getInitArgs()) {
+    if (isa<IREE::Stream::ResourceType>(initArg.getType())) {
+      indeterminateResources.insert(lastUseSet.lookupResource(initArg));
+    }
+  }
+
   // Step 1: Find captured resources (defined outside, used inside).
   // These need their lifetimes extended to the loop result in the parent block.
   extendCapturedResourceLifetimes(forOp.getRegion(), loopResultTimepoint,

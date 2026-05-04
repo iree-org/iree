@@ -49,8 +49,8 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // when they cannot retain complete selected events.
   IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS = 1ull << 3,
 
-  // Explicitly selected hardware/software counter samples. Requested counters
-  // are described by |counter_sets|.
+  // Explicitly selected hardware/software counter samples attributed to
+  // individual operations. Requested counters are described by |counter_sets|.
   IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES = 1ull << 4,
 
   // Executable/code-object/export metadata needed for offline analysis. Some
@@ -81,6 +81,11 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // around groups of command operations; dispatch/kernel execution details stay
   // in dispatch or host-execution event families.
   IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS = 1ull << 9,
+
+  // Explicitly selected hardware/software counter ranges. Requested counters
+  // are described by |counter_sets| and are sampled over producer-defined time
+  // ranges without requiring operation attribution.
+  IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES = 1ull << 10,
 };
 
 // Bitfield selecting producer-side profiling behavior that is not itself a
@@ -246,9 +251,8 @@ typedef struct iree_hal_device_profiling_options_t {
   // string views it contains before returning from profiling_begin.
   iree_hal_profile_capture_filter_t capture_filter;
 
-  // Number of explicitly requested hardware/software counter sets.
-  // Must be nonzero when requesting
-  // IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES.
+  // Number of explicitly requested hardware/software counter sets. Must be
+  // nonzero when requesting counter samples or counter ranges.
   iree_host_size_t counter_set_count;
 
   // Borrowed begin-call-only array of explicitly requested counter sets.
@@ -296,11 +300,26 @@ iree_hal_device_profiling_options_requests_lightweight_statistics(
       options->flags, IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS);
 }
 
-// Returns true when |options| requests explicit hardware counter capture.
+// Returns true when |options| requests operation-attributed counter samples.
 static inline bool iree_hal_device_profiling_options_requests_counter_samples(
     const iree_hal_device_profiling_options_t* options) {
   return iree_hal_device_profiling_options_requests_data(
       options, IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES);
+}
+
+// Returns true when |options| requests range-scoped counter samples.
+static inline bool iree_hal_device_profiling_options_requests_counter_ranges(
+    const iree_hal_device_profiling_options_t* options) {
+  return iree_hal_device_profiling_options_requests_data(
+      options, IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES);
+}
+
+// Returns true when |options| requests any explicit counter capture.
+static inline bool iree_hal_device_profiling_options_requests_counters(
+    const iree_hal_device_profiling_options_t* options) {
+  return iree_hal_device_profiling_options_requests_data(
+      options, IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
+                   IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES);
 }
 
 // Returns true when |options| requests executable trace artifacts.

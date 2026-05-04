@@ -8,6 +8,7 @@
 #define IREE_HAL_DRIVERS_AMDGPU_SYSTEM_H_
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/amdgpu/util/device_clock.h"
 #include "iree/hal/drivers/amdgpu/util/device_library.h"
 #include "iree/hal/drivers/amdgpu/util/info.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
@@ -23,8 +24,6 @@ extern "C" {
 
 // Options defining total system behavior.
 typedef struct iree_hal_amdgpu_system_options_t {
-  // Enable dispatch-level tracing (if device instrumentation is compiled in).
-  uint64_t trace_execution : 1;
   // Force queues to run one entry at a time instead of overlapping or
   // aggressively scheduling queue entries out-of-order.
   uint64_t exclusive_execution : 1;
@@ -36,6 +35,13 @@ typedef struct iree_hal_amdgpu_system_options_t {
 // access the CPU memory. We try to allocate resources that may be used
 // frequently on a particular cluster of CPU/GPU agents closest to the agents.
 typedef struct iree_hal_amdgpu_host_memory_pools_t {
+  // Coarse-grained shared host memory pool used for write-once/read-many data.
+  hsa_amd_memory_pool_t coarse_pool;
+  // Shared host memory pool suitable for kernel argument storage.
+  // Allocations from this pool must have
+  // HSA_AMD_MEMORY_POOL_GLOBAL_FLAG_KERNARG_INIT so dispatch packets can use
+  // them as kernarg segment storage.
+  hsa_amd_memory_pool_t kernarg_pool;
   // Memory pool used for various system-level resources.
   // Allocations from this pool must be accessible to all agents. Must have the
   // HSA_REGION_GLOBAL_FLAG_FINE_GRAINED region flag as memory within this
@@ -63,9 +69,8 @@ typedef struct iree_hal_amdgpu_system_t {
   // HSA API handle.
   iree_hal_amdgpu_libhsa_t libhsa;
 
-  // /dev/kfd handle, if needed on the platform.
-  // TODO(benvanik): drop this when HSA supports all of the ioctls we need.
-  int kfd_fd;
+  // Platform source used for device/host clock-correlation sampling.
+  iree_hal_amdgpu_device_clock_source_t device_clock_source;
 
   // System topology as visible to the HAL device. This may be a subset of
   // the devices available in the system.

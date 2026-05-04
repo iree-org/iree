@@ -465,6 +465,103 @@ class PerfettoTest(unittest.TestCase):
         self.assertIn("iree_counter_value_aggregation", annotation_names)
         self.assertIn("iree_perfetto_timing_source", annotation_names)
 
+    def test_build_trace_projects_range_counters_on_separate_tracks(self):
+        builder = _FakeTraceProtoBuilder()
+        trace_bytes, stats = perfetto.build_trace(
+            [
+                {"record_type": "device", "physical_device_ordinal": 0},
+                {
+                    "record_type": "queue",
+                    "physical_device_ordinal": 0,
+                    "queue_ordinal": 0,
+                    "stream_id": 0,
+                },
+                {
+                    "record_type": "clock_correlation",
+                    "physical_device_ordinal": 0,
+                    "device_tick": 100,
+                    "host_time_begin_ns": 1000,
+                    "host_time_end_ns": 1000,
+                },
+                {
+                    "record_type": "clock_correlation",
+                    "physical_device_ordinal": 0,
+                    "device_tick": 200,
+                    "host_time_begin_ns": 2000,
+                    "host_time_end_ns": 2000,
+                },
+                {
+                    "record_type": "counter_set",
+                    "counter_set_id": 1,
+                    "physical_device_ordinal": 0,
+                    "counter_count": 1,
+                    "sample_value_count": 2,
+                    "name": "amdgpu.pmc",
+                },
+                {
+                    "record_type": "counter",
+                    "counter_set_id": 1,
+                    "counter_ordinal": 0,
+                    "physical_device_ordinal": 0,
+                    "unit": 1,
+                    "sample_value_offset": 0,
+                    "sample_value_count": 2,
+                    "block": "SQ",
+                    "name": "SQ_WAVES",
+                },
+                {
+                    "record_type": "counter_sample",
+                    "sample_id": 7,
+                    "counter_set_id": 1,
+                    "scope": "device_time_range",
+                    "physical_device_ordinal": 0,
+                    "queue_ordinal": 0,
+                    "stream_id": 0,
+                    "flags": 2,
+                    "device_tick_range_present": True,
+                    "start_tick": 110,
+                    "end_tick": 120,
+                    "duration_ticks": 10,
+                    "device_tick_range_valid": True,
+                    "duration_ns": 100,
+                    "values": [1, 2],
+                },
+            ],
+            perfetto.PerfettoImports(
+                trace_proto_builder=lambda: builder,
+                track_descriptor=_FakeTrackDescriptor,
+                track_event=_FakeTrackEvent,
+            ),
+        )
+
+        counter_packets = [
+            packet
+            for packet in builder.packets
+            if getattr(packet.track_event, "type", None) == _FakeTrackEvent.TYPE_COUNTER
+        ]
+        track_names = [
+            getattr(packet.track_descriptor, "name", "")
+            for packet in builder.packets
+            if hasattr(packet.track_descriptor, "name")
+        ]
+        annotation_values = [
+            annotation.string_value
+            for packet in counter_packets
+            for annotation in packet.track_event.debug_annotations
+            if getattr(annotation, "name", "") == "iree_perfetto_timing_source"
+        ]
+
+        self.assertTrue(trace_bytes.startswith(b"packets="))
+        self.assertEqual(1, stats.counter_samples)
+        self.assertEqual(0, stats.dispatch_scoped_counter_values)
+        self.assertEqual(1, stats.range_counter_values)
+        self.assertEqual(0, stats.skipped_range_counter_samples)
+        self.assertEqual(1, len(counter_packets))
+        self.assertEqual(3, counter_packets[0].track_event.counter_value)
+        self.assertIn("range counters", track_names)
+        self.assertNotIn("dispatch-scoped counters", track_names)
+        self.assertIn("range_counter_sample_midpoint", annotation_values)
+
     def test_build_trace_skips_unmapped_device_ticks_but_keeps_host_spans(self):
         trace_bytes, stats = perfetto.build_trace(
             [

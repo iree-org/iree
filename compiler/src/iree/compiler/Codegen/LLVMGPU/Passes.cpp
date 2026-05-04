@@ -867,7 +867,13 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
-  tileAndBufferize(funcPassManager);
+  tileAndDistributeToWorkgroup(funcPassManager);
+  // OnlineAttentionOp has no bufferization path of its own. Decompose only on
+  // the generic Distribute fallback path after workgroup tiling.
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  addBufferizePasses(funcPassManager);
 
   // Distribute linalg onto threads within the workgroup.
   funcPassManager.addPass(createLLVMGPUTileAndDistributePass(
@@ -995,7 +1001,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // This pass needs to run before SCF -> CF.
   // Lower vector operations and legalize all operations to 1D vectors.
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(createLLVMGPUVectorFlatteningPass)
       .addPass(createLLVMGPULegalizeNDVectorsPass)
+      .addPass(createLLVMGPUVectorMultiReductionLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
@@ -1048,6 +1056,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
             ConvertUnsupportedFloatArithPassOptions{
                 clLLVMGPUEnableSmallFloatEmulation});
       });
+
+  // Group global loads together to improve AMDGPU instruction scheduling.
+  // The transformation is target-agnostic, but currently only enabled for
+  // ROCDL targets until there is data to support that it benefits other
+  // targets.
+  funcPassManager.addPredicatedPass(forROCDL,
+                                    createLLVMGPUGroupGlobalLoadsPass);
 
   // Commit the func-level adaptor before adding module-level passes.
   funcPassManager.commitPass();

@@ -51,8 +51,11 @@ table ModuleDef {
 }
 
 table ExecutableDef {
-  // Canonical ISA name this executable has been compiled for.
-  // E.g. `amdgcn-amd-amdhsa--gfx1100`
+  // AMDGPU target ID this executable has been compiled for.
+  //
+  // E.g. `gfx1100` or `gfx942:sramecc+:xnack-`. Runtime compatibility checks
+  // recover the load target from embedded ELF module flags; this field is kept
+  // as producer metadata and for older tools that inspect the flatbuffer.
   isa:string;
 
   // Exported functions in canonical executable entry point order.

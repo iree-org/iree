@@ -48,6 +48,8 @@ build --force_pic
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
 build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_runtime_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_compiler_plugins=//compiler/plugins:enabled_plugins
 build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
 # Builds the runtime with tracing support enabled.
@@ -240,6 +242,9 @@ build:tracy --iree_enable_runtime_tracing=tracy
 
 # Don't strip debug info
 build:sanitizer --strip=never
+# Emit line tables in sanitizer builds. The default opt configuration passes
+# -g0, so this trailing -g restores file:line symbolization for TSAN/ASAN/etc.
+build:sanitizer --copt=-g
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
 # We don't use this in IREE (that's what linkstatic is for), but it could show
 # up in dependencies.
@@ -285,6 +290,10 @@ build:ubsan --features=ubsan
 build:ubsan --copt=-fsanitize=undefined
 build:ubsan --linkopt=-fsanitize=undefined
 build:ubsan --linkopt=-lubsan
+# Match the CMake UBSAN configuration: the runtime uses type-erased function
+# pointers for dynamic dispatch, which UBSAN's function check cannot model.
+build:ubsan --copt=-fno-sanitize=function
+build:ubsan --cxxopt=-fno-sanitize=function
 # The vptr sanitizer check uses typeid() to verify vtable pointers, which
 # requires RTTI. IREE compiles all C++ with -fno-rtti for LLVM/MLIR
 # compatibility, so the vptr check produces false positives on every

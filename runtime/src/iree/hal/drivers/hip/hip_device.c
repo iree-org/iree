@@ -82,9 +82,8 @@ typedef struct iree_hal_hip_device_t {
   // Borrowed from the pool -- valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's axis and monotonic epoch counter for frontier tracking.
@@ -96,6 +95,7 @@ typedef struct iree_hal_hip_device_t {
 
   // Device memory pools and allocators.
   bool supports_memory_pools;
+  iree_hal_allocator_t* device_allocator;
 
   // Device uses an external execution stream rather than a
   // self-managed stream.
@@ -105,8 +105,6 @@ typedef struct iree_hal_hip_device_t {
   iree_hal_channel_provider_t* channel_provider;
 
   iree_hal_device_topology_info_t topology_info;
-
-  iree_hal_allocator_t* device_allocator;
 
   iree_hal_hip_cleanup_thread_t* cleanup_thread;
 
@@ -248,13 +246,11 @@ static iree_hal_hip_device_t* iree_hal_hip_device_cast_unsafe(
 // thread is FIFO-ordered: submission order = causal ordering.
 static void iree_hal_hip_device_advance_frontier(
     iree_hal_hip_device_t* device) {
-  if (device->frontier_tracker) {
-    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
-                         &device->epoch, 1, iree_memory_order_acq_rel) +
-                     1;
-    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
-                                        epoch);
-  }
+  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(&device->epoch, 1,
+                                                   iree_memory_order_acq_rel) +
+                   1;
+  iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                      epoch);
 }
 
 IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
@@ -533,19 +529,9 @@ iree_status_t iree_hal_hip_device_create(
   if (iree_status_is_ok(status)) {
     device->proactor_pool = create_params->proactor_pool;
     iree_async_proactor_pool_retain(device->proactor_pool);
-    device->frontier_tracker = create_params->frontier.base_axis != 0
-                                   ? create_params->frontier.tracker
-                                   : NULL;
-    device->axis = create_params->frontier.base_axis;
     iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
-    if (device->frontier_tracker) {
-      status = iree_async_frontier_tracker_register_axis(
-          device->frontier_tracker, device->axis, /*semaphore=*/NULL);
-    }
-    if (iree_status_is_ok(status)) {
-      status = iree_async_proactor_pool_get(device->proactor_pool, 0,
-                                            &device->proactor);
-    }
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
   }
 
   // Initialize each device.
@@ -619,6 +605,19 @@ const iree_hal_hip_dynamic_symbols_t* iree_hal_hip_device_dynamic_symbols(
   return device->hip_symbols;
 }
 
+static void iree_hal_hip_device_clear_topology_info(
+    iree_hal_hip_device_t* device) {
+  if (device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        device->frontier_tracker, device->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    iree_async_frontier_tracker_release(device->frontier_tracker);
+    device->frontier_tracker = NULL;
+    device->axis = 0;
+  }
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -630,6 +629,8 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_hip_dispatch_thread_deinitialize(
         device->devices[i].dispatch_thread);
   }
+
+  iree_hal_hip_device_clear_topology_info(device);
 
   // Join with the threads and clear them so that subsequent resource
   // cleanup does not get scheduled on these threads.
@@ -805,7 +806,19 @@ static iree_status_t iree_hal_hip_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  if (!topology_info) {
+    iree_hal_hip_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  iree_async_axis_t axis = topology_info->frontier.base_axis;
+  IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL));
   device->topology_info = *topology_info;
+  device->frontier_tracker = frontier_tracker;
+  device->axis = axis;
+  iree_async_frontier_tracker_retain(device->frontier_tracker);
   return iree_ok_status();
 }
 
@@ -1084,6 +1097,45 @@ iree_hal_hip_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
   // TODO: implement HIP semaphores.
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
+}
+
+static iree_status_t iree_hal_hip_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HIP queue pool backend not implemented");
+}
+
+static iree_status_t iree_hal_hip_device_select_queue_affinity(
+    const iree_hal_hip_device_t* device,
+    iree_hal_queue_affinity_t requested_affinity,
+    iree_hal_queue_affinity_t* out_queue_affinity) {
+  iree_hal_queue_affinity_t available_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
+  if (device->device_count < IREE_HAL_MAX_QUEUES) {
+    available_affinity =
+        (((iree_hal_queue_affinity_t)1) << device->device_count) - 1;
+  }
+
+  iree_hal_queue_affinity_t queue_affinity = requested_affinity;
+  if (iree_hal_queue_affinity_is_empty(queue_affinity) ||
+      iree_hal_queue_affinity_is_any(queue_affinity)) {
+    queue_affinity = available_affinity;
+  } else {
+    iree_hal_queue_affinity_and_into(queue_affinity, available_affinity);
+  }
+
+  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "device queue affinity 0x%016" PRIx64
+                            " does not select one of the %" PRIhsz
+                            " available HIP queues",
+                            requested_affinity, device->device_count);
+  }
+
+  *out_queue_affinity =
+      ((iree_hal_queue_affinity_t)1)
+      << iree_hal_queue_affinity_find_first_set(queue_affinity);
+  return iree_ok_status();
 }
 
 static void iree_hal_hip_async_buffer_release(
@@ -1722,21 +1774,19 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
 
   *out_buffer = NULL;
 
-  if (IREE_UNLIKELY(pool)) {
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  if (IREE_UNLIKELY(pool != NULL)) {
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "HIP device does not support queue allocation pools");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "HIP custom queue alloca pools not implemented");
   }
 
-  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  uint64_t queue_affinity_mask =
-      ((iree_hal_queue_affinity_t)1 << device->device_count);
-  queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
-  queue_affinity &= queue_affinity_mask;
-
-  int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
-  queue_affinity = (uint64_t)1 << device_ordinal;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_device_select_queue_affinity(device, queue_affinity,
+                                                    &queue_affinity));
+  const int device_ordinal =
+      iree_hal_queue_affinity_find_first_set(queue_affinity);
+  params.queue_affinity = queue_affinity;
 
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
@@ -1845,22 +1895,11 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  uint64_t queue_affinity_mask =
-      ((iree_hal_queue_affinity_t)1 << device->device_count);
-  queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
-  queue_affinity &= queue_affinity_mask;
-
-  int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
-
-  if (device_ordinal > device->device_count) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "device affinity out of range, maximum device is %" PRIhsz,
-        device->device_count);
-  }
-
-  queue_affinity = (uint64_t)1 << device_ordinal;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_device_select_queue_affinity(device, queue_affinity,
+                                                    &queue_affinity));
+  const int device_ordinal =
+      iree_hal_queue_affinity_find_first_set(queue_affinity);
 
   iree_status_t status = iree_ok_status();
   if (iree_hal_hip_allocator_isa(iree_hal_device_allocator(base_device))) {
@@ -2336,12 +2375,12 @@ static iree_status_t iree_hal_hip_device_queue_read(
     iree_device_size_t length, iree_hal_read_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (queue_affinity == IREE_HAL_QUEUE_AFFINITY_ANY) {
-    queue_affinity = 0x1;
-  }
-
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  const int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_device_select_queue_affinity(device, queue_affinity,
+                                                    &queue_affinity));
+  const int device_ordinal =
+      iree_hal_queue_affinity_find_first_set(queue_affinity);
 
   iree_hal_hip_device_semaphore_queue_read_callback_data_t* callback_data =
       NULL;
@@ -2710,17 +2749,11 @@ static iree_status_t iree_hal_hip_device_queue_execute(
 
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
 
-  if (queue_affinity == IREE_HAL_QUEUE_AFFINITY_ANY) {
-    queue_affinity = 0x1;
-  }
-
-  uint64_t queue_affinity_mask =
-      ((iree_hal_queue_affinity_t)1 << device->device_count);
-  queue_affinity_mask = queue_affinity_mask | (queue_affinity_mask - 1);
-  queue_affinity &= queue_affinity_mask;
-
-  int device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
-  queue_affinity = (uint64_t)1 << device_ordinal;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_device_select_queue_affinity(device, queue_affinity,
+                                                    &queue_affinity));
+  const int device_ordinal =
+      iree_hal_queue_affinity_find_first_set(queue_affinity);
 
   iree_hal_hip_device_semaphore_submit_callback_data_t* callback_data = NULL;
   iree_status_t status = iree_ok_status();
@@ -2784,35 +2817,38 @@ static iree_status_t iree_hal_hip_device_queue_flush(
 static iree_status_t iree_hal_hip_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
+  (void)base_device;
+  (void)options;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "HIP HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_hip_device_profiling_flush(
     iree_hal_device_t* base_device) {
-  // Unimplemented (and that's ok).
+  // This backend does not buffer HAL-native profiling data.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_hip_device_profiling_end(
     iree_hal_device_t* base_device) {
-  // Unimplemented (and that's ok).
+  // This backend does not hold HAL-native profiling session resources.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_hip_device_external_capture_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_external_capture_options_t* options) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "HIP external capture provider '%.*s' is not implemented",
-      (int)options->provider.size, options->provider.data);
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HIP external capture not implemented");
 }
 
 static iree_status_t iree_hal_hip_device_external_capture_end(
     iree_hal_device_t* base_device) {
+  (void)base_device;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "HIP external capture is not implemented");
+                          "HIP external capture not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
@@ -2836,6 +2872,7 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .create_semaphore = iree_hal_hip_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_hip_device_query_semaphore_compatibility,
+    .query_queue_pool_backend = iree_hal_hip_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_hip_device_queue_alloca,
     .queue_dealloca = iree_hal_hip_device_queue_dealloca,
     .queue_fill = iree_hal_device_queue_emulated_fill,

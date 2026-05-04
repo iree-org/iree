@@ -57,6 +57,7 @@ iree_lit_test_suite(
     "set_encoding_pipeline.mlir"
     "set_split_reduction_sizes_conv.mlir"
     "set_split_reduction_sizes_gemm.mlir"
+    "set_split_reduction_sizes_low_parallelism.mlir"
     "set_split_reduction_sizes_outer_reduction.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"

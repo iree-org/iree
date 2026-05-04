@@ -800,6 +800,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
    "getResultTilePosition",
    "getTiledImplementation",
    "generateResultTileValue",
+   "getIterationDomainTileFromResultTile",
    "getIterationDomain"]
   >,
   DeclareOpInterfaceMethods<PartialReductionOpInterface,

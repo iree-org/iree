@@ -91,8 +91,11 @@ class ConversionStats:
     diagnostic_instants: int = 0
     counter_samples: int = 0
     dispatch_scoped_counter_values: int = 0
+    range_counter_values: int = 0
     skipped_dispatch_scoped_counter_samples: int = 0
     skipped_dispatch_scoped_counter_values: int = 0
+    skipped_range_counter_samples: int = 0
+    skipped_range_counter_values: int = 0
     device_metric_counter_values: int = 0
     device_metric_partial_samples: int = 0
     skipped_device_metric_samples: int = 0
@@ -728,7 +731,10 @@ class PerfettoTraceConverter:
         elif record_type == "clock_correlation":
             self.collect_clock_correlation(record)
         elif record_type == "counter_sample":
-            self.collect_dispatch_scoped_counter_sample(record)
+            if record.get("scope") == "device_time_range":
+                self.collect_range_counter_sample(record)
+            else:
+                self.collect_dispatch_scoped_counter_sample(record)
         elif record_type == "device_metric_sample":
             self.collect_device_metric_sample(record)
         elif record_type == "diagnostic":
@@ -1146,7 +1152,7 @@ class PerfettoTraceConverter:
 
         emitted_value_count = 0
         for counter in counters:
-            counter_value = self.dispatch_scoped_counter_value(values, counter)
+            counter_value = self.counter_sample_value(values, counter)
             if counter_value is None:
                 self.stats.skipped_dispatch_scoped_counter_values += 1
                 continue
@@ -1188,7 +1194,7 @@ class PerfettoTraceConverter:
         if emitted_value_count == 0:
             self.stats.skipped_dispatch_scoped_counter_samples += 1
 
-    def dispatch_scoped_counter_value(
+    def counter_sample_value(
         self, values: list[Any], counter: dict[str, Any]
     ) -> int | None:
         offset = parse_integer(counter.get("sample_value_offset", 0))
@@ -1199,6 +1205,116 @@ class PerfettoTraceConverter:
         for value in values[offset : offset + count]:
             value_sum += parse_integer(value)
         return value_sum
+
+    def collect_range_counter_sample(self, record: dict[str, Any]) -> None:
+        values = record.get("values", [])
+        counter_set_id = parse_integer(record.get("counter_set_id", 0))
+        counter_set = self.counter_sets_by_id.get(counter_set_id)
+        counters = self.counters_by_counter_set_id.get(counter_set_id, [])
+        if (
+            record.get("device_tick_range_valid") is False
+            or not isinstance(values, list)
+            or counter_set is None
+            or not counters
+        ):
+            self.stats.skipped_range_counter_samples += 1
+            return
+        expected_value_count = parse_integer(
+            counter_set.get("sample_value_count", len(values))
+        )
+        if expected_value_count != len(values):
+            self.stats.skipped_range_counter_samples += 1
+            return
+        host_range = device_event_host_time_range(record, self.clock_mappers)
+        if host_range is None:
+            self.stats.skipped_range_counter_samples += 1
+            return
+        start_time_ns, end_time_ns, time_domain = host_range
+        normalized_range = normalized_time_range(start_time_ns, end_time_ns)
+        if normalized_range is None:
+            self.stats.skipped_range_counter_samples += 1
+            return
+        start_time_ns, end_time_ns = normalized_range
+        event_time_ns = (start_time_ns + end_time_ns) // 2
+        physical_device_ordinal, _ = queue_key(record)
+
+        emitted_value_count = 0
+        for counter in counters:
+            counter_value = self.counter_sample_value(values, counter)
+            if counter_value is None:
+                self.stats.skipped_range_counter_values += 1
+                continue
+            counter_ordinal = parse_ordinal(counter.get("counter_ordinal"))
+            track_uuid = self.define_range_counter_track(
+                physical_device_ordinal, counter_set_id, counter_set, counter
+            )
+            annotations = self.range_counter_annotations(
+                record, counter_set, counter, counter_value, time_domain
+            )
+            self.timeline_events.append(
+                TimelineEvent(
+                    event_time_ns,
+                    (
+                        2,
+                        "range-counter",
+                        physical_device_ordinal,
+                        counter_set_id,
+                        counter_ordinal,
+                        event_time_ns,
+                        parse_integer(record.get("sample_id", 0)),
+                    ),
+                    lambda timestamp_ns=event_time_ns, track_uuid=track_uuid, value=counter_value, annotations=annotations: (
+                        add_counter(
+                            self.builder,
+                            self.perfetto.track_event,
+                            timestamp_ns,
+                            track_uuid,
+                            value,
+                            annotations,
+                        )
+                    ),
+                )
+            )
+            self.all_timestamp_ns.append(event_time_ns)
+            self.stats.counter_samples += 1
+            self.stats.range_counter_values += 1
+            emitted_value_count += 1
+        if emitted_value_count == 0:
+            self.stats.skipped_range_counter_samples += 1
+
+    def range_counter_annotations(
+        self,
+        sample_record: dict[str, Any],
+        counter_set: dict[str, Any],
+        counter: dict[str, Any],
+        counter_value: int,
+        time_domain: str,
+    ) -> dict[str, Any]:
+        return {
+            "iree_counter_sample_id": sample_record.get("sample_id"),
+            "iree_counter_set_id": sample_record.get("counter_set_id"),
+            "iree_counter_set_name": counter_set.get("name"),
+            "iree_counter_ordinal": counter.get("counter_ordinal"),
+            "iree_counter_name": counter.get("name"),
+            "iree_counter_block": counter.get("block"),
+            "iree_counter_unit": counter.get("unit"),
+            "iree_counter_value_aggregation": "sum",
+            "iree_counter_value": counter_value,
+            "iree_counter_raw_value_offset": counter.get("sample_value_offset"),
+            "iree_counter_raw_value_count": counter.get("sample_value_count"),
+            "iree_counter_sample_scope": sample_record.get("scope"),
+            "iree_counter_sample_scope_value": sample_record.get("scope_value"),
+            "iree_counter_sample_flags": sample_record.get("flags"),
+            "iree_physical_device_ordinal": sample_record.get(
+                "physical_device_ordinal"
+            ),
+            "iree_queue_ordinal": sample_record.get("queue_ordinal"),
+            "iree_stream_id": sample_record.get("stream_id"),
+            "iree_duration_ticks": sample_record.get("duration_ticks"),
+            "iree_duration_ns": sample_record.get("duration_ns"),
+            "iree_perfetto_time_domain": time_domain,
+            "iree_perfetto_timing_source": "range_counter_sample_midpoint",
+        }
 
     def dispatch_scoped_counter_annotations(
         self,
@@ -1301,6 +1417,71 @@ class PerfettoTraceConverter:
         track_uuid = self.tracks.uuid(
             "iree",
             "dispatch-scoped-counter",
+            physical_device_ordinal,
+            counter_set_id,
+            counter_ordinal,
+        )
+        counter_name = str(counter.get("name") or f"counter[{counter_ordinal}]")
+        block_name = str(counter.get("block") or "")
+        if block_name and not counter_name.startswith(f"{block_name}_"):
+            counter_name = f"{block_name}.{counter_name}"
+        self.tracks.define(
+            track_uuid,
+            counter_name,
+            parent_uuid=counter_set_uuid,
+            sibling_order_rank=min(counter_ordinal, 999999),
+            is_counter=True,
+        )
+        return track_uuid
+
+    def ensure_range_counter_group_track(self, physical_device_ordinal: int) -> int:
+        device_uuid = self.ensure_device_track(physical_device_ordinal)
+        track_uuid = self.tracks.uuid("iree", "range-counters", physical_device_ordinal)
+        self.tracks.define(
+            track_uuid,
+            "range counters",
+            parent_uuid=device_uuid,
+            sibling_order_rank=8100,
+            explicit_child_order=True,
+        )
+        return track_uuid
+
+    def define_range_counter_set_track(
+        self,
+        physical_device_ordinal: int,
+        counter_set_id: int,
+        counter_set: dict[str, Any],
+    ) -> int:
+        group_uuid = self.ensure_range_counter_group_track(physical_device_ordinal)
+        track_uuid = self.tracks.uuid(
+            "iree", "range-counter-set", physical_device_ordinal, counter_set_id
+        )
+        counter_set_name = str(
+            counter_set.get("name") or f"counter set {counter_set_id}"
+        )
+        self.tracks.define(
+            track_uuid,
+            counter_set_name,
+            parent_uuid=group_uuid,
+            sibling_order_rank=min(counter_set_id, 999999),
+            explicit_child_order=True,
+        )
+        return track_uuid
+
+    def define_range_counter_track(
+        self,
+        physical_device_ordinal: int,
+        counter_set_id: int,
+        counter_set: dict[str, Any],
+        counter: dict[str, Any],
+    ) -> int:
+        counter_set_uuid = self.define_range_counter_set_track(
+            physical_device_ordinal, counter_set_id, counter_set
+        )
+        counter_ordinal = parse_ordinal(counter.get("counter_ordinal"))
+        track_uuid = self.tracks.uuid(
+            "iree",
+            "range-counter",
             physical_device_ordinal,
             counter_set_id,
             counter_ordinal,
@@ -1728,6 +1909,7 @@ def summary_fields(stats: ConversionStats) -> list[tuple[str, Any]]:
         ("clock_instants", stats.clock_instants),
         ("counter_samples", stats.counter_samples),
         ("dispatch_scoped_counter_values", stats.dispatch_scoped_counter_values),
+        ("range_counter_values", stats.range_counter_values),
         (
             "skipped_dispatch_scoped_counter_samples",
             stats.skipped_dispatch_scoped_counter_samples,
@@ -1736,6 +1918,8 @@ def summary_fields(stats: ConversionStats) -> list[tuple[str, Any]]:
             "skipped_dispatch_scoped_counter_values",
             stats.skipped_dispatch_scoped_counter_values,
         ),
+        ("skipped_range_counter_samples", stats.skipped_range_counter_samples),
+        ("skipped_range_counter_values", stats.skipped_range_counter_values),
         ("device_metric_counter_values", stats.device_metric_counter_values),
         ("device_metric_partial_samples", stats.device_metric_partial_samples),
         ("skipped_device_metric_samples", stats.skipped_device_metric_samples),

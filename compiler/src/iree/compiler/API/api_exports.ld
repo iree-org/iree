@@ -725,12 +725,14 @@ VER_0 {
     mlirLocationIsAFileLineColRange;
     mlirLocationIsAFused;
     mlirLocationIsAName;
+    mlirLocationIsAUnknown;
     mlirLocationNameGet;
     mlirLocationNameGetChildLoc;
     mlirLocationNameGetName;
     mlirLocationNameGetTypeID;
     mlirLocationPrint;
     mlirLocationUnknownGet;
+    mlirLocationUnknownGetTypeID;
     mlirMemRefTypeContiguousGet;
     mlirMemRefTypeContiguousGetChecked;
     mlirMemRefTypeGet;

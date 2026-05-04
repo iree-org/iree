@@ -16,6 +16,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/local/profile.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_inline_command_buffer_t
@@ -24,7 +25,13 @@
 // Inline synchronous one-shot command "buffer".
 typedef struct iree_hal_inline_command_buffer_t {
   iree_hal_command_buffer_t base;
+
+  // Allocator used to free heap storage when created as a ref-counted object.
   iree_allocator_t host_allocator;
+
+  // Original heap allocation returned by the allocator, or NULL when the
+  // command buffer uses caller-owned storage.
+  void* allocated_storage;
 
   struct {
     // Cached and initialized dispatch state reused for all dispatches.
@@ -41,6 +48,20 @@ typedef struct iree_hal_inline_command_buffer_t {
     // Guess at the current processor ID.
     iree_cpu_processor_id_t processor_id;
   } state;
+
+  struct {
+    // Optional recorder used for command-buffer replay profiling.
+    iree_hal_local_profile_recorder_t* recorder;
+
+    // Queue identity attached to emitted replay records.
+    iree_hal_local_profile_queue_scope_t scope;
+
+    // Queue submission id shared by replayed dispatch records.
+    uint64_t submission_id;
+
+    // Session-local command buffer id for replayed dispatch records.
+    uint64_t command_buffer_id;
+  } profile;
 } iree_hal_inline_command_buffer_t;
 
 static const iree_hal_command_buffer_vtable_t
@@ -64,10 +85,20 @@ static void iree_hal_inline_command_buffer_reset(
       command_buffer->state.binding_length_storage;
 }
 
-iree_host_size_t iree_hal_inline_command_buffer_size(
+static iree_host_size_t iree_hal_inline_command_buffer_alignment(void) {
+  return iree_alignof(iree_hal_inline_command_buffer_t);
+}
+
+static iree_host_size_t iree_hal_inline_command_buffer_body_size(
     iree_hal_command_buffer_mode_t mode, iree_host_size_t binding_capacity) {
   return sizeof(iree_hal_inline_command_buffer_t) +
          iree_hal_command_buffer_validation_state_size(mode, binding_capacity);
+}
+
+iree_host_size_t iree_hal_inline_command_buffer_size(
+    iree_hal_command_buffer_mode_t mode, iree_host_size_t binding_capacity) {
+  return iree_hal_inline_command_buffer_body_size(mode, binding_capacity) +
+         iree_hal_inline_command_buffer_alignment() - 1;
 }
 
 iree_status_t iree_hal_inline_command_buffer_initialize(
@@ -95,8 +126,16 @@ iree_status_t iree_hal_inline_command_buffer_initialize(
         IREE_STATUS_INVALID_ARGUMENT,
         "indirect command buffers do not support binding tables");
   }
-  if (storage.data_length <
-      iree_hal_inline_command_buffer_size(mode, binding_capacity)) {
+  const uintptr_t storage_address = (uintptr_t)storage.data;
+  const uintptr_t command_buffer_address =
+      (uintptr_t)iree_host_align((iree_host_size_t)storage_address,
+                                 iree_hal_inline_command_buffer_alignment());
+  const iree_host_size_t storage_prefix_length =
+      (iree_host_size_t)(command_buffer_address - storage_address);
+  const iree_host_size_t required_size =
+      storage_prefix_length +
+      iree_hal_inline_command_buffer_body_size(mode, binding_capacity);
+  if (storage.data_length < required_size) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "storage must have at least the capacity as "
                             "defined by iree_hal_inline_command_buffer_size");
@@ -105,7 +144,7 @@ iree_status_t iree_hal_inline_command_buffer_initialize(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_inline_command_buffer_t* command_buffer =
-      (iree_hal_inline_command_buffer_t*)storage.data;
+      (iree_hal_inline_command_buffer_t*)command_buffer_address;
   memset(command_buffer, 0, sizeof(*command_buffer));
 
   iree_hal_command_buffer_initialize(
@@ -126,6 +165,19 @@ void iree_hal_inline_command_buffer_deinitialize(
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
   iree_hal_inline_command_buffer_reset(command_buffer);
+}
+
+void iree_hal_inline_command_buffer_set_profile_recorder(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id) {
+  iree_hal_inline_command_buffer_t* command_buffer =
+      iree_hal_inline_command_buffer_cast(base_command_buffer);
+  command_buffer->profile.recorder = recorder;
+  command_buffer->profile.scope = scope;
+  command_buffer->profile.submission_id = submission_id;
+  command_buffer->profile.command_buffer_id = command_buffer_id;
 }
 
 iree_status_t iree_hal_inline_command_buffer_create(
@@ -154,6 +206,8 @@ iree_status_t iree_hal_inline_command_buffer_create(
   }
 
   if (iree_status_is_ok(status)) {
+    iree_hal_inline_command_buffer_cast(command_buffer)->allocated_storage =
+        storage;
     *out_command_buffer = command_buffer;
   } else {
     iree_allocator_free(host_allocator, storage);
@@ -167,10 +221,13 @@ static void iree_hal_inline_command_buffer_destroy(
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator = command_buffer->host_allocator;
+  void* allocated_storage = command_buffer->allocated_storage;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_ASSERT(allocated_storage,
+              "caller-owned inline command buffer storage cannot be retained");
   iree_hal_inline_command_buffer_deinitialize(base_command_buffer);
-  iree_allocator_free(host_allocator, command_buffer);
+  iree_allocator_free(host_allocator, allocated_storage);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -405,8 +462,11 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         config.workgroup_count_ref.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
         IREE_HAL_MEMORY_ACCESS_READ, config.workgroup_count_ref.offset,
         3 * sizeof(uint32_t), &buffer_mapping));
-    memcpy(&dispatch_state->workgroup_count_x, buffer_mapping.contents.data,
-           sizeof(uint32_t) * 3);
+    const uint32_t* workgroup_count =
+        (const uint32_t*)buffer_mapping.contents.data;
+    dispatch_state->workgroup_count_x = workgroup_count[0];
+    dispatch_state->workgroup_count_y = workgroup_count[1];
+    dispatch_state->workgroup_count_z = (uint16_t)workgroup_count[2];
   } else {
     dispatch_state->workgroup_count_x = config.workgroup_count[0];
     dispatch_state->workgroup_count_y = config.workgroup_count[1];
@@ -464,6 +524,15 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
         buffer_mapping.contents.data_length;
   }
 
+  const bool profile_host_execution =
+      IREE_UNLIKELY(iree_hal_local_profile_recorder_is_enabled(
+          command_buffer->profile.recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS));
+  if (IREE_UNLIKELY(command_buffer->profile.recorder)) {
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
+        command_buffer->profile.recorder, executable));
+  }
+
   // TODO(benvanik): plumb through an arena or fixed-size reservation to use.
   // For now when deploying to devices where you want something like the
   // inline command buffer you probably don't want 256KB of transient memory
@@ -480,12 +549,51 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   // Since we are running on a borrowed thread, we know nothing about the
   // floating point state. Reset it.
+  const iree_time_t start_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
       local_executable, export_ordinal, dispatch_state,
       command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
+  const iree_time_t end_host_time_ns =
+      profile_host_execution ? iree_time_now() : 0;
+
+  if (IREE_UNLIKELY(profile_host_execution)) {
+    iree_hal_local_profile_host_execution_event_info_t event_info =
+        iree_hal_local_profile_host_execution_event_info_default();
+    event_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+    event_info.flags =
+        IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_COMMAND_BUFFER;
+    if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+      event_info.flags |=
+          IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
+    }
+    event_info.status_code = iree_status_code(status);
+    event_info.scope = command_buffer->profile.scope;
+    event_info.submission_id = command_buffer->profile.submission_id;
+    event_info.command_buffer_id = command_buffer->profile.command_buffer_id;
+    event_info.executable_id =
+        iree_hal_local_executable_profile_id(local_executable);
+    event_info.export_ordinal = export_ordinal;
+    event_info.workgroup_count[0] = dispatch_state->workgroup_count_x;
+    event_info.workgroup_count[1] = dispatch_state->workgroup_count_y;
+    event_info.workgroup_count[2] = dispatch_state->workgroup_count_z;
+    event_info.workgroup_size[0] = dispatch_state->workgroup_size_x;
+    event_info.workgroup_size[1] = dispatch_state->workgroup_size_y;
+    event_info.workgroup_size[2] = dispatch_state->workgroup_size_z;
+    event_info.start_host_time_ns = start_host_time_ns;
+    event_info.end_host_time_ns = end_host_time_ns;
+    event_info.tile_count = (uint64_t)event_info.workgroup_count[0] *
+                            (uint64_t)event_info.workgroup_count[1] *
+                            (uint64_t)event_info.workgroup_count[2];
+    event_info.tile_duration_sum_ns =
+        (int64_t)(end_host_time_ns - start_host_time_ns);
+    event_info.operation_count = 1;
+    iree_hal_local_profile_recorder_append_host_execution_event(
+        command_buffer->profile.recorder, &event_info, /*out_event_id=*/NULL);
+  }
 
   if (local_memory.data) {
     iree_allocator_free(command_buffer->host_allocator, local_memory.data);
