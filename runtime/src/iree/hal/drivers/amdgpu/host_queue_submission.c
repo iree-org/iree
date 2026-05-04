@@ -498,11 +498,12 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
       signal_semaphore_list.count, operation_resource_count,
       &out_submission->reclaim_resource_count));
 
-  iree_status_t status =
-      iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
-          queue, profile_queue_device_event ? 1u : 0u,
-          &out_submission->profile_queue_device_events);
-  if (!iree_status_is_ok(status)) return status;
+  if (profile_queue_device_event) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
+            queue, /*event_count=*/1,
+            &out_submission->profile_queue_device_events));
+  }
 
   const iree_host_size_t frontier_snapshot_count =
       iree_hal_amdgpu_host_queue_count_frontier_snapshots(
@@ -528,7 +529,7 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_barrier_submission(
   out_submission->reclaim_entry =
       iree_hal_amdgpu_notification_ring_reclaim_entry(
           &queue->notification_ring);
-  status = iree_hal_amdgpu_reclaim_entry_prepare(
+  iree_status_t status = iree_hal_amdgpu_reclaim_entry_prepare(
       out_submission->reclaim_entry, queue->block_pool,
       out_submission->reclaim_resource_count,
       &out_submission->reclaim_resources);
