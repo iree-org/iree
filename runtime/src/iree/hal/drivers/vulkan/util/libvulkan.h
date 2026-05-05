@@ -7,8 +7,12 @@
 #ifndef IREE_HAL_DRIVERS_VULKAN_UTIL_LIBVULKAN_H_
 #define IREE_HAL_DRIVERS_VULKAN_UTIL_LIBVULKAN_H_
 
+#if !defined(VK_NO_PROTOTYPES)
+#define VK_NO_PROTOTYPES
+#endif  // !VK_NO_PROTOTYPES
 #include "iree/base/api.h"
 #include "iree/hal/drivers/vulkan/api.h"
+#include "vulkan/vulkan.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,7 +71,155 @@ typedef struct iree_hal_vulkan_libvulkan_t {
 
   // Root Vulkan loader entry point used to populate instance/device tables.
   PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+
+#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
+#define IREE_HAL_VULKAN_LOADER_PFN(result_type, symbol, decl, args) \
+  PFN_##symbol symbol;
+#define IREE_HAL_VULKAN_INSTANCE_PFN(...)
+#define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN(...)
+#define IREE_HAL_VULKAN_DEVICE_PFN(...)
+#define DECL(...) __VA_ARGS__
+#define ARGS(...) __VA_ARGS__
+#include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: export
+#undef ARGS
+#undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PFN
+#undef IREE_HAL_VULKAN_LOADER_PFN
+#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
 } iree_hal_vulkan_libvulkan_t;
+
+// Instance-level Vulkan dispatch table.
+typedef struct iree_hal_vulkan_instance_syms_t {
+#if IREE_HAL_VULKAN_LIBVULKAN_STATIC
+  // Placeholder field so the type remains embeddable in static mode.
+  uint8_t reserved;
+#else
+#define IREE_HAL_VULKAN_LOADER_PFN(...)
+#define IREE_HAL_VULKAN_INSTANCE_PFN(result_type, symbol, decl, args) \
+  PFN_##symbol symbol;
+#define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN IREE_HAL_VULKAN_INSTANCE_PFN
+#define IREE_HAL_VULKAN_DEVICE_PFN(...)
+#define DECL(...) __VA_ARGS__
+#define ARGS(...) __VA_ARGS__
+#include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: export
+#undef ARGS
+#undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PFN
+#undef IREE_HAL_VULKAN_LOADER_PFN
+#endif  // IREE_HAL_VULKAN_LIBVULKAN_STATIC
+} iree_hal_vulkan_instance_syms_t;
+
+// Device-level Vulkan dispatch table.
+typedef struct iree_hal_vulkan_device_syms_t {
+#if IREE_HAL_VULKAN_LIBVULKAN_STATIC
+  // Placeholder field so the type remains embeddable in static mode.
+  uint8_t reserved;
+#else
+#define IREE_HAL_VULKAN_LOADER_PFN(...)
+#define IREE_HAL_VULKAN_INSTANCE_PFN(...)
+#define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN(...)
+#define IREE_HAL_VULKAN_DEVICE_PFN(result_type, symbol, decl, args) \
+  PFN_##symbol symbol;
+#define DECL(...) __VA_ARGS__
+#define ARGS(...) __VA_ARGS__
+#include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: export
+#undef ARGS
+#undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PFN
+#undef IREE_HAL_VULKAN_LOADER_PFN
+#endif  // IREE_HAL_VULKAN_LIBVULKAN_STATIC
+} iree_hal_vulkan_device_syms_t;
+
+// Dispatch table entries are load invariants, not capability predicates.
+// Extension and feature decisions must be made from cached Vulkan inventory:
+// instance/device extension names, promoted core features, and queried property
+// structs. Static builds can expose linked entry points even when a device has
+// not enabled the corresponding extension, and dynamic loaders may return
+// trampolines whose presence says nothing about device support.
+
+// Returns an IREE status for |result| with source location and symbol context.
+IREE_API_EXPORT iree_status_t iree_status_from_vk_result(const char* file,
+                                                         uint32_t line,
+                                                         VkResult result,
+                                                         const char* symbol);
+
+// Loads instance-level Vulkan functions.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_instance_syms(
+    const iree_hal_vulkan_libvulkan_t* libvulkan, VkInstance instance,
+    iree_hal_vulkan_instance_syms_t* out_syms);
+
+// Loads device-level Vulkan functions.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_device_syms(
+    const iree_hal_vulkan_instance_syms_t* instance_syms, VkDevice device,
+    iree_hal_vulkan_device_syms_t* out_syms);
+
+//===----------------------------------------------------------------------===//
+// Vulkan API Wrappers
+//===----------------------------------------------------------------------===//
+
+// Wraps an iree_hal_vulkan_libvulkan_t* for use with loader-level API wrappers.
+// All calls should either embed their file and line information directly or use
+// this macro.
+#define IREE_LIBVULKAN(libvulkan) (libvulkan), __FILE__, __LINE__
+
+// Wraps an iree_hal_vulkan_instance_syms_t* for instance-level API wrappers.
+#define IREE_VULKAN_INSTANCE(instance_syms) (instance_syms), __FILE__, __LINE__
+
+// Wraps an iree_hal_vulkan_device_syms_t* for device-level API wrappers.
+#define IREE_VULKAN_DEVICE(device_syms) (device_syms), __FILE__, __LINE__
+
+#define IREE_HAL_VULKAN_DECLARE_LOADER_VkResult(result_type, symbol, decl)    \
+  IREE_API_EXPORT iree_status_t iree_##symbol(                                \
+      const iree_hal_vulkan_libvulkan_t* IREE_RESTRICT libvulkan,             \
+      const char* file, uint32_t line _COMMA_DECL(decl));                     \
+  IREE_API_EXPORT result_type iree_##symbol##_raw(                            \
+      const iree_hal_vulkan_libvulkan_t* IREE_RESTRICT libvulkan _COMMA_DECL( \
+          decl));
+#define IREE_HAL_VULKAN_DECLARE_INSTANCE_VkResult(result_type, symbol, decl) \
+  IREE_API_EXPORT iree_status_t iree_##symbol(                               \
+      const iree_hal_vulkan_instance_syms_t* IREE_RESTRICT syms,             \
+      const char* file, uint32_t line _COMMA_DECL(decl));                    \
+  IREE_API_EXPORT result_type iree_##symbol##_raw(                           \
+      const iree_hal_vulkan_instance_syms_t* IREE_RESTRICT syms _COMMA_DECL( \
+          decl));
+#define IREE_HAL_VULKAN_DECLARE_INSTANCE_void(result_type, symbol, decl) \
+  IREE_API_EXPORT void iree_##symbol(                                    \
+      const iree_hal_vulkan_instance_syms_t* IREE_RESTRICT syms,         \
+      const char* file, uint32_t line _COMMA_DECL(decl));
+#define IREE_HAL_VULKAN_DECLARE_DEVICE_void(result_type, symbol, decl) \
+  IREE_API_EXPORT void iree_##symbol(                                  \
+      const iree_hal_vulkan_device_syms_t* IREE_RESTRICT syms,         \
+      const char* file, uint32_t line _COMMA_DECL(decl));
+
+#define IREE_HAL_VULKAN_LOADER_PFN(result_type, symbol, decl, args) \
+  IREE_HAL_VULKAN_DECLARE_LOADER_##result_type(result_type, symbol, DECL(decl))
+#define IREE_HAL_VULKAN_INSTANCE_PFN(result_type, symbol, decl, args) \
+  IREE_HAL_VULKAN_DECLARE_INSTANCE_##result_type(result_type, symbol, \
+                                                 DECL(decl))
+#define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN(...)
+#define IREE_HAL_VULKAN_DEVICE_PFN(result_type, symbol, decl, args) \
+  IREE_HAL_VULKAN_DECLARE_DEVICE_##result_type(result_type, symbol, DECL(decl))
+#define DECL(...) __VA_ARGS__
+#define ARGS(...) __VA_ARGS__
+#define _COMMA_DECL(...) __VA_OPT__(, ) __VA_ARGS__
+#include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: export
+#undef _COMMA_DECL
+#undef ARGS
+#undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_PFN
+#undef IREE_HAL_VULKAN_LOADER_PFN
+#undef IREE_HAL_VULKAN_DECLARE_DEVICE_void
+#undef IREE_HAL_VULKAN_DECLARE_INSTANCE_void
+#undef IREE_HAL_VULKAN_DECLARE_INSTANCE_VkResult
+#undef IREE_HAL_VULKAN_DECLARE_LOADER_VkResult
 
 // Initializes |out_libvulkan| by loading the Vulkan loader from disk unless the
 // driver is compiled in static mode. The populated structure is immutable once

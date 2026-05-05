@@ -15,9 +15,11 @@ iree_cc_library(
     libvulkan
   HDRS
     "libvulkan.h"
+    "libvulkan_tables.h"
   SRCS
     "libvulkan.c"
   DEPS
+    Vulkan::Headers
     iree::base
     iree::base::internal::dynamic_library
     iree::base::internal::path

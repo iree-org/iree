@@ -15,11 +15,15 @@ package(
 iree_runtime_cc_library(
     name = "libvulkan",
     srcs = ["libvulkan.c"],
-    hdrs = ["libvulkan.h"],
+    hdrs = [
+        "libvulkan.h",
+        "libvulkan_tables.h",
+    ],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:dynamic_library",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal/drivers/vulkan:api",
+        "@vulkan_headers",
     ],
 )
