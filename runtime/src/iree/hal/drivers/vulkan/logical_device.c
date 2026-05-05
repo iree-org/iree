@@ -797,6 +797,10 @@ static iree_status_t iree_hal_vulkan_unimplemented(
 // Power-of-two capacity for logical-device queue operation event buffering.
 #define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY (64 * 1024)
 
+// Power-of-two capacity for logical-device dispatch event buffering.
+#define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_DISPATCH_EVENT_CAPACITY \
+  (64 * 1024)
+
 // Power-of-two capacity for logical-device queue device event buffering.
 #define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_DEVICE_EVENT_CAPACITY \
   (64 * 1024)
@@ -945,7 +949,8 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
     iree_hal_vulkan_logical_device_t* device) {
   if (!iree_hal_local_profile_recorder_is_enabled(
           device->profile_recorder,
-          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS)) {
+          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+              IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
     return iree_ok_status();
   }
 
@@ -1629,6 +1634,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       iree_hal_vulkan_logical_device_resolve_profiling_options(options);
   const iree_hal_device_profiling_data_families_t supported_data_families =
       IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
       IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
       IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS |
       IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
@@ -1645,7 +1651,10 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       iree_hal_device_profiling_options_requests_data(
           &resolved_options,
           IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS);
-  if (device_queue_events_enabled) {
+  const bool dispatch_events_enabled =
+      iree_hal_device_profiling_options_requests_data(
+          &resolved_options, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
+  if (device_queue_events_enabled || dispatch_events_enabled) {
     IREE_RETURN_IF_ERROR(
         iree_hal_vulkan_logical_device_validate_queue_device_profiling(
             device, &profile_host_time_domain));
@@ -1686,12 +1695,17 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       .device_records = &device_record,
       .queue_record_count = device->queue_lane_count,
       .queue_records = queue_records,
+      .dispatch_event_capacity =
+          IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_DISPATCH_EVENT_CAPACITY,
       .queue_event_capacity =
           IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY,
       .producer_data_families =
-          device_queue_events_enabled
-              ? IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS
-              : IREE_HAL_DEVICE_PROFILING_DATA_NONE,
+          (dispatch_events_enabled
+               ? IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS
+               : IREE_HAL_DEVICE_PROFILING_DATA_NONE) |
+          (device_queue_events_enabled
+               ? IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS
+               : IREE_HAL_DEVICE_PROFILING_DATA_NONE),
       .queue_device_event_capacity =
           IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_DEVICE_EVENT_CAPACITY,
       .memory_event_capacity =

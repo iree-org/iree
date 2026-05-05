@@ -31,6 +31,14 @@ typedef struct iree_hal_local_profile_id_set_t {
   iree_host_size_t count;
 } iree_hal_local_profile_id_set_t;
 
+typedef struct iree_hal_local_profile_dispatch_event_record_t {
+  // Queue scope used for chunk metadata when flushing the event.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Serialized dispatch event record.
+  iree_hal_profile_dispatch_event_t event;
+} iree_hal_local_profile_dispatch_event_record_t;
+
 struct iree_hal_local_profile_recorder_t {
   // Host allocator used for recorder-owned storage.
   iree_allocator_t host_allocator;
@@ -61,6 +69,9 @@ struct iree_hal_local_profile_recorder_t {
 
   // Single allocation backing all enabled event rings.
   void* event_storage;
+
+  // Ring of producer-owned dispatch event records.
+  iree_hal_profile_event_ring_t dispatch_event_ring;
 
   // Ring of host queue event records.
   iree_hal_profile_event_ring_t queue_event_ring;
@@ -135,6 +146,11 @@ iree_hal_local_profile_recorder_resolve_profiling_options(
   if (iree_hal_device_profiling_options_requests_data(
           &resolved_options,
           IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS)) {
+    resolved_options.data_families |=
+        IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
+  }
+  if (iree_hal_device_profiling_options_requests_data(
+          &resolved_options, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
     resolved_options.data_families |=
         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
   }
@@ -236,9 +252,23 @@ static iree_status_t iree_hal_local_profile_recorder_validate_profiling_options(
   }
   if (!iree_hal_profile_capture_filter_is_default(
           &profiling_options->capture_filter)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "local profiling does not support capture filters yet");
+    const bool dispatch_filter_owned_by_producer =
+        iree_hal_device_profiling_options_requests_data(
+            profiling_options,
+            IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS) &&
+        iree_all_bits_set(recorder_options->producer_data_families,
+                          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
+    const iree_hal_device_profiling_data_families_t unfilterable_data_families =
+        profiling_options->data_families &
+        ~(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA);
+    if (!dispatch_filter_owned_by_producer ||
+        unfilterable_data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "local profiling capture filters require producer-owned dispatch "
+          "events and no unfilterable local data families");
+    }
   }
   if (profiling_options->counter_set_count != 0 ||
       profiling_options->counter_sets) {
@@ -266,11 +296,17 @@ static iree_status_t iree_hal_local_profile_recorder_normalize_capacity(
 static iree_status_t iree_hal_local_profile_recorder_allocate_events(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_recorder_options_t* recorder_options) {
+  iree_host_size_t dispatch_event_capacity = 0;
   iree_host_size_t queue_event_capacity = 0;
   iree_host_size_t queue_device_event_capacity = 0;
   iree_host_size_t host_execution_event_capacity = 0;
   iree_host_size_t memory_event_capacity = 0;
   iree_host_size_t command_region_event_capacity = 0;
+  if (iree_hal_local_profile_recorder_requests_data(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_normalize_capacity(
+        recorder_options->dispatch_event_capacity, &dispatch_event_capacity));
+  }
   if (iree_hal_local_profile_recorder_requests_data(
           recorder, IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
     IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_normalize_capacity(
@@ -300,6 +336,7 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
         &command_region_event_capacity));
   }
 
+  iree_host_size_t dispatch_events_offset = 0;
   iree_host_size_t queue_events_offset = 0;
   iree_host_size_t queue_device_events_offset = 0;
   iree_host_size_t host_execution_events_offset = 0;
@@ -308,6 +345,11 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
   iree_host_size_t total_size = 0;
   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
       0, &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(
+          dispatch_event_capacity,
+          iree_hal_local_profile_dispatch_event_record_t,
+          iree_alignof(iree_hal_local_profile_dispatch_event_record_t),
+          &dispatch_events_offset),
       IREE_STRUCT_FIELD_ALIGNED(
           queue_event_capacity, iree_hal_profile_queue_event_t,
           iree_alignof(iree_hal_profile_queue_event_t), &queue_events_offset),
@@ -336,6 +378,12 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
   memset(event_storage, 0, total_size);
   recorder->event_storage = event_storage;
 
+  if (dispatch_event_capacity != 0) {
+    iree_hal_profile_event_ring_initialize(
+        (uint8_t*)event_storage + dispatch_events_offset,
+        sizeof(iree_hal_local_profile_dispatch_event_record_t),
+        dispatch_event_capacity, &recorder->dispatch_event_ring);
+  }
   if (queue_event_capacity != 0) {
     iree_hal_profile_event_ring_initialize(
         (uint8_t*)event_storage + queue_events_offset,
@@ -532,6 +580,12 @@ bool iree_hal_local_profile_recorder_is_enabled(
   return recorder && recorder->active &&
          iree_hal_device_profiling_options_requests_data(&recorder->options,
                                                          data_families);
+}
+
+const iree_hal_device_profiling_options_t*
+iree_hal_local_profile_recorder_options(
+    const iree_hal_local_profile_recorder_t* recorder) {
+  return recorder && recorder->active ? &recorder->options : NULL;
 }
 
 static iree_host_size_t iree_hal_local_profile_hash_id(
@@ -865,6 +919,13 @@ static iree_hal_profile_queue_event_t* iree_hal_local_profile_queue_event_at(
       ring, position);
 }
 
+static iree_hal_local_profile_dispatch_event_record_t*
+iree_hal_local_profile_dispatch_event_at(
+    const iree_hal_profile_event_ring_t* ring, uint64_t position) {
+  return (iree_hal_local_profile_dispatch_event_record_t*)
+      iree_hal_profile_event_ring_record_at(ring, position);
+}
+
 static iree_hal_profile_queue_device_event_t*
 iree_hal_local_profile_queue_device_event_at(
     const iree_hal_profile_event_ring_t* ring, uint64_t position) {
@@ -890,6 +951,63 @@ iree_hal_local_profile_command_region_event_at(
     const iree_hal_profile_event_ring_t* ring, uint64_t position) {
   return (iree_hal_profile_command_region_event_t*)
       iree_hal_profile_event_ring_record_at(ring, position);
+}
+
+iree_status_t iree_hal_local_profile_recorder_append_dispatch_event(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_dispatch_event_info_t* event_info,
+    uint64_t* out_event_id) {
+  IREE_ASSERT_ARGUMENT(event_info);
+  if (out_event_id) *out_event_id = 0;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
+    return iree_ok_status();
+  }
+  const bool is_valid =
+      iree_hal_local_profile_queue_scope_is_valid(&event_info->scope) &&
+      event_info->executable_id != 0 &&
+      event_info->export_ordinal != UINT32_MAX &&
+      event_info->workgroup_size[0] != 0 &&
+      event_info->start_tick <= event_info->end_tick;
+  IREE_ASSERT(is_valid);
+  if (IREE_UNLIKELY(!is_valid)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "local profiling dispatch event has invalid identity, workgroup size, "
+        "or timestamp range");
+  }
+
+  iree_hal_profile_event_ring_t* ring = &recorder->dispatch_event_ring;
+  iree_slim_mutex_lock(&recorder->mutex);
+  uint64_t event_position = 0;
+  uint64_t event_id = 0;
+  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
+                                              &event_id)) {
+    iree_slim_mutex_unlock(&recorder->mutex);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "local profiling dispatch event ring is full");
+  }
+
+  iree_hal_local_profile_dispatch_event_record_t* record =
+      iree_hal_local_profile_dispatch_event_at(ring, event_position);
+  record->scope = event_info->scope;
+  record->event = iree_hal_profile_dispatch_event_default();
+  record->event.flags = event_info->flags;
+  record->event.event_id = event_id;
+  record->event.submission_id = event_info->submission_id;
+  record->event.command_buffer_id = event_info->command_buffer_id;
+  record->event.executable_id = event_info->executable_id;
+  record->event.command_index = event_info->command_index;
+  record->event.export_ordinal = event_info->export_ordinal;
+  memcpy(record->event.workgroup_count, event_info->workgroup_count,
+         sizeof(record->event.workgroup_count));
+  memcpy(record->event.workgroup_size, event_info->workgroup_size,
+         sizeof(record->event.workgroup_size));
+  record->event.start_tick = event_info->start_tick;
+  record->event.end_tick = event_info->end_tick;
+  if (out_event_id) *out_event_id = event_id;
+  iree_slim_mutex_unlock(&recorder->mutex);
+  return iree_ok_status();
 }
 
 void iree_hal_local_profile_recorder_append_queue_event(
@@ -1240,6 +1358,126 @@ static iree_status_t iree_hal_local_profile_recorder_write_event_ring(
   return iree_ok_status();
 }
 
+static bool iree_hal_local_profile_dispatch_events_have_same_scope(
+    const iree_hal_local_profile_dispatch_event_record_t* lhs,
+    const iree_hal_local_profile_dispatch_event_record_t* rhs) {
+  return lhs->scope.stream_id == rhs->scope.stream_id &&
+         lhs->scope.physical_device_ordinal ==
+             rhs->scope.physical_device_ordinal &&
+         lhs->scope.queue_ordinal == rhs->scope.queue_ordinal;
+}
+
+static iree_hal_profile_chunk_metadata_t
+iree_hal_local_profile_recorder_dispatch_event_metadata(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_dispatch_event_record_t* record,
+    uint64_t dropped_record_count) {
+  iree_hal_profile_chunk_metadata_t metadata =
+      iree_hal_local_profile_recorder_metadata(
+          recorder, IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS);
+  if (record) {
+    metadata.stream_id = record->scope.stream_id;
+    metadata.physical_device_ordinal = record->scope.physical_device_ordinal;
+    metadata.queue_ordinal = record->scope.queue_ordinal;
+  }
+  if (dropped_record_count != 0) {
+    metadata.flags |= IREE_HAL_PROFILE_CHUNK_FLAG_TRUNCATED;
+    metadata.dropped_record_count = dropped_record_count;
+  }
+  return metadata;
+}
+
+static iree_status_t iree_hal_local_profile_recorder_write_dispatch_event_run(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_dispatch_event_record_t* records,
+    iree_host_size_t record_count, uint64_t dropped_record_count) {
+  if (record_count == 0 && dropped_record_count == 0) return iree_ok_status();
+  const iree_hal_local_profile_dispatch_event_record_t* first_record =
+      record_count != 0 ? records : NULL;
+  iree_hal_profile_chunk_metadata_t metadata =
+      iree_hal_local_profile_recorder_dispatch_event_metadata(
+          recorder, first_record, dropped_record_count);
+  if (record_count == 0) {
+    return iree_hal_profile_sink_write(recorder->options.sink, &metadata,
+                                       /*iovec_count=*/0, /*iovecs=*/NULL);
+  }
+
+  iree_hal_profile_dispatch_event_t* events = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc_array(recorder->host_allocator, record_count,
+                                  sizeof(*events), (void**)&events));
+  for (iree_host_size_t i = 0; i < record_count; ++i) {
+    events[i] = records[i].event;
+  }
+  iree_const_byte_span_t iovec =
+      iree_make_const_byte_span(events, record_count * sizeof(*events));
+  iree_status_t status = iree_hal_profile_sink_write(
+      recorder->options.sink, &metadata, /*iovec_count=*/1, &iovec);
+  iree_allocator_free(recorder->host_allocator, events);
+  return status;
+}
+
+static iree_status_t iree_hal_local_profile_recorder_write_dispatch_event_span(
+    iree_hal_local_profile_recorder_t* recorder, iree_const_byte_span_t span,
+    uint64_t* remaining_dropped_record_count) {
+  IREE_ASSERT(span.data_length %
+                  sizeof(iree_hal_local_profile_dispatch_event_record_t) ==
+              0);
+  const iree_hal_local_profile_dispatch_event_record_t* records =
+      (const iree_hal_local_profile_dispatch_event_record_t*)span.data;
+  const iree_host_size_t record_count =
+      span.data_length / sizeof(iree_hal_local_profile_dispatch_event_record_t);
+  iree_host_size_t run_start = 0;
+  iree_status_t status = iree_ok_status();
+  while (iree_status_is_ok(status) && run_start < record_count) {
+    iree_host_size_t run_end = run_start + 1;
+    while (run_end < record_count &&
+           iree_hal_local_profile_dispatch_events_have_same_scope(
+               &records[run_start], &records[run_end])) {
+      ++run_end;
+    }
+    const uint64_t run_dropped_record_count = *remaining_dropped_record_count;
+    *remaining_dropped_record_count = 0;
+    status = iree_hal_local_profile_recorder_write_dispatch_event_run(
+        recorder, &records[run_start], run_end - run_start,
+        run_dropped_record_count);
+    run_start = run_end;
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_local_profile_recorder_write_dispatch_event_ring(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_profile_event_ring_t* ring) {
+  iree_hal_profile_event_ring_snapshot_t snapshot;
+  iree_slim_mutex_lock(&recorder->mutex);
+  iree_status_t status = iree_hal_profile_event_ring_snapshot(ring, &snapshot);
+  iree_slim_mutex_unlock(&recorder->mutex);
+  IREE_RETURN_IF_ERROR(status);
+
+  if (snapshot.record_count == 0 && snapshot.dropped_record_count == 0) {
+    return iree_ok_status();
+  }
+
+  uint64_t remaining_dropped_record_count = snapshot.dropped_record_count;
+  for (iree_host_size_t i = 0;
+       i < snapshot.record_span_count && iree_status_is_ok(status); ++i) {
+    status = iree_hal_local_profile_recorder_write_dispatch_event_span(
+        recorder, snapshot.record_spans[i], &remaining_dropped_record_count);
+  }
+  if (iree_status_is_ok(status) && remaining_dropped_record_count != 0) {
+    status = iree_hal_local_profile_recorder_write_dispatch_event_run(
+        recorder, /*records=*/NULL, /*record_count=*/0,
+        remaining_dropped_record_count);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&recorder->mutex);
+    iree_hal_profile_event_ring_commit_snapshot(ring, &snapshot);
+    iree_slim_mutex_unlock(&recorder->mutex);
+  }
+  return status;
+}
+
 static bool iree_hal_local_profile_queue_device_events_have_same_scope(
     const iree_hal_profile_queue_device_event_t* lhs,
     const iree_hal_profile_queue_device_event_t* rhs) {
@@ -1351,9 +1589,14 @@ iree_hal_local_profile_recorder_write_queue_device_event_ring(
 static iree_status_t iree_hal_local_profile_recorder_flush_records(
     iree_hal_local_profile_recorder_t* recorder) {
   iree_slim_mutex_lock(&recorder->flush_mutex);
-  iree_status_t status = iree_hal_local_profile_recorder_write_event_ring(
-      recorder, IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
-      &recorder->queue_event_ring);
+  iree_status_t status =
+      iree_hal_local_profile_recorder_write_dispatch_event_ring(
+          recorder, &recorder->dispatch_event_ring);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_profile_recorder_write_event_ring(
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_EVENTS,
+        &recorder->queue_event_ring);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_local_profile_recorder_write_queue_device_event_ring(
         recorder, &recorder->queue_device_event_ring);

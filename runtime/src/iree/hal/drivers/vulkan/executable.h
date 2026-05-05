@@ -65,6 +65,10 @@ typedef struct iree_hal_vulkan_pipeline_t {
 
   // Required subgroup size for pipeline creation, or zero for no requirement.
   uint32_t subgroup_size;
+
+  // Static SPIR-V local workgroup size for the entry point, or zero when
+  // unavailable.
+  uint32_t workgroup_size[3];
 } iree_hal_vulkan_pipeline_t;
 
 // Returns the supported Vulkan executable format inferred from

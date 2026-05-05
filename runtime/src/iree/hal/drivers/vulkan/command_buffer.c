@@ -458,6 +458,20 @@ bool iree_hal_vulkan_command_buffer_has_native_commands(
   return command_buffer->has_native_commands;
 }
 
+iree_host_size_t iree_hal_vulkan_command_buffer_dispatch_count(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  iree_host_size_t dispatch_count = 0;
+  for (iree_host_size_t i = 0; i < command_buffer->command_count; ++i) {
+    if (command_buffer->commands[i].type ==
+        IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) {
+      ++dispatch_count;
+    }
+  }
+  return dispatch_count;
+}
+
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_local_profile_recorder_t* profile_recorder) {
@@ -484,6 +498,104 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
                 command->dispatch.executable)));
   }
   return iree_ok_status();
+}
+
+static bool iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope,
+    const iree_hal_vulkan_pipeline_t* pipeline) {
+  const iree_hal_device_profiling_options_t* options =
+      iree_hal_local_profile_recorder_options(profile_recorder);
+  if (!options) return false;
+  const iree_hal_profile_capture_filter_t* filter = &options->capture_filter;
+  if (!iree_hal_profile_capture_filter_matches_location(
+          filter, /*command_buffer_id=*/0, /*command_index=*/UINT32_MAX,
+          scope.physical_device_ordinal, scope.queue_ordinal)) {
+    return false;
+  }
+  if (iree_any_bit_set(
+          filter->flags,
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN) &&
+      !iree_string_view_match_pattern(pipeline->name,
+                                      filter->executable_export_pattern)) {
+    return false;
+  }
+  return true;
+}
+
+iree_status_t
+iree_hal_vulkan_command_buffer_append_direct_dispatch_profile_event(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t start_tick, uint64_t end_tick) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_recorder, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  if (command_buffer->state != IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_ENDED) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan direct dispatch profile event requires ended command buffer");
+  }
+
+  const iree_hal_vulkan_command_t* dispatch_command = NULL;
+  for (iree_host_size_t i = 0; i < command_buffer->command_count; ++i) {
+    const iree_hal_vulkan_command_t* command = &command_buffer->commands[i];
+    if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
+    if (dispatch_command) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "Vulkan dispatch profiling for reusable command buffers requires "
+          "per-dispatch timestamp query planning");
+    }
+    dispatch_command = command;
+  }
+  if (!dispatch_command) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "Vulkan direct dispatch profile event requires one "
+                            "recorded dispatch");
+  }
+
+  const iree_hal_vulkan_pipeline_t* pipeline = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
+      dispatch_command->dispatch.executable,
+      dispatch_command->dispatch.export_ordinal, &pipeline));
+  if (!iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
+          profile_recorder, scope, pipeline)) {
+    return iree_ok_status();
+  }
+  if (pipeline->workgroup_size[0] == 0) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan dispatch profiling requires static SPIR-V LocalSize metadata");
+  }
+
+  iree_hal_local_profile_dispatch_event_info_t event_info =
+      iree_hal_local_profile_dispatch_event_info_default();
+  event_info.scope = scope;
+  event_info.submission_id = submission_id;
+  event_info.executable_id = iree_hal_vulkan_executable_profile_id(
+      dispatch_command->dispatch.executable);
+  event_info.export_ordinal = dispatch_command->dispatch.export_ordinal;
+  if (iree_hal_dispatch_uses_indirect_parameters(
+          dispatch_command->dispatch.flags)) {
+    event_info.flags |=
+        IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS;
+  } else {
+    memcpy(event_info.workgroup_count,
+           dispatch_command->dispatch.config.workgroup_count,
+           sizeof(event_info.workgroup_count));
+  }
+  memcpy(event_info.workgroup_size, pipeline->workgroup_size,
+         sizeof(event_info.workgroup_size));
+  event_info.start_tick = start_tick;
+  event_info.end_tick = end_tick;
+  return iree_hal_local_profile_recorder_append_dispatch_event(
+      profile_recorder, &event_info, /*out_event_id=*/NULL);
 }
 
 iree_status_t iree_hal_vulkan_command_buffer_replay_host(

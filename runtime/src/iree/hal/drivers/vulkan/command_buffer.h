@@ -40,6 +40,10 @@ bool iree_hal_vulkan_command_buffer_has_host_commands(
 bool iree_hal_vulkan_command_buffer_has_native_commands(
     iree_hal_command_buffer_t* command_buffer);
 
+// Returns the number of dispatch commands recorded in |command_buffer|.
+iree_host_size_t iree_hal_vulkan_command_buffer_dispatch_count(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
@@ -49,6 +53,15 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
 iree_status_t iree_hal_vulkan_command_buffer_replay_host(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table);
+
+// Appends a direct queue-dispatch profile event from a single-dispatch command
+// buffer.
+iree_status_t
+iree_hal_vulkan_command_buffer_append_direct_dispatch_profile_event(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t start_tick, uint64_t end_tick);
 
 // Optional timestamp marker injected around native command-buffer payloads.
 typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {

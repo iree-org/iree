@@ -884,6 +884,116 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
   return iree_ok_status();
 }
 
+enum {
+  IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
+  IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE = 16u,
+  IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
+  IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
+};
+
+static bool iree_hal_vulkan_spirv_entry_point_name_matches(
+    const uint32_t* operands, uint16_t operand_word_count,
+    iree_string_view_t entry_point) {
+  if (operand_word_count < 3) return false;
+  const char* name = (const char*)&operands[2];
+  const iree_host_size_t name_capacity = (operand_word_count - 2) * 4;
+  iree_host_size_t name_length = 0;
+  while (name_length < name_capacity && name[name_length] != 0) {
+    ++name_length;
+  }
+  return name_length == entry_point.size &&
+         memcmp(name, entry_point.data, name_length) == 0;
+}
+
+static iree_status_t iree_hal_vulkan_spirv_next_instruction(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_host_size_t* inout_word_offset, uint16_t* out_opcode,
+    uint16_t* out_word_count, const uint32_t** out_operands) {
+  if (*inout_word_offset >= spirv_word_count) {
+    *out_opcode = 0;
+    *out_word_count = 0;
+    *out_operands = NULL;
+    return iree_ok_status();
+  }
+  const uint32_t header = spirv_words[*inout_word_offset];
+  const uint16_t word_count = (uint16_t)(header >> 16);
+  const uint16_t opcode = (uint16_t)(header & 0xFFFFu);
+  if (word_count == 0 || *inout_word_offset > spirv_word_count - word_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "SPIR-V instruction at word %" PRIhsz
+                            " exceeds module length",
+                            *inout_word_offset);
+  }
+  *inout_word_offset += word_count;
+  *out_opcode = opcode;
+  *out_word_count = word_count;
+  *out_operands = &spirv_words[*inout_word_offset - word_count + 1];
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_parse_spirv_workgroup_size(
+    flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
+    uint32_t out_workgroup_size[3]) {
+  memset(out_workgroup_size, 0, sizeof(uint32_t) * 3);
+  const uint32_t* spirv_words = (const uint32_t*)spirv_code_vec;
+  const iree_host_size_t spirv_word_count =
+      flatbuffers_uint32_vec_len(spirv_code_vec);
+  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
+    return iree_ok_status();
+  }
+
+  uint32_t entry_point_id = 0;
+  iree_host_size_t word_offset = 5;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT || word_count < 4) {
+      continue;
+    }
+    if (operands[0] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE) {
+      continue;
+    }
+    if (iree_hal_vulkan_spirv_entry_point_name_matches(
+            operands, (uint16_t)(word_count - 1), entry_point)) {
+      entry_point_id = operands[1];
+      break;
+    }
+  }
+  if (entry_point_id == 0) return iree_ok_status();
+
+  word_offset = 5;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE || word_count < 3) {
+      continue;
+    }
+    if (operands[0] != entry_point_id ||
+        operands[1] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE) {
+      continue;
+    }
+    if (word_count < 6) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "SPIR-V LocalSize execution mode for '%.*s' is truncated",
+          (int)entry_point.size, entry_point.data);
+    }
+    out_workgroup_size[0] = operands[2];
+    out_workgroup_size[1] = operands[3];
+    out_workgroup_size[2] = operands[4];
+    return iree_ok_status();
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkPipelineCache pipeline_cache,
@@ -891,6 +1001,7 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const VkSpecializationInfo* specialization_info,
     iree_hal_vulkan_PipelineLayoutDef_vec_t pipeline_layouts_vec,
     iree_hal_vulkan_DescriptorSetLayoutDef_vec_t descriptor_set_layouts_vec,
+    iree_hal_vulkan_ShaderModuleDef_vec_t shader_modules_vec,
     const VkPipelineLayout* pipeline_layouts,
     const VkDescriptorSetLayout* descriptor_set_layouts,
     const VkShaderModule* shader_modules, iree_allocator_t host_allocator,
@@ -909,6 +1020,11 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
       iree_hal_vulkan_PipelineDef_shader_module_ordinal_get(pipeline_def);
   const uint32_t subgroup_size =
       iree_hal_vulkan_PipelineDef_subgroup_size_get(pipeline_def);
+  iree_hal_vulkan_ShaderModuleDef_table_t shader_module_def =
+      iree_hal_vulkan_ShaderModuleDef_vec_at(shader_modules_vec,
+                                             shader_module_ordinal);
+  flatbuffers_uint32_vec_t spirv_code_vec =
+      iree_hal_vulkan_ShaderModuleDef_spirv_code_get(shader_module_def);
   out_pipeline->layout = pipeline_layouts[pipeline_layout_ordinal];
   out_pipeline->subgroup_size = subgroup_size;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
@@ -922,6 +1038,10 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
   };
   flatbuffers_string_t entry_point =
       iree_hal_vulkan_PipelineDef_entry_point_get(pipeline_def);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
+      spirv_code_vec,
+      iree_make_string_view(entry_point, flatbuffers_string_len(entry_point)),
+      out_pipeline->workgroup_size));
   VkPipelineShaderStageCreateInfo stage_create_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .pNext = subgroup_size ? &subgroup_size_info : NULL,
@@ -1222,8 +1342,9 @@ iree_status_t iree_hal_vulkan_executable_create(
     status = iree_hal_vulkan_create_compute_pipeline(
         syms, logical_device, pipeline_cache, executable_params,
         &specialization_info, pipeline_layouts_vec, descriptor_set_layouts_vec,
-        executable->pipeline_layouts, executable->descriptor_set_layouts,
-        shader_modules, host_allocator, pipeline_def, pipeline);
+        shader_modules_vec, executable->pipeline_layouts,
+        executable->descriptor_set_layouts, shader_modules, host_allocator,
+        pipeline_def, pipeline);
     if (!iree_status_is_ok(status)) {
       status = iree_status_annotate_f(status, "pipelines[%" PRIhsz "]", i);
     }
@@ -1324,6 +1445,8 @@ static iree_status_t iree_hal_vulkan_executable_export_info(
   out_info->name = pipeline->name;
   out_info->constant_count = pipeline->constant_count;
   out_info->binding_count = pipeline->binding_count;
+  memcpy(out_info->workgroup_size, pipeline->workgroup_size,
+         sizeof(out_info->workgroup_size));
   return iree_ok_status();
 }
 

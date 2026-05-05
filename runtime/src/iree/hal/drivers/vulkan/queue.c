@@ -694,6 +694,7 @@ static void iree_hal_vulkan_queue_profile_submission_initialize(
   iree_hal_local_profile_recorder_t* recorder = queue->profile_recorder;
   if (!iree_hal_local_profile_recorder_is_enabled(
           recorder, IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+                        IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
                         IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
                         IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS)) {
     return;
@@ -813,6 +814,20 @@ static bool iree_hal_vulkan_queue_profile_requests_queue_device_event(
       IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS);
 }
 
+static bool iree_hal_vulkan_queue_profile_requests_dispatch_events(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  return iree_hal_local_profile_recorder_is_enabled(
+      submission->profile.recorder,
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
+}
+
+static bool iree_hal_vulkan_queue_profile_requests_device_timestamps(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  return iree_hal_vulkan_queue_profile_requests_queue_device_event(
+             submission) ||
+         iree_hal_vulkan_queue_profile_requests_dispatch_events(submission);
+}
+
 static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
     const iree_hal_vulkan_queue_pending_submission_t* submission) {
   switch (submission->kind) {
@@ -834,7 +849,7 @@ static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
 static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (!iree_hal_vulkan_queue_profile_requests_queue_device_event(submission)) {
+  if (!iree_hal_vulkan_queue_profile_requests_device_timestamps(submission)) {
     return iree_ok_status();
   }
   if (!iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
@@ -844,8 +859,8 @@ static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
   if (!submission->native_command_buffer) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan queue device profiling requires native command recording for "
-        "queue event type %u",
+        "Vulkan device timestamp profiling requires native command recording "
+        "for queue event type %u",
         (uint32_t)submission->profile.type);
   }
   if (submission->profile.query_pool) return iree_ok_status();
@@ -880,30 +895,56 @@ static void iree_hal_vulkan_queue_profile_write_timestamp_end(
       submission->profile.end_query);
 }
 
-static iree_status_t iree_hal_vulkan_queue_profile_record_queue_device_event(
+static iree_status_t iree_hal_vulkan_queue_profile_read_native_timestamps(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (!iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) ||
-      submission->profile.queue_device_event_recorded ||
-      !submission->profile.query_pool) {
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    uint64_t out_ticks[2], bool* out_has_ticks) {
+  out_ticks[0] = 0;
+  out_ticks[1] = 0;
+  *out_has_ticks = false;
+  if (!submission->profile.query_pool) {
     return iree_ok_status();
   }
-  submission->profile.queue_device_event_recorded = true;
-
-  uint64_t ticks[2] = {0, 0};
   VkResult result = iree_vkGetQueryPoolResults_raw(
       &queue->syms, queue->logical_device, submission->profile.query_pool,
-      submission->profile.start_query, IREE_ARRAYSIZE(ticks), sizeof(ticks),
-      ticks, sizeof(ticks[0]), VK_QUERY_RESULT_64_BIT);
+      submission->profile.start_query, 2u, sizeof(uint64_t[2]), out_ticks,
+      sizeof(out_ticks[0]), VK_QUERY_RESULT_64_BIT);
   if (result != VK_SUCCESS) {
     return iree_status_from_vk_result(__FILE__, __LINE__, result,
                                       "vkGetQueryPoolResults");
   }
-  if (ticks[1] < ticks[0]) {
+  if (out_ticks[1] < out_ticks[0]) {
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
         "Vulkan queue device profiling timestamp range is not monotonic");
   }
+  *out_has_ticks = true;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_queue_profile_record_dispatch_events(
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const uint64_t ticks[2]) {
+  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
+    return iree_ok_status();
+  }
+  if (submission->profile.type != IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH) {
+    return iree_ok_status();
+  }
+  return iree_hal_vulkan_command_buffer_append_direct_dispatch_profile_event(
+      submission->execute.command_buffer, submission->profile.recorder,
+      submission->profile.scope, submission->profile.submission_id, ticks[0],
+      ticks[1]);
+}
+
+static iree_status_t iree_hal_vulkan_queue_profile_record_queue_device_event(
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const uint64_t ticks[2]) {
+  if (!iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) ||
+      submission->profile.queue_device_event_recorded) {
+    return iree_ok_status();
+  }
+  submission->profile.queue_device_event_recorded = true;
 
   iree_hal_vulkan_queue_profile_populate_submission_metrics(submission);
   iree_hal_local_profile_queue_device_event_info_t event_info =
@@ -1761,8 +1802,18 @@ static void iree_hal_vulkan_queue_complete_submission(
     iree_status_t completion_status) {
   iree_status_t terminal_status = iree_status_clone(completion_status);
   if (iree_status_is_ok(terminal_status)) {
-    terminal_status = iree_hal_vulkan_queue_profile_record_queue_device_event(
-        queue, submission);
+    uint64_t profile_ticks[2] = {0, 0};
+    bool has_profile_ticks = false;
+    terminal_status = iree_hal_vulkan_queue_profile_read_native_timestamps(
+        queue, submission, profile_ticks, &has_profile_ticks);
+    if (iree_status_is_ok(terminal_status) && has_profile_ticks) {
+      terminal_status = iree_hal_vulkan_queue_profile_record_dispatch_events(
+          submission, profile_ticks);
+    }
+    if (iree_status_is_ok(terminal_status) && has_profile_ticks) {
+      terminal_status = iree_hal_vulkan_queue_profile_record_queue_device_event(
+          submission, profile_ticks);
+    }
   }
 
   switch (submission->kind) {
@@ -4403,6 +4454,17 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         "indirect Vulkan command buffer binding table storage is NULL for %u "
         "bindings",
         command_buffer->binding_count);
+  }
+  if (iree_status_is_ok(status) &&
+      queue_event_type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE &&
+      iree_hal_local_profile_recorder_is_enabled(
+          queue->profile_recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS) &&
+      iree_hal_vulkan_command_buffer_dispatch_count(command_buffer) != 0) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan dispatch profiling for reusable command buffers requires "
+        "per-dispatch timestamp query planning");
   }
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;

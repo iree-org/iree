@@ -71,6 +71,9 @@ struct RecordingProfileSink {
   // Queue event records copied from data chunks.
   std::vector<iree_hal_profile_queue_event_t> queue_events;
 
+  // Dispatch event records copied from data chunks.
+  std::vector<iree_hal_profile_dispatch_event_t> dispatch_events;
+
   // Queue device event records copied from data chunks.
   std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;
 
@@ -85,6 +88,9 @@ struct RecordingProfileSink {
 
   // Dropped queue event records reported by truncated chunks.
   uint64_t dropped_queue_event_count = 0;
+
+  // Dropped dispatch event records reported by truncated chunks.
+  uint64_t dropped_dispatch_event_count = 0;
 
   // Dropped queue device event records reported by truncated chunks.
   uint64_t dropped_queue_device_event_count = 0;
@@ -238,6 +244,17 @@ static iree_status_t RecordingProfileSinkWrite(
     for (iree_host_size_t i = 0; i < iovec_count; ++i) {
       IREE_RETURN_IF_ERROR(
           CopyProfileRecords(iovecs[i], &test_sink->queue_events));
+    }
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(metadata->content_type,
+                             IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS)) {
+    test_sink->dropped_dispatch_event_count += metadata->dropped_record_count;
+    EXPECT_NE(UINT32_MAX, metadata->physical_device_ordinal);
+    EXPECT_NE(UINT32_MAX, metadata->queue_ordinal);
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->dispatch_events));
     }
     return iree_ok_status();
   }
@@ -440,6 +457,7 @@ class LocalProfileRecorderTest : public ::testing::Test {
     recorder_options_.device_records = &device_record_;
     recorder_options_.queue_record_count = 1;
     recorder_options_.queue_records = &queue_record_;
+    recorder_options_.dispatch_event_capacity = 4;
     recorder_options_.queue_event_capacity = 4;
     recorder_options_.queue_device_event_capacity = 4;
     recorder_options_.host_execution_event_capacity = 4;
@@ -508,6 +526,49 @@ TEST_F(LocalProfileRecorderTest, RejectsUnsupportedDataFamily) {
       Create(IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS));
 }
 
+TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsDispatchEvents) {
+  recorder_options_.producer_data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS));
+
+  iree_hal_local_profile_dispatch_event_info_t event_info =
+      iree_hal_local_profile_dispatch_event_info_default();
+  event_info.flags = IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS;
+  event_info.scope = QueueScope();
+  event_info.submission_id = 7;
+  event_info.command_buffer_id = 8;
+  event_info.executable_id = 9;
+  event_info.command_index = 10;
+  event_info.export_ordinal = 11;
+  event_info.workgroup_size[0] = 4;
+  event_info.workgroup_size[1] = 5;
+  event_info.workgroup_size[2] = 6;
+  event_info.start_tick = 1000;
+  event_info.end_tick = 1200;
+  uint64_t event_id = 0;
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_dispatch_event(
+      recorder_, &event_info, &event_id));
+  EXPECT_NE(0u, event_id);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
+  ASSERT_EQ(1u, sink_.dispatch_events.size());
+  const iree_hal_profile_dispatch_event_t& recorded_event =
+      sink_.dispatch_events[0];
+  EXPECT_EQ(event_id, recorded_event.event_id);
+  EXPECT_EQ(IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS,
+            recorded_event.flags);
+  EXPECT_EQ(7u, recorded_event.submission_id);
+  EXPECT_EQ(8u, recorded_event.command_buffer_id);
+  EXPECT_EQ(9u, recorded_event.executable_id);
+  EXPECT_EQ(10u, recorded_event.command_index);
+  EXPECT_EQ(11u, recorded_event.export_ordinal);
+  EXPECT_EQ(4u, recorded_event.workgroup_size[0]);
+  EXPECT_EQ(5u, recorded_event.workgroup_size[1]);
+  EXPECT_EQ(6u, recorded_event.workgroup_size[2]);
+  EXPECT_EQ(1000u, recorded_event.start_tick);
+  EXPECT_EQ(1200u, recorded_event.end_tick);
+}
+
 TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsQueueDeviceEvents) {
   recorder_options_.producer_data_families =
       IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
@@ -565,6 +626,35 @@ TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsQueueDeviceEvents) {
 TEST_F(LocalProfileRecorderTest, RejectsCaptureFilter) {
   iree_hal_device_profiling_options_t options =
       MakeProfilingOptions(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS);
+  options.capture_filter.flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL;
+  options.capture_filter.queue_ordinal = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_UNIMPLEMENTED,
+      iree_hal_local_profile_recorder_create(
+          &recorder_options_, &options, iree_allocator_system(), &recorder_));
+}
+
+TEST_F(LocalProfileRecorderTest,
+       AcceptsCaptureFilterForProducerDispatchEvents) {
+  recorder_options_.producer_data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  iree_hal_device_profiling_options_t options =
+      MakeProfilingOptions(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
+  options.capture_filter.flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
+  options.capture_filter.executable_export_pattern = IREE_SV("dispatch_*");
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_create(
+      &recorder_options_, &options, iree_allocator_system(), &recorder_));
+}
+
+TEST_F(LocalProfileRecorderTest,
+       RejectsCaptureFilterWhenLocalQueueEventsAreRequested) {
+  recorder_options_.producer_data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  iree_hal_device_profiling_options_t options =
+      MakeProfilingOptions(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+                           IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
   options.capture_filter.flags =
       IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_QUEUE_ORDINAL;
   options.capture_filter.queue_ordinal = 0;
