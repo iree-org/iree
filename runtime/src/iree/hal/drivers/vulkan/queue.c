@@ -27,6 +27,7 @@ typedef enum iree_hal_vulkan_queue_submission_kind_e {
   IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DEALLOCA = 7,
   IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_WRITE = 8,
   IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_READ = 9,
+  IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND = 10,
 } iree_hal_vulkan_queue_submission_kind_t;
 
 typedef enum iree_hal_vulkan_queue_deferred_state_e {
@@ -116,6 +117,18 @@ struct iree_hal_vulkan_queue_pending_submission_t {
 
   // Native Vulkan command buffer submitted for GPU-encoded work.
   VkCommandBuffer native_command_buffer;
+
+  // Queue-ordered sparse buffer memory binding payload.
+  struct {
+    // Sparse buffer receiving the memory binds.
+    VkBuffer buffer;
+
+    // Queue-owned sparse memory bind array.
+    VkSparseMemoryBind* binds;
+
+    // Number of populated entries in |binds|.
+    uint32_t bind_count;
+  } sparse_bind;
 
   // Wait entries registered for software-resolved wait-before-signal edges.
   iree_hal_vulkan_queue_wait_entry_t* wait_entries;
@@ -595,6 +608,9 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   iree_status_free(wait_failure_status);
   if (submission->wait_entries) {
     iree_allocator_free(queue->host_allocator, submission->wait_entries);
+  }
+  if (submission->sparse_bind.binds) {
+    iree_allocator_free(queue->host_allocator, submission->sparse_bind.binds);
   }
   if (submission->fill.target_buffer) {
     iree_hal_buffer_release(submission->fill.target_buffer);
@@ -1207,6 +1223,7 @@ static void iree_hal_vulkan_queue_complete_submission(
     iree_status_t completion_status) {
   switch (submission->kind) {
     case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_BARRIER:
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND:
       if (iree_status_is_ok(completion_status)) {
         iree_hal_vulkan_queue_signal_list_or_fail(
             submission->signal_semaphore_list,
@@ -1590,6 +1607,99 @@ static iree_status_t iree_hal_vulkan_queue_try_stage_alloca_backing_now(
   }
 }
 
+static iree_status_t iree_hal_vulkan_queue_allocate_sparse_wait_arrays(
+    iree_hal_vulkan_queue_t* queue,
+    const iree_hal_vulkan_queue_wait_resolution_t* resolution,
+    VkSemaphore** out_wait_semaphores, uint64_t** out_wait_values) {
+  *out_wait_semaphores = NULL;
+  *out_wait_values = NULL;
+  if (resolution->wait_info_count == 0) return iree_ok_status();
+
+  iree_host_size_t wait_semaphore_storage_size = 0;
+  if (!iree_host_size_checked_mul(resolution->wait_info_count,
+                                  sizeof(**out_wait_semaphores),
+                                  &wait_semaphore_storage_size)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan sparse bind wait semaphore array overflows host storage");
+  }
+  iree_host_size_t wait_value_storage_size = 0;
+  if (!iree_host_size_checked_mul(resolution->wait_info_count,
+                                  sizeof(**out_wait_values),
+                                  &wait_value_storage_size)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan sparse bind wait value array overflows host storage");
+  }
+
+  iree_status_t status =
+      iree_allocator_malloc(queue->host_allocator, wait_semaphore_storage_size,
+                            (void**)out_wait_semaphores);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc(queue->host_allocator, wait_value_storage_size,
+                              (void**)out_wait_values);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(queue->host_allocator, *out_wait_semaphores);
+    *out_wait_semaphores = NULL;
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_queue_submit_sparse_bind_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const iree_hal_vulkan_queue_wait_resolution_t* resolution) {
+  VkSemaphore* wait_semaphores = NULL;
+  uint64_t* wait_values = NULL;
+  iree_status_t status = iree_hal_vulkan_queue_allocate_sparse_wait_arrays(
+      queue, resolution, &wait_semaphores, &wait_values);
+
+  if (iree_status_is_ok(status)) {
+    for (uint32_t i = 0; i < resolution->wait_info_count; ++i) {
+      wait_semaphores[i] = resolution->wait_infos[i].semaphore;
+      wait_values[i] = resolution->wait_infos[i].value;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    VkSemaphore signal_semaphore = queue->epoch_semaphore;
+    const uint64_t signal_value = submission->epoch;
+    VkTimelineSemaphoreSubmitInfo timeline_info = {
+        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+        .waitSemaphoreValueCount = resolution->wait_info_count,
+        .pWaitSemaphoreValues = wait_values,
+        .signalSemaphoreValueCount = 1,
+        .pSignalSemaphoreValues = &signal_value,
+    };
+    VkSparseBufferMemoryBindInfo buffer_bind_info = {
+        .buffer = submission->sparse_bind.buffer,
+        .bindCount = submission->sparse_bind.bind_count,
+        .pBinds = submission->sparse_bind.binds,
+    };
+    VkBindSparseInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+        .pNext = &timeline_info,
+        .waitSemaphoreCount = resolution->wait_info_count,
+        .pWaitSemaphores = wait_semaphores,
+        .bufferBindCount = 1,
+        .pBufferBinds = &buffer_bind_info,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &signal_semaphore,
+    };
+    iree_slim_mutex_lock(queue->queue_handle_mutex);
+    status =
+        iree_vkQueueBindSparse(IREE_VULKAN_DEVICE(&queue->syms), queue->queue,
+                               /*bindInfoCount=*/1, &bind_info, VK_NULL_HANDLE);
+    iree_slim_mutex_unlock(queue->queue_handle_mutex);
+  }
+
+  iree_allocator_free(queue->host_allocator, wait_values);
+  iree_allocator_free(queue->host_allocator, wait_semaphores);
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
@@ -1654,32 +1764,38 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     }
   }
   if (iree_status_is_ok(status)) {
-    VkSemaphoreSubmitInfo epoch_signal_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = queue->epoch_semaphore,
-        .value = submission->epoch,
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        .deviceIndex = 0,
-    };
-    VkCommandBufferSubmitInfo command_buffer_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .commandBuffer = submission->native_command_buffer,
-        .deviceMask = 0,
-    };
-    VkSubmitInfo2 submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .waitSemaphoreInfoCount = resolution->wait_info_count,
-        .pWaitSemaphoreInfos = resolution->wait_infos,
-        .commandBufferInfoCount = submission->native_command_buffer ? 1u : 0u,
-        .pCommandBufferInfos =
-            submission->native_command_buffer ? &command_buffer_info : NULL,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &epoch_signal_info,
-    };
-    iree_slim_mutex_lock(queue->queue_handle_mutex);
-    status = iree_vkQueueSubmit2(IREE_VULKAN_DEVICE(&queue->syms), queue->queue,
-                                 1, &submit_info, VK_NULL_HANDLE);
-    iree_slim_mutex_unlock(queue->queue_handle_mutex);
+    if (submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND) {
+      status = iree_hal_vulkan_queue_submit_sparse_bind_under_lock(
+          queue, submission, resolution);
+    } else {
+      VkSemaphoreSubmitInfo epoch_signal_info = {
+          .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+          .semaphore = queue->epoch_semaphore,
+          .value = submission->epoch,
+          .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+          .deviceIndex = 0,
+      };
+      VkCommandBufferSubmitInfo command_buffer_info = {
+          .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+          .commandBuffer = submission->native_command_buffer,
+          .deviceMask = 0,
+      };
+      VkSubmitInfo2 submit_info = {
+          .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+          .waitSemaphoreInfoCount = resolution->wait_info_count,
+          .pWaitSemaphoreInfos = resolution->wait_infos,
+          .commandBufferInfoCount = submission->native_command_buffer ? 1u : 0u,
+          .pCommandBufferInfos =
+              submission->native_command_buffer ? &command_buffer_info : NULL,
+          .signalSemaphoreInfoCount = 1,
+          .pSignalSemaphoreInfos = &epoch_signal_info,
+      };
+      iree_slim_mutex_lock(queue->queue_handle_mutex);
+      status =
+          iree_vkQueueSubmit2(IREE_VULKAN_DEVICE(&queue->syms), queue->queue, 1,
+                              &submit_info, VK_NULL_HANDLE);
+      iree_slim_mutex_unlock(queue->queue_handle_mutex);
+    }
     if (iree_status_is_ok(status)) {
       iree_hal_vulkan_queue_publish_signals(queue, submission);
       queue->frontier = submission->frontier;
@@ -2340,6 +2456,7 @@ iree_status_t iree_hal_vulkan_queue_initialize(
   out_queue->syms = *params->syms;
   out_queue->logical_device = params->logical_device;
   out_queue->queue = params->queue;
+  out_queue->queue_flags = params->queue_flags;
   out_queue->queue_handle_mutex = params->queue_handle_mutex;
   out_queue->proactor = params->proactor;
   out_queue->queue_family_index = params->queue_family_index;
@@ -2733,6 +2850,96 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
              iree_hal_local_transient_buffer_isa(buffer)) {
     iree_hal_local_transient_buffer_abort_dealloca(buffer);
   }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_hal_vulkan_queue_submit_sparse_bind(
+    iree_hal_vulkan_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list, VkBuffer buffer,
+    iree_host_size_t bind_count, const VkSparseMemoryBind* binds) {
+  IREE_ASSERT_ARGUMENT(queue);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)bind_count);
+
+  iree_status_t status = iree_ok_status();
+  if (!buffer) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan sparse bind buffer is NULL");
+  }
+  if (iree_status_is_ok(status) && !binds) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan sparse bind array is NULL");
+  }
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(queue->queue_flags, VK_QUEUE_SPARSE_BINDING_BIT)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan queue family %u does not support sparse binding",
+        queue->queue_family_index);
+  }
+  if (iree_status_is_ok(status) && bind_count == 0) {
+    status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan sparse bind submission must contain at least one bind");
+  }
+  if (iree_status_is_ok(status) && bind_count > UINT32_MAX) {
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "too many Vulkan sparse buffer binds");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_validate_semaphore_list(
+        queue, wait_semaphore_list, IREE_SV("wait"));
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_validate_semaphore_list(
+        queue, signal_semaphore_list, IREE_SV("signal"));
+  }
+
+  VkSparseMemoryBind* copied_binds = NULL;
+  if (iree_status_is_ok(status)) {
+    iree_host_size_t bind_storage_size = 0;
+    if (iree_host_size_checked_mul(bind_count, sizeof(*binds),
+                                   &bind_storage_size)) {
+      status = iree_allocator_malloc(queue->host_allocator, bind_storage_size,
+                                     (void**)&copied_binds);
+    } else {
+      status =
+          iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                           "Vulkan sparse bind array overflows host storage");
+    }
+  }
+  if (iree_status_is_ok(status)) {
+    memcpy(copied_binds, binds, bind_count * sizeof(*binds));
+  }
+
+  iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_pending_submission_create(
+        queue, wait_semaphore_list, signal_semaphore_list,
+        IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND,
+        (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        &submission);
+  }
+  if (iree_status_is_ok(status)) {
+    submission->sparse_bind.buffer = buffer;
+    submission->sparse_bind.binds = copied_binds;
+    submission->sparse_bind.bind_count = (uint32_t)bind_count;
+    copied_binds = NULL;
+    status =
+        iree_hal_vulkan_queue_submit_captured_submission(queue, submission);
+    submission = NULL;
+  }
+  if (submission) {
+    if (!iree_status_is_ok(status)) {
+      iree_hal_vulkan_queue_fail_signal_list(submission->signal_semaphore_list,
+                                             iree_status_clone(status));
+    }
+    iree_hal_vulkan_queue_pending_submission_destroy(queue, submission);
+  }
+  iree_allocator_free(queue->host_allocator, copied_binds);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

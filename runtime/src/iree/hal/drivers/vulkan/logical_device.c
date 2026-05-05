@@ -1536,6 +1536,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
       .syms = &device->syms,
       .logical_device = device->logical_device,
       .queue = selected_queue->handle,
+      .queue_flags = selected_queue->flags,
       .queue_handle_mutex = iree_hal_vulkan_logical_device_queue_handle_mutex(
           device, selected_queue),
       .proactor = device->proactor,

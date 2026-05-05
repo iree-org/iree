@@ -49,6 +49,9 @@ typedef struct iree_hal_vulkan_queue_params_t {
   // Vulkan queue handle borrowed from the logical device.
   VkQueue queue;
 
+  // Vulkan queue family capability flags for |queue|.
+  VkQueueFlags queue_flags;
+
   // Mutex serializing host access to |queue|. Borrowed.
   iree_slim_mutex_t* queue_handle_mutex;
 
@@ -84,6 +87,9 @@ typedef struct iree_hal_vulkan_queue_t {
 
   // Vulkan queue handle borrowed from the logical device.
   VkQueue queue;
+
+  // Vulkan queue family capability flags for |queue|.
+  VkQueueFlags queue_flags;
 
   // Mutex serializing host access to queue. Borrowed.
   iree_slim_mutex_t* queue_handle_mutex;
@@ -199,6 +205,18 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer, iree_hal_dealloca_flags_t flags);
+
+// Submits sparse buffer memory binds ordered by queue semaphores.
+//
+// |binds| is copied into queue-owned storage and may be released by the caller
+// after this returns. The sparse VkBuffer and VkDeviceMemory handles referenced
+// by |binds| must stay live until |signal_semaphore_list| has retired or
+// failed.
+iree_status_t iree_hal_vulkan_queue_submit_sparse_bind(
+    iree_hal_vulkan_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list, VkBuffer buffer,
+    iree_host_size_t bind_count, const VkSparseMemoryBind* binds);
 
 // Submits a host-mediated buffer fill ordered by queue semaphores.
 iree_status_t iree_hal_vulkan_queue_submit_fill(
