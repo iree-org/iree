@@ -19,10 +19,12 @@
 //   - Multiple dispatches in a single reusable command buffer
 //   - Large workgroup counts through reusable command buffers
 
+#include <algorithm>
 #include <cstdint>
 #include <numeric>
 #include <vector>
 
+#include "iree/hal/cts/util/profile_test_util.h"
 #include "iree/hal/cts/util/test_base.h"
 
 namespace iree::hal::cts {
@@ -175,6 +177,83 @@ TEST_P(DispatchReuseTest, ResubmitWithDifferentBindings) {
     EXPECT_THAT(data, ContainerEq(expected))
         << "Mismatch on iteration " << iteration;
   }
+}
+
+TEST_P(DispatchReuseTest, DispatchProfilingRecordsCommandBufferDispatch) {
+  static constexpr iree_host_size_t kWorkgroupCount = 32;
+  const iree_device_size_t buffer_size = kWorkgroupCount * sizeof(uint32_t);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
+
+  Ref<iree_hal_buffer_t> output;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output.out()));
+
+  iree_hal_buffer_binding_t bindings[1] = {{
+      /*buffer=*/output,
+      /*offset=*/0,
+      /*length=*/buffer_size,
+  }};
+  iree_hal_buffer_binding_table_t binding_table = {
+      /*.count=*/1,
+      /*.bindings=*/bindings,
+  };
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+  sink.expected_dispatch_flags =
+      IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
+  sink.expected_dispatch_command_indices = {0};
+  sink.expected_workgroup_count[0] = kWorkgroupCount;
+  sink.expected_workgroup_count[1] = 1;
+  sink.expected_workgroup_count[2] = 1;
+
+  DeviceProfilingScope profiling(device_);
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+                      TestProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device dispatch profiling unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  SubmitWithBindingsAndWait(command_buffer, binding_table);
+
+  auto data = ReadBufferData<uint32_t>(output);
+  std::vector<uint32_t> expected(kWorkgroupCount);
+  std::iota(expected.begin(), expected.end(), 0u);
+  EXPECT_THAT(data, ContainerEq(expected));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.clock_correlation_count, 3);
+  EXPECT_GE(sink.executable_metadata_count, 1);
+  EXPECT_GE(sink.command_buffer_metadata_count, 1);
+  EXPECT_GE(sink.command_operation_metadata_count, 1);
+  ASSERT_EQ(1u, sink.dispatch_events.size());
+  const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[0];
+  EXPECT_NE(0u, event.command_buffer_id);
+  EXPECT_NE(sink.command_buffer_ids.end(),
+            std::find(sink.command_buffer_ids.begin(),
+                      sink.command_buffer_ids.end(), event.command_buffer_id));
+  auto operation_it = std::find_if(
+      sink.command_operations.begin(), sink.command_operations.end(),
+      [&](const iree_hal_profile_command_operation_record_t& operation) {
+        return operation.command_buffer_id == event.command_buffer_id &&
+               operation.command_index == event.command_index &&
+               operation.type ==
+                   IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
+      });
+  EXPECT_NE(sink.command_operations.end(), operation_it);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+  ExpectDispatchEventsWithinClockCorrelationRange(sink);
 }
 
 // Submits a reusable command buffer with large workgroup counts. The existing

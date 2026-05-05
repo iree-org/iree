@@ -151,14 +151,26 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Set after the queue event has been appended to the recorder.
     bool queue_event_recorded;
 
-    // Query pool receiving queue-device timestamps, or VK_NULL_HANDLE.
+    // Query pool receiving device timestamps, or VK_NULL_HANDLE.
     VkQueryPool query_pool;
 
-    // Query index written before native command payloads.
-    uint32_t start_query;
+    // Number of query slots allocated in query_pool.
+    uint32_t query_count;
 
-    // Query index written after native command payloads.
-    uint32_t end_query;
+    // Query index written before native command payloads, or ABSENT.
+    uint32_t queue_start_query;
+
+    // Query index written after native command payloads, or ABSENT.
+    uint32_t queue_end_query;
+
+    // First query slot for per-dispatch timestamp pairs, or ABSENT.
+    uint32_t dispatch_base_query;
+
+    // Number of dispatch commands with per-dispatch timestamp pairs.
+    uint32_t dispatch_query_count;
+
+    // Host storage receiving query results after native completion.
+    uint64_t* query_values;
 
     // Set after the queue device event has been appended to the recorder.
     bool queue_device_event_recorded;
@@ -451,12 +463,13 @@ static iree_status_t iree_hal_vulkan_queue_allocate_native_command_buffer(
 }
 
 static iree_status_t iree_hal_vulkan_queue_create_timestamp_query_pool(
-    iree_hal_vulkan_queue_t* queue, VkQueryPool* out_query_pool) {
+    iree_hal_vulkan_queue_t* queue, uint32_t query_count,
+    VkQueryPool* out_query_pool) {
   *out_query_pool = VK_NULL_HANDLE;
   VkQueryPoolCreateInfo create_info = {
       .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
       .queryType = VK_QUERY_TYPE_TIMESTAMP,
-      .queryCount = 2,
+      .queryCount = query_count,
   };
   return iree_vkCreateQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
                                 queue->logical_device, &create_info,
@@ -758,6 +771,16 @@ static uint64_t iree_hal_vulkan_queue_profile_allocation_id(
   }
 }
 
+static uint64_t iree_hal_vulkan_queue_profile_command_buffer_id(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (submission->kind != IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE ||
+      !submission->execute.command_buffer ||
+      submission->profile.type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH) {
+    return 0;
+  }
+  return submission->execute.command_buffer->profile_id;
+}
+
 static void iree_hal_vulkan_queue_profile_populate_submission_metrics(
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (!submission->profile.recorder) return;
@@ -795,6 +818,8 @@ static void iree_hal_vulkan_queue_profile_record_submission(
   event_info.host_time_ns = submission->profile.submit_host_time_ns;
   event_info.ready_host_time_ns = submission->profile.ready_host_time_ns;
   event_info.submission_id = submission->profile.submission_id;
+  event_info.command_buffer_id =
+      iree_hal_vulkan_queue_profile_command_buffer_id(submission);
   event_info.allocation_id =
       iree_hal_vulkan_queue_profile_allocation_id(submission);
   event_info.wait_count = iree_hal_vulkan_queue_profile_count(
@@ -821,13 +846,6 @@ static bool iree_hal_vulkan_queue_profile_requests_dispatch_events(
       IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
 }
 
-static bool iree_hal_vulkan_queue_profile_requests_device_timestamps(
-    const iree_hal_vulkan_queue_pending_submission_t* submission) {
-  return iree_hal_vulkan_queue_profile_requests_queue_device_event(
-             submission) ||
-         iree_hal_vulkan_queue_profile_requests_dispatch_events(submission);
-}
-
 static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
     const iree_hal_vulkan_queue_pending_submission_t* submission) {
   switch (submission->kind) {
@@ -846,17 +864,37 @@ static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
   }
 }
 
+static iree_status_t iree_hal_vulkan_queue_profile_dispatch_count(
+    const iree_hal_vulkan_queue_pending_submission_t* submission,
+    uint32_t* out_dispatch_count) {
+  *out_dispatch_count = 0;
+  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
+    return iree_ok_status();
+  }
+  if (submission->kind != IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE ||
+      !submission->execute.command_buffer) {
+    return iree_ok_status();
+  }
+  const iree_host_size_t dispatch_count =
+      iree_hal_vulkan_command_buffer_dispatch_count(
+          submission->execute.command_buffer);
+  if (dispatch_count > UINT32_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan dispatch profile dispatch count exceeds uint32_t");
+  }
+  *out_dispatch_count = (uint32_t)dispatch_count;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (!iree_hal_vulkan_queue_profile_requests_device_timestamps(submission)) {
-    return iree_ok_status();
-  }
-  if (!iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
-          submission)) {
-    return iree_ok_status();
-  }
   if (!submission->native_command_buffer) {
+    if (!iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
+            submission)) {
+      return iree_ok_status();
+    }
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan device timestamp profiling requires native command recording "
@@ -864,84 +902,146 @@ static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
         (uint32_t)submission->profile.type);
   }
   if (submission->profile.query_pool) return iree_ok_status();
+
+  const bool needs_queue_device_timestamps =
+      iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) &&
+      iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
+          submission);
+  uint32_t dispatch_query_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_profile_dispatch_count(
+      submission, &dispatch_query_count));
+  if (!needs_queue_device_timestamps && dispatch_query_count == 0) {
+    return iree_ok_status();
+  }
+
+  uint32_t query_count = 0;
+  if (needs_queue_device_timestamps) {
+    submission->profile.queue_start_query = query_count++;
+    submission->profile.queue_end_query = query_count++;
+  }
+  if (dispatch_query_count != 0) {
+    if (dispatch_query_count > (UINT32_MAX - query_count) / 2) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan dispatch profile query count exceeds uint32_t");
+    }
+    submission->profile.dispatch_base_query = query_count;
+    submission->profile.dispatch_query_count = dispatch_query_count;
+    query_count += dispatch_query_count * 2;
+  }
+
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_create_timestamp_query_pool(
-      queue, &submission->profile.query_pool));
-  submission->profile.start_query = 0;
-  submission->profile.end_query = 1;
+      queue, query_count, &submission->profile.query_pool));
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+      queue->host_allocator, query_count, sizeof(uint64_t),
+      (void**)&submission->profile.query_values));
+  submission->profile.query_count = query_count;
   return iree_ok_status();
 }
 
 static void iree_hal_vulkan_queue_profile_write_timestamp_begin(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (!submission->profile.query_pool) return;
-  iree_vkCmdResetQueryPool(
-      IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
-      submission->profile.query_pool, submission->profile.start_query,
-      /*queryCount=*/2);
+  if (!submission->profile.query_pool ||
+      submission->profile.queue_start_query ==
+          IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    return;
+  }
+  iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
+                           submission->native_command_buffer,
+                           submission->profile.query_pool, /*firstQuery=*/0,
+                           submission->profile.query_count);
   iree_vkCmdWriteTimestamp2(
       IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
       VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, submission->profile.query_pool,
-      submission->profile.start_query);
+      submission->profile.queue_start_query);
 }
 
 static void iree_hal_vulkan_queue_profile_write_timestamp_end(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (!submission->profile.query_pool) return;
+  if (!submission->profile.query_pool ||
+      submission->profile.queue_end_query ==
+          IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    return;
+  }
   iree_vkCmdWriteTimestamp2(
       IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
       VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, submission->profile.query_pool,
-      submission->profile.end_query);
+      submission->profile.queue_end_query);
 }
 
 static iree_status_t iree_hal_vulkan_queue_profile_read_native_timestamps(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_pending_submission_t* submission,
-    uint64_t out_ticks[2], bool* out_has_ticks) {
-  out_ticks[0] = 0;
-  out_ticks[1] = 0;
-  *out_has_ticks = false;
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (!submission->profile.query_pool) {
     return iree_ok_status();
   }
   VkResult result = iree_vkGetQueryPoolResults_raw(
       &queue->syms, queue->logical_device, submission->profile.query_pool,
-      submission->profile.start_query, 2u, sizeof(uint64_t[2]), out_ticks,
-      sizeof(out_ticks[0]), VK_QUERY_RESULT_64_BIT);
+      /*firstQuery=*/0, submission->profile.query_count,
+      submission->profile.query_count * sizeof(uint64_t),
+      submission->profile.query_values, sizeof(uint64_t),
+      VK_QUERY_RESULT_64_BIT);
   if (result != VK_SUCCESS) {
     return iree_status_from_vk_result(__FILE__, __LINE__, result,
                                       "vkGetQueryPoolResults");
   }
-  if (out_ticks[1] < out_ticks[0]) {
-    return iree_make_status(
-        IREE_STATUS_DATA_LOSS,
-        "Vulkan queue device profiling timestamp range is not monotonic");
+  if (submission->profile.queue_start_query !=
+      IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    const uint64_t start_tick =
+        submission->profile.query_values[submission->profile.queue_start_query];
+    const uint64_t end_tick =
+        submission->profile.query_values[submission->profile.queue_end_query];
+    if (end_tick < start_tick) {
+      return iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "Vulkan queue device profiling timestamp range is not monotonic");
+    }
   }
-  *out_has_ticks = true;
+  for (uint32_t i = 0; i < submission->profile.dispatch_query_count; ++i) {
+    const uint32_t query_index =
+        submission->profile.dispatch_base_query + i * 2;
+    const uint64_t start_tick = submission->profile.query_values[query_index];
+    const uint64_t end_tick = submission->profile.query_values[query_index + 1];
+    if (end_tick < start_tick) {
+      return iree_make_status(
+          IREE_STATUS_DATA_LOSS,
+          "Vulkan dispatch profiling timestamp range is not monotonic");
+    }
+  }
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_queue_profile_record_dispatch_events(
-    iree_hal_vulkan_queue_pending_submission_t* submission,
-    const uint64_t ticks[2]) {
-  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission) ||
+      submission->profile.dispatch_query_count == 0) {
     return iree_ok_status();
   }
-  if (submission->profile.type != IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH) {
-    return iree_ok_status();
+  if (submission->profile.dispatch_base_query ==
+      IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan dispatch profiling has no dispatch timestamp query range");
   }
-  return iree_hal_vulkan_command_buffer_append_direct_dispatch_profile_event(
+  return iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
       submission->execute.command_buffer, submission->profile.recorder,
-      submission->profile.scope, submission->profile.submission_id, ticks[0],
-      ticks[1]);
+      submission->profile.scope, submission->profile.submission_id,
+      iree_hal_vulkan_queue_profile_command_buffer_id(submission),
+      &submission->profile
+           .query_values[submission->profile.dispatch_base_query],
+      submission->profile.dispatch_query_count);
 }
 
 static iree_status_t iree_hal_vulkan_queue_profile_record_queue_device_event(
-    iree_hal_vulkan_queue_pending_submission_t* submission,
-    const uint64_t ticks[2]) {
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (!iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) ||
       submission->profile.queue_device_event_recorded) {
+    return iree_ok_status();
+  }
+  if (submission->profile.queue_start_query ==
+      IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
     return iree_ok_status();
   }
   submission->profile.queue_device_event_recorded = true;
@@ -953,12 +1053,16 @@ static iree_status_t iree_hal_vulkan_queue_profile_record_queue_device_event(
   event_info.flags = submission->profile.flags;
   event_info.scope = submission->profile.scope;
   event_info.submission_id = submission->profile.submission_id;
+  event_info.command_buffer_id =
+      iree_hal_vulkan_queue_profile_command_buffer_id(submission);
   event_info.allocation_id =
       iree_hal_vulkan_queue_profile_allocation_id(submission);
   event_info.operation_count = submission->profile.operation_count;
   event_info.payload_length = submission->profile.payload_length;
-  event_info.start_tick = ticks[0];
-  event_info.end_tick = ticks[1];
+  event_info.start_tick =
+      submission->profile.query_values[submission->profile.queue_start_query];
+  event_info.end_tick =
+      submission->profile.query_values[submission->profile.queue_end_query];
   return iree_hal_local_profile_recorder_append_queue_device_event(
       submission->profile.recorder, &event_info, /*out_event_id=*/NULL);
 }
@@ -1050,6 +1154,10 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
   memset(submission, 0, sizeof(*submission));
   submission->queue = queue;
   submission->kind = kind;
+  submission->profile.queue_start_query = IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
+  submission->profile.queue_end_query = IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
+  submission->profile.dispatch_base_query =
+      IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
   iree_notification_initialize(&submission->callback_notification);
   iree_atomic_store(&submission->alloca.memory_wait_callback_complete, 1,
                     iree_memory_order_relaxed);
@@ -1153,6 +1261,10 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
                             queue->logical_device,
                             submission->profile.query_pool,
                             /*pAllocator=*/NULL);
+  }
+  if (submission->profile.query_values) {
+    iree_allocator_free(queue->host_allocator,
+                        submission->profile.query_values);
   }
   if (submission->native_command_buffer) {
     iree_slim_mutex_lock(&queue->submission_mutex);
@@ -1802,17 +1914,15 @@ static void iree_hal_vulkan_queue_complete_submission(
     iree_status_t completion_status) {
   iree_status_t terminal_status = iree_status_clone(completion_status);
   if (iree_status_is_ok(terminal_status)) {
-    uint64_t profile_ticks[2] = {0, 0};
-    bool has_profile_ticks = false;
-    terminal_status = iree_hal_vulkan_queue_profile_read_native_timestamps(
-        queue, submission, profile_ticks, &has_profile_ticks);
-    if (iree_status_is_ok(terminal_status) && has_profile_ticks) {
-      terminal_status = iree_hal_vulkan_queue_profile_record_dispatch_events(
-          submission, profile_ticks);
+    terminal_status =
+        iree_hal_vulkan_queue_profile_read_native_timestamps(queue, submission);
+    if (iree_status_is_ok(terminal_status)) {
+      terminal_status =
+          iree_hal_vulkan_queue_profile_record_dispatch_events(submission);
     }
-    if (iree_status_is_ok(terminal_status) && has_profile_ticks) {
-      terminal_status = iree_hal_vulkan_queue_profile_record_queue_device_event(
-          submission, profile_ticks);
+    if (iree_status_is_ok(terminal_status)) {
+      terminal_status =
+          iree_hal_vulkan_queue_profile_record_queue_device_event(submission);
     }
   }
 
@@ -4393,8 +4503,11 @@ static iree_status_t iree_hal_vulkan_queue_prepare_native_execute_submission(
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_command_buffer_profile_marker_t profile_marker = {
         .query_pool = submission->profile.query_pool,
-        .start_query = submission->profile.start_query,
-        .end_query = submission->profile.end_query,
+        .query_count = submission->profile.query_count,
+        .queue_start_query = submission->profile.queue_start_query,
+        .queue_end_query = submission->profile.queue_end_query,
+        .dispatch_base_query = submission->profile.dispatch_base_query,
+        .dispatch_query_count = submission->profile.dispatch_query_count,
     };
     status = iree_hal_vulkan_command_buffer_record_native(
         submission->execute.command_buffer, &queue->syms, queue->logical_device,
@@ -4455,18 +4568,6 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         "bindings",
         command_buffer->binding_count);
   }
-  if (iree_status_is_ok(status) &&
-      queue_event_type == IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE &&
-      iree_hal_local_profile_recorder_is_enabled(
-          queue->profile_recorder,
-          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS) &&
-      iree_hal_vulkan_command_buffer_dispatch_count(command_buffer) != 0) {
-    status = iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan dispatch profiling for reusable command buffers requires "
-        "per-dispatch timestamp query planning");
-  }
-
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_pending_submission_create(
@@ -4513,8 +4614,11 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         .count = submission->execute.binding_table_count,
         .bindings = submission->execute.binding_table_bindings,
     };
+    const uint64_t command_buffer_id =
+        iree_hal_vulkan_queue_profile_command_buffer_id(submission);
     status = iree_hal_vulkan_command_buffer_record_profile_metadata(
-        command_buffer, queue->profile_recorder);
+        command_buffer, queue->profile_recorder, submission->profile.scope,
+        command_buffer_id);
     if (iree_status_is_ok(status)) {
       status = iree_hal_vulkan_queue_prepare_native_execute_submission(
           queue, submission, captured_binding_table);

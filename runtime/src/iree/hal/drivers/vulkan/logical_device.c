@@ -835,6 +835,14 @@ iree_hal_vulkan_logical_device_resolve_profiling_options(
     resolved_options.data_families =
         iree_hal_vulkan_logical_device_lightweight_statistics_data_families();
   }
+  if (iree_hal_device_profiling_options_requests_data(
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+              IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
+              IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
+    resolved_options.data_families |=
+        IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA;
+  }
   resolved_options.flags &=
       ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
   return resolved_options;

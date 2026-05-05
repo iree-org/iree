@@ -167,6 +167,49 @@ static iree_status_t TestProfileSinkWrite(
     ++test_sink->executable_export_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_buffer_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_buffer_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_buffer_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_buffer_record_t),
+                records[i].record_length);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      test_sink->command_buffer_ids.push_back(records[i].command_buffer_id);
+    }
+    ++test_sink->command_buffer_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_operation_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_operation_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_operation_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_operation_record_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      EXPECT_NE(UINT32_MAX, records[i].command_index);
+    }
+    test_sink->command_operations.insert(test_sink->command_operations.end(),
+                                         records, records + record_count);
+    ++test_sink->command_operation_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
     EXPECT_TRUE(test_sink->saw_device_metadata);
     EXPECT_EQ(0u, iovecs[0].data_length %
@@ -217,7 +260,20 @@ static iree_status_t TestProfileSinkWrite(
       EXPECT_EQ(test_sink->expected_dispatch_flags, records[i].flags);
       EXPECT_NE(0u, records[i].event_id);
       EXPECT_NE(0u, records[i].executable_id);
-      EXPECT_EQ(UINT32_MAX, records[i].command_index);
+      const iree_host_size_t event_index =
+          test_sink->dispatch_events.size() + i;
+      if (test_sink->expected_dispatch_command_indices.empty()) {
+        EXPECT_EQ(UINT32_MAX, records[i].command_index);
+      } else {
+        if (event_index >=
+            test_sink->expected_dispatch_command_indices.size()) {
+          return iree_make_status(
+              IREE_STATUS_DATA_LOSS,
+              "dispatch event index exceeds expected command index count");
+        }
+        EXPECT_EQ(test_sink->expected_dispatch_command_indices[event_index],
+                  records[i].command_index);
+      }
       if (!test_sink->executable_ids.empty() ||
           !test_sink->export_record_executable_ids.empty()) {
         EXPECT_NE(0u, records[i].executable_id);

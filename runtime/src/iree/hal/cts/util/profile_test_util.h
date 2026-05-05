@@ -60,6 +60,12 @@ struct TestProfileSink {
   // Number of executable export metadata chunks observed.
   int executable_export_metadata_count = 0;
 
+  // Number of command-buffer metadata chunks observed.
+  int command_buffer_metadata_count = 0;
+
+  // Number of command-operation metadata chunks observed.
+  int command_operation_metadata_count = 0;
+
   // Number of clock correlation chunks observed.
   int clock_correlation_count = 0;
 
@@ -108,12 +114,21 @@ struct TestProfileSink {
   // Executable identifiers referenced by EXECUTABLE_EXPORTS chunks.
   std::vector<uint64_t> export_record_executable_ids;
 
+  // Command-buffer identifiers copied from COMMAND_BUFFERS chunks.
+  std::vector<uint64_t> command_buffer_ids;
+
+  // Command operations copied from COMMAND_OPERATIONS chunks.
+  std::vector<iree_hal_profile_command_operation_record_t> command_operations;
+
   // Physical device ordinals for entries in |dispatch_events|.
   std::vector<uint32_t> dispatch_event_physical_device_ordinals;
 
   // Dispatch event flags expected for every event record.
   iree_hal_profile_dispatch_event_flags_t expected_dispatch_flags =
       IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_NONE;
+
+  // Expected dispatch event command indexes. Empty means direct dispatches.
+  std::vector<uint32_t> expected_dispatch_command_indices;
 
   // True if dispatch event workgroup counts should be checked.
   bool validate_dispatch_workgroup_count = true;

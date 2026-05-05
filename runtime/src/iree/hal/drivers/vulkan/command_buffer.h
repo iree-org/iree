@@ -47,38 +47,67 @@ iree_host_size_t iree_hal_vulkan_command_buffer_dispatch_count(
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_local_profile_recorder_t* profile_recorder);
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id);
 
 // Replays a recorded Vulkan command buffer using host-mediated operations.
 iree_status_t iree_hal_vulkan_command_buffer_replay_host(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table);
 
-// Appends a direct queue-dispatch profile event from a single-dispatch command
-// buffer.
-iree_status_t
-iree_hal_vulkan_command_buffer_append_direct_dispatch_profile_event(
+// Appends dispatch profile events from timestamp pairs recorded around each
+// dispatch command.
+//
+// |dispatch_ticks| contains |dispatch_count| adjacent start/end tick pairs.
+// |command_buffer_id| is 0 for direct queue dispatches and nonzero for reusable
+// command-buffer dispatches.
+iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
-    uint64_t start_tick, uint64_t end_tick);
+    uint64_t command_buffer_id, const uint64_t* dispatch_ticks,
+    iree_host_size_t dispatch_count);
 
-// Optional timestamp marker injected around native command-buffer payloads.
-typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
-  // Query pool receiving start/end timestamps, or VK_NULL_HANDLE when absent.
+#define IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT UINT32_MAX
+
+// Optional timestamp marker injected around one dispatch command.
+typedef struct iree_hal_vulkan_command_buffer_dispatch_profile_marker_t {
+  // Query pool receiving start/end timestamps.
   VkQueryPool query_pool;
 
-  // Query index written before the command payload.
+  // Query index written before the dispatch payload.
   uint32_t start_query;
 
-  // Query index written after the command payload.
+  // Query index written after the dispatch payload.
   uint32_t end_query;
+} iree_hal_vulkan_command_buffer_dispatch_profile_marker_t;
+
+// Optional timestamp plan injected into native command-buffer payloads.
+typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
+  // Query pool receiving timestamp records, or VK_NULL_HANDLE when absent.
+  VkQueryPool query_pool;
+
+  // Number of query slots allocated in query_pool.
+  uint32_t query_count;
+
+  // Query index written before the command-buffer payload, or ABSENT.
+  uint32_t queue_start_query;
+
+  // Query index written after the command-buffer payload, or ABSENT.
+  uint32_t queue_end_query;
+
+  // First query slot for per-dispatch timestamp pairs, or ABSENT.
+  uint32_t dispatch_base_query;
+
+  // Number of dispatch commands with per-dispatch timestamp pairs.
+  uint32_t dispatch_query_count;
 } iree_hal_vulkan_command_buffer_profile_marker_t;
 
 // Records Vulkan-native commands into |native_command_buffer|.
 //
 // |profile_marker| may be NULL. When present, the query pool is reset and
-// timestamped inside |native_command_buffer| around the recorded payload.
+// timestamped inside |native_command_buffer| around the requested queue payload
+// and dispatch commands.
 //
 // Descriptor sets are allocated from a transient descriptor pool returned in
 // |out_descriptor_pool|. The caller must keep that pool alive until
