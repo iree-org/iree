@@ -21,6 +21,8 @@ def iree_check_test(
         target_backend,
         driver = None,
         compiler_flags = [],
+        data = [],
+        env = {},
         input_type = None,
         runner_args = [],
         tags = [],
@@ -38,6 +40,8 @@ def iree_check_test(
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
+      data: additional data dependencies available to the generated runner.
+      env: environment variables for the generated runner.
       input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to iree-check-module. The
           driver and input file are passed automatically.
@@ -67,13 +71,21 @@ def iree_check_test(
     if not driver:
         return
 
+    test_data = list(data)
+    test_env = dict(env)
+    if driver == "vulkan":
+        test_data.append("//build_tools/sanitizer:lsan_suppressions_vulkan.txt")
+        if "LSAN_OPTIONS" not in test_env:
+            test_env["LSAN_OPTIONS"] = "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)"
+
     native_test(
         name = name,
         args = [
             "--device=%s" % driver,
             "--module=$(location :%s)" % bytecode_module_name,
         ] + runner_args,
-        data = [":%s" % bytecode_module_name],
+        data = [":%s" % bytecode_module_name] + test_data,
+        env = test_env,
         src = "//tools:iree-check-module",
         tags = tags + ["driver=%s" % driver, "target=%s" % target_backend],
         timeout = timeout,
@@ -86,6 +98,8 @@ def iree_check_single_backend_test_suite(
         target_backend,
         driver = None,
         compiler_flags = [],
+        data = [],
+        env = {},
         input_type = None,
         runner_args = [],
         tags = [],
@@ -105,6 +119,8 @@ def iree_check_single_backend_test_suite(
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
+      data: additional data dependencies available to each generated runner.
+      env: environment variables for each generated runner.
       input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to the underlying
           iree-check-module tests. The driver and input file are passed
@@ -135,6 +151,8 @@ def iree_check_single_backend_test_suite(
             target_backend = target_backend,
             driver = driver,
             compiler_flags = compiler_flags,
+            data = data,
+            env = env,
             input_type = input_type,
             runner_args = runner_args,
             tags = tags,
@@ -165,6 +183,8 @@ def iree_check_test_suite(
         input_type = None,
         runner_args = [],
         tags = [],
+        data = [],
+        env = {},
         target_cpu_features_variants = [],
         deps = [],
         **kwargs):
@@ -187,6 +207,8 @@ def iree_check_test_suite(
       tags: tags to apply to the generated tests. Note that as in standard test
           suites, manual is treated specially and will also apply to the test
           suite itself.
+      data: additional data dependencies available to each generated runner.
+      env: environment variables for each generated runner.
       target_cpu_features_variants: ignored, assumed to be ["generic"] in this
           Bazel implementation. See the CMake implementation for what this does
           in general.
@@ -211,6 +233,8 @@ def iree_check_test_suite(
             input_type = input_type,
             runner_args = runner_args,
             tags = tags,
+            data = data,
+            env = env,
             deps = deps,
             **kwargs
         )
