@@ -580,6 +580,7 @@ iree_status_t iree_hal_command_buffer_dispatch_validation(
 
   // Validate workgroup count buffers for indirect parameters.
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    const iree_device_size_t workgroup_count_length = 3 * sizeof(uint32_t);
     if ((config.workgroup_count_ref.offset % sizeof(uint32_t)) != 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -587,26 +588,38 @@ iree_status_t iree_hal_command_buffer_dispatch_validation(
           "required natural alignment "
           "of uint32_t (offset=%" PRIdsz ", min_byte_alignment=%" PRIhsz ")",
           config.workgroup_count_ref.offset, sizeof(uint32_t));
-    } else if (config.workgroup_count_ref.length < 3 * sizeof(uint32_t)) {
+    } else if (config.workgroup_count_ref.length != IREE_HAL_WHOLE_BUFFER &&
+               config.workgroup_count_ref.length < workgroup_count_length) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
           "workgroup count buffer does not have the capacity "
           "to store the required 3 uint32_t values "
-          "(length=%" PRIdsz ", min_length=%" PRIhsz ")",
-          config.workgroup_count_ref.length, 3 * sizeof(uint32_t));
+          "(length=%" PRIdsz ", min_length=%" PRIdsz ")",
+          config.workgroup_count_ref.length, workgroup_count_length);
+    }
+    iree_device_size_t workgroup_count_end = 0;
+    if (IREE_UNLIKELY(!iree_device_size_checked_add(
+            config.workgroup_count_ref.offset, workgroup_count_length,
+            &workgroup_count_end))) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "workgroup count offset overflows device size (offset=%" PRIdsz
+          ", length=%" PRIdsz ")",
+          config.workgroup_count_ref.offset, workgroup_count_length);
     }
 
+    iree_hal_buffer_ref_t workgroup_count_ref = config.workgroup_count_ref;
+    workgroup_count_ref.length = workgroup_count_length;
     const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
         .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
         .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS,
         .access = IREE_HAL_MEMORY_ACCESS_READ,
         .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        .max_byte_offset = config.workgroup_count_ref.offset +
-                           config.workgroup_count_ref.length,
+        .max_byte_offset = workgroup_count_end,
         .min_byte_alignment = sizeof(uint32_t),
     };
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
-        command_buffer, validation_state, config.workgroup_count_ref,
+        command_buffer, validation_state, workgroup_count_ref,
         workgroups_reqs));
   }
 

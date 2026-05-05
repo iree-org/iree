@@ -26,6 +26,7 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -52,6 +53,7 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -70,6 +72,7 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -97,6 +100,7 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -114,6 +118,7 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
@@ -134,6 +139,7 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "topk_v2.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND

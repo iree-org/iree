@@ -183,6 +183,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let hasVerifier = 1;
 
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [

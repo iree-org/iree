@@ -473,6 +473,11 @@ def IREECodegen_RotateRowsAttr  :
   let assemblyFormat = [{
     `<` $row_width `,` $access_width `>`
   }];
+  let extraClassDeclaration = [{
+    int64_t getSwizzlePeriod() const {
+      return getRowWidth() * (getRowWidth() / getAccessWidth());
+    }
+  }];
   let genVerifyDecl = 1;
 }
 
@@ -595,6 +600,11 @@ def IREECodegen_XORShuffleAttr  :
   );
   let assemblyFormat = [{
     `<` $row_width `,` $access_width  (`,` $row_stride^)? (`,` $per_phase^)? `>`
+  }];
+  let extraClassDeclaration = [{
+    int64_t getSwizzlePeriod() const {
+      return getRowWidth() * (getRowWidth() / getAccessWidth());
+    }
   }];
   let genVerifyDecl = 1;
 }

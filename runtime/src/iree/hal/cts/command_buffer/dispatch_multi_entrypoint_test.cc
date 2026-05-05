@@ -65,15 +65,18 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
   iree_hal_buffer_t* input_buffer = nullptr;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(
-        input_data.data(), input_data.size() * sizeof(uint32_t), &input_buffer);
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(uint32_t),
+        &input_buffer));
   }
 
   // Create two output buffers (zeroed).
   iree_hal_buffer_t* output_negate = nullptr;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_negate);
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_negate));
   iree_hal_buffer_t* output_double = nullptr;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_double);
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_double));
 
   // Set up bindings for two dispatches.
   //

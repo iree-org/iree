@@ -105,10 +105,13 @@ typedef struct iree_tokenizer_postprocessor_t {
   // Template for single-sequence encoding (always populated).
   iree_tokenizer_postprocessor_template_t single;
 
+  // True when pair encoding has an explicit pair template.
+  bool has_pair;
+
   // Template for pair-sequence encoding (zeroed if unsupported).
-  // When pair.prefix_count + pair.infix_count + pair.suffix_count == 0 and
-  // pair.sequence_a_type_id == 0 and pair.sequence_b_type_id == 0, pair
-  // encoding is not supported.
+  // Valid only when |has_pair| is true. An explicit empty pair template is
+  // meaningful: it encodes sequence A followed by sequence B without inserting
+  // special tokens or changing type IDs.
   iree_tokenizer_postprocessor_template_t pair;
 
   // Behavioral flags (IREE_TOKENIZER_POSTPROCESSOR_FLAG_*).
@@ -118,10 +121,7 @@ typedef struct iree_tokenizer_postprocessor_t {
 // Returns true if the postprocessor supports pair encoding.
 static inline bool iree_tokenizer_postprocessor_supports_pair(
     const iree_tokenizer_postprocessor_t* postprocessor) {
-  return iree_tokenizer_postprocessor_template_total_count(
-             &postprocessor->pair) > 0 ||
-         postprocessor->pair.sequence_a_type_id != 0 ||
-         postprocessor->pair.sequence_b_type_id != 0;
+  return postprocessor->has_pair;
 }
 
 // Initializes a postprocessor from precomputed template data.
@@ -148,13 +148,14 @@ void iree_tokenizer_postprocessor_deinitialize(
 // Phase of the postprocessor state machine during encoding.
 // Tracks which portion of the template is being emitted relative to model
 // tokens:
-//   PREFIX → SEQUENCE_A → SUFFIX → DONE
-// For pair encoding (future), the full sequence is:
-//   PREFIX → SEQUENCE_A → INFIX → SEQUENCE_B → SUFFIX → DONE
+//   Single:  PREFIX → SEQUENCE_A → SUFFIX → DONE
+//   Pair:    PREFIX → SEQUENCE_A → INFIX → SEQUENCE_B → SUFFIX → DONE
 typedef enum {
   IREE_TOKENIZER_POSTPROCESSOR_PHASE_IDLE = 0,
   IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX,
   IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B,
   IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX,
   IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE,
 } iree_tokenizer_postprocessor_phase_t;
@@ -177,9 +178,9 @@ typedef struct iree_tokenizer_postprocessor_encode_state_t {
 } iree_tokenizer_postprocessor_encode_state_t;
 
 // Initializes encode state for a given postprocessor and template. If the
-// template has no special tokens (total count == 0), the state remains IDLE
-// (all operations are no-ops). The template pointer must remain valid for the
-// lifetime of the encode state.
+// template has no special tokens and assigns no non-zero sequence type IDs, the
+// state remains IDLE (all operations are no-ops). The template pointer must
+// remain valid for the lifetime of the encode state.
 static inline void iree_tokenizer_postprocessor_encode_state_initialize(
     const iree_tokenizer_postprocessor_t* postprocessor,
     const iree_tokenizer_postprocessor_template_t* active_template,
@@ -189,7 +190,8 @@ static inline void iree_tokenizer_postprocessor_encode_state_initialize(
   out_state->flags = postprocessor->flags;
   uint8_t total =
       iree_tokenizer_postprocessor_template_total_count(active_template);
-  if (total > 0) {
+  if (total > 0 || active_template->sequence_a_type_id != 0 ||
+      active_template->sequence_b_type_id != 0) {
     out_state->active_template = active_template;
     out_state->phase = active_template->prefix_count > 0
                            ? IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX
@@ -197,12 +199,13 @@ static inline void iree_tokenizer_postprocessor_encode_state_initialize(
   }
 }
 
-// Returns true if the postprocessor has pending tokens to emit (prefix or
-// suffix phase not yet complete). Used by the tokenizer to report pending work
-// in the streaming API.
+// Returns true if the postprocessor has pending tokens to emit (prefix, infix,
+// or suffix phase not yet complete). Used by the tokenizer to report pending
+// work in the streaming API.
 static inline bool iree_tokenizer_postprocessor_encode_state_has_pending(
     const iree_tokenizer_postprocessor_encode_state_t* state) {
   return state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX ||
+         state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX ||
          state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX;
 }
 
@@ -218,20 +221,44 @@ iree_host_size_t iree_tokenizer_postprocessor_emit_prefix(
     iree_tokenizer_postprocessor_encode_state_t* state,
     iree_tokenizer_token_output_t output, iree_host_size_t output_offset);
 
+// Emits infix special tokens into the output if in INFIX phase.
+// Transitions to SEQUENCE_B when all infix tokens are emitted.
+// No-op if the phase is not INFIX.
+// Returns the number of tokens written to output.
+iree_host_size_t iree_tokenizer_postprocessor_emit_infix(
+    iree_tokenizer_postprocessor_encode_state_t* state,
+    iree_tokenizer_token_output_t output, iree_host_size_t output_offset);
+
 // Assigns type_ids to model-produced tokens based on current sequence phase.
-// Uses sequence_a_type_id during SEQUENCE_A (sequence_b_type_id for future pair
-// encoding). No-op if type_ids output is NULL or phase is not a sequence phase.
+// Uses sequence_a_type_id during SEQUENCE_A, sequence_b_type_id during
+// SEQUENCE_B. No-op if type_ids output is NULL or phase is not a sequence
+// phase.
 void iree_tokenizer_postprocessor_assign_type_ids(
     const iree_tokenizer_postprocessor_encode_state_t* state,
     iree_tokenizer_token_output_t output, iree_host_size_t offset,
     iree_host_size_t count);
 
-// Transitions from sequence phase to SUFFIX after model finalize.
-// If suffix_count is 0, transitions directly to DONE.
+// Transitions from SEQUENCE_A → INFIX (or SEQUENCE_B if infix_count == 0)
+// after finalizing sequence A during pair encoding.
 // No-op if phase is not SEQUENCE_A.
-static inline void iree_tokenizer_postprocessor_begin_suffix(
+static inline void iree_tokenizer_postprocessor_begin_infix(
     iree_tokenizer_postprocessor_encode_state_t* state) {
   if (state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A) return;
+  state->position = 0;
+  state->phase = state->active_template->infix_count > 0
+                     ? IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX
+                     : IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B;
+}
+
+// Transitions from sequence phase to SUFFIX after model finalize.
+// If suffix_count is 0, transitions directly to DONE.
+// No-op if phase is not SEQUENCE_A or SEQUENCE_B.
+static inline void iree_tokenizer_postprocessor_begin_suffix(
+    iree_tokenizer_postprocessor_encode_state_t* state) {
+  if (state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A &&
+      state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B) {
+    return;
+  }
   state->position = 0;
   state->phase = state->active_template->suffix_count > 0
                      ? IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX

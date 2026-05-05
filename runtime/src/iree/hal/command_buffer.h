@@ -72,6 +72,21 @@ enum iree_hal_command_buffer_mode_bits_t {
   // about lifetime this flag disables the internal resource tracking to reduce
   // overhead.
   IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
+
+  // Retains producer metadata required for command-buffer profiling.
+  // This makes profiling possible for the command buffer but does not enable
+  // profiling by itself. Implementations may spend additional recording-time
+  // CPU and memory to retain command operation metadata and compact sidecars
+  // used by profiling sessions. This is intended for rich host profiling that
+  // needs source/correlation records, not minimal production timestamp capture.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA = 1u << 7,
+
+  // Retains compact dispatch metadata required for command-buffer timestamping.
+  // This makes dispatch timestamp capture possible for the command buffer but
+  // does not enable timestamp capture by itself. Implementations may spend
+  // additional recording-time CPU and memory to retain compact per-dispatch
+  // packet/correlation sidecars without requiring full profile metadata.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA = 1u << 8,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -792,6 +807,15 @@ IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
+// Returns the queue affinity selected for the command buffer.
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer);
+
+// Returns the process-local nonzero profiling identifier for |command_buffer|.
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
+    const iree_hal_command_buffer_t* command_buffer);
+
 // Begins recording into the command buffer.
 // The command buffer must not have been recorded already; this is only valid to
 // call once after creation and must be paired with iree_hal_command_buffer_end.
@@ -1123,6 +1147,10 @@ struct iree_hal_command_buffer_t {
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
+
+  // Process-local nonzero command-buffer identifier used by profiling sessions.
+  uint64_t profile_id;
+
   uint32_t binding_capacity;
   uint32_t binding_count;
   void* validation_state;

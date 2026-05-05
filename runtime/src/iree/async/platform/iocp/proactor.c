@@ -2694,11 +2694,11 @@ static void iree_async_proactor_iocp_notification_signal(
 
 static bool iree_async_proactor_iocp_notification_wait(
     iree_async_proactor_t* base_proactor,
-    iree_async_notification_t* notification, iree_timeout_t timeout) {
+    iree_async_notification_t* notification, uint32_t wait_token,
+    iree_timeout_t timeout) {
   (void)base_proactor;
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  int32_t wait_epoch =
-      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
+  int32_t wait_epoch = (int32_t)wait_token;
   while (iree_time_now() < deadline_ns) {
     int32_t current_epoch =
         iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);

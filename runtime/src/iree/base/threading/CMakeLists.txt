@@ -22,6 +22,7 @@ iree_cc_library(
     "notification.h"
     "numa.h"
     "processor.h"
+    "wait_address.h"
   SRCS
     "affinity.c"
     "mutex.c"
@@ -30,6 +31,7 @@ iree_cc_library(
     "numa_impl.h"
     "numa_linux.c"
     "numa_win32.c"
+    "wait_address.c"
   DEPS
     iree::base
     iree::base::core_headers
@@ -125,6 +127,19 @@ iree_cc_test(
     ::thread
     ::threading
     iree::base::internal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    wait_address_test
+  SRCS
+    "wait_address_test.cc"
+  DEPS
+    ::thread
+    ::threading
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

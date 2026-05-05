@@ -13,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/threading/thread.h"
+#include "iree/task/affinity_set.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus
@@ -42,12 +43,10 @@ iree_task_topology_node_id_t iree_task_topology_query_current_node(void);
 //===----------------------------------------------------------------------===//
 
 // A bitmask indicating which other groups from 0 to N may constructively share
-// caches. For example, a value of 0b1100 indicates that group 2 and 3 share.
-typedef uint64_t iree_task_topology_group_mask_t;
-
-#define IREE_TASK_TOPOLOGY_GROUP_MASK_ALL UINT64_MAX
-#define IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT \
-  (sizeof(iree_task_topology_group_mask_t) * 8)
+// caches. For example, bits 2 and 3 set indicates that groups 2 and 3 share.
+// Uses the same multi-word type as worker affinity sets (one bit per group,
+// max groups = max workers).
+typedef iree_task_affinity_set_t iree_task_topology_group_mask_t;
 
 // Total cache sizes (that we care about).
 // More information may be available but we shouldn't be specializing on it
@@ -120,7 +119,7 @@ typedef struct iree_task_topology_t {
   // IREE_TASK_TOPOLOGY_NODE_ID_ANY if unspecified.
   iree_task_topology_node_id_t node_id;
   iree_host_size_t group_count;
-  iree_task_topology_group_t groups[IREE_TASK_EXECUTOR_MAX_WORKER_COUNT];
+  iree_task_topology_group_t groups[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
 } iree_task_topology_t;
 
 // Initializes an empty task topology.

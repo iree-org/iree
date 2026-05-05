@@ -57,6 +57,7 @@
 /compiler/src/iree/compiler/API/ @benvanik @IanWood1
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/Common @hanhanW @Max191 @MaheshRavishankar @qedawkins
+/compiler/src/iree/compiler/Codegen/**/*Vector* @amd-eochoalo @Groverkss @hanhanW @sommerlukas
 /compiler/src/iree/compiler/Codegen/Common/GPU @qedawkins @Groverkss @kuhar
 /compiler/src/iree/compiler/Codegen/Dialect/Codegen @Max191 @MaheshRavishankar @qedawkins
 /compiler/src/iree/compiler/Codegen/Dialect/CPU @hanhanW
@@ -70,7 +71,7 @@
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Encoding/ @bjacob @hanhanW @Max191 @jtuyls
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1
+/compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1 @bangtianliu
 /compiler/src/iree/compiler/Dialect/Stream/ @benvanik @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/TensorExt/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/Dialect/Vulkan/ @kuhar

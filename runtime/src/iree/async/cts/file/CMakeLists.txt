@@ -13,12 +13,18 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     file_test
+  HDRS
+    "native_file.h"
   SRCS
     "file_test.cc"
+    "native_file.cc"
   DEPS
     iree::async
     iree::async::cts::util::registry
     iree::async::cts::util::test_base
+    iree::base
+    iree::io::file_handle
+    iree::testing::temp_file
   TESTONLY
   ALWAYSLINK
   PUBLIC

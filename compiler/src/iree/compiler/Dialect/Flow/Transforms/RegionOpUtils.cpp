@@ -846,8 +846,70 @@ bool isCloneableIntoDispatchOp(Operation *op,
   return false;
 }
 
+/// Returns true if `operand` is an init that producers cannot be fused
+/// through (scatter's `original`, insert_slice's `dest`, ...).
+static bool isUnfusableInit(OpOperand &operand) {
+  Operation *op = operand.getOwner();
+  if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(op)) {
+    return insertSlice.getDest() == operand.get();
+  }
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
+  if (!dpsOp || !dpsOp.isDpsInit(&operand)) {
+    return false;
+  }
+  // A null matching map means the init has no mapping into the affine
+  // iteration space, so producers cannot be fused through it.
+  // Scatter's `original` hits this branch — its writes are addressed by
+  // `indices`, not mapped from iteration variables.
+  auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
+  return fusionOp && !fusionOp.getMatchingIndexingMap(&operand);
+}
+
+/// Collects values whose producers materialize a tensor write feeding an
+/// init that cannot be fused through (scatter's `original`,
+/// insert_slice's `dest`, ...). Such producers must stay out of the dispatch.
+static llvm::DenseSet<Value>
+collectUnfusableInitSources(IREE::Flow::DispatchRegionOp regionOp,
+                            CloneableIntoDispatchOptions options) {
+  BackwardSliceOptions sliceOpts;
+  sliceOpts.omitUsesFromAbove = false;
+  sliceOpts.omitBlockArguments = true;
+  sliceOpts.inclusive = true;
+  sliceOpts.filter = [&](Operation *op) {
+    return IREE::Flow::isCloneableIntoDispatchOp(op, options);
+  };
+
+  SetVector<Operation *> slice;
+  regionOp.getBody().walk([&](Operation *op) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (isUnfusableInit(operand)) {
+        (void)getBackwardSlice(operand.get(), &slice, sliceOpts);
+      }
+    }
+  });
+
+  llvm::DenseSet<Value> sources;
+  for (Operation *sliceOp : slice) {
+    if (isa<tensor::ExtractSliceOp, tensor::EmptyOp, tensor::ExpandShapeOp,
+            tensor::CollapseShapeOp>(sliceOp)) {
+      continue;
+    }
+    for (Value r : sliceOp->getResults()) {
+      if (isa<RankedTensorType>(r.getType())) {
+        sources.insert(r);
+      }
+    }
+  }
+  return sources;
+}
+
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
-static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
+static bool
+hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
+                          const llvm::DenseSet<Value> &unfusableInitSources) {
+  if (unfusableInitSources.contains(v)) {
+    return true;
+  }
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
 
@@ -859,22 +921,9 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
       return true;
     }
 
-    Operation *ownerWorkgroupsOp =
-        user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
-    Operation *ownerRegionOp =
-        user->getParentOfType<IREE::Flow::DispatchRegionOp>();
-    Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
-
-    // Ignore uses outside of dispatch workgroups op.
-    if (owner != dispatchOp) {
-      continue;
-    }
-
-    // Cannot fuse producer of `dest` with `tensor.insert_slice`.
-    if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.getDest() == v) {
-        return true;
-      }
+    if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(user);
+        insertSlice && use.get() == insertSlice.getDest()) {
+      return true;
     }
   }
   return false;
@@ -889,6 +938,9 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
   if (valuesDefinedAbove.empty()) {
     return {};
   }
+
+  llvm::DenseSet<Value> unfusableInitSources =
+      collectUnfusableInitSources(regionOp, options);
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
@@ -907,7 +959,8 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
     Operation *definingOp = outsideValue.getDefiningOp();
     if (!definingOp ||
         !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp)) {
+        hasUnfusableUseInDispatch(outsideValue, regionOp,
+                                  unfusableInitSources)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }

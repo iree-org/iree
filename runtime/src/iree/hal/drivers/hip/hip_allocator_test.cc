@@ -29,6 +29,7 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/registration/driver_module.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree::hal::hip {
 namespace {
@@ -53,7 +54,7 @@ class HipAllocatorTest : public ::testing::Test {
       iree_status_ignore(status);
       status = iree_ok_status();
     }
-    ASSERT_TRUE(iree_status_is_ok(status));
+    IREE_ASSERT_OK(status);
 
     status = iree_hal_driver_registry_try_create(
         iree_hal_driver_registry_default(), iree_make_cstring_view("hip"),
@@ -63,11 +64,10 @@ class HipAllocatorTest : public ::testing::Test {
       GTEST_SKIP() << "HIP driver not available";
     }
 
-    status = iree_async_proactor_pool_create(
+    IREE_ASSERT_OK(iree_async_proactor_pool_create(
         iree_numa_node_count(), /*node_ids=*/NULL,
         iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool_);
-    ASSERT_TRUE(iree_status_is_ok(status));
+        &proactor_pool_));
 
     iree_hal_device_create_params_t create_params =
         iree_hal_device_create_params_default();
@@ -124,9 +124,9 @@ TEST_F(HipAllocatorTest, ImportHostAllocationUnregistersOnDestroy) {
   }
 
   void* host_ptr = nullptr;
-  ASSERT_TRUE(iree_status_is_ok(iree_allocator_malloc_aligned(
-      iree_allocator_system(), kSize, /*min_alignment=*/64, /*offset=*/0,
-      &host_ptr)));
+  IREE_ASSERT_OK(iree_allocator_malloc_aligned(iree_allocator_system(), kSize,
+                                               /*min_alignment=*/64,
+                                               /*offset=*/0, &host_ptr));
 
   iree_hal_external_buffer_t ext = {};
   ext.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
@@ -134,9 +134,9 @@ TEST_F(HipAllocatorTest, ImportHostAllocationUnregistersOnDestroy) {
   ext.handle.host_allocation.ptr = host_ptr;
 
   iree_hal_buffer_t* buffer = nullptr;
-  ASSERT_TRUE(iree_status_is_ok(iree_hal_allocator_import_buffer(
+  IREE_ASSERT_OK(iree_hal_allocator_import_buffer(
       allocator, params, &ext, iree_hal_buffer_release_callback_null(),
-      &buffer)));
+      &buffer));
   ASSERT_NE(nullptr, buffer);
 
   iree_hal_buffer_release(buffer);
@@ -175,9 +175,9 @@ TEST_F(HipAllocatorTest, ImportHostAllocationWithCallbackUnregistersOnDestroy) {
   }
 
   void* host_ptr = nullptr;
-  ASSERT_TRUE(iree_status_is_ok(iree_allocator_malloc_aligned(
-      iree_allocator_system(), kSize, /*min_alignment=*/64, /*offset=*/0,
-      &host_ptr)));
+  IREE_ASSERT_OK(iree_allocator_malloc_aligned(iree_allocator_system(), kSize,
+                                               /*min_alignment=*/64,
+                                               /*offset=*/0, &host_ptr));
 
   int release_count = 0;
   iree_hal_buffer_release_callback_t callback = {};
@@ -192,8 +192,8 @@ TEST_F(HipAllocatorTest, ImportHostAllocationWithCallbackUnregistersOnDestroy) {
   ext.handle.host_allocation.ptr = host_ptr;
 
   iree_hal_buffer_t* buffer = nullptr;
-  ASSERT_TRUE(iree_status_is_ok(iree_hal_allocator_import_buffer(
-      allocator, params, &ext, callback, &buffer)));
+  IREE_ASSERT_OK(iree_hal_allocator_import_buffer(allocator, params, &ext,
+                                                  callback, &buffer));
   ASSERT_NE(nullptr, buffer);
 
   iree_hal_buffer_release(buffer);

@@ -1752,14 +1752,83 @@ FailureOr<TilingResult>
 TopkV2Op::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
-  return failure();
+  int64_t rank = getInputRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  int64_t kDim = getDimension();
+  Value outputValues = getOutputValues();
+  Value outputIndices = getOutputIndices();
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return {};
+  }
+
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> slices;
+
+  // Input values.
+  Operation *valuesSlice =
+      getSlice(builder, loc, getValues(), offsets, sizes, strides);
+  tiledOperands.emplace_back(valuesSlice->getResult(0));
+  slices.push_back(valuesSlice);
+
+  // Optional input indices.
+  Value inputIndices = getInputIndices();
+  if (inputIndices) {
+    Operation *indicesSlice =
+        getSlice(builder, loc, inputIndices, offsets, sizes, strides);
+    tiledOperands.emplace_back(indicesSlice->getResult(0));
+    slices.push_back(indicesSlice);
+  }
+
+  // Replace the tile size for the K dimension to use the output size instead of
+  // the input size.
+  Value kSize = getDimValue(builder, loc, outputValues, kDim);
+  outputSizes[kDim] = getAsOpFoldResult(kSize);
+
+  // Output values.
+  Operation *outputValuesSlice =
+      getSlice(builder, loc, outputValues, outputOffsets, outputSizes, strides);
+  tiledOperands.emplace_back(outputValuesSlice->getResult(0));
+  slices.push_back(outputValuesSlice);
+
+  // Optional output indices.
+  Operation *outputIndicesSlice = nullptr;
+  if (outputIndices) {
+    outputIndicesSlice = getSlice(builder, loc, outputIndices, outputOffsets,
+                                  outputSizes, strides);
+    tiledOperands.emplace_back(outputIndicesSlice->getResult(0));
+    slices.push_back(outputIndicesSlice);
+  }
+
+  SmallVector<Type, 2> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputValuesSlice->getResult(0).getType());
+    if (outputIndicesSlice) {
+      resultTypes.push_back(outputIndicesSlice->getResult(0).getType());
+    }
+  }
+
+  Operation *tiledTopkV2Op =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  return TilingResult{
+      {tiledTopkV2Op}, SmallVector<Value>(tiledTopkV2Op->getResults()), slices};
 }
 
 LogicalResult TopkV2Op::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  return failure();
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
+                            getDimension());
+  resultSizes[getDimension()] = getAsOpFoldResult(kSize);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1870,11 +1939,53 @@ LogicalResult ArgCompareOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult ArgCompareOp::getIterationDomainTileFromResultTile(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  // Result tiles are in the output coordinate space (reduction dim removed).
+  // Re-insert the reduction dimension as the full range to get input-rank
+  // coordinates for the iteration domain.
+  int64_t reductionDim = getDimension();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult reductionDimSize =
+      getDim(builder, getLoc(), getInputValue(), reductionDim);
+  int64_t inputRank = offsets.size() + 1;
+  iterDomainOffsets.reserve(inputRank);
+  iterDomainSizes.reserve(inputRank);
+  int64_t outIdx = 0;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i == reductionDim) {
+      iterDomainOffsets.push_back(zero);
+      iterDomainSizes.push_back(reductionDimSize);
+    } else {
+      iterDomainOffsets.push_back(offsets[outIdx]);
+      iterDomainSizes.push_back(sizes[outIdx]);
+      ++outIdx;
+    }
+  }
+  return success();
+}
+
 FailureOr<TilingResult>
 ArgCompareOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
                                       ArrayRef<OpFoldResult> offsets,
                                       ArrayRef<OpFoldResult> sizes) {
-  return getTiledImplementation(builder, offsets, sizes);
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromResultTile(
+          builder, resultNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  FailureOr<TilingResult> tilingResult =
+      getTiledImplementation(builder, mappedOffsets, mappedSizes);
+  if (failed(tilingResult)) {
+    return failure();
+  }
+  return TilingResult{
+      tilingResult->tiledOps,
+      SmallVector<Value>{tilingResult->tiledValues[resultNumber]},
+      tilingResult->generatedSlices};
 }
 
 LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,

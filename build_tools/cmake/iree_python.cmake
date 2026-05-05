@@ -101,6 +101,9 @@ function(iree_local_py_test)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  if(NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
 
   add_test(
     NAME ${_NAME_PATH}
@@ -111,7 +114,7 @@ function(iree_local_py_test)
   )
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
 
   # Extend the PYTHONPATH environment variable with _RULE_PACKAGE_DIRS.
   list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
@@ -123,11 +126,8 @@ function(iree_local_py_test)
   endif()
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
       "PYTHONPATH=${_PYTHONPATH}"
+      "PYTHONDONTWRITEBYTECODE=1"
   )
-
-  if (NOT DEFINED _RULE_TIMEOUT)
-    set(_RULE_TIMEOUT 60)
-  endif()
 
   iree_configure_test(${_NAME_PATH})
 

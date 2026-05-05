@@ -413,8 +413,14 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     }
 
     // Sort the ops in the execution region. This is safe because we are
-    // still unaliased and SSA values imply ordering.
-    mlir::sortTopologically(block);
+    // still unaliased and SSA values imply ordering. If sorting cannot satisfy
+    // all dependencies then partitioning introduced a cycle and the outlined
+    // schedule would fail SSA dominance verification.
+    if (!mlir::sortTopologically(block)) {
+      return mlir::emitError(loc)
+             << "failed to schedule execution partitions without cyclic "
+                "dependencies";
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "\nPartitions constructed:\n";
