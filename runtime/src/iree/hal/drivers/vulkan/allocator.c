@@ -520,10 +520,7 @@ static iree_status_t iree_hal_vulkan_allocator_create_pool_pair(
   const iree_device_size_t max_allocation_size =
       iree_hal_vulkan_allocator_max_allocation_size_for_type(allocator,
                                                              memory_type_index);
-  if (!(iree_all_bits_set(allocator->enabled_features,
-                          IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
-        allocator->sparse_binding_queue != VK_NULL_HANDLE) &&
-      max_allocation_size < range_length) {
+  if (max_allocation_size < range_length) {
     range_length = max_allocation_size;
   }
   range_length &= ~(allocator->default_pool_alignment - 1);
@@ -1219,12 +1216,6 @@ iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
   iree_hal_buffer_params_canonicalize(params);
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_allocator_align_allocation_size(allocation_size));
-  if (!iree_hal_vulkan_allocator_allocation_size_in_range(allocator,
-                                                          *allocation_size)) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
-        allocator, *allocation_size,
-        allocator->properties11.maxMemoryAllocationSize, params));
-  }
 
   iree_hal_vulkan_allocator_memory_placement_t memory_placement;
   if (!iree_hal_vulkan_allocator_resolve_memory_placement(
@@ -1235,12 +1226,12 @@ iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
       iree_hal_vulkan_allocator_max_allocation_size_for_type(
           allocator, memory_placement.memory_type_index);
   if (*allocation_size > max_allocation_size) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
-        allocator, *allocation_size, max_allocation_size, params));
-    if (!iree_hal_vulkan_allocator_resolve_memory_placement(
-            allocator, UINT32_MAX, params, &memory_placement)) {
-      return iree_hal_vulkan_allocator_make_buffer_params_status(params);
-    }
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan queue_alloca allocation size %" PRIu64
+        " exceeds per-memory-type max allocation size %" PRIu64
+        "; queue-ordered sparse binding is required",
+        (uint64_t)*allocation_size, (uint64_t)max_allocation_size);
   }
 
   if (requested_pool) {

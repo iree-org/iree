@@ -61,7 +61,8 @@ iree_status_t iree_hal_vulkan_allocator_query_queue_pool_backend(
 // |allocation_size| is rounded to the Vulkan buffer size granularity. When
 // |requested_pool| is NULL the allocator's default pool policy is used.
 // Otherwise the requested pool is validated against the normalized parameters
-// and returned borrowed in |out_pool|.
+// and returned borrowed in |out_pool|. Allocations requiring sparse binding
+// fail until queue_alloca can submit sparse bind packets as queue work.
 iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
     iree_hal_allocator_t* base_allocator, iree_hal_pool_t* requested_pool,
     iree_hal_buffer_params_t* params, iree_device_size_t* allocation_size,
