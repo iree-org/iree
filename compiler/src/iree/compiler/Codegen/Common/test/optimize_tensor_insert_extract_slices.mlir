@@ -679,27 +679,38 @@ module {
 //     Gather #1 from %indir_table — index vecs consumed directly.
 // CHECK:         %[[G1:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
 // CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[G1_IDX:.+]] = arith.index_cast %[[G1]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 //
 //     Gather #2 from %indir_table — reuses the same index vecs as #1.
 // CHECK:         %[[G2:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
 // CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[G2_IDX:.+]] = arith.index_cast %[[G2]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 //
 //     Clamp results of gather #1 and #2 — pure vector ops, no tensor roundtrip.
 //     G1_IDX -> maxsi -> minui = CLAMP_A, G2_IDX -> maxsi -> minui = CLAMP_B.
 // CHECK:         %[[G1_MAX:.+]] = arith.maxsi %[[G1_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[CLAMP_A:.+]] = arith.minui %[[G1_MAX]], {{.*}} : vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[G2_MAX:.+]] = arith.maxsi %[[G2_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[CLAMP_B:.+]] = arith.minui %[[G2_MAX]], {{.*}} : vector<1x8x8xindex>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 //
 //     Gather #3 from %lut — takes clamped results directly as index vectors.
 // CHECK:         %[[G3:.+]] = iree_vector_ext.transfer_gather %[[LUT]]
 // CHECK-SAME:      [{{.*}}, %[[CLAMP_A]], %[[CLAMP_B]] : {{.*}}]
 // CHECK-SAME:      : tensor<50x40x40xi8>, vector<1x8x8xi8>
+// CHECK-NOT:     tensor<{{.*}}xindex>
 //
 //     Final select + write.
 // CHECK:         %[[GATE:.+]] = arith.cmpi ugt, %[[G3]]
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         %[[RES:.+]] = arith.select %[[GATE]]
+// CHECK-NOT:     tensor<{{.*}}xindex>
 // CHECK:         vector.transfer_write %[[RES]], %[[OUT]]
 // CHECK-NOT:     tensor<{{.*}}xindex>
