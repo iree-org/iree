@@ -12,6 +12,8 @@
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/vulkan/allocator.h"
+#include "iree/hal/drivers/vulkan/executable.h"
+#include "iree/hal/drivers/vulkan/executable_cache.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/syms.h"
@@ -495,6 +497,8 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
 
   VkPhysicalDeviceVulkan13Features enabled_features13 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+      .subgroupSizeControl = snapshot->features13.subgroupSizeControl,
+      .computeFullSubgroups = snapshot->features13.computeFullSubgroups,
       .synchronization2 = VK_TRUE,
       .shaderIntegerDotProduct = snapshot->features13.shaderIntegerDotProduct,
   };
@@ -569,6 +573,16 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
     enabled_features2.features.sparseResidencyBuffer = VK_TRUE;
     enabled_features2.features.sparseResidencyAliased = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
+  }
+  if (iree_any_bit_set(requested_features,
+                       IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL) &&
+      !snapshot->features13.subgroupSizeControl) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "requested Vulkan subgroupSizeControl is not available");
+  }
+  if (snapshot->features13.subgroupSizeControl) {
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL;
   }
 
   VkDeviceCreateInfo device_create_info = {
@@ -788,7 +802,10 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
     return iree_ok_status();
   }
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
-    *out_value = 0;
+    *out_value = iree_hal_vulkan_executable_format_supported(
+                     device->enabled_features, key)
+                     ? 1
+                     : 0;
     return iree_ok_status();
   }
   if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
@@ -917,10 +934,12 @@ static iree_status_t iree_hal_vulkan_logical_device_create_event(
 static iree_status_t iree_hal_vulkan_logical_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_hal_executable_cache_t** out_executable_cache) {
-  (void)base_device;
-  (void)identifier;
-  *out_executable_cache = NULL;
-  return iree_hal_vulkan_unimplemented(IREE_SV("executable caches"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  return iree_hal_vulkan_executable_cache_create(
+      &device->syms, device->logical_device, &device->physical_device,
+      device->enabled_features, identifier, device->host_allocator,
+      out_executable_cache);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_import_file(
@@ -1384,6 +1403,14 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
         IREE_STATUS_FAILED_PRECONDITION,
         "external Vulkan VkDevice enabled sparse residency aliasing but the "
         "physical device did not report it");
+  }
+  if (iree_all_bits_set(enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL) &&
+      !snapshot->features13.subgroupSizeControl) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external Vulkan VkDevice enabled subgroupSizeControl but the physical "
+        "device did not report it");
   }
   return iree_ok_status();
 }

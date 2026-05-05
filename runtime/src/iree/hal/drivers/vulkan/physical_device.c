@@ -348,7 +348,13 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
 
   out_snapshot->subgroup_properties = (VkPhysicalDeviceSubgroupProperties){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
+      .pNext = &out_snapshot->subgroup_size_control_properties,
   };
+  out_snapshot->subgroup_size_control_properties =
+      (VkPhysicalDeviceSubgroupSizeControlProperties){
+          .sType =
+              VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES,
+      };
   out_snapshot->driver_properties = (VkPhysicalDeviceDriverProperties){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES,
       .pNext = &out_snapshot->subgroup_properties,
@@ -826,7 +832,8 @@ iree_status_t iree_hal_vulkan_dump_physical_device_info(
         builder,
         "features: bufferDeviceAddress=%s timelineSemaphore=%s "
         "scalarBlockLayout=%s synchronization2=%s shaderInt8=%s "
-        "shaderFloat16=%s shaderIntegerDotProduct=%s\n",
+        "shaderFloat16=%s shaderIntegerDotProduct=%s "
+        "subgroupSizeControl=%s\n",
         iree_hal_vulkan_bool_string(snapshot.features12.bufferDeviceAddress),
         iree_hal_vulkan_bool_string(snapshot.features12.timelineSemaphore),
         iree_hal_vulkan_bool_string(snapshot.features12.scalarBlockLayout),
@@ -834,7 +841,8 @@ iree_status_t iree_hal_vulkan_dump_physical_device_info(
         iree_hal_vulkan_bool_string(snapshot.features12.shaderInt8),
         iree_hal_vulkan_bool_string(snapshot.features12.shaderFloat16),
         iree_hal_vulkan_bool_string(
-            snapshot.features13.shaderIntegerDotProduct)));
+            snapshot.features13.shaderIntegerDotProduct),
+        iree_hal_vulkan_bool_string(snapshot.features13.subgroupSizeControl)));
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder, "sparse: binding=%s residencyBuffer=%s residencyAliased=%s\n",
         iree_hal_vulkan_bool_string(snapshot.features2.features.sparseBinding),
@@ -844,11 +852,16 @@ iree_status_t iree_hal_vulkan_dump_physical_device_info(
             snapshot.features2.features.sparseResidencyAliased)));
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder,
-        "subgroup: size=%u operations=0x%08x quadOperationsInAllStages=%s\n",
+        "subgroup: size=%u operations=0x%08x quadOperationsInAllStages=%s "
+        "minSubgroupSize=%u maxSubgroupSize=%u "
+        "requiredSubgroupSizeStages=0x%08x\n",
         snapshot.subgroup_properties.subgroupSize,
         snapshot.subgroup_properties.supportedOperations,
         iree_hal_vulkan_bool_string(
-            snapshot.subgroup_properties.quadOperationsInAllStages)));
+            snapshot.subgroup_properties.quadOperationsInAllStages),
+        snapshot.subgroup_size_control_properties.minSubgroupSize,
+        snapshot.subgroup_size_control_properties.maxSubgroupSize,
+        snapshot.subgroup_size_control_properties.requiredSubgroupSizeStages));
 
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder, "queue_families: %u\n", snapshot.queue_family_count));

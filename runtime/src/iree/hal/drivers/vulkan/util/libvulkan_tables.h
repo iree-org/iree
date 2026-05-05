@@ -202,3 +202,69 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkWaitSemaphores,
                                 const VkSemaphoreWaitInfo* pWaitInfo,
                                 uint64_t timeout),
                            ARGS(device, pWaitInfo, timeout))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreatePipelineCache,
+                           DECL(VkDevice device,
+                                const VkPipelineCacheCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkPipelineCache* pPipelineCache),
+                           ARGS(device, pCreateInfo, pAllocator,
+                                pPipelineCache))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyPipelineCache,
+                           DECL(VkDevice device, VkPipelineCache pipelineCache,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, pipelineCache, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(
+    VkResult, vkCreateDescriptorSetLayout,
+    DECL(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
+         const VkAllocationCallbacks* pAllocator,
+         VkDescriptorSetLayout* pSetLayout),
+    ARGS(device, pCreateInfo, pAllocator, pSetLayout))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDescriptorSetLayout,
+                           DECL(VkDevice device,
+                                VkDescriptorSetLayout descriptorSetLayout,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, descriptorSetLayout, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreatePipelineLayout,
+                           DECL(VkDevice device,
+                                const VkPipelineLayoutCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkPipelineLayout* pPipelineLayout),
+                           ARGS(device, pCreateInfo, pAllocator,
+                                pPipelineLayout))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyPipelineLayout,
+                           DECL(VkDevice device,
+                                VkPipelineLayout pipelineLayout,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, pipelineLayout, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateShaderModule,
+                           DECL(VkDevice device,
+                                const VkShaderModuleCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkShaderModule* pShaderModule),
+                           ARGS(device, pCreateInfo, pAllocator, pShaderModule))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyShaderModule,
+                           DECL(VkDevice device, VkShaderModule shaderModule,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, shaderModule, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateComputePipelines,
+                           DECL(VkDevice device, VkPipelineCache pipelineCache,
+                                uint32_t createInfoCount,
+                                const VkComputePipelineCreateInfo* pCreateInfos,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkPipeline* pPipelines),
+                           ARGS(device, pipelineCache, createInfoCount,
+                                pCreateInfos, pAllocator, pPipelines))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyPipeline,
+                           DECL(VkDevice device, VkPipeline pipeline,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, pipeline, pAllocator))

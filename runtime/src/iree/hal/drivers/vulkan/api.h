@@ -88,6 +88,8 @@ typedef enum iree_hal_vulkan_feature_bits_t {
   IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2 = 1u << 8,
   // Reports scalar block layout support enabled on a logical device.
   IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT = 1u << 9,
+  // Requests and reports subgroup size control on a logical device.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL = 1u << 10,
   // Required enabled logical-device feature set for the rewrite baseline.
   IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
       IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES |
@@ -102,7 +104,8 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED |
-      IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE,
+      IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL,
 } iree_hal_vulkan_feature_bits_t;
 
 typedef uint32_t iree_hal_vulkan_features_t;

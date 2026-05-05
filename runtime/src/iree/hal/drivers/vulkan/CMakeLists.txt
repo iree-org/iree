@@ -32,6 +32,10 @@ iree_cc_library(
     "buffer.h"
     "driver.c"
     "driver.h"
+    "executable.c"
+    "executable.h"
+    "executable_cache.c"
+    "executable_cache.h"
     "logical_device.c"
     "logical_device.h"
     "physical_device.c"
@@ -50,6 +54,7 @@ iree_cc_library(
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal
+    iree::base::internal::flatcc::parsing
     iree::base::threading
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
@@ -57,6 +62,10 @@ iree_cc_library(
     iree::hal::memory::slab_provider
     iree::hal::memory::tlsf_pool
     iree::hal::memory::tracing
+    iree::hal::utils::executable_debug_info
+    iree::hal::utils::executable_header
+    iree::schemas::executable_debug_info_c_fbs
+    iree::schemas::vulkan_executable_def_c_fbs
   PUBLIC
 )
 
