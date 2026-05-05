@@ -366,6 +366,67 @@ static int32_t iree_hal_vulkan_allocator_memory_type_priority(
   return priority;
 }
 
+// Heap queries feed first-match consumers such as the caching allocator. Prefer
+// private device-local memory for common dispatches, then UMA/BAR memory, then
+// host-local staging/readback classes.
+static int32_t iree_hal_vulkan_allocator_query_memory_heap_priority(
+    iree_hal_memory_type_t memory_type) {
+  int32_t priority = 0;
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    priority += 1000;
+    if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      priority += 300;
+    }
+  }
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    priority += 200;
+  }
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    priority += 100;
+  }
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+    priority += 40;
+  }
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    priority += 20;
+  }
+  return priority;
+}
+
+static bool iree_hal_vulkan_allocator_memory_type_precedes(
+    const iree_hal_vulkan_allocator_t* allocator,
+    uint32_t left_memory_type_index, uint32_t right_memory_type_index) {
+  const VkPhysicalDeviceMemoryProperties* memory_properties =
+      &allocator->memory_properties2.memoryProperties;
+  const VkMemoryType* left_memory_type =
+      &memory_properties->memoryTypes[left_memory_type_index];
+  const VkMemoryType* right_memory_type =
+      &memory_properties->memoryTypes[right_memory_type_index];
+  const iree_hal_memory_type_t left_hal_memory_type =
+      iree_hal_vulkan_memory_type_from_vk(left_memory_type->propertyFlags);
+  const iree_hal_memory_type_t right_hal_memory_type =
+      iree_hal_vulkan_memory_type_from_vk(right_memory_type->propertyFlags);
+  const int32_t left_priority =
+      iree_hal_vulkan_allocator_query_memory_heap_priority(
+          left_hal_memory_type);
+  const int32_t right_priority =
+      iree_hal_vulkan_allocator_query_memory_heap_priority(
+          right_hal_memory_type);
+  if (left_priority != right_priority) {
+    return left_priority > right_priority;
+  }
+  const iree_device_size_t left_max_allocation_size =
+      iree_hal_vulkan_allocator_max_allocation_size_for_type(
+          allocator, left_memory_type_index);
+  const iree_device_size_t right_max_allocation_size =
+      iree_hal_vulkan_allocator_max_allocation_size_for_type(
+          allocator, right_memory_type_index);
+  if (left_max_allocation_size != right_max_allocation_size) {
+    return left_max_allocation_size > right_max_allocation_size;
+  }
+  return left_memory_type_index < right_memory_type_index;
+}
+
 static int32_t iree_hal_vulkan_allocator_host_write_memory_priority(
     iree_hal_memory_type_t memory_type) {
   int32_t priority = 0;
@@ -655,8 +716,28 @@ static iree_status_t iree_hal_vulkan_allocator_query_memory_heaps(
   }
   if (heaps == NULL) return iree_ok_status();
 
+  uint32_t memory_type_indices[VK_MAX_MEMORY_TYPES];
   for (iree_host_size_t i = 0; i < heap_count; ++i) {
-    const VkMemoryType* memory_type = &memory_properties->memoryTypes[i];
+    memory_type_indices[i] = (uint32_t)i;
+  }
+  for (iree_host_size_t i = 1; i < heap_count; ++i) {
+    const uint32_t memory_type_index = memory_type_indices[i];
+    iree_host_size_t insertion_index = i;
+    while (insertion_index > 0 &&
+           iree_hal_vulkan_allocator_memory_type_precedes(
+               allocator, memory_type_index,
+               memory_type_indices[insertion_index - 1])) {
+      memory_type_indices[insertion_index] =
+          memory_type_indices[insertion_index - 1];
+      --insertion_index;
+    }
+    memory_type_indices[insertion_index] = memory_type_index;
+  }
+
+  for (iree_host_size_t i = 0; i < heap_count; ++i) {
+    const uint32_t memory_type_index = memory_type_indices[i];
+    const VkMemoryType* memory_type =
+        &memory_properties->memoryTypes[memory_type_index];
     const iree_hal_memory_type_t hal_memory_type =
         iree_hal_vulkan_memory_type_from_vk(memory_type->propertyFlags);
     heaps[i] = (iree_hal_allocator_memory_heap_t){
@@ -664,8 +745,8 @@ static iree_status_t iree_hal_vulkan_allocator_query_memory_heaps(
         .allowed_usage =
             iree_hal_vulkan_allowed_usage_from_memory_type(hal_memory_type),
         .max_allocation_size =
-            iree_hal_vulkan_allocator_max_allocation_size_for_type(allocator,
-                                                                   (uint32_t)i),
+            iree_hal_vulkan_allocator_max_allocation_size_for_type(
+                allocator, memory_type_index),
         .min_alignment = 1,
     };
   }
