@@ -291,6 +291,9 @@ VER_0 {
     mlirComplexTypeGetElementType;
     mlirComplexTypeGetName;
     mlirComplexTypeGetTypeID;
+    mlirConditionallySpeculatableOpInterfaceAttachFallbackModel;
+    mlirConditionallySpeculatableOpInterfaceGetSpeculatability;
+    mlirConditionallySpeculatableOpInterfaceTypeID;
     mlirContextAppendDialectRegistry;
     mlirContextAttachDiagnosticHandler;
     mlirContextCreate;
