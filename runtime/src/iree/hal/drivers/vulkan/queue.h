@@ -17,6 +17,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
+#include "iree/hal/local/profile.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,6 +167,15 @@ typedef struct iree_hal_vulkan_queue_t {
 
   // Queue-owned completion thread waiting on epoch_semaphore.
   iree_thread_t* completion_thread;
+
+  // Active HAL-native profile recorder, when profiling is enabled. Borrowed.
+  iree_hal_local_profile_recorder_t* profile_recorder;
+
+  // Queue identity emitted with HAL-native profile records.
+  iree_hal_local_profile_queue_scope_t profile_scope;
+
+  // Shared submission id source for HAL-native profile records. Borrowed.
+  iree_atomic_int64_t* profile_submission_counter;
 } iree_hal_vulkan_queue_t;
 
 // Initializes a queue lane around a borrowed VkQueue.
@@ -183,6 +193,13 @@ iree_status_t iree_hal_vulkan_queue_assign_frontier(
 
 // Retires this queue's causal frontier axis and stops completion processing.
 void iree_hal_vulkan_queue_retire_frontier(iree_hal_vulkan_queue_t* queue);
+
+// Assigns the active HAL-native profile recorder for this queue.
+void iree_hal_vulkan_queue_set_profile_recorder(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t profile_scope,
+    iree_atomic_int64_t* submission_counter);
 
 // Submits a queue-ordered semaphore barrier.
 iree_status_t iree_hal_vulkan_queue_submit_barrier(

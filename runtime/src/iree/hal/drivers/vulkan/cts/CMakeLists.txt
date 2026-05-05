@@ -137,6 +137,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    profiling_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+    "profiling_test.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::cts::util::profile_test_util
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_basic_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"

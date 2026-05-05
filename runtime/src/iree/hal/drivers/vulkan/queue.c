@@ -115,6 +115,42 @@ struct iree_hal_vulkan_queue_pending_submission_t {
   // Submission kind controlling completion-side actions.
   iree_hal_vulkan_queue_submission_kind_t kind;
 
+  // HAL-native profiling metadata captured for this submission.
+  struct {
+    // Recorder active when the submission was captured. Borrowed.
+    iree_hal_local_profile_recorder_t* recorder;
+
+    // Queue metadata scope active when the submission was captured.
+    iree_hal_local_profile_queue_scope_t scope;
+
+    // Queue event type corresponding to |kind|.
+    iree_hal_profile_queue_event_type_t type;
+
+    // Queue event flags accumulated during dependency resolution.
+    iree_hal_profile_queue_event_flags_t flags;
+
+    // Strategy used to satisfy wait dependencies.
+    iree_hal_profile_queue_dependency_strategy_t dependency_strategy;
+
+    // Host timestamp when the queue operation was captured.
+    iree_time_t submit_host_time_ns;
+
+    // Host timestamp when the operation was accepted for native/deferred work.
+    iree_time_t ready_host_time_ns;
+
+    // Profile submission id assigned to this queue operation.
+    uint64_t submission_id;
+
+    // Number of payload operations represented by this queue operation.
+    uint32_t operation_count;
+
+    // Type-specific payload length represented by this queue operation.
+    uint64_t payload_length;
+
+    // Set after the queue event has been appended to the recorder.
+    bool queue_event_recorded;
+  } profile;
+
   // Native Vulkan command buffer submitted for GPU-encoded work.
   VkCommandBuffer native_command_buffer;
 
@@ -547,6 +583,169 @@ static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
   return iree_ok_status();
 }
 
+static uint32_t iree_hal_vulkan_queue_profile_count(iree_host_size_t value) {
+  return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static iree_hal_profile_queue_event_type_t iree_hal_vulkan_queue_profile_type(
+    iree_hal_vulkan_queue_submission_kind_t kind) {
+  switch (kind) {
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_BARRIER:
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_BARRIER;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_HOST_CALL:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_HOST_CALL;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_FILL:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_FILL;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_UPDATE:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_UPDATE;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_COPY:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_COPY;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DEALLOCA:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_WRITE:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_WRITE;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_READ:
+      return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_READ;
+  }
+  return IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_NONE;
+}
+
+static uint32_t iree_hal_vulkan_queue_profile_operation_count(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  switch (submission->kind) {
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_BARRIER:
+      return 0;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND:
+      return submission->sparse_bind.bind_count;
+    default:
+      return 1;
+  }
+}
+
+static uint64_t iree_hal_vulkan_queue_profile_payload_length(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  switch (submission->kind) {
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_FILL:
+      return submission->fill.length;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_UPDATE:
+      return submission->update.length;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_COPY:
+      return submission->copy.length;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA:
+      return submission->alloca.allocation_size;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_READ:
+      return submission->read.length;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_WRITE:
+      return submission->write.length;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND: {
+      uint64_t total_length = 0;
+      for (uint32_t i = 0; i < submission->sparse_bind.bind_count; ++i) {
+        const VkDeviceSize bind_size = submission->sparse_bind.binds[i].size;
+        if (total_length > UINT64_MAX - bind_size) return UINT64_MAX;
+        total_length += bind_size;
+      }
+      return total_length;
+    }
+    default:
+      return 0;
+  }
+}
+
+static void iree_hal_vulkan_queue_profile_submission_initialize(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_hal_local_profile_recorder_t* recorder = queue->profile_recorder;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    return;
+  }
+  submission->profile.recorder = recorder;
+  submission->profile.scope = queue->profile_scope;
+  submission->profile.type =
+      iree_hal_vulkan_queue_profile_type(submission->kind);
+  submission->profile.submit_host_time_ns = iree_time_now();
+  if (queue->profile_submission_counter) {
+    submission->profile.submission_id = (uint64_t)iree_atomic_fetch_add(
+        queue->profile_submission_counter, 1, iree_memory_order_relaxed);
+  }
+}
+
+static void iree_hal_vulkan_queue_profile_set_dependency_resolution(
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const iree_hal_vulkan_queue_wait_resolution_t* resolution) {
+  if (!submission->profile.recorder) return;
+  if (submission->profile.dependency_strategy ==
+      IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER) {
+    return;
+  }
+  if (submission->wait_semaphore_list.count == 0) {
+    submission->profile.dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_NONE;
+  } else if (resolution->needs_deferral) {
+    submission->profile.dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER;
+    submission->profile.flags |=
+        IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
+  } else if (resolution->wait_info_count != 0) {
+    submission->profile.dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_DEVICE_BARRIER;
+  } else {
+    submission->profile.dependency_strategy =
+        IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_INLINE;
+  }
+}
+
+static void iree_hal_vulkan_queue_profile_force_software_defer(
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (!submission->profile.recorder) return;
+  submission->profile.dependency_strategy =
+      IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER;
+  submission->profile.flags |=
+      IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
+}
+
+static void iree_hal_vulkan_queue_profile_record_submission(
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (!submission->profile.recorder ||
+      submission->profile.queue_event_recorded) {
+    return;
+  }
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          submission->profile.recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
+    return;
+  }
+  submission->profile.queue_event_recorded = true;
+  submission->profile.ready_host_time_ns = iree_time_now();
+  submission->profile.operation_count =
+      iree_hal_vulkan_queue_profile_operation_count(submission);
+  submission->profile.payload_length =
+      iree_hal_vulkan_queue_profile_payload_length(submission);
+
+  iree_hal_local_profile_queue_event_info_t event_info =
+      iree_hal_local_profile_queue_event_info_default();
+  event_info.type = submission->profile.type;
+  event_info.flags = submission->profile.flags;
+  event_info.dependency_strategy = submission->profile.dependency_strategy;
+  event_info.scope = submission->profile.scope;
+  event_info.host_time_ns = submission->profile.submit_host_time_ns;
+  event_info.ready_host_time_ns = submission->profile.ready_host_time_ns;
+  event_info.submission_id = submission->profile.submission_id;
+  event_info.wait_count = iree_hal_vulkan_queue_profile_count(
+      submission->wait_semaphore_list.count);
+  event_info.signal_count = iree_hal_vulkan_queue_profile_count(
+      submission->signal_semaphore_list.count);
+  event_info.operation_count = submission->profile.operation_count;
+  event_info.payload_length = submission->profile.payload_length;
+  iree_hal_local_profile_recorder_append_queue_event(
+      submission->profile.recorder, &event_info, /*out_event_id=*/NULL);
+}
+
 static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -570,6 +769,7 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
            sizeof(submission->host_call.args));
     submission->host_call.flags = flags;
   }
+  iree_hal_vulkan_queue_profile_submission_initialize(queue, submission);
 
   iree_status_t status =
       iree_hal_semaphore_list_clone(&wait_semaphore_list, queue->host_allocator,
@@ -1728,6 +1928,10 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     status = iree_hal_vulkan_queue_resolve_waits(
         queue, submission->wait_semaphore_list, &submission->frontier,
         allow_software_deferral, resolution);
+    if (iree_status_is_ok(status)) {
+      iree_hal_vulkan_queue_profile_set_dependency_resolution(submission,
+                                                              resolution);
+    }
   }
   if (iree_status_is_ok(status) && resolution->needs_deferral) {
     return iree_ok_status();
@@ -1745,7 +1949,9 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
                         iree_memory_order_release);
       iree_atomic_store(&submission->alloca.memory_wait_callback_complete, 1,
                         iree_memory_order_relaxed);
+      iree_hal_vulkan_queue_profile_force_software_defer(submission);
       iree_hal_vulkan_queue_append_deferred_submission(queue, submission);
+      iree_hal_vulkan_queue_profile_record_submission(submission);
       out_result->memory_wait_submission = submission;
       return iree_ok_status();
     }
@@ -1797,6 +2003,7 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
       iree_slim_mutex_unlock(queue->queue_handle_mutex);
     }
     if (iree_status_is_ok(status)) {
+      iree_hal_vulkan_queue_profile_record_submission(submission);
       iree_hal_vulkan_queue_publish_signals(queue, submission);
       queue->frontier = submission->frontier;
       queue->next_epoch_value = queue->next_epoch_value + 1;
@@ -2575,6 +2782,22 @@ void iree_hal_vulkan_queue_retire_frontier(iree_hal_vulkan_queue_t* queue) {
   queue->axis = 0;
 }
 
+void iree_hal_vulkan_queue_set_profile_recorder(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t profile_scope,
+    iree_atomic_int64_t* submission_counter) {
+  if (profile_recorder) {
+    queue->profile_scope = profile_scope;
+    queue->profile_submission_counter = submission_counter;
+    queue->profile_recorder = profile_recorder;
+  } else {
+    queue->profile_recorder = NULL;
+    queue->profile_scope = profile_scope;
+    queue->profile_submission_counter = NULL;
+  }
+}
+
 static iree_status_t iree_hal_vulkan_queue_submit_captured_submission(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
@@ -2604,6 +2827,7 @@ static iree_status_t iree_hal_vulkan_queue_submit_captured_submission(
           iree_hal_vulkan_queue_prepare_deferred_submission(queue, submission);
       if (iree_status_is_ok(status)) {
         iree_hal_vulkan_queue_append_deferred_submission(queue, submission);
+        iree_hal_vulkan_queue_profile_record_submission(submission);
         deferred_submission = submission;
         submission = NULL;
       }

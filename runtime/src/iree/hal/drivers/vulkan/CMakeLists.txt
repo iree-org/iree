@@ -63,6 +63,7 @@ iree_cc_library(
     iree::base::threading::thread
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
+    iree::hal::local::profile
     iree::hal::local::transient_buffer
     iree::hal::memory::passthrough_pool
     iree::hal::memory::slab_provider

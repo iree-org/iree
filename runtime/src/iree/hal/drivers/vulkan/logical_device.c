@@ -19,6 +19,7 @@
 #include "iree/hal/drivers/vulkan/queue.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/syms.h"
+#include "iree/hal/local/profile.h"
 #include "iree/hal/utils/file_registry.h"
 
 //===----------------------------------------------------------------------===//
@@ -729,6 +730,15 @@ struct iree_hal_vulkan_logical_device_t {
   // Logical allocator.
   iree_hal_allocator_t* device_allocator;
 
+  // Active HAL-native profile recorder, when profiling is enabled.
+  iree_hal_local_profile_recorder_t* profile_recorder;
+
+  // Next process-local profiling session id.
+  uint64_t next_profile_session_id;
+
+  // Next profile submission id shared across queue lanes.
+  iree_atomic_int64_t next_profile_submission_id;
+
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
@@ -767,6 +777,23 @@ static bool iree_hal_vulkan_logical_device_query_pool_epoch(
                                          device->frontier_tracker, axis, epoch);
 }
 
+static uint32_t iree_hal_vulkan_logical_device_profile_count(
+    iree_host_size_t value) {
+  return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static iree_hal_local_profile_queue_scope_t
+iree_hal_vulkan_logical_device_profile_queue_scope(
+    const iree_hal_vulkan_logical_device_t* device, uint32_t queue_ordinal) {
+  const uint32_t physical_device_ordinal =
+      device->topology_info.topology ? device->topology_info.topology_index : 0;
+  return (iree_hal_local_profile_queue_scope_t){
+      .physical_device_ordinal = physical_device_ordinal,
+      .queue_ordinal = queue_ordinal,
+      .stream_id = ((uint64_t)physical_device_ordinal << 32) | queue_ordinal,
+  };
+}
+
 static void iree_hal_vulkan_logical_device_clear_topology_info(
     iree_hal_vulkan_logical_device_t* device) {
   if (device->frontier_tracker) {
@@ -786,6 +813,9 @@ static void iree_hal_vulkan_logical_device_destroy(
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_allocator_t host_allocator = device->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_ASSERT(!device->profile_recorder,
+              "profiling sessions must be ended before device destruction");
 
   iree_hal_vulkan_logical_device_clear_topology_info(device);
   iree_hal_channel_provider_release(device->channel_provider);
@@ -1364,21 +1394,113 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_flush(
 static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  (void)base_device;
-  (void)options;
-  return iree_hal_vulkan_unimplemented(IREE_SV("device profiling"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  if (device->profile_recorder) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot nest Vulkan profile captures");
+  }
+  if (iree_hal_device_profiling_options_requests_lightweight_statistics(
+          options)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan lightweight statistics require host execution and executable "
+        "metadata profiling");
+  }
+  const iree_hal_device_profiling_data_families_t supported_data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS;
+  const iree_hal_device_profiling_data_families_t unsupported_data_families =
+      options->data_families & ~supported_data_families;
+  if (unsupported_data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "unsupported Vulkan profiling data families 0x%" PRIx64,
+        unsupported_data_families);
+  }
+
+  const uint32_t physical_device_ordinal =
+      device->topology_info.topology ? device->topology_info.topology_index : 0;
+  iree_hal_profile_device_record_t device_record =
+      iree_hal_profile_device_record_default();
+  device_record.physical_device_ordinal = physical_device_ordinal;
+  device_record.queue_count =
+      iree_hal_vulkan_logical_device_profile_count(device->queue_lane_count);
+  device_record.flags |= IREE_HAL_PROFILE_DEVICE_FLAG_PHYSICAL_DEVICE_UUID;
+  memcpy(device_record.physical_device_uuid,
+         device->physical_device.id_properties.deviceUUID,
+         sizeof(device_record.physical_device_uuid));
+
+  iree_hal_profile_queue_record_t* queue_records = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+      device->host_allocator, device->queue_lane_count, sizeof(*queue_records),
+      (void**)&queue_records));
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    const uint32_t queue_ordinal =
+        iree_hal_vulkan_logical_device_profile_count(i);
+    const iree_hal_local_profile_queue_scope_t scope =
+        iree_hal_vulkan_logical_device_profile_queue_scope(device,
+                                                           queue_ordinal);
+    queue_records[i] = iree_hal_profile_queue_record_default();
+    queue_records[i].physical_device_ordinal = scope.physical_device_ordinal;
+    queue_records[i].queue_ordinal = scope.queue_ordinal;
+    queue_records[i].stream_id = scope.stream_id;
+  }
+
+  iree_hal_local_profile_recorder_options_t recorder_options = {
+      .name = device->identifier,
+      .session_id = ++device->next_profile_session_id,
+      .device_record_count = 1,
+      .device_records = &device_record,
+      .queue_record_count = device->queue_lane_count,
+      .queue_records = queue_records,
+  };
+  iree_hal_local_profile_recorder_t* recorder = NULL;
+  iree_status_t status = iree_hal_local_profile_recorder_create(
+      &recorder_options, options, device->host_allocator, &recorder);
+  iree_allocator_free(device->host_allocator, queue_records);
+  if (!iree_status_is_ok(status) || !recorder) return status;
+
+  iree_atomic_store(&device->next_profile_submission_id, 1,
+                    iree_memory_order_relaxed);
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_set_profile_recorder(
+        &device->queue_lanes[i], recorder,
+        iree_hal_vulkan_logical_device_profile_queue_scope(
+            device, iree_hal_vulkan_logical_device_profile_count(i)),
+        &device->next_profile_submission_id);
+  }
+  device->profile_recorder = recorder;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_profiling_flush(
     iree_hal_device_t* base_device) {
-  (void)base_device;
-  return iree_hal_vulkan_unimplemented(IREE_SV("device profiling"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  return iree_hal_local_profile_recorder_flush(device->profile_recorder);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
     iree_hal_device_t* base_device) {
-  (void)base_device;
-  return iree_hal_vulkan_unimplemented(IREE_SV("device profiling"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
+  if (!recorder) return iree_ok_status();
+
+  const iree_hal_local_profile_queue_scope_t empty_scope =
+      iree_hal_local_profile_queue_scope_default();
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_set_profile_recorder(
+        &device->queue_lanes[i], /*profile_recorder=*/NULL, empty_scope,
+        /*submission_counter=*/NULL);
+  }
+  device->profile_recorder = NULL;
+  iree_atomic_store(&device->next_profile_submission_id, 0,
+                    iree_memory_order_relaxed);
+
+  iree_status_t status = iree_hal_local_profile_recorder_end(recorder);
+  iree_hal_local_profile_recorder_destroy(recorder);
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_external_capture_begin(
