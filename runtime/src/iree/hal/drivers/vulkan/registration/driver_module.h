@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,10 +6,6 @@
 
 #ifndef IREE_HAL_DRIVERS_VULKAN_REGISTRATION_DRIVER_MODULE_H_
 #define IREE_HAL_DRIVERS_VULKAN_REGISTRATION_DRIVER_MODULE_H_
-
-// clang-format off: must be included before all other headers.
-#include "iree/hal/drivers/vulkan/vulkan_headers.h"
-// clang-format on
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"

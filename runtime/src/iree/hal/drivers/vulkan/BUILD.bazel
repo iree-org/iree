@@ -1,12 +1,10 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# HAL implementation using Vulkan and (likely) SPIR-V executables.
-
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,116 +13,29 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "vulkan",
-    srcs = [
-        "api.cc",
-        "base_buffer.c",
-        "base_buffer.h",
-        "builtin_executables.cc",
-        "builtin_executables.h",
-        "command_queue.h",
-        "completion_watcher.cc",
-        "completion_watcher.h",
-        "debug_reporter.cc",
-        "debug_reporter.h",
-        "descriptor_pool_cache.cc",
-        "descriptor_pool_cache.h",
-        "descriptor_set_arena.cc",
-        "descriptor_set_arena.h",
-        "direct_command_buffer.cc",
-        "direct_command_buffer.h",
-        "direct_command_queue.cc",
-        "direct_command_queue.h",
-        "extensibility_util.cc",
-        "extensibility_util.h",
-        "handle_util.h",
-        "native_allocator.cc",
-        "native_allocator.h",
-        "native_buffer.cc",
-        "native_buffer.h",
-        "native_event.cc",
-        "native_event.h",
-        "native_executable.cc",
-        "native_executable.h",
-        "native_semaphore.cc",
-        "native_semaphore.h",
-        "nop_executable_cache.cc",
-        "nop_executable_cache.h",
-        "pipeline_layout.cc",
-        "pipeline_layout.h",
-        "sparse_buffer.cc",
-        "sparse_buffer.h",
-        "status_util.c",
-        "status_util.h",
-        "tracing.cc",
-        "tracing.h",
-        "vulkan_device.cc",
-        "vulkan_driver.cc",
-        "vulkan_headers.h",
-    ],
+    name = "api",
     hdrs = [
-        # TODO(benvanik): hide all but api.h.
         "api.h",
-        "vulkan_device.h",
-        "vulkan_driver.h",
     ],
     deps = [
-        ":dynamic_symbols",
-        "//runtime/src/iree/async",
-        "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/base/internal/flatcc:parsing",
-        "//runtime/src/iree/base/threading",
-        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/drivers/vulkan/builtin",
-        "//runtime/src/iree/hal/drivers/vulkan/util:arena",
-        "//runtime/src/iree/hal/drivers/vulkan/util:intrusive_list",
-        "//runtime/src/iree/hal/drivers/vulkan/util:ref_ptr",
-        "//runtime/src/iree/hal/utils:deferred_command_buffer",
-        "//runtime/src/iree/hal/utils:executable_debug_info",
-        "//runtime/src/iree/hal/utils:executable_header",
-        "//runtime/src/iree/hal/utils:file_transfer",
-        "//runtime/src/iree/hal/utils:files",
-        "//runtime/src/iree/hal/utils:queue_emulation",
-        "//runtime/src/iree/hal/utils:queue_host_call_emulation",
-        "//runtime/src/iree/hal/utils:resource_set",
-        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
-        "//runtime/src/iree/schemas:vulkan_executable_def_c_fbs",
-        "@vulkan_headers",
     ],
 )
 
 iree_runtime_cc_library(
-    name = "dynamic_symbols",
+    name = "vulkan",
     srcs = [
-        "dynamic_symbols.cc",
-        "vulkan_headers.h",
-    ],
-    hdrs = [
-        "dynamic_symbols.h",
-    ],
-    textual_hdrs = [
-        "dynamic_symbol_tables.h",
+        "api.c",
+        "driver.c",
+        "driver.h",
+        "syms.h",
     ],
     deps = [
+        ":api",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:dynamic_library",
-        "//runtime/src/iree/hal/drivers/vulkan/util:ref_ptr",
-        "@vulkan_headers",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "dynamic_symbols_test",
-    srcs = ["dynamic_symbols_test.cc"],
-    tags = ["driver=vulkan"],
-    deps = [
-        ":dynamic_symbols",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/vulkan/util:libvulkan",
     ],
 )

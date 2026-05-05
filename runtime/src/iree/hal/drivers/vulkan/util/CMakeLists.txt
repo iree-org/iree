@@ -12,72 +12,17 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    arena
+    libvulkan
   HDRS
-    "arena.h"
+    "libvulkan.h"
   SRCS
-    "arena.cc"
+    "libvulkan.c"
   DEPS
     iree::base
+    iree::base::internal::dynamic_library
+    iree::base::internal::path
+    iree::hal::drivers::vulkan::api
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    arena_test
-  SRCS
-    "arena_test.cc"
-  DEPS
-    ::arena
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    intrusive_list
-  HDRS
-    "intrusive_list.h"
-    "intrusive_list_unique_ptr.inc"
-  DEPS
-    iree::base
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    intrusive_list_test
-  SRCS
-    "intrusive_list_test.cc"
-    "intrusive_list_unique_ptr_test.cc"
-  DEPS
-    ::intrusive_list
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    ref_ptr
-  HDRS
-    "ref_ptr.h"
-  DEPS
-    iree::base
-    iree::base::internal
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    ref_ptr_test
-  SRCS
-    "ref_ptr_test.cc"
-  DEPS
-    ::ref_ptr
-    iree::testing::gtest
-    iree::testing::gtest_main
-  TIMEOUT
-    60
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
