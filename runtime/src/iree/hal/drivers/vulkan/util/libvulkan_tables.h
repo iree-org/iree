@@ -90,3 +90,31 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkGetDeviceQueue2,
                                 const VkDeviceQueueInfo2* pQueueInfo,
                                 VkQueue* pQueue),
                            ARGS(device, pQueueInfo, pQueue))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateSemaphore,
+                           DECL(VkDevice device,
+                                const VkSemaphoreCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkSemaphore* pSemaphore),
+                           ARGS(device, pCreateInfo, pAllocator, pSemaphore))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroySemaphore,
+                           DECL(VkDevice device, VkSemaphore semaphore,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, semaphore, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkGetSemaphoreCounterValue,
+                           DECL(VkDevice device, VkSemaphore semaphore,
+                                uint64_t* pValue),
+                           ARGS(device, semaphore, pValue))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkSignalSemaphore,
+                           DECL(VkDevice device,
+                                const VkSemaphoreSignalInfo* pSignalInfo),
+                           ARGS(device, pSignalInfo))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkWaitSemaphores,
+                           DECL(VkDevice device,
+                                const VkSemaphoreWaitInfo* pWaitInfo,
+                                uint64_t timeout),
+                           ARGS(device, pWaitInfo, timeout))

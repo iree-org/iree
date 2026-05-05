@@ -196,6 +196,13 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_device_syms(
   IREE_API_EXPORT void iree_##symbol(                                  \
       const iree_hal_vulkan_device_syms_t* IREE_RESTRICT syms,         \
       const char* file, uint32_t line _COMMA_DECL(decl));
+#define IREE_HAL_VULKAN_DECLARE_DEVICE_VkResult(result_type, symbol, decl) \
+  IREE_API_EXPORT iree_status_t iree_##symbol(                             \
+      const iree_hal_vulkan_device_syms_t* IREE_RESTRICT syms,             \
+      const char* file, uint32_t line _COMMA_DECL(decl));                  \
+  IREE_API_EXPORT result_type iree_##symbol##_raw(                         \
+      const iree_hal_vulkan_device_syms_t* IREE_RESTRICT syms _COMMA_DECL( \
+          decl));
 
 #define IREE_HAL_VULKAN_LOADER_PFN(result_type, symbol, decl, args) \
   IREE_HAL_VULKAN_DECLARE_LOADER_##result_type(result_type, symbol, DECL(decl))
@@ -217,6 +224,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_device_syms(
 #undef IREE_HAL_VULKAN_INSTANCE_PFN
 #undef IREE_HAL_VULKAN_LOADER_PFN
 #undef IREE_HAL_VULKAN_DECLARE_DEVICE_void
+#undef IREE_HAL_VULKAN_DECLARE_DEVICE_VkResult
 #undef IREE_HAL_VULKAN_DECLARE_INSTANCE_void
 #undef IREE_HAL_VULKAN_DECLARE_INSTANCE_VkResult
 #undef IREE_HAL_VULKAN_DECLARE_LOADER_VkResult

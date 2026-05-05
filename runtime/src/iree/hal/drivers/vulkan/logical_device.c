@@ -10,8 +10,10 @@
 
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
+#include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/vulkan/allocator.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
+#include "iree/hal/drivers/vulkan/semaphore.h"
 
 //===----------------------------------------------------------------------===//
 // Physical-device selection
@@ -316,6 +318,22 @@ static iree_status_t iree_hal_vulkan_select_queues(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_queue_affinity_normalize(
+    iree_hal_queue_affinity_t supported_affinity,
+    iree_hal_queue_affinity_t requested_affinity,
+    iree_hal_queue_affinity_t* out_normalized_affinity) {
+  iree_hal_queue_affinity_t normalized_affinity =
+      iree_hal_queue_affinity_is_any(requested_affinity) ? supported_affinity
+                                                         : requested_affinity;
+  iree_hal_queue_affinity_and_into(normalized_affinity, supported_affinity);
+  if (iree_hal_queue_affinity_is_empty(normalized_affinity)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no valid Vulkan queue affinity bits specified");
+  }
+  *out_normalized_affinity = normalized_affinity;
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // Device extension/feature policy
 //===----------------------------------------------------------------------===//
@@ -509,6 +527,12 @@ struct iree_hal_vulkan_logical_device_t {
   // Retained Vulkan loader keeping resolved entry-point code live.
   iree_hal_vulkan_libvulkan_t libvulkan;
 
+  // Proactor pool retained from create_params for async host waits.
+  iree_async_proactor_pool_t* proactor_pool;
+
+  // Proactor borrowed from the pool for device-local async operations.
+  iree_async_proactor_t* proactor;
+
   // Driver-owned Vulkan instance and instance dispatch table.
   iree_hal_vulkan_instance_t instance;
 
@@ -598,6 +622,7 @@ static void iree_hal_vulkan_logical_device_destroy(
   iree_hal_vulkan_logical_device_clear_topology_info(device);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_hal_allocator_release(device->device_allocator);
+  iree_async_proactor_pool_release(device->proactor_pool);
   if (device->logical_device && device->owns_logical_device) {
     iree_vkDestroyDevice(IREE_VULKAN_DEVICE(&device->syms),
                          device->logical_device, /*pAllocator=*/NULL);
@@ -822,20 +847,23 @@ static iree_status_t iree_hal_vulkan_logical_device_create_semaphore(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     uint64_t initial_value, iree_hal_semaphore_flags_t flags,
     iree_hal_semaphore_t** out_semaphore) {
-  (void)base_device;
-  (void)queue_affinity;
-  (void)initial_value;
-  (void)flags;
-  *out_semaphore = NULL;
-  return iree_hal_vulkan_unimplemented(IREE_SV("timeline semaphores"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
+      device->queue_affinity_mask, queue_affinity, &queue_affinity));
+  return iree_hal_vulkan_semaphore_create(
+      &device->syms, device->logical_device, device->proactor, queue_affinity,
+      initial_value, flags, device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
 iree_hal_vulkan_logical_device_query_semaphore_compatibility(
     iree_hal_device_t* base_device, iree_hal_semaphore_t* semaphore) {
   (void)base_device;
-  (void)semaphore;
-  return IREE_HAL_SEMAPHORE_COMPATIBILITY_NONE;
+  if (iree_hal_vulkan_semaphore_isa(semaphore)) {
+    return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
+  }
+  return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_query_queue_pool_backend(
@@ -1118,6 +1146,12 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_allocator_create(
         &device->physical_device, host_allocator, &device->device_allocator);
+  }
+  if (iree_status_is_ok(status)) {
+    device->proactor_pool = create_params->proactor_pool;
+    iree_async_proactor_pool_retain(device->proactor_pool);
+    status = iree_async_proactor_pool_get(device->proactor_pool, 0,
+                                          &device->proactor);
   }
 
   iree_hal_vulkan_selected_queues_t selected_queues;

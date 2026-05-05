@@ -150,13 +150,3 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(
       IREE_STATUS_FAILED_PRECONDITION,
       "buffer is not backed by the Vulkan HAL rewrite scaffold");
 }
-
-IREE_API_EXPORT iree_status_t iree_hal_vulkan_semaphore_handle(
-    iree_hal_semaphore_t* semaphore, VkSemaphore* out_handle) {
-  IREE_ASSERT_ARGUMENT(semaphore);
-  IREE_ASSERT_ARGUMENT(out_handle);
-  *out_handle = (VkSemaphore)0;
-  return iree_make_status(
-      IREE_STATUS_FAILED_PRECONDITION,
-      "semaphore is not backed by the Vulkan HAL rewrite scaffold");
-}

@@ -34,11 +34,14 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "semaphore.c"
+    "semaphore.h"
     "syms.h"
   DEPS
     ::api
     Vulkan::Headers
     iree::async
+    iree::async::util::proactor_pool
     iree::base
     iree::base::internal
     iree::hal
