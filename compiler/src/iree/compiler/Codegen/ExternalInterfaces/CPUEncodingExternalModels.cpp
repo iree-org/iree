@@ -345,45 +345,23 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   }
 }
 
-/// Returns x86 `MMAIntrinsic` cases whose required ISA extensions are all
-/// present in `config` (`cpu_features` / target features). Only the "natural"
-/// (M<=N) intrinsic orientations are listed; the M↔N-swapped orientation is
-/// expressed by the `transposed_intrinsic` flag on DataTiledMMAAttr, enumerated
-/// separately by the cost model.
-static SmallVector<IREE::CPU::MMAIntrinsic>
-getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
-  using IREE::CPU::MMAIntrinsic;
-  SmallVector<MMAIntrinsic> out;
-  if (!config) {
-    return out;
-  }
-  if (!isX86(config)) {
-    return out;
-  }
-  static const MMAIntrinsic kAllX86[] = {
-      MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
-      MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
-      MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
-      MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
-      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
-      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
-  };
-  for (MMAIntrinsic intr : kAllX86) {
-    SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
-    if (required.empty()) {
-      continue;
-    }
-    if (llvm::all_of(required,
-                     [&](StringRef f) { return hasFeature(config, f); })) {
-      out.push_back(intr);
-    }
-  }
-  return out;
-}
+/// All x86 `MMAIntrinsic` enum values. The TableGen-generated enum API only
+/// gives us `symbolizeMMAIntrinsic(uint32_t)` and
+/// `getMaxEnumValForMMAIntrinsic()`, not a way to iterate the actual cases —
+/// and the values are sparse, so we keep the list manually. Add new x86
+/// intrinsic enum values here.
+static constexpr IREE::CPU::MMAIntrinsic kAllX86Intrinsics[] = {
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
+    IREE::CPU::MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
+};
 
 /// Shape and element-bit-width summary of one intrinsic, with unroll factors
 /// all 1, in a specific orientation. The LHS is (M, K), the RHS is (N, K) —
@@ -396,24 +374,17 @@ struct IntrinsicInfo {
   int64_t lhsBits = 0, rhsBits = 0, accBits = 0;
 };
 
-/// Returns the IntrinsicInfo for `intr` in the given orientation, if its ABC
-/// element types match `elementTypes`. Returns nullopt otherwise.
-static std::optional<IntrinsicInfo>
-getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
-                 IREE::CPU::MMAIntrinsic intr, bool transposed) {
+/// Returns the IntrinsicInfo for `intr` in the given orientation.
+static IntrinsicInfo getIntrinsicInfo(MLIRContext *ctx,
+                                      IREE::CPU::MMAIntrinsic intr,
+                                      bool transposed) {
   auto base = IREE::CPU::DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
                                                /*intrinsics_n=*/1,
                                                /*intrinsics_k=*/1, transposed);
   SmallVector<VectorType> baseTiles;
   base.getUndistributedTileTypes(baseTiles);
-  if (baseTiles.size() != 3) {
-    return std::nullopt;
-  }
-  if (baseTiles[0].getElementType() != elementTypes[0] ||
-      baseTiles[1].getElementType() != elementTypes[1] ||
-      baseTiles[2].getElementType() != elementTypes[2]) {
-    return std::nullopt;
-  }
+  assert(baseTiles.size() == 3 &&
+         "MMAIntrinsic must lower to a 3-operand DataTiledMMA");
   IntrinsicInfo info;
   info.intrinsicM = baseTiles[0].getShape()[0];
   info.intrinsicK = baseTiles[0].getShape()[1];
@@ -422,6 +393,28 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   info.rhsBits = baseTiles[1].getElementType().getIntOrFloatBitWidth();
   info.accBits = baseTiles[2].getElementType().getIntOrFloatBitWidth();
   return info;
+}
+
+/// True if the (LHS, RHS, ACC) tile element types of `intr` match
+/// `elementTypes`.
+static bool intrinsicMatchesElementTypes(MLIRContext *ctx,
+                                         IREE::CPU::MMAIntrinsic intr,
+                                         ArrayRef<Type> elementTypes) {
+  if (elementTypes.size() != 3) {
+    return false;
+  }
+  auto base = IREE::CPU::DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
+                                               /*intrinsics_n=*/1,
+                                               /*intrinsics_k=*/1,
+                                               /*transposed_intrinsic=*/false);
+  SmallVector<VectorType> baseTiles;
+  base.getUndistributedTileTypes(baseTiles);
+  if (baseTiles.size() != 3) {
+    return false;
+  }
+  return baseTiles[0].getElementType() == elementTypes[0] &&
+         baseTiles[1].getElementType() == elementTypes[1] &&
+         baseTiles[2].getElementType() == elementTypes[2];
 }
 
 /// Phase 1 of `chooseCpuInnerTiledMmaForEncoding`: jointly pick the
@@ -439,8 +432,7 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
 ///
 /// Returns nullopt if no compatible intrinsic exists.
 static std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>>
-chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
-                DictionaryAttr config,
+chooseIntrinsic(MLIRContext *ctx, ArrayRef<IREE::CPU::MMAIntrinsic> intrinsics,
                 const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
   auto usefulSize = [](int64_t matmulSize, int64_t intrinsicSize) -> int64_t {
     return ShapedType::isDynamic(matmulSize)
@@ -449,17 +441,13 @@ chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   };
   std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> best;
   std::pair<int64_t, int64_t> bestScore = {-1, -1};
-  for (IREE::CPU::MMAIntrinsic intr : getMmaIntrinsicsForTargetConfig(config)) {
+  for (IREE::CPU::MMAIntrinsic intr : intrinsics) {
     for (bool transposed : {false, true}) {
-      std::optional<IntrinsicInfo> info =
-          getIntrinsicInfo(ctx, elementTypes, intr, transposed);
-      if (!info) {
-        continue;
-      }
-      int64_t usefulOps = usefulSize(matmulSizes.M, info->intrinsicM) *
-                          usefulSize(matmulSizes.N, info->intrinsicN) *
-                          info->intrinsicK;
-      int64_t rawOps = info->intrinsicM * info->intrinsicN * info->intrinsicK;
+      IntrinsicInfo info = getIntrinsicInfo(ctx, intr, transposed);
+      int64_t usefulOps = usefulSize(matmulSizes.M, info.intrinsicM) *
+                          usefulSize(matmulSizes.N, info.intrinsicN) *
+                          info.intrinsicK;
+      int64_t rawOps = info.intrinsicM * info.intrinsicN * info.intrinsicK;
       std::pair<int64_t, int64_t> score = {usefulOps, rawOps};
       if (score > bestScore) {
         bestScore = score;
@@ -496,22 +484,17 @@ static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
 // Returns nullopt if no feasible (im, in) exists. The returned pair is
 // (intrinsicsM, intrinsicsN).
 static std::optional<std::pair<int64_t, int64_t>>
-chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
-                IREE::CPU::MMAIntrinsic intr, bool transposed,
+chooseUnrolling(MLIRContext *ctx, IREE::CPU::MMAIntrinsic intr, bool transposed,
                 const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
-  std::optional<IntrinsicInfo> info =
-      getIntrinsicInfo(ctx, elementTypes, intr, transposed);
-  if (!info) {
-    return std::nullopt;
-  }
+  IntrinsicInfo info = getIntrinsicInfo(ctx, intr, transposed);
   int64_t regBitBudget = IREE::CPU::getRegisterSpaceBytes(intr) * 8;
-  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, regBitBudget);
-  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, regBitBudget);
-  int64_t accTerm = info->intrinsicM * info->intrinsicN * info->accBits;
-  int64_t lhsTerm = info->intrinsicM * info->intrinsicK * info->lhsBits;
-  int64_t rhsTerm = info->intrinsicN * info->intrinsicK * info->rhsBits;
+  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info.intrinsicM, regBitBudget);
+  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info.intrinsicN, regBitBudget);
+  int64_t accTerm = info.intrinsicM * info.intrinsicN * info.accBits;
+  int64_t lhsTerm = info.intrinsicM * info.intrinsicK * info.lhsBits;
+  int64_t rhsTerm = info.intrinsicN * info.intrinsicK * info.rhsBits;
   std::optional<std::pair<int64_t, int64_t>> best;
-  double bestIntensity = -1.0;
+  float bestIntensity = -1.0f;
   // Enumerate power-of-two intrinsicsM; for each, pick the largest feasible
   // power-of-two intrinsicsN under the bit budget and the static N cap.
   // The budget bounds im on its own (im*lhsTerm alone must be < budget),
@@ -527,9 +510,9 @@ chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
       continue;
     }
     int64_t in = llvm::bit_floor(inCap);
-    double effM = static_cast<double>(im) * info->intrinsicM;
-    double effN = static_cast<double>(in) * info->intrinsicN;
-    double intensity = effM * effN / (effM + effN);
+    float effM = static_cast<float>(im) * info.intrinsicM;
+    float effN = static_cast<float>(in) * info.intrinsicN;
+    float intensity = effM * effN / (effM + effN);
     if (intensity > bestIntensity) {
       bestIntensity = intensity;
       best = {im, in};
@@ -553,14 +536,19 @@ chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
   if (failed(matmulSizes)) {
     return {};
   }
+  SmallVector<IREE::CPU::MMAIntrinsic> intrinsics =
+      matchMmaIntrinsics(ctx, config, elementTypes);
+  if (intrinsics.empty()) {
+    return {};
+  }
   std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> intrChoice =
-      chooseIntrinsic(ctx, elementTypes, config, *matmulSizes);
+      chooseIntrinsic(ctx, intrinsics, *matmulSizes);
   if (!intrChoice) {
     return {};
   }
   auto [intr, transposed] = *intrChoice;
   std::optional<std::pair<int64_t, int64_t>> unroll =
-      chooseUnrolling(ctx, elementTypes, intr, transposed, *matmulSizes);
+      chooseUnrolling(ctx, intr, transposed, *matmulSizes);
   if (!unroll) {
     return {};
   }
@@ -1424,6 +1412,30 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
             VMVXEncodingResolverMaterializerAttr, VMVXLayoutResolverAttr,
             VMVXSerializableAttr, VMVXEncodingResolverVerifier>(*ctx);
       });
+}
+
+SmallVector<IREE::CPU::MMAIntrinsic>
+matchMmaIntrinsics(MLIRContext *ctx, DictionaryAttr config,
+                   ArrayRef<Type> elementTypes) {
+  SmallVector<IREE::CPU::MMAIntrinsic> out;
+  if (!config || !isX86(config)) {
+    return out;
+  }
+  for (IREE::CPU::MMAIntrinsic intr : kAllX86Intrinsics) {
+    SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
+    if (required.empty()) {
+      continue;
+    }
+    if (!llvm::all_of(required,
+                      [&](StringRef f) { return hasFeature(config, f); })) {
+      continue;
+    }
+    if (!intrinsicMatchesElementTypes(ctx, intr, elementTypes)) {
+      continue;
+    }
+    out.push_back(intr);
+  }
+  return out;
 }
 
 } // namespace mlir::iree_compiler::IREE::CPU

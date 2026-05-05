@@ -5,10 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -185,6 +188,75 @@ static bool isSupportedScaledContractionOp(linalg::LinalgOp linalgOp) {
   return true;
 }
 
+/// Returns the (lhs, rhs, acc) element types of a contraction-like
+/// `linalg::LinalgOp`, or an empty vector on failure.
+static SmallVector<Type, 3>
+getContractionElementTypes(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumDpsInputs() < 2 || linalgOp.getNumDpsInits() != 1) {
+    return {};
+  }
+  auto getEltType = [](Value v) -> Type {
+    auto t = dyn_cast<RankedTensorType>(v.getType());
+    return t ? t.getElementType() : Type();
+  };
+  Type lhs = getEltType(linalgOp.getDpsInputs()[0]);
+  Type rhs = getEltType(linalgOp.getDpsInputs()[1]);
+  Type acc = getEltType(linalgOp.getDpsInits()[0]);
+  if (!lhs || !rhs || !acc) {
+    return {};
+  }
+  return {lhs, rhs, acc};
+}
+
+/// Returns true if `linalgOp`'s element types have a candidate CPU
+/// MMA intrinsic on every `enable_inner_tiled` target in
+/// `innerTiledCpuConfigs`.
+static bool hasCpuMmaIntrinsic(linalg::LinalgOp linalgOp,
+                               ArrayRef<DictionaryAttr> innerTiledCpuConfigs) {
+  if (innerTiledCpuConfigs.empty()) {
+    return true;
+  }
+  SmallVector<Type, 3> elementTypes = getContractionElementTypes(linalgOp);
+  if (elementTypes.empty()) {
+    return true;
+  }
+  MLIRContext *ctx = linalgOp.getContext();
+  for (DictionaryAttr config : innerTiledCpuConfigs) {
+    if (IREE::CPU::matchMmaIntrinsics(ctx, config, elementTypes).empty()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Returns the configurations of CPU `enable_inner_tiled` executable targets in
+/// the module.
+static SmallVector<DictionaryAttr>
+collectInnerTiledCpuConfigs(FunctionOpInterface funcOp) {
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  SmallVector<DictionaryAttr> result;
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+    auto deviceTargetAttr = dyn_cast_if_present<IREE::HAL::DeviceTargetAttr>(
+        globalOp.getGlobalInitialValue());
+    if (!deviceTargetAttr) {
+      continue;
+    }
+    for (IREE::HAL::ExecutableTargetAttr target :
+         deviceTargetAttr.getExecutableTargets()) {
+      DictionaryAttr config = target.getConfiguration();
+      if (!config) {
+        continue;
+      }
+      auto enableAttr =
+          dyn_cast_if_present<BoolAttr>(config.get("enable_inner_tiled"));
+      if (enableAttr && enableAttr.getValue()) {
+        result.push_back(config);
+      }
+    }
+  }
+  return result;
+}
+
 void AnnotateDataTilingHintsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
 
@@ -207,6 +279,15 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
     }
   }
 
+  // On CPU specifically, the available MMA intrinsics may fail to cover all
+  // element type combinations that we need to compile. Collecting CPU configs
+  // here in preparation for logic below to opt out of data-tiling when some
+  // target config misses a MMA intrinsic for the linalgOp's element types.
+  //
+  // When none of the target configs is CPU, cpuConfigs is empty and the
+  // below condition becomes vacuous.
+  SmallVector<DictionaryAttr> cpuConfigs = collectInnerTiledCpuConfigs(funcOp);
+
   SmallVector<Operation *> candidates;
   WalkResult result = funcOp.walk([&](Operation *op) -> WalkResult {
     if (IREE::Encoding::hasDataTilingHint(op)) {
@@ -219,6 +300,12 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
     if ((enableMatmul && isSupportedContractionOp(linalgOp)) ||
         (enableScaledMatmul && isSupportedScaledContractionOp(linalgOp)) ||
         (enableConvolution && isSupportedConvolutionOp(linalgOp))) {
+      // Last filter: if cpuConfigs is not empty, skip data tiling on inputs
+      // that would land in the CPU inner-tiled path on some target without any
+      // matching MMA intrinsic for their element types.
+      if (!hasCpuMmaIntrinsic(linalgOp, cpuConfigs)) {
+        return WalkResult::advance();
+      }
       candidates.push_back(op);
     }
     return WalkResult::advance();
