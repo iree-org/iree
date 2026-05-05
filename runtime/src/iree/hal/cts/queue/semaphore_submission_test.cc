@@ -12,7 +12,32 @@
 
 namespace iree::hal::cts {
 
-class SemaphoreSubmissionTest : public CtsTestBase<> {};
+namespace {
+
+constexpr iree_hal_queue_affinity_t kQueueAffinity0 =
+    ((iree_hal_queue_affinity_t)1ull) << 0;
+constexpr iree_hal_queue_affinity_t kQueueAffinity1 =
+    ((iree_hal_queue_affinity_t)1ull) << 1;
+
+}  // namespace
+
+class SemaphoreSubmissionTest : public CtsTestBase<> {
+ protected:
+  iree_status_t HasQueueAffinity(iree_hal_queue_affinity_t queue_affinity,
+                                 bool* out_has_queue_affinity) {
+    *out_has_queue_affinity = false;
+    iree_hal_queue_pool_backend_t backend = {0};
+    iree_status_t status = iree_hal_device_query_queue_pool_backend(
+        device_, queue_affinity, &backend);
+    if (iree_status_is_invalid_argument(status)) {
+      iree_status_free(status);
+      return iree_ok_status();
+    }
+    IREE_RETURN_IF_ERROR(status);
+    *out_has_queue_affinity = true;
+    return iree_ok_status();
+  }
+};
 
 TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
@@ -94,6 +119,83 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);
   iree_hal_semaphore_release(signal_semaphore);
+}
+
+TEST_P(SemaphoreSubmissionTest, CrossQueueWaitBeforeSignal) {
+  bool has_queue1 = false;
+  IREE_ASSERT_OK(HasQueueAffinity(kQueueAffinity1, &has_queue1));
+  if (!has_queue1) {
+    GTEST_SKIP() << "backend exposes fewer than two explicit queue affinities";
+    return;
+  }
+
+  SemaphoreList producer_signal(device_, {0}, {1});
+  SemaphoreList consumer_signal(device_, {0}, {1});
+  SemaphoreList empty_wait;
+
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(device_, kQueueAffinity1,
+                                               producer_signal, consumer_signal,
+                                               IREE_HAL_EXECUTE_FLAG_NONE));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(consumer_signal));
+
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(device_, kQueueAffinity0,
+                                               empty_wait, producer_signal,
+                                               IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      consumer_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+}
+
+TEST_P(SemaphoreSubmissionTest, MultiQueueFanOutDifferentValuesBeforeSignal) {
+  bool has_queue1 = false;
+  IREE_ASSERT_OK(HasQueueAffinity(kQueueAffinity1, &has_queue1));
+  if (!has_queue1) {
+    GTEST_SKIP() << "backend exposes fewer than two explicit queue affinities";
+    return;
+  }
+
+  iree_hal_semaphore_t* producer_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* queue0_done_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* queue1_done_semaphore = CreateSemaphore();
+
+  uint64_t queue0_wait_value = 1;
+  iree_hal_semaphore_list_t queue0_wait = {/*count=*/1, &producer_semaphore,
+                                           &queue0_wait_value};
+  uint64_t queue0_done_value = 1;
+  iree_hal_semaphore_list_t queue0_done = {/*count=*/1, &queue0_done_semaphore,
+                                           &queue0_done_value};
+
+  uint64_t queue1_wait_value = 2;
+  iree_hal_semaphore_list_t queue1_wait = {/*count=*/1, &producer_semaphore,
+                                           &queue1_wait_value};
+  uint64_t queue1_done_value = 1;
+  iree_hal_semaphore_list_t queue1_done = {/*count=*/1, &queue1_done_semaphore,
+                                           &queue1_done_value};
+
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(device_, kQueueAffinity1,
+                                               queue1_wait, queue1_done,
+                                               IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(device_, kQueueAffinity0,
+                                               queue0_wait, queue0_done,
+                                               IREE_HAL_EXECUTE_FLAG_NONE));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(queue0_done));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(queue1_done));
+
+  uint64_t producer_signal_value = 3;
+  iree_hal_semaphore_list_t producer_signal = {/*count=*/1, &producer_semaphore,
+                                               &producer_signal_value};
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(
+      device_, kQueueAffinity0, iree_hal_semaphore_list_empty(),
+      producer_signal, IREE_HAL_EXECUTE_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      queue0_done, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      queue1_done, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  CheckSemaphoreValue(producer_semaphore, producer_signal_value);
+
+  iree_hal_semaphore_release(producer_semaphore);
+  iree_hal_semaphore_release(queue0_done_semaphore);
+  iree_hal_semaphore_release(queue1_done_semaphore);
 }
 
 TEST_P(SemaphoreSubmissionTest,
