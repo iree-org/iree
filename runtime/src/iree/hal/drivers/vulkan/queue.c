@@ -30,9 +30,17 @@ typedef enum iree_hal_vulkan_queue_submission_kind_e {
 } iree_hal_vulkan_queue_submission_kind_t;
 
 typedef enum iree_hal_vulkan_queue_deferred_state_e {
+  // Linked on the deferred list and waiting for software dependencies.
   IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PENDING = 0,
-  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_READY = 1,
-  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_CANCELLING = 2,
+
+  // A dependency callback owns promotion from deferred to ready.
+  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PROMOTING = 1,
+
+  // Linked on the ready list for native submission by the completion thread.
+  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_READY = 2,
+
+  // Cancellation owns the unsubmitted node after unlinking it from deferred.
+  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_CANCELLING = 3,
 } iree_hal_vulkan_queue_deferred_state_t;
 
 typedef enum iree_hal_vulkan_queue_alloca_memory_wait_kind_e {
@@ -390,7 +398,7 @@ static void iree_hal_vulkan_queue_append_deferred_submission(
   queue->deferred_head = submission;
 }
 
-static void iree_hal_vulkan_queue_unlink_deferred_submission(
+static bool iree_hal_vulkan_queue_unlink_deferred_submission(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   iree_hal_vulkan_queue_pending_submission_t** link = &queue->deferred_head;
@@ -398,10 +406,11 @@ static void iree_hal_vulkan_queue_unlink_deferred_submission(
     if (*link == submission) {
       *link = submission->next;
       submission->next = NULL;
-      return;
+      return true;
     }
     link = &(*link)->next;
   }
+  return false;
 }
 
 static void iree_hal_vulkan_queue_append_ready_submission(
@@ -414,6 +423,24 @@ static void iree_hal_vulkan_queue_append_ready_submission(
     queue->ready_head = submission;
   }
   queue->ready_tail = submission;
+}
+
+static bool iree_hal_vulkan_queue_unlink_ready_submission(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_hal_vulkan_queue_pending_submission_t* previous = NULL;
+  iree_hal_vulkan_queue_pending_submission_t** link = &queue->ready_head;
+  while (*link) {
+    if (*link == submission) {
+      *link = submission->next;
+      if (queue->ready_tail == submission) queue->ready_tail = previous;
+      submission->next = NULL;
+      return true;
+    }
+    previous = *link;
+    link = &(*link)->next;
+  }
+  return false;
 }
 
 static iree_hal_vulkan_queue_pending_submission_t*
@@ -1704,27 +1731,61 @@ static void iree_hal_vulkan_queue_submission_record_wait_status(
   }
 }
 
-static bool iree_hal_vulkan_queue_submission_mark_ready(
+static bool iree_hal_vulkan_queue_submission_claim_promotion(
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   int32_t expected_state = IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PENDING;
   return iree_atomic_compare_exchange_strong(
       &submission->deferred_state, &expected_state,
-      IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_READY, iree_memory_order_acq_rel,
+      IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PROMOTING, iree_memory_order_acq_rel,
       iree_memory_order_acquire);
 }
 
 static void iree_hal_vulkan_queue_deferred_submission_ready(
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   iree_hal_vulkan_queue_t* queue = submission->queue;
+  iree_status_t failure_status = iree_ok_status();
   iree_slim_mutex_lock(&queue->submission_mutex);
-  iree_hal_vulkan_queue_unlink_deferred_submission(queue, submission);
-  iree_hal_vulkan_queue_append_ready_submission(queue, submission);
+  const bool was_deferred =
+      iree_hal_vulkan_queue_unlink_deferred_submission(queue, submission);
+  failure_status = (iree_status_t)iree_atomic_load(&queue->failure_status,
+                                                   iree_memory_order_acquire);
+  if (was_deferred && iree_status_is_ok(failure_status)) {
+    iree_hal_vulkan_queue_append_ready_submission(queue, submission);
+    iree_atomic_store(&submission->deferred_state,
+                      IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_READY,
+                      iree_memory_order_release);
+  }
   iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  iree_notification_post(&submission->callback_notification, IREE_ALL_WAITERS);
+  if (!was_deferred) {
+    iree_hal_vulkan_queue_fail_unsubmitted_submission(
+        queue, submission,
+        iree_make_status(IREE_STATUS_INTERNAL,
+                         "Vulkan deferred submission promotion lost queue "
+                         "ownership"));
+    return;
+  }
+  if (!iree_status_is_ok(failure_status)) {
+    iree_hal_vulkan_queue_fail_unsubmitted_submission(
+        queue, submission, iree_status_clone(failure_status));
+    return;
+  }
+
   iree_status_t wake_status = iree_hal_vulkan_queue_signal_wakeup(queue);
   if (!iree_status_is_ok(wake_status)) {
     iree_status_t stored_status =
         iree_hal_vulkan_queue_store_error(queue, wake_status);
-    iree_status_free(stored_status);
+    iree_slim_mutex_lock(&queue->submission_mutex);
+    const bool recovered_submission =
+        iree_hal_vulkan_queue_unlink_ready_submission(queue, submission);
+    iree_slim_mutex_unlock(&queue->submission_mutex);
+    if (recovered_submission) {
+      iree_hal_vulkan_queue_fail_unsubmitted_submission(queue, submission,
+                                                        stored_status);
+    } else {
+      iree_status_free(stored_status);
+    }
   }
 }
 
@@ -1739,12 +1800,12 @@ static void iree_hal_vulkan_queue_deferred_wait_resolved(
 
   const int32_t previous_count = iree_atomic_fetch_sub(
       &submission->wait_count, 1, iree_memory_order_acq_rel);
-  const bool owns_ready =
+  const bool owns_promotion =
       previous_count == 1 &&
-      iree_hal_vulkan_queue_submission_mark_ready(submission);
+      iree_hal_vulkan_queue_submission_claim_promotion(submission);
 
   iree_hal_vulkan_queue_wait_entry_publish_callback_complete(entry);
-  if (!owns_ready) return;
+  if (!owns_promotion) return;
 
   iree_notification_await(&submission->callback_notification,
                           iree_hal_vulkan_queue_wait_callbacks_are_complete,
@@ -1803,7 +1864,7 @@ static iree_status_t iree_hal_vulkan_queue_start_deferred_submission(
       const int32_t previous_count = iree_atomic_fetch_sub(
           &submission->wait_count, unregistered, iree_memory_order_acq_rel);
       if (previous_count == unregistered &&
-          iree_hal_vulkan_queue_submission_mark_ready(submission)) {
+          iree_hal_vulkan_queue_submission_claim_promotion(submission)) {
         iree_notification_await(
             &submission->callback_notification,
             iree_hal_vulkan_queue_wait_callbacks_are_complete, submission,
@@ -1855,10 +1916,10 @@ static void iree_hal_vulkan_queue_alloca_memory_wait_resolved(
   }
 
   iree_hal_vulkan_queue_submission_record_wait_status(submission, status);
-  const bool owns_ready =
-      iree_hal_vulkan_queue_submission_mark_ready(submission);
+  const bool owns_promotion =
+      iree_hal_vulkan_queue_submission_claim_promotion(submission);
   iree_hal_vulkan_queue_alloca_memory_wait_publish_complete(submission);
-  if (owns_ready) {
+  if (owns_promotion) {
     iree_hal_vulkan_queue_deferred_submission_ready(submission);
   }
 }
@@ -1968,6 +2029,31 @@ static iree_status_t iree_hal_vulkan_queue_submission_take_wait_failure(
                                              0, iree_memory_order_acquire);
 }
 
+static iree_hal_vulkan_queue_pending_submission_t*
+iree_hal_vulkan_queue_take_cancellable_deferred_submissions_under_lock(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_hal_vulkan_queue_pending_submission_t* cancellable_head = NULL;
+  iree_hal_vulkan_queue_pending_submission_t** cancellable_tail =
+      &cancellable_head;
+  iree_hal_vulkan_queue_pending_submission_t** link = &queue->deferred_head;
+  while (*link) {
+    iree_hal_vulkan_queue_pending_submission_t* submission = *link;
+    int32_t expected_state = IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PENDING;
+    if (iree_atomic_compare_exchange_strong(
+            &submission->deferred_state, &expected_state,
+            IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_CANCELLING,
+            iree_memory_order_acq_rel, iree_memory_order_acquire)) {
+      *link = submission->next;
+      submission->next = NULL;
+      *cancellable_tail = submission;
+      cancellable_tail = &submission->next;
+      continue;
+    }
+    link = &submission->next;
+  }
+  return cancellable_head;
+}
+
 static void iree_hal_vulkan_queue_cancel_alloca_memory_wait(
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (submission->kind != IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA) return;
@@ -2018,14 +2104,11 @@ static void iree_hal_vulkan_queue_cancel_deferred_submission(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
     iree_status_t status) {
-  int32_t expected_state = IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_PENDING;
-  if (!iree_atomic_compare_exchange_strong(
-          &submission->deferred_state, &expected_state,
-          IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_CANCELLING,
-          iree_memory_order_acq_rel, iree_memory_order_acquire)) {
-    iree_status_free(status);
-    return;
-  }
+  IREE_ASSERT(iree_atomic_load(&submission->deferred_state,
+                               iree_memory_order_acquire) ==
+                  IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_CANCELLING,
+              "Vulkan deferred submission must be claimed before "
+              "cancellation");
 
   for (iree_host_size_t i = 0; i < submission->wait_entry_count; ++i) {
     iree_hal_vulkan_queue_wait_entry_t* entry = &submission->wait_entries[i];
@@ -2046,8 +2129,9 @@ static void iree_hal_vulkan_queue_cancel_deferred_submissions(
     iree_hal_vulkan_queue_t* queue, iree_status_t status) {
   iree_hal_vulkan_queue_pending_submission_t* deferred_head = NULL;
   iree_slim_mutex_lock(&queue->submission_mutex);
-  deferred_head = queue->deferred_head;
-  queue->deferred_head = NULL;
+  deferred_head =
+      iree_hal_vulkan_queue_take_cancellable_deferred_submissions_under_lock(
+          queue);
   iree_slim_mutex_unlock(&queue->submission_mutex);
 
   while (deferred_head) {
@@ -2068,12 +2152,13 @@ static void iree_hal_vulkan_queue_fail_pending_submissions(
   iree_slim_mutex_lock(&queue->submission_mutex);
   pending_head = queue->pending_head;
   ready_head = queue->ready_head;
-  deferred_head = queue->deferred_head;
+  deferred_head =
+      iree_hal_vulkan_queue_take_cancellable_deferred_submissions_under_lock(
+          queue);
   queue->pending_head = NULL;
   queue->pending_tail = NULL;
   queue->ready_head = NULL;
   queue->ready_tail = NULL;
-  queue->deferred_head = NULL;
   iree_slim_mutex_unlock(&queue->submission_mutex);
 
   if (queue->frontier_tracker) {
@@ -2197,7 +2282,11 @@ static int iree_hal_vulkan_queue_completion_thread_main(void* entry_arg) {
       iree_hal_vulkan_queue_drain_ready_submissions(queue);
       iree_hal_vulkan_queue_drain_completions(queue);
     }
-    if (stop_requested && !iree_hal_vulkan_queue_has_pending(queue)) break;
+    const bool has_pending = iree_hal_vulkan_queue_has_pending(queue);
+    if (stop_requested && !has_pending) break;
+    iree_status_t failure_status = (iree_status_t)iree_atomic_load(
+        &queue->failure_status, iree_memory_order_acquire);
+    if (!iree_status_is_ok(failure_status) && !has_pending) break;
 
     VkSemaphore wait_semaphores[2] = {
         queue->epoch_semaphore,
@@ -2229,7 +2318,6 @@ static int iree_hal_vulkan_queue_completion_thread_main(void* entry_arg) {
     iree_status_t stored_status =
         iree_hal_vulkan_queue_store_error(queue, status);
     iree_hal_vulkan_queue_fail_pending_submissions(queue, stored_status);
-    break;
   }
 
   return 0;
