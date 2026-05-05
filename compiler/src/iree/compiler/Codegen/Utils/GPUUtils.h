@@ -272,7 +272,8 @@ FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                    bool skipUntunedFallback = false);
+                    bool skipUntunedFallback = false, bool transposeB = false,
+                    bool useDirectLoad = false);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
@@ -281,7 +282,8 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                  bool skipUntunedFallback = false);
+                  bool skipUntunedFallback = false, bool transposeB = false,
+                  bool useDirectLoad = false);
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
