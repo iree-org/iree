@@ -278,12 +278,12 @@ FailureOr<XorShuffleParams> getXorShuffleParams(
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
 FailureOr<Attribute> getXorShuffleAttr(
-  MLIRContext *context, Attribute baseConfigAttr,
-  IREE::GPU::TargetAttr target,
-  IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-  bool skipUntunedFallback = false,
-  function_ref<LogicalResult(XorShuffleParams)> constraint = nullptr);
+    MLIRContext *context, Attribute baseConfigAttr,
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+    bool skipUntunedFallback = false,
+    function_ref<LogicalResult(XorShuffleParams)> constraint = nullptr);
 
 /// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
 /// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
