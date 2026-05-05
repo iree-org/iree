@@ -174,17 +174,18 @@ static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
   Location loc = val.getLoc();
   VectorValue deinterleavedPacked =
       getDeinterleavedPackedForm(rewriter, val, layout);
-  ArrayRef<int64_t> packedShape = deinterleavedPacked.getType().getShape();
   SmallVector<int64_t> unpackedShape;
   unpackedShape.reserve(layout.getRank());
   for (int64_t unDistrDim : llvm::seq<int64_t>(layout.getRank())) {
     int64_t unpackedDim = layout.getBatchTile()[unDistrDim] *
                           layout.getOuterTile()[unDistrDim] *
                           layout.getElementTile()[unDistrDim];
-    assert(unpackedDim == packedShape[unDistrDim * 3] *
-                              packedShape[unDistrDim * 3 + 1] *
-                              packedShape[unDistrDim * 3 + 2] &&
-           "packed B/O/E shape must match nested layout tile product");
+    assert(
+        unpackedDim ==
+            deinterleavedPacked.getType().getShape()[unDistrDim * 3] *
+                deinterleavedPacked.getType().getShape()[unDistrDim * 3 + 1] *
+                deinterleavedPacked.getType().getShape()[unDistrDim * 3 + 2] &&
+        "packed B/O/E shape must match nested layout tile product");
     unpackedShape.push_back(unpackedDim);
   }
   VectorType unpackedType = VectorType::get(
