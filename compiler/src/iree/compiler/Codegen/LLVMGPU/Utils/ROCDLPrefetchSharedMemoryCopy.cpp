@@ -1075,16 +1075,55 @@ static Operation *findLastGatherToLDS(Block::iterator begin,
   return nullptr;
 }
 
-/// Sets the async flag on gather_to_lds ops in the given block range so they
+/// Sets the async flag on gather_to_lds ops from `begin` to `end` so they
 /// lower to rocdl.load.async.to.lds instead of rocdl.load.to.lds.
-/// Only affects ops between prologueStart and the end of the block, plus ops
-/// inside the loop body. This avoids making pre-existing gather ops (e.g., Q
-/// loads consumed before the loop) async, which would be incorrect since those
-/// ops lack corresponding asyncmark/wait.asyncmark synchronization.
-static void enableAsyncOnGatherOps(Block *parentBlock,
-                                   Block::iterator prologueStart) {
-  for (auto it = prologueStart; it != parentBlock->end(); ++it) {
+static void enableAsyncOnGatherOps(Block::iterator begin, Block::iterator end) {
+  for (auto it = begin; it != end; ++it) {
     it->walk([](amdgpu::GatherToLDSOp gatherOp) { gatherOp.setAsync(true); });
+  }
+}
+
+/// Inserts an asyncmark/wait.asyncmark 0 pair before `insertPt`.
+static void insertAsyncDrainBefore(RewriterBase &rewriter, Location loc,
+                                   Operation *insertPt) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(insertPt);
+  ROCDL::AsyncmarkOp::create(rewriter, loc);
+  ROCDL::WaitAsyncmarkOp::create(rewriter, loc, rewriter.getI16IntegerAttr(0));
+}
+
+/// Converts direct pre-existing gather_to_lds ops before the pipelined loop to
+/// async mode and inserts explicit waits that preserve their original
+/// synchronous behavior.
+///
+/// Pre-loop async groups must be fully drained before the pipelining prologue
+/// starts. Otherwise, the loop body's wait.asyncmark N would count unrelated
+/// pre-loop groups and no longer correspond to the intended N-stage pipeline.
+///
+/// This only handles direct gather_to_lds ops in the parent block. Recursively
+/// converting nested pre-loop gathers would require placing marks and waits
+/// inside those nested regions according to their local control flow.
+static void insertPreLoopAsyncMarkers(RewriterBase &rewriter, Location loc,
+                                      Block::iterator preLoopStart,
+                                      Block::iterator preLoopEnd) {
+  bool hasPendingAsyncGather = false;
+  for (auto it = preLoopStart; it != preLoopEnd;) {
+    Operation *op = &*it++;
+
+    if (hasPendingAsyncGather &&
+        (isa<gpu::BarrierOp>(op) || hasNestedSharedRead(op))) {
+      insertAsyncDrainBefore(rewriter, loc, op);
+      hasPendingAsyncGather = false;
+    }
+
+    if (auto gatherOp = dyn_cast<amdgpu::GatherToLDSOp>(op)) {
+      gatherOp.setAsync(true);
+      hasPendingAsyncGather = true;
+    }
+  }
+
+  if (hasPendingAsyncGather) {
+    insertAsyncDrainBefore(rewriter, loc, &*preLoopEnd);
   }
 }
 
@@ -1187,7 +1226,8 @@ static void insertExplicitAsyncMarkers(RewriterBase &rewriter,
   Location loc = newForOp.getLoc();
   int16_t waitCount = static_cast<int16_t>(numStages - 1);
 
-  enableAsyncOnGatherOps(parentBlock, prologueStart);
+  insertPreLoopAsyncMarkers(rewriter, loc, parentBlock->begin(), prologueStart);
+  enableAsyncOnGatherOps(prologueStart, parentBlock->end());
   insertPrologueAsyncMarks(rewriter, loc, prologueStart,
                            newForOp->getIterator(), numStages);
   insertLoopBodyAsyncMarkers(rewriter, loc, newForOp, waitCount);
@@ -1324,18 +1364,13 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
 
-  // Record the position of the original loop before pipelining. The pipelining
-  // transformation inserts prologue ops before the loop and epilogue ops after.
-  // Any gather_to_lds ops that existed before the loop in the parent block
-  // (e.g., Q loads in attention) are not part of the pipeline and must not be
-  // converted to async mode.
-  Block *parentBlock = forOp->getBlock();
-  Block::iterator preLoopMarker = forOp->getIterator();
-  bool noOpsBeforeLoop = (preLoopMarker == parentBlock->begin());
-  if (!noOpsBeforeLoop) {
-    // Decrement to point to the operation before the loop that is going to be
-    // transform, otherwise the marker would be invalidated.
-    --preLoopMarker;
+  Operation *opBeforeLoop = nullptr;
+  if (mode == PipelineMode::AsyncCopy) {
+    // Record the operation before the original loop. After pipelining, the next
+    // operation after this marker is the start of the generated prologue. Ops
+    // before that boundary are pre-existing parent-block ops and are explicitly
+    // drained separately from the pipelined async groups.
+    opBeforeLoop = forOp->getPrevNode();
   }
 
   FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
@@ -1356,8 +1391,9 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   if (mode == PipelineMode::AsyncCopy) {
     // Compute the start of the pipelining prologue, skipping any pre-existing
     // ops that were before the original loop.
-    Block::iterator prologueStart =
-        noOpsBeforeLoop ? parentBlock->begin() : std::next(preLoopMarker);
+    Block::iterator prologueStart = opBeforeLoop
+                                        ? std::next(opBeforeLoop->getIterator())
+                                        : newForOp->getBlock()->begin();
     insertExplicitAsyncMarkers(rewriter, newForOp, numStages, prologueStart);
   }
 
