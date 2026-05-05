@@ -52,7 +52,7 @@ struct LowerGlobalSubgroupBarrier final
 
   LogicalResult matchAndRewrite(IREE::GPU::GlobalSubgroupBarrierOp op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<NVVM::Barrier0Op>(op);
+    rewriter.replaceOpWithNewOp<NVVM::BarrierOp>(op);
     return success();
   }
 };
