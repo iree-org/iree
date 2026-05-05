@@ -243,8 +243,33 @@ func.func @attention_20x1x64x4096x64() attributes {hal.executable.target = #exec
 // -----
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
-#config = #iree_gpu.lowering_config<{workgroup = [1, 64, 0, 0, 64], reduction = [0, 0, 0, 64, 0], promote_operands = [0, 1, 2]}>
-#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [128, 1, 1] subgroup_size = 64>
+// Tile Sizes:
+// workgroup         = [1, 1,  0,   0, 32]
+// partial_reduction = [0, 0,  0, 128,  0]
+// subgroup          = [0, 0,  0,   0,  8]
+// thread            = [0, 0, 32,   4,  4]
+
+// Counts:
+// subgroup          = [1, 1,  1,   1,  4]
+// threads           = [1, 1,  2,  32,  1]
+
+#config = #iree_gpu.lowering_config<{workgroup = [1, 1, 0, 0, 32],
+                               partial_reduction = [0, 0, 0, 128, 0],
+                               promote_operands = [1, 2]}>
+
+#qk_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 2, 3]],
+                                  lane_basis = [[1, 1, 2, 32, 1], [0, 1, 2, 3]],
+                                  thread         = [0, 0, 32, 4],
+                                  promote_operands = [1]}>
+
+#pv_config = #iree_gpu.lowering_config<{subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 3, 4]],
+                                  lane_basis = [[1, 1, 2, 32, 1], [0, 1, 3, 4]],
+                                  thread         = [0, 0, 4, 4],
+                                  promote_operands = [1]}>
+
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+                                        workgroup_size = [256, 1, 1]
+                                        subgroup_size = 64>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
