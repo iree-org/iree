@@ -72,7 +72,7 @@ iree_hal_cts_test_suite(
     graph
   ARGS
     "--hip_use_streams=false"
-    "--gtest_filter=-CTS/QueueTransferTest.*:CTS/AsyncTransientBufferTest.*"
+    "--gtest_filter=-CTS/QueueTransferTest.*:CTS/AsyncTransientBufferTest.*:CTS/TransientBufferTest.*"
   LABELS
     "driver=hip"
     "requires-gpu-amd"

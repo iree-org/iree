@@ -1394,10 +1394,10 @@ static iree_status_t iree_hal_task_queue_compute_item_allocate(
   return iree_ok_status();
 }
 
-// Routes a recording through the compute process for multi-worker execution.
+// Routes a recording through the compute process for deferred execution.
 // Acquires a compute item, allocates the processor context, and schedules the
-// compute process. The recording is referenced (not copied) — the caller
-// ensures it stays alive until the compute item's final release.
+// compute process. The processor context always references a recording that
+// remains live until the compute item's final release.
 //
 // If |owned_recording| is non-NULL, the compute item takes ownership and
 // releases the blocks in its final release path. If NULL, the caller
@@ -1454,12 +1454,27 @@ static iree_status_t iree_hal_task_queue_drain_recording(
         iree_hal_task_queue_compute_item_allocate(queue, &item));
   }
 
+  // Transfer ownership before allocating the processor context so the context
+  // never captures a pointer to a caller stack recording.
+  const iree_hal_cmd_block_recording_t* processor_recording = recording;
+  if (owned_recording) {
+    item->recording = *owned_recording;
+    memset(owned_recording, 0, sizeof(*owned_recording));
+    processor_recording = &item->recording;
+  } else {
+    memset(&item->recording, 0, sizeof(item->recording));
+  }
+
   // Allocate the block processor execution context.
   iree_hal_cmd_block_processor_context_t* processor_context = NULL;
   status = iree_hal_cmd_block_processor_context_allocate(
-      recording, binding_table, binding_table_length, worker_count,
+      processor_recording, binding_table, binding_table_length, worker_count,
       host_allocator, &processor_context);
   if (!iree_status_is_ok(status)) {
+    if (owned_recording) {
+      iree_hal_cmd_block_recording_release(&item->recording);
+      memset(&item->recording, 0, sizeof(item->recording));
+    }
     iree_hal_task_queue_compute_item_slist_push(&queue->compute_free_pool,
                                                 item);
     return status;
@@ -1501,12 +1516,6 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   item->worker_count = worker_count;
   item->operation = operation;
   item->host_allocator = host_allocator;
-  if (owned_recording) {
-    item->recording = *owned_recording;
-    memset(owned_recording, 0, sizeof(*owned_recording));
-  } else {
-    memset(&item->recording, 0, sizeof(item->recording));
-  }
   memset(item->worker_states, 0, sizeof(item->worker_states[0]) * worker_count);
   // drainers retains generation from previous lifecycle. Count and CLOSED
   // were cleared during the previous cleanup. First use: memset zeroed it.

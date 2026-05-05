@@ -28,12 +28,12 @@
   "expected_compile_failures": [],
   "expected_run_failures": [],
   "golden_times_ms": {
-    "AB/8192x8192xf32_bench": 107.60851647438749,
-    "AB/1024x1024xf32_bench": 0.4509026762196051,
-    "AB/256x256xf32_bench": 0.1743873563575457,
-    "AB/128x128xf32_bench": 0.148048073505022,
-    "AB/2048x2048xf32_bench": 1.5943956199949283,
-    "AB/4096x4096xf32_bench": 10.252960922347533,
-    "AB/512x512xf32_bench": 0.23526767679662958
+    "AB/128x128xf32_bench": 0.10,
+    "AB/256x256xf32_bench" : 0.14,
+    "AB/512x512xf32_bench" : 0.17,
+    "AB/1024x1024xf32_bench": 0.26,
+    "AB/2048x2048xf32_bench" : 1.00,
+    "AB/4096x4096xf32_bench": 7.38,
+    "AB/8192x8192xf32_bench": 120.2
   }
 }

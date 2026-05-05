@@ -220,6 +220,15 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "profile_event_ring",
+    srcs = ["profile_event_ring.c"],
+    hdrs = ["profile_event_ring.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "statistics_sink",
     srcs = ["statistics_sink.c"],
     hdrs = ["statistics_sink.h"],

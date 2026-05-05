@@ -54,6 +54,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:recorder",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
@@ -71,6 +72,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:recorder",
         "//runtime/src/iree/modules/check",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/tooling:context_util",
@@ -161,12 +163,55 @@ iree_runtime_cc_binary(
 )
 
 iree_runtime_cc_binary(
+    name = "iree-dump-replay",
+    srcs = ["iree-dump-replay-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/replay:dump",
+        "//runtime/src/iree/io:file_handle",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-run-replay",
+    srcs = ["iree-run-replay-main.c"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:execute",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/tooling:device_util",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-benchmark-replay",
+    srcs = ["iree-benchmark-replay-main.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:proactor_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:execute",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/tooling:device_util",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-encode-parameters",
     srcs = ["iree-encode-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/replay:recorder",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:parameter_index_provider",

@@ -171,7 +171,8 @@ TEST(TopologyEdge, CreateSelf) {
       IREE_HAL_TOPOLOGY_CAPABILITY_CONCURRENT_SAFE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_DEVICE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_SYSTEM |
-      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
+      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE |
+      IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
   EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge.lo), expected_caps);
 
   // Self-edges use SAME_DIE link class.
@@ -280,6 +281,25 @@ TEST(TopologyEdge, ZeroHandleNoAliasing) {
   // Zero handle → no aliasing detection.
   // Same driver but no UUID or P2P → non-zero copy cost.
   EXPECT_NE(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+}
+
+TEST(TopologyEdge, SharedVirtualAddressDoesNotImplyUnifiedMemory) {
+  iree_hal_device_capabilities_t caps = {0};
+  caps.flags = IREE_HAL_DEVICE_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
+
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_from_capabilities(
+      &caps, &caps, IREE_SV("amdgpu"), IREE_SV("amdgpu"));
+  iree_hal_topology_capability_t topology_caps =
+      iree_hal_topology_edge_capability_flags(edge.lo);
+
+  EXPECT_TRUE(topology_caps &
+              IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS);
+  EXPECT_FALSE(topology_caps & IREE_HAL_TOPOLOGY_CAPABILITY_UNIFIED_MEMORY);
+  EXPECT_FALSE(topology_caps & IREE_HAL_TOPOLOGY_CAPABILITY_PEER_COHERENT);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 }
 
 //===----------------------------------------------------------------------===//

@@ -154,6 +154,7 @@ ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
       /*alignInBits=*/0,
       /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
       /*associated=*/nullptr,
+      /*identifier=*/nullptr, /*discriminator=*/nullptr,
       /*elements=*/
       {
           LLVM::DISubrangeAttr::get(
@@ -234,6 +235,7 @@ LLVM::DICompositeTypeAttr ExecutableLibraryDI::getProcessorV0T() {
       /*alignInBits=*/0,
       /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
       /*associated=*/nullptr,
+      /*identifier=*/nullptr, /*discriminator=*/nullptr,
       /*elements=*/
       {
           getMemberOf("data", getArrayOf(getUint64T(), 8), &offsetInBits),
@@ -254,6 +256,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
           /*dataLocation=*/nullptr,
           /*rank=*/nullptr, /*allocated=*/nullptr,
           /*associated=*/nullptr,
+          /*identifier=*/nullptr, /*discriminator=*/nullptr,
           /*elements=*/
           {
               getMemberOf("constants",
@@ -281,6 +284,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
           /*alignInBits=*/0,
           /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
           /*associated=*/nullptr,
+          /*identifier=*/nullptr, /*discriminator=*/nullptr,
           /*elements=*/
           {
               getMemberOf("workgroup_size_x", getUint32T(), &offsetInBits),
@@ -318,6 +322,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
           /*dataLocation=*/nullptr,
           /*rank=*/nullptr, /*allocated=*/nullptr,
           /*associated=*/nullptr,
+          /*identifier=*/nullptr, /*discriminator=*/nullptr,
           /*elements=*/
           {
               getMemberOf("workgroup_id_x", getUint32T(), &offsetInBits),

@@ -188,7 +188,8 @@ iree_hal_topology_edge_t iree_hal_topology_edge_make_self(void) {
       IREE_HAL_TOPOLOGY_CAPABILITY_CONCURRENT_SAFE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_DEVICE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_SYSTEM |
-      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
+      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE |
+      IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
   lo = iree_hal_topology_edge_set_capability_flags(lo, caps);
 
   // Zero cost for all operations on self.
@@ -338,8 +339,9 @@ iree_hal_topology_edge_from_capabilities(
   //     Determined by PEER_ADDRESSABLE (large BAR mapping) and P2P_COPY.
   //
   //   Coherent: memory with hardware-maintained coherency (fine-grained, SVM).
-  //     Often more accessible — SVM provides direct load/store across devices.
-  //     Determined by UNIFIED_MEMORY (SVM) or PEER_COHERENT + PEER_ADDRESSABLE.
+  //     UNIFIED_MEMORY means device-visible coherent memory is accessible by
+  //     default. SHARED_VIRTUAL_ADDRESS only says matching virtual addresses
+  //     can be made meaningful; it may still require per-range access grants.
   //
   // NATIVE: load/store addressable — scheduler references the buffer directly.
   // IMPORT: buffer handle import — one-time setup, then directly usable.
@@ -355,6 +357,9 @@ iree_hal_topology_edge_from_capabilities(
   bool unified_memory =
       (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY) &&
       (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY);
+  bool shared_virtual_address =
+      (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_SHARED_VIRTUAL_ADDRESS) &&
+      (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_SHARED_VIRTUAL_ADDRESS);
 
   // Non-coherent buffer modes (device-local, coarse-grained).
   iree_hal_topology_interop_mode_t nc_buffer_read_mode, nc_buffer_write_mode;
@@ -406,6 +411,10 @@ iree_hal_topology_edge_from_capabilities(
   if ((src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY) &&
       (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY)) {
     caps |= IREE_HAL_TOPOLOGY_CAPABILITY_UNIFIED_MEMORY;
+  }
+
+  if (shared_virtual_address) {
+    caps |= IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
   }
 
   if ((src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT) &&

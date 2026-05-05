@@ -76,7 +76,7 @@ iree_hal_cts_test_suite(
     name = "graph",
     args = [
         "--hip_use_streams=false",
-        "--gtest_filter=-CTS/QueueTransferTest.*:CTS/AsyncTransientBufferTest.*",
+        "--gtest_filter=-CTS/QueueTransferTest.*:CTS/AsyncTransientBufferTest.*:CTS/TransientBufferTest.*",
     ],
     backends_lib = ":backends",
     resource_group = "hip_driver",

@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/api.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace iree::hal::hip {
 namespace {
@@ -33,11 +35,15 @@ class HipGraphCommandBufferTest : public ::testing::Test {
       GTEST_SKIP() << "HIP driver not available";
     }
 
-    status = iree_async_proactor_pool_create(
+    IREE_ASSERT_OK(iree_async_proactor_pool_create(
         iree_numa_node_count(), /*node_ids=*/NULL,
         iree_async_proactor_pool_options_default(), iree_allocator_system(),
-        &proactor_pool_);
-    ASSERT_TRUE(iree_status_is_ok(status));
+        &proactor_pool_));
+
+    iree_async_frontier_tracker_options_t frontier_options =
+        iree_async_frontier_tracker_options_default();
+    IREE_ASSERT_OK(iree_async_frontier_tracker_create(
+        frontier_options, iree_allocator_system(), &frontier_tracker_));
 
     iree_hal_device_create_params_t create_params =
         iree_hal_device_create_params_default();
@@ -48,11 +54,18 @@ class HipGraphCommandBufferTest : public ::testing::Test {
       iree_status_ignore(status);
       GTEST_SKIP() << "No HIP device available";
     }
+
+    IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
+        device_, frontier_tracker_, iree_allocator_system(), &device_group_));
   }
 
   void TearDown() override {
     iree_hal_device_release(device_);
     device_ = NULL;
+    iree_hal_device_group_release(device_group_);
+    device_group_ = NULL;
+    iree_async_frontier_tracker_release(frontier_tracker_);
+    frontier_tracker_ = NULL;
     iree_async_proactor_pool_release(proactor_pool_);
     proactor_pool_ = NULL;
     iree_hal_driver_release(driver_);
@@ -61,14 +74,20 @@ class HipGraphCommandBufferTest : public ::testing::Test {
 
   // Proactor pool required by HIP device queue operations.
   iree_async_proactor_pool_t* proactor_pool_ = NULL;
+  // Frontier tracker assigned to the test device through the device group.
+  iree_async_frontier_tracker_t* frontier_tracker_ = NULL;
   // HIP driver configured to record command buffers into HIP graphs.
   iree_hal_driver_t* driver_ = NULL;
+  // Single-device topology group that assigns queue frontier state.
+  iree_hal_device_group_t* device_group_ = NULL;
   // Default HIP device created from |driver_|.
   iree_hal_device_t* device_ = NULL;
 };
 
-TEST_F(HipGraphCommandBufferTest, RecordsMoreThanInitialNodeCapacity) {
+TEST_F(HipGraphCommandBufferTest,
+       RecordsAndRepeatedlyExecutesMoreThanInitialNodeCapacity) {
   constexpr uint32_t kFillNodeCount = 129;
+  constexpr uint64_t kExecutionCount = 16;
   iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
 
   iree_hal_buffer_params_t buffer_params = {0};
@@ -105,10 +124,33 @@ TEST_F(HipGraphCommandBufferTest, RecordsMoreThanInitialNodeCapacity) {
     status = iree_hal_command_buffer_end(command_buffer);
   }
 
+  iree_hal_semaphore_t* semaphore = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_create(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*initial_value=*/0, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore);
+  }
+  for (uint64_t i = 1; i <= kExecutionCount && iree_status_is_ok(status); ++i) {
+    iree_hal_semaphore_list_t signal_semaphores = {
+        /*.count=*/1,
+        /*.semaphores=*/&semaphore,
+        /*.payload_values=*/&i,
+    };
+    status = iree_hal_device_queue_execute(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+        signal_semaphores, command_buffer,
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_semaphore_wait(semaphore, i, iree_infinite_timeout(),
+                                       IREE_ASYNC_WAIT_FLAG_NONE);
+    }
+  }
+
+  iree_hal_semaphore_release(semaphore);
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(buffer);
 
-  EXPECT_TRUE(iree_status_is_ok(status));
+  IREE_EXPECT_OK(status);
 }
 
 }  // namespace

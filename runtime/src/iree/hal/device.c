@@ -521,11 +521,11 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
           IREE_STATUS_INVALID_ARGUMENT,
           "hardware counter set selections require a counter_sets array");
     }
-    if (!iree_hal_device_profiling_options_requests_counter_samples(options)) {
+    if (!iree_hal_device_profiling_options_requests_counters(options)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "hardware counter set selections require the counter-samples "
-          "profiling data family");
+          "hardware counter set selections require a counter profiling data "
+          "family");
     }
     for (iree_host_size_t i = 0; i < options->counter_set_count; ++i) {
       const iree_hal_profile_counter_set_selection_t* counter_set =
@@ -548,12 +548,11 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
       }
     }
   }
-  if (iree_hal_device_profiling_options_requests_counter_samples(options) &&
+  if (iree_hal_device_profiling_options_requests_counters(options) &&
       options->counter_set_count == 0) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "counter-samples profiling requires at least one counter set "
-        "selection");
+        "counter profiling requires at least one counter set selection");
   }
 
   const bool data_requested =

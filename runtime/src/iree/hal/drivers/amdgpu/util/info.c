@@ -74,6 +74,7 @@ iree_status_t iree_hal_amdgpu_system_info_query(
                              "only systems with SVM are supported "
                              "(HSA_AMD_SYSTEM_INFO_SVM_SUPPORTED == true)"));
   }
+  out_info->svm.supported = 1;
 
   bool svm_accessible_by_default = false;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -82,7 +83,16 @@ iree_status_t iree_hal_amdgpu_system_info_query(
                                HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT,
                                &svm_accessible_by_default),
       "querying HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT");
-  out_info->svm_accessible_by_default = svm_accessible_by_default ? 1 : 0;
+  out_info->svm.accessible_by_default = svm_accessible_by_default ? 1 : 0;
+
+  bool xnack_enabled = false;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hsa_system_get_info(IREE_LIBHSA(libhsa),
+                               HSA_AMD_SYSTEM_INFO_XNACK_ENABLED,
+                               &xnack_enabled),
+      "querying HSA_AMD_SYSTEM_INFO_XNACK_ENABLED");
+  out_info->svm.xnack_enabled = xnack_enabled ? 1 : 0;
 
   bool dmabuf_supported = false;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

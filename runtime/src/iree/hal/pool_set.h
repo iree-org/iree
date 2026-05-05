@@ -106,8 +106,9 @@ iree_status_t iree_hal_pool_set_register(iree_hal_pool_set_t* pool_set,
 // Selects the best pool for the given buffer parameters and allocation size.
 //
 // Returns the highest-priority pool whose capabilities are compatible with
-// |params| and |allocation_size|. Returns NULL if no registered pool can
-// satisfy the request.
+// |params| and |allocation_size|. IREE_HAL_MEMORY_TYPE_OPTIMAL is treated as a
+// placement hint instead of a required memory type bit. Returns NULL if no
+// registered pool can satisfy the request.
 iree_hal_pool_t* iree_hal_pool_set_select(const iree_hal_pool_set_t* pool_set,
                                           iree_hal_buffer_params_t params,
                                           iree_device_size_t allocation_size);

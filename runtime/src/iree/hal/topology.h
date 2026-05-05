@@ -276,6 +276,10 @@ enum iree_hal_topology_capability_bits_t {
   // Shared virtual addressing (SVA/SVM) across this link.
   // Both devices can use the same virtual addresses for shared memory.
   IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS = 1u << 11,
+  // One or more direct peer access paths represented by this edge require
+  // per-allocation access grants. Until the allocation/access policy proves a
+  // grant was applied, those buffer modes must not report NATIVE access.
+  IREE_HAL_TOPOLOGY_CAPABILITY_PEER_ACCESS_REQUIRES_GRANT = 1u << 12,
 };
 typedef uint16_t iree_hal_topology_capability_t;
 
@@ -510,6 +514,7 @@ iree_hal_topology_edge_buffer_write_mode_coherent(
 // - TIMELINE_SEMAPHORE: Supports timeline semaphores for fine-grained sync
 // - REMOTE_DMA: RDMA transfers supported across this link
 // - SHARED_VIRTUAL_ADDRESS: SVA/SVM across this link
+// - PEER_ACCESS_REQUIRES_GRANT: direct peer access needs allocation grants
 //
 // Implementations should be conservative - only set flags that hardware truly
 // guarantees. ATOMIC_SYSTEM requires platform support (PCIe atomics, vendor

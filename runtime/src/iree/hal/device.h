@@ -314,10 +314,15 @@ enum iree_hal_device_capability_bits_e {
   // Native timeline semaphore support (not binary emulation).
   IREE_HAL_DEVICE_CAPABILITY_TIMELINE_SEMAPHORES = 1ull << 0,
 
-  // Memory model capabilities.
+  // Device memory is transparently accessible through one address space without
+  // driver-specific per-range access programming.
   IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY = 1ull << 1,
+  // Host accesses to device-visible memory are coherent without explicit
+  // application-managed cache maintenance.
   IREE_HAL_DEVICE_CAPABILITY_HOST_COHERENT = 1ull << 2,
-  IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT = 1ull << 3,  // Same-driver.
+  // Same-driver peer memory accesses are coherent without explicit
+  // application-managed cache maintenance.
+  IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT = 1ull << 3,
 
   // Transfer capabilities.
   // P2P DMA engine can copy directly between this device and peers.
@@ -332,6 +337,11 @@ enum iree_hal_device_capability_bits_e {
   // Example: NVLink with large BAR → PEER_ADDRESSABLE + P2P_COPY.
   // Example: PCIe P2P without BAR mapping → P2P_COPY only.
   IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE = 1ull << 10,
+  // Shared virtual addressing is available across devices. This means a
+  // driver can make matching virtual addresses meaningful, but it does not
+  // imply those addresses are accessible by default; some runtimes require
+  // per-allocation or per-range access programming before device use.
+  IREE_HAL_DEVICE_CAPABILITY_SHARED_VIRTUAL_ADDRESS = 1ull << 11,
 
   // Concurrency and atomics.
   IREE_HAL_DEVICE_CAPABILITY_CONCURRENT_SAFE = 1ull << 6,
@@ -341,7 +351,7 @@ enum iree_hal_device_capability_bits_e {
   // Isolation (MIG, SR-IOV, etc.).
   IREE_HAL_DEVICE_CAPABILITY_ISOLATED = 1ull << 9,
 
-  // Reserved for future use (bits 10-63).
+  // Reserved for future use (bits 12-63).
 };
 
 // Device capabilities for topology edge construction.

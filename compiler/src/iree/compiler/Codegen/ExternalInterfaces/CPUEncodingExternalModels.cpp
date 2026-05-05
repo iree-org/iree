@@ -42,6 +42,7 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
@@ -50,9 +51,13 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
@@ -287,6 +292,362 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
                 ArrayRef{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
          << " penalty:" << bestRatedTile.paddingPenalty;
   return bestRatedTile;
+}
+
+static bool getEnableInnerTiledFromConfig(DictionaryAttr config) {
+  Attribute attr = config.get("enable_inner_tiled");
+  if (auto battr = dyn_cast_if_present<BoolAttr>(attr)) {
+    return battr.getValue();
+  }
+  return false;
+}
+
+/// Returns the matmul {M, N, K} tile shape covered by a CPU DataTiledMMAAttr.
+/// Derived directly from `getUndistributedTileTypes`: LHS is M×K (always) and
+/// RHS is N×K (always), regardless of the `transposed_intrinsic` flag. The
+/// ACC layout varies (M×N row-major vs. N×M column-major for transposed
+/// intrinsics), so we derive M and N from the LHS and RHS tiles instead.
+static IREE::Codegen::TileMxNxK getTileMxNxK(IREE::CPU::DataTiledMMAAttr mma) {
+  SmallVector<VectorType> tiles;
+  mma.getUndistributedTileTypes(tiles);
+  assert(tiles.size() == 3 && "Expected LHS, RHS, ACC tile types");
+  ArrayRef<int64_t> lhsShape = tiles[0].getShape();
+  ArrayRef<int64_t> rhsShape = tiles[1].getShape();
+  return IREE::Codegen::TileMxNxK{lhsShape[0], rhsShape[0], lhsShape[1]};
+}
+
+/// Returns the set of `+feature` strings that must all be present in the
+/// target config for `intr` to be usable. Most AVX-512 intrinsics map
+/// 1:1 to a single `+feature`, but the AVX2 f32 MMA intrinsics require both
+/// `+avx2` and `+fma` (FMA3 is a separate ISA extension from AVX2 itself,
+/// and our AVX2 intrinsics lower to `vfmadd...`).
+static SmallVector<StringRef>
+getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
+  using IREE::CPU::MMAIntrinsic;
+  switch (intr) {
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+    return {"+avx2", "+fma"};
+  case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
+    return {"+avx512f"};
+  case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+    return {"+avx512fp16"};
+  case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+    return {"+avx512bf16"};
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+    return {"+avx512vnni"};
+  default:
+    return {};
+  }
+}
+
+/// Returns x86 `MMAIntrinsic` cases whose required ISA extensions are all
+/// present in `config` (`cpu_features` / target features). Only the "natural"
+/// (M<=N) intrinsic orientations are listed; the M↔N-swapped orientation is
+/// expressed by the `transposed_intrinsic` flag on DataTiledMMAAttr, enumerated
+/// separately by the cost model.
+static SmallVector<IREE::CPU::MMAIntrinsic>
+getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
+  using IREE::CPU::MMAIntrinsic;
+  SmallVector<MMAIntrinsic> out;
+  if (!config) {
+    return out;
+  }
+  if (!isX86(config)) {
+    return out;
+  }
+  static const MMAIntrinsic kAllX86[] = {
+      MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
+      MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
+      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
+      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
+      MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
+      MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
+      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
+      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
+      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
+      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
+  };
+  for (MMAIntrinsic intr : kAllX86) {
+    SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
+    if (required.empty()) {
+      continue;
+    }
+    if (llvm::all_of(required,
+                     [&](StringRef f) { return hasFeature(config, f); })) {
+      out.push_back(intr);
+    }
+  }
+  return out;
+}
+
+/// Shape and element-bit-width summary of one intrinsic, with unroll factors
+/// all 1, in a specific orientation. The LHS is (M, K), the RHS is (N, K) —
+/// the `transposed` flag has already swapped M↔N inside the base attr.
+/// Scalable dims (e.g. SVE) are treated as their 128-bit-minimum static
+/// shape here; `getRegisterSpaceBytes` applies the matching simplification
+/// on the capacity side.
+struct IntrinsicInfo {
+  int64_t intrinsicM = 0, intrinsicN = 0, intrinsicK = 0;
+  int64_t lhsBits = 0, rhsBits = 0, accBits = 0;
+};
+
+/// Returns the IntrinsicInfo for `intr` in the given orientation, if its ABC
+/// element types match `elementTypes`. Returns nullopt otherwise.
+static std::optional<IntrinsicInfo>
+getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
+                 IREE::CPU::MMAIntrinsic intr, bool transposed) {
+  auto base = IREE::CPU::DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
+                                               /*intrinsics_n=*/1,
+                                               /*intrinsics_k=*/1, transposed);
+  SmallVector<VectorType> baseTiles;
+  base.getUndistributedTileTypes(baseTiles);
+  if (baseTiles.size() != 3) {
+    return std::nullopt;
+  }
+  if (baseTiles[0].getElementType() != elementTypes[0] ||
+      baseTiles[1].getElementType() != elementTypes[1] ||
+      baseTiles[2].getElementType() != elementTypes[2]) {
+    return std::nullopt;
+  }
+  IntrinsicInfo info;
+  info.intrinsicM = baseTiles[0].getShape()[0];
+  info.intrinsicK = baseTiles[0].getShape()[1];
+  info.intrinsicN = baseTiles[1].getShape()[0];
+  info.lhsBits = baseTiles[0].getElementType().getIntOrFloatBitWidth();
+  info.rhsBits = baseTiles[1].getElementType().getIntOrFloatBitWidth();
+  info.accBits = baseTiles[2].getElementType().getIntOrFloatBitWidth();
+  return info;
+}
+
+/// Phase 1 of `chooseCpuInnerTiledMmaForEncoding`: jointly pick the
+/// intrinsic and its orientation (`transposed_intrinsic`). We maximize
+/// `usefulOps` per invocation,
+///   usefulOps = min(intrinsicM, M) * min(intrinsicN, N) * intrinsicK
+/// where the `min` clamps an intrinsicM/intrinsicN that exceeds a narrow
+/// static matmul dim — i.e. it charges the intrinsic for the padding it
+/// would force. A dynamic matmul dim is treated as "not narrow" (the full
+/// intrinsic size counts toward usefulOps). Ties are broken by the raw
+/// intrinsic size `intrinsicM*intrinsicN*intrinsicK` (prefer the bigger
+/// intrinsic: it gives the Phase-2 register budget more tiles to play with)
+/// and, finally, by iteration order (non-transposed first). `K` is never
+/// narrow for optimization purposes, so it never enters the `min`.
+///
+/// Returns nullopt if no compatible intrinsic exists.
+static std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>>
+chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
+                DictionaryAttr config,
+                const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
+  auto usefulSize = [](int64_t matmulSize, int64_t intrinsicSize) -> int64_t {
+    return ShapedType::isDynamic(matmulSize)
+               ? intrinsicSize
+               : std::min(intrinsicSize, matmulSize);
+  };
+  std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> best;
+  std::pair<int64_t, int64_t> bestScore = {-1, -1};
+  for (IREE::CPU::MMAIntrinsic intr : getMmaIntrinsicsForTargetConfig(config)) {
+    for (bool transposed : {false, true}) {
+      std::optional<IntrinsicInfo> info =
+          getIntrinsicInfo(ctx, elementTypes, intr, transposed);
+      if (!info) {
+        continue;
+      }
+      int64_t usefulOps = usefulSize(matmulSizes.M, info->intrinsicM) *
+                          usefulSize(matmulSizes.N, info->intrinsicN) *
+                          info->intrinsicK;
+      int64_t rawOps = info->intrinsicM * info->intrinsicN * info->intrinsicK;
+      std::pair<int64_t, int64_t> score = {usefulOps, rawOps};
+      if (score > bestScore) {
+        bestScore = score;
+        best = {intr, transposed};
+      }
+    }
+  }
+  return best;
+}
+
+/// Power-of-two cap on one unroll dim. For a static matmul extent
+/// `matmulSize` divided by `intrinsicSize`, we floor the cover count to a
+/// power of two. For dynamic dims we fall back to `fallback`, which callers
+/// set to something at least as large as the register budget — that budget
+/// itself terminates the enumeration below, so no tighter static cap is
+/// needed.
+static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
+                            int64_t fallback) {
+  if (ShapedType::isDynamic(matmulSize)) {
+    return fallback;
+  }
+  uint64_t cover =
+      std::max<int64_t>(1, llvm::divideCeil(matmulSize, intrinsicSize));
+  return llvm::bit_floor(cover);
+}
+
+// Phase 2 of `chooseCpuInnerTiledMmaForEncoding`: for an already-chosen
+// (intrinsic, transposed) pair, pick the largest power-of-two unroll
+// factors (intrinsicsM, intrinsicsN) such that the three tiles
+// (ACC + LHS + RHS) still fit in the target's vector register file,
+// breaking ties with arithmetic intensity (effM*effN)/(effM+effN) so
+// approximately-square tiles win.
+//
+// Returns nullopt if no feasible (im, in) exists. The returned pair is
+// (intrinsicsM, intrinsicsN).
+static std::optional<std::pair<int64_t, int64_t>>
+chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
+                IREE::CPU::MMAIntrinsic intr, bool transposed,
+                const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
+  std::optional<IntrinsicInfo> info =
+      getIntrinsicInfo(ctx, elementTypes, intr, transposed);
+  if (!info) {
+    return std::nullopt;
+  }
+  int64_t regBitBudget = IREE::CPU::getRegisterSpaceBytes(intr) * 8;
+  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, regBitBudget);
+  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, regBitBudget);
+  int64_t accTerm = info->intrinsicM * info->intrinsicN * info->accBits;
+  int64_t lhsTerm = info->intrinsicM * info->intrinsicK * info->lhsBits;
+  int64_t rhsTerm = info->intrinsicN * info->intrinsicK * info->rhsBits;
+  std::optional<std::pair<int64_t, int64_t>> best;
+  double bestIntensity = -1.0;
+  // Enumerate power-of-two intrinsicsM; for each, pick the largest feasible
+  // power-of-two intrinsicsN under the bit budget and the static N cap.
+  // The budget bounds im on its own (im*lhsTerm alone must be < budget),
+  // which terminates the loop without any numRegs-style cap.
+  for (int64_t im = 1; im <= capMPo2; im *= 2) {
+    int64_t remaining = regBitBudget - im * lhsTerm;
+    if (remaining <= 0) {
+      break;
+    }
+    int64_t inMaxBudget = remaining / (im * accTerm + rhsTerm);
+    uint64_t inCap = std::min<int64_t>(capNPo2, inMaxBudget);
+    if (inCap < 1) {
+      continue;
+    }
+    int64_t in = llvm::bit_floor(inCap);
+    double effM = static_cast<double>(im) * info->intrinsicM;
+    double effN = static_cast<double>(in) * info->intrinsicN;
+    double intensity = effM * effN / (effM + effN);
+    if (intensity > bestIntensity) {
+      bestIntensity = intensity;
+      best = {im, in};
+    }
+  }
+  return best;
+}
+
+// Picks a CPU `DataTiledMMAAttr` for `iree_codegen.inner_tiled` given an
+// encoding and target config.
+static IREE::CPU::DataTiledMMAAttr
+chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
+                                  IREE::Encoding::EncodingAttr encoding,
+                                  DictionaryAttr config) {
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
+  if (elementTypes.size() != 3) {
+    return {};
+  }
+  FailureOr<IREE::Encoding::BxMxNxKxKb> matmulSizes =
+      IREE::Encoding::getEncodingContractionLikeSizes(encoding);
+  if (failed(matmulSizes)) {
+    return {};
+  }
+  std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> intrChoice =
+      chooseIntrinsic(ctx, elementTypes, config, *matmulSizes);
+  if (!intrChoice) {
+    return {};
+  }
+  auto [intr, transposed] = *intrChoice;
+  std::optional<std::pair<int64_t, int64_t>> unroll =
+      chooseUnrolling(ctx, elementTypes, intr, transposed, *matmulSizes);
+  if (!unroll) {
+    return {};
+  }
+  auto [intrinsicsM, intrinsicsN] = *unroll;
+  return IREE::CPU::DataTiledMMAAttr::get(ctx, intr, intrinsicsM, intrinsicsN,
+                                          /*intrinsics_k=*/1, transposed);
+}
+
+/// Lowers a contraction under a `CPUEncodingResolverAttr` with
+/// `enable_inner_tiled = true` to an `iree_codegen.inner_tiled` op whose kind
+/// is a CPU `data_tiled_mma_layout`. Returns nullptr if no CPU MMA intrinsic
+/// is available for the encoding/target.
+static Operation *lowerContractionToInnerTiled(
+    OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return nullptr;
+  }
+
+  auto inputs = linalgOp.getDpsInputOperands();
+  auto outputs = linalgOp.getDpsInits();
+
+  auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
+  auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
+  auto resultType = cast<RankedTensorType>(outputs[0].getType());
+  auto lhsEncoding = IREE::Encoding::getEncodingAttr(lhsType);
+  auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
+  auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
+  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
+    return nullptr;
+  }
+
+  if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
+      rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
+      resultEncoding.getOperandIndex().getValue() !=
+          IREE::Encoding::MATMUL_RESULT) {
+    return nullptr;
+  }
+
+  auto cDims = linalg::inferContractionDims(linalgOp);
+  if (!cDims->batch.empty()) {
+    LDBG() << "inner_tiled lowering: batched contraction not implemented";
+    return nullptr;
+  }
+
+  MLIRContext *ctx = builder.getContext();
+  Location loc = linalgOp.getLoc();
+  AffineExpr d0 = builder.getAffineDimExpr(0);
+  AffineExpr d1 = builder.getAffineDimExpr(1);
+  AffineExpr d2 = builder.getAffineDimExpr(2);
+  // RHS uses (d1, d2) i.e. (N_iter, K_iter) outer ordering — mmt4d-style — to
+  // match the packed RHS operand shape produced upstream (the RHS pack uses
+  // `outer_dims_perm = [1, 0]` so its outer dims come out as N_iter, K_iter,
+  // not K_iter, N_iter).
+  SmallVector<AffineMap> indexingMaps = {
+      AffineMap::get(3, 0, {d0, d2}, ctx),
+      AffineMap::get(3, 0, {d1, d2}, ctx),
+      AffineMap::get(3, 0, {d0, d1}, ctx),
+  };
+  SmallVector<utils::IteratorType> iteratorTypes = {
+      utils::IteratorType::parallel, utils::IteratorType::parallel,
+      utils::IteratorType::reduction};
+
+  DictionaryAttr targetConfig;
+  if (auto cpuResolver = dyn_cast<IREE::CPU::CPUEncodingResolverAttr>(
+          cast<Attribute>(layoutAttr))) {
+    targetConfig = cpuResolver.getConfiguration();
+  }
+
+  // Mirrors the GPU DataTiledMMA path: the MMA attribute is determined from
+  // the encoding + target config alone (the same inputs used by the encoding
+  // materialization side), not reverse-engineered from the already-packed
+  // operand tile shapes.
+  IREE::CPU::DataTiledMMAAttr chosenKind =
+      chooseCpuInnerTiledMmaForEncoding(ctx, resultEncoding, targetConfig);
+  if (!chosenKind) {
+    LDBG() << "inner_tiled lowering: no CPU DataTiledMMA kind available for "
+              "encoding/target";
+    return nullptr;
+  }
+
+  auto semanticsAttr = IREE::CPU::InnerTiledSemanticsAttr::get(ctx);
+  Operation *inner = IREE::Codegen::InnerTiledOp::create(
+      builder, loc, ValueRange{operands[0], operands[1]},
+      ValueRange{operands[2]}, indexingMaps, iteratorTypes, chosenKind,
+      semanticsAttr);
+  return inner;
 }
 
 Operation *lowerContractionOpWithEncoding(
@@ -714,14 +1075,29 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
 
+    DictionaryAttr config = layoutAttr.getConfiguration();
+    if (getEnableInnerTiledFromConfig(config)) {
+      return getInnerTiledEncodingInfo(type.getContext(), encoding, *cDims,
+                                       config);
+    }
+    return getMmt4dEncodingInfo(encoding, *cDims, config);
+  }
+
+private:
+  /// Legacy mmt4d path: enumerate candidate `TileMxNxK`s, pick one with the
+  /// narrow-dim-aware scoring, and apply the narrow-N→narrow-M transpose
+  /// trick required by the handwritten microkernels.
+  static MaterializeEncodingInfo
+  getMmt4dEncodingInfo(IREE::Encoding::EncodingAttr encoding,
+                       const linalg::ContractionDimensions &cDims,
+                       DictionaryAttr config) {
+    MaterializeEncodingInfo info;
     SmallVector<TileMxNxK> enumeratedTileMxNxK =
-        enumerateCPUMatmulTiles(encoding, layoutAttr.getConfiguration());
+        enumerateCPUMatmulTiles(encoding, config);
     if (enumeratedTileMxNxK.empty()) {
       return info;
     }
     auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
-    // Choose a final matmul TileMxNxK from the above-enumerated tile shapes,
-    // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK =
         chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
@@ -731,7 +1107,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     }
     info = std::move(maybeEncodingInfo.value());
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
-        getScalableTileFlags(*cDims, encoding, layoutAttr.getConfiguration());
+        getScalableTileFlags(cDims, encoding, config);
     if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
     }
@@ -739,6 +1115,34 @@ struct CPUEncodingPackedLayoutMaterializerAttr
         llvm::none_of(info.scalableTiles.value_or(Codegen::ScalableTileFlags{}),
                       [](bool flag) { return flag; })) {
       transposeInPlace(info);
+    }
+    return info;
+  }
+
+  /// Intrinsic-first path for `iree_codegen.inner_tiled`: pick a
+  /// `DataTiledMMAAttr` (same decision the lowering will make) and derive the
+  /// packed-layout tile shape from it. No narrow-N transpose: unlike the
+  /// legacy mmt4d path, the inner_tiled lowering handles narrow dims natively
+  /// via `intrinsics_m` / `intrinsics_n`.
+  static MaterializeEncodingInfo getInnerTiledEncodingInfo(
+      MLIRContext *ctx, IREE::Encoding::EncodingAttr encoding,
+      const linalg::ContractionDimensions &cDims, DictionaryAttr config) {
+    MaterializeEncodingInfo info;
+    IREE::CPU::DataTiledMMAAttr mma =
+        chooseCpuInnerTiledMmaForEncoding(ctx, encoding, config);
+    if (!mma) {
+      return info;
+    }
+    FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
+        getEncodingInfoForMatmul(encoding, getTileMxNxK(mma));
+    if (failed(maybeEncodingInfo)) {
+      return info;
+    }
+    info = std::move(maybeEncodingInfo.value());
+    FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
+        getScalableTileFlags(cDims, encoding, config);
+    if (succeeded(scalableFlags)) {
+      info.scalableTiles = std::move(scalableFlags);
     }
     return info;
   }
@@ -769,6 +1173,12 @@ struct CPUEncodingResolverMaterializerAttr final
                                     convertedOperands.drop_front(numInputs));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
+      DictionaryAttr config = layoutAttr.getConfiguration();
+      if (getEnableInnerTiledFromConfig(config)) {
+        return lowerContractionToInnerTiled(
+            b, linalgOp, convertedOperands,
+            cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+      }
       return lowerContractionOpWithEncoding(
           b, linalgOp, convertedOperands,
           cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
@@ -796,6 +1206,7 @@ struct CPULayoutResolverAttr final
       addConfigTargetTriple(ctx, targetTriple.value(), configItems);
     }
     storeNamedAttrIfPresent(configItems, config, "ukernels");
+    storeNamedAttrIfPresent(configItems, config, "enable_inner_tiled");
     return CPUEncodingResolverAttr::get(ctx,
                                         DictionaryAttr::get(ctx, configItems));
   }

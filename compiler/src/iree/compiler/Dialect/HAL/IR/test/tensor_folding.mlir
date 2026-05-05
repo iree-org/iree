@@ -53,6 +53,77 @@ util.func public @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> 
 
 // -----
 
+// CHECK-LABEL: @propagateImportDimsFromConsumers
+// CHECK-SAME: (%[[BV:.+]]: !hal.buffer_view, %[[BUF:.+]]: !hal.buffer)
+util.func public @propagateImportDimsFromConsumers(%bv: !hal.buffer_view, %buf: !hal.buffer) -> tensor<?x?xf32> {
+  %d0 = hal.buffer_view.dim<%bv : !hal.buffer_view>[0] : index
+  %d1 = hal.buffer_view.dim<%bv : !hal.buffer_view>[1] : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK: hal.tensor.import %[[BV]] : !hal.buffer_view -> tensor<?x?xf32>{%[[C4]], %[[C8]]}
+  %t = hal.tensor.import %bv : !hal.buffer_view -> tensor<?x?xf32>{%d0, %d1}
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
+  %aliased = hal.tensor.alias %t : tensor<?x?xf32>{%c4, %c8} to %buf : !hal.buffer
+  util.return %aliased : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @propagateImportDimsPartial
+// CHECK-SAME: (%[[BV:.+]]: !hal.buffer_view, %[[BUF:.+]]: !hal.buffer)
+util.func public @propagateImportDimsPartial(%bv: !hal.buffer_view, %buf: !hal.buffer) -> tensor<?x?xf32> {
+  // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[BV]] : !hal.buffer_view>[0] : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  %d0 = hal.buffer_view.dim<%bv : !hal.buffer_view>[0] : index
+  %d1 = hal.buffer_view.dim<%bv : !hal.buffer_view>[1] : index
+  // CHECK: hal.tensor.import %[[BV]] : !hal.buffer_view -> tensor<?x?xf32>{%[[D0]], %[[C8]]}
+  %t = hal.tensor.import %bv : !hal.buffer_view -> tensor<?x?xf32>{%d0, %d1}
+  %c8 = arith.constant 8 : index
+  %aliased = hal.tensor.alias %t : tensor<?x?xf32>{%d0, %c8} to %buf : !hal.buffer
+  util.return %aliased : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @propagateImportDimsConflictingConsumers
+// CHECK-SAME: (%[[BV:.+]]: !hal.buffer_view, %[[BUF0:.+]]: !hal.buffer, %[[BUF1:.+]]: !hal.buffer)
+util.func public @propagateImportDimsConflictingConsumers(%bv: !hal.buffer_view, %buf0: !hal.buffer, %buf1: !hal.buffer) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
+  // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[BV]] : !hal.buffer_view>[0] : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  %d0 = hal.buffer_view.dim<%bv : !hal.buffer_view>[0] : index
+  %d1 = hal.buffer_view.dim<%bv : !hal.buffer_view>[1] : index
+  %c4 = arith.constant 4 : index
+  %c5 = arith.constant 5 : index
+  %c8 = arith.constant 8 : index
+  // CHECK: hal.tensor.import %[[BV]] : !hal.buffer_view -> tensor<?x?xf32>{%[[D0]], %[[C8]]}
+  %t = hal.tensor.import %bv : !hal.buffer_view -> tensor<?x?xf32>{%d0, %d1}
+  %aliased0 = hal.tensor.alias %t : tensor<?x?xf32>{%c4, %c8} to %buf0 : !hal.buffer
+  %aliased1 = hal.tensor.alias %t : tensor<?x?xf32>{%c5, %c8} to %buf1 : !hal.buffer
+  util.return %aliased0, %aliased1 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @doNotPropagateImportDimsFromNestedConsumer
+// CHECK-SAME: (%[[BV:.+]]: !hal.buffer_view, %[[BUF:.+]]: !hal.buffer, %[[COND:.+]]: i1)
+util.func public @doNotPropagateImportDimsFromNestedConsumer(%bv: !hal.buffer_view, %buf: !hal.buffer, %cond: i1) -> tensor<?xf32> {
+  // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[BV]] : !hal.buffer_view>[0] : index
+  %d0 = hal.buffer_view.dim<%bv : !hal.buffer_view>[0] : index
+  // CHECK: hal.tensor.import %[[BV]] : !hal.buffer_view -> tensor<?xf32>{%[[D0]]}
+  %t = hal.tensor.import %bv : !hal.buffer_view -> tensor<?xf32>{%d0}
+  %r = scf.if %cond -> tensor<?xf32> {
+    %c4 = arith.constant 4 : index
+    %aliased = hal.tensor.alias %t : tensor<?xf32>{%c4} to %buf : !hal.buffer
+    scf.yield %aliased : tensor<?xf32>
+  } else {
+    scf.yield %t : tensor<?xf32>
+  }
+  util.return %r : tensor<?xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldConsecutiveTransientsSameStorage
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>, %[[STORAGE:.+]]: !hal.buffer)
 util.func public @FoldConsecutiveTransientsSameStorage(%arg0: tensor<4xf32>, %storage: !hal.buffer) -> tensor<4xf32> {

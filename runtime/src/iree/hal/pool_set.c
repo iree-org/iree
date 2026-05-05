@@ -19,6 +19,20 @@ typedef struct iree_hal_pool_set_entry_t {
   iree_hal_pool_capabilities_t capabilities;
 } iree_hal_pool_set_entry_t;
 
+static iree_hal_memory_type_t iree_hal_pool_set_required_memory_type(
+    iree_hal_memory_type_t memory_type) {
+  return memory_type & ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+}
+
+static void iree_hal_pool_set_apply_optimal_memory_type(
+    const iree_hal_pool_capabilities_t* capabilities,
+    iree_hal_buffer_params_t* params) {
+  if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
+    params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+    params->type |= capabilities->memory_type;
+  }
+}
+
 iree_status_t iree_hal_pool_set_initialize(iree_host_size_t initial_capacity,
                                            iree_allocator_t host_allocator,
                                            iree_hal_pool_set_t* out_pool_set) {
@@ -102,13 +116,15 @@ iree_hal_pool_t* iree_hal_pool_set_select(const iree_hal_pool_set_t* pool_set,
                                           iree_device_size_t allocation_size) {
   IREE_ASSERT_ARGUMENT(pool_set);
   iree_hal_buffer_params_canonicalize(&params);
+  const iree_hal_memory_type_t required_type =
+      iree_hal_pool_set_required_memory_type(params.type);
 
   for (iree_host_size_t i = 0; i < pool_set->entry_count; ++i) {
     const iree_hal_pool_set_entry_t* entry = &pool_set->entries[i];
     const iree_hal_pool_capabilities_t* capabilities = &entry->capabilities;
 
     // Memory type: pool must provide at least the required type bits.
-    if ((capabilities->memory_type & params.type) != params.type) {
+    if ((capabilities->memory_type & required_type) != required_type) {
       continue;
     }
 
@@ -151,6 +167,9 @@ iree_status_t iree_hal_pool_set_allocate_buffer(
         " bytes with the requested buffer parameters",
         allocation_size);
   }
+  iree_hal_pool_capabilities_t capabilities;
+  iree_hal_pool_query_capabilities(pool, &capabilities);
+  iree_hal_pool_set_apply_optimal_memory_type(&capabilities, &params);
   return iree_hal_pool_allocate_buffer(pool, params, allocation_size,
                                        requester_frontier, timeout, out_buffer);
 }

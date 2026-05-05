@@ -189,6 +189,14 @@ TEST_F(DeviceProfilingTest, BeginRejectsCounterSamplesWithoutCounterSets) {
                         Begin(&profiling_options));
 }
 
+TEST_F(DeviceProfilingTest, BeginRejectsCounterRangesWithoutCounterSets) {
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_RANGES;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        Begin(&profiling_options));
+}
+
 TEST_F(DeviceProfilingTest, BeginRejectsCounterSetWithoutCounterNames) {
   iree_hal_profile_counter_set_selection_t counter_set = {0};
 

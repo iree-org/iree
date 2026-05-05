@@ -257,6 +257,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    profile_event_ring
+  HDRS
+    "profile_event_ring.h"
+  SRCS
+    "profile_event_ring.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     statistics_sink
   HDRS
     "statistics_sink.h"

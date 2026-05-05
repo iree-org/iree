@@ -48,17 +48,38 @@ ENVIRONMENT VARIABLES
     Values: ON/YES/TRUE/Y/1 (enabled), OFF/NO/FALSE/N/0 (disabled)
     Defaults: local-sync, local-task, vulkan enabled (matches CMake)
 
-    Note: Compiler backends are always built in Bazel (plugin architecture).
+    Compiler Plugins:
+      IREE_COMPILER_PLUGINS=all      - All buildable plugins (default)
+      IREE_COMPILER_PLUGINS=all,-X   - All except plugin X
+      IREE_COMPILER_PLUGINS=X,Y      - Only plugins X and Y
+
+    Plugin detection (for "all"):
+      - CUDA: requires IREE_CUDA_TOOLKIT_ROOT/IREE_CUDA_DEPS_DIR,
+              CUDA_ROOT/CUDA_HOME/CUDA_PATH/CUDA_TOOLKIT_ROOT_DIR, or nvcc in PATH
+      - ROCm: requires ROCM_PATH/ROCM_ROOT/ROCM_HOME/HIP_PATH or hipcc in PATH
+      - MetalSPIRV: always buildable
+      - StableHLO: requires third_party/stablehlo submodule
+      - Torch: requires third_party/torch-mlir submodule
+
+    SDK detection:
+      VULKAN_SDK                   - Used when set; otherwise configure probes
+                                     vulkaninfo and common SDK install paths
 
 EXAMPLES
-    # Configure with defaults
+    # Configure with defaults (all buildable plugins)
     iree-bazel-configure
 
-    # Enable CUDA
+    # Enable CUDA runtime driver
     IREE_HAL_DRIVER_CUDA=ON iree-bazel-configure
 
-    # Enable multiple drivers
+    # Enable multiple runtime drivers
     IREE_HAL_DRIVER_CUDA=ON IREE_HAL_DRIVER_VULKAN=ON iree-bazel-configure
+
+    # Exclude torch plugin (faster builds)
+    IREE_COMPILER_PLUGINS="all,-input_torch" iree-bazel-configure
+
+    # Only specific plugins
+    IREE_COMPILER_PLUGINS="hal_target_llvm_cpu,hal_target_vulkan_spirv" iree-bazel-configure
 
 AFTER CONFIGURATION
     iree-bazel-build      Build IREE targets
@@ -84,6 +105,11 @@ iree_info "Configuring IREE for Bazel in ${IREE_BAZEL_WORKTREE_DIR}..."
 # Run platform detection.
 if [[ -f "configure_bazel.py" ]]; then
     iree_info "Running configure_bazel.py..."
+    # Default to all buildable plugins unless explicitly set.
+    # Users who want selective plugins can set IREE_COMPILER_PLUGINS explicitly.
+    if [[ -z "${IREE_COMPILER_PLUGINS:-}" ]]; then
+        export IREE_COMPILER_PLUGINS="all"
+    fi
     python3 configure_bazel.py
 else
     iree_error "configure_bazel.py not found in ${IREE_BAZEL_WORKTREE_DIR}"

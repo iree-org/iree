@@ -11,6 +11,7 @@
 
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/local/local_executable.h"
+#include "iree/hal/utils/profile_event_ring.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_local_profile_recorder_t
@@ -18,55 +19,6 @@
 
 // Default number of records retained per enabled event stream between flushes.
 #define IREE_HAL_LOCAL_PROFILE_DEFAULT_EVENT_CAPACITY 4096
-
-typedef struct iree_hal_local_profile_event_ring_t {
-  // Storage for fixed-size event records, or NULL when the stream is disabled.
-  void* records;
-
-  // Size in bytes of each event record in |records|.
-  iree_host_size_t record_size;
-
-  // Power-of-two number of event records in |records|.
-  iree_host_size_t capacity;
-
-  // Bit mask used to wrap absolute positions into |records|.
-  iree_host_size_t mask;
-
-  // Absolute position of the first unflushed event record.
-  uint64_t read_position;
-
-  // Absolute position one past the last appended event record.
-  uint64_t write_position;
-
-  // Next nonzero event id assigned to a captured record.
-  uint64_t next_event_id;
-
-  // Records dropped since the last successful truncated flush.
-  uint64_t dropped_record_count;
-} iree_hal_local_profile_event_ring_t;
-
-typedef struct iree_hal_local_profile_event_ring_snapshot_t {
-  // Absolute read position captured for this flush attempt.
-  uint64_t read_position;
-
-  // Number of event records captured for this flush attempt.
-  iree_host_size_t record_count;
-
-  // Dropped records captured for this flush attempt.
-  uint64_t dropped_record_count;
-
-  // First contiguous record span in the ring.
-  const void* first_records;
-
-  // Number of records in |first_records|.
-  iree_host_size_t first_record_count;
-
-  // Second contiguous record span after ring wraparound, or NULL.
-  const void* second_records;
-
-  // Number of records in |second_records|.
-  iree_host_size_t second_record_count;
-} iree_hal_local_profile_event_ring_snapshot_t;
 
 typedef struct iree_hal_local_profile_id_set_t {
   // Open-addressed nonzero ids whose metadata was emitted.
@@ -111,16 +63,16 @@ struct iree_hal_local_profile_recorder_t {
   void* event_storage;
 
   // Ring of host queue event records.
-  iree_hal_local_profile_event_ring_t queue_event_ring;
+  iree_hal_profile_event_ring_t queue_event_ring;
 
   // Ring of host execution span records.
-  iree_hal_local_profile_event_ring_t host_execution_event_ring;
+  iree_hal_profile_event_ring_t host_execution_event_ring;
 
   // Ring of memory lifecycle event records.
-  iree_hal_local_profile_event_ring_t memory_event_ring;
+  iree_hal_profile_event_ring_t memory_event_ring;
 
   // Ring of command-buffer region event records.
-  iree_hal_local_profile_event_ring_t command_region_event_ring;
+  iree_hal_profile_event_ring_t command_region_event_ring;
 
   // Metadata ids already emitted to the session sink.
   struct {
@@ -281,17 +233,6 @@ static iree_status_t iree_hal_local_profile_recorder_normalize_capacity(
   return iree_ok_status();
 }
 
-static void iree_hal_local_profile_event_ring_initialize(
-    void* records, iree_host_size_t record_size, iree_host_size_t capacity,
-    iree_hal_local_profile_event_ring_t* out_ring) {
-  memset(out_ring, 0, sizeof(*out_ring));
-  out_ring->records = records;
-  out_ring->record_size = record_size;
-  out_ring->capacity = capacity;
-  out_ring->mask = capacity - 1;
-  out_ring->next_event_id = 1;
-}
-
 static iree_status_t iree_hal_local_profile_recorder_allocate_events(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_recorder_options_t* recorder_options) {
@@ -354,25 +295,25 @@ static iree_status_t iree_hal_local_profile_recorder_allocate_events(
   recorder->event_storage = event_storage;
 
   if (queue_event_capacity != 0) {
-    iree_hal_local_profile_event_ring_initialize(
+    iree_hal_profile_event_ring_initialize(
         (uint8_t*)event_storage + queue_events_offset,
         sizeof(iree_hal_profile_queue_event_t), queue_event_capacity,
         &recorder->queue_event_ring);
   }
   if (host_execution_event_capacity != 0) {
-    iree_hal_local_profile_event_ring_initialize(
+    iree_hal_profile_event_ring_initialize(
         (uint8_t*)event_storage + host_execution_events_offset,
         sizeof(iree_hal_profile_host_execution_event_t),
         host_execution_event_capacity, &recorder->host_execution_event_ring);
   }
   if (memory_event_capacity != 0) {
-    iree_hal_local_profile_event_ring_initialize(
+    iree_hal_profile_event_ring_initialize(
         (uint8_t*)event_storage + memory_events_offset,
         sizeof(iree_hal_profile_memory_event_t), memory_event_capacity,
         &recorder->memory_event_ring);
   }
   if (command_region_event_capacity != 0) {
-    iree_hal_local_profile_event_ring_initialize(
+    iree_hal_profile_event_ring_initialize(
         (uint8_t*)event_storage + command_region_events_offset,
         sizeof(iree_hal_profile_command_region_event_t),
         command_region_event_capacity, &recorder->command_region_event_ring);
@@ -856,33 +797,29 @@ static bool iree_hal_local_profile_queue_scope_is_valid(
 }
 
 static iree_hal_profile_queue_event_t* iree_hal_local_profile_queue_event_at(
-    const iree_hal_local_profile_event_ring_t* ring, uint64_t position) {
-  iree_hal_profile_queue_event_t* records =
-      (iree_hal_profile_queue_event_t*)ring->records;
-  return &records[position & ring->mask];
+    const iree_hal_profile_event_ring_t* ring, uint64_t position) {
+  return (iree_hal_profile_queue_event_t*)iree_hal_profile_event_ring_record_at(
+      ring, position);
 }
 
 static iree_hal_profile_host_execution_event_t*
 iree_hal_local_profile_host_execution_event_at(
-    const iree_hal_local_profile_event_ring_t* ring, uint64_t position) {
-  iree_hal_profile_host_execution_event_t* records =
-      (iree_hal_profile_host_execution_event_t*)ring->records;
-  return &records[position & ring->mask];
+    const iree_hal_profile_event_ring_t* ring, uint64_t position) {
+  return (iree_hal_profile_host_execution_event_t*)
+      iree_hal_profile_event_ring_record_at(ring, position);
 }
 
 static iree_hal_profile_memory_event_t* iree_hal_local_profile_memory_event_at(
-    const iree_hal_local_profile_event_ring_t* ring, uint64_t position) {
-  iree_hal_profile_memory_event_t* records =
-      (iree_hal_profile_memory_event_t*)ring->records;
-  return &records[position & ring->mask];
+    const iree_hal_profile_event_ring_t* ring, uint64_t position) {
+  return (iree_hal_profile_memory_event_t*)
+      iree_hal_profile_event_ring_record_at(ring, position);
 }
 
 static iree_hal_profile_command_region_event_t*
 iree_hal_local_profile_command_region_event_at(
-    const iree_hal_local_profile_event_ring_t* ring, uint64_t position) {
-  iree_hal_profile_command_region_event_t* records =
-      (iree_hal_profile_command_region_event_t*)ring->records;
-  return &records[position & ring->mask];
+    const iree_hal_profile_event_ring_t* ring, uint64_t position) {
+  return (iree_hal_profile_command_region_event_t*)
+      iree_hal_profile_event_ring_record_at(ring, position);
 }
 
 void iree_hal_local_profile_recorder_append_queue_event(
@@ -901,17 +838,18 @@ void iree_hal_local_profile_recorder_append_queue_event(
   IREE_ASSERT(is_valid);
   if (IREE_UNLIKELY(!is_valid)) return;
 
-  iree_hal_local_profile_event_ring_t* ring = &recorder->queue_event_ring;
+  iree_hal_profile_event_ring_t* ring = &recorder->queue_event_ring;
   iree_slim_mutex_lock(&recorder->mutex);
-  if (ring->write_position - ring->read_position >= ring->capacity) {
-    ++ring->dropped_record_count;
+  uint64_t event_position = 0;
+  uint64_t event_id = 0;
+  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
+                                              &event_id)) {
     iree_slim_mutex_unlock(&recorder->mutex);
     return;
   }
 
-  const uint64_t event_id = ring->next_event_id++;
   iree_hal_profile_queue_event_t* event =
-      iree_hal_local_profile_queue_event_at(ring, ring->write_position);
+      iree_hal_local_profile_queue_event_at(ring, event_position);
   *event = iree_hal_profile_queue_event_default();
   event->type = event_info->type;
   event->flags = event_info->flags;
@@ -931,7 +869,6 @@ void iree_hal_local_profile_recorder_append_queue_event(
   event->barrier_count = event_info->barrier_count;
   event->operation_count = event_info->operation_count;
   event->payload_length = event_info->payload_length;
-  ++ring->write_position;
   if (out_event_id) *out_event_id = event_id;
   iree_slim_mutex_unlock(&recorder->mutex);
 }
@@ -960,19 +897,18 @@ void iree_hal_local_profile_recorder_append_host_execution_event(
   IREE_ASSERT(has_valid_range);
   if (IREE_UNLIKELY(!has_valid_range)) end_time_ns = start_time_ns;
 
-  iree_hal_local_profile_event_ring_t* ring =
-      &recorder->host_execution_event_ring;
+  iree_hal_profile_event_ring_t* ring = &recorder->host_execution_event_ring;
   iree_slim_mutex_lock(&recorder->mutex);
-  if (ring->write_position - ring->read_position >= ring->capacity) {
-    ++ring->dropped_record_count;
+  uint64_t event_position = 0;
+  uint64_t event_id = 0;
+  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
+                                              &event_id)) {
     iree_slim_mutex_unlock(&recorder->mutex);
     return;
   }
 
-  const uint64_t event_id = ring->next_event_id++;
   iree_hal_profile_host_execution_event_t* event =
-      iree_hal_local_profile_host_execution_event_at(ring,
-                                                     ring->write_position);
+      iree_hal_local_profile_host_execution_event_at(ring, event_position);
   *event = iree_hal_profile_host_execution_event_default();
   event->type = event_info->type;
   event->flags = event_info->flags;
@@ -997,7 +933,6 @@ void iree_hal_local_profile_recorder_append_host_execution_event(
   event->tile_count = event_info->tile_count;
   event->tile_duration_sum_ns = event_info->tile_duration_sum_ns;
   event->operation_count = event_info->operation_count;
-  ++ring->write_position;
   if (out_event_id) *out_event_id = event_id;
   iree_slim_mutex_unlock(&recorder->mutex);
 }
@@ -1027,19 +962,18 @@ void iree_hal_local_profile_recorder_append_command_region_event(
   IREE_ASSERT(has_valid_range);
   if (IREE_UNLIKELY(!has_valid_range)) end_time_ns = start_time_ns;
 
-  iree_hal_local_profile_event_ring_t* ring =
-      &recorder->command_region_event_ring;
+  iree_hal_profile_event_ring_t* ring = &recorder->command_region_event_ring;
   iree_slim_mutex_lock(&recorder->mutex);
-  if (ring->write_position - ring->read_position >= ring->capacity) {
-    ++ring->dropped_record_count;
+  uint64_t event_position = 0;
+  uint64_t event_id = 0;
+  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
+                                              &event_id)) {
     iree_slim_mutex_unlock(&recorder->mutex);
     return;
   }
 
-  const uint64_t event_id = ring->next_event_id++;
   iree_hal_profile_command_region_event_t* event =
-      iree_hal_local_profile_command_region_event_at(ring,
-                                                     ring->write_position);
+      iree_hal_local_profile_command_region_event_at(ring, event_position);
   *event = iree_hal_profile_command_region_event_default();
   event->flags = event_info->flags;
   event->event_id = event_id;
@@ -1102,7 +1036,6 @@ void iree_hal_local_profile_recorder_append_command_region_event(
   event->retention.publish_keep_active_count =
       event_info->retention.publish_keep_active_count;
   event->retention.keep_warm_count = event_info->retention.keep_warm_count;
-  ++ring->write_position;
   if (out_event_id) *out_event_id = event_id;
   iree_slim_mutex_unlock(&recorder->mutex);
 }
@@ -1132,92 +1065,40 @@ void iree_hal_local_profile_recorder_append_memory_event(
   IREE_ASSERT(is_valid);
   if (IREE_UNLIKELY(!is_valid)) return;
 
-  iree_hal_local_profile_event_ring_t* ring = &recorder->memory_event_ring;
+  iree_hal_profile_event_ring_t* ring = &recorder->memory_event_ring;
   iree_slim_mutex_lock(&recorder->mutex);
-  if (ring->write_position - ring->read_position >= ring->capacity) {
-    ++ring->dropped_record_count;
+  uint64_t event_position = 0;
+  uint64_t event_id = 0;
+  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
+                                              &event_id)) {
     iree_slim_mutex_unlock(&recorder->mutex);
     return;
   }
 
-  const uint64_t event_id = ring->next_event_id++;
   iree_hal_profile_memory_event_t* record =
-      iree_hal_local_profile_memory_event_at(ring, ring->write_position);
+      iree_hal_local_profile_memory_event_at(ring, event_position);
   *record = *event;
   record->record_length = sizeof(*record);
   record->event_id = event_id;
   if (record->host_time_ns == 0) {
     record->host_time_ns = iree_time_now();
   }
-  ++ring->write_position;
   if (out_event_id) *out_event_id = event_id;
   iree_slim_mutex_unlock(&recorder->mutex);
 }
 
-static void iree_hal_local_profile_event_ring_snapshot(
-    const iree_hal_local_profile_event_ring_t* ring,
-    iree_hal_local_profile_event_ring_snapshot_t* out_snapshot) {
-  memset(out_snapshot, 0, sizeof(*out_snapshot));
-  if (!ring->records) return;
-
-  out_snapshot->read_position = ring->read_position;
-  out_snapshot->record_count =
-      (iree_host_size_t)(ring->write_position - ring->read_position);
-  out_snapshot->dropped_record_count = ring->dropped_record_count;
-  IREE_ASSERT_LE(out_snapshot->record_count, ring->capacity);
-  if (out_snapshot->record_count == 0) return;
-
-  const iree_host_size_t first_record_index =
-      (iree_host_size_t)(ring->read_position & ring->mask);
-  out_snapshot->first_record_count =
-      iree_min(out_snapshot->record_count, ring->capacity - first_record_index);
-  out_snapshot->first_records =
-      (const uint8_t*)ring->records + first_record_index * ring->record_size;
-  out_snapshot->second_record_count =
-      out_snapshot->record_count - out_snapshot->first_record_count;
-  if (out_snapshot->second_record_count != 0) {
-    out_snapshot->second_records = ring->records;
-  }
-}
-
-static iree_status_t iree_hal_local_profile_append_iovec(
-    const void* records, iree_host_size_t record_count,
-    iree_host_size_t record_size, iree_host_size_t* iovec_count,
-    iree_const_byte_span_t iovecs[2]) {
-  if (record_count == 0) return iree_ok_status();
-  iree_host_size_t byte_length = 0;
-  if (IREE_UNLIKELY(!iree_host_size_checked_mul(record_count, record_size,
-                                                &byte_length))) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "local profiling event chunk size overflow for %" PRIhsz " records",
-        record_count);
-  }
-  iovecs[(*iovec_count)++] = iree_make_const_byte_span(records, byte_length);
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_local_profile_recorder_write_event_ring(
     iree_hal_local_profile_recorder_t* recorder,
-    iree_string_view_t content_type,
-    iree_hal_local_profile_event_ring_t* ring) {
-  iree_hal_local_profile_event_ring_snapshot_t snapshot;
+    iree_string_view_t content_type, iree_hal_profile_event_ring_t* ring) {
+  iree_hal_profile_event_ring_snapshot_t snapshot;
   iree_slim_mutex_lock(&recorder->mutex);
-  iree_hal_local_profile_event_ring_snapshot(ring, &snapshot);
+  iree_status_t status = iree_hal_profile_event_ring_snapshot(ring, &snapshot);
   iree_slim_mutex_unlock(&recorder->mutex);
+  IREE_RETURN_IF_ERROR(status);
 
   if (snapshot.record_count == 0 && snapshot.dropped_record_count == 0) {
     return iree_ok_status();
   }
-
-  iree_const_byte_span_t iovecs[2];
-  iree_host_size_t iovec_count = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_local_profile_append_iovec(
-      snapshot.first_records, snapshot.first_record_count, ring->record_size,
-      &iovec_count, iovecs));
-  IREE_RETURN_IF_ERROR(iree_hal_local_profile_append_iovec(
-      snapshot.second_records, snapshot.second_record_count, ring->record_size,
-      &iovec_count, iovecs));
 
   iree_hal_profile_chunk_metadata_t metadata =
       iree_hal_local_profile_recorder_metadata(recorder, content_type);
@@ -1226,15 +1107,11 @@ static iree_status_t iree_hal_local_profile_recorder_write_event_ring(
     metadata.dropped_record_count = snapshot.dropped_record_count;
   }
   IREE_RETURN_IF_ERROR(iree_hal_profile_sink_write(
-      recorder->options.sink, &metadata, iovec_count, iovecs));
+      recorder->options.sink, &metadata, snapshot.record_span_count,
+      snapshot.record_span_count ? snapshot.record_spans : NULL));
 
   iree_slim_mutex_lock(&recorder->mutex);
-  ring->read_position = snapshot.read_position + snapshot.record_count;
-  if (ring->dropped_record_count >= snapshot.dropped_record_count) {
-    ring->dropped_record_count -= snapshot.dropped_record_count;
-  } else {
-    ring->dropped_record_count = 0;
-  }
+  iree_hal_profile_event_ring_commit_snapshot(ring, &snapshot);
   iree_slim_mutex_unlock(&recorder->mutex);
   return iree_ok_status();
 }

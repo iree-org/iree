@@ -2144,7 +2144,18 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
-        max, sum, indexingMaps, DictionaryAttr::get(odsBuilder.getContext()));
+        max, sum, indexingMaps, DictionaryAttr());
+}
+
+void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                              TypeRange results, ValueRange inputOperands,
+                              ValueRange initOperands, ArrayAttr indexingMaps) {
+  assert(inputOperands.size() < 6);
+  assert(initOperands.size() == 3);
+  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
+        inputOperands[2], inputOperands[3], mask, initOperands[0],
+        initOperands[1], initOperands[2], indexingMaps, DictionaryAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {

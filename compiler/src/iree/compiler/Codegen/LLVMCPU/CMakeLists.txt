@@ -127,6 +127,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRPass
@@ -157,6 +158,9 @@ iree_cc_library(
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Transforms::IREECodegenTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

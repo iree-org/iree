@@ -151,6 +151,17 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "buffer_view_util_test",
+    srcs = ["buffer_view_util_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "pool_test",
     srcs = ["pool_test.cc"],
     deps = [

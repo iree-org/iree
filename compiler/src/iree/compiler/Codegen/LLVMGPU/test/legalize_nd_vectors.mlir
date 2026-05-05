@@ -301,6 +301,34 @@ func.func @linearize_2d_vector_unroll(%v0: vector<2x2xindex>, %v1: vector<2x2xin
 
 // -----
 
+// vector.interleave on a 2-D vector: each pair of 1-D vectors is interleaved individually.
+func.func @interleave_2d(%a: vector<2x3xf32>, %b: vector<2x3xf32>) -> vector<2x6xf32> {
+  %0 = vector.interleave %a, %b : vector<2x3xf32> -> vector<2x6xf32>
+  return %0 : vector<2x6xf32>
+}
+// CHECK-LABEL: func.func @interleave_2d
+//  CHECK-SAME:   (%[[A0:.+]]: vector<3xf32>, %[[A1:.+]]: vector<3xf32>, %[[B0:.+]]: vector<3xf32>, %[[B1:.+]]: vector<3xf32>)
+//  CHECK-SAME:   -> (vector<6xf32>, vector<6xf32>)
+//       CHECK:   %[[R0:.+]] = vector.interleave %[[A0]], %[[B0]] : vector<3xf32> -> vector<6xf32>
+//       CHECK:   %[[R1:.+]] = vector.interleave %[[A1]], %[[B1]] : vector<3xf32> -> vector<6xf32>
+//       CHECK:   return %[[R0]], %[[R1]] : vector<6xf32>, vector<6xf32>
+
+// -----
+
+// vector.deinterleave on a 2-D vector: each 1-D vector is deinterleaved individually.
+func.func @deinterleave_2d(%v: vector<2x6xf32>) -> (vector<2x3xf32>, vector<2x3xf32>) {
+  %0, %1 = vector.deinterleave %v : vector<2x6xf32> -> vector<2x3xf32>
+  return %0, %1 : vector<2x3xf32>, vector<2x3xf32>
+}
+// CHECK-LABEL: func.func @deinterleave_2d
+//  CHECK-SAME:   (%[[V0:.+]]: vector<6xf32>, %[[V1:.+]]: vector<6xf32>)
+//  CHECK-SAME:   -> (vector<3xf32>, vector<3xf32>, vector<3xf32>, vector<3xf32>)
+//       CHECK:   %[[E0:.+]], %[[O0:.+]] = vector.deinterleave %[[V0]] : vector<6xf32> -> vector<3xf32>
+//       CHECK:   %[[E1:.+]], %[[O1:.+]] = vector.deinterleave %[[V1]] : vector<6xf32> -> vector<3xf32>
+//       CHECK:   return %[[E0]], %[[E1]], %[[O0]], %[[O1]] : vector<3xf32>, vector<3xf32>, vector<3xf32>, vector<3xf32>
+
+// -----
+
 util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4xf32> {
   %0 = arith.addf %arg0, %arg1 : vector<2x4xf32>
   util.return %0 : vector<2x4xf32>
@@ -311,3 +339,31 @@ util.func @util_func_addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> 
 //       CHECK:   %[[R0:.+]] = arith.addf %[[A0]], %[[B0]] : vector<4xf32>
 //       CHECK:   %[[R1:.+]] = arith.addf %[[A1]], %[[B1]] : vector<4xf32>
 //       CHECK:   util.return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+func.func @negative_vector_multi_reduction_rank_one(%arg0: vector<2xf32>, %acc: f32) -> f32 {
+    %0 = vector.multi_reduction <mul>, %arg0, %acc [0] : vector<2xf32> to f32
+    return %0 : f32
+}
+
+// CHECK-LABEL: func.func @negative_vector_multi_reduction_rank_one
+//       CHECK:   vector.multi_reduction
+//       CHECK:   return
+
+// -----
+
+func.func @vector_multi_reduction_2d(%src: vector<2x4xf32>, %acc: vector<2xf32>) -> vector<2xf32> {
+    %0 = vector.multi_reduction <mul>, %src, %acc [1] : vector<2x4xf32> to vector<2xf32>
+    return %0 : vector<2xf32>
+}
+
+// CHECK-LABEL: func.func @vector_multi_reduction_2d
+//  CHECK-SAME:   (%[[S0:.+]]: vector<4xf32>, %[[S1:.+]]: vector<4xf32>, %[[ACC:.+]]: vector<2xf32>)
+//       CHECK:   %[[A0:.+]] = vector.extract %[[ACC]][0] : f32 from vector<2xf32>
+//       CHECK:   %[[R0:.+]] = vector.multi_reduction <mul>, %[[S0]], %[[A0]] [0] : vector<4xf32> to f32
+//       CHECK:   %[[INS0:.+]] = vector.insert %[[R0]], %{{.*}} [0] : f32 into vector<2xf32>
+//       CHECK:   %[[A1:.+]] = vector.extract %[[ACC]][1] : f32 from vector<2xf32>
+//       CHECK:   %[[R1:.+]] = vector.multi_reduction <mul>, %[[S1]], %[[A1]] [0] : vector<4xf32> to f32
+//       CHECK:   %[[INS1:.+]] = vector.insert %[[R1]], %[[INS0]] [1] : f32 into vector<2xf32>
+//       CHECK:   return %[[INS1]] : vector<2xf32>

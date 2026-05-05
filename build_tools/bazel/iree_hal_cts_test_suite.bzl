@@ -53,6 +53,7 @@ _NON_EXECUTABLE_SUITES = [
 _EXECUTABLE_SUITES = [
     ("dispatch_tests", "//runtime/src/iree/hal/cts/command_buffer:all_dispatch_tests"),
     ("executable_tests", "//runtime/src/iree/hal/cts/core:all_executable_tests"),
+    ("queue_dispatch_tests", "//runtime/src/iree/hal/cts/queue:queue_dispatch_test"),
 ]
 
 def _camel_case(snake_str):

@@ -271,7 +271,8 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                    bool skipUntunedFallback = false);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
@@ -279,7 +280,29 @@ FailureOr<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+                  bool skipUntunedFallback = false);
+
+/// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
+/// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
+///
+/// When the subgroup transfer size is not a multiple of the swizzle period,
+/// we add the subgroup's base offset within the full allocation before
+/// swizzling and subtract it after.
+///
+///    Example: xor_shuffle<64, 8>, period = 64*64/8 = 512 elements.
+///    Workgroup tile = 32x32, 4 subgroups of 8x32 = 256 each.
+///    256 < 512, so the fix is needed:
+///    ```
+///      BUG: swizzle(local)
+///           Subgroups 0 and 1 see the same local offsets but occupy
+///           different rows in the full allocation.
+///      FIX: swizzle(local + base) - base
+///    ```
+Value applyInverseXorSwizzleToDMASourceOffset(
+    OpBuilder &builder, Location loc, Value srcLinearOffset,
+    IREE::Codegen::XORShuffleAttr swizzle, Value dest);
+
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//

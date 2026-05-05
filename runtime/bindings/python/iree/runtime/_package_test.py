@@ -35,10 +35,13 @@ assert v.VERSION
 print("IREE version:", v.VERSION)
 
 check_tool("iree-benchmark-module", ["--help"], "IREE: iree-benchmark-module")
+check_tool("iree-benchmark-replay", ["--help"], "IREE: iree-benchmark-replay")
 check_tool("iree-run-module", ["--help"], "IREE: iree-run-module")
+check_tool("iree-run-replay", ["--help"], "IREE: iree-run-replay")
 check_tool("iree-create-parameters", ["--help"], "IREE: iree-create-parameters")
 check_tool("iree-convert-parameters", ["--help"], "IREE: iree-convert-parameters")
 check_tool("iree-dump-module", ["--help"], "IREE: iree-dump-module")
+check_tool("iree-dump-replay", ["--help"], "IREE: iree-dump-replay")
 check_tool("iree-dump-parameters", ["--help"], "IREE: iree-dump-parameters")
 check_tool("iree-profile", ["--help"], "IREE: iree-profile")
 check_tool("iree-profile-render", ["--help"], "usage: iree-profile-render")

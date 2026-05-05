@@ -77,8 +77,16 @@ enum iree_hal_command_buffer_mode_bits_t {
   // This makes profiling possible for the command buffer but does not enable
   // profiling by itself. Implementations may spend additional recording-time
   // CPU and memory to retain command operation metadata and compact sidecars
-  // used by profiling sessions.
+  // used by profiling sessions. This is intended for rich host profiling that
+  // needs source/correlation records, not minimal production timestamp capture.
   IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA = 1u << 7,
+
+  // Retains compact dispatch metadata required for command-buffer timestamping.
+  // This makes dispatch timestamp capture possible for the command buffer but
+  // does not enable timestamp capture by itself. Implementations may spend
+  // additional recording-time CPU and memory to retain compact per-dispatch
+  // packet/correlation sidecars without requiring full profile metadata.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA = 1u << 8,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 

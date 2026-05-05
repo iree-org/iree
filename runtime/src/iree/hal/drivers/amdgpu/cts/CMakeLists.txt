@@ -38,7 +38,7 @@ iree_hal_cts_testdata(
   BACKEND_NAME
     "amdgpu"
   FORMAT_STRING
-    [=["amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}"]=]
+    "\"amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}\""
   TESTDATA_DIR
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
   FLAGS

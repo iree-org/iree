@@ -299,6 +299,10 @@ TEST(PoolSetTest, SelectsHighestPriorityCompatiblePoolBySize) {
   EXPECT_EQ((iree_hal_pool_t*)direct_pool,
             iree_hal_pool_set_select(&pool_set, params, 2048));
 
+  params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  EXPECT_EQ((iree_hal_pool_t*)tlsf_pool,
+            iree_hal_pool_set_select(&pool_set, params, 512));
+
   params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
   EXPECT_EQ(nullptr, iree_hal_pool_set_select(&pool_set, params, 512));
 

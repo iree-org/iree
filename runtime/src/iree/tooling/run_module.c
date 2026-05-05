@@ -9,6 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
+#include "iree/hal/replay/recorder.h"
 #include "iree/io/stdio_stream.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/comparison.h"
@@ -100,8 +101,8 @@ static iree_status_t iree_tooling_create_run_context(
     iree_vm_instance_t* instance, iree_string_view_t default_device_uri,
     iree_const_byte_span_t module_contents, iree_allocator_t host_allocator,
     iree_vm_context_t** out_context, iree_vm_function_t* out_function,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator) {
+    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_replay_recorder_t** out_replay_recorder) {
   // Load all modules specified by --module= flags.
   iree_tooling_module_list_t module_list;
   iree_tooling_module_list_initialize(&module_list);
@@ -146,11 +147,13 @@ static iree_status_t iree_tooling_create_run_context(
   iree_vm_context_t* context = NULL;
   iree_hal_device_t* device = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
         iree_tooling_create_context_from_flags(
             instance, module_list.count, module_list.values, default_device_uri,
-            host_allocator, &context, &device, &device_allocator),
+            host_allocator, &context, &device, &device_allocator,
+            &replay_recorder),
         "creating VM context");
   }
 
@@ -177,8 +180,16 @@ static iree_status_t iree_tooling_create_run_context(
     *out_function = function;
     *out_device = device;
     *out_device_allocator = device_allocator;
+    *out_replay_recorder = replay_recorder;
   } else {
     iree_vm_context_release(context);
+    if (replay_recorder) {
+      status = iree_status_join(
+          status, iree_status_annotate_f(
+                      iree_hal_replay_recorder_close(replay_recorder),
+                      "closing HAL replay capture"));
+      iree_hal_replay_recorder_release(replay_recorder);
+    }
     iree_hal_allocator_release(device_allocator);
     iree_hal_device_release(device);
   }
@@ -199,6 +210,7 @@ static iree_status_t iree_tooling_annotate_status_with_function_decl(
 static iree_status_t iree_tooling_run_function(
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_replay_recorder_t* replay_recorder,
     iree_allocator_t host_allocator, int* out_exit_code) {
   iree_string_view_t function_name = iree_vm_function_name(&function);
   (void)function_name;
@@ -208,6 +220,13 @@ static iree_status_t iree_tooling_run_function(
   iree_string_view_t arguments_cconv, results_cconv;
   iree_status_t status = iree_vm_function_call_get_cconv_fragments(
       &signature, &arguments_cconv, &results_cconv);
+
+  bool replay_execute_scope_open = false;
+  if (iree_status_is_ok(status) && replay_recorder) {
+    status = iree_hal_replay_recorder_scope_begin(replay_recorder,
+                                                  IREE_SV("execute"));
+    replay_execute_scope_open = iree_status_is_ok(status);
+  }
 
   // Parse --input= values into device buffers.
   iree_vm_list_t* inputs = NULL;
@@ -261,7 +280,7 @@ static iree_status_t iree_tooling_run_function(
 
   // If the function is async we need to wait for it to complete.
   if (iree_status_is_ok(status) && finish_fence) {
-    IREE_RETURN_IF_ERROR(
+    status = iree_status_annotate_f(
         iree_hal_fence_wait(finish_fence, iree_infinite_timeout(),
                             IREE_ASYNC_WAIT_FLAG_NONE),
         "waiting on finish fence");
@@ -323,6 +342,10 @@ static iree_status_t iree_tooling_run_function(
   iree_io_stream_release(stdout_stream);
   fflush(stdout);
 
+  if (replay_execute_scope_open) {
+    status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
+                                          replay_recorder, IREE_SV("execute")));
+  }
   return status;
 }
 
@@ -406,31 +429,53 @@ iree_status_t iree_tooling_run_module_with_data(
   iree_vm_function_t function = {0};
   iree_hal_device_t* device = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
+  iree_hal_replay_recorder_t* replay_recorder = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_tooling_create_run_context(instance, default_device_uri,
-                                      module_contents, host_allocator, &context,
-                                      &function, &device, &device_allocator),
+      iree_tooling_create_run_context(
+          instance, default_device_uri, module_contents, host_allocator,
+          &context, &function, &device, &device_allocator, &replay_recorder),
       "creating run context");
 
   // Parse inputs, run the function, and process outputs.
   iree_status_t status =
       iree_tooling_run_function(context, function, device, device_allocator,
-                                host_allocator, out_exit_code);
+                                replay_recorder, host_allocator, out_exit_code);
 
   // Annotate errors with the function description.
   if (!iree_status_is_ok(status)) {
     status = iree_tooling_annotate_status_with_function_decl(status, function);
   }
 
+  bool replay_deinit_scope_open = false;
+  if (replay_recorder) {
+    iree_status_t begin_status = iree_hal_replay_recorder_scope_begin(
+        replay_recorder, IREE_SV("deinit"));
+    replay_deinit_scope_open = iree_status_is_ok(begin_status);
+    status = iree_status_join(status, begin_status);
+  }
+
   // Release the context and all retained resources (variables, constants, etc).
   iree_vm_context_release(context);
+
+  if (replay_deinit_scope_open) {
+    status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
+                                          replay_recorder, IREE_SV("deinit")));
+  }
+
+  if (replay_recorder) {
+    status = iree_status_join(
+        status,
+        iree_status_annotate_f(iree_hal_replay_recorder_close(replay_recorder),
+                               "closing HAL replay capture"));
+    iree_hal_replay_recorder_release(replay_recorder);
+  }
 
   // Print statistics after we've released the inputs/outputs and the context
   // which may be holding on to resources like constants/variables.
   if (device_allocator && FLAG_print_statistics) {
-    IREE_IGNORE_ERROR(
-        iree_hal_allocator_statistics_fprint(stderr, device_allocator));
+    status = iree_status_join(
+        status, iree_hal_allocator_statistics_fprint(stderr, device_allocator));
   }
 
   iree_hal_allocator_release(device_allocator);

@@ -130,6 +130,18 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    buffer_view_util_test
+  SRCS
+    "buffer_view_util_test.cc"
+  DEPS
+    ::hal
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     pool_test
   SRCS
     "pool_test.cc"

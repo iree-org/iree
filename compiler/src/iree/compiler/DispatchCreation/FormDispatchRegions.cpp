@@ -393,10 +393,20 @@ static bool isUnpackLikeOp(Operation *op) {
 static SmallVector<OpOperand *>
 getFusableUses(MLIRContext *context, Operation *op,
                DominanceInfo const &dominanceInfo, bool aggressiveFusion) {
-  if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
-                             return !isa<tensor::DimOp>(use.getOwner());
-                           }) != 1) {
-    return {};
+  // In non-aggressive mode, restrict fusion to producers whose results flow
+  // to a single consumer. Count distinct consumers rather than operand uses
+  // so that a single consumer reading multiple results from a multi-result
+  // producer (e.g. OnlineAttentionOp) still qualifies.
+  if (!aggressiveFusion) {
+    llvm::SetVector<Operation *> consumers;
+    for (Operation *user : op->getUsers()) {
+      if (!isa<tensor::DimOp>(user)) {
+        consumers.insert(user);
+      }
+    }
+    if (consumers.size() != 1) {
+      return {};
+    }
   }
 
   // Collect all fusable user candidates.
@@ -713,7 +723,8 @@ static bool isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          consumer)) {
     // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
@@ -882,8 +893,10 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isCloneableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(),
-                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
+          llvm::all_of(op.getUsers(), [](Operation *user) {
+            return isa<IREE::LinalgExt::AttentionOp,
+                       IREE::LinalgExt::OnlineAttentionOp>(user);
+          })) {
         continue;
       }
 
