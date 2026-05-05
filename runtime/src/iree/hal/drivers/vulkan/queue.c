@@ -1347,7 +1347,7 @@ static iree_status_t iree_hal_vulkan_queue_resolve_waits(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_queue_publish_signals(
+static void iree_hal_vulkan_queue_publish_signals(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   const iree_async_frontier_t* frontier =
@@ -1358,7 +1358,6 @@ static iree_status_t iree_hal_vulkan_queue_publish_signals(
         submission->signal_semaphore_list.semaphores[i], queue->axis, frontier,
         submission->epoch, submission->signal_semaphore_list.payload_values[i]);
   }
-  return iree_ok_status();
 }
 
 static void iree_hal_vulkan_queue_alloca_pool_notification_end_observe(
@@ -1628,9 +1627,6 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     }
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_publish_signals(queue, submission);
-  }
-  if (iree_status_is_ok(status)) {
     VkSemaphoreSubmitInfo epoch_signal_info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .semaphore = queue->epoch_semaphore,
@@ -1658,6 +1654,7 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
                                  1, &submit_info, VK_NULL_HANDLE);
     iree_slim_mutex_unlock(queue->queue_handle_mutex);
     if (iree_status_is_ok(status)) {
+      iree_hal_vulkan_queue_publish_signals(queue, submission);
       queue->frontier = submission->frontier;
       queue->next_epoch_value = queue->next_epoch_value + 1;
       iree_hal_vulkan_queue_append_pending_submission(queue, submission);
