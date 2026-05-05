@@ -328,6 +328,13 @@ hal.executable private @attention_20x1x64x4096x64 {
         %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
         %7 = tensor.empty() : tensor<20x1x64xf32>
         %8 = tensor.empty() : tensor<20x1xf32>
+
+        %cst_zero = arith.constant 0.000000e+00 : f32
+        %cst_neg_inf = arith.constant 0xFF800000 : f32
+        %acc_fill = linalg.fill ins(%cst_zero : f32) outs(%7: tensor<20x1x64xf32>) -> tensor<20x1x64xf32>
+        %max_fill = linalg.fill ins(%cst_neg_inf : f32) outs(%8: tensor<20x1xf32>) -> tensor<20x1xf32>
+        %sum_fill = linalg.fill ins(%cst_zero : f32) outs(%8: tensor<20x1xf32>) -> tensor<20x1xf32>
+
         %9:3 = iree_linalg_ext.online_attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -340,7 +347,7 @@ hal.executable private @attention_20x1x64x4096x64 {
                       qk_attrs = {lowering_config = #qk_config},
                       pv_attrs = {lowering_config = #pv_config}
                      }}
-                     ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7, %8, %8 : tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>) {
+                     ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%acc_fill, %max_fill, %sum_fill : tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>
