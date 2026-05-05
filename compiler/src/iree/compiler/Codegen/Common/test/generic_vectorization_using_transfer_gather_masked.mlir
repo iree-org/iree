@@ -288,4 +288,3 @@ func.func @dynamic_contiguous_gather_read(
 // CHECK:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[STORAGE]]
 // CHECK-SAME:      : tensor<8192x8xf16>, vector<64x8xf16>
 // CHECK:         vector.transfer_write %[[GATHER]]
-
