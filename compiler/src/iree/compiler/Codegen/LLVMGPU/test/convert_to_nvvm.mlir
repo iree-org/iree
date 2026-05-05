@@ -471,4 +471,4 @@ hal.executable @barrier_test {
 }
 
 // CHECK-LABEL: llvm.func @global_subgroup_barrier
-//       CHECK:   nvvm.barrier0
+//       CHECK:   nvvm.barrier
