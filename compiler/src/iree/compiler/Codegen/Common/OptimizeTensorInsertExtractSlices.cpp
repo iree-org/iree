@@ -307,26 +307,43 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     }
 
     TypedValue<VectorType> wMask = writeOp.getMask();
-    Value rPad = op.getPadding();
+    TypedValue<VectorType> rMask = op.getMask();
 
-    // Match only if the write and read op are masked and have the same mask.
-    if (!wMask || (wMask != op.getMask())) {
-      return failure();
+    if (wMask && rMask) {
+      // Both masked: masks must match.
+      if (wMask != rMask) {
+        return failure();
+      }
+      Value rPad = op.getPadding();
+      assert(!isa<VectorType>(rPad.getType()) &&
+             "search `NOTE[FoldMaskedTransferRAW]` in "
+             "GenericVectorization.cpp::FoldTransferRAW for information");
+      auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                                valToStore.getType(), rPad);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore,
+                                                   padVal);
+    } else if (wMask && !rMask) {
+      // Masked write, unmasked read: the read sees written values where the
+      // mask is true, and the original tensor's values where it is false.
+      // Replace with: select(wMask, valToStore, read(original_tensor)).
+      auto originalRead = vector::TransferReadOp::create(
+          rewriter, op.getLoc(), op.getType(), writeOp.getBase(),
+          op.getIndices(), op.getPermutationMap(), op.getPadding(),
+          /*mask=*/Value(), op.getInBoundsAttr());
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore,
+                                                   originalRead);
+    } else if (!wMask && !rMask) {
+      // Both unmasked: the read produces exactly what was written.
+      rewriter.replaceOp(op, valToStore);
+    } else {
+      // Unmasked write, masked read: the written tensor is fully overwritten,
+      // so a masked read of it doesn't depend on the write's mask. Just
+      // re-read the original tensor with the read's mask. This case is unusual
+      // but handle it for completeness.
+      rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+          op, op.getType(), writeOp.getBase(), op.getIndices(),
+          op.getPermutationMap(), op.getPadding(), rMask, op.getInBoundsAttr());
     }
-
-    // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
-    // types with vector element types (see `verifyTransferOp` in upstream MLIR
-    // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
-    // never has a vector type. But for sanity add an assert in case things
-    // change upstream.
-    assert(!isa<VectorType>(rPad.getType()) &&
-           "search `NOTE[FoldMaskedTransferRAW]` in "
-           "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
-
-    // Materialize the padding with a constant.
-    auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
-                                              valToStore.getType(), rPad);
-    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
     return success();
   }
 };
