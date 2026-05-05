@@ -41,8 +41,9 @@ func.func @matvec_fp16() attributes {hal.executable.target = #executable_target_
 //     CHECK-LABEL: func.func @matvec_fp16
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c128
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
-//          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
+//     CHECK-SAME:      vector<1x8xf16>, vector<1x8xf16> into vector<1x1xf16>
+//          CHECK:      vector.shape_cast %[[OUT]] : vector<1x1xf16> to vector<1x1x1x1x1x1xf16>
+//          CHECK:      %[[SCALAR:.+]] = vector.extract %{{.*}}
 //          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
@@ -90,8 +91,9 @@ func.func @matvec_fp16_parallel_subgroup() attributes {hal.executable.target = #
 //     CHECK-LABEL: func.func @matvec_fp16_parallel_subgroup
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c512
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
-//          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
+//     CHECK-SAME:      vector<1x8xf16>, vector<1x8xf16> into vector<1x1xf16>
+//          CHECK:      vector.shape_cast %[[OUT]] : vector<1x1xf16> to vector<1x1x1x1x1x1xf16>
+//          CHECK:      %[[SCALAR:.+]] = vector.extract %{{.*}}
 //          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
@@ -143,8 +145,9 @@ func.func @matvec_fp16_promote_rhs() attributes {hal.executable.target = #execut
 //          CHECK:      %[[RHS_SHARED_READ:.+]] = vector.transfer_read %alloc
 //          CHECK:      %[[RHS_INSERT:.+]] = vector.insert_strided_slice %[[RHS_SHARED_READ]]
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      %{{.*}}, %[[RHS_INSERT]], %{{.*}} : vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
-//          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
+//     CHECK-SAME:      vector<1x8xf16>, vector<1x8xf16> into vector<1x1xf16>
+//          CHECK:      vector.shape_cast %[[OUT]] : vector<1x1xf16> to vector<1x1x1x1x1x1xf16>
+//          CHECK:      %[[SCALAR:.+]] = vector.extract %{{.*}}
 //          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 
 //          CHECK:      scf.yield
@@ -224,7 +227,8 @@ func.func @attention_20x1x64x4096x64() attributes {hal.executable.target = #exec
 // CHECK:         scf.for %{{.*}} = %c0 to %c4096 step %c128
 // QK Matmul
 // CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x1x4xf32>
+// CHECK-SAME:      vector<1x1x32xf16>, vector<1x4x32xf16> into vector<1x1x4xf32>
+// CHECK-NEXT:      vector.shape_cast %{{.*}} : vector<1x1x4xf32> to vector<1x1x1x1x1x1x1x1x4xf32>
 // CHECK-COUNT-4:   gpu.subgroup_reduce add
 
 // QK Max
@@ -313,7 +317,8 @@ func.func @attention_20x1x64x4096x64() attributes {hal.executable.target = #exec
 // CHECK:         scf.for %{{.*}} = %c0 to %c4096 step %c128
 // QK Matmul
 // CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x4x1xf32>
+// CHECK-SAME:      vector<1x1x32xf16>, vector<1x4x32xf16> into vector<1x4x1xf32>
+// CHECK-NEXT:      vector.shape_cast %{{.*}} : vector<1x4x1xf32> to vector<1x1x1x1x1x1x1x4x1xf32>
 // CHECK-COUNT-4:   gpu.subgroup_reduce add
 
 // No subgroup reduction in the loop other than QK reductions
@@ -369,8 +374,9 @@ func.func @matvec_fp16_subgroup_reduction() attributes {hal.executable.target = 
 //     CHECK-LABEL: func.func @matvec_fp16_subgroup_reduction
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c128
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x1x1x1x4xf16>, vector<1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1xf16>
-//          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
+//     CHECK-SAME:      vector<1x4xf16>, vector<1x4xf16> into vector<1x1xf16>
+//          CHECK:      vector.shape_cast %[[OUT]] : vector<1x1xf16> to vector<1x1x1x1x1x1xf16>
+//          CHECK:      %[[SCALAR:.+]] = vector.extract %{{.*}}
 //          CHECK:      gpu.subgroup_reduce add %[[SCALAR]]
 //          CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
                        /// Second round of reduction i.e., across subgroups.

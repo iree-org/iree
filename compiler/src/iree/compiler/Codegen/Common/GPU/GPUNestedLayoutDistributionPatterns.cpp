@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
@@ -133,7 +134,7 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
 static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
                                               VectorValue val,
                                               NestedLayoutAttr layout) {
-  Location loc = val.getDefiningOp()->getLoc();
+  Location loc = val.getLoc();
   SmallVector<int64_t> interleavedPackedShape(layout.getRank() * 3, 0);
   for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
     SmallVector<int64_t> packedShapePerDim =
@@ -158,6 +159,9 @@ static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
       perm.push_back(tileGroupIdx * layout.getRank() + undistributedDim);
     }
   }
+  if (perm.empty()) {
+    return interleavedPackedShaped;
+  }
   return vector::TransposeOp::create(rewriter, loc, interleavedPackedShaped,
                                      perm);
 }
@@ -167,18 +171,21 @@ static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
 static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
                                                 VectorValue val,
                                                 NestedLayoutAttr layout) {
-  Location loc = val.getDefiningOp()->getLoc();
+  Location loc = val.getLoc();
   VectorValue deinterleavedPacked =
       getDeinterleavedPackedForm(rewriter, val, layout);
-  ArrayRef<int64_t> deinterleavedPackedShape =
-      deinterleavedPacked.getType().getShape();
+  ArrayRef<int64_t> packedShape = deinterleavedPacked.getType().getShape();
   SmallVector<int64_t> unpackedShape;
-  unpackedShape.reserve(layout.getRank() * 3);
+  unpackedShape.reserve(layout.getRank());
   for (int64_t unDistrDim : llvm::seq<int64_t>(layout.getRank())) {
-    int64_t collapsedDimLen = deinterleavedPackedShape[unDistrDim * 3 + 0] *
-                              deinterleavedPackedShape[unDistrDim * 3 + 1] *
-                              deinterleavedPackedShape[unDistrDim * 3 + 2];
-    unpackedShape.push_back(collapsedDimLen);
+    int64_t unpackedDim = layout.getBatchTile()[unDistrDim] *
+                          layout.getOuterTile()[unDistrDim] *
+                          layout.getElementTile()[unDistrDim];
+    assert(unpackedDim == packedShape[unDistrDim * 3] *
+                              packedShape[unDistrDim * 3 + 1] *
+                              packedShape[unDistrDim * 3 + 2] &&
+           "packed B/O/E shape must match nested layout tile product");
+    unpackedShape.push_back(unpackedDim);
   }
   VectorType unpackedType = VectorType::get(
       unpackedShape, deinterleavedPacked.getType().getElementType());
@@ -191,7 +198,7 @@ static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
 static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
                                             VectorValue val,
                                             NestedLayoutAttr layout) {
-  Location loc = val.getDefiningOp()->getLoc();
+  Location loc = val.getLoc();
   SmallVector<int64_t> nonInterleavedPackedShape;
   nonInterleavedPackedShape.reserve(layout.getRank() * 3);
   for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
@@ -212,6 +219,9 @@ static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
     for (int64_t undistributedDim : llvm::seq<int64_t>(layout.getRank())) {
       perm.push_back(tileGroupIdx + 3 * undistributedDim);
     }
+  }
+  if (perm.empty()) {
+    return nonInterleavedPackedShaped;
   }
   return vector::TransposeOp::create(rewriter, loc, nonInterleavedPackedShaped,
                                      perm);
@@ -259,6 +269,8 @@ static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
 /// but with projecting out the indexed/sliced dimensions from the result.
 static VectorValue projectVector(RewriterBase &rewriter, Location loc,
                                  VectorValue val, AffineMap projectionMap) {
+  assert(projectionMap.isProjectedPermutation() &&
+         "expected a projected permutation map");
   SmallVector<int64_t> remainingDims;
   auto allDims =
       llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
@@ -2245,8 +2257,7 @@ private:
 /// the resulting vector is interpreted in undistributed domain. The said
 /// undistributed vector is a partial reduction when contraction has been
 /// performed only thread locally. Therefore, a to-be-distributed
-/// vector.multi_reduce
-////is added to complete the contraction.
+/// vector.multi_reduction is added to complete the contraction.
 struct DistributeContract final
     : MaskedOpDistributionPattern<vector::ContractionOp> {
   using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
@@ -2266,6 +2277,7 @@ struct DistributeContract final
     if (failed(maybeOpInfo)) {
       return rewriter.notifyMatchFailure(contractOp, "not a contraction");
     }
+    const VectorContractOpInfo &opInfo = maybeOpInfo.value();
     // If mmaAttr exists, defer the lowering to use MMA.
     // Notify failure if the "iree.gpu.mma" intrinsic attribute is present.
     auto mmaAttr =
@@ -2286,8 +2298,13 @@ struct DistributeContract final
           contractOp, "missing nested layout for contraction rhs");
     }
     NestedLayoutAttr resLayout;
-    if (auto contractRes = dyn_cast<VectorValue>(contractOp.getResult())) {
-      resLayout = dyn_cast<NestedLayoutAttr>(signature[contractRes]);
+    auto resVector = dyn_cast<VectorValue>(contractOp.getResult());
+    if (resVector) {
+      resLayout = dyn_cast<NestedLayoutAttr>(signature[resVector]);
+      if (!resLayout) {
+        return rewriter.notifyMatchFailure(
+            contractOp, "missing nested layout for contraction result");
+      }
     } else {
       // Create a zero-d layout because we
       // are going to add reduction dims
@@ -2296,104 +2313,193 @@ struct DistributeContract final
           contractOp.getContext(), ArrayRef<int64_t>{}, {}, {}, {}, {}, {}, {});
     }
 
-    Value disLhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
-    Value disRhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
-
-    VectorValue mask = nullptr;
+    NestedLayoutAttr maskLayoutAttr;
     if (maskOp) {
-      auto maskLayout = dyn_cast_if_present<NestedLayoutAttr>(
+      maskLayoutAttr = dyn_cast_if_present<NestedLayoutAttr>(
           maskSignature.value()[maskOp.getMask()]);
-      if (!maskLayout) {
+      if (!maskLayoutAttr) {
         return rewriter.notifyMatchFailure(maskOp,
                                            "expected nested layout attr");
       }
-      mask = getDistributed(rewriter, maskOp.getMask(), maskLayout);
+    }
+
+    SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
+    if (lhsLayout.getRank() != opInfo.getARank() ||
+        rhsLayout.getRank() != opInfo.getBRank()) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "nested layout rank does not match contraction maps");
+    }
+
+    MLIRContext *ctx = contractOp.getContext();
+    AffineMap lhsMap = indexingMaps[0];
+    AffineMap rhsMap = indexingMaps[1];
+    auto hasMatchingDimLayout = [](NestedLayoutAttr lhsLayout, int64_t lhsDim,
+                                   NestedLayoutAttr rhsLayout, int64_t rhsDim) {
+      return lhsLayout.getSubgroupTile()[lhsDim] ==
+                 rhsLayout.getSubgroupTile()[rhsDim] &&
+             lhsLayout.getBatchTile()[lhsDim] ==
+                 rhsLayout.getBatchTile()[rhsDim] &&
+             lhsLayout.getOuterTile()[lhsDim] ==
+                 rhsLayout.getOuterTile()[rhsDim] &&
+             lhsLayout.getThreadTile()[lhsDim] ==
+                 rhsLayout.getThreadTile()[rhsDim] &&
+             lhsLayout.getElementTile()[lhsDim] ==
+                 rhsLayout.getElementTile()[rhsDim] &&
+             lhsLayout.getSubgroupStrides()[lhsDim] ==
+                 rhsLayout.getSubgroupStrides()[rhsDim] &&
+             lhsLayout.getThreadStrides()[lhsDim] ==
+                 rhsLayout.getThreadStrides()[rhsDim];
+    };
+    if (resVector) {
+      auto resType = cast<VectorType>(resVector.getType());
+      SmallVector<int64_t> resUndistributedShape =
+          resLayout.getUndistributedShape();
+      if (resLayout.getRank() != opInfo.getCRank() ||
+          !llvm::equal(resUndistributedShape, resType.getShape())) {
+        return rewriter.notifyMatchFailure(
+            contractOp, "result layout does not match contraction result");
+      }
+    }
+    if (maskOp) {
+      // Mask projection uses getDimPosition on operand map results. Keep the
+      // unmasked path aligned with VectorContractOpInfo, which allows constant
+      // zero results for broadcast-style maps.
+      if (!lhsMap.isProjectedPermutation() ||
+          !rhsMap.isProjectedPermutation()) {
+        return rewriter.notifyMatchFailure(
+            maskOp,
+            "masked contraction requires projected permutation operand maps");
+      }
+      if (maskLayoutAttr.getRank() !=
+          static_cast<int64_t>(contractOp.getIteratorTypes().size())) {
+        return rewriter.notifyMatchFailure(
+            maskOp, "mask layout rank does not match contraction iterators");
+      }
+      auto hasMatchingMaskLayout = [&](AffineMap operandMap,
+                                       NestedLayoutAttr operandLayout) {
+        for (int64_t resultIdx :
+             llvm::seq<int64_t>(operandMap.getNumResults())) {
+          int64_t iterSpacePos = operandMap.getDimPosition(resultIdx);
+          if (!hasMatchingDimLayout(maskLayoutAttr, iterSpacePos, operandLayout,
+                                    resultIdx)) {
+            return false;
+          }
+        }
+        return true;
+      };
+      if (!hasMatchingMaskLayout(lhsMap, lhsLayout) ||
+          !hasMatchingMaskLayout(rhsMap, rhsLayout)) {
+        return rewriter.notifyMatchFailure(
+            maskOp, "mask layout does not match contraction operand layouts");
+      }
+    }
+    SmallVector<int64_t> reductionLhsPositions;
+    for (auto [index, iteratorType] :
+         llvm::enumerate(contractOp.getIteratorTypes())) {
+      if (!vector::isReductionIterator(iteratorType)) {
+        continue;
+      }
+      AffineExpr reductionExpr = getAffineDimExpr(index, ctx);
+      auto lhsResultPos = lhsMap.getResultPosition(reductionExpr);
+      auto rhsResultPos = rhsMap.getResultPosition(reductionExpr);
+      if (!lhsResultPos || !rhsResultPos) {
+        return rewriter.notifyMatchFailure(
+            contractOp, "reduction iterators must appear in lhs and rhs maps");
+      }
+
+      int64_t redLhsIdx = *lhsResultPos;
+      int64_t redRhsIdx = *rhsResultPos;
+      if (!hasMatchingDimLayout(lhsLayout, redLhsIdx, rhsLayout, redRhsIdx)) {
+        return rewriter.notifyMatchFailure(
+            contractOp, "lhs/rhs reduction iterator layouts do not match");
+      }
+      reductionLhsPositions.push_back(redLhsIdx);
+    }
+
+    VectorValue localLhs = getDeinterleavedUnpackedForm(
+        rewriter, getDistributed(rewriter, contractOp.getLhs(), lhsLayout),
+        lhsLayout);
+    VectorValue localRhs = getDeinterleavedUnpackedForm(
+        rewriter, getDistributed(rewriter, contractOp.getRhs(), rhsLayout),
+        rhsLayout);
+    assert(
+        cast<VectorType>(localLhs.getType()).getRank() == opInfo.getARank() &&
+        cast<VectorType>(localRhs.getType()).getRank() == opInfo.getBRank() &&
+        "nested layout unpack must match contraction indexing maps");
+
+    VectorValue mask = nullptr;
+    if (maskOp) {
+      mask = getDistributed(rewriter, maskOp.getMask(), maskLayoutAttr);
       Value passThruLhs = getCombiningIdentityValue(
-          loc, rewriter, contractOp.getKind(), disLhs.getType());
+          loc, rewriter, contractOp.getKind(), localLhs.getType());
       Value passThruRhs = getCombiningIdentityValue(
-          loc, rewriter, contractOp.getKind(), disRhs.getType());
+          loc, rewriter, contractOp.getKind(), localRhs.getType());
 
       VectorValue deInterleavedMask =
-          getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+          getDeinterleavedUnpackedForm(rewriter, mask, maskLayoutAttr);
       VectorValue maskLhs = projectVector(rewriter, loc, deInterleavedMask,
                                           contractOp.getIndexingMapsArray()[0]);
-      VectorValue interleavedMaskLhs =
-          getInterleavedPackedForm(rewriter, maskLhs, lhsLayout);
 
       VectorValue maskRhs = projectVector(rewriter, loc, deInterleavedMask,
                                           contractOp.getIndexingMapsArray()[1]);
-      VectorValue interleavedMaskRhs =
-          getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
 
-      disLhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
-                                                         interleavedMaskLhs,
-                                                         disLhs, passThruLhs)
-                                     .getResult());
-      disRhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
-                                                         interleavedMaskRhs,
-                                                         disRhs, passThruRhs)
-                                     .getResult());
+      localLhs = cast<VectorValue>(
+          arith::SelectOp::create(rewriter, loc, maskLhs, localLhs, passThruLhs)
+              .getResult());
+      localRhs = cast<VectorValue>(
+          arith::SelectOp::create(rewriter, loc, maskRhs, localRhs, passThruRhs)
+              .getResult());
     }
 
     Value acc = contractOp.getAcc();
-    Value res = contractOp.getResult();
     auto accVector = dyn_cast<VectorValue>(acc);
-    auto resVector = dyn_cast<VectorValue>(res);
-    Value disAcc;
-    if (accVector) {
-      disAcc = getDistributed(rewriter, accVector, signature[accVector]);
-    } else {
-      disAcc = contractOp.getAcc();
-    }
 
     Type accElemTy = getElementTypeOrSelf(acc.getType());
 
-    MLIRContext *ctx = contractOp.getContext();
-
     // Step 1: local contraction
-    Value localInit = getCombiningIdentityValue(
-        loc, rewriter, contractOp.getKind(), disAcc.getType());
-    Value localContract = doDistributedContraction(
-        rewriter, loc, ctx, contractOp, disLhs, disRhs, localInit);
-
-    // TODO: As per current upstream lowering implementations, there is no point
-    // in doing this because it does a select much later in a finer granularity
-    // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions across the distribution, we can choose not to mask
-    // the op post-distribution.
-
-    VectorValue localContractValue;
+    Type localInitType = acc.getType();
     if (accVector) {
-      localContractValue = dyn_cast<VectorValue>(localContract);
+      SmallVector<int64_t> localResultShape;
+      localResultShape.reserve(resLayout.getRank());
+      for (int64_t unDistrDim : llvm::seq<int64_t>(resLayout.getRank())) {
+        localResultShape.push_back(resLayout.getBatchTile()[unDistrDim] *
+                                   resLayout.getOuterTile()[unDistrDim] *
+                                   resLayout.getElementTile()[unDistrDim]);
+      }
+      localInitType = VectorType::get(localResultShape, accElemTy);
+    }
+    Value localInit = getCombiningIdentityValue(
+        loc, rewriter, contractOp.getKind(), localInitType);
+    Value localContract = doDistributedContraction(
+        rewriter, loc, contractOp, localLhs, localRhs, localInit);
+
+    VectorValue packedLocalContractValue;
+    if (accVector) {
+      VectorValue localContractValue = dyn_cast<VectorValue>(localContract);
+      packedLocalContractValue =
+          getInterleavedPackedForm(rewriter, localContractValue, resLayout);
     } else {
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, accElemTy);
-      localContractValue =
+      packedLocalContractValue =
           vector::BroadcastOp::create(rewriter, loc, vecType, localContract);
     }
 
-    assert(localContractValue && "result should have been a vector");
+    assert(packedLocalContractValue && "result should have been a vector");
 
     // Identify the reduction dimension and apply it for subgroup reduction.
-    auto lhsMap = contractOp.getIndexingMapsArray()[0];
     SmallVector<int64_t> reductionSubGroupTile;
     SmallVector<int64_t> reductionSubGroupStrides;
     SmallVector<int64_t> reductionThreadTile;
     SmallVector<int64_t> reductionThreadStrides;
     SmallVector<int64_t> partialReductionDims;
-    for (auto [index, iteratorType] :
-         llvm::enumerate(contractOp.getIteratorTypes())) {
-      if (vector::isReductionIterator(iteratorType)) {
-        int64_t redLhsIdx =
-            *(lhsMap.getResultPosition(getAffineDimExpr(index, ctx)));
-        partialReductionDims.push_back(resLayout.getRank() +
-                                       reductionSubGroupTile.size());
-        reductionSubGroupTile.push_back(lhsLayout.getSubgroupTile()[redLhsIdx]);
-        reductionSubGroupStrides.push_back(
-            lhsLayout.getSubgroupStrides()[redLhsIdx]);
-        reductionThreadTile.push_back(lhsLayout.getThreadTile()[redLhsIdx]);
-        reductionThreadStrides.push_back(
-            lhsLayout.getThreadStrides()[redLhsIdx]);
-      }
+    for (int64_t redLhsIdx : reductionLhsPositions) {
+      partialReductionDims.push_back(resLayout.getRank() +
+                                     reductionSubGroupTile.size());
+      reductionSubGroupTile.push_back(lhsLayout.getSubgroupTile()[redLhsIdx]);
+      reductionSubGroupStrides.push_back(
+          lhsLayout.getSubgroupStrides()[redLhsIdx]);
+      reductionThreadTile.push_back(lhsLayout.getThreadTile()[redLhsIdx]);
+      reductionThreadStrides.push_back(lhsLayout.getThreadStrides()[redLhsIdx]);
     }
     SmallVector<int64_t> unitBroadcastTile(reductionThreadTile.size(), 1);
 
@@ -2415,12 +2521,12 @@ struct DistributeContract final
 
     VectorType partialReducedDistributedType =
         VectorType::get(reductionLayout.getDistributedShape(),
-                        localContractValue.getType().getElementType());
+                        packedLocalContractValue.getType().getElementType());
     Value shapeCasted = vector::ShapeCastOp::create(
-        rewriter, loc, partialReducedDistributedType, localContractValue);
+        rewriter, loc, partialReducedDistributedType, packedLocalContractValue);
     VectorType unDistributedType =
         VectorType::get(reductionLayout.getUndistributedShape(),
-                        localContractValue.getType().getElementType());
+                        packedLocalContractValue.getType().getElementType());
     Value undistrLocalReduced = IREE::VectorExt::ToSIMDOp::create(
         rewriter, loc, unDistributedType, shapeCasted);
 
@@ -2442,50 +2548,12 @@ struct DistributeContract final
 
   vector::ContractionOp
   doDistributedContraction(RewriterBase &rewriter, Location loc,
-                           MLIRContext *ctx, vector::ContractionOp contractOp,
-                           Value lhs, Value rhs, Value acc) const {
-    SmallVector<AffineMap> maps = contractOp.getIndexingMapsArray();
-    ArrayRef<Attribute> iteratorTypes =
-        contractOp.getIteratorTypes().getValue();
-
-    // Given that the distribution format is <BATCH x OUTER x ELEMENT>,
-    // the iterations and affine maps need to be replicated three times.
-
-    SmallVector<Attribute> newIterators;
-    // Replicate the iterators for local vector.contract
-    for (int i = 0; i < 3; ++i) {
-      newIterators.append(iteratorTypes.begin(), iteratorTypes.end());
-    }
-
-    // Replicate the affine maps for local vector.contract
-    SmallVector<AffineMap> newMaps;
-    for (AffineMap map : maps) {
-      int64_t numDims = map.getNumDims();
-      int64_t numResults = map.getNumResults();
-      SmallVector<AffineExpr> exprs;
-      for (int i = 0; i < 3; ++i) {
-        AffineMap shiftedMap = map.shiftDims(i * numDims);
-        for (int j = 0; j < numResults; ++j) {
-          exprs.push_back(shiftedMap.getResult(j));
-        }
-      }
-      AffineMap newMap =
-          AffineMap::get(/*dimCount=*/3 * numDims,
-                         /*symbolCount=*/map.getNumSymbols(), exprs, ctx);
-      newMaps.push_back(newMap);
-    }
-
-    Value localInit = getCombiningIdentityValue(
-        loc, rewriter, contractOp.getKind(), acc.getType());
-
-    auto localContractOp = vector::ContractionOp::create(
-        rewriter, loc, lhs, rhs, localInit,
-        rewriter.getAffineMapArrayAttr(newMaps),
-        rewriter.getArrayAttr(newIterators), contractOp.getKind());
-    localContractOp->setDiscardableAttrs(
-        contractOp->getDiscardableAttrDictionary());
-
-    return localContractOp;
+                           vector::ContractionOp contractOp, Value lhs,
+                           Value rhs, Value acc) const {
+    return vector::ContractionOp::create(
+        rewriter, loc, lhs, rhs, acc, contractOp.getIndexingMaps(),
+        contractOp.getIteratorTypes(), contractOp.getKind(),
+        contractOp.getFastmath());
   }
 };
 
