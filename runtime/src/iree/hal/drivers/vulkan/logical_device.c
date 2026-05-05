@@ -2377,7 +2377,9 @@ iree_status_t iree_hal_vulkan_logical_device_create_by_path(
     const iree_hal_device_create_params_t* create_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   const iree_hal_vulkan_physical_device_selector_t selector = {
-      .mode = IREE_HAL_VULKAN_PHYSICAL_DEVICE_SELECTOR_PATH,
+      .mode = iree_string_view_is_empty(device_path)
+                  ? IREE_HAL_VULKAN_PHYSICAL_DEVICE_SELECTOR_DEFAULT
+                  : IREE_HAL_VULKAN_PHYSICAL_DEVICE_SELECTOR_PATH,
       .device_path = device_path,
   };
   return iree_hal_vulkan_logical_device_create_with_selector(
