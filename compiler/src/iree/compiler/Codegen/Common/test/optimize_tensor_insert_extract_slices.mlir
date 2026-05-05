@@ -367,8 +367,8 @@ func.func @no_hoist_from_possibly_unexecuted_region(%arg0: tensor<4x8xi32>) -> t
 
 // -----
 
-// Both write and read are masked with the same mask: replace with select(mask, val, broadcast(pad)).
 // Test for FoldMaskedTransferRAW.
+// Both write and read are masked with the same mask: replace with select(mask, val, broadcast(pad)).
 func.func @fold_masked_transfer_raw_both_masked(%t: tensor<128xf16>, %mask: vector<128xi1>) -> vector<128xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
@@ -388,3 +388,26 @@ func.func @fold_masked_transfer_raw_both_masked(%t: tensor<128xf16>, %mask: vect
 // CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[CST_1]], %[[CST_0]]
 // CHECK:         return %[[SEL]]
 
+// -----
+
+// Test for FoldMaskedTransferRAW.
+// Masked write, unmasked read: replace with select(wMask, val, read(original_tensor)).
+func.func @fold_masked_transfer_raw_masked_write_unmasked_read(%t: tensor<128xf16>, %mask: vector<128xi1>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %val = arith.constant dense<1.0> : vector<128xf16>
+  %w = vector.transfer_write %val, %t[%c0], %mask {in_bounds = [true]}
+     : vector<128xf16>, tensor<128xf16>
+  %r = vector.transfer_read %w[%c0], %cst {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_masked_transfer_raw_masked_write_unmasked_read
+// CHECK-SAME:    %[[T:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:     %[[VAL:.*]] = arith.constant dense<1.000000e+00> : vector<128xf16>
+// CHECK:         %[[READ:.*]] = vector.transfer_read %[[T]]{{.*}}, %[[CST]] {in_bounds = [true]}
+// CHECK-SAME:      : tensor<128xf16>, vector<128xf16>
+// CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[READ]]
+// CHECK:         return %[[SEL]]
