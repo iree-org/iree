@@ -82,9 +82,61 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING | (1u << 5),
   // Requests buffer device address support for pointer-first executables.
   IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES = 1u << 6,
+  // Reports timeline semaphore support enabled on a logical device.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES = 1u << 7,
+  // Reports synchronization2 support enabled on a logical device.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2 = 1u << 8,
+  // Reports scalar block layout support enabled on a logical device.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT = 1u << 9,
+  // Required enabled logical-device feature set for the rewrite baseline.
+  IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
+      IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT,
+  // Recognized feature bits accepted by public Vulkan HAL APIs.
+  IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED =
+      IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED |
+      IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE,
 } iree_hal_vulkan_feature_bits_t;
 
 typedef uint32_t iree_hal_vulkan_features_t;
+
+// Recognized device extension bits cached from device enumeration.
+typedef enum iree_hal_vulkan_device_extension_bits_t {
+  // No recognized device extensions.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_NONE = 0u,
+  // VK_KHR_portability_subset.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET = 1u << 0,
+  // VK_KHR_external_memory.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY = 1u << 1,
+  // VK_KHR_external_memory_fd.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_FD = 1u << 2,
+  // VK_KHR_external_memory_win32.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_WIN32 = 1u << 3,
+  // VK_EXT_external_memory_host.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST = 1u << 4,
+  // Recognized extension bits accepted by public Vulkan HAL APIs.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_ALL_RECOGNIZED =
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_FD |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_WIN32 |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST,
+} iree_hal_vulkan_device_extension_bits_t;
+
+typedef uint32_t iree_hal_vulkan_device_extensions_t;
+
+// Populates recognized Vulkan device extension bits from an enabled extension
+// name list. Unknown extension names are ignored.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_device_extensions_from_names(
+    iree_host_size_t extension_count, const char* const* extension_names,
+    iree_hal_vulkan_device_extensions_t* out_extensions);
 
 // Identifies a layer or extension name set exposed through the public API.
 typedef enum iree_hal_vulkan_extensibility_set_e {
@@ -104,9 +156,10 @@ typedef enum iree_hal_vulkan_extensibility_set_e {
   IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT,
 } iree_hal_vulkan_extensibility_set_t;
 
-// Queries the Vulkan layer or extension names required by a requested feature
-// set. The rewrite scaffold has no extension contract yet and returns empty
-// sets until adapter feature policy is implemented.
+// Queries the Vulkan layer or extension names used by a requested feature set.
+// Required sets must be enabled by applications wrapping external instances or
+// devices. Optional sets should be enabled when the Vulkan implementation
+// reports them so IREE can use the corresponding strategy bits.
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
@@ -146,6 +199,23 @@ typedef struct iree_hal_vulkan_queue_set_t {
   uint64_t queue_indices;
 } iree_hal_vulkan_queue_set_t;
 
+// Externally-created VkDevice contract supplied to iree_hal_vulkan_wrap_device.
+typedef struct iree_hal_vulkan_external_device_params_t {
+  // Feature bits enabled on the VkDevice and usable by IREE. Must include
+  // IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE.
+  iree_hal_vulkan_features_t enabled_features;
+
+  // Recognized device extension bits enabled on the VkDevice.
+  iree_hal_vulkan_device_extensions_t enabled_extensions;
+
+  // Compute-capable queue family and indices available to IREE.
+  iree_hal_vulkan_queue_set_t compute_queue_set;
+
+  // Transfer-capable queue family and indices available to IREE. Leave
+  // queue_indices zero to reuse the selected compute queue for transfers.
+  iree_hal_vulkan_queue_set_t transfer_queue_set;
+} iree_hal_vulkan_external_device_params_t;
+
 typedef enum iree_hal_vulkan_device_flag_bits_t {
   // No device flags.
   IREE_HAL_VULKAN_DEVICE_FLAG_NONE = 0u,
@@ -172,8 +242,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     const iree_hal_device_create_params_t* create_params,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, VkDevice logical_device,
-    const iree_hal_vulkan_queue_set_t* compute_queue_set,
-    const iree_hal_vulkan_queue_set_t* transfer_queue_set,
+    const iree_hal_vulkan_external_device_params_t* external_device_params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 //===----------------------------------------------------------------------===//

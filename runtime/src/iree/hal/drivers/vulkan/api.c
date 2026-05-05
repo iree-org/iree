@@ -11,6 +11,85 @@
 
 #include "iree/hal/drivers/vulkan/syms.h"
 
+#if !defined(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
+#define IREE_HAL_VULKAN_KHR_PORTABILITY_SUBSET_EXTENSION_NAME \
+  "VK_KHR_portability_subset"
+#else
+#define IREE_HAL_VULKAN_KHR_PORTABILITY_SUBSET_EXTENSION_NAME \
+  VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#endif  // !VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+
+static bool iree_hal_vulkan_extension_name_list_contains(
+    iree_host_size_t extension_count, const char* const* extension_names,
+    const char* extension_name) {
+  for (iree_host_size_t i = 0; i < extension_count; ++i) {
+    if (extension_names[i] != NULL &&
+        strcmp(extension_name, extension_names[i]) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_device_extensions_from_names(
+    iree_host_size_t extension_count, const char* const* extension_names,
+    iree_hal_vulkan_device_extensions_t* out_extensions) {
+  IREE_ASSERT_ARGUMENT(out_extensions);
+  *out_extensions = IREE_HAL_VULKAN_DEVICE_EXTENSION_NONE;
+  if (extension_count > 0 && extension_names == NULL) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan extension name list has count %" PRIhsz
+                            " but no value storage",
+                            extension_count);
+  }
+  iree_hal_vulkan_device_extensions_t extensions =
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_NONE;
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          IREE_HAL_VULKAN_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET;
+  }
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY;
+  }
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_WIN32;
+  }
+#else
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_FD;
+  }
+#endif  // defined(VK_USE_PLATFORM_WIN32_KHR)
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST;
+  }
+  *out_extensions = extensions;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_add_extensibility_string(
+    const char* value, iree_host_size_t string_capacity,
+    iree_host_size_t* out_string_count, const char** out_string_values) {
+  if (out_string_values != NULL && *out_string_count >= string_capacity) {
+    *out_string_count = *out_string_count + 1;
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+  if (out_string_values != NULL) {
+    out_string_values[*out_string_count] = value;
+  }
+  *out_string_count = *out_string_count + 1;
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
@@ -23,11 +102,77 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
                             "invalid Vulkan extensibility set %u",
                             (uint32_t)set);
   }
+  if (iree_any_bit_set(requested_features,
+                       ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT, "unrecognized Vulkan feature bits 0x%08x",
+        requested_features & ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED);
+  }
 
-  (void)requested_features;
-  (void)string_capacity;
-  (void)out_string_values;
-  return iree_ok_status();
+  iree_status_t status = iree_ok_status();
+#define IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(target_set, value)      \
+  if (set == (target_set)) {                                             \
+    iree_status_t add_status = iree_hal_vulkan_add_extensibility_string( \
+        (value), string_capacity, out_string_count, out_string_values);  \
+    if (!iree_status_is_ok(add_status) && iree_status_is_ok(status)) {   \
+      status = add_status;                                               \
+    }                                                                    \
+  }
+
+  switch (set) {
+    case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED:
+      if (iree_any_bit_set(requested_features,
+                           IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS)) {
+        IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+            IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED,
+            "VK_LAYER_KHRONOS_validation");
+      }
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL:
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED:
+      if (iree_any_bit_set(requested_features,
+                           IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS)) {
+        IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+            IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
+            VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+      }
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL:
+#if defined(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL,
+          VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif  // VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED:
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL:
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          IREE_HAL_VULKAN_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+#else
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+#endif  // defined(VK_USE_PLATFORM_WIN32_KHR)
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+      break;
+    case IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT:
+      break;
+  }
+#undef IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING
+
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
@@ -105,37 +250,6 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   IREE_ASSERT_ARGUMENT(out_options);
   memset(out_options, 0, sizeof(*out_options));
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
-    iree_string_view_t identifier,
-    const iree_hal_vulkan_device_options_t* options,
-    const iree_hal_device_create_params_t* create_params,
-    const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
-    VkPhysicalDevice physical_device, VkDevice logical_device,
-    const iree_hal_vulkan_queue_set_t* compute_queue_set,
-    const iree_hal_vulkan_queue_set_t* transfer_queue_set,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
-  IREE_ASSERT_ARGUMENT(options);
-  IREE_ASSERT_ARGUMENT(create_params);
-  IREE_ASSERT_ARGUMENT(out_device);
-  *out_device = NULL;
-
-  (void)identifier;
-  (void)options;
-  (void)create_params;
-  (void)instance_syms;
-  (void)instance;
-  (void)physical_device;
-  (void)logical_device;
-  (void)compute_queue_set;
-  (void)transfer_queue_set;
-  (void)host_allocator;
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "wrapping external VkDevice handles requires an explicit enabled "
-      "feature/extension inventory; Vulkan function pointer presence is not a "
-      "capability contract");
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(

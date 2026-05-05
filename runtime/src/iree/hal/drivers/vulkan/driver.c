@@ -52,6 +52,24 @@ static iree_status_t iree_hal_vulkan_driver_options_verify(
                                 i);
     }
   }
+  if (iree_status_is_ok(status) &&
+      iree_any_bit_set(options->requested_features,
+                       ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED)) {
+    status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unrecognized Vulkan requested feature bits 0x%08x",
+        options->requested_features & ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED);
+  }
+  const iree_hal_vulkan_device_flags_t recognized_device_flags =
+      IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
+  if (iree_status_is_ok(status) &&
+      iree_any_bit_set(options->device_options.flags,
+                       ~recognized_device_flags)) {
+    status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unrecognized Vulkan device option flag bits 0x%08x",
+        options->device_options.flags & ~recognized_device_flags);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
