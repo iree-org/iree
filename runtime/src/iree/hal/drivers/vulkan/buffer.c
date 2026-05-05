@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/vulkan/sparse_buffer.h"
 #include "iree/hal/local/transient_buffer.h"
 
 //===----------------------------------------------------------------------===//
@@ -262,6 +263,10 @@ iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
       iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
   iree_hal_buffer_t* allocated_buffer =
       iree_hal_buffer_allocated_buffer(backing_buffer);
+  if (iree_hal_vulkan_sparse_buffer_isa(allocated_buffer)) {
+    return iree_hal_vulkan_sparse_buffer_handle(backing_buffer, out_memory,
+                                                out_handle);
+  }
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "buffer is not backed by the Vulkan HAL rewrite");
@@ -282,6 +287,10 @@ iree_status_t iree_hal_vulkan_buffer_device_address(
       iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
   iree_hal_buffer_t* allocated_buffer =
       iree_hal_buffer_allocated_buffer(backing_buffer);
+  if (iree_hal_vulkan_sparse_buffer_isa(allocated_buffer)) {
+    return iree_hal_vulkan_sparse_buffer_device_address(buffer,
+                                                        out_device_address);
+  }
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "buffer is not backed by the Vulkan HAL rewrite");
