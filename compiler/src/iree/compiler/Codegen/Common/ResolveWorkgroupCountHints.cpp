@@ -349,8 +349,7 @@ static LogicalResult processHint(IREE::Codegen::WorkgroupCountHintOp hintOp,
   processConditionsFromBase(hintOp, slice.conditions);
   if (failed(getBackwardOrdinalSlice(hintOp, slice.slice, slice.funcArgLeaves,
                                      slice.ordinalLeaves))) {
-    return hintOp->emitOpError(
-        "failed to resolve workgroup count hint in terms of workload ordinals");
+    return failure();
   }
   slice.hintOp = hintOp;
   return success();
