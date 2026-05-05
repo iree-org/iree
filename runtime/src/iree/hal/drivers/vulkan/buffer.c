@@ -16,6 +16,13 @@
 static const char* IREE_HAL_VULKAN_ALLOCATOR_ID = "iree-hal-vulkan-unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
+typedef uint32_t iree_hal_vulkan_buffer_ownership_t;
+enum iree_hal_vulkan_buffer_ownership_bits_e {
+  IREE_HAL_VULKAN_BUFFER_OWNS_NONE = 0u,
+  IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE = 1u << 0,
+  IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY = 1u << 1,
+};
+
 typedef struct iree_hal_vulkan_buffer_t {
   // Base HAL buffer resource returned to callers.
   iree_hal_buffer_t base;
@@ -32,6 +39,9 @@ typedef struct iree_hal_vulkan_buffer_t {
   // Dense memory backing |handle|.
   VkDeviceMemory device_memory;
 
+  // Byte offset within |device_memory| where this buffer's allocation begins.
+  VkDeviceSize device_memory_offset;
+
   // Vulkan buffer handle.
   VkBuffer handle;
 
@@ -43,6 +53,9 @@ typedef struct iree_hal_vulkan_buffer_t {
 
   // Physical device nonCoherentAtomSize used for mapped-memory ranges.
   VkDeviceSize non_coherent_atom_size;
+
+  // Vulkan resource ownership bits controlling destroy-time cleanup.
+  iree_hal_vulkan_buffer_ownership_t ownership;
 
   // Optional callback issued after Vulkan resources are released.
   iree_hal_buffer_release_callback_t release_callback;
@@ -56,6 +69,63 @@ static iree_hal_vulkan_buffer_t* iree_hal_vulkan_buffer_cast(
   return (iree_hal_vulkan_buffer_t*)base_value;
 }
 
+static iree_status_t iree_hal_vulkan_buffer_create_internal(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    VkMemoryPropertyFlags memory_property_flags,
+    VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
+    VkDeviceSize device_memory_offset, VkBuffer handle,
+    VkDeviceAddress device_address,
+    iree_hal_vulkan_buffer_ownership_t ownership,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)byte_length);
+
+  if (IREE_UNLIKELY(byte_offset > allocation_size ||
+                    byte_length > allocation_size - byte_offset)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan buffer byte range offset %" PRIdsz
+                            " with length %" PRIdsz
+                            " exceeds allocation size %" PRIdsz,
+                            byte_offset, byte_length, allocation_size);
+  }
+
+  iree_hal_vulkan_buffer_t* buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer));
+  memset(buffer, 0, sizeof(*buffer));
+  iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
+                             byte_offset, byte_length, memory_type,
+                             allowed_access, allowed_usage,
+                             &iree_hal_vulkan_buffer_vtable, &buffer->base);
+  buffer->host_allocator = host_allocator;
+  buffer->syms = *syms;
+  buffer->logical_device = logical_device;
+  buffer->device_memory = device_memory;
+  buffer->device_memory_offset = device_memory_offset;
+  buffer->handle = handle;
+  buffer->device_address = device_address;
+  buffer->memory_property_flags = memory_property_flags;
+  buffer->non_coherent_atom_size =
+      non_coherent_atom_size ? non_coherent_atom_size : 1;
+  buffer->ownership = ownership;
+  buffer->release_callback = release_callback;
+
+  *out_buffer = &buffer->base;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_buffer_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
@@ -66,36 +136,34 @@ iree_status_t iree_hal_vulkan_buffer_create(
     VkBuffer handle, VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(syms);
-  IREE_ASSERT_ARGUMENT(handle);
-  IREE_ASSERT_ARGUMENT(out_buffer);
-  *out_buffer = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+  return iree_hal_vulkan_buffer_create_internal(
+      syms, logical_device, placement, memory_type, allowed_access,
+      allowed_usage, allocation_size, /*byte_offset=*/0, byte_length,
+      memory_property_flags, non_coherent_atom_size, device_memory,
+      /*device_memory_offset=*/0, handle, device_address,
+      IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE |
+          IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY,
+      release_callback, host_allocator, out_buffer);
+}
 
-  iree_hal_vulkan_buffer_t* buffer = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer));
-  memset(buffer, 0, sizeof(*buffer));
-  iree_hal_buffer_initialize(placement, &buffer->base, allocation_size,
-                             /*byte_offset=*/0, byte_length, memory_type,
-                             allowed_access, allowed_usage,
-                             &iree_hal_vulkan_buffer_vtable, &buffer->base);
-  buffer->host_allocator = host_allocator;
-  buffer->syms = *syms;
-  buffer->logical_device = logical_device;
-  buffer->device_memory = device_memory;
-  buffer->handle = handle;
-  buffer->device_address = device_address;
-  buffer->memory_property_flags = memory_property_flags;
-  buffer->non_coherent_atom_size =
-      non_coherent_atom_size ? non_coherent_atom_size : 1;
-  buffer->release_callback = release_callback;
-
-  *out_buffer = &buffer->base;
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+iree_status_t iree_hal_vulkan_buffer_create_borrowed(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    VkMemoryPropertyFlags memory_property_flags,
+    VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
+    VkBuffer handle, VkDeviceAddress device_address,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  return iree_hal_vulkan_buffer_create_internal(
+      syms, logical_device, placement, memory_type, allowed_access,
+      allowed_usage, allocation_size, byte_offset, byte_length,
+      memory_property_flags, non_coherent_atom_size, device_memory,
+      /*device_memory_offset=*/0, handle, device_address,
+      IREE_HAL_VULKAN_BUFFER_OWNS_NONE, release_callback, host_allocator,
+      out_buffer);
 }
 
 static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -105,13 +173,16 @@ static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
-  if (buffer->handle) {
+  if (buffer->handle &&
+      iree_any_bit_set(buffer->ownership, IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE)) {
     IREE_TRACE_FREE_NAMED(IREE_HAL_VULKAN_ALLOCATOR_ID, (void*)buffer->handle);
     iree_vkDestroyBuffer(IREE_VULKAN_DEVICE(&buffer->syms),
                          buffer->logical_device, buffer->handle,
                          /*pAllocator=*/NULL);
   }
-  if (buffer->device_memory) {
+  if (buffer->device_memory &&
+      iree_any_bit_set(buffer->ownership,
+                       IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY)) {
     iree_vkFreeMemory(IREE_VULKAN_DEVICE(&buffer->syms), buffer->logical_device,
                       buffer->device_memory,
                       /*pAllocator=*/NULL);
@@ -190,9 +261,13 @@ static VkMappedMemoryRange iree_hal_vulkan_buffer_make_mapped_memory_range(
   return (VkMappedMemoryRange){
       .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
       .memory = buffer->device_memory,
-      .offset = range_offset,
-      .size = range_end == allocation_size ? VK_WHOLE_SIZE
-                                           : range_end - range_offset,
+      .offset = buffer->device_memory_offset + range_offset,
+      .size =
+          range_end == allocation_size &&
+                  iree_all_bits_set(buffer->ownership,
+                                    IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY)
+              ? VK_WHOLE_SIZE
+              : range_end - range_offset,
   };
 }
 
@@ -224,7 +299,8 @@ static iree_status_t iree_hal_vulkan_buffer_map_range(
   void* data = NULL;
   IREE_RETURN_IF_ERROR(iree_vkMapMemory(
       IREE_VULKAN_DEVICE(&buffer->syms), buffer->logical_device,
-      buffer->device_memory, (VkDeviceSize)local_byte_offset,
+      buffer->device_memory,
+      buffer->device_memory_offset + (VkDeviceSize)local_byte_offset,
       (VkDeviceSize)local_byte_length, /*flags=*/0, &data));
   mapping->contents = iree_make_byte_span(data, local_byte_length);
 

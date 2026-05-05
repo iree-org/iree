@@ -38,6 +38,8 @@ iree_cc_library(
     "physical_device.h"
     "semaphore.c"
     "semaphore.h"
+    "slab_provider.c"
+    "slab_provider.h"
     "sparse_buffer.c"
     "sparse_buffer.h"
     "syms.h"
@@ -51,6 +53,10 @@ iree_cc_library(
     iree::base::threading
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
+    iree::hal::memory::passthrough_pool
+    iree::hal::memory::slab_provider
+    iree::hal::memory::tlsf_pool
+    iree::hal::memory::tracing
   PUBLIC
 )
 

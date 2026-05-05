@@ -682,6 +682,14 @@ static iree_status_t iree_hal_vulkan_unimplemented(
                           (int)operation.size, operation.data);
 }
 
+static bool iree_hal_vulkan_logical_device_query_pool_epoch(
+    void* user_data, iree_async_axis_t axis, uint64_t epoch) {
+  iree_hal_vulkan_logical_device_t* device =
+      (iree_hal_vulkan_logical_device_t*)user_data;
+  return device->frontier_tracker && iree_async_frontier_tracker_query_epoch(
+                                         device->frontier_tracker, axis, epoch);
+}
+
 static void iree_hal_vulkan_logical_device_clear_topology_info(
     iree_hal_vulkan_logical_device_t* device) {
   if (device->frontier_tracker) {
@@ -954,10 +962,15 @@ iree_hal_vulkan_logical_device_query_semaphore_compatibility(
 static iree_status_t iree_hal_vulkan_logical_device_query_queue_pool_backend(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_queue_pool_backend_t* out_backend) {
-  (void)base_device;
-  (void)queue_affinity;
-  (void)out_backend;
-  return iree_hal_vulkan_unimplemented(IREE_SV("queue pool backend"));
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_query_queue_pool_backend(
+      device->device_allocator, queue_affinity, out_backend));
+  out_backend->epoch_query = (iree_hal_pool_epoch_query_t){
+      .fn = iree_hal_vulkan_logical_device_query_pool_epoch,
+      .user_data = device,
+  };
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_queue_alloca(
@@ -1242,7 +1255,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_allocator(
       (iree_hal_device_t*)device, &device->syms, device->logical_device,
       &device->physical_device, device->enabled_features,
       device->queue_affinity_mask, device->sparse_binding_queue.handle,
-      device->host_allocator, &device->device_allocator);
+      device->proactor, device->host_allocator, &device->device_allocator);
 }
 
 static void iree_hal_vulkan_logical_device_assign_selected_queues(

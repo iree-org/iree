@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_VULKAN_ALLOCATOR_H_
 #define IREE_HAL_DRIVERS_VULKAN_ALLOCATOR_H_
 
+#include "iree/async/api.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
@@ -19,19 +20,38 @@ extern "C" {
 // iree_hal_vulkan_allocator_t
 //===----------------------------------------------------------------------===//
 
+typedef struct iree_hal_vulkan_allocator_t iree_hal_vulkan_allocator_t;
+
 // Creates the Vulkan allocator object for a logical device.
 //
-// This starts as a direct allocation path: each allocate_buffer call creates a
-// VkBuffer, allocates/binds a VkDeviceMemory object, and wraps both in a HAL
-// buffer. Slab suballocation and sparse virtual memory plug in behind the same
-// allocator interface once their policies are implemented.
+// The allocator owns the default Vulkan slab/pool policy used for synchronous
+// HAL allocations. Each slab provider delegates whole-slab materialization back
+// through the direct allocation helpers below so the Vulkan object creation and
+// sparse-binding rules remain centralized.
 iree_status_t iree_hal_vulkan_allocator_create(
     iree_hal_device_t* parent_device, const iree_hal_vulkan_device_syms_t* syms,
     VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
     iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
-    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
+    iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
+    iree_hal_allocator_t** out_allocator);
+
+// Allocates one whole Vulkan buffer from a required memory type index.
+//
+// This is the primitive used by Vulkan slab providers. It bypasses the default
+// pool set and creates a standalone dense or fully-bound sparse buffer. Normal
+// users should call iree_hal_allocator_allocate_buffer() instead.
+iree_status_t iree_hal_vulkan_allocator_allocate_direct_buffer_from_type(
+    iree_hal_vulkan_allocator_t* allocator, uint32_t memory_type_index,
+    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer);
+
+// Returns the default queue-pool backend resources borrowed from |allocator|.
+iree_status_t iree_hal_vulkan_allocator_query_queue_pool_backend(
+    iree_hal_allocator_t* base_allocator,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend);
 
 #ifdef __cplusplus
 }  // extern "C"
