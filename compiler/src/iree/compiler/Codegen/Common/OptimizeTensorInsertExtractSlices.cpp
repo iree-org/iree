@@ -347,6 +347,78 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     return success();
   }
 };
+
+/// Folds transfer_read(tensor.empty) into ub.poison (or, for out-of-bounds
+/// lanes, a select with the padding value).
+///
+/// Since tensor.empty has unspecified contents, reading from it produces
+/// an unspecified value, which is exactly the semantics of ub.poison.
+///
+///   Case 1 — fully in-bounds, no mask:
+///     %e = tensor.empty() : tensor<128xf16>
+///     %r = vector.transfer_read %e[%c0], %pad {in_bounds = [true]}
+///   ->
+///     %r = ub.poison : vector<128xf16>
+///
+///   Case 2 — fully in-bounds, masked:
+///     %e = tensor.empty() : tensor<128xf16>
+///     %r = vector.transfer_read %e[%c0], %pad, %mask {in_bounds = [true]}
+///   ->
+///     %poison = ub.poison : vector<128xf16>
+///     %bcast  = vector.broadcast %pad : f16 to vector<128xf16>
+///     %r = arith.select %mask, %poison, %bcast
+///
+///   Case 3 — has out-of-bounds dims, no mask:
+///     %e = tensor.empty() : tensor<128xf16>
+///     %r = vector.transfer_read %e[%c0], %pad
+///   ->
+///     %r = ub.poison : vector<128xf16>
+///     (out-of-bounds lanes are filled with pad, but since the tensor contents
+///      are also unspecified, all lanes are unspecified → poison)
+///
+///   Case 4 — has out-of-bounds dims, masked:
+///     Same reasoning as case 3: unspecified contents + unspecified OOB
+///     = fully unspecified → but masked-off lanes must use the pad value.
+///   ->
+///     %poison = ub.poison : vector<128xf16>
+///     %bcast  = vector.broadcast %pad : f16 to vector<128xf16>
+///     %r = arith.select %mask, %poison, %bcast
+struct FoldTransferReadOfEmptyTensor
+    : OpRewritePattern<vector::TransferReadOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    auto emptyOp = op.getBase().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return failure();
+    }
+
+    // Only handle minor identity permutation maps for now.
+    if (!op.getPermutationMap().isMinorIdentity()) {
+      return failure();
+    }
+
+    Value poison = ub::PoisonOp::create(rewriter, op.getLoc(), op.getType());
+
+    TypedValue<VectorType> mask = op.getMask();
+    if (mask) {
+      // Masked lanes that are "off" must produce the padding value, not poison.
+      Value rPad = op.getPadding();
+      auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                                op.getType(), rPad);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(op, mask, poison, padVal);
+    } else {
+      // All lanes read from the empty tensor -> all unspecified -> poison.
+      rewriter.replaceOp(op, poison);
+    }
+    return success();
+  }
+};
 } // namespace
 
 // Find the earliest insertion point in the block for the given operation.
@@ -408,7 +480,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   // Apply masked transfer_write + transfer_read folding to avoid spurious
   // (future) roundtrips to memory.
   // TODO: consider upstreaming.
-  patterns.add<FoldMaskedTransferRAW>(context);
+  patterns.add<FoldMaskedTransferRAW, FoldTransferReadOfEmptyTensor>(context);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

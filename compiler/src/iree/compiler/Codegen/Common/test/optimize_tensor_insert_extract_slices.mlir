@@ -454,3 +454,130 @@ func.func @fold_masked_transfer_raw_unmasked_write_masked_read(%t: tensor<128xf1
 // CHECK:         %[[READ:.*]] = vector.transfer_read %[[T]]{{.*}}, %[[CST]], %[[MASK]] {in_bounds = [true]}
 // CHECK-SAME:      : tensor<128xf16>, vector<128xf16>
 // CHECK:         return %[[READ]]
+
+// -----
+
+// transfer_read from a memref (not tensor semantics): pattern must not fire.
+func.func @negative_read_empty_not_tensor_semantics(%m: memref<128xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %r = vector.transfer_read %m[%c0], %cst {in_bounds = [true]}
+     : memref<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @negative_read_empty_not_tensor_semantics
+// CHECK:         vector.transfer_read
+
+// -----
+
+// transfer_read from a regular tensor (not tensor.empty): pattern must not fire.
+func.func @negative_read_not_empty_tensor(%t: tensor<128xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %r = vector.transfer_read %t[%c0], %cst {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @negative_read_not_empty_tensor
+// CHECK:         vector.transfer_read
+
+// -----
+
+// transfer_read from tensor.empty with a transposing permutation map: bail.
+func.func @negative_read_empty_non_identity_map() -> vector<64x128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %e = tensor.empty() : tensor<128x64xf16>
+  %r = vector.transfer_read %e[%c0, %c0], %cst
+     {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>}
+     : tensor<128x64xf16>, vector<64x128xf16>
+  return %r : vector<64x128xf16>
+}
+// CHECK-LABEL: func.func @negative_read_empty_non_identity_map
+// CHECK:         tensor.empty
+// CHECK:         vector.transfer_read
+
+// -----
+
+// Unmasked, in-bounds read from tensor.empty -> ub.poison.
+func.func @fold_read_empty_unmasked_inbounds() -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %e = tensor.empty() : tensor<128xf16>
+  %r = vector.transfer_read %e[%c0], %cst {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_read_empty_unmasked_inbounds
+// CHECK-NOT:     tensor.empty
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[POISON:.*]] = ub.poison : vector<128xf16>
+// CHECK:         return %[[POISON]]
+
+// -----
+
+// Unmasked, out-of-bounds read from tensor.empty -> ub.poison.
+func.func @fold_read_empty_unmasked_outofbounds() -> vector<256xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %e = tensor.empty() : tensor<128xf16>
+  %r = vector.transfer_read %e[%c0], %cst
+     : tensor<128xf16>, vector<256xf16>
+  return %r : vector<256xf16>
+}
+// CHECK-LABEL: func.func @fold_read_empty_unmasked_outofbounds
+// CHECK-NOT:     tensor.empty
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[POISON:.*]] = ub.poison : vector<256xf16>
+// CHECK:         return %[[POISON]]
+
+// -----
+
+// Masked read from tensor.empty where padding is ub.poison -> just ub.poison.
+func.func @fold_read_empty_masked_poison_pad(%mask: vector<128xi1>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = ub.poison : f16
+  %e = tensor.empty() : tensor<128xf16>
+  %r = vector.transfer_read %e[%c0], %pad, %mask {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_read_empty_masked_poison_pad
+// CHECK-NOT:     tensor.empty
+// CHECK-NOT:     vector.transfer_read
+// CHECK-NOT:     arith.select
+// CHECK:         %[[POISON:.*]] = ub.poison : vector<128xf16>
+// CHECK:         return %[[POISON]]
+
+// -----
+
+// Masked read from tensor.empty with a concrete pad value -> select(mask, poison, broadcast(pad)).
+// Followed by: select cond, poison, X -> X
+func.func @fold_read_empty_masked_real_pad(%mask: vector<128xi1>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %e = tensor.empty() : tensor<128xf16>
+  %r = vector.transfer_read %e[%c0], %cst, %mask {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_read_empty_masked_real_pad
+// CHECK:         %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<128xf16>
+// CHECK:         return %[[CST]]
+
+// -----
+
+// Unmasked read from a dynamically-shaped tensor.empty -> ub.poison.
+func.func @fold_read_empty_dynamic_unmasked(%sz: index) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<?xf16>
+  %r = vector.transfer_read %e[%c0], %cst {in_bounds = [true]}
+     : tensor<?xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_read_empty_dynamic_unmasked
+// CHECK-NOT:     tensor.empty
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[POISON:.*]] = ub.poison : vector<128xf16>
+// CHECK:         return %[[POISON]]
