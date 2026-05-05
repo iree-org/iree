@@ -439,6 +439,22 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
         iree_hal_vulkan_available_device_extensions_from_list(
             out_snapshot->extension_count, out_snapshot->extensions);
   }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_physical_device_has_extension(
+          out_snapshot,
+          IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST)) {
+    out_snapshot->external_memory_host_properties =
+        (VkPhysicalDeviceExternalMemoryHostPropertiesEXT){
+            .sType =
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT,
+        };
+    VkPhysicalDeviceProperties2 properties2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &out_snapshot->external_memory_host_properties,
+    };
+    iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
+                                        handle, &properties2);
+  }
 
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(host_allocator, out_snapshot->extensions);

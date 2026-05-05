@@ -54,6 +54,21 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
 // Returns true if |buffer| is a Vulkan HAL buffer.
 bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer);
 
+// Resolves |buffer| to a Vulkan-backed buffer view suitable for queue packet
+// emission. Transient queue-allocation wrappers return their staged backing
+// view even before the wrapper is committed to host-visible accessors.
+iree_status_t iree_hal_vulkan_buffer_resolve_backing(
+    iree_hal_buffer_t* buffer, iree_hal_buffer_t** out_backing_buffer);
+
+// Returns the byte offset into |backing_buffer| for |buffer| plus
+// |local_byte_offset|. When |buffer| is a subspan of a transient wrapper this
+// preserves both the staged backing view offset and the original wrapper view
+// offset.
+iree_status_t iree_hal_vulkan_buffer_resolve_backing_offset(
+    iree_hal_buffer_t* buffer, iree_hal_buffer_t* backing_buffer,
+    iree_device_size_t local_byte_offset,
+    iree_device_size_t* out_backing_byte_offset);
+
 // Returns the Vulkan memory and buffer handles backing |buffer|.
 iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
                                             VkDeviceMemory* out_memory,

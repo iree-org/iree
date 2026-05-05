@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/hal/local/transient_buffer.h"
+
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_buffer_t
 //===----------------------------------------------------------------------===//
@@ -201,14 +203,65 @@ bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer) {
                               &iree_hal_vulkan_buffer_vtable);
 }
 
+iree_status_t iree_hal_vulkan_buffer_resolve_backing(
+    iree_hal_buffer_t* buffer, iree_hal_buffer_t** out_backing_buffer) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_backing_buffer);
+  *out_backing_buffer = NULL;
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(buffer);
+  if (iree_hal_local_transient_buffer_isa(allocated_buffer)) {
+    iree_hal_buffer_t* backing_buffer =
+        iree_hal_local_transient_buffer_backing_buffer(allocated_buffer);
+    if (!backing_buffer) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "transient buffer has no staged Vulkan backing; ensure the buffer "
+          "was returned from queue_alloca before submitting dependent work");
+    }
+    *out_backing_buffer = backing_buffer;
+    return iree_ok_status();
+  }
+  *out_backing_buffer = buffer;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_buffer_resolve_backing_offset(
+    iree_hal_buffer_t* buffer, iree_hal_buffer_t* backing_buffer,
+    iree_device_size_t local_byte_offset,
+    iree_device_size_t* out_backing_byte_offset) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(backing_buffer);
+  IREE_ASSERT_ARGUMENT(out_backing_byte_offset);
+  iree_device_size_t backing_byte_offset =
+      iree_hal_buffer_byte_offset(backing_buffer);
+  if (backing_buffer != buffer &&
+      !iree_device_size_checked_add(backing_byte_offset,
+                                    iree_hal_buffer_byte_offset(buffer),
+                                    &backing_byte_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan buffer backing offset overflows");
+  }
+  if (!iree_device_size_checked_add(backing_byte_offset, local_byte_offset,
+                                    &backing_byte_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan buffer local offset overflows");
+  }
+  *out_backing_byte_offset = backing_byte_offset;
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
                                             VkDeviceMemory* out_memory,
                                             VkBuffer* out_handle) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_memory);
   IREE_ASSERT_ARGUMENT(out_handle);
+  iree_hal_buffer_t* backing_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
   iree_hal_buffer_t* allocated_buffer =
-      iree_hal_buffer_allocated_buffer(buffer);
+      iree_hal_buffer_allocated_buffer(backing_buffer);
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "buffer is not backed by the Vulkan HAL rewrite");
@@ -224,16 +277,21 @@ iree_status_t iree_hal_vulkan_buffer_device_address(
     iree_hal_buffer_t* buffer, VkDeviceAddress* out_device_address) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_device_address);
+  iree_hal_buffer_t* backing_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
   iree_hal_buffer_t* allocated_buffer =
-      iree_hal_buffer_allocated_buffer(buffer);
+      iree_hal_buffer_allocated_buffer(backing_buffer);
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "buffer is not backed by the Vulkan HAL rewrite");
   }
   iree_hal_vulkan_buffer_t* vulkan_buffer =
       iree_hal_vulkan_buffer_cast(allocated_buffer);
-  *out_device_address =
-      vulkan_buffer->device_address + iree_hal_buffer_byte_offset(buffer);
+  iree_device_size_t byte_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_resolve_backing_offset(
+      buffer, backing_buffer, /*local_byte_offset=*/0, &byte_offset));
+  *out_device_address = vulkan_buffer->device_address + byte_offset;
   return iree_ok_status();
 }
 

@@ -788,6 +788,101 @@ static iree_status_t iree_hal_vulkan_create_specialization_info(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
+    iree_hal_vulkan_PipelineLayoutDef_table_t pipeline_layout_def,
+    iree_hal_vulkan_DescriptorSetLayoutDef_vec_t descriptor_set_layouts_vec,
+    const VkDescriptorSetLayout* descriptor_set_layouts,
+    iree_allocator_t host_allocator, iree_hal_vulkan_pipeline_t* out_pipeline) {
+  flatbuffers_uint32_vec_t descriptor_set_layout_ordinals_vec =
+      iree_hal_vulkan_PipelineLayoutDef_descriptor_set_layout_ordinals_get(
+          pipeline_layout_def);
+  const iree_host_size_t descriptor_set_layout_count =
+      flatbuffers_uint32_vec_len(descriptor_set_layout_ordinals_vec);
+  if (descriptor_set_layout_count > UINT32_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "pipeline layout declares %" PRIhsz
+        " descriptor set layouts, exceeding Vulkan limit %u",
+        descriptor_set_layout_count, UINT32_MAX);
+  }
+
+  out_pipeline->descriptor_set_layout_count = descriptor_set_layout_count;
+  if (descriptor_set_layout_count > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+        host_allocator, descriptor_set_layout_count,
+        sizeof(out_pipeline->descriptor_set_layouts[0]),
+        (void**)&out_pipeline->descriptor_set_layouts));
+  }
+
+  uint64_t descriptor_binding_count = 0;
+  for (iree_host_size_t i = 0; i < descriptor_set_layout_count; ++i) {
+    const uint32_t descriptor_set_layout_ordinal =
+        flatbuffers_uint32_vec_at(descriptor_set_layout_ordinals_vec, i);
+    out_pipeline->descriptor_set_layouts[i] =
+        descriptor_set_layouts[descriptor_set_layout_ordinal];
+
+    iree_hal_vulkan_DescriptorSetLayoutDef_table_t descriptor_set_layout_def =
+        iree_hal_vulkan_DescriptorSetLayoutDef_vec_at(
+            descriptor_set_layouts_vec, descriptor_set_layout_ordinal);
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_count_descriptor_set_layout_def(
+        descriptor_set_layout_def, /*inout_sampler_count=*/NULL,
+        /*inout_uniform_buffer_count=*/NULL,
+        /*inout_storage_buffer_count=*/NULL, &descriptor_binding_count));
+  }
+  if (descriptor_binding_count > IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "pipeline layout declares %" PRIu64
+                            " descriptor bindings, exceeding host size limit",
+                            descriptor_binding_count);
+  }
+
+  out_pipeline->descriptor_binding_count =
+      (iree_host_size_t)descriptor_binding_count;
+  if (descriptor_binding_count > 0) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+        host_allocator, (iree_host_size_t)descriptor_binding_count,
+        sizeof(out_pipeline->descriptor_bindings[0]),
+        (void**)&out_pipeline->descriptor_bindings));
+  }
+
+  iree_host_size_t binding_index = 0;
+  for (iree_host_size_t i = 0; i < descriptor_set_layout_count; ++i) {
+    const uint32_t descriptor_set_layout_ordinal =
+        flatbuffers_uint32_vec_at(descriptor_set_layout_ordinals_vec, i);
+    iree_hal_vulkan_DescriptorSetLayoutDef_table_t descriptor_set_layout_def =
+        iree_hal_vulkan_DescriptorSetLayoutDef_vec_at(
+            descriptor_set_layouts_vec, descriptor_set_layout_ordinal);
+    iree_hal_vulkan_DescriptorSetLayoutBindingDef_vec_t bindings_vec =
+        iree_hal_vulkan_DescriptorSetLayoutDef_bindings_get(
+            descriptor_set_layout_def);
+    const iree_host_size_t set_binding_count =
+        iree_hal_vulkan_DescriptorSetLayoutBindingDef_vec_len(bindings_vec);
+    for (iree_host_size_t j = 0; j < set_binding_count; ++j) {
+      iree_hal_vulkan_DescriptorSetLayoutBindingDef_table_t binding_def =
+          iree_hal_vulkan_DescriptorSetLayoutBindingDef_vec_at(bindings_vec, j);
+      const uint32_t descriptor_count =
+          iree_hal_vulkan_DescriptorSetLayoutBindingDef_descriptor_count_get(
+              binding_def);
+      for (uint32_t array_element = 0; array_element < descriptor_count;
+           ++array_element) {
+        out_pipeline->descriptor_bindings
+            [binding_index++] = (iree_hal_vulkan_descriptor_binding_t){
+            .set_ordinal = (uint32_t)i,
+            .binding =
+                iree_hal_vulkan_DescriptorSetLayoutBindingDef_binding_get(
+                    binding_def),
+            .array_element = array_element,
+            .descriptor_type = (VkDescriptorType)
+                iree_hal_vulkan_DescriptorSetLayoutBindingDef_descriptor_type_get(
+                    binding_def),
+        };
+      }
+    }
+  }
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkPipelineCache pipeline_cache,
@@ -796,7 +891,8 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     iree_hal_vulkan_PipelineLayoutDef_vec_t pipeline_layouts_vec,
     iree_hal_vulkan_DescriptorSetLayoutDef_vec_t descriptor_set_layouts_vec,
     const VkPipelineLayout* pipeline_layouts,
-    const VkShaderModule* shader_modules,
+    const VkDescriptorSetLayout* descriptor_set_layouts,
+    const VkShaderModule* shader_modules, iree_allocator_t host_allocator,
     iree_hal_vulkan_PipelineDef_table_t pipeline_def,
     iree_hal_vulkan_pipeline_t* out_pipeline) {
   const uint32_t pipeline_layout_ordinal =
@@ -814,6 +910,9 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
       iree_hal_vulkan_PipelineDef_subgroup_size_get(pipeline_def);
   out_pipeline->layout = pipeline_layouts[pipeline_layout_ordinal];
   out_pipeline->subgroup_size = subgroup_size;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
+      pipeline_layout_def, descriptor_set_layouts_vec, descriptor_set_layouts,
+      host_allocator, out_pipeline));
 
   VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_info = {
       .sType =
@@ -892,6 +991,11 @@ static iree_hal_vulkan_executable_t* iree_hal_vulkan_executable_cast(
   return (iree_hal_vulkan_executable_t*)base_value;
 }
 
+bool iree_hal_vulkan_executable_isa(iree_hal_executable_t* executable) {
+  return iree_hal_resource_is((const iree_hal_resource_t*)executable,
+                              &iree_hal_vulkan_executable_vtable);
+}
+
 static iree_status_t iree_hal_vulkan_allocate_executable(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     iree_host_size_t descriptor_set_layout_count,
@@ -919,17 +1023,30 @@ static iree_status_t iree_hal_vulkan_allocate_executable(
         host_allocator, descriptor_set_layout_count,
         sizeof(executable->descriptor_set_layouts[0]),
         (void**)&executable->descriptor_set_layouts);
+    if (iree_status_is_ok(status)) {
+      memset(executable->descriptor_set_layouts, 0,
+             descriptor_set_layout_count *
+                 sizeof(executable->descriptor_set_layouts[0]));
+    }
   }
   if (iree_status_is_ok(status) && pipeline_layout_count > 0) {
     status =
         iree_allocator_malloc_array(host_allocator, pipeline_layout_count,
                                     sizeof(executable->pipeline_layouts[0]),
                                     (void**)&executable->pipeline_layouts);
+    if (iree_status_is_ok(status)) {
+      memset(executable->pipeline_layouts, 0,
+             pipeline_layout_count * sizeof(executable->pipeline_layouts[0]));
+    }
   }
   if (iree_status_is_ok(status) && pipeline_count > 0) {
     status = iree_allocator_malloc_array(host_allocator, pipeline_count,
                                          sizeof(executable->pipelines[0]),
                                          (void**)&executable->pipelines);
+    if (iree_status_is_ok(status)) {
+      memset(executable->pipelines, 0,
+             pipeline_count * sizeof(executable->pipelines[0]));
+    }
   }
   if (iree_status_is_ok(status) && name_storage_size > 0) {
     status = iree_allocator_malloc(host_allocator, name_storage_size,
@@ -1088,7 +1205,8 @@ iree_status_t iree_hal_vulkan_executable_create(
     status = iree_hal_vulkan_create_compute_pipeline(
         syms, logical_device, pipeline_cache, executable_params,
         &specialization_info, pipeline_layouts_vec, descriptor_set_layouts_vec,
-        executable->pipeline_layouts, shader_modules, pipeline_def, pipeline);
+        executable->pipeline_layouts, executable->descriptor_set_layouts,
+        shader_modules, host_allocator, pipeline_def, pipeline);
     if (!iree_status_is_ok(status)) {
       status = iree_status_annotate_f(status, "pipelines[%" PRIhsz "]", i);
     }
@@ -1123,6 +1241,10 @@ static void iree_hal_vulkan_executable_destroy(
                              executable->pipelines[i].handle,
                              /*pAllocator=*/NULL);
     }
+    iree_allocator_free(host_allocator,
+                        executable->pipelines[i].descriptor_bindings);
+    iree_allocator_free(host_allocator,
+                        executable->pipelines[i].descriptor_set_layouts);
   }
   for (iree_host_size_t i = 0; i < executable->pipeline_layout_count; ++i) {
     if (executable->pipeline_layouts[i]) {

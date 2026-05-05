@@ -9,6 +9,7 @@
 
 #include "iree/async/api.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 
@@ -33,7 +34,9 @@ iree_status_t iree_hal_vulkan_allocator_create(
     VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_device_extensions_t enabled_extensions,
     iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
+    iree_slim_mutex_t* sparse_binding_queue_mutex,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator);
 
@@ -52,6 +55,17 @@ iree_status_t iree_hal_vulkan_allocator_query_queue_pool_backend(
     iree_hal_allocator_t* base_allocator,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_queue_pool_backend_t* out_backend);
+
+// Selects a pool and compatible buffer parameters for queue_alloca.
+//
+// |allocation_size| is rounded to the Vulkan buffer size granularity. When
+// |requested_pool| is NULL the allocator's default pool policy is used.
+// Otherwise the requested pool is validated against the normalized parameters
+// and returned borrowed in |out_pool|.
+iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
+    iree_hal_allocator_t* base_allocator, iree_hal_pool_t* requested_pool,
+    iree_hal_buffer_params_t* params, iree_device_size_t* allocation_size,
+    iree_hal_pool_t** out_pool);
 
 #ifdef __cplusplus
 }  // extern "C"

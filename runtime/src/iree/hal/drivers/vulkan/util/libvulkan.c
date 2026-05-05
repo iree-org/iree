@@ -40,6 +40,8 @@ static iree_status_code_t iree_hal_vulkan_status_code(VkResult result) {
       return IREE_STATUS_DATA_LOSS;
     case VK_ERROR_MEMORY_MAP_FAILED:
       return IREE_STATUS_INTERNAL;
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE:
+      return IREE_STATUS_INVALID_ARGUMENT;
     case VK_ERROR_LAYER_NOT_PRESENT:
     case VK_ERROR_EXTENSION_NOT_PRESENT:
       return IREE_STATUS_NOT_FOUND;
@@ -82,6 +84,8 @@ static const char* iree_hal_vulkan_result_string(VkResult result) {
       return "VK_ERROR_DEVICE_LOST";
     case VK_ERROR_MEMORY_MAP_FAILED:
       return "VK_ERROR_MEMORY_MAP_FAILED";
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE:
+      return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
     case VK_ERROR_LAYER_NOT_PRESENT:
       return "VK_ERROR_LAYER_NOT_PRESENT";
     case VK_ERROR_EXTENSION_NOT_PRESENT:

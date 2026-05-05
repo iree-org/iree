@@ -5,6 +5,9 @@
 
 leak:libvulkan_radeon.so
 leak:libvulkan_lvp.so
+# Vulkan loader physical-device terminator setup may allocate ICD bookkeeping
+# that remains reachable only through loader-internal process lifetime state.
+leak:setup_loader_term_phys_devs
 # Fallback: when ASAN can't resolve the shared library name, match the
 # pthread_once call that triggers the per-thread initialization.
 leak:__pthread_once_slow

@@ -19,6 +19,21 @@ extern "C" {
 // iree_hal_vulkan_pipeline_t
 //===----------------------------------------------------------------------===//
 
+// Maps one HAL dispatch binding to one Vulkan descriptor slot.
+typedef struct iree_hal_vulkan_descriptor_binding_t {
+  // Pipeline-layout set ordinal containing the descriptor.
+  uint32_t set_ordinal;
+
+  // Vulkan descriptor binding number within the set.
+  uint32_t binding;
+
+  // Array element within the descriptor binding.
+  uint32_t array_element;
+
+  // Vulkan descriptor type expected at the slot.
+  VkDescriptorType descriptor_type;
+} iree_hal_vulkan_descriptor_binding_t;
+
 // Prepared Vulkan compute pipeline and HAL export metadata.
 typedef struct iree_hal_vulkan_pipeline_t {
   // Vulkan compute pipeline handle owned by the executable.
@@ -26,6 +41,18 @@ typedef struct iree_hal_vulkan_pipeline_t {
 
   // Vulkan pipeline layout handle owned by the executable.
   VkPipelineLayout layout;
+
+  // Number of set layout handles in descriptor_set_layouts.
+  iree_host_size_t descriptor_set_layout_count;
+
+  // Pipeline-layout ordered descriptor set layout handles.
+  VkDescriptorSetLayout* descriptor_set_layouts;
+
+  // Number of HAL dispatch binding mappings in descriptor_bindings.
+  iree_host_size_t descriptor_binding_count;
+
+  // HAL dispatch binding mappings in binding ordinal order.
+  iree_hal_vulkan_descriptor_binding_t* descriptor_bindings;
 
   // Export name stored in executable-owned host memory.
   iree_string_view_t name;
@@ -60,6 +87,9 @@ iree_status_t iree_hal_vulkan_executable_create(
     iree_hal_vulkan_features_t enabled_features, VkPipelineCache pipeline_cache,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
+
+// Returns true if |executable| is a Vulkan executable.
+bool iree_hal_vulkan_executable_isa(iree_hal_executable_t* executable);
 
 // Returns the native pipeline metadata for |export_ordinal|.
 iree_status_t iree_hal_vulkan_executable_lookup_pipeline(

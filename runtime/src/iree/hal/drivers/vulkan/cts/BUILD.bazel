@@ -37,8 +37,398 @@ iree_hal_cts_testdata(
 )
 
 iree_runtime_cc_test(
+    name = "core_driver_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/core:driver_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "core_semaphore_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/core:semaphore_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "core_semaphore_thread_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/core:semaphore_thread_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/buffer:all_tests",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_basic_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:basic_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_fill_buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:fill_buffer_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_update_buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:update_buffer_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_copy_buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:copy_buffer_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_transient_buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:transient_buffer_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_pipeline_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_pipeline_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_reuse_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_reuse_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_constants_bindings_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_constants_bindings_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_constants_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_constants_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_indirect_parameters_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_indirect_parameters_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_multi_entrypoint_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_multi_entrypoint_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_dispatch_multi_workgroup_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:dispatch_multi_workgroup_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_stress_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/command_buffer:stress_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "executable_tests",
     srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
     tags = [
         "driver=vulkan",
         "requires-gpu-vulkan",
@@ -48,6 +438,160 @@ iree_runtime_cc_test(
         ":testdata_vulkan_spirv_lib",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal/cts/core:all_executable_tests",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/file:all_tests",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_alloca_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:queue_alloca_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_host_call_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:queue_host_call_test",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_dispatch_direct_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    args = ["--gtest_filter=CTS/QueueDispatchTest.*"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:queue_dispatch_test",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_dispatch_indirect_parameters_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    args = ["--gtest_filter=CTS/QueueDispatchIndirectParametersTest.*"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:queue_dispatch_test",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "queue_transfer_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:queue_transfer_test",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "semaphore_submission_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/queue:semaphore_submission_test",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/testing:gtest",

@@ -24,6 +24,8 @@ IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
   IREE_ASSERT_ARGUMENT(out_options);
   memset(out_options, 0, sizeof(*out_options));
   iree_hal_vulkan_device_options_initialize(&out_options->device_options);
+  out_options->device_options.flags |=
+      IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
 }
 
 static iree_status_t iree_hal_vulkan_driver_options_verify(

@@ -41,14 +41,508 @@ iree_hal_cts_testdata(
 
 iree_cc_test(
   NAME
+    core_driver_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::core::driver_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    core_semaphore_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::core::semaphore_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    core_semaphore_thread_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::core::semaphore_thread_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    buffer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::buffer::all_tests
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_basic_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::basic_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_fill_buffer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::fill_buffer_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_update_buffer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::update_buffer_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_copy_buffer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::copy_buffer_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_transient_buffer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::transient_buffer_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_pipeline_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_pipeline_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_reuse_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_reuse_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_constants_bindings_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_constants_bindings_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_constants_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_constants_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_indirect_parameters_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_indirect_parameters_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_multi_entrypoint_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_multi_entrypoint_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_dispatch_multi_workgroup_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_multi_workgroup_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_stress_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::stress_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
     executable_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
     iree::base::tooling::flags
     iree::hal::cts::core::all_executable_tests
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    file_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::file::all_tests
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    queue_alloca_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::queue::queue_alloca_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    queue_host_call_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::queue::queue_host_call_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    queue_dispatch_direct_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::queue::queue_dispatch_test
+    iree::hal::cts::util::profile_test_util
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  ARGS
+    "--gtest_filter=CTS/QueueDispatchTest.*"
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    queue_dispatch_indirect_parameters_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    ::testdata_vulkan_spirv_lib
+    iree::base::tooling::flags
+    iree::hal::cts::queue::queue_dispatch_test
+    iree::hal::cts::util::profile_test_util
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  ARGS
+    "--gtest_filter=CTS/QueueDispatchIndirectParametersTest.*"
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    queue_transfer_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::queue::queue_transfer_test
+    iree::hal::cts::util::profile_test_util
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    semaphore_submission_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal::cts::queue::semaphore_submission_test
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
     iree::testing::gtest

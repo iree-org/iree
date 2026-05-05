@@ -38,7 +38,7 @@ IREE_FLAG(bool, vulkan_sparse_residency, true,
 IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
           "Requests buffer device addresses for pointer-first executables.");
 IREE_FLAG(
-    bool, vulkan_dedicated_compute_queue, false,
+    bool, vulkan_dedicated_compute_queue, true,
     "Requests a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch work.");
 
 static iree_status_t iree_hal_vulkan_driver_factory_enumerate(
@@ -95,6 +95,9 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
   if (FLAG_vulkan_dedicated_compute_queue) {
     options.device_options.flags |=
         IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
+  } else {
+    options.device_options.flags &=
+        ~IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
   }
 
   return iree_hal_vulkan_driver_create(driver_name, &options, /*syms=*/NULL,

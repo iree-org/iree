@@ -133,6 +133,13 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkAllocateMemory,
                                 VkDeviceMemory* pMemory),
                            ARGS(device, pAllocateInfo, pAllocator, pMemory))
 
+IREE_HAL_VULKAN_DEVICE_PFN(
+    VkResult, vkGetMemoryHostPointerPropertiesEXT,
+    DECL(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType,
+         const void* pHostPointer,
+         VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties),
+    ARGS(device, handleType, pHostPointer, pMemoryHostPointerProperties))
+
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkFreeMemory,
                            DECL(VkDevice device, VkDeviceMemory memory,
                                 const VkAllocationCallbacks* pAllocator),
@@ -149,6 +156,70 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkQueueBindSparse,
                                 const VkBindSparseInfo* pBindInfo,
                                 VkFence fence),
                            ARGS(queue, bindInfoCount, pBindInfo, fence))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkQueueSubmit2,
+                           DECL(VkQueue queue, uint32_t submitCount,
+                                const VkSubmitInfo2* pSubmits, VkFence fence),
+                           ARGS(queue, submitCount, pSubmits, fence))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateCommandPool,
+                           DECL(VkDevice device,
+                                const VkCommandPoolCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkCommandPool* pCommandPool),
+                           ARGS(device, pCreateInfo, pAllocator, pCommandPool))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyCommandPool,
+                           DECL(VkDevice device, VkCommandPool commandPool,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, commandPool, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(
+    VkResult, vkAllocateCommandBuffers,
+    DECL(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
+         VkCommandBuffer* pCommandBuffers),
+    ARGS(device, pAllocateInfo, pCommandBuffers))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkFreeCommandBuffers,
+                           DECL(VkDevice device, VkCommandPool commandPool,
+                                uint32_t commandBufferCount,
+                                const VkCommandBuffer* pCommandBuffers),
+                           ARGS(device, commandPool, commandBufferCount,
+                                pCommandBuffers))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBeginCommandBuffer,
+                           DECL(VkCommandBuffer commandBuffer,
+                                const VkCommandBufferBeginInfo* pBeginInfo),
+                           ARGS(commandBuffer, pBeginInfo))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkEndCommandBuffer,
+                           DECL(VkCommandBuffer commandBuffer),
+                           ARGS(commandBuffer))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdFillBuffer,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                VkDeviceSize size, uint32_t data),
+                           ARGS(commandBuffer, dstBuffer, dstOffset, size,
+                                data))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdUpdateBuffer,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                VkDeviceSize dataSize, const void* pData),
+                           ARGS(commandBuffer, dstBuffer, dstOffset, dataSize,
+                                pData))
+
+IREE_HAL_VULKAN_DEVICE_PFN(
+    void, vkCmdCopyBuffer,
+    DECL(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
+         uint32_t regionCount, const VkBufferCopy* pRegions),
+    ARGS(commandBuffer, srcBuffer, dstBuffer, regionCount, pRegions))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdPipelineBarrier2,
+                           DECL(VkCommandBuffer commandBuffer,
+                                const VkDependencyInfo* pDependencyInfo),
+                           ARGS(commandBuffer, pDependencyInfo))
 
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkMapMemory,
                            DECL(VkDevice device, VkDeviceMemory memory,
@@ -229,6 +300,34 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDescriptorSetLayout,
                                 const VkAllocationCallbacks* pAllocator),
                            ARGS(device, descriptorSetLayout, pAllocator))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateDescriptorPool,
+                           DECL(VkDevice device,
+                                const VkDescriptorPoolCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkDescriptorPool* pDescriptorPool),
+                           ARGS(device, pCreateInfo, pAllocator,
+                                pDescriptorPool))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDescriptorPool,
+                           DECL(VkDevice device,
+                                VkDescriptorPool descriptorPool,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, descriptorPool, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(
+    VkResult, vkAllocateDescriptorSets,
+    DECL(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
+         VkDescriptorSet* pDescriptorSets),
+    ARGS(device, pAllocateInfo, pDescriptorSets))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkUpdateDescriptorSets,
+                           DECL(VkDevice device, uint32_t descriptorWriteCount,
+                                const VkWriteDescriptorSet* pDescriptorWrites,
+                                uint32_t descriptorCopyCount,
+                                const VkCopyDescriptorSet* pDescriptorCopies),
+                           ARGS(device, descriptorWriteCount, pDescriptorWrites,
+                                descriptorCopyCount, pDescriptorCopies))
+
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreatePipelineLayout,
                            DECL(VkDevice device,
                                 const VkPipelineLayoutCreateInfo* pCreateInfo,
@@ -268,3 +367,38 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyPipeline,
                            DECL(VkDevice device, VkPipeline pipeline,
                                 const VkAllocationCallbacks* pAllocator),
                            ARGS(device, pipeline, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdBindPipeline,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkPipelineBindPoint pipelineBindPoint,
+                                VkPipeline pipeline),
+                           ARGS(commandBuffer, pipelineBindPoint, pipeline))
+
+IREE_HAL_VULKAN_DEVICE_PFN(
+    void, vkCmdBindDescriptorSets,
+    DECL(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+         VkPipelineLayout layout, uint32_t firstSet,
+         uint32_t descriptorSetCount, const VkDescriptorSet* pDescriptorSets,
+         uint32_t dynamicOffsetCount, const uint32_t* pDynamicOffsets),
+    ARGS(commandBuffer, pipelineBindPoint, layout, firstSet, descriptorSetCount,
+         pDescriptorSets, dynamicOffsetCount, pDynamicOffsets))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdPushConstants,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkPipelineLayout layout,
+                                VkShaderStageFlags stageFlags, uint32_t offset,
+                                uint32_t size, const void* pValues),
+                           ARGS(commandBuffer, layout, stageFlags, offset, size,
+                                pValues))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdDispatch,
+                           DECL(VkCommandBuffer commandBuffer,
+                                uint32_t groupCountX, uint32_t groupCountY,
+                                uint32_t groupCountZ),
+                           ARGS(commandBuffer, groupCountX, groupCountY,
+                                groupCountZ))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdDispatchIndirect,
+                           DECL(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                VkDeviceSize offset),
+                           ARGS(commandBuffer, buffer, offset))
