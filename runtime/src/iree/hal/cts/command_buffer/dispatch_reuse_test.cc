@@ -78,6 +78,25 @@ class DispatchReuseTest : public CtsTestBase<> {
     CtsTestBase::TearDown();
   }
 
+  void RecordDispatchBarrier(iree_hal_command_buffer_t* command_buffer) {
+    const iree_hal_memory_barrier_t memory_barrier = {
+        IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
+            IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE |
+            IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE,
+        IREE_HAL_ACCESS_SCOPE_DISPATCH_READ | IREE_HAL_ACCESS_SCOPE_MEMORY_READ,
+    };
+    IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+        command_buffer,
+        IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
+            IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+        IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
+            IREE_HAL_EXECUTION_STAGE_DISPATCH |
+            IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/1,
+        /*memory_barriers=*/&memory_barrier,
+        /*buffer_barrier_count=*/0, /*buffer_barriers=*/nullptr));
+  }
+
   // Records a reusable command buffer that dispatches the workgroup-ID kernel
   // with the given workgroup count. Uses a single indirect binding (slot 0)
   // for the output buffer.
@@ -108,17 +127,43 @@ class DispatchReuseTest : public CtsTestBase<> {
         iree_hal_make_static_dispatch_config(workgroup_count, 1, 1),
         iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
 
-    IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-        command_buffer,
-        /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |
-            IREE_HAL_EXECUTION_STAGE_TRANSFER |
-            IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-        /*target_stage_mask=*/IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
-            IREE_HAL_EXECUTION_STAGE_DISPATCH |
-            IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/0,
-        /*memory_barriers=*/nullptr,
-        /*buffer_barrier_count=*/0, /*buffer_barriers=*/nullptr));
+    RecordDispatchBarrier(command_buffer);
+
+    IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+    *out_command_buffer = command_buffer;
+  }
+
+  // Records two workgroup-ID dispatches into slots 0 and 1. The portable
+  // command indexes of the dispatch operations are 0 and 2 because each
+  // dispatch is followed by a barrier.
+  void RecordTwoWorkgroupIdDispatches(
+      iree_host_size_t workgroup_count,
+      iree_hal_command_buffer_t** out_command_buffer) {
+    iree_hal_command_buffer_t* command_buffer = nullptr;
+    IREE_ASSERT_OK(iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+        IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*binding_capacity=*/2, &command_buffer));
+    IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+
+    for (uint32_t buffer_slot = 0; buffer_slot < 2; ++buffer_slot) {
+      iree_hal_buffer_ref_t binding_refs[1] = {{
+          /*binding=*/0,
+          /*buffer_slot=*/buffer_slot,
+          /*buffer=*/nullptr,
+          /*offset=*/0,
+          /*length=*/workgroup_count * sizeof(uint32_t),
+      }};
+      iree_hal_buffer_ref_list_t bindings = {
+          /*.count=*/1,
+          /*.values=*/binding_refs,
+      };
+      IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+          command_buffer, workgroup_id_executable_, /*entry_point=*/0,
+          iree_hal_make_static_dispatch_config(workgroup_count, 1, 1),
+          iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+      RecordDispatchBarrier(command_buffer);
+    }
 
     IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
     *out_command_buffer = command_buffer;
@@ -150,11 +195,9 @@ TEST_P(DispatchReuseTest, ResubmitWithDifferentBindings) {
   static constexpr iree_host_size_t kWorkgroupCount = 64;
   const iree_device_size_t buffer_size = kWorkgroupCount * sizeof(uint32_t);
 
-  // Record once with indirect bindings.
   Ref<iree_hal_command_buffer_t> command_buffer;
   RecordWorkgroupIdDispatch(kWorkgroupCount, command_buffer.out());
 
-  // Submit 3 times, each with a different output buffer.
   for (int iteration = 0; iteration < 3; ++iteration) {
     Ref<iree_hal_buffer_t> output;
     IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output.out()));
@@ -561,54 +604,8 @@ TEST_P(DispatchReuseTest, MultipleDispatchesInSingleCommandBuffer) {
   static constexpr iree_host_size_t kWorkgroupCount = 32;
   const iree_device_size_t buffer_size = kWorkgroupCount * sizeof(uint32_t);
 
-  // Record two dispatches writing to different binding slots,
-  // separated by a barrier.
   Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/2, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-
-  // Dispatch 1: write workgroup IDs to slot 0.
-  {
-    iree_hal_buffer_ref_t refs[1] = {{0, 0, nullptr, 0, buffer_size}};
-    iree_hal_buffer_ref_list_t bindings = {1, refs};
-    IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-        command_buffer, workgroup_id_executable_, /*entry_point=*/0,
-        iree_hal_make_static_dispatch_config(kWorkgroupCount, 1, 1),
-        iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
-  }
-
-  // Barrier between dispatches.
-  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-      command_buffer,
-      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
-          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
-          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
-
-  // Dispatch 2: write workgroup IDs to slot 1.
-  {
-    iree_hal_buffer_ref_t refs[1] = {{0, 1, nullptr, 0, buffer_size}};
-    iree_hal_buffer_ref_list_t bindings = {1, refs};
-    IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-        command_buffer, workgroup_id_executable_, /*entry_point=*/0,
-        iree_hal_make_static_dispatch_config(kWorkgroupCount, 1, 1),
-        iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
-  }
-
-  // Final barrier.
-  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-      command_buffer,
-      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
-          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
-          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  RecordTwoWorkgroupIdDispatches(kWorkgroupCount, command_buffer.out());
 
   // Submit with two different output buffers in the binding table.
   Ref<iree_hal_buffer_t> output_a;
@@ -635,6 +632,84 @@ TEST_P(DispatchReuseTest, MultipleDispatchesInSingleCommandBuffer) {
   EXPECT_THAT(data_b, ContainerEq(expected)) << "Output B mismatch";
 }
 
+TEST_P(DispatchReuseTest, MultiDispatchProfilingFiltersCommandIndex) {
+  static constexpr iree_host_size_t kWorkgroupCount = 32;
+  const iree_device_size_t buffer_size = kWorkgroupCount * sizeof(uint32_t);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  RecordTwoWorkgroupIdDispatches(kWorkgroupCount, command_buffer.out());
+
+  Ref<iree_hal_buffer_t> output_a;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output_a.out()));
+  Ref<iree_hal_buffer_t> output_b;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, output_b.out()));
+
+  iree_hal_buffer_binding_t table_bindings[2] = {
+      {output_a, 0, buffer_size},
+      {output_b, 0, buffer_size},
+  };
+  iree_hal_buffer_binding_table_t binding_table = {2, table_bindings};
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+  sink.expected_dispatch_flags =
+      IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
+  sink.expected_dispatch_command_indices = {2};
+  sink.expected_workgroup_count[0] = kWorkgroupCount;
+  sink.expected_workgroup_count[1] = 1;
+  sink.expected_workgroup_count[2] = 1;
+
+  iree_hal_device_profiling_options_t profiling_options = {0};
+  profiling_options.data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
+  profiling_options.sink = TestProfileSinkAsBase(&sink);
+  profiling_options.capture_filter.flags =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX;
+  profiling_options.capture_filter.command_index = 2;
+
+  DeviceProfilingScope profiling(device_);
+  iree_status_t profiling_status = profiling.Begin(&profiling_options);
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device dispatch profiling unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  SubmitWithBindingsAndWait(command_buffer, binding_table);
+
+  std::vector<uint32_t> expected(kWorkgroupCount);
+  std::iota(expected.begin(), expected.end(), 0u);
+  auto data_a = ReadBufferData<uint32_t>(output_a);
+  EXPECT_THAT(data_a, ContainerEq(expected)) << "Output A mismatch";
+  auto data_b = ReadBufferData<uint32_t>(output_b);
+  EXPECT_THAT(data_b, ContainerEq(expected)) << "Output B mismatch";
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.clock_correlation_count, 3);
+  EXPECT_GE(sink.command_buffer_metadata_count, 1);
+  EXPECT_GE(sink.command_operation_metadata_count, 1);
+  ASSERT_EQ(1u, sink.dispatch_events.size());
+
+  const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[0];
+  EXPECT_NE(0u, event.command_buffer_id);
+  EXPECT_EQ(2u, event.command_index);
+  iree_host_size_t matching_dispatch_operation_count = 0;
+  for (const iree_hal_profile_command_operation_record_t& operation :
+       sink.command_operations) {
+    if (operation.command_buffer_id == event.command_buffer_id &&
+        operation.type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
+      ++matching_dispatch_operation_count;
+    }
+  }
+  EXPECT_EQ(2u, matching_dispatch_operation_count);
+  ExpectDispatchEventsWithinClockCorrelationRange(sink);
+}
+
 // Resubmits a multi-dispatch command buffer multiple times with different
 // binding tables. This is the full hot-path pattern: record N dispatches
 // once, then iterate alloca→execute→dealloca with different transient
@@ -643,45 +718,8 @@ TEST_P(DispatchReuseTest, MultiDispatchMultiResubmit) {
   static constexpr iree_host_size_t kWorkgroupCount = 32;
   const iree_device_size_t buffer_size = kWorkgroupCount * sizeof(uint32_t);
 
-  // Record command buffer with two dispatches to different slots.
   Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/2, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-
-  iree_hal_buffer_ref_t refs_0[1] = {{0, 0, nullptr, 0, buffer_size}};
-  iree_hal_buffer_ref_list_t bindings_0 = {1, refs_0};
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, workgroup_id_executable_, 0,
-      iree_hal_make_static_dispatch_config(kWorkgroupCount, 1, 1),
-      iree_const_byte_span_empty(), bindings_0, IREE_HAL_DISPATCH_FLAG_NONE));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-      command_buffer,
-      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
-          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
-          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
-
-  iree_hal_buffer_ref_t refs_1[1] = {{0, 1, nullptr, 0, buffer_size}};
-  iree_hal_buffer_ref_list_t bindings_1 = {1, refs_1};
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, workgroup_id_executable_, 0,
-      iree_hal_make_static_dispatch_config(kWorkgroupCount, 1, 1),
-      iree_const_byte_span_empty(), bindings_1, IREE_HAL_DISPATCH_FLAG_NONE));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-      command_buffer,
-      IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER |
-          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
-          IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  RecordTwoWorkgroupIdDispatches(kWorkgroupCount, command_buffer.out());
 
   std::vector<uint32_t> expected(kWorkgroupCount);
   std::iota(expected.begin(), expected.end(), 0u);
