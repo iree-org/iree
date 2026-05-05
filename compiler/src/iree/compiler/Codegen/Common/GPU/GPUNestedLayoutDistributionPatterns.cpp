@@ -180,12 +180,6 @@ static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
     int64_t unpackedDim = layout.getBatchTile()[unDistrDim] *
                           layout.getOuterTile()[unDistrDim] *
                           layout.getElementTile()[unDistrDim];
-    assert(
-        unpackedDim ==
-            deinterleavedPacked.getType().getShape()[unDistrDim * 3] *
-                deinterleavedPacked.getType().getShape()[unDistrDim * 3 + 1] *
-                deinterleavedPacked.getType().getShape()[unDistrDim * 3 + 2] &&
-        "packed B/O/E shape must match nested layout tile product");
     unpackedShape.push_back(unpackedDim);
   }
   VectorType unpackedType = VectorType::get(
@@ -270,8 +264,6 @@ static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
 /// but with projecting out the indexed/sliced dimensions from the result.
 static VectorValue projectVector(RewriterBase &rewriter, Location loc,
                                  VectorValue val, AffineMap projectionMap) {
-  assert(projectionMap.isProjectedPermutation() &&
-         "expected a projected permutation map");
   SmallVector<int64_t> remainingDims;
   auto allDims =
       llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
@@ -2423,10 +2415,6 @@ struct DistributeContract final
     VectorValue localRhs = getDeinterleavedUnpackedForm(
         rewriter, getDistributed(rewriter, contractOp.getRhs(), rhsLayout),
         rhsLayout);
-    assert(
-        cast<VectorType>(localLhs.getType()).getRank() == opInfo.getARank() &&
-        cast<VectorType>(localRhs.getType()).getRank() == opInfo.getBRank() &&
-        "nested layout unpack must match contraction indexing maps");
 
     VectorValue mask = nullptr;
     if (maskOp) {
@@ -2476,7 +2464,7 @@ struct DistributeContract final
 
     VectorValue packedLocalContractValue;
     if (accVector) {
-      VectorValue localContractValue = dyn_cast<VectorValue>(localContract);
+      VectorValue localContractValue = cast<VectorValue>(localContract);
       packedLocalContractValue =
           getInterleavedPackedForm(rewriter, localContractValue, resLayout);
     } else {
@@ -2484,8 +2472,6 @@ struct DistributeContract final
       packedLocalContractValue =
           vector::BroadcastOp::create(rewriter, loc, vecType, localContract);
     }
-
-    assert(packedLocalContractValue && "result should have been a vector");
 
     // Identify the reduction dimension and apply it for subgroup reduction.
     SmallVector<int64_t> reductionSubGroupTile;
