@@ -940,6 +940,67 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
 
 // -----
 
+// Same mask-generator handling should apply to online_attention:
+// isAttentionMaskGenerator recognises both AttentionOp and OnlineAttentionOp.
+
+util.func @online_attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: tensor<?x?xf16>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_neg = arith.constant -3.4028235e+38 : f32
+  %M = tensor.dim %Q, %c0 : tensor<?x?xf16>
+  %K2 = tensor.dim %K, %c1 : tensor<?x?xf16>
+  %N = tensor.dim %V, %c1 : tensor<?x?xf16>
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+  %scale = arith.constant 1.0 : f16
+
+  %mask_e = tensor.empty(%M, %K2) : tensor<?x?xi1>
+  %acc_e = tensor.empty(%M, %N) : tensor<?x?xf32>
+  %ms_e = tensor.empty(%M) : tensor<?xf32>
+  %acc = linalg.fill ins(%cst : f32) outs(%acc_e : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<?xf32>) -> tensor<?xf32>
+  %sum = linalg.fill ins(%cst : f32) outs(%ms_e : tensor<?xf32>) -> tensor<?xf32>
+
+  %causalmask = linalg.generic {indexing_maps = [affine_map<(M, K2) -> (M, K2)>], iterator_types = ["parallel", "parallel"]} outs(%mask_e : tensor<?x?xi1>) {
+  ^bb0(%out: i1):
+    %i = linalg.index 0 : index
+    %j = linalg.index 1 : index
+    %dec = arith.cmpi sge, %i, %j : index
+    %mask = arith.select %dec, %false, %true : i1
+    linalg.yield %mask : i1
+  } -> tensor<?x?xi1>
+
+  %out:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [
+      affine_map<(M, N, K2, K1) -> (M, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, K1)>,
+      affine_map<(M, N, K2, K1) -> (K2, N)>,
+      affine_map<(M, N, K2, K1) -> ()>,
+      affine_map<(M, N, K2, K1) -> (M, K2)>,
+      affine_map<(M, N, K2, K1) -> (M, N)>,
+      affine_map<(M, N, K2, K1) -> (M)>,
+      affine_map<(M, N, K2, K1) -> (M)>
+    ]
+  } ins(%Q, %K, %V, %scale, %causalmask :
+        tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+    outs(%acc, %max, %sum : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>) {
+  ^bb0(%score : f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
+
+  util.return %out#0 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: @online_attention_clone_mask
+// CHECK-NOT: flow.dispatch.region
+// CHECK:     linalg.generic
+// CHECK:     flow.dispatch.region
+// CHECK:       iree_linalg_ext.online_attention
+// CHECK:       flow.return
+
+// -----
+
 util.func @scatter_no_index_producer_fusion(%arg0 : tensor<?x1xi64>,
     %arg1 : index, %arg2 : tensor<?x1x32x8x128xf16>,
     %arg3 : tensor<?x32x8x128xf16>) -> tensor<?x32x8x128xf16> {
