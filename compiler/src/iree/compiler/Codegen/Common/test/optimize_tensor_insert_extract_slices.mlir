@@ -446,14 +446,19 @@ func.func @fold_masked_transfer_raw_unmasked_write_masked_read(%t: tensor<128xf1
      : tensor<128xf16>, vector<128xf16>
   return %r : vector<128xf16>
 }
+
 // CHECK-LABEL: func.func @fold_masked_transfer_raw_unmasked_write_masked_read
 // CHECK-SAME:    %[[T:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
-// CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:     %[[VAL:.*]] = arith.constant dense<1.000000e+00> : vector<128xf16>
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<128xf16>
 // CHECK-NOT:     vector.transfer_write
-// CHECK:         %[[READ:.*]] = vector.transfer_read %[[T]]{{.*}}, %[[CST]], %[[MASK]] {in_bounds = [true]}
-// CHECK-SAME:      : tensor<128xf16>, vector<128xf16>
-// CHECK:         return %[[READ]]
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[RES:.+]] = arith.select %[[MASK]]
+// CHECK-DAG:         %[[VAL]]
+// CHECK-DAG:         %[[PAD]]
+// CHECK-SAME:       vector<128xi1>, vector<128xf16>
+// CHECK:         return %[[RES]]
 
 // -----
 
@@ -528,8 +533,8 @@ func.func @fold_read_empty_unmasked_outofbounds() -> vector<256xf16> {
 // CHECK-LABEL: func.func @fold_read_empty_unmasked_outofbounds
 // CHECK-NOT:     tensor.empty
 // CHECK-NOT:     vector.transfer_read
-// CHECK:         %[[POISON:.*]] = ub.poison : vector<256xf16>
-// CHECK:         return %[[POISON]]
+// CHECK:         %[[PAD:.+]] = arith.constant dense<0.000000e+00> : vector<256xf16>
+// CHECK:         return %[[PAD]]
 
 // -----
 
