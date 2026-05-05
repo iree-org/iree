@@ -319,6 +319,9 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Target byte offset captured from queue_read.
     iree_device_size_t target_offset;
 
+    // Staging buffer receiving host file reads before native GPU copies.
+    iree_hal_buffer_t* staging_buffer;
+
     // Number of bytes to read into the target buffer.
     iree_device_size_t length;
 
@@ -857,6 +860,8 @@ static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
       return submission->copy.length != 0;
     case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE:
       return true;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_READ:
+      return submission->read.staging_buffer != NULL;
     case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_WRITE:
       return submission->write.staging_buffer != NULL;
     default:
@@ -1239,6 +1244,9 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   }
   if (submission->read.target_buffer) {
     iree_hal_buffer_release(submission->read.target_buffer);
+  }
+  if (submission->read.staging_buffer) {
+    iree_hal_buffer_release(submission->read.staging_buffer);
   }
   if (submission->alloca.buffer) {
     if (submission->alloca.pool_notification_observation_held) {
@@ -1756,6 +1764,10 @@ static void iree_hal_vulkan_queue_execute_read(
     iree_hal_vulkan_queue_signal_list_or_fail(signal_semaphore_list, frontier);
     return;
   }
+  if (submission->read.staging_buffer) {
+    iree_hal_vulkan_queue_signal_list_or_fail(signal_semaphore_list, frontier);
+    return;
+  }
 
   iree_status_t status = iree_hal_file_read(
       submission->read.source_file, submission->read.source_offset,
@@ -2147,6 +2159,37 @@ static void iree_hal_vulkan_queue_publish_signals(
         submission->signal_semaphore_list.semaphores[i], queue->axis, frontier,
         submission->epoch, submission->signal_semaphore_list.payload_values[i]);
   }
+}
+
+static bool iree_hal_vulkan_queue_requires_pre_native_host_stage(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  return submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_READ &&
+         submission->read.staging_buffer != NULL;
+}
+
+static iree_status_t iree_hal_vulkan_queue_stage_before_native_submit(
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (!iree_hal_vulkan_queue_requires_pre_native_host_stage(submission)) {
+    return iree_ok_status();
+  }
+  iree_hal_buffer_t* source_storage_buffer =
+      iree_hal_file_storage_buffer(submission->read.source_file);
+  if (!source_storage_buffer) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan staged queue read requires a storage-buffer-backed source file "
+        "until proactor file staging is implemented");
+  }
+  if (submission->read.source_offset > IREE_DEVICE_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "read source offset %" PRIu64
+                            " exceeds device size",
+                            submission->read.source_offset);
+  }
+  return iree_hal_buffer_map_copy(
+      source_storage_buffer, (iree_device_size_t)submission->read.source_offset,
+      submission->read.staging_buffer, /*target_offset=*/0,
+      submission->read.length);
 }
 
 static void iree_hal_vulkan_queue_alloca_pool_notification_end_observe(
@@ -2630,6 +2673,12 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
       iree_hal_vulkan_queue_profile_set_dependency_resolution(submission,
                                                               resolution);
     }
+  }
+  if (iree_status_is_ok(status) && allow_software_deferral &&
+      submission->wait_semaphore_list.count != 0 &&
+      iree_hal_vulkan_queue_requires_pre_native_host_stage(submission)) {
+    resolution->needs_deferral = true;
+    iree_hal_vulkan_queue_profile_force_software_defer(submission);
   }
   if (iree_status_is_ok(status) && resolution->needs_deferral) {
     return iree_ok_status();
@@ -3250,20 +3299,25 @@ static void iree_hal_vulkan_queue_drain_ready_submissions(
     if (iree_status_is_ok(status)) {
       iree_slim_mutex_lock(&queue->submission_mutex);
       status = iree_hal_vulkan_queue_submission_take_wait_failure(submission);
-      if (iree_status_is_ok(status)) {
-        if (wait_info_capacity < submission->wait_semaphore_list.count) {
-          status = iree_make_status(
-              IREE_STATUS_OUT_OF_RANGE,
-              "too many Vulkan queue wait semaphores for ready submission");
-        } else {
-          iree_hal_vulkan_queue_wait_resolution_t resolution = {
-              .wait_infos = wait_infos,
-              .wait_info_capacity = wait_info_capacity,
-          };
-          status = iree_hal_vulkan_queue_submit_native_under_lock(
-              queue, submission, /*allow_software_deferral=*/false, &resolution,
-              &submit_result);
-        }
+      iree_slim_mutex_unlock(&queue->submission_mutex);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_queue_stage_before_native_submit(submission);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_slim_mutex_lock(&queue->submission_mutex);
+      if (wait_info_capacity < submission->wait_semaphore_list.count) {
+        status = iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "too many Vulkan queue wait semaphores for ready submission");
+      } else {
+        iree_hal_vulkan_queue_wait_resolution_t resolution = {
+            .wait_infos = wait_infos,
+            .wait_info_capacity = wait_info_capacity,
+        };
+        status = iree_hal_vulkan_queue_submit_native_under_lock(
+            queue, submission, /*allow_software_deferral=*/false, &resolution,
+            &submit_result);
       }
       iree_slim_mutex_unlock(&queue->submission_mutex);
     }
@@ -3523,11 +3577,54 @@ static iree_status_t iree_hal_vulkan_queue_submit_captured_submission(
       .queue_failure_status = iree_ok_status(),
   };
 
+  iree_status_t status = iree_ok_status();
+  if (iree_hal_vulkan_queue_requires_pre_native_host_stage(submission) &&
+      submission->wait_semaphore_list.count == 0) {
+    bool ready_submission = false;
+    iree_slim_mutex_lock(&queue->submission_mutex);
+    status = iree_hal_vulkan_queue_check_error(queue);
+    if (iree_status_is_ok(status) && !queue->frontier_tracker) {
+      status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                                "Vulkan queue frontier is not assigned");
+    }
+    if (iree_status_is_ok(status) &&
+        iree_atomic_load(&queue->stop_requested, iree_memory_order_acquire)) {
+      status = iree_make_status(IREE_STATUS_CANCELLED,
+                                "Vulkan queue is shutting down");
+    }
+    if (iree_status_is_ok(status)) {
+      iree_hal_vulkan_queue_wait_resolution_t resolution = {0};
+      iree_hal_vulkan_queue_profile_set_dependency_resolution(submission,
+                                                              &resolution);
+      iree_atomic_store(&submission->deferred_state,
+                        IREE_HAL_VULKAN_QUEUE_DEFERRED_STATE_READY,
+                        iree_memory_order_release);
+      iree_hal_vulkan_queue_append_ready_submission(queue, submission);
+      iree_hal_vulkan_queue_profile_record_submission(submission);
+      ready_submission = true;
+      submission = NULL;
+    }
+    iree_slim_mutex_unlock(&queue->submission_mutex);
+
+    if (ready_submission) {
+      status = iree_hal_vulkan_queue_signal_wakeup(queue);
+      if (!iree_status_is_ok(status)) {
+        iree_status_t stored_status =
+            iree_hal_vulkan_queue_store_error(queue, status);
+        status = iree_status_clone(stored_status);
+        iree_hal_vulkan_queue_fail_pending_submissions(queue, stored_status);
+      }
+      return status;
+    }
+  }
+
   VkSemaphoreSubmitInfo* wait_infos = NULL;
   uint32_t wait_info_capacity = 0;
-  iree_status_t status = iree_hal_vulkan_queue_allocate_wait_infos(
-      queue, submission->wait_semaphore_list.count, &wait_infos,
-      &wait_info_capacity);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_allocate_wait_infos(
+        queue, submission->wait_semaphore_list.count, &wait_infos,
+        &wait_info_capacity);
+  }
   if (iree_status_is_ok(status)) {
     iree_slim_mutex_lock(&queue->submission_mutex);
     iree_hal_vulkan_queue_wait_resolution_t resolution = {
@@ -4204,6 +4301,26 @@ static iree_status_t iree_hal_vulkan_queue_allocate_write_staging_buffer(
       length, out_buffer);
 }
 
+static iree_status_t iree_hal_vulkan_queue_allocate_read_staging_buffer(
+    iree_hal_vulkan_queue_t* queue, iree_device_size_t length,
+    iree_hal_buffer_t** out_buffer) {
+  *out_buffer = NULL;
+  iree_hal_buffer_params_t params = {
+      .access =
+          IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+      .queue_affinity = queue->queue_affinity,
+      .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST |
+              IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
+               IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+               IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
+  };
+  return iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator((iree_hal_device_t*)queue->device), params,
+      length, out_buffer);
+}
+
 static iree_status_t iree_hal_vulkan_queue_validate_file_range(
     iree_hal_file_t* file, uint64_t offset, iree_device_size_t length,
     iree_string_view_t operation) {
@@ -4282,6 +4399,11 @@ iree_status_t iree_hal_vulkan_queue_submit_read(
     status = iree_hal_vulkan_queue_buffer_is_native(target_buffer,
                                                     &target_is_native);
   }
+  const bool target_is_mappable =
+      iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+      iree_all_bits_set(iree_hal_buffer_allowed_usage(target_buffer),
+                        IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED);
   if (iree_status_is_ok(status) && source_storage_is_native &&
       target_is_native) {
     if (source_offset > IREE_DEVICE_SIZE_MAX) {
@@ -4296,19 +4418,28 @@ iree_status_t iree_hal_vulkan_queue_submit_read(
           target_buffer, target_offset, length, IREE_HAL_COPY_FLAG_NONE);
     }
   }
-  if (iree_status_is_ok(status) &&
+  const bool target_needs_staging = target_is_native && !target_is_mappable;
+  if (iree_status_is_ok(status) && target_needs_staging &&
+      !source_storage_buffer) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan queue read into non-mappable native buffers requires a "
+        "storage-buffer-backed source file until proactor file staging is "
+        "implemented");
+  }
+  if (iree_status_is_ok(status) && !target_needs_staging &&
       !iree_hal_file_supports_synchronous_io(source_file)) {
     status = iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "Vulkan queue read without a direct storage-buffer copy requires "
         "synchronous file I/O until proactor staging is implemented");
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !target_needs_staging) {
     status = iree_hal_buffer_validate_memory_type(
         iree_hal_buffer_memory_type(target_buffer),
         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !target_needs_staging) {
     status = iree_hal_buffer_validate_usage(
         iree_hal_buffer_allowed_usage(target_buffer),
         IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED);
@@ -4330,6 +4461,24 @@ iree_status_t iree_hal_vulkan_queue_submit_read(
     submission->read.target_offset = target_offset;
     submission->read.length = length;
     submission->read.flags = flags;
+  }
+  if (iree_status_is_ok(status) && target_needs_staging) {
+    status = iree_hal_vulkan_queue_allocate_read_staging_buffer(
+        queue, length, &submission->read.staging_buffer);
+  }
+  if (iree_status_is_ok(status) && submission->read.staging_buffer) {
+    status = iree_hal_vulkan_queue_allocate_native_command_buffer(
+        queue, &submission->native_command_buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+          queue, submission);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_queue_record_copy_native_buffers(
+          queue, submission->read.staging_buffer, /*source_offset=*/0,
+          target_buffer, target_offset, length,
+          submission->native_command_buffer, submission);
+    }
   }
   if (iree_status_is_ok(status)) {
     status =
