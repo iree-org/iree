@@ -374,11 +374,11 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
 ///   ->
 ///     %r = ub.poison : vector<128xf16>
 ///     (out-of-bounds lanes are filled with pad, but since the tensor contents
-///      are also unspecified, all lanes are unspecified → poison)
+///      are also unspecified, all lanes are unspecified -> poison)
 ///
 ///   Case 4 — has out-of-bounds dims, masked:
 ///     Same reasoning as case 3: unspecified contents + unspecified OOB
-///     = fully unspecified → but masked-off lanes must use the pad value.
+///     = fully unspecified -> but masked-off lanes must use the pad value.
 ///   ->
 ///     %poison = ub.poison : vector<128xf16>
 ///     %bcast  = vector.broadcast %pad : f16 to vector<128xf16>
