@@ -581,3 +581,125 @@ func.func @fold_read_empty_dynamic_unmasked(%sz: index) -> vector<128xf16> {
 // CHECK-NOT:     vector.transfer_read
 // CHECK:         %[[POISON:.*]] = ub.poison : vector<128xf16>
 // CHECK:         return %[[POISON]]
+
+// -----
+
+// Multiple chained gathers: the index vectors computed for the first two
+// gathers (and the clamp ops derived from their results) must be reused
+// directly as vector SSA values by subsequent gathers. Vectorization may
+// introduce tensor.empty<...xindex> intermediaries with write-read chains
+// for materialized index vectors; these are cleaned up by the
+// optimize-tensor-insert-extract-slices pass that follows.
+
+#map = affine_map<(d0, d1, d2)[s0, s1, s2] -> (s0, s1, s2, 0)>
+#map1 = affine_map<(d0, d1, d2)[s0, s1, s2] -> ()>
+#map2 = affine_map<(d0, d1, d2)[s0, s1, s2] -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2)[s0, s1, s2] -> (d2)>
+#map4 = affine_map<(d0, d1, d2)[s0, s1, s2] -> (s0, s1, s2)>
+module {
+  func.func @three_gathers_index_materialization(%arg0: tensor<1x8x?xf32>, %arg1: tensor<1x8xf32>, %arg2: tensor<1x8xf32>, %arg3: tensor<1x8x?xf32>, %arg4: tensor<50x32x25x2xi32>, %arg5: tensor<50x40x40xi8>, %arg6: index, %arg7: index, %arg8: index, %arg9: index) -> tensor<1x8x?xf32> {
+    %cst = arith.constant dense<0> : vector<1x8x8xi8>
+    %0 = ub.poison : i8
+    %cst_0 = arith.constant dense<39> : vector<1x8x8xindex>
+    %cst_1 = arith.constant dense<0> : vector<1x8x8xindex>
+    %1 = ub.poison : i32
+    %cst_2 = arith.constant dense<0.000000e+00> : vector<1x8x8xf32>
+    %2 = ub.poison : index
+    %3 = ub.poison : f32
+    %c2 = arith.constant 2 : index
+    %c8 = arith.constant 8 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %4 = tensor.empty() : tensor<1x8x8xf32>
+    %5 = tensor.empty() : tensor<1x8x8xindex>
+    %6 = tensor.empty() : tensor<1x8x8xindex>
+    %7 = tensor.empty() : tensor<1x8x8xindex>
+    %dim = tensor.dim %arg0, %c2 : tensor<1x8x?xf32>
+    %8 = vector.transfer_read %arg1[%c0, %c0], %3 {in_bounds = [true, true]} : tensor<1x8xf32>, vector<1x8xf32>
+    %9 = vector.transfer_read %arg2[%c0, %c0], %3 {in_bounds = [true, true]} : tensor<1x8xf32>, vector<1x8xf32>
+    %10 = vector.create_mask %c1, %c8, %dim : vector<1x8x8xi1>
+    %11 = vector.transfer_read %arg0[%c0, %c0, %c0], %3, %10 {in_bounds = [true, true, true]} : tensor<1x8x?xf32>, vector<1x8x8xf32>
+    %12 = arith.divf %8, %9 : vector<1x8xf32>
+    %13 = vector.broadcast %12 : vector<1x8xf32> to vector<8x1x8xf32>
+    %14 = vector.transpose %13, [1, 2, 0] : vector<8x1x8xf32> to vector<1x8x8xf32>
+    %15 = arith.cmpf une, %11, %cst_2 : vector<1x8x8xf32>
+    %16 = arith.select %15, %14, %cst_2 : vector<1x8x8xi1>, vector<1x8x8xf32>
+    %17 = arith.addi %arg6, %arg7 : index
+    %18 = vector.step : vector<8xindex>
+    %19 = vector.broadcast %18 : vector<8xindex> to vector<1x8x8xindex>
+    %20 = vector.transpose %19, [0, 2, 1] : vector<1x8x8xindex> to vector<1x8x8xindex>
+    %21 = vector.broadcast %arg8 : index to vector<1x8x8xindex>
+    %22 = arith.addi %21, %20 : vector<1x8x8xindex>
+    %23 = vector.step : vector<8xindex>
+    %24 = vector.broadcast %arg9 : index to vector<8xindex>
+    %25 = arith.addi %24, %23 : vector<8xindex>
+    %26 = vector.transfer_write %16, %4[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xf32>, tensor<1x8x8xf32>
+    %27 = vector.broadcast %17 : index to vector<1x8x8xindex>
+    %28 = vector.transfer_write %27, %5[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
+    %29 = vector.transfer_write %22, %6[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
+    %30 = vector.broadcast %25 : vector<8xindex> to vector<1x8x8xindex>
+    %31 = vector.transfer_write %30, %7[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
+    %32 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c0] [%17, %22, %25 : index, vector<1x8x8xindex>, vector<8xindex>], %1 {indexing_maps = [#map, #map1, #map2, #map3]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %33 = arith.index_cast %32 : vector<1x8x8xi32> to vector<1x8x8xindex>
+    %34 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
+    %35 = vector.transfer_read %29[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
+    %36 = vector.transfer_read %31[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
+    %37 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c1] [%34, %35, %36 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %1 {indexing_maps = [#map, #map2, #map2, #map2]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %38 = arith.index_cast %37 : vector<1x8x8xi32> to vector<1x8x8xindex>
+    %39 = arith.maxsi %33, %cst_1 : vector<1x8x8xindex>
+    %40 = arith.minui %39, %cst_0 : vector<1x8x8xindex>
+    %41 = arith.maxsi %38, %cst_1 : vector<1x8x8xindex>
+    %42 = arith.minui %41, %cst_0 : vector<1x8x8xindex>
+    %43 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
+    %44 = iree_vector_ext.transfer_gather %arg5[%c0, %c0, %c0] [%43, %40, %42 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %0 {indexing_maps = [#map4, #map2, #map2, #map2]} : tensor<50x40x40xi8>, vector<1x8x8xi8>
+    %45 = vector.transfer_read %26[%c0, %c0, %c0], %3 {in_bounds = [true, true, true]} : tensor<1x8x8xf32>, vector<1x8x8xf32>
+    %46 = arith.cmpi ugt, %44, %cst : vector<1x8x8xi8>
+    %47 = arith.select %46, %45, %cst_2 : vector<1x8x8xi1>, vector<1x8x8xf32>
+    %48 = vector.transfer_write %47, %arg3[%c0, %c0, %c0] {in_bounds = [true, true, false]} : vector<1x8x8xf32>, tensor<1x8x?xf32>
+    return %48 : tensor<1x8x?xf32>
+  }
+}
+
+// Verify three transfer_gather ops are produced. Index vectors from the first
+// two gathers (and the clamp ops on their results) feed directly into the
+// third gather as vector SSA values — no tensor.empty<...xindex> or
+// write-read chains.
+//
+// CHECK-LABEL: func.func @three_gathers_index_materialization
+// CHECK-SAME:    %[[IN0:[a-zA-Z0-9]+]]: tensor<1x8x?xf32>
+// CHECK-SAME:    %[[IN1:[a-zA-Z0-9]+]]: tensor<1x8xf32>
+// CHECK-SAME:    %[[IN2:[a-zA-Z0-9]+]]: tensor<1x8xf32>
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x8x?xf32>
+// CHECK-SAME:    %[[TABLE:[a-zA-Z0-9]+]]: tensor<50x32x25x2xi32>
+// CHECK-SAME:    %[[LUT:[a-zA-Z0-9]+]]: tensor<50x40x40xi8>
+//
+//     No index-typed tensors should appear anywhere in the output.
+// CHECK-NOT:     tensor<{{.*}}xindex>
+//
+//     Gather #1 from %indir_table — index vecs consumed directly.
+// CHECK:         %[[G1:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
+// CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK:         %[[G1_IDX:.+]] = arith.index_cast %[[G1]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+//
+//     Gather #2 from %indir_table — reuses the same index vecs as #1.
+// CHECK:         %[[G2:.+]] = iree_vector_ext.transfer_gather %[[TABLE]]
+// CHECK-SAME:      : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+// CHECK:         %[[G2_IDX:.+]] = arith.index_cast %[[G2]] : vector<1x8x8xi32> to vector<1x8x8xindex>
+//
+//     Clamp results of gather #1 and #2 — pure vector ops, no tensor roundtrip.
+//     G1_IDX -> maxsi -> minui = CLAMP_A, G2_IDX -> maxsi -> minui = CLAMP_B.
+// CHECK:         %[[G1_MAX:.+]] = arith.maxsi %[[G1_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[CLAMP_A:.+]] = arith.minui %[[G1_MAX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[G2_MAX:.+]] = arith.maxsi %[[G2_IDX]], {{.*}} : vector<1x8x8xindex>
+// CHECK:         %[[CLAMP_B:.+]] = arith.minui %[[G2_MAX]], {{.*}} : vector<1x8x8xindex>
+//
+//     Gather #3 from %lut — takes clamped results directly as index vectors.
+// CHECK:         %[[G3:.+]] = iree_vector_ext.transfer_gather %[[LUT]]
+// CHECK-SAME:      [{{.*}}, %[[CLAMP_A]], %[[CLAMP_B]] : {{.*}}]
+// CHECK-SAME:      : tensor<50x40x40xi8>, vector<1x8x8xi8>
+//
+//     Final select + write.
+// CHECK:         %[[GATE:.+]] = arith.cmpi ugt, %[[G3]]
+// CHECK:         %[[RES:.+]] = arith.select %[[GATE]]
+// CHECK:         vector.transfer_write %[[RES]], %[[OUT]]
+// CHECK-NOT:     tensor<{{.*}}xindex>
