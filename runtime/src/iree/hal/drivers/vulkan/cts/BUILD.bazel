@@ -1,0 +1,55 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Focused CTS coverage for the Vulkan HAL rewrite.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:iree_hal_cts_test_suite.bzl", "iree_hal_cts_testdata")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/drivers/vulkan/registration",
+    ],
+    alwayslink = True,
+)
+
+iree_hal_cts_testdata(
+    backend_name = "vulkan",
+    format_name = "vulkan_spirv",
+    format_string = '"vulkan-spirv-fb"',
+    identifier = "iree_cts_testdata_vulkan_spirv",
+    target_device = "vulkan",
+    testdata = "//runtime/src/iree/hal/cts/testdata:executable_srcs",
+)
+
+iree_runtime_cc_test(
+    name = "executable_tests",
+    srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        ":testdata_vulkan_spirv_lib",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal/cts/core:all_executable_tests",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
