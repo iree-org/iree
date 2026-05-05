@@ -14,6 +14,7 @@
 #include "iree/base/threading/notification.h"
 #include "iree/hal/drivers/vulkan/buffer.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
+#include "iree/hal/drivers/vulkan/sparse_buffer.h"
 #include "iree/hal/local/transient_buffer.h"
 
 typedef enum iree_hal_vulkan_queue_submission_kind_e {
@@ -306,7 +307,13 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Transient buffer retained until the alloca retires.
     iree_hal_buffer_t* buffer;
 
-    // Borrowed pool used to acquire backing for buffer.
+    // Backing strategy selected by the allocator.
+    iree_hal_vulkan_queue_alloca_strategy_t strategy;
+
+    // Borrowed allocator used by the sparse strategy.
+    iree_hal_allocator_t* allocator;
+
+    // Borrowed pool used by the pool strategy.
     iree_hal_pool_t* pool;
 
     // Buffer parameters captured from queue_alloca after normalization.
@@ -1659,6 +1666,52 @@ static iree_status_t iree_hal_vulkan_queue_stage_alloca_reservation(
   return status;
 }
 
+static iree_status_t iree_hal_vulkan_queue_stage_alloca_sparse_backing(
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_hal_vulkan_queue_t* queue = submission->queue;
+  iree_hal_buffer_placement_t placement = {
+      .device = (iree_hal_device_t*)queue->device,
+      .queue_affinity = submission->alloca.params.queue_affinity,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
+
+  iree_hal_buffer_t* backing_buffer = NULL;
+  iree_host_size_t bind_count = 0;
+  VkSparseMemoryBind* binds = NULL;
+  iree_status_t status = iree_hal_vulkan_allocator_allocate_queue_sparse_buffer(
+      submission->alloca.allocator, placement, submission->alloca.params,
+      submission->alloca.allocation_size,
+      iree_hal_buffer_byte_length(submission->alloca.buffer),
+      queue->host_allocator, &backing_buffer, &bind_count, &binds);
+
+  VkBuffer sparse_buffer_handle = VK_NULL_HANDLE;
+  if (iree_status_is_ok(status)) {
+    VkDeviceMemory sparse_buffer_memory = VK_NULL_HANDLE;
+    status = iree_hal_vulkan_sparse_buffer_handle(
+        backing_buffer, &sparse_buffer_memory, &sparse_buffer_handle);
+    (void)sparse_buffer_memory;
+  }
+  if (iree_status_is_ok(status) && bind_count > UINT32_MAX) {
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "too many Vulkan sparse buffer binds for "
+                              "queue_alloca");
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_local_transient_buffer_stage_backing(submission->alloca.buffer,
+                                                  backing_buffer);
+    submission->sparse_bind.buffer = sparse_buffer_handle;
+    submission->sparse_bind.binds = binds;
+    submission->sparse_bind.bind_count = (uint32_t)bind_count;
+    binds = NULL;
+    submission->alloca.memory_wait_kind =
+        IREE_HAL_VULKAN_QUEUE_ALLOCA_MEMORY_WAIT_NONE;
+  }
+
+  iree_allocator_free(queue->host_allocator, binds);
+  iree_hal_buffer_release(backing_buffer);
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_queue_prepare_alloca_pool_notification(
     iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_async_frontier_t* requester_frontier) {
@@ -1731,6 +1784,20 @@ static iree_status_t iree_hal_vulkan_queue_prepare_alloca_backing(
     return iree_ok_status();
   }
 
+  if (submission->alloca.strategy ==
+      IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_SPARSE) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_queue_stage_alloca_sparse_backing(submission));
+    *out_needs_memory_wait = false;
+    return iree_ok_status();
+  }
+  if (submission->alloca.strategy !=
+      IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_POOL) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized Vulkan queue_alloca strategy %u",
+                            (uint32_t)submission->alloca.strategy);
+  }
+
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t acquire_info;
   iree_hal_pool_acquire_result_t acquire_result =
@@ -1778,6 +1845,17 @@ static iree_status_t iree_hal_vulkan_queue_try_stage_alloca_backing_now(
   iree_slim_mutex_unlock(&queue->submission_mutex);
   const iree_async_frontier_t* requester_frontier =
       iree_async_fixed_frontier_as_const_frontier(&requester_frontier_storage);
+
+  if (submission->alloca.strategy ==
+      IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_SPARSE) {
+    return iree_hal_vulkan_queue_stage_alloca_sparse_backing(submission);
+  }
+  if (submission->alloca.strategy !=
+      IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_POOL) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized Vulkan queue_alloca strategy %u",
+                            (uint32_t)submission->alloca.strategy);
+  }
 
   iree_hal_pool_reservation_t reservation;
   iree_hal_pool_acquire_info_t acquire_info;
@@ -1851,6 +1929,13 @@ static iree_status_t iree_hal_vulkan_queue_submit_sparse_bind_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_hal_vulkan_queue_wait_resolution_t* resolution) {
+  if (!iree_all_bits_set(queue->queue_flags, VK_QUEUE_SPARSE_BINDING_BIT)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan queue family %u does not support sparse binding",
+        queue->queue_family_index);
+  }
+
   VkSemaphore* wait_semaphores = NULL;
   uint64_t* wait_values = NULL;
   iree_status_t status = iree_hal_vulkan_queue_allocate_sparse_wait_arrays(
@@ -1900,6 +1985,13 @@ static iree_status_t iree_hal_vulkan_queue_submit_sparse_bind_under_lock(
   return status;
 }
 
+static bool iree_hal_vulkan_queue_submission_uses_sparse_bind(
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  return submission->kind ==
+             IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND ||
+         submission->sparse_bind.bind_count != 0;
+}
+
 static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
@@ -1921,6 +2013,14 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
       iree_atomic_load(&queue->stop_requested, iree_memory_order_acquire)) {
     status = iree_make_status(IREE_STATUS_CANCELLED,
                               "Vulkan queue is shutting down");
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_queue_submission_uses_sparse_bind(submission) &&
+      !iree_all_bits_set(queue->queue_flags, VK_QUEUE_SPARSE_BINDING_BIT)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan queue family %u does not support sparse binding",
+        queue->queue_family_index);
   }
   if (iree_status_is_ok(status)) {
     submission->epoch = queue->next_epoch_value;
@@ -1970,7 +2070,7 @@ static iree_status_t iree_hal_vulkan_queue_submit_native_under_lock(
     }
   }
   if (iree_status_is_ok(status)) {
-    if (submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND) {
+    if (iree_hal_vulkan_queue_submission_uses_sparse_bind(submission)) {
       status = iree_hal_vulkan_queue_submit_sparse_bind_under_lock(
           queue, submission, resolution);
     } else {
@@ -2910,7 +3010,7 @@ static iree_status_t iree_hal_vulkan_queue_create_transient_buffer(
     iree_hal_alloca_flags_t flags, iree_hal_buffer_t** out_buffer) {
   iree_hal_buffer_placement_t placement = {
       .device = (iree_hal_device_t*)queue->device,
-      .queue_affinity = queue->queue_affinity,
+      .queue_affinity = params.queue_affinity,
       .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
   };
   if (iree_all_bits_set(flags, IREE_HAL_ALLOCA_FLAG_INDETERMINATE_LIFETIME)) {
@@ -2925,12 +3025,11 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_device_size_t byte_length,
-    iree_hal_alloca_flags_t flags,
+    iree_hal_vulkan_queue_alloca_plan_t allocation_plan,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(queue);
-  IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -2947,6 +3046,37 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
   if (iree_status_is_ok(status) && allocation_size == 0) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Vulkan queue_alloca size must be non-zero");
+  }
+  if (iree_status_is_ok(status)) {
+    switch (allocation_plan.strategy) {
+      case IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_POOL:
+        if (!allocation_plan.pool) {
+          status = iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "Vulkan queue_alloca pool strategy requires a pool");
+        }
+        break;
+      case IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_SPARSE:
+        if (!allocation_plan.allocator) {
+          status = iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "Vulkan queue_alloca sparse strategy requires an allocator");
+        } else if (!iree_all_bits_set(queue->queue_flags,
+                                      VK_QUEUE_SPARSE_BINDING_BIT)) {
+          status = iree_make_status(
+              IREE_STATUS_FAILED_PRECONDITION,
+              "Vulkan queue family %u does not support sparse binding",
+              queue->queue_family_index);
+        }
+        break;
+      case IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_NONE:
+      default:
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "unrecognized Vulkan queue_alloca strategy "
+                                  "%u",
+                                  (uint32_t)allocation_plan.strategy);
+        break;
+    }
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
@@ -2973,7 +3103,9 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
   if (iree_status_is_ok(status)) {
     submission->alloca.buffer = buffer;
     iree_hal_buffer_retain(buffer);
-    submission->alloca.pool = pool;
+    submission->alloca.strategy = allocation_plan.strategy;
+    submission->alloca.allocator = allocation_plan.allocator;
+    submission->alloca.pool = allocation_plan.pool;
     submission->alloca.params = params;
     submission->alloca.allocation_size = allocation_size;
     submission->alloca.flags = flags;

@@ -1148,13 +1148,26 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_alloca(
   iree_hal_vulkan_queue_t* queue = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
       device, queue_affinity, &queue));
+  const iree_hal_queue_affinity_t allocation_queue_affinity =
+      queue->queue_affinity;
 
-  iree_hal_pool_t* allocation_pool = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_select_queue_pool(
+  iree_hal_vulkan_queue_alloca_plan_t allocation_plan;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_select_queue_alloca_plan(
       device->device_allocator, pool, &params, &allocation_size,
-      &allocation_pool));
+      &allocation_plan));
+  params.queue_affinity = allocation_queue_affinity;
+  if (allocation_plan.strategy ==
+          IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_SPARSE &&
+      !iree_all_bits_set(queue->queue_flags, VK_QUEUE_SPARSE_BINDING_BIT)) {
+    if (!device->sparse_binding_queue_lane) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "Vulkan sparse queue_alloca requires a sparse-binding queue");
+    }
+    queue = device->sparse_binding_queue_lane;
+  }
   return iree_hal_vulkan_queue_submit_alloca(
-      queue, wait_semaphore_list, signal_semaphore_list, allocation_pool,
+      queue, wait_semaphore_list, signal_semaphore_list, allocation_plan,
       params, allocation_size, byte_length, flags, out_buffer);
 }
 

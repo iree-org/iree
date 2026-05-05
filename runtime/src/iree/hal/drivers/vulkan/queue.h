@@ -15,6 +15,7 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/vulkan/allocator.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 #include "iree/hal/local/profile.h"
@@ -212,9 +213,9 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
-    iree_device_size_t allocation_size, iree_device_size_t byte_length,
-    iree_hal_alloca_flags_t flags,
+    iree_hal_vulkan_queue_alloca_plan_t allocation_plan,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
 // Submits a queue-ordered transient deallocation.

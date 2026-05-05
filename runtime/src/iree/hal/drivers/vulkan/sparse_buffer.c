@@ -188,6 +188,14 @@ static void iree_hal_vulkan_sparse_buffer_free_physical_blocks(
   }
 }
 
+static void iree_hal_vulkan_sparse_buffer_free_unowned_handle(
+    iree_hal_vulkan_sparse_buffer_t* buffer) {
+  iree_hal_vulkan_sparse_buffer_free_physical_blocks(
+      &buffer->syms, buffer->logical_device, buffer->physical_block_count,
+      buffer->physical_blocks);
+  iree_allocator_free(buffer->host_allocator, buffer);
+}
+
 iree_status_t iree_hal_vulkan_sparse_buffer_bind_sync(
     iree_hal_vulkan_queue_t* sparse_binding_queue,
     iree_hal_buffer_placement_t placement, VkBuffer handle,
@@ -272,6 +280,90 @@ static VkDeviceAddress iree_hal_vulkan_sparse_buffer_query_device_address(
   };
   return iree_vkGetBufferDeviceAddress(IREE_VULKAN_DEVICE(syms), logical_device,
                                        &address_info);
+}
+
+iree_status_t iree_hal_vulkan_sparse_buffer_create_pending_bind(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, VkBuffer handle,
+    VkMemoryRequirements memory_requirements, uint32_t memory_type_index,
+    VkDeviceSize max_allocation_size,
+    VkMemoryAllocateFlags memory_allocate_flags,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer,
+    iree_host_size_t* out_bind_count, VkSparseMemoryBind** out_binds) {
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(placement.device);
+  IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_ASSERT_ARGUMENT(out_bind_count);
+  IREE_ASSERT_ARGUMENT(out_binds);
+  *out_buffer = NULL;
+  *out_bind_count = 0;
+  *out_binds = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+
+  VkDeviceSize physical_block_size = 0;
+  iree_host_size_t physical_block_count = 0;
+  iree_status_t status = iree_hal_vulkan_sparse_buffer_calculate_block_size(
+      memory_requirements, max_allocation_size, &physical_block_size,
+      &physical_block_count);
+
+  iree_host_size_t total_size = 0;
+  if (iree_status_is_ok(status) &&
+      !iree_host_size_checked_mul_add(sizeof(iree_hal_vulkan_sparse_buffer_t),
+                                      physical_block_count,
+                                      sizeof(VkDeviceMemory), &total_size)) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan sparse buffer physical block table overflows host storage");
+  }
+
+  iree_hal_vulkan_sparse_buffer_t* buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_sparse_buffer_allocate_bind_array(
+        physical_block_count, host_allocator, out_binds);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    memset(buffer, 0, total_size);
+    iree_hal_buffer_initialize(
+        placement, &buffer->base, allocation_size,
+        /*byte_offset=*/0, byte_length, memory_type, allowed_access,
+        allowed_usage, &iree_hal_vulkan_sparse_buffer_vtable, &buffer->base);
+    buffer->host_allocator = host_allocator;
+    buffer->syms = *syms;
+    buffer->logical_device = logical_device;
+    buffer->handle = handle;
+    buffer->flags = IREE_HAL_VULKAN_SPARSE_BUFFER_FLAG_NONE;
+    buffer->memory_requirements = memory_requirements;
+    buffer->physical_block_count = physical_block_count;
+
+    status = iree_hal_vulkan_sparse_buffer_allocate_physical_blocks(
+        &buffer->syms, buffer->logical_device, memory_requirements,
+        memory_type_index, physical_block_size, physical_block_count,
+        memory_allocate_flags, buffer->physical_blocks, *out_binds);
+  }
+  if (iree_status_is_ok(status)) {
+    buffer->device_address = iree_hal_vulkan_sparse_buffer_query_device_address(
+        &buffer->syms, buffer->logical_device, buffer->handle);
+    *out_buffer = &buffer->base;
+    *out_bind_count = physical_block_count;
+  } else {
+    iree_allocator_free(host_allocator, *out_binds);
+    *out_binds = NULL;
+    if (buffer) {
+      iree_hal_vulkan_sparse_buffer_free_unowned_handle(buffer);
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(

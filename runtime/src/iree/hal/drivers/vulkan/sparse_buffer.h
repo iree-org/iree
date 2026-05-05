@@ -44,6 +44,24 @@ iree_status_t iree_hal_vulkan_sparse_buffer_create_bound_sync(
     VkMemoryAllocateFlags memory_allocate_flags,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
+// Creates a fully-resident sparse Vulkan buffer without submitting binds.
+//
+// The returned HAL buffer owns |handle| and all VkDeviceMemory blocks. The
+// buffer is not usable until |out_binds| are submitted with vkQueueBindSparse.
+// Queue implementations use this to make sparse binding the queue_alloca epoch
+// instead of synchronously waiting in the allocator.
+iree_status_t iree_hal_vulkan_sparse_buffer_create_pending_bind(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, VkBuffer handle,
+    VkMemoryRequirements memory_requirements, uint32_t memory_type_index,
+    VkDeviceSize max_allocation_size,
+    VkMemoryAllocateFlags memory_allocate_flags,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer,
+    iree_host_size_t* out_bind_count, VkSparseMemoryBind** out_binds);
+
 // Creates an unbound sparse Vulkan buffer representing a virtual address range.
 //
 // The returned HAL buffer owns |handle| but no physical VkDeviceMemory. Callers

@@ -1350,21 +1350,49 @@ static iree_hal_pool_t* iree_hal_vulkan_allocator_select_default_pool(
   return selected_pool;
 }
 
-iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
+iree_status_t iree_hal_vulkan_allocator_select_queue_alloca_plan(
     iree_hal_allocator_t* base_allocator, iree_hal_pool_t* requested_pool,
     iree_hal_buffer_params_t* params, iree_device_size_t* allocation_size,
-    iree_hal_pool_t** out_pool) {
+    iree_hal_vulkan_queue_alloca_plan_t* out_plan) {
   IREE_ASSERT_ARGUMENT(base_allocator);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(allocation_size);
-  IREE_ASSERT_ARGUMENT(out_pool);
-  *out_pool = NULL;
+  IREE_ASSERT_ARGUMENT(out_plan);
+  *out_plan = (iree_hal_vulkan_queue_alloca_plan_t){
+      .strategy = IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_NONE,
+  };
   iree_hal_vulkan_allocator_t* allocator =
       iree_hal_vulkan_allocator_cast(base_allocator);
 
   iree_hal_buffer_params_canonicalize(params);
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_allocator_align_allocation_size(allocation_size));
+
+  if (requested_pool) {
+    iree_hal_pool_capabilities_t capabilities;
+    iree_hal_pool_query_capabilities(requested_pool, &capabilities);
+    if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
+      params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+      params->type |= capabilities.memory_type;
+    }
+
+    iree_hal_vulkan_allocator_memory_placement_t memory_placement;
+    if (!iree_hal_vulkan_allocator_resolve_memory_placement(
+            allocator, UINT32_MAX, params, &memory_placement)) {
+      return iree_hal_vulkan_allocator_make_buffer_params_status(params);
+    }
+    if (!iree_hal_vulkan_allocator_pool_matches(requested_pool, *params,
+                                                *allocation_size)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "requested Vulkan queue allocation pool cannot satisfy allocation of "
+          "%" PRIu64 " bytes",
+          (uint64_t)*allocation_size);
+    }
+    out_plan->strategy = IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_POOL;
+    out_plan->pool = requested_pool;
+    return iree_ok_status();
+  }
 
   iree_hal_vulkan_allocator_memory_placement_t memory_placement;
   if (!iree_hal_vulkan_allocator_resolve_memory_placement(
@@ -1375,44 +1403,143 @@ iree_status_t iree_hal_vulkan_allocator_select_queue_pool(
       iree_hal_vulkan_allocator_max_allocation_size_for_type(
           allocator, memory_placement.memory_type_index);
   if (*allocation_size > max_allocation_size) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan queue_alloca allocation size %" PRIu64
-        " exceeds per-memory-type max allocation size %" PRIu64
-        "; queue-ordered sparse binding is required",
-        (uint64_t)*allocation_size, (uint64_t)max_allocation_size);
-  }
-
-  if (requested_pool) {
-    iree_hal_pool_capabilities_t capabilities;
-    iree_hal_pool_query_capabilities(requested_pool, &capabilities);
-    if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
-      params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
-      params->type |= capabilities.memory_type;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+        allocator, *allocation_size, max_allocation_size, params));
+    if (!iree_hal_vulkan_allocator_resolve_memory_placement(
+            allocator, UINT32_MAX, params, &memory_placement)) {
+      return iree_hal_vulkan_allocator_make_buffer_params_status(params);
     }
-    if (!iree_hal_vulkan_allocator_pool_matches(requested_pool, *params,
-                                                *allocation_size)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "requested Vulkan queue allocation pool cannot satisfy allocation of "
-          "%" PRIu64 " bytes",
-          (uint64_t)*allocation_size);
-    }
-    *out_pool = requested_pool;
-    return iree_ok_status();
+    max_allocation_size =
+        iree_hal_vulkan_allocator_max_allocation_size_for_type(
+            allocator, memory_placement.memory_type_index);
   }
 
   iree_hal_pool_t* selected_pool =
       iree_hal_vulkan_allocator_select_default_pool(allocator, *params,
                                                     *allocation_size);
-  if (!selected_pool) {
-    return iree_make_status(
-        IREE_STATUS_NOT_FOUND,
-        "no Vulkan queue allocation pool can satisfy allocation of %" PRIu64
-        " bytes",
-        (uint64_t)*allocation_size);
+  if (selected_pool) {
+    out_plan->strategy = IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_POOL;
+    out_plan->pool = selected_pool;
+    return iree_ok_status();
   }
-  *out_pool = selected_pool;
+
+  if (*allocation_size > max_allocation_size) {
+    out_plan->strategy = IREE_HAL_VULKAN_QUEUE_ALLOCA_STRATEGY_SPARSE;
+    out_plan->allocator = base_allocator;
+    return iree_ok_status();
+  }
+
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "no Vulkan queue allocation pool can satisfy allocation of %" PRIu64
+      " bytes",
+      (uint64_t)*allocation_size);
+}
+
+iree_status_t iree_hal_vulkan_allocator_allocate_queue_sparse_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_placement_t placement,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer, iree_host_size_t* out_bind_count,
+    VkSparseMemoryBind** out_binds) {
+  IREE_ASSERT_ARGUMENT(base_allocator);
+  IREE_ASSERT_ARGUMENT(placement.device);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_ASSERT_ARGUMENT(out_bind_count);
+  IREE_ASSERT_ARGUMENT(out_binds);
+  *out_buffer = NULL;
+  *out_bind_count = 0;
+  *out_binds = NULL;
+  iree_hal_vulkan_allocator_t* allocator =
+      iree_hal_vulkan_allocator_cast(base_allocator);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
+
+  iree_status_t status =
+      iree_hal_vulkan_allocator_align_allocation_size(&allocation_size);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+        allocator, allocation_size,
+        allocator->properties11.maxMemoryAllocationSize, &params);
+  }
+
+  iree_hal_vulkan_allocator_memory_placement_t memory_placement;
+  if (iree_status_is_ok(status) &&
+      !iree_hal_vulkan_allocator_resolve_memory_placement(
+          allocator, UINT32_MAX, &params, &memory_placement)) {
+    status = iree_hal_vulkan_allocator_make_buffer_params_status(&params);
+  }
+
+  VkBuffer handle = VK_NULL_HANDLE;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_allocator_create_buffer_handle(
+        allocator, &params, allocation_size,
+        VK_BUFFER_CREATE_SPARSE_BINDING_BIT,
+        /*create_info_pnext=*/NULL, &handle);
+  }
+
+  VkMemoryRequirements memory_requirements = {0};
+  if (iree_status_is_ok(status)) {
+    iree_vkGetBufferMemoryRequirements(IREE_VULKAN_DEVICE(&allocator->syms),
+                                       allocator->logical_device, handle,
+                                       &memory_requirements);
+  }
+  if (iree_status_is_ok(status) &&
+      !iree_hal_vulkan_allocator_resolve_memory_placement(
+          allocator, memory_requirements.memoryTypeBits, &params,
+          &memory_placement)) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "allocator cannot find a Vulkan memory type "
+                              "compatible with sparse buffer usage");
+  }
+
+  iree_device_size_t max_allocation_size = 0;
+  if (iree_status_is_ok(status)) {
+    max_allocation_size =
+        iree_hal_vulkan_allocator_max_allocation_size_for_type(
+            allocator, memory_placement.memory_type_index);
+  }
+
+  iree_hal_buffer_t* buffer = NULL;
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+  VkBuffer trace_handle = VK_NULL_HANDLE;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_sparse_buffer_create_pending_bind(
+        &allocator->syms, allocator->logical_device, placement,
+        memory_placement.memory_type, params.access, params.usage,
+        allocation_size, byte_length, handle, memory_requirements,
+        memory_placement.memory_type_index, max_allocation_size,
+        iree_hal_vulkan_allocator_memory_allocate_flags(allocator,
+                                                        params.usage),
+        host_allocator, &buffer, out_bind_count, out_binds);
+    if (iree_status_is_ok(status)) {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+      trace_handle = handle;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+      handle = VK_NULL_HANDLE;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_VULKAN_ALLOCATOR_ID, (void*)trace_handle,
+                           (iree_host_size_t)allocation_size);
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+    iree_allocator_free(host_allocator, *out_binds);
+    *out_binds = NULL;
+    *out_bind_count = 0;
+    if (handle) {
+      iree_vkDestroyBuffer(IREE_VULKAN_DEVICE(&allocator->syms),
+                           allocator->logical_device, handle,
+                           /*pAllocator=*/NULL);
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
