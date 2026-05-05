@@ -769,6 +769,12 @@ static iree_status_t iree_hal_vulkan_unimplemented(
                           (int)operation.size, operation.data);
 }
 
+// Power-of-two capacity for logical-device memory lifecycle event buffering.
+#define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_MEMORY_EVENT_CAPACITY (64 * 1024)
+
+// Power-of-two capacity for logical-device queue operation event buffering.
+#define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY (64 * 1024)
+
 static bool iree_hal_vulkan_logical_device_query_pool_epoch(
     void* user_data, iree_async_axis_t axis, uint64_t epoch) {
   iree_hal_vulkan_logical_device_t* device =
@@ -780,6 +786,27 @@ static bool iree_hal_vulkan_logical_device_query_pool_epoch(
 static uint32_t iree_hal_vulkan_logical_device_profile_count(
     iree_host_size_t value) {
   return value > UINT32_MAX ? UINT32_MAX : (uint32_t)value;
+}
+
+static iree_hal_device_profiling_data_families_t
+iree_hal_vulkan_logical_device_lightweight_statistics_data_families(void) {
+  return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
+}
+
+static iree_hal_device_profiling_options_t
+iree_hal_vulkan_logical_device_resolve_profiling_options(
+    const iree_hal_device_profiling_options_t* options) {
+  iree_hal_device_profiling_options_t resolved_options = *options;
+  if (resolved_options.data_families == IREE_HAL_DEVICE_PROFILING_DATA_NONE &&
+      iree_hal_device_profiling_options_requests_lightweight_statistics(
+          options)) {
+    resolved_options.data_families =
+        iree_hal_vulkan_logical_device_lightweight_statistics_data_families();
+  }
+  resolved_options.flags &=
+      ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  return resolved_options;
 }
 
 static iree_hal_local_profile_queue_scope_t
@@ -1413,17 +1440,13 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "cannot nest Vulkan profile captures");
   }
-  if (iree_hal_device_profiling_options_requests_lightweight_statistics(
-          options)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan lightweight statistics require host execution and executable "
-        "metadata profiling");
-  }
+  const iree_hal_device_profiling_options_t resolved_options =
+      iree_hal_vulkan_logical_device_resolve_profiling_options(options);
   const iree_hal_device_profiling_data_families_t supported_data_families =
-      IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS;
+      IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+      IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
   const iree_hal_device_profiling_data_families_t unsupported_data_families =
-      options->data_families & ~supported_data_families;
+      resolved_options.data_families & ~supported_data_families;
   if (unsupported_data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
@@ -1466,10 +1489,14 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       .device_records = &device_record,
       .queue_record_count = device->queue_lane_count,
       .queue_records = queue_records,
+      .queue_event_capacity =
+          IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY,
+      .memory_event_capacity =
+          IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_MEMORY_EVENT_CAPACITY,
   };
   iree_hal_local_profile_recorder_t* recorder = NULL;
   iree_status_t status = iree_hal_local_profile_recorder_create(
-      &recorder_options, options, device->host_allocator, &recorder);
+      &recorder_options, &resolved_options, device->host_allocator, &recorder);
   iree_allocator_free(device->host_allocator, queue_records);
   if (!iree_status_is_ok(status) || !recorder) return status;
 

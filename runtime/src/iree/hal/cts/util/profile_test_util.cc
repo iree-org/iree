@@ -306,6 +306,35 @@ static iree_status_t TestProfileSinkWrite(
     ++test_sink->host_execution_event_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_memory_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_memory_event_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_memory_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_memory_event_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0u, records[i].allocation_id);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      if (iree_all_bits_set(
+              records[i].flags,
+              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION)) {
+        EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+        EXPECT_NE(0u, records[i].submission_id);
+      }
+    }
+    test_sink->memory_events.insert(test_sink->memory_events.end(), records,
+                                    records + record_count);
+    ++test_sink->memory_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
     EXPECT_TRUE(test_sink->saw_device_metadata);
     EXPECT_TRUE(test_sink->saw_queue_metadata);

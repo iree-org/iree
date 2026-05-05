@@ -72,6 +72,9 @@ struct TestProfileSink {
   // Number of host execution event chunks observed.
   int host_execution_event_count = 0;
 
+  // Number of memory event chunks observed.
+  int memory_event_count = 0;
+
   // Number of queue device event chunks observed.
   int queue_device_event_count = 0;
 
@@ -89,6 +92,9 @@ struct TestProfileSink {
 
   // Host execution event records copied from HOST_EXECUTION_EVENTS chunks.
   std::vector<iree_hal_profile_host_execution_event_t> host_execution_events;
+
+  // Memory event records copied from MEMORY_EVENTS chunks.
+  std::vector<iree_hal_profile_memory_event_t> memory_events;
 
   // Queue device event records copied from QUEUE_DEVICE_EVENTS chunks.
   std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;

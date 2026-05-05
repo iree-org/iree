@@ -80,6 +80,98 @@ TEST_P(VulkanProfilingTest, QueueEventsRecordNativeTransferSubmissions) {
   EXPECT_GE(copy_it->ready_host_time_ns, copy_it->host_time_ns);
 }
 
+TEST_P(VulkanProfilingTest,
+       LightweightStatisticsRecordQueueAllocaMemoryEvents) {
+  constexpr iree_device_size_t kBufferSize = 1024;
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+
+  iree_hal_device_profiling_options_t options = {0};
+  options.flags = IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
+  options.sink = TestProfileSinkAsBase(&sink);
+
+  DeviceProfilingScope profiling(device_);
+  IREE_ASSERT_OK(profiling.Begin(&options));
+
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+
+  Ref<iree_hal_buffer_t> buffer;
+  SemaphoreList empty_wait;
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  iree_hal_buffer_t* raw_buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
+      /*pool=*/NULL, params, kBufferSize, IREE_HAL_ALLOCA_FLAG_NONE,
+      &raw_buffer));
+  buffer.reset(raw_buffer);
+
+  SemaphoreList dealloca_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
+      buffer.get(), IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dealloca_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_GE(sink.queue_event_count, 1);
+  EXPECT_GE(sink.memory_event_count, 1);
+  EXPECT_EQ(0, sink.host_execution_event_count);
+  EXPECT_EQ(0, sink.dispatch_event_count);
+  EXPECT_EQ(0, sink.queue_device_event_count);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+
+  auto find_queue_event = [&](iree_hal_profile_queue_event_type_t type) {
+    return std::find_if(sink.queue_events.begin(), sink.queue_events.end(),
+                        [type](const iree_hal_profile_queue_event_t& event) {
+                          return event.type == type;
+                        });
+  };
+  auto find_memory_event = [&](iree_hal_profile_memory_event_type_t type) {
+    return std::find_if(sink.memory_events.begin(), sink.memory_events.end(),
+                        [type](const iree_hal_profile_memory_event_t& event) {
+                          return event.type == type;
+                        });
+  };
+
+  auto queue_alloca_it =
+      find_queue_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_ALLOCA);
+  ASSERT_NE(sink.queue_events.end(), queue_alloca_it);
+  EXPECT_EQ(kBufferSize, queue_alloca_it->payload_length);
+  EXPECT_NE(0u, queue_alloca_it->allocation_id);
+
+  auto queue_dealloca_it =
+      find_queue_event(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DEALLOCA);
+  ASSERT_NE(sink.queue_events.end(), queue_dealloca_it);
+  EXPECT_EQ(queue_alloca_it->allocation_id, queue_dealloca_it->allocation_id);
+
+  auto memory_alloca_it =
+      find_memory_event(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_ALLOCA);
+  ASSERT_NE(sink.memory_events.end(), memory_alloca_it);
+  EXPECT_EQ(queue_alloca_it->allocation_id, memory_alloca_it->allocation_id);
+  EXPECT_EQ(kBufferSize, memory_alloca_it->length);
+  EXPECT_NE(0u, memory_alloca_it->submission_id);
+
+  auto memory_dealloca_it =
+      find_memory_event(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_QUEUE_DEALLOCA);
+  ASSERT_NE(sink.memory_events.end(), memory_dealloca_it);
+  EXPECT_EQ(queue_alloca_it->allocation_id, memory_dealloca_it->allocation_id);
+  EXPECT_EQ(kBufferSize, memory_dealloca_it->length);
+  EXPECT_NE(0u, memory_dealloca_it->submission_id);
+}
+
 CTS_REGISTER_TEST_SUITE(VulkanProfilingTest);
 
 }  // namespace iree::hal::cts
