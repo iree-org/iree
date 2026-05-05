@@ -314,10 +314,16 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
       if (wMask != rMask) {
         return failure();
       }
+      // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
+      // types with vector element types (see `verifyTransferOp` in upstream MLIR
+      // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
+      // never has a vector type. But for sanity add an assert in case things
+      // change upstream.
       Value rPad = op.getPadding();
       assert(!isa<VectorType>(rPad.getType()) &&
              "search `NOTE[FoldMaskedTransferRAW]` in "
              "GenericVectorization.cpp::FoldTransferRAW for information");
+
       auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
                                                 valToStore.getType(), rPad);
       rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore,
