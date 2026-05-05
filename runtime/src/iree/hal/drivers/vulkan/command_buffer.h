@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
+#include "iree/hal/local/profile.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +39,11 @@ bool iree_hal_vulkan_command_buffer_has_host_commands(
 // Returns true if |command_buffer| contains Vulkan-native commands.
 bool iree_hal_vulkan_command_buffer_has_native_commands(
     iree_hal_command_buffer_t* command_buffer);
+
+// Emits executable/export metadata referenced by recorded dispatch commands.
+iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder);
 
 // Replays a recorded Vulkan command buffer using host-mediated operations.
 iree_status_t iree_hal_vulkan_command_buffer_replay_host(

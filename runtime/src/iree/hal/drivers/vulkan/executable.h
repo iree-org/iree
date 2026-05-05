@@ -91,6 +91,10 @@ iree_status_t iree_hal_vulkan_executable_create(
 // Returns true if |executable| is a Vulkan executable.
 bool iree_hal_vulkan_executable_isa(iree_hal_executable_t* executable);
 
+// Returns the process-local nonzero profiling identifier for |executable|.
+uint64_t iree_hal_vulkan_executable_profile_id(
+    iree_hal_executable_t* executable);
+
 // Returns the native pipeline metadata for |export_ordinal|.
 iree_status_t iree_hal_vulkan_executable_lookup_pipeline(
     iree_hal_executable_t* executable,

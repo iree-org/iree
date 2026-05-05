@@ -362,7 +362,17 @@ bool iree_hal_local_profile_recorder_is_enabled(
     const iree_hal_local_profile_recorder_t* recorder,
     iree_hal_device_profiling_data_families_t data_families);
 
-// Emits executable/export metadata for |executable| once per recorder session.
+// Emits executable/export metadata for |executable_id| once per recorder
+// session.
+//
+// |executable_id| must be a producer-defined nonzero identifier that remains
+// stable for the lifetime of |executable|. This helper is for non-local HAL
+// executables that cannot use iree_hal_local_executable_t as their base type.
+iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_executable_t* executable, uint64_t executable_id);
+
+// Emits local executable/export metadata once per recorder session.
 //
 // Returns OK without work when executable metadata is not enabled. This is a
 // cold-path helper for queue submission/replay sites that produce events with

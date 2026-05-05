@@ -184,6 +184,7 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":backends",
+        ":testdata_vulkan_spirv_lib",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:profile_test_util",

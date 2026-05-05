@@ -691,18 +691,19 @@ static iree_status_t iree_hal_local_profile_recorder_write_span(
                                      &span);
 }
 
-iree_status_t iree_hal_local_profile_recorder_record_executable(
+iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
     iree_hal_local_profile_recorder_t* recorder,
-    iree_hal_executable_t* executable) {
+    iree_hal_executable_t* executable, uint64_t executable_id) {
   if (!iree_hal_local_profile_recorder_is_enabled(
           recorder, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
     return iree_ok_status();
   }
+  if (IREE_UNLIKELY(executable_id == 0)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "local profiling executable metadata requires a nonzero id");
+  }
 
-  iree_hal_local_executable_t* local_executable =
-      iree_hal_local_executable_cast(executable);
-  const uint64_t executable_id =
-      iree_hal_local_executable_profile_id(local_executable);
   if (iree_hal_local_profile_recorder_has_emitted_id(
           recorder, &recorder->emitted.executables, executable_id)) {
     return iree_ok_status();
@@ -753,6 +754,20 @@ iree_status_t iree_hal_local_profile_recorder_record_executable(
   }
   iree_allocator_free(recorder->host_allocator, export_data);
   return status;
+}
+
+iree_status_t iree_hal_local_profile_recorder_record_executable(
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_executable_t* executable) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          recorder, IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
+    return iree_ok_status();
+  }
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  return iree_hal_local_profile_recorder_record_executable_with_id(
+      recorder, executable,
+      iree_hal_local_executable_profile_id(local_executable));
 }
 
 iree_status_t iree_hal_local_profile_recorder_record_command_buffer(

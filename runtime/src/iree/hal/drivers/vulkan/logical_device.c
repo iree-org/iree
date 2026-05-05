@@ -791,6 +791,7 @@ static uint32_t iree_hal_vulkan_logical_device_profile_count(
 static iree_hal_device_profiling_data_families_t
 iree_hal_vulkan_logical_device_lightweight_statistics_data_families(void) {
   return IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+         IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
          IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
 }
 
@@ -1444,6 +1445,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       iree_hal_vulkan_logical_device_resolve_profiling_options(options);
   const iree_hal_device_profiling_data_families_t supported_data_families =
       IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+      IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
       IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
   const iree_hal_device_profiling_data_families_t unsupported_data_families =
       resolved_options.data_families & ~supported_data_families;

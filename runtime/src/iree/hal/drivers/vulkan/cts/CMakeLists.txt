@@ -165,6 +165,7 @@ iree_cc_test(
     iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
+    ::testdata_vulkan_spirv_lib
     iree::base::tooling::flags
     iree::hal
     iree::hal::cts::util::profile_test_util

@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/base/internal/atomics.h"
 #include "iree/base/internal/flatcc/parsing.h"
 #include "iree/hal/utils/executable_debug_info.h"
 #include "iree/hal/utils/executable_header.h"
@@ -948,6 +949,9 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
 // iree_hal_vulkan_executable_t
 //===----------------------------------------------------------------------===//
 
+static iree_atomic_int64_t iree_hal_vulkan_executable_next_profile_id =
+    IREE_ATOMIC_VAR_INIT(1);
+
 typedef struct iree_hal_vulkan_executable_t {
   // HAL resource header.
   iree_hal_resource_t resource;
@@ -960,6 +964,9 @@ typedef struct iree_hal_vulkan_executable_t {
 
   // Borrowed logical-device handle.
   VkDevice logical_device;
+
+  // Process-local nonzero executable identifier used by profiling sessions.
+  uint64_t profile_id;
 
   // Number of descriptor set layouts in |descriptor_set_layouts|.
   iree_host_size_t descriptor_set_layout_count;
@@ -996,6 +1003,13 @@ bool iree_hal_vulkan_executable_isa(iree_hal_executable_t* executable) {
                               &iree_hal_vulkan_executable_vtable);
 }
 
+uint64_t iree_hal_vulkan_executable_profile_id(
+    iree_hal_executable_t* executable) {
+  iree_hal_vulkan_executable_t* vulkan_executable =
+      iree_hal_vulkan_executable_cast(executable);
+  return vulkan_executable->profile_id;
+}
+
 static iree_status_t iree_hal_vulkan_allocate_executable(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     iree_host_size_t descriptor_set_layout_count,
@@ -1013,6 +1027,9 @@ static iree_status_t iree_hal_vulkan_allocate_executable(
   executable->host_allocator = host_allocator;
   executable->syms = syms;
   executable->logical_device = logical_device;
+  executable->profile_id = (uint64_t)iree_atomic_fetch_add(
+      &iree_hal_vulkan_executable_next_profile_id, 1,
+      iree_memory_order_relaxed);
   executable->descriptor_set_layout_count = descriptor_set_layout_count;
   executable->pipeline_layout_count = pipeline_layout_count;
   executable->pipeline_count = pipeline_count;

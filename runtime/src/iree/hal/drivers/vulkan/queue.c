@@ -4240,8 +4240,12 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         .count = submission->execute.binding_table_count,
         .bindings = submission->execute.binding_table_bindings,
     };
-    status = iree_hal_vulkan_queue_prepare_native_execute_submission(
-        queue, submission, captured_binding_table);
+    status = iree_hal_vulkan_command_buffer_record_profile_metadata(
+        command_buffer, queue->profile_recorder);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_queue_prepare_native_execute_submission(
+          queue, submission, captured_binding_table);
+    }
   }
   if (iree_status_is_ok(status)) {
     status =

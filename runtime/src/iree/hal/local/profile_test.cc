@@ -515,6 +515,30 @@ TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataOnce) {
   iree_hal_local_executable_deinitialize(&executable.base);
 }
 
+TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataWithExplicitId) {
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA));
+
+  FakeLocalExecutable executable;
+  iree_hal_local_executable_initialize(
+      &kFakeLocalExecutableVTable, iree_allocator_system(), &executable.base);
+  iree_hal_executable_t* base_executable =
+      reinterpret_cast<iree_hal_executable_t*>(&executable.base);
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_record_executable_with_id(
+      recorder_, base_executable, 42));
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_record_executable_with_id(
+      recorder_, base_executable, 42));
+
+  ASSERT_EQ(1u, sink_.executable_records.size());
+  ASSERT_EQ(2u, sink_.executable_export_records.size());
+  EXPECT_EQ(42u, sink_.executable_records[0].executable_id);
+  EXPECT_EQ(42u, sink_.executable_export_records[0].executable_id);
+  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+
+  iree_hal_local_executable_deinitialize(&executable.base);
+}
+
 TEST_F(LocalProfileRecorderTest, HostExecutionEnablesExecutableMetadata) {
   IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS));
   EXPECT_TRUE(iree_hal_local_profile_recorder_is_enabled(

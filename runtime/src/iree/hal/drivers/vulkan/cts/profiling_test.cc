@@ -6,13 +6,34 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <vector>
 
 #include "iree/hal/cts/util/profile_test_util.h"
 #include "iree/hal/cts/util/test_base.h"
 
 namespace iree::hal::cts {
 
-class VulkanProfilingTest : public CtsTestBase<> {};
+class VulkanProfilingTest : public CtsTestBase<> {
+ protected:
+  iree_status_t CreateScaleAndOffsetExecutable(
+      Ref<iree_hal_executable_cache_t>& executable_cache,
+      Ref<iree_hal_executable_t>& executable) {
+    IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
+        device_, iree_make_cstring_view("default"), executable_cache.out()));
+
+    iree_hal_executable_params_t executable_params;
+    iree_hal_executable_params_initialize(&executable_params);
+    executable_params.caching_mode =
+        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+    executable_params.executable_format =
+        iree_make_cstring_view(executable_format());
+    executable_params.executable_data = executable_data(iree_make_cstring_view(
+        "command_buffer_dispatch_constants_bindings_test.bin"));
+
+    return iree_hal_executable_cache_prepare_executable(
+        executable_cache.get(), &executable_params, executable.out());
+  }
+};
 
 TEST_P(VulkanProfilingTest, QueueEventsRecordNativeTransferSubmissions) {
   constexpr iree_device_size_t kBufferSize = 128;
@@ -172,6 +193,83 @@ TEST_P(VulkanProfilingTest,
   EXPECT_NE(0u, memory_dealloca_it->submission_id);
 }
 
-CTS_REGISTER_TEST_SUITE(VulkanProfilingTest);
+TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
+  Ref<iree_hal_executable_cache_t> executable_cache;
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(CreateScaleAndOffsetExecutable(executable_cache, executable));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  {
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
+  }
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), output_buffer.out()));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_buffer_ref(input_buffer.get(), /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer.get())),
+      iree_hal_make_buffer_ref(
+          output_buffer.get(), /*offset=*/0,
+          iree_hal_buffer_byte_length(output_buffer.get())),
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      .count = IREE_ARRAYSIZE(binding_refs),
+      .values = binding_refs,
+  };
+
+  const uint32_t constant_data[] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_data, sizeof(constant_data));
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+
+  DeviceProfilingScope profiling(device_);
+  IREE_ASSERT_OK(
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA,
+                      TestProfileSinkAsBase(&sink)));
+
+  SemaphoreList empty_wait;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+      executable.get(), /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+  ASSERT_EQ(4u, output_data.size());
+  EXPECT_EQ(13u, output_data[0]);
+  EXPECT_EQ(16u, output_data[1]);
+  EXPECT_EQ(19u, output_data[2]);
+  EXPECT_EQ(22u, output_data[3]);
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.device_metadata_count);
+  EXPECT_EQ(1, sink.queue_metadata_count);
+  EXPECT_EQ(1, sink.executable_metadata_count);
+  EXPECT_EQ(1, sink.executable_export_metadata_count);
+  EXPECT_EQ(0, sink.queue_event_count);
+  EXPECT_EQ(0, sink.memory_event_count);
+  EXPECT_FALSE(sink.executable_ids.empty());
+  EXPECT_FALSE(sink.export_record_executable_ids.empty());
+  EXPECT_EQ(sink.executable_ids[0], sink.export_record_executable_ids[0]);
+  EXPECT_TRUE(sink.saw_device_metadata);
+  EXPECT_TRUE(sink.saw_queue_metadata);
+  EXPECT_FALSE(sink.write_after_end);
+}
+
+CTS_REGISTER_EXECUTABLE_TEST_SUITE(VulkanProfilingTest);
 
 }  // namespace iree::hal::cts

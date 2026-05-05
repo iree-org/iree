@@ -458,6 +458,34 @@ bool iree_hal_vulkan_command_buffer_has_native_commands(
   return command_buffer->has_native_commands;
 }
 
+iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  if (command_buffer->state != IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_ENDED) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan command buffer profile metadata requires ended state");
+  }
+  for (iree_host_size_t i = 0; i < command_buffer->command_count; ++i) {
+    const iree_hal_vulkan_command_t* command = &command_buffer->commands[i];
+    if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_local_profile_recorder_record_executable_with_id(
+            profile_recorder, command->dispatch.executable,
+            iree_hal_vulkan_executable_profile_id(
+                command->dispatch.executable)));
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_command_buffer_replay_host(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_binding_table_t binding_table) {
