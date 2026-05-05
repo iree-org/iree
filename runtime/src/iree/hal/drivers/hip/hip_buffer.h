@@ -42,10 +42,16 @@ iree_status_t iree_hal_hip_buffer_wrap(
 iree_hal_hip_buffer_type_t iree_hal_hip_buffer_type(
     const iree_hal_buffer_t* buffer);
 
-// Returns the HIP base pointer for the given |buffer|.
-// This is the entire allocated_buffer and must be offset by the buffer
-// byte_offset and byte_length when used.
+// Returns the HIP base pointer for the given |buffer|, waiting for async
+// allocations to commit if needed. This is the entire allocated_buffer and must
+// be offset by the buffer byte_offset and byte_length when used.
 hipDeviceptr_t iree_hal_hip_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
+// Queries the HIP base pointer for the given |buffer| without waiting for async
+// allocations to commit. This is used by graph command-buffer recording paths
+// that must capture concrete pointers immediately.
+iree_status_t iree_hal_hip_buffer_query_available_device_pointer(
+    iree_hal_buffer_t* buffer, hipDeviceptr_t* out_device_pointer);
 
 // Sets the HIP base pointer for the given |buffer|.
 // This is the entire allocated_buffer and must be offset by the buffer

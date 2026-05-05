@@ -10,10 +10,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/IndexingMapOpInterface.h"
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
@@ -284,14 +286,14 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
   return ContractionLayout{lhs, rhs, acc};
 }
 
-SmallVector<int64_t> getIterationSpaceBounds(linalg::LinalgOp linalgOp) {
-  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
-  std::optional<VectorizationTileSizes> sizes =
-      inferSizesFromIR(linalgOp, std::nullopt);
-  // Even though the opShape could be dynamic, we could potentially
-  // infer the vector shape
-  if (sizes.has_value()) {
-    bounds = sizes.value().vectorSizes;
+SmallVector<int64_t> getIterationSpaceBounds(IndexingMapOpInterface candidate) {
+  SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(candidate.getOperation())) {
+    std::optional<VectorizationTileSizes> sizes =
+        inferSizesFromIR(linalgOp, std::nullopt);
+    if (sizes.has_value()) {
+      bounds = sizes.value().vectorSizes;
+    }
   }
   return bounds;
 }
@@ -354,31 +356,24 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 }
 
 static LogicalResult setDerivedThreadConfigLayout(
-    IREE::GPU::DerivedThreadConfigAttr config, linalg::LinalgOp linalgOp,
+    IREE::GPU::DerivedThreadConfigAttr config, IndexingMapOpInterface candidate,
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
 
-  int64_t opRank = linalgOp.getNumLoops();
+  SmallVector<int64_t> opShape = getIterationSpaceBounds(candidate);
+  int64_t opRank = opShape.size();
 
   SmallVector<int64_t> elementTile = config.getStaticTilingLevelSizes(
-      static_cast<unsigned>(IREE::GPU::TilingLevel::Thread), linalgOp);
-
-  SmallVector<int64_t> opShape = linalgOp.getStaticLoopRanges();
-  std::optional<VectorizationTileSizes> sizes =
-      inferSizesFromIR(linalgOp, std::nullopt);
-  // Even though the opShape could be dynamic, we could potentially
-  // infer the vector shape
-  if (sizes.has_value()) {
-    opShape = sizes.value().vectorSizes;
-  }
+      static_cast<unsigned>(IREE::GPU::TilingLevel::Thread),
+      candidate.getOperation());
 
   for (auto [index, size, element] : llvm::enumerate(opShape, elementTile)) {
     if (ShapedType::isDynamic(size)) {
-      linalgOp->emitError() << "opShape could not be inferred";
+      candidate->emitError() << "opShape could not be inferred";
       return failure();
     }
 
     if (size % element != 0) {
-      linalgOp->emitError()
+      candidate->emitError()
           << "Operation with unsupported number of elements. "
              "Chosen vector tile sizes for operation are not "
              "divisible by operation loop ranges at dim: "
@@ -403,7 +398,8 @@ static LogicalResult setDerivedThreadConfigLayout(
     } else if (size % residualThreads == 0) {
       threadBlock = residualThreads;
     } else {
-      linalgOp->emitError() << "Operation with unsupported number of elements.";
+      candidate->emitError()
+          << "Operation with unsupported number of elements.";
       return failure();
     }
 
@@ -424,13 +420,15 @@ static LogicalResult setDerivedThreadConfigLayout(
       context, subgroupTile, opShape, outerTile, threadTile, elementTile,
       subgroupStrides, threadStrides);
 
-  Location loc = linalgOp.getLoc();
+  Location loc = candidate->getLoc();
+  auto dpsOp = cast<DestinationStyleOpInterface>(candidate.getOperation());
 
-  rewriter.setInsertionPointAfter(linalgOp);
-  for (OpResult result : linalgOp->getResults()) {
-    VectorLayoutInterface resultLayout =
-        layout.apply(linalgOp.getIndexingMapMatchingResult(result));
-    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
+  rewriter.setInsertionPointAfter(candidate.getOperation());
+  for (OpResult result : candidate->getResults()) {
+    AffineMap resultMap = candidate.getMatchingIndexingMap(
+        dpsOp.getDpsInitOperand(result.getResultNumber()));
+    auto toLayout =
+        ToLayoutOp::create(rewriter, loc, result, layout.apply(resultMap));
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 
@@ -458,16 +456,16 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
 }
 
 static LogicalResult setGPULoweringConfigLayout(
-    IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp candidate,
+    IREE::GPU::LoweringConfigAttr config, IndexingMapOpInterface candidate,
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
   MLIRContext *context = config.getContext();
-  Location loc = candidate.getLoc();
+  Location loc = candidate->getLoc();
 
   SmallVector<int64_t> bounds = getIterationSpaceBounds(candidate);
 
   // Subgroup distribution layouts.
   SmallVector<int64_t> subgroupSizes, subgroupStrides;
-  if (failed(distributeTilingSizes(candidate, config,
+  if (failed(distributeTilingSizes(candidate.getOperation(), config,
                                    IREE::GPU::TilingLevel::Subgroup, bounds,
                                    subgroupSizes, subgroupStrides))) {
     return failure();
@@ -475,7 +473,7 @@ static LogicalResult setGPULoweringConfigLayout(
 
   // Thread distribution layouts.
   SmallVector<int64_t> threadSizes, threadStrides;
-  if (failed(distributeTilingSizes(candidate, config,
+  if (failed(distributeTilingSizes(candidate.getOperation(), config,
                                    IREE::GPU::TilingLevel::Thread, bounds,
                                    threadSizes, threadStrides))) {
     return failure();
@@ -483,7 +481,8 @@ static LogicalResult setGPULoweringConfigLayout(
 
   // Use thread tile sizes as the vector width for each thread.
   SmallVector<int64_t> threadTileSizes = config.getStaticTilingLevelSizes(
-      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), candidate);
+      llvm::to_underlying(IREE::GPU::TilingLevel::Thread),
+      candidate.getOperation());
   FailureOr<SmallVector<int64_t>> elementTile =
       divideTile(bounds, threadTileSizes);
   if (failed(elementTile)) {
@@ -499,9 +498,10 @@ static LogicalResult setGPULoweringConfigLayout(
       context, subgroupSizes, batchTile, outerTile, threadSizes,
       elementTile.value(), subgroupStrides, threadStrides);
 
-  SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
+  SmallVector<bool> promotedOperands =
+      getPromotedOperands(candidate.getOperation());
 
-  rewriter.setInsertionPoint(candidate);
+  rewriter.setInsertionPoint(candidate.getOperation());
   for (OpOperand &operand : candidate->getOpOperands()) {
     VectorLayoutInterface operandLayout =
         layout.apply(candidate.getMatchingIndexingMap(&operand));
@@ -513,11 +513,13 @@ static LogicalResult setGPULoweringConfigLayout(
     operand.set(toLayout);
   }
 
-  rewriter.setInsertionPointAfter(candidate);
+  auto dpsOp = cast<DestinationStyleOpInterface>(candidate.getOperation());
+  rewriter.setInsertionPointAfter(candidate.getOperation());
   for (OpResult result : candidate->getResults()) {
-    VectorLayoutInterface resultLayout =
-        layout.apply(candidate.getIndexingMapMatchingResult(result));
-    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
+    AffineMap resultMap = candidate.getMatchingIndexingMap(
+        dpsOp.getDpsInitOperand(result.getResultNumber()));
+    auto toLayout =
+        ToLayoutOp::create(rewriter, loc, result, layout.apply(resultMap));
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 
@@ -554,27 +556,31 @@ struct LLVMGPUConfigureTensorLayoutsPass final
   LogicalResult setLayoutsFromLoweringConfig(FunctionOpInterface funcOp,
                                              ArrayRef<int64_t> workgroupSize,
                                              RewriterBase &rewriter) {
-    SmallVector<linalg::LinalgOp> candidates;
-    funcOp->walk([&](linalg::LinalgOp op) {
-      if (getLoweringConfig(op)) {
-        candidates.push_back(op);
+    SmallVector<Operation *> candidates;
+    funcOp.walk([&](Operation *op) {
+      if (!isa<linalg::LinalgOp, IREE::LinalgExt::ScanOp>(op) ||
+          !getLoweringConfig(op)) {
+        return;
       }
+      candidates.push_back(op);
     });
 
-    for (linalg::LinalgOp candidate : candidates) {
-      auto result =
+    for (Operation *candidate : candidates) {
+      auto indexingMapOp = cast<IndexingMapOpInterface>(candidate);
+      LogicalResult result =
           TypeSwitch<IREE::Codegen::LoweringConfigAttrInterface, LogicalResult>(
               getLoweringConfig(candidate))
               .Case([&](IREE::GPU::DerivedThreadConfigAttr config) {
-                return setDerivedThreadConfigLayout(config, candidate,
+                return setDerivedThreadConfigLayout(config, indexingMapOp,
                                                     workgroupSize, rewriter);
               })
               .Case([&](IREE::GPU::LoweringConfigAttr config) {
                 if (getMmaKind(config)) {
                   return setIntrinsicLoweringConfigLayout(
-                      config, candidate, workgroupSize, rewriter);
+                      config, cast<linalg::LinalgOp>(candidate), workgroupSize,
+                      rewriter);
                 }
-                return setGPULoweringConfigLayout(config, candidate,
+                return setGPULoweringConfigLayout(config, indexingMapOp,
                                                   workgroupSize, rewriter);
               })
               .Default(failure());

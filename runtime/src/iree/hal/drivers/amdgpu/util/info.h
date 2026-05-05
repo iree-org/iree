@@ -23,10 +23,18 @@ typedef struct iree_hal_amdgpu_system_info_t {
   // Timestamp value increase rate in hz.
   // Query of HSA_SYSTEM_INFO_TIMESTAMP_FREQUENCY.
   uint64_t timestamp_frequency;
-  // Whether all agents have access to system allocated memory by default.
-  // This is true on APUs and discrete GPUs with XNACK enabled.
-  // Query of HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT.
-  uint32_t svm_accessible_by_default : 1;
+  // HSA SVM/HMM process-wide capability facts.
+  struct {
+    // Whether the HSA SVM attribute and prefetch APIs are supported.
+    // Query of HSA_AMD_SYSTEM_INFO_SVM_SUPPORTED.
+    uint32_t supported : 1;
+    // Whether all agents have access to system allocated memory by default.
+    // Query of HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT.
+    uint32_t accessible_by_default : 1;
+    // Whether the process is bound to XNACK-enabled execution.
+    // Query of HSA_AMD_SYSTEM_INFO_XNACK_ENABLED.
+    uint32_t xnack_enabled : 1;
+  } svm;
   // Whether the dmabuf APIs are supported by the driver.
   // Query of HSA_AMD_SYSTEM_INFO_DMABUF_SUPPORTED.
   uint32_t dmabuf_supported : 1;

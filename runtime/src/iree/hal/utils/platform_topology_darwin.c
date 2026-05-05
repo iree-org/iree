@@ -25,19 +25,27 @@ iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
   return 1;
 }
 
+bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
+                                                    uint8_t node_b,
+                                                    uint8_t* out_distance) {
+  IREE_ASSERT_ARGUMENT(out_distance);
+  if (node_a != 0 || node_b != 0) return false;
+  *out_distance = 10;
+  return true;
+}
+
 iree_status_t iree_hal_platform_query_numa_distance_impl(
     uint8_t node_a, uint8_t node_b, uint8_t* out_distance) {
   IREE_ASSERT_ARGUMENT(out_distance);
 
   // macOS: only node 0 exists.
-  if (node_a != 0 || node_b != 0) {
+  if (!iree_hal_platform_try_query_numa_distance_impl(node_a, node_b,
+                                                      out_distance)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "NUMA node out of range (only node 0 exists on "
                             "macOS/Darwin)");
   }
 
-  // Same node distance.
-  *out_distance = 10;
   return iree_ok_status();
 }
 

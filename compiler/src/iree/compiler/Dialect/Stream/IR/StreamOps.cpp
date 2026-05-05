@@ -3033,6 +3033,35 @@ void AsyncTransferOp::getAsyncAccessRanges(
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.cast
+//===----------------------------------------------------------------------===//
+
+Value AsyncCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> AsyncCastOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+LogicalResult AsyncCastOp::verify() {
+  AsyncCastOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  if (getSourceSize() != getResultSize()) {
+    return emitOpError("source and result sizes must be equal (tied storage)");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.load
 //===----------------------------------------------------------------------===//
 

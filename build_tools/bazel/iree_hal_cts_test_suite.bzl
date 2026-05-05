@@ -53,6 +53,7 @@ _NON_EXECUTABLE_SUITES = [
 _EXECUTABLE_SUITES = [
     ("dispatch_tests", "//runtime/src/iree/hal/cts/command_buffer:all_dispatch_tests"),
     ("executable_tests", "//runtime/src/iree/hal/cts/core:all_executable_tests"),
+    ("queue_dispatch_tests", "//runtime/src/iree/hal/cts/queue:queue_dispatch_test"),
 ]
 
 def _camel_case(snake_str):
@@ -202,6 +203,7 @@ def iree_hal_cts_test_suite(
         flag_values = {},
         name = "",
         args = [],
+        resource_group = None,
         tags = [],
         testonly = True,
         **kwargs):
@@ -241,6 +243,8 @@ def iree_hal_cts_test_suite(
             targets are prefixed (stream_core_tests, graph_buffer_tests, etc.).
             Use a prefix for multi-variant drivers (e.g., CUDA graph/stream).
         args: Runtime arguments passed to all test binaries.
+        resource_group: Optional shared resource group for generated tests.
+            Tests sharing the same resource group will not run concurrently.
         tags: Additional tags for test targets.
         testonly: Defaults to True.
         **kwargs: Forwarded to underlying rules (e.g., target_compatible_with).
@@ -280,6 +284,7 @@ def iree_hal_cts_test_suite(
     # Common deps for all test binaries.
     common_deps = [
         backends_lib,
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/testing:gtest",
@@ -296,6 +301,7 @@ def iree_hal_cts_test_suite(
             srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
             args = args,
             deps = common_deps + [test_lib],
+            resource_group = resource_group,
             tags = tags,
             **all_test_kwargs
         )
@@ -308,6 +314,7 @@ def iree_hal_cts_test_suite(
                 srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
                 args = args,
                 deps = common_deps + _testdata_libs + [test_lib],
+                resource_group = resource_group,
                 tags = tags,
                 **all_test_kwargs
             )

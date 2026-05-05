@@ -8,6 +8,10 @@
 
 #include "iree/base/internal/debugging.h"
 
+enum {
+  IREE_HAL_RESOURCE_SET_MAX_USABLE_BLOCK_SIZE = 64 * 1024,
+};
+
 // Computes the total capacity in resources of a chunk allocated with a total
 // |storage_size| (including the header).
 static uint16_t iree_hal_resource_set_chunk_capacity(
@@ -23,8 +27,16 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
 
   // We could allow larger sizes (would require widening the capacity/count
   // fields in the chunk) but in real usage having even 64k is a bit too much.
-  IREE_ASSERT_LE(block_pool->usable_block_size, 64 * 1024,
-                 "keep block sizes small for resource sets");
+  if (IREE_UNLIKELY(block_pool->usable_block_size >
+                    IREE_HAL_RESOURCE_SET_MAX_USABLE_BLOCK_SIZE)) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "resource set block pool usable block size %" PRIhsz
+                         " exceeds maximum %d",
+                         block_pool->usable_block_size,
+                         IREE_HAL_RESOURCE_SET_MAX_USABLE_BLOCK_SIZE));
+  }
 
   // Acquire block and place the set struct at the head.
   iree_arena_block_t* block = NULL;

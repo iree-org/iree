@@ -184,6 +184,8 @@ iree_generated_e2e_runner_test(
   LABELS
     "hostonly"
     "local"
+  TIMEOUT
+    300
 )
 
 # To distinguish between CDNA(gfx9) and RDNA3(gfx11)

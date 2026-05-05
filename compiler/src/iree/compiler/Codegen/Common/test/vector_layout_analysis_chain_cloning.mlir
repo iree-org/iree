@@ -146,3 +146,58 @@ func.func @no_clone_non_cheap_producer(
   %b = iree_vector_ext.to_layout %neg to layout(#layoutF) : vector<16x64xf16>
   func.return %a, %b : vector<16x64xf16>, vector<16x64xf16>
 }
+
+// -----
+
+#layoutA = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutB = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 32],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+// Constant-like chain leaves are accepted even if they're defined in another
+// block than the rest of the duplicatable chain.
+
+// CHECK-LABEL: @clone_mask_chain_entry_block_constant_leaf
+//   CHECK-DAG: %[[CMPI_A:.+]] = arith.cmpi slt
+//   CHECK-DAG: %[[CMPI_B:.+]] = arith.cmpi slt
+//   CHECK-DAG: %[[MASK_A:.+]] = vector.broadcast %[[CMPI_A]] : vector<64xi1> to vector<16x64xi1>
+//   CHECK-DAG: %[[MASK_B:.+]] = vector.broadcast %[[CMPI_B]] : vector<64xi1> to vector<16x64xi1>
+//   CHECK-NOT: iree_vector_ext.to_layout {{.*}}xi1
+//       CHECK: arith.select %[[MASK_A]]
+//       CHECK: arith.select %[[MASK_B]]
+func.func @clone_mask_chain_entry_block_constant_leaf(
+    %a: vector<16x64xf16>, %b: vector<16x64xf16>, %cond: i1)
+    -> (vector<16x64xf16>, vector<16x64xf16>) {
+  %cst = arith.constant dense<24> : vector<64xindex>
+  %zero = arith.constant dense<0.0> : vector<16x64xf16>
+  %0:2 = scf.if %cond -> (vector<16x64xf16>, vector<16x64xf16>) {
+    %step = vector.step : vector<64xindex>
+    %mask_1d = arith.cmpi slt, %step, %cst : vector<64xindex>
+    %mask = vector.broadcast %mask_1d : vector<64xi1> to vector<16x64xi1>
+    %al = iree_vector_ext.to_layout %a to layout(#layoutA) : vector<16x64xf16>
+    %bl = iree_vector_ext.to_layout %b to layout(#layoutB) : vector<16x64xf16>
+    %sa = arith.select %mask, %al, %zero : vector<16x64xi1>, vector<16x64xf16>
+    %sb = arith.select %mask, %bl, %zero : vector<16x64xi1>, vector<16x64xf16>
+    scf.yield %sa, %sb : vector<16x64xf16>, vector<16x64xf16>
+  } else {
+    scf.yield %zero, %zero : vector<16x64xf16>, vector<16x64xf16>
+  }
+  func.return %0#0, %0#1 : vector<16x64xf16>, vector<16x64xf16>
+}

@@ -54,6 +54,46 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
+#scan_config = #iree_gpu.lowering_config<{
+  subgroup_basis = [[1, 1], [0, 1]],
+  lane_basis = [[1, 8], [0, 1]],
+  thread = [1, 8]
+}>
+
+func.func @scan_dim1(%input: tensor<4x16xf32>,
+                     %output: tensor<4x16xf32>,
+                     %accum: tensor<4xf32>)
+                     -> (tensor<4x16xf32>, tensor<4xf32>)
+                     attributes {translation_info = #translation} {
+  %result:2 = iree_linalg_ext.scan {lowering_config = #scan_config}
+      dimension(1) inclusive(true)
+      ins(%input : tensor<4x16xf32>)
+      outs(%output, %accum : tensor<4x16xf32>, tensor<4xf32>) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %sum = arith.addf %lhs, %rhs : f32
+      iree_linalg_ext.yield %sum : f32
+  } -> tensor<4x16xf32>, tensor<4xf32>
+  return %result#0, %result#1 : tensor<4x16xf32>, tensor<4xf32>
+}
+
+// CHECK-DAG: #[[$SCAN_LAYOUT:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [4, 1], outer_tile = [1, 1], thread_tile = [1, 8], element_tile = [1, 8], subgroup_strides = [0, 0], thread_strides = [0, 1]>
+// CHECK-DAG: #[[$SCAN_ACC_LAYOUT:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [4], outer_tile = [1], thread_tile = [1], element_tile = [1], subgroup_strides = [0], thread_strides = [0]>
+// CHECK-LABEL: func.func @scan_dim1
+// CHECK-DAG: %[[INPUT_LAYOUT:.+]] = iree_vector_ext.to_layout %arg0 to layout(#[[$SCAN_LAYOUT]]) : tensor<4x16xf32>
+// CHECK-DAG: %[[OUTPUT_LAYOUT:.+]] = iree_vector_ext.to_layout %arg1 to layout(#[[$SCAN_LAYOUT]]) : tensor<4x16xf32>
+// CHECK-DAG: %[[ACC_LAYOUT:.+]] = iree_vector_ext.to_layout %arg2 to layout(#[[$SCAN_ACC_LAYOUT]]) : tensor<4xf32>
+// CHECK: %[[SCAN0:.+]]:2 = iree_linalg_ext.scan
+// CHECK-SAME: ins(%[[INPUT_LAYOUT]] : tensor<4x16xf32>)
+// CHECK-SAME: outs(%[[OUTPUT_LAYOUT]], %[[ACC_LAYOUT]] : tensor<4x16xf32>, tensor<4xf32>)
+// CHECK-DAG: iree_vector_ext.to_layout %[[SCAN0]]#0 to layout(#[[$SCAN_LAYOUT]]) : tensor<4x16xf32>
+// CHECK-DAG: iree_vector_ext.to_layout %[[SCAN0]]#1 to layout(#[[$SCAN_ACC_LAYOUT]]) : tensor<4xf32>
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
 #maps = [
   affine_map<(m, n, k) -> (m, k)>,
   affine_map<(m, n, k) -> (n, k)>,

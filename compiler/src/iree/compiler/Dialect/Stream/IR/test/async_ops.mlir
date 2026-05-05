@@ -182,6 +182,26 @@ util.func private @asyncTransferAffinities(%arg0: !stream.resource<constant>, %a
 
 // -----
 
+// CHECK-LABEL: @asyncCast
+util.func private @asyncCast(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<*> {
+  // CHECK: = stream.async.cast %arg0 : !stream.resource<external>{%arg1} -> !stream.resource<*>{%arg1}
+  %0 = stream.async.cast %arg0 : !stream.resource<external>{%arg1} -> !stream.resource<*>{%arg1}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @asyncCastWithAffinity
+util.func private @asyncCastWithAffinity(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<external> {
+  // CHECK: = stream.async.cast on(#hal.device.affinity<@device>) %arg0 : !stream.resource<*>{%arg1} -> !stream.resource<external>{%arg1}
+  %0 = stream.async.cast on(#hal.device.affinity<@device>) %arg0 : !stream.resource<*>{%arg1} -> !stream.resource<external>{%arg1}
+  util.return %0 : !stream.resource<external>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncLoad
 util.func private @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index

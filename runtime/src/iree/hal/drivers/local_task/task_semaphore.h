@@ -11,10 +11,7 @@
 
 #include "iree/async/proactor.h"
 #include "iree/base/api.h"
-#include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
-#include "iree/task/executor.h"
-#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,17 +27,6 @@ iree_status_t iree_hal_task_semaphore_create(
 
 // Returns true if |semaphore| is a task system semaphore.
 bool iree_hal_task_semaphore_isa(iree_hal_semaphore_t* semaphore);
-
-// Registers a direct semaphore timepoint for the given minimum payload value.
-// When the semaphore reaches |minimum_value|, |issue_task| will have its
-// pending_dependency_count decremented and be submitted to |executor| when all
-// dependencies are satisfied. If the value is already reached, returns
-// immediately without registering a dependency. Allocations are made from
-// |arena| whose lifetime must be tied to the submission.
-iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
-    iree_hal_semaphore_t* semaphore, uint64_t minimum_value,
-    iree_task_t* issue_task, iree_task_executor_t* executor,
-    iree_arena_allocator_t* arena);
 
 #ifdef __cplusplus
 }  // extern "C"

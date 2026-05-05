@@ -993,11 +993,20 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // This pass needs to run before SCF -> CF.
+  // Lower vector operations and legalize all operations to 1D vectors.
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(createLLVMGPUVectorFlatteningPass)
+      .addPass(createLLVMGPULegalizeNDVectorsPass)
+      .addPass(createLLVMGPUVectorMultiReductionLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
+
   funcPassManager.addPass(createReinsertSwizzleHintsPass);
+
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
+
+  // Canonicalize with a restriction that all vector operations are 1D.
+  funcPassManager.addPass(createLLVMGPU1DVectorCanonicalizationsPass);
 
   if (forROCDL) {
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
@@ -1041,6 +1050,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
             ConvertUnsupportedFloatArithPassOptions{
                 clLLVMGPUEnableSmallFloatEmulation});
       });
+
+  // Group global loads together to improve AMDGPU instruction scheduling.
+  // The transformation is target-agnostic, but currently only enabled for
+  // ROCDL targets until there is data to support that it benefits other
+  // targets.
+  funcPassManager.addPredicatedPass(forROCDL,
+                                    createLLVMGPUGroupGlobalLoadsPass);
 
   // Commit the func-level adaptor before adding module-level passes.
   funcPassManager.commitPass();

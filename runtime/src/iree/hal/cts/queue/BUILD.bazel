@@ -15,11 +15,50 @@ package(
 )
 
 iree_runtime_cc_library(
+    name = "queue_alloca_test",
+    testonly = True,
+    srcs = ["queue_alloca_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/memory:fixed_block_pool",
+        "//runtime/src/iree/hal/memory:passthrough_pool",
+        "//runtime/src/iree/hal/memory:tlsf_pool",
+        "//runtime/src/iree/io:file_handle",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "queue_dispatch_test",
+    testonly = True,
+    srcs = ["queue_dispatch_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "queue_host_call_test",
     testonly = True,
     srcs = ["queue_host_call_test.cc"],
     deps = [
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "queue_transfer_test",
+    testonly = True,
+    srcs = ["queue_transfer_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
         "//runtime/src/iree/hal/cts/util:test_base",
     ],
     alwayslink = True,
@@ -41,7 +80,10 @@ iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
     deps = [
+        ":queue_alloca_test",
+        ":queue_dispatch_test",
         ":queue_host_call_test",
+        ":queue_transfer_test",
         ":semaphore_submission_test",
     ],
 )

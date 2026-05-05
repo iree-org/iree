@@ -20,6 +20,9 @@ IREE_FLAG(int64_t, amdgpu_host_block_pool_small_size, 0,
 IREE_FLAG(int64_t, amdgpu_host_block_pool_large_size, 0,
           "Size in bytes of a large host block in the pool. Must be a power of "
           "two or 0 for the default.");
+IREE_FLAG(int64_t, amdgpu_host_block_pool_command_buffer_size, 0,
+          "Usable size in bytes of a command-buffer recording block in the "
+          "host block pool. Must be a power of two or 0 for the default.");
 
 IREE_FLAG(int64_t, amdgpu_device_block_pool_small_size, 0,
           "Size in bytes of a small device block in the pool. Must be a power "
@@ -34,27 +37,56 @@ IREE_FLAG(int64_t, amdgpu_device_block_pool_large_capacity, 0,
           "Initial large block pool block allocation count in blocks or 0 for "
           "the default.");
 
+IREE_FLAG(int64_t, amdgpu_default_pool_range_length, 0,
+          "Logical byte length of the default TLSF queue-allocation pool per "
+          "physical device or 0 for the default.");
+IREE_FLAG(int64_t, amdgpu_default_pool_alignment, 0,
+          "Minimum byte alignment for default-pool reservations. Must be a "
+          "power of two or 0 for the default.");
+IREE_FLAG(int32_t, amdgpu_default_pool_frontier_capacity, 0,
+          "Maximum death-frontier entry count stored per free default-pool "
+          "block or 0 for the default.");
+
 IREE_FLAG(string, amdgpu_queue_placement, "any",
-          "Device queue placement: 'any' (best possible based on topology), "
-          "'host', or 'device'.");
+          "Device queue placement: 'any' (currently host), 'host', or "
+          "'device' (reserved and currently unsupported).");
 
 IREE_FLAG(bool, amdgpu_preallocate_pools, true,
           "Preallocates a reasonable number of resources in pools to reduce "
           "initial execution latency.");
 
-IREE_FLAG(bool, amdgpu_trace_execution, false,
-          "Enables dispatch-level tracing (if device instrumentation is "
-          "compiled in).");
-
 IREE_FLAG(bool, amdgpu_exclusive_execution, false,
-          "Forces queues to run one entry at a time instead of overlapping or "
-          "aggressively scheduling queue entries out-of-order.");
+          "Reserved for exclusive queue scheduling; currently unsupported.");
+
+IREE_FLAG(
+    bool, amdgpu_force_wait_barrier_defer, false,
+    "Forces cross-queue wait barriers through the software deferral path "
+    "instead of using the device-side strategy selected from the GPU ISA.");
 
 IREE_FLAG(int64_t, amdgpu_wait_active_for_ns, 0,
-          "Uses HSA_WAIT_STATE_ACTIVE for up to duration before switching to "
-          "HSA_WAIT_STATE_BLOCKED. >0 will increase CPU usage in cases where "
-          "the waits are long and decrease latency in cases where "
-          "the waits are short.");
+          "Reserved for future HSA active-wait tuning. Must be 0 today.");
+
+static iree_status_t iree_hal_amdgpu_flag_int64_to_host_size(
+    const char* flag_name, int64_t flag_value, iree_host_size_t* out_value) {
+  if (flag_value < 0) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "%s must be non-negative (got %" PRIi64 ")",
+                            flag_name, flag_value);
+  }
+  *out_value = (iree_host_size_t)flag_value;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_amdgpu_flag_int64_to_device_size(
+    const char* flag_name, int64_t flag_value, iree_device_size_t* out_value) {
+  if (flag_value < 0) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "%s must be non-negative (got %" PRIi64 ")",
+                            flag_name, flag_value);
+  }
+  *out_value = (iree_device_size_t)flag_value;
+  return iree_ok_status();
+}
 
 static iree_status_t iree_hal_amdgpu_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
@@ -85,29 +117,75 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
   options.libhsa_search_paths = FLAG_amdgpu_libhsa_search_path_list();
 
   if (FLAG_amdgpu_host_block_pool_small_size) {
-    device_options->host_block_pools.small.block_size =
-        FLAG_amdgpu_host_block_pool_small_size;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_host_size(
+        "--amdgpu_host_block_pool_small_size",
+        FLAG_amdgpu_host_block_pool_small_size,
+        &device_options->host_block_pools.small.block_size));
   }
   if (FLAG_amdgpu_host_block_pool_large_size) {
-    device_options->host_block_pools.large.block_size =
-        FLAG_amdgpu_host_block_pool_large_size;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_host_size(
+        "--amdgpu_host_block_pool_large_size",
+        FLAG_amdgpu_host_block_pool_large_size,
+        &device_options->host_block_pools.large.block_size));
+  }
+  if (FLAG_amdgpu_host_block_pool_command_buffer_size) {
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_host_size(
+        "--amdgpu_host_block_pool_command_buffer_size",
+        FLAG_amdgpu_host_block_pool_command_buffer_size,
+        &device_options->host_block_pools.command_buffer.usable_block_size));
   }
 
   if (FLAG_amdgpu_device_block_pool_small_size) {
-    device_options->device_block_pools.small.block_size =
-        FLAG_amdgpu_device_block_pool_small_size;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_device_size(
+        "--amdgpu_device_block_pool_small_size",
+        FLAG_amdgpu_device_block_pool_small_size,
+        &device_options->device_block_pools.small.block_size));
   }
   if (FLAG_amdgpu_device_block_pool_small_capacity) {
-    device_options->device_block_pools.small.initial_capacity =
-        FLAG_amdgpu_device_block_pool_small_capacity;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_host_size(
+        "--amdgpu_device_block_pool_small_capacity",
+        FLAG_amdgpu_device_block_pool_small_capacity,
+        &device_options->device_block_pools.small.initial_capacity));
   }
   if (FLAG_amdgpu_device_block_pool_large_size) {
-    device_options->device_block_pools.large.block_size =
-        FLAG_amdgpu_device_block_pool_large_size;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_device_size(
+        "--amdgpu_device_block_pool_large_size",
+        FLAG_amdgpu_device_block_pool_large_size,
+        &device_options->device_block_pools.large.block_size));
   }
   if (FLAG_amdgpu_device_block_pool_large_capacity) {
-    device_options->device_block_pools.large.initial_capacity =
-        FLAG_amdgpu_device_block_pool_large_capacity;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_host_size(
+        "--amdgpu_device_block_pool_large_capacity",
+        FLAG_amdgpu_device_block_pool_large_capacity,
+        &device_options->device_block_pools.large.initial_capacity));
+  }
+
+  if (FLAG_amdgpu_default_pool_range_length) {
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_device_size(
+        "--amdgpu_default_pool_range_length",
+        FLAG_amdgpu_default_pool_range_length,
+        &device_options->default_pool.range_length));
+  }
+  if (FLAG_amdgpu_default_pool_alignment) {
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_flag_int64_to_device_size(
+        "--amdgpu_default_pool_alignment", FLAG_amdgpu_default_pool_alignment,
+        &device_options->default_pool.alignment));
+  }
+  if (FLAG_amdgpu_default_pool_frontier_capacity) {
+    if (FLAG_amdgpu_default_pool_frontier_capacity < 0) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool frontier capacity must be non-negative (got %d)",
+          FLAG_amdgpu_default_pool_frontier_capacity);
+    }
+    if (FLAG_amdgpu_default_pool_frontier_capacity > UINT8_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "default pool frontier capacity %d exceeds maximum %u",
+          FLAG_amdgpu_default_pool_frontier_capacity, UINT8_MAX);
+    }
+    device_options->default_pool.frontier_capacity =
+        (uint8_t)FLAG_amdgpu_default_pool_frontier_capacity;
   }
 
   if (strcmp(FLAG_amdgpu_queue_placement, "any") == 0) {
@@ -124,10 +202,17 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
 
   device_options->preallocate_pools = FLAG_amdgpu_preallocate_pools;
 
-  device_options->trace_execution = FLAG_amdgpu_trace_execution;
-
   device_options->exclusive_execution = FLAG_amdgpu_exclusive_execution;
 
+  device_options->force_wait_barrier_defer =
+      FLAG_amdgpu_force_wait_barrier_defer;
+
+  if (FLAG_amdgpu_wait_active_for_ns < 0) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "--amdgpu_wait_active_for_ns must be non-negative (got %" PRIi64 ")",
+        FLAG_amdgpu_wait_active_for_ns);
+  }
   device_options->wait_active_for_ns = FLAG_amdgpu_wait_active_for_ns;
 
   iree_status_t status = iree_hal_amdgpu_driver_create(

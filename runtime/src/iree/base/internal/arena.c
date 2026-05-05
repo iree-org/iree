@@ -15,6 +15,19 @@
 // iree_arena_block_pool_t
 //===----------------------------------------------------------------------===//
 
+#if defined(IREE_SANITIZER_THREAD)
+static void iree_arena_block_pool_release_tsan(iree_arena_block_t* block_head,
+                                               iree_arena_block_t* block_tail) {
+  iree_arena_block_t* block = block_head;
+  while (block) {
+    iree_arena_block_t* next = block->next;
+    IREE_TSAN_RELEASE(block);
+    if (block == block_tail) break;
+    block = next;
+  }
+}
+#endif  // IREE_SANITIZER_THREAD
+
 void iree_arena_block_pool_initialize(iree_host_size_t total_block_size,
                                       iree_allocator_t block_allocator,
                                       iree_arena_block_pool_t* out_block_pool) {
@@ -56,6 +69,9 @@ iree_status_t iree_arena_block_pool_preallocate(
                                                 (void**)&block_base));
     iree_arena_block_t* block =
         iree_arena_block_trailer(block_pool, block_base);
+#if defined(IREE_SANITIZER_THREAD)
+    IREE_TSAN_RELEASE(block);
+#endif  // IREE_SANITIZER_THREAD
     iree_atomic_arena_block_slist_concat(&block_pool->available_slist, block,
                                          block);
   }
@@ -103,6 +119,9 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
     block = iree_arena_block_trailer(block_pool, block_base);
     *out_ptr = block_base;
   } else {
+#if defined(IREE_SANITIZER_THREAD)
+    IREE_TSAN_ACQUIRE(block);
+#endif  // IREE_SANITIZER_THREAD
     *out_ptr = iree_arena_block_ptr(block_pool, block);
   }
 
@@ -117,6 +136,12 @@ void iree_arena_block_pool_release(iree_arena_block_pool_t* block_pool,
                                    iree_arena_block_t* block_head,
                                    iree_arena_block_t* block_tail) {
   IREE_TRACE_ZONE_BEGIN(z0);
+#if defined(IREE_SANITIZER_THREAD)
+  // Arena blocks are custom-freed back to this pool and later reused without
+  // malloc/free. Publish the ownership transfer so TSAN does not treat the next
+  // user of the block as racing with the previous owner.
+  iree_arena_block_pool_release_tsan(block_head, block_tail);
+#endif  // IREE_SANITIZER_THREAD
   iree_atomic_arena_block_slist_concat(&block_pool->available_slist, block_head,
                                        block_tail);
   IREE_TRACE_ZONE_END(z0);

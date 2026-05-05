@@ -67,7 +67,8 @@ use_repo(
     "vulkan_sdk",
 )
 
-# IREE extension creates llvm-raw (when IREE is root) and other IREE-specific repos
+# IREE extension creates MLIR-adjacent source repos when IREE is root and other
+# IREE-specific repos unconditionally.
 iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
@@ -75,6 +76,7 @@ use_repo(
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
+    "dlmalloc",
     "hip_api_headers",
     "hsa_runtime_headers",
     "iree_cuda",
@@ -83,6 +85,7 @@ use_repo(
     "rccl",
     "spirv_cross",
     "stablehlo",
+    "torch-mlir-raw",
     "tracy_client",
     "vulkan_headers",
     "webgpu_headers",
@@ -102,4 +105,13 @@ llvm_configure(
         "WebAssembly",
         "X86",
     ],
+)
+
+# Configure torch-mlir using its upstream Bazel overlay. The configured
+# repository is only needed when the Torch input plugin is selected.
+torch_mlir_configure = use_repo_rule("@torch-mlir-raw//utils/bazel:configure.bzl", "torch_mlir_configure")
+
+torch_mlir_configure(
+    name = "torch-mlir",
+    src_workspace = "@torch-mlir-raw//:CMakeLists.txt",
 )

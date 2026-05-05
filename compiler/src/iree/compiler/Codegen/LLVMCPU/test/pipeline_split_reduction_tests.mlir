@@ -1,10 +1,12 @@
-// CPU backend disable fp reassociation for O0 and O1, so the checks should be the same.
+// CPU backend disables fp reassociation for O0 and O1, so the checks should be
+// the same.
 // RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-reassociate-fp-reductions=false --split-input-file %s | FileCheck %s
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O0 --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='opt-level=O0' --iree-codegen-llvmcpu-lowering-pipeline='opt-level=O0 include-llvm-lowering=false' --split-input-file %s | FileCheck %s
 
-// CPU backend enables fp reassociation starting from O2, so the checks should be the same.
+// CPU backend enables fp reassociation starting from O2, so the checks should
+// be the same.
 // RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-reassociate-fp-reductions=true --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='opt-level=O2' --iree-codegen-llvmcpu-lowering-pipeline='opt-level=O2 include-llvm-lowering=false' --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

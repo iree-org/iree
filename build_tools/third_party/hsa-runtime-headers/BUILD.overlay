@@ -9,6 +9,7 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "hsa_runtime_headers",
     hdrs = glob([
+        "include/aqlprofile-sdk/*.h",
         "include/hsa/*.h",
     ]),
     include_prefix = "third_party/hsa-runtime-headers/",

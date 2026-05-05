@@ -50,9 +50,11 @@ set(LLVM_INSTALL_TOOLCHAIN_ONLY OFF CACHE BOOL "")
 
 ### Distributions ###
 
+# Order matters: Toolchain must come before Development so that the LLVM shared
+# library target is defined before Development exports reference it.
 set(LLVM_DISTRIBUTIONS
-      Development
       Toolchain
+      Development
     CACHE STRING "")
 
 set(LLVM_TOOLCHAIN_TOOLS

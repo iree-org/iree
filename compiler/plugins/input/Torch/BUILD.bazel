@@ -1,0 +1,44 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Torch-MLIR input plugin for IREE.
+# This plugin is conditionally built when IREE_INPUT_TORCH=ON.
+#
+# The torch-mlir libraries are provided by @torch-mlir which is configured
+# by the torch_mlir_auto_configure repository rule.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_compiler_cc_library(
+    name = "registration",
+    srcs = ["PluginRegistration.cpp"],
+    deps = [
+        "//compiler/plugins/input/Torch/InputConversion",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MLProgramDialect",
+        "@llvm-project//mlir:Pass",
+        "@torch-mlir//:TorchMLIRConversionPasses",
+        "@torch-mlir//:TorchMLIRTMTensorDialect",
+        "@torch-mlir//:TorchMLIRTorchConversionDialect",
+        "@torch-mlir//:TorchMLIRTorchConversionPasses",
+        "@torch-mlir//:TorchMLIRTorchDialect",
+        "@torch-mlir//:TorchMLIRTorchOnnxToTorch",
+        "@torch-mlir//:TorchMLIRTorchPasses",
+    ],
+)

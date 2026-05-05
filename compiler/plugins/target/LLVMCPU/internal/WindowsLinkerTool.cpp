@@ -179,8 +179,7 @@ public:
         "/out:" + artifacts.libraryFile.path,
     };
 
-    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() >= 2 ||
-        targetOptions.target.optimizerOptLevel.getSizeLevel() >= 2) {
+    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() >= 2) {
       // https://docs.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=vs-2019
       // Enable all the fancy optimizations.
       flags.push_back("/opt:ref,icf,lbr");

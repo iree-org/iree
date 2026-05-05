@@ -90,6 +90,37 @@ func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16
 
 // -----
 
+func.func @fold_transpose_generic_op(%source : tensor<2x4x16xf32>, %result : memref<4x16x2xf32>) {
+  %init = tensor.empty() : tensor<4x16x2xf32>
+  %transposed = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%source : tensor<2x4x16xf32>) outs(%init : tensor<4x16x2xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<4x16x2xf32>
+  iree_codegen.store_to_buffer %transposed, %result : tensor<4x16x2xf32> into memref<4x16x2xf32>
+  return
+}
+// The transpose generic is specialized to linalg.transpose by
+// simplifyComplexRelayoutOps, then folded into map_store.
+// DISPATCH-SCOPE-LABEL: @fold_transpose_generic_op
+//  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+//  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<4x16x2xf32>
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
+//  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
+//  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[IDX1]], %[[IDX2]], %[[IDX0]], %[[TRUE]]
+//       DISPATCH-SCOPE:   } : tensor<2x4x16xf32> into tensor<4x16x2xf32> -> tensor<4x16x2xf32>
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<4x16x2xf32> into memref<4x16x2xf32>
+
+// -----
+
 func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf32>) {
   %slice = tensor.extract_slice %source[0] [63] [1] : tensor<64xf32> to tensor<63xf32>
   iree_codegen.store_to_buffer %slice, %result : tensor<63xf32> into memref<63xf32>
@@ -229,7 +260,7 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
 //   DISPATCH-SCOPE-DAG:   %[[SRC_D1:.+]] = tensor.dim %[[SOURCE]], %[[C1]] : tensor<?x?x128x128xf32>
 //   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE0:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D0]]]
 //   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE1:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D1]]]
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty(%[[RES_D0]], %[[RES_D1]]) : tensor<?x?xf32>
+//   DISPATCH-SCOPE-DAG:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty(%[[RES_D0]], %[[RES_D1]]) : tensor<?x?xf32>
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index):
@@ -256,16 +287,10 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
   iree_codegen.store_to_buffer %unpack, %result : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
   return
 }
-//       DISPATCH-SCOPE: #[[$MAP:.+]] = affine_map<(d0) -> (256, d0 + 1)>
-//       DISPATCH-SCOPE: #[[$MAP1:.+]] = affine_map<(d0) -> (256, d0 + 64)>
 // DISPATCH-SCOPE-LABEL: @fold_pack_op
 //  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
 //   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
-//   DISPATCH-SCOPE-DAG:   %[[PAD_VAL:.+]] = arith.constant 0.000000e+00 : f32
-//   DISPATCH-SCOPE-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   DISPATCH-SCOPE-DAG:   %[[C250:.+]] = arith.constant 250 : index
-//   DISPATCH-SCOPE-DAG:   %[[C256:.+]] = arith.constant 256 : index
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<2x2x128x128xf32>
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
@@ -277,37 +302,6 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[DELINEARIZE0]]#0, %[[DELINEARIZE1]]#0, %[[DELINEARIZE0]]#1, %[[DELINEARIZE1]]#1, %[[TRUE]]
 //       DISPATCH-SCOPE:   } : tensor<250x250xf32> into tensor<2x2x128x128xf32> -> tensor<2x2x128x128xf32>
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
-
-// High padding for dimension 0
-
-//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP0_IV0:.+]], %[[WG_LOOP0_IV1:.+]]) = (250, 0) to (256, 256) step (1, 64) {
-//   DISPATCH-SCOPE-DAG:     %[[WG_TILE0_UB0:.+]] = affine.min #[[$MAP]](%[[WG_LOOP0_IV0]])
-//   DISPATCH-SCOPE-DAG:     %[[WG_TILE0_UB1:.+]] = affine.min #[[$MAP1]](%[[WG_LOOP0_IV1]])
-//       DISPATCH-SCOPE:     scf.for %[[HIGH0_IDX0:.+]] = %[[WG_LOOP0_IV0]] to %[[WG_TILE0_UB0]] step %[[C1]] {
-//       DISPATCH-SCOPE:       scf.for %[[HIGH0_IDX1:.+]] = %[[WG_LOOP0_IV1]] to %[[WG_TILE0_UB1]] step %[[C1]] {
-//   DISPATCH-SCOPE-DAG:         %[[EXPANDED_HIGH0_IDX0:.+]]:2 = affine.delinearize_index %[[HIGH0_IDX0]] into (2, 128)
-//   DISPATCH-SCOPE-DAG:         %[[EXPANDED_HIGH0_IDX1:.+]]:2 = affine.delinearize_index %[[HIGH0_IDX1]] into (2, 128)
-//       DISPATCH-SCOPE:         memref.store %[[PAD_VAL]], %[[RESULT]]
-//  DISPATCH-SCOPE-SAME:           [%[[EXPANDED_HIGH0_IDX0]]#0, %[[EXPANDED_HIGH0_IDX1]]#0, %[[EXPANDED_HIGH0_IDX0]]#1, %[[EXPANDED_HIGH0_IDX1]]#1]
-//  DISPATCH-SCOPE-SAME:           : memref<2x2x128x128xf32>
-//  DISPATCH-SCOPE:            }
-//  DISPATCH-SCOPE:          }
-//  DISPATCH-SCOPE:        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-
-// High padding for dimension 1
-
-//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP1_IV0:.+]], %[[WG_LOOP1_IV1:.+]]) = (0, 250) to (256, 256) step (1, 64) {
-//   DISPATCH-SCOPE-DAG:     %[[WG_TILE1_UB0:.+]] = affine.min #[[$MAP]](%[[WG_LOOP1_IV0]])
-//       DISPATCH-SCOPE:     scf.for %[[HIGH1_IDX0:.+]] = %[[WG_LOOP1_IV0]] to %[[WG_TILE1_UB0]] step %[[C1]] {
-//       DISPATCH-SCOPE:       scf.for %[[HIGH1_IDX1:.+]] = %[[C250]] to %[[C256]] step %[[C1]] {
-//   DISPATCH-SCOPE-DAG:         %[[EXPANDED_HIGH1_IDX0:.+]]:2 = affine.delinearize_index %[[HIGH1_IDX0]] into (2, 128)
-//   DISPATCH-SCOPE-DAG:         %[[EXPANDED_HIGH1_IDX1:.+]]:2 = affine.delinearize_index %[[HIGH1_IDX1]] into (2, 128)
-//       DISPATCH-SCOPE:         memref.store %[[PAD_VAL]], %[[RESULT]]
-//  DISPATCH-SCOPE-SAME:           [%[[EXPANDED_HIGH1_IDX0]]#0, %[[EXPANDED_HIGH1_IDX1]]#0, %[[EXPANDED_HIGH1_IDX0]]#1, %[[EXPANDED_HIGH1_IDX1]]#1]
-//  DISPATCH-SCOPE-SAME:           : memref<2x2x128x128xf32>
-//  DISPATCH-SCOPE:            }
-//  DISPATCH-SCOPE:          }
-//  DISPATCH-SCOPE:        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 

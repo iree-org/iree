@@ -191,8 +191,7 @@ iree_hal_vulkan_native_allocator_query_buffer_compatibility(
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_any_bit_set(params->usage,
-                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+    if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
@@ -382,6 +381,9 @@ static iree_status_t iree_hal_vulkan_native_allocator_create_buffer(
   if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  }
+  if (iree_any_bit_set(params->usage,
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
   }
   if (use_sparse_allocation) {
@@ -879,6 +881,102 @@ static iree_status_t iree_hal_vulkan_native_allocator_export_buffer(
                           "exporting to external buffers not supported");
 }
 
+static bool iree_hal_vulkan_native_allocator_supports_virtual_memory(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
+  return false;
+}
+
+static iree_status_t
+iree_hal_vulkan_native_allocator_virtual_memory_query_granularity(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
+  *out_minimum_page_size = 0;
+  *out_recommended_page_size = 0;
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_reserve(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
+    iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
+  *out_virtual_buffer = NULL;
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_release(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_physical_memory_allocate(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t size,
+    iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
+  *out_physical_memory = NULL;
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_physical_memory_free(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_map(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
+    iree_device_size_t physical_offset, iree_device_size_t size) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_unmap(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_protect(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_protection_t protection) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
+static iree_status_t iree_hal_vulkan_native_allocator_virtual_memory_advise(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan native allocator does not support virtual memory");
+}
+
 namespace {
 const iree_hal_allocator_vtable_t iree_hal_vulkan_native_allocator_vtable = {
     /*.destroy=*/iree_hal_vulkan_native_allocator_destroy,
@@ -892,5 +990,25 @@ const iree_hal_allocator_vtable_t iree_hal_vulkan_native_allocator_vtable = {
     /*.deallocate_buffer=*/iree_hal_vulkan_native_allocator_deallocate_buffer,
     /*.import_buffer=*/iree_hal_vulkan_native_allocator_import_buffer,
     /*.export_buffer=*/iree_hal_vulkan_native_allocator_export_buffer,
+    /*.supports_virtual_memory=*/
+    iree_hal_vulkan_native_allocator_supports_virtual_memory,
+    /*.virtual_memory_query_granularity=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_query_granularity,
+    /*.virtual_memory_reserve=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_reserve,
+    /*.virtual_memory_release=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_release,
+    /*.physical_memory_allocate=*/
+    iree_hal_vulkan_native_allocator_physical_memory_allocate,
+    /*.physical_memory_free=*/
+    iree_hal_vulkan_native_allocator_physical_memory_free,
+    /*.virtual_memory_map=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_map,
+    /*.virtual_memory_unmap=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_unmap,
+    /*.virtual_memory_protect=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_protect,
+    /*.virtual_memory_advise=*/
+    iree_hal_vulkan_native_allocator_virtual_memory_advise,
 };
 }  // namespace

@@ -61,7 +61,8 @@ class DispatchMultiWorkgroupTest : public CtsTestBase<> {
 // Expected output: [0, 1, 2, ..., 31].
 TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateZeroedDeviceBuffer(kWorkgroupCount * sizeof(uint32_t), &output_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kWorkgroupCount * sizeof(uint32_t),
+                                          &output_buffer));
 
   iree_hal_buffer_ref_t binding_refs[1];
   iree_hal_buffer_binding_t binding_table_values[1];

@@ -116,6 +116,7 @@ void LLVMTarget::print(llvm::raw_ostream &os) const {
      << "  }\n"
      << "  ukernels=" << ukernels << "\n"
      << "  linkUkernelBitcode=" << linkUkernelBitcode << "\n"
+     << "  enableInnerTiled=" << enableInnerTiled << "\n"
      << "}\n";
 }
 
@@ -197,6 +198,9 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   }
   if (linkUkernelBitcode != DEFAULT_LINK_UKERNEL_BITCODE) {
     addBool("link_ukernel_bitcode", linkUkernelBitcode);
+  }
+  if (enableInnerTiled) {
+    addBool("enable_inner_tiled", true);
   }
 }
 
@@ -325,6 +329,8 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   target.ukernels = getString("ukernels", target.ukernels, false);
   target.linkUkernelBitcode =
       getBool("link_ukernel_bitcode", target.linkUkernelBitcode);
+  target.enableInnerTiled =
+      getBool("enable_inner_tiled", LLVMTarget::DEFAULT_ENABLE_INNER_TILED);
 
   if (hasFailures) {
     return {};
@@ -601,6 +607,11 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category),
       llvm::cl::desc(
           "Link ukernel bitcode libraries into generated executables"));
+  binder.opt<bool>(
+      "iree-llvmcpu-enable-inner-tiled", enableInnerTiled,
+      llvm::cl::cat(category),
+      llvm::cl::desc("Lower encoded matmuls to iree_codegen.inner_tiled on "
+                     "LLVM CPU instead of linalg.mmt4d."));
 }
 
 LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
@@ -647,6 +658,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
   target.linkUkernelBitcode = linkUKernelBitcode;
+  target.enableInnerTiled = enableInnerTiled;
 
   target.populateDefaultsFromTargetMachine();
   return targetOptions;
