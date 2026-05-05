@@ -28,9 +28,12 @@ iree_cc_library(
     "api.c"
     "driver.c"
     "driver.h"
+    "physical_device.c"
+    "physical_device.h"
     "syms.h"
   DEPS
     ::api
+    Vulkan::Headers
     iree::base
     iree::base::internal
     iree::hal

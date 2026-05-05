@@ -24,16 +24,19 @@ extern "C" {
 // Including full Vulkan headers here would leak loader/header policy into every
 // user of the IREE runtime API.
 
-#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object
+#if !defined(VK_VERSION_1_0)
+#if !defined(VK_DEFINE_HANDLE)
+#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
+#endif  // !VK_DEFINE_HANDLE
 #if !defined(VK_DEFINE_NON_DISPATCHABLE_HANDLE)
 #if defined(__LP64__) || defined(_WIN64) ||                            \
     (defined(__x86_64__) && !defined(__ILP32__)) || defined(_M_X64) || \
     defined(__ia64) || defined(_M_IA64) || defined(__aarch64__) ||     \
     defined(__powerpc64__)
 #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) \
-  typedef struct object##_T* object
+  typedef struct object##_T* object;
 #else
-#define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object
+#define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;
 #endif  // 64-bit pointer check
 #endif  // !VK_DEFINE_NON_DISPATCHABLE_HANDLE
 
@@ -44,20 +47,17 @@ VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDeviceMemory);
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkBuffer);
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSemaphore);
 
-#if !defined(VKAPI_PTR)
 #if defined(_WIN32)
-#define VKAPI_PTR __stdcall
+#define IREE_HAL_VULKAN_API_PTR __stdcall
 #else
-#define VKAPI_PTR
+#define IREE_HAL_VULKAN_API_PTR
 #endif  // defined(_WIN32)
-#endif  // !VKAPI_PTR
-#if !defined(VKAPI_CALL)
-#define VKAPI_CALL VKAPI_PTR
-#endif  // !VKAPI_CALL
 
-typedef void(VKAPI_PTR* PFN_vkVoidFunction)(void);
-typedef PFN_vkVoidFunction(VKAPI_PTR* PFN_vkGetInstanceProcAddr)(
+typedef void(IREE_HAL_VULKAN_API_PTR* PFN_vkVoidFunction)(void);
+typedef PFN_vkVoidFunction(IREE_HAL_VULKAN_API_PTR* PFN_vkGetInstanceProcAddr)(
     VkInstance instance, const char* name);
+#undef IREE_HAL_VULKAN_API_PTR
+#endif  // !VK_VERSION_1_0
 
 //===----------------------------------------------------------------------===//
 // Feature and extension policy

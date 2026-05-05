@@ -29,6 +29,8 @@ iree_runtime_cc_library(
         "api.c",
         "driver.c",
         "driver.h",
+        "physical_device.c",
+        "physical_device.h",
         "syms.h",
     ],
     deps = [
@@ -37,5 +39,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/vulkan/util:libvulkan",
+        "@vulkan_headers",
     ],
 )

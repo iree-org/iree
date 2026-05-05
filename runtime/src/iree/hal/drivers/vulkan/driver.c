@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/hal/drivers/vulkan/api.h"
+#include "iree/hal/drivers/vulkan/physical_device.h"
 #include "iree/hal/drivers/vulkan/syms.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 
@@ -216,22 +217,18 @@ static iree_status_t iree_hal_vulkan_driver_query_available_devices(
   IREE_ASSERT_ARGUMENT(out_device_info_count);
   IREE_ASSERT_ARGUMENT(out_device_infos);
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
-  (void)driver;
-  (void)host_allocator;
-
-  *out_device_info_count = 0;
-  *out_device_infos = NULL;
-  return iree_ok_status();
+  return iree_hal_vulkan_query_available_physical_devices(
+      &driver->libvulkan, &driver->options, host_allocator,
+      out_device_info_count, out_device_infos);
 }
 
 static iree_status_t iree_hal_vulkan_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
-  (void)driver;
-  (void)device_id;
-  (void)builder;
-  return iree_ok_status();
+  return iree_hal_vulkan_dump_physical_device_info(
+      &driver->libvulkan, &driver->options, device_id, driver->host_allocator,
+      builder);
 }
 
 static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
