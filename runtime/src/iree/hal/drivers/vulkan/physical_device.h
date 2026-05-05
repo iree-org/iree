@@ -40,6 +40,25 @@ typedef struct iree_hal_vulkan_instance_t {
   iree_hal_vulkan_instance_syms_t syms;
 } iree_hal_vulkan_instance_t;
 
+typedef uint32_t iree_hal_vulkan_time_domain_flags_t;
+
+typedef enum iree_hal_vulkan_time_domain_flag_bits_e {
+  // No calibrated timestamp domains are available.
+  IREE_HAL_VULKAN_TIME_DOMAIN_NONE = 0u,
+
+  // VK_TIME_DOMAIN_DEVICE_EXT.
+  IREE_HAL_VULKAN_TIME_DOMAIN_DEVICE = 1u << 0,
+
+  // VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT.
+  IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC = 1u << 1,
+
+  // VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT.
+  IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC_RAW = 1u << 2,
+
+  // VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT.
+  IREE_HAL_VULKAN_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER = 1u << 3,
+} iree_hal_vulkan_time_domain_flag_bits_t;
+
 // Creates a driver-owned Vulkan instance for enumeration or device creation.
 iree_status_t iree_hal_vulkan_instance_initialize(
     const iree_hal_vulkan_libvulkan_t* libvulkan,
@@ -117,6 +136,9 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
 
   // Recognized device extension bits available on this physical device.
   iree_hal_vulkan_device_extensions_t available_extensions;
+
+  // VK_EXT_calibrated_timestamps domains supported by this physical device.
+  iree_hal_vulkan_time_domain_flags_t calibrated_timestamp_time_domains;
 } iree_hal_vulkan_physical_device_snapshot_t;
 
 // Captures properties, features, memory, queue, and extension data for a

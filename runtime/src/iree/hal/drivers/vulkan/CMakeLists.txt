@@ -57,6 +57,7 @@ iree_cc_library(
     iree::async
     iree::async::util::proactor_pool
     iree::base
+    iree::base::core_headers
     iree::base::internal
     iree::base::internal::flatcc::parsing
     iree::base::threading

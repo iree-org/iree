@@ -117,7 +117,69 @@ iree_hal_vulkan_available_device_extensions_from_list(
     available_extensions |=
         IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST;
   }
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS;
+  }
   return available_extensions;
+}
+
+static iree_hal_vulkan_time_domain_flags_t iree_hal_vulkan_time_domain_flag(
+    VkTimeDomainEXT time_domain) {
+  switch (time_domain) {
+    default:
+      return IREE_HAL_VULKAN_TIME_DOMAIN_NONE;
+    case VK_TIME_DOMAIN_DEVICE_EXT:
+      return IREE_HAL_VULKAN_TIME_DOMAIN_DEVICE;
+    case VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT:
+      return IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC;
+    case VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT:
+      return IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC_RAW;
+    case VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT:
+      return IREE_HAL_VULKAN_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER;
+  }
+}
+
+static iree_status_t iree_hal_vulkan_query_calibrated_timestamp_time_domains(
+    const iree_hal_vulkan_instance_t* instance, VkPhysicalDevice handle,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_time_domain_flags_t* out_time_domains) {
+  *out_time_domains = IREE_HAL_VULKAN_TIME_DOMAIN_NONE;
+
+#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
+  if (!instance->syms.vkGetPhysicalDeviceCalibrateableTimeDomainsEXT) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan calibrated timestamp extension is advertised but "
+        "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT is not loaded");
+  }
+#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
+
+  uint32_t time_domain_count = 0;
+  IREE_RETURN_IF_ERROR(iree_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(
+      IREE_VULKAN_INSTANCE(&instance->syms), handle, &time_domain_count,
+      /*pTimeDomains=*/NULL));
+  if (time_domain_count == 0) return iree_ok_status();
+
+  VkTimeDomainEXT* time_domains = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+      host_allocator, time_domain_count, sizeof(*time_domains),
+      (void**)&time_domains));
+  iree_status_t status = iree_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(
+      IREE_VULKAN_INSTANCE(&instance->syms), handle, &time_domain_count,
+      time_domains);
+  if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_time_domain_flags_t flags =
+        IREE_HAL_VULKAN_TIME_DOMAIN_NONE;
+    for (uint32_t i = 0; i < time_domain_count; ++i) {
+      flags |= iree_hal_vulkan_time_domain_flag(time_domains[i]);
+    }
+    *out_time_domains = flags;
+  }
+  iree_allocator_free(host_allocator, time_domains);
+  return status;
 }
 
 static bool iree_hal_vulkan_layer_list_contains(uint32_t layer_count,
@@ -438,6 +500,14 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
     out_snapshot->available_extensions =
         iree_hal_vulkan_available_device_extensions_from_list(
             out_snapshot->extension_count, out_snapshot->extensions);
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_physical_device_has_extension(
+          out_snapshot,
+          IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS)) {
+    status = iree_hal_vulkan_query_calibrated_timestamp_time_domains(
+        instance, handle, host_allocator,
+        &out_snapshot->calibrated_timestamp_time_domains);
   }
   if (iree_status_is_ok(status) &&
       iree_hal_vulkan_physical_device_has_extension(

@@ -50,7 +50,22 @@ iree_status_t iree_hal_vulkan_command_buffer_replay_host(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table);
 
+// Optional timestamp marker injected around native command-buffer payloads.
+typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
+  // Query pool receiving start/end timestamps, or VK_NULL_HANDLE when absent.
+  VkQueryPool query_pool;
+
+  // Query index written before the command payload.
+  uint32_t start_query;
+
+  // Query index written after the command payload.
+  uint32_t end_query;
+} iree_hal_vulkan_command_buffer_profile_marker_t;
+
 // Records Vulkan-native commands into |native_command_buffer|.
+//
+// |profile_marker| may be NULL. When present, the query pool is reset and
+// timestamped inside |native_command_buffer| around the recorded payload.
 //
 // Descriptor sets are allocated from a transient descriptor pool returned in
 // |out_descriptor_pool|. The caller must keep that pool alive until
@@ -60,6 +75,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkCommandBuffer native_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
     iree_allocator_t host_allocator, VkDescriptorPool* out_descriptor_pool);
 
 #ifdef __cplusplus

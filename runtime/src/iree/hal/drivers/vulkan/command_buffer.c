@@ -1097,6 +1097,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkCommandBuffer native_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
     iree_allocator_t host_allocator, VkDescriptorPool* out_descriptor_pool) {
   IREE_ASSERT_ARGUMENT(syms);
   IREE_ASSERT_ARGUMENT(native_command_buffer);
@@ -1128,6 +1129,16 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     };
     status = iree_vkBeginCommandBuffer(IREE_VULKAN_DEVICE(syms),
                                        native_command_buffer, &begin_info);
+  }
+  if (iree_status_is_ok(status) && profile_marker &&
+      profile_marker->query_pool) {
+    iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(syms), native_command_buffer,
+                             profile_marker->query_pool,
+                             profile_marker->start_query, /*queryCount=*/2);
+    iree_vkCmdWriteTimestamp2(IREE_VULKAN_DEVICE(syms), native_command_buffer,
+                              VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                              profile_marker->query_pool,
+                              profile_marker->start_query);
   }
   for (iree_host_size_t i = 0;
        iree_status_is_ok(status) && i < command_buffer->command_count; ++i) {
@@ -1161,6 +1172,13 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
                                   (uint32_t)command->type);
         break;
     }
+  }
+  if (iree_status_is_ok(status) && profile_marker &&
+      profile_marker->query_pool) {
+    iree_vkCmdWriteTimestamp2(IREE_VULKAN_DEVICE(syms), native_command_buffer,
+                              VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+                              profile_marker->query_pool,
+                              profile_marker->end_query);
   }
   if (iree_status_is_ok(status)) {
     status = iree_vkEndCommandBuffer(IREE_VULKAN_DEVICE(syms),

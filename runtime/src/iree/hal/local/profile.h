@@ -60,8 +60,19 @@ typedef struct iree_hal_local_profile_recorder_options_t {
   // Borrowed queue metadata records emitted at session begin.
   const iree_hal_profile_queue_record_t* queue_records;
 
+  // Additional data families that the embedding producer implements.
+  //
+  // The local recorder only produces host/local families itself. Non-local HALs
+  // may opt in to precise producer-owned families such as device queue events
+  // and feed records through the explicit append APIs below.
+  iree_hal_device_profiling_data_families_t producer_data_families;
+
   // Maximum queue events retained between flushes; 0 selects the default.
   iree_host_size_t queue_event_capacity;
+
+  // Maximum queue device events retained between flushes; 0 selects the
+  // default.
+  iree_host_size_t queue_device_event_capacity;
 
   // Maximum host execution events retained between flushes; 0 selects the
   // default.
@@ -146,6 +157,48 @@ typedef struct iree_hal_local_profile_queue_event_info_t {
 static inline iree_hal_local_profile_queue_event_info_t
 iree_hal_local_profile_queue_event_info_default(void) {
   iree_hal_local_profile_queue_event_info_t info;
+  memset(&info, 0, sizeof(info));
+  info.scope = iree_hal_local_profile_queue_scope_default();
+  return info;
+}
+
+// Queue operation data used to append one device-timestamped queue event.
+typedef struct iree_hal_local_profile_queue_device_event_info_t {
+  // Kind of queue operation represented by the event.
+  iree_hal_profile_queue_event_type_t type;
+
+  // Flags describing queue operation properties.
+  iree_hal_profile_queue_event_flags_t flags;
+
+  // Queue metadata identity shared by the appended record.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Queue submission epoch associated with this operation, or 0 when absent.
+  uint64_t submission_id;
+
+  // Session-local command-buffer identifier, or 0 when not applicable.
+  uint64_t command_buffer_id;
+
+  // Producer-defined allocation identifier, or 0 when not applicable.
+  uint64_t allocation_id;
+
+  // Number of encoded payload operations represented by this queue operation.
+  uint32_t operation_count;
+
+  // Type-specific payload byte length, or 0 when not applicable.
+  uint64_t payload_length;
+
+  // Device timestamp captured when queue-visible work started.
+  uint64_t start_tick;
+
+  // Device timestamp captured when queue-visible work completed.
+  uint64_t end_tick;
+} iree_hal_local_profile_queue_device_event_info_t;
+
+// Returns default queue device event append data.
+static inline iree_hal_local_profile_queue_device_event_info_t
+iree_hal_local_profile_queue_device_event_info_default(void) {
+  iree_hal_local_profile_queue_device_event_info_t info;
   memset(&info, 0, sizeof(info));
   info.scope = iree_hal_local_profile_queue_scope_default();
   return info;
@@ -401,6 +454,18 @@ void iree_hal_local_profile_recorder_append_queue_event(
     const iree_hal_local_profile_queue_event_info_t* event_info,
     uint64_t* out_event_id);
 
+// Appends one device-timestamped queue event to |recorder|.
+//
+// |out_event_id| may be NULL. When provided it receives the assigned event id,
+// or 0 if queue device events were not requested. Unlike host queue events,
+// queue device events are precise profiling records; a full ring is returned as
+// RESOURCE_EXHAUSTED so producers can fail the profiled operation/session
+// instead of silently truncating device timelines.
+iree_status_t iree_hal_local_profile_recorder_append_queue_device_event(
+    iree_hal_local_profile_recorder_t* recorder,
+    const iree_hal_local_profile_queue_device_event_info_t* event_info,
+    uint64_t* out_event_id);
+
 // Appends one host execution span to |recorder|.
 //
 // |out_event_id| may be NULL. When provided it receives the assigned event id,
@@ -432,6 +497,15 @@ void iree_hal_local_profile_recorder_append_command_region_event(
 void iree_hal_local_profile_recorder_append_memory_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_profile_memory_event_t* event, uint64_t* out_event_id);
+
+// Writes clock-correlation records to the active session sink.
+//
+// The caller must provide real producer-obtained clock samples. This helper is
+// intentionally not buffered: correlations are cold-path session calibration
+// records, and failures must be reported directly to the profiling operation.
+iree_status_t iree_hal_local_profile_recorder_write_clock_correlations(
+    iree_hal_local_profile_recorder_t* recorder, iree_host_size_t record_count,
+    const iree_hal_profile_clock_correlation_record_t* records);
 
 // Writes all buffered profile records to the session sink.
 iree_status_t iree_hal_local_profile_recorder_flush(

@@ -8,6 +8,12 @@
 
 #include <string.h>
 
+#include "iree/base/target_platform.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <windows.h>
+#endif  // defined(IREE_PLATFORM_WINDOWS)
+
 #include "iree/async/frontier.h"
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
@@ -214,6 +220,9 @@ typedef struct iree_hal_vulkan_selected_queue_t {
   // Queue family capability flags cached from the physical snapshot.
   VkQueueFlags flags;
 
+  // Valid timestamp bits reported by the selected queue family.
+  uint32_t timestamp_valid_bits;
+
   // HAL queue affinity bit that maps to this queue.
   iree_hal_queue_affinity_t affinity;
 } iree_hal_vulkan_selected_queue_t;
@@ -379,12 +388,14 @@ static iree_status_t iree_hal_vulkan_select_queues(
       .family_index = compute_family_index,
       .queue_index = 0,
       .flags = compute_family->queueFlags,
+      .timestamp_valid_bits = compute_family->timestampValidBits,
       .affinity = 1ull << 0,
   };
   out_queues->transfer = (iree_hal_vulkan_selected_queue_t){
       .family_index = transfer_family_index,
       .queue_index = transfer_queue_index,
       .flags = transfer_family->queueFlags,
+      .timestamp_valid_bits = transfer_family->timestampValidBits,
       .affinity = 1ull << 1,
   };
   if (sparse_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
@@ -394,6 +405,7 @@ static iree_status_t iree_hal_vulkan_select_queues(
         .family_index = sparse_family_index,
         .queue_index = 0,
         .flags = sparse_family->queueFlags,
+        .timestamp_valid_bits = sparse_family->timestampValidBits,
         .affinity = 0,
     };
   } else {
@@ -491,6 +503,10 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
   iree_hal_vulkan_enable_extension_if_available(
       snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST,
       VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME, enabled_extensions,
+      &enabled_extension_count, out_enabled_extensions);
+  iree_hal_vulkan_enable_extension_if_available(
+      snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS,
+      VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabled_extensions,
       &enabled_extension_count, out_enabled_extensions);
 
   float queue_priorities[3] = {1.0f, 1.0f, 1.0f};
@@ -733,8 +749,14 @@ struct iree_hal_vulkan_logical_device_t {
   // Active HAL-native profile recorder, when profiling is enabled.
   iree_hal_local_profile_recorder_t* profile_recorder;
 
+  // Host time domain selected for calibrated profiling samples.
+  VkTimeDomainEXT profile_host_time_domain;
+
   // Next process-local profiling session id.
   uint64_t next_profile_session_id;
+
+  // Next clock-correlation sample id for the active profiling session.
+  uint64_t next_profile_clock_correlation_sample_id;
 
   // Next profile submission id shared across queue lanes.
   iree_atomic_int64_t next_profile_submission_id;
@@ -775,6 +797,10 @@ static iree_status_t iree_hal_vulkan_unimplemented(
 // Power-of-two capacity for logical-device queue operation event buffering.
 #define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY (64 * 1024)
 
+// Power-of-two capacity for logical-device queue device event buffering.
+#define IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_DEVICE_EVENT_CAPACITY \
+  (64 * 1024)
+
 static bool iree_hal_vulkan_logical_device_query_pool_epoch(
     void* user_data, iree_async_axis_t axis, uint64_t epoch) {
   iree_hal_vulkan_logical_device_t* device =
@@ -808,6 +834,163 @@ iree_hal_vulkan_logical_device_resolve_profiling_options(
   resolved_options.flags &=
       ~IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
   return resolved_options;
+}
+
+static iree_status_t
+iree_hal_vulkan_logical_device_select_profile_host_time_domain(
+    const iree_hal_vulkan_logical_device_t* device,
+    VkTimeDomainEXT* out_time_domain) {
+  *out_time_domain = VK_TIME_DOMAIN_DEVICE_EXT;
+  const iree_hal_vulkan_time_domain_flags_t domains =
+      device->physical_device.calibrated_timestamp_time_domains;
+  if (!iree_all_bits_set(domains, IREE_HAL_VULKAN_TIME_DOMAIN_DEVICE)) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "Vulkan device queue profiling requires calibrated device timestamps");
+  }
+  if (iree_all_bits_set(domains, IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC)) {
+    *out_time_domain = VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT;
+    return iree_ok_status();
+  }
+  if (iree_all_bits_set(domains,
+                        IREE_HAL_VULKAN_TIME_DOMAIN_CLOCK_MONOTONIC_RAW)) {
+    *out_time_domain = VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT;
+    return iree_ok_status();
+  }
+#if defined(IREE_PLATFORM_WINDOWS)
+  if (iree_all_bits_set(
+          domains, IREE_HAL_VULKAN_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER)) {
+    *out_time_domain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT;
+    return iree_ok_status();
+  }
+#endif  // defined(IREE_PLATFORM_WINDOWS)
+  return iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "Vulkan device queue profiling requires a calibrated host timestamp "
+      "domain compatible with IREE host time");
+}
+
+static iree_status_t
+iree_hal_vulkan_logical_device_validate_queue_device_profiling(
+    const iree_hal_vulkan_logical_device_t* device,
+    VkTimeDomainEXT* out_time_domain) {
+  if (!iree_all_bits_set(
+          device->enabled_extensions,
+          IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "Vulkan device queue profiling requires "
+                            "VK_EXT_calibrated_timestamps");
+  }
+#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
+  if (!device->syms.vkGetCalibratedTimestampsEXT) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan calibrated timestamp extension is enabled but "
+        "vkGetCalibratedTimestampsEXT is not loaded");
+  }
+#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_logical_device_select_profile_host_time_domain(
+          device, out_time_domain));
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    const iree_hal_vulkan_queue_t* queue = &device->queue_lanes[i];
+    if (queue->timestamp_valid_bits != 64) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Vulkan device queue profiling requires 64 valid timestamp bits on "
+          "queue family %u, but it reports %u",
+          queue->queue_family_index, queue->timestamp_valid_bits);
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_host_time_domain_frequency(
+    VkTimeDomainEXT time_domain, uint64_t* out_frequency_hz) {
+  *out_frequency_hz = 0;
+  switch (time_domain) {
+    default:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "unsupported Vulkan calibrated host time domain %u",
+          (uint32_t)time_domain);
+    case VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT:
+    case VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT:
+      *out_frequency_hz = 1000000000ull;
+      return iree_ok_status();
+#if defined(IREE_PLATFORM_WINDOWS)
+    case VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT: {
+      LARGE_INTEGER frequency;
+      if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "QueryPerformanceCounter frequency is unavailable");
+      }
+      *out_frequency_hz = (uint64_t)frequency.QuadPart;
+      return iree_ok_status();
+    }
+#endif  // defined(IREE_PLATFORM_WINDOWS)
+  }
+}
+
+static uint64_t iree_hal_vulkan_host_time_domain_timestamp_ns(
+    uint64_t timestamp, uint64_t frequency_hz) {
+  if (frequency_hz == 1000000000ull) return timestamp;
+  const uint64_t seconds = timestamp / frequency_hz;
+  const uint64_t remainder = timestamp % frequency_hz;
+  return seconds * 1000000000ull + (remainder * 1000000000ull) / frequency_hz;
+}
+
+static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
+    iree_hal_vulkan_logical_device_t* device) {
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          device->profile_recorder,
+          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS)) {
+    return iree_ok_status();
+  }
+
+  uint64_t host_frequency_hz = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_host_time_domain_frequency(
+      device->profile_host_time_domain, &host_frequency_hz));
+
+  VkCalibratedTimestampInfoEXT timestamp_infos[2] = {
+      {
+          .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
+          .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT,
+      },
+      {
+          .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
+          .timeDomain = device->profile_host_time_domain,
+      },
+  };
+  uint64_t timestamps[2] = {0, 0};
+  uint64_t max_deviation = 0;
+  const iree_time_t host_time_begin_ns = iree_time_now();
+  IREE_RETURN_IF_ERROR(iree_vkGetCalibratedTimestampsEXT(
+      IREE_VULKAN_DEVICE(&device->syms), device->logical_device,
+      IREE_ARRAYSIZE(timestamp_infos), timestamp_infos, timestamps,
+      &max_deviation));
+  const iree_time_t host_time_end_ns = iree_time_now();
+  (void)max_deviation;
+
+  iree_hal_profile_clock_correlation_record_t record =
+      iree_hal_profile_clock_correlation_record_default();
+  record.flags = IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+                 IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP |
+                 IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_SYSTEM_TIMESTAMP |
+                 IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET;
+  record.physical_device_ordinal =
+      device->topology_info.topology ? device->topology_info.topology_index : 0;
+  record.sample_id = ++device->next_profile_clock_correlation_sample_id;
+  record.device_tick = timestamps[0];
+  record.host_cpu_timestamp_ns = iree_hal_vulkan_host_time_domain_timestamp_ns(
+      timestamps[1], host_frequency_hz);
+  record.host_system_timestamp = timestamps[1];
+  record.host_system_frequency_hz = host_frequency_hz;
+  record.host_time_begin_ns = host_time_begin_ns;
+  record.host_time_end_ns = host_time_end_ns;
+  return iree_hal_local_profile_recorder_write_clock_correlations(
+      device->profile_recorder, 1, &record);
 }
 
 static iree_hal_local_profile_queue_scope_t
@@ -1366,7 +1549,8 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dispatch(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_submit_execute(
         queue, wait_semaphore_list, signal_semaphore_list, command_buffer,
-        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE);
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE,
+        IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH);
   }
   iree_hal_command_buffer_release(command_buffer);
   return status;
@@ -1414,7 +1598,7 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_execute(
   }
   return iree_hal_vulkan_queue_submit_execute(
       queue, wait_semaphore_list, signal_semaphore_list, command_buffer,
-      binding_table, flags);
+      binding_table, flags, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_queue_flush(
@@ -1446,7 +1630,8 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
   const iree_hal_device_profiling_data_families_t supported_data_families =
       IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
       IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_METADATA |
-      IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS;
+      IREE_HAL_DEVICE_PROFILING_DATA_MEMORY_EVENTS |
+      IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
   const iree_hal_device_profiling_data_families_t unsupported_data_families =
       resolved_options.data_families & ~supported_data_families;
   if (unsupported_data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
@@ -1454,6 +1639,16 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
         IREE_STATUS_UNIMPLEMENTED,
         "unsupported Vulkan profiling data families 0x%" PRIx64,
         unsupported_data_families);
+  }
+  VkTimeDomainEXT profile_host_time_domain = VK_TIME_DOMAIN_DEVICE_EXT;
+  const bool device_queue_events_enabled =
+      iree_hal_device_profiling_options_requests_data(
+          &resolved_options,
+          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS);
+  if (device_queue_events_enabled) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_logical_device_validate_queue_device_profiling(
+            device, &profile_host_time_domain));
   }
 
   const uint32_t physical_device_ordinal =
@@ -1493,6 +1688,12 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       .queue_records = queue_records,
       .queue_event_capacity =
           IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_EVENT_CAPACITY,
+      .producer_data_families =
+          device_queue_events_enabled
+              ? IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS
+              : IREE_HAL_DEVICE_PROFILING_DATA_NONE,
+      .queue_device_event_capacity =
+          IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_QUEUE_DEVICE_EVENT_CAPACITY,
       .memory_event_capacity =
           IREE_HAL_VULKAN_LOGICAL_DEVICE_PROFILE_MEMORY_EVENT_CAPACITY,
   };
@@ -1501,6 +1702,18 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
       &recorder_options, &resolved_options, device->host_allocator, &recorder);
   iree_allocator_free(device->host_allocator, queue_records);
   if (!iree_status_is_ok(status) || !recorder) return status;
+
+  device->profile_recorder = recorder;
+  device->profile_host_time_domain = profile_host_time_domain;
+  device->next_profile_clock_correlation_sample_id = 0;
+  status = iree_hal_vulkan_logical_device_write_clock_correlation(device);
+  if (!iree_status_is_ok(status)) {
+    device->profile_recorder = NULL;
+    status =
+        iree_status_join(status, iree_hal_local_profile_recorder_end(recorder));
+    iree_hal_local_profile_recorder_destroy(recorder);
+    return status;
+  }
 
   iree_atomic_store(&device->next_profile_submission_id, 1,
                     iree_memory_order_relaxed);
@@ -1511,7 +1724,6 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
             device, iree_hal_vulkan_logical_device_profile_count(i)),
         &device->next_profile_submission_id);
   }
-  device->profile_recorder = recorder;
   return iree_ok_status();
 }
 
@@ -1519,7 +1731,15 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_flush(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
-  return iree_hal_local_profile_recorder_flush(device->profile_recorder);
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_drain_completions(&device->queue_lanes[i]);
+  }
+  iree_status_t status =
+      iree_hal_vulkan_logical_device_write_clock_correlation(device);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_local_profile_recorder_flush(device->profile_recorder);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
@@ -1529,6 +1749,12 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
   iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
   if (!recorder) return iree_ok_status();
 
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_drain_completions(&device->queue_lanes[i]);
+  }
+  iree_status_t status =
+      iree_hal_vulkan_logical_device_write_clock_correlation(device);
+
   const iree_hal_local_profile_queue_scope_t empty_scope =
       iree_hal_local_profile_queue_scope_default();
   for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
@@ -1537,10 +1763,13 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
         /*submission_counter=*/NULL);
   }
   device->profile_recorder = NULL;
+  device->profile_host_time_domain = VK_TIME_DOMAIN_DEVICE_EXT;
+  device->next_profile_clock_correlation_sample_id = 0;
   iree_atomic_store(&device->next_profile_submission_id, 0,
                     iree_memory_order_relaxed);
 
-  iree_status_t status = iree_hal_local_profile_recorder_end(recorder);
+  status =
+      iree_status_join(status, iree_hal_local_profile_recorder_end(recorder));
   iree_hal_local_profile_recorder_destroy(recorder);
   return status;
 }
@@ -1697,6 +1926,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
       .logical_device = device->logical_device,
       .queue = selected_queue->handle,
       .queue_flags = selected_queue->flags,
+      .timestamp_valid_bits = selected_queue->timestamp_valid_bits,
       .queue_handle_mutex = iree_hal_vulkan_logical_device_queue_handle_mutex(
           device, selected_queue),
       .proactor = device->proactor,
@@ -1932,6 +2162,7 @@ static iree_status_t iree_hal_vulkan_select_external_queue(
           iree_hal_vulkan_first_queue_index(queue_set->queue_indices),
       .handle = VK_NULL_HANDLE,
       .flags = queue_family->queueFlags,
+      .timestamp_valid_bits = queue_family->timestampValidBits,
       .affinity = affinity,
   };
   return iree_ok_status();

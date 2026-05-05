@@ -4,6 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#if !defined(IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN)
+#define IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN IREE_HAL_VULKAN_INSTANCE_PFN
+#define IREE_HAL_VULKAN_UNDEFINE_INSTANCE_OPTIONAL_PFN
+#endif  // !IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN
+
+#if !defined(IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN)
+#define IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN IREE_HAL_VULKAN_DEVICE_PFN
+#define IREE_HAL_VULKAN_UNDEFINE_DEVICE_OPTIONAL_PFN
+#endif  // !IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN
+
 // Global loader-level entry points.
 
 IREE_HAL_VULKAN_LOADER_PFN(VkResult, vkCreateInstance,
@@ -77,6 +87,12 @@ IREE_HAL_VULKAN_INSTANCE_PFN(
     DECL(VkPhysicalDevice physicalDevice, const char* pLayerName,
          uint32_t* pPropertyCount, VkExtensionProperties* pProperties),
     ARGS(physicalDevice, pLayerName, pPropertyCount, pProperties))
+
+IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(
+    VkResult, vkGetPhysicalDeviceCalibrateableTimeDomainsEXT,
+    DECL(VkPhysicalDevice physicalDevice, uint32_t* pTimeDomainCount,
+         VkTimeDomainEXT* pTimeDomains),
+    ARGS(physicalDevice, pTimeDomainCount, pTimeDomains))
 
 // Device-level entry points.
 
@@ -174,6 +190,26 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyCommandPool,
                                 const VkAllocationCallbacks* pAllocator),
                            ARGS(device, commandPool, pAllocator))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateQueryPool,
+                           DECL(VkDevice device,
+                                const VkQueryPoolCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkQueryPool* pQueryPool),
+                           ARGS(device, pCreateInfo, pAllocator, pQueryPool))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyQueryPool,
+                           DECL(VkDevice device, VkQueryPool queryPool,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, queryPool, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkGetQueryPoolResults,
+                           DECL(VkDevice device, VkQueryPool queryPool,
+                                uint32_t firstQuery, uint32_t queryCount,
+                                size_t dataSize, void* pData,
+                                VkDeviceSize stride, VkQueryResultFlags flags),
+                           ARGS(device, queryPool, firstQuery, queryCount,
+                                dataSize, pData, stride, flags))
+
 IREE_HAL_VULKAN_DEVICE_PFN(
     VkResult, vkAllocateCommandBuffers,
     DECL(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
@@ -195,6 +231,19 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBeginCommandBuffer,
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkEndCommandBuffer,
                            DECL(VkCommandBuffer commandBuffer),
                            ARGS(commandBuffer))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdResetQueryPool,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkQueryPool queryPool, uint32_t firstQuery,
+                                uint32_t queryCount),
+                           ARGS(commandBuffer, queryPool, firstQuery,
+                                queryCount))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdWriteTimestamp2,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkPipelineStageFlags2 stage,
+                                VkQueryPool queryPool, uint32_t query),
+                           ARGS(commandBuffer, stage, queryPool, query))
 
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdFillBuffer,
                            DECL(VkCommandBuffer commandBuffer,
@@ -402,3 +451,20 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdDispatchIndirect,
                            DECL(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                 VkDeviceSize offset),
                            ARGS(commandBuffer, buffer, offset))
+
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
+    VkResult, vkGetCalibratedTimestampsEXT,
+    DECL(VkDevice device, uint32_t timestampCount,
+         const VkCalibratedTimestampInfoEXT* pTimestampInfos,
+         uint64_t* pTimestamps, uint64_t* pMaxDeviation),
+    ARGS(device, timestampCount, pTimestampInfos, pTimestamps, pMaxDeviation))
+
+#if defined(IREE_HAL_VULKAN_UNDEFINE_DEVICE_OPTIONAL_PFN)
+#undef IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN
+#undef IREE_HAL_VULKAN_UNDEFINE_DEVICE_OPTIONAL_PFN
+#endif  // IREE_HAL_VULKAN_UNDEFINE_DEVICE_OPTIONAL_PFN
+
+#if defined(IREE_HAL_VULKAN_UNDEFINE_INSTANCE_OPTIONAL_PFN)
+#undef IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN
+#undef IREE_HAL_VULKAN_UNDEFINE_INSTANCE_OPTIONAL_PFN
+#endif  // IREE_HAL_VULKAN_UNDEFINE_INSTANCE_OPTIONAL_PFN

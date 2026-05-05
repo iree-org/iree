@@ -71,6 +71,12 @@ struct RecordingProfileSink {
   // Queue event records copied from data chunks.
   std::vector<iree_hal_profile_queue_event_t> queue_events;
 
+  // Queue device event records copied from data chunks.
+  std::vector<iree_hal_profile_queue_device_event_t> queue_device_events;
+
+  // Clock correlation records copied from data chunks.
+  std::vector<iree_hal_profile_clock_correlation_record_t> clock_correlations;
+
   // Host execution event records copied from data chunks.
   std::vector<iree_hal_profile_host_execution_event_t> host_execution_events;
 
@@ -79,6 +85,9 @@ struct RecordingProfileSink {
 
   // Dropped queue event records reported by truncated chunks.
   uint64_t dropped_queue_event_count = 0;
+
+  // Dropped queue device event records reported by truncated chunks.
+  uint64_t dropped_queue_device_event_count = 0;
 
   // Dropped host execution event records reported by truncated chunks.
   uint64_t dropped_host_execution_event_count = 0;
@@ -229,6 +238,26 @@ static iree_status_t RecordingProfileSinkWrite(
     for (iree_host_size_t i = 0; i < iovec_count; ++i) {
       IREE_RETURN_IF_ERROR(
           CopyProfileRecords(iovecs[i], &test_sink->queue_events));
+    }
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(
+          metadata->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
+    test_sink->dropped_queue_device_event_count +=
+        metadata->dropped_record_count;
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->queue_device_events));
+    }
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(
+          metadata->content_type,
+          IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
+    for (iree_host_size_t i = 0; i < iovec_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          CopyProfileRecords(iovecs[i], &test_sink->clock_correlations));
     }
     return iree_ok_status();
   }
@@ -412,6 +441,7 @@ class LocalProfileRecorderTest : public ::testing::Test {
     recorder_options_.queue_record_count = 1;
     recorder_options_.queue_records = &queue_record_;
     recorder_options_.queue_event_capacity = 4;
+    recorder_options_.queue_device_event_capacity = 4;
     recorder_options_.host_execution_event_capacity = 4;
     recorder_options_.memory_event_capacity = 4;
   }
@@ -476,6 +506,60 @@ TEST_F(LocalProfileRecorderTest, RejectsUnsupportedDataFamily) {
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_UNIMPLEMENTED,
       Create(IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS));
+}
+
+TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsQueueDeviceEvents) {
+  recorder_options_.producer_data_families =
+      IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS;
+  IREE_EXPECT_OK(Create(IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS));
+
+  iree_hal_local_profile_queue_device_event_info_t event_info =
+      iree_hal_local_profile_queue_device_event_info_default();
+  event_info.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
+  event_info.flags = IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED;
+  event_info.scope = QueueScope();
+  event_info.submission_id = 7;
+  event_info.command_buffer_id = 8;
+  event_info.allocation_id = 9;
+  event_info.operation_count = 1;
+  event_info.payload_length = 64;
+  event_info.start_tick = 1000;
+  event_info.end_tick = 1200;
+  uint64_t event_id = 0;
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_append_queue_device_event(
+      recorder_, &event_info, &event_id));
+  EXPECT_NE(0u, event_id);
+
+  iree_hal_profile_clock_correlation_record_t correlation =
+      iree_hal_profile_clock_correlation_record_default();
+  correlation.flags =
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_CPU_TIMESTAMP;
+  correlation.physical_device_ordinal = QueueScope().physical_device_ordinal;
+  correlation.sample_id = 1;
+  correlation.device_tick = 1000;
+  correlation.host_cpu_timestamp_ns = 5000;
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_write_clock_correlations(
+      recorder_, 1, &correlation));
+
+  IREE_EXPECT_OK(iree_hal_local_profile_recorder_flush(recorder_));
+  ASSERT_EQ(1u, sink_.queue_device_events.size());
+  const iree_hal_profile_queue_device_event_t& recorded_event =
+      sink_.queue_device_events[0];
+  EXPECT_EQ(event_id, recorded_event.event_id);
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH, recorded_event.type);
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_FLAG_SOFTWARE_DEFERRED,
+            recorded_event.flags);
+  EXPECT_EQ(7u, recorded_event.submission_id);
+  EXPECT_EQ(8u, recorded_event.command_buffer_id);
+  EXPECT_EQ(9u, recorded_event.allocation_id);
+  EXPECT_EQ(1u, recorded_event.operation_count);
+  EXPECT_EQ(64u, recorded_event.payload_length);
+  EXPECT_EQ(1000u, recorded_event.start_tick);
+  EXPECT_EQ(1200u, recorded_event.end_tick);
+  ASSERT_EQ(1u, sink_.clock_correlations.size());
+  EXPECT_EQ(1u, sink_.clock_correlations[0].sample_id);
+  EXPECT_EQ(1000u, sink_.clock_correlations[0].device_tick);
 }
 
 TEST_F(LocalProfileRecorderTest, RejectsCaptureFilter) {

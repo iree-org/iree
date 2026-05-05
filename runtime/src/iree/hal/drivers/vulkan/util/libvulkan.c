@@ -184,6 +184,17 @@ static iree_status_t iree_hal_vulkan_lookup_instance(
   return iree_ok_status();
 }
 
+static void iree_hal_vulkan_lookup_instance_optional(
+    const iree_hal_vulkan_libvulkan_t* libvulkan, VkInstance instance,
+    const char* symbol, PFN_vkVoidFunction* out_fn) {
+  IREE_ASSERT_ARGUMENT(libvulkan);
+  IREE_ASSERT_ARGUMENT(out_fn);
+  *out_fn = NULL;
+  if (libvulkan->vkGetInstanceProcAddr) {
+    *out_fn = libvulkan->vkGetInstanceProcAddr(instance, symbol);
+  }
+}
+
 static iree_status_t iree_hal_vulkan_lookup_device(
     const iree_hal_vulkan_instance_syms_t* instance_syms, VkDevice device,
     const char* symbol, PFN_vkVoidFunction* out_fn) {
@@ -200,6 +211,17 @@ static iree_status_t iree_hal_vulkan_lookup_device(
                             "Vulkan device symbol '%s' not found", symbol);
   }
   return iree_ok_status();
+}
+
+static void iree_hal_vulkan_lookup_device_optional(
+    const iree_hal_vulkan_instance_syms_t* instance_syms, VkDevice device,
+    const char* symbol, PFN_vkVoidFunction* out_fn) {
+  IREE_ASSERT_ARGUMENT(instance_syms);
+  IREE_ASSERT_ARGUMENT(out_fn);
+  *out_fn = NULL;
+  if (instance_syms->vkGetDeviceProcAddr) {
+    *out_fn = instance_syms->vkGetDeviceProcAddr(device, symbol);
+  }
 }
 
 static iree_status_t iree_hal_vulkan_libvulkan_load_loader_syms(
@@ -251,13 +273,21 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_instance_syms(
         libvulkan, instance, #symbol, (PFN_vkVoidFunction*)&out_syms->symbol); \
   }
 #define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN IREE_HAL_VULKAN_INSTANCE_PFN
+#define IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(result_type, symbol, decl, args) \
+  if (iree_status_is_ok(status)) {                                             \
+    iree_hal_vulkan_lookup_instance_optional(                                  \
+        libvulkan, instance, #symbol, (PFN_vkVoidFunction*)&out_syms->symbol); \
+  }
 #define IREE_HAL_VULKAN_DEVICE_PFN(...)
+#define IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(...)
 #define DECL(...) __VA_ARGS__
 #define ARGS(...) __VA_ARGS__
 #include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: keep
 #undef ARGS
 #undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN
 #undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN
 #undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
 #undef IREE_HAL_VULKAN_INSTANCE_PFN
 #undef IREE_HAL_VULKAN_LOADER_PFN
@@ -287,18 +317,27 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_device_syms(
 #define IREE_HAL_VULKAN_LOADER_PFN(...)
 #define IREE_HAL_VULKAN_INSTANCE_PFN(...)
 #define IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN(...)
+#define IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(...)
 #define IREE_HAL_VULKAN_DEVICE_PFN(result_type, symbol, decl, args)            \
   if (iree_status_is_ok(status)) {                                             \
     status =                                                                   \
         iree_hal_vulkan_lookup_device(instance_syms, device, #symbol,          \
                                       (PFN_vkVoidFunction*)&out_syms->symbol); \
   }
+#define IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(result_type, symbol, decl, args) \
+  if (iree_status_is_ok(status)) {                                           \
+    iree_hal_vulkan_lookup_device_optional(                                  \
+        instance_syms, device, #symbol,                                      \
+        (PFN_vkVoidFunction*)&out_syms->symbol);                             \
+  }
 #define DECL(...) __VA_ARGS__
 #define ARGS(...) __VA_ARGS__
 #include "iree/hal/drivers/vulkan/util/libvulkan_tables.h"  // IWYU pragma: keep
 #undef ARGS
 #undef DECL
+#undef IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN
 #undef IREE_HAL_VULKAN_DEVICE_PFN
+#undef IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN
 #undef IREE_HAL_VULKAN_INSTANCE_PRIVATE_PFN
 #undef IREE_HAL_VULKAN_INSTANCE_PFN
 #undef IREE_HAL_VULKAN_LOADER_PFN

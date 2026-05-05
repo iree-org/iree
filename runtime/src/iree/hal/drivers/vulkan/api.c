@@ -74,6 +74,11 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_device_extensions_from_names(
           VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME)) {
     extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST;
   }
+  if (iree_hal_vulkan_extension_name_list_contains(
+          extension_count, extension_names,
+          VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME)) {
+    extensions |= IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS;
+  }
   *out_extensions = extensions;
   return iree_ok_status();
 }
@@ -168,6 +173,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
       IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
           IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+      IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
+          IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
       break;
     case IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT:
       break;
