@@ -33,6 +33,7 @@ typedef struct iree_hal_vulkan_queue_pending_submission_t
 typedef enum iree_hal_vulkan_queue_role_e {
   IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE = 0,
   IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER = 1,
+  IREE_HAL_VULKAN_QUEUE_ROLE_SPARSE_BINDING = 2,
 } iree_hal_vulkan_queue_role_t;
 
 // Queue construction parameters.

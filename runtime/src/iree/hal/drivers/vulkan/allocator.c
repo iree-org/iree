@@ -10,8 +10,8 @@
 #include <string.h>
 
 #include "iree/async/notification.h"
-#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/vulkan/buffer.h"
+#include "iree/hal/drivers/vulkan/queue.h"
 #include "iree/hal/drivers/vulkan/slab_provider.h"
 #include "iree/hal/drivers/vulkan/sparse_buffer.h"
 #include "iree/hal/memory/passthrough_pool.h"
@@ -97,11 +97,8 @@ struct iree_hal_vulkan_allocator_t {
   // Queue affinity bits supported by this logical device.
   iree_hal_queue_affinity_t queue_affinity_mask;
 
-  // Internal queue used to perform sparse memory binding.
-  VkQueue sparse_binding_queue;
-
-  // Mutex serializing host access to |sparse_binding_queue|. Borrowed.
-  iree_slim_mutex_t* sparse_binding_queue_mutex;
+  // Internal queue lane used to perform sparse memory binding. Borrowed.
+  iree_hal_vulkan_queue_t* sparse_binding_queue;
 
   // Shared notification published when default-pool reservations are released.
   iree_async_notification_t* default_pool_notification;
@@ -142,8 +139,8 @@ iree_status_t iree_hal_vulkan_allocator_create(
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
     iree_hal_vulkan_device_extensions_t enabled_extensions,
-    iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
-    iree_slim_mutex_t* sparse_binding_queue_mutex,
+    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_vulkan_queue_t* sparse_binding_queue,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(parent_device);
@@ -154,12 +151,6 @@ iree_status_t iree_hal_vulkan_allocator_create(
   IREE_ASSERT_ARGUMENT(out_allocator);
   *out_allocator = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (sparse_binding_queue != VK_NULL_HANDLE && !sparse_binding_queue_mutex) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan sparse-binding queue requires a queue handle mutex");
-  }
 
   iree_hal_vulkan_allocator_t* allocator = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -184,7 +175,6 @@ iree_status_t iree_hal_vulkan_allocator_create(
   allocator->enabled_extensions = enabled_extensions;
   allocator->queue_affinity_mask = queue_affinity_mask;
   allocator->sparse_binding_queue = sparse_binding_queue;
-  allocator->sparse_binding_queue_mutex = sparse_binding_queue_mutex;
 
   iree_status_t status =
       iree_hal_vulkan_allocator_initialize_default_pools(allocator, proactor);
@@ -900,8 +890,7 @@ static bool iree_hal_vulkan_allocator_supports_sparse_binding(
     const iree_hal_vulkan_allocator_t* allocator) {
   return iree_all_bits_set(allocator->enabled_features,
                            IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
-         allocator->sparse_binding_queue != VK_NULL_HANDLE &&
-         allocator->sparse_binding_queue_mutex != NULL;
+         allocator->sparse_binding_queue != NULL;
 }
 
 static bool iree_hal_vulkan_allocator_supports_host_allocation_import(
@@ -1400,8 +1389,7 @@ iree_hal_vulkan_allocator_allocate_direct_buffer_with_memory_type_bits(
           max_allocation_size,
           iree_hal_vulkan_allocator_memory_allocate_flags(allocator,
                                                           compat_params.usage),
-          allocator->sparse_binding_queue_mutex, allocator->host_allocator,
-          &buffer);
+          allocator->host_allocator, &buffer);
       if (iree_status_is_ok(status)) {
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
         trace_handle = handle;

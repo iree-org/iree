@@ -9,7 +9,6 @@
 
 #include "iree/async/api.h"
 #include "iree/base/api.h"
-#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 
@@ -22,6 +21,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_vulkan_allocator_t iree_hal_vulkan_allocator_t;
+typedef struct iree_hal_vulkan_queue_t iree_hal_vulkan_queue_t;
 
 // Creates the Vulkan allocator object for a logical device.
 //
@@ -35,8 +35,8 @@ iree_status_t iree_hal_vulkan_allocator_create(
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
     iree_hal_vulkan_device_extensions_t enabled_extensions,
-    iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
-    iree_slim_mutex_t* sparse_binding_queue_mutex,
+    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_vulkan_queue_t* sparse_binding_queue,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,
     iree_hal_allocator_t** out_allocator);
 

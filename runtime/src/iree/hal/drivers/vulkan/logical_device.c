@@ -198,6 +198,7 @@ static iree_status_t iree_hal_vulkan_select_physical_device(
 
 #define IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY UINT32_MAX
 #define IREE_HAL_VULKAN_DEFAULT_QUEUE_COUNT 2
+#define IREE_HAL_VULKAN_MAX_QUEUE_LANES 3
 
 typedef struct iree_hal_vulkan_selected_queue_t {
   // Queue family index from the selected physical device.
@@ -703,8 +704,9 @@ struct iree_hal_vulkan_logical_device_t {
     iree_slim_mutex_t sparse_binding;
   } queue_handle_mutexes;
 
-  // Queue lanes initialized from distinct HAL-visible selected queues.
-  iree_hal_vulkan_queue_t queue_lanes[2];
+  // Queue lanes initialized from distinct selected queues, including hidden
+  // internal lanes such as sparse binding.
+  iree_hal_vulkan_queue_t queue_lanes[IREE_HAL_VULKAN_MAX_QUEUE_LANES];
 
   // Count of initialized entries in queue_lanes.
   iree_host_size_t queue_lane_count;
@@ -714,6 +716,9 @@ struct iree_hal_vulkan_logical_device_t {
 
   // Queue lane used for transfer-capable submissions.
   iree_hal_vulkan_queue_t* transfer_queue_lane;
+
+  // Internal queue lane used for sparse binding submissions.
+  iree_hal_vulkan_queue_t* sparse_binding_queue_lane;
 
   // Count of distinct HAL queues exposed through queue affinity.
   iree_host_size_t queue_count;
@@ -1442,25 +1447,12 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_proactor(
 static iree_status_t iree_hal_vulkan_logical_device_initialize_allocator(
     iree_hal_vulkan_logical_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
-  iree_slim_mutex_t* sparse_binding_queue_mutex =
-      device->sparse_binding_queue.handle
-          ? &device->queue_handle_mutexes.sparse_binding
-          : NULL;
-  if (device->sparse_binding_queue.handle) {
-    if (iree_hal_vulkan_selected_queue_is_same_handle(
-            &device->sparse_binding_queue, &device->compute_queue)) {
-      sparse_binding_queue_mutex = &device->queue_handle_mutexes.compute;
-    } else if (iree_hal_vulkan_selected_queue_is_same_handle(
-                   &device->sparse_binding_queue, &device->transfer_queue)) {
-      sparse_binding_queue_mutex = &device->queue_handle_mutexes.transfer;
-    }
-  }
   return iree_hal_vulkan_allocator_create(
       (iree_hal_device_t*)device, &device->syms, device->logical_device,
       &device->physical_device, device->enabled_features,
       device->enabled_extensions, device->queue_affinity_mask,
-      device->sparse_binding_queue.handle, sparse_binding_queue_mutex,
-      device->proactor, device->host_allocator, &device->device_allocator);
+      device->sparse_binding_queue_lane, device->proactor,
+      device->host_allocator, &device->device_allocator);
 }
 
 static void iree_hal_vulkan_logical_device_assign_selected_queues(
@@ -1528,6 +1520,10 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
     iree_hal_vulkan_queue_role_t role, iree_hal_vulkan_queue_t** out_queue) {
   IREE_ASSERT_ARGUMENT(out_queue);
   *out_queue = NULL;
+  if (device->queue_lane_count >= IREE_HAL_VULKAN_MAX_QUEUE_LANES) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "Vulkan logical device queue lane storage is full");
+  }
 
   iree_hal_vulkan_queue_t* queue =
       &device->queue_lanes[device->queue_lane_count];
@@ -1558,17 +1554,34 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queues(
   device->queue_lane_count = 0;
   device->compute_queue_lane = NULL;
   device->transfer_queue_lane = NULL;
+  device->sparse_binding_queue_lane = NULL;
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_initialize_queue_lane(
       device, &device->compute_queue, IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE,
       &device->compute_queue_lane));
+  iree_status_t status = iree_ok_status();
   if (device->transfer_queue.affinity == device->compute_queue.affinity) {
     device->transfer_queue_lane = device->compute_queue_lane;
-    return iree_ok_status();
+  } else {
+    status = iree_hal_vulkan_logical_device_initialize_queue_lane(
+        device, &device->transfer_queue, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER,
+        &device->transfer_queue_lane);
   }
-  return iree_hal_vulkan_logical_device_initialize_queue_lane(
-      device, &device->transfer_queue, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER,
-      &device->transfer_queue_lane);
+  if (iree_status_is_ok(status) && device->sparse_binding_queue.handle) {
+    if (iree_hal_vulkan_selected_queue_is_same_handle(
+            &device->sparse_binding_queue, &device->compute_queue)) {
+      device->sparse_binding_queue_lane = device->compute_queue_lane;
+    } else if (iree_hal_vulkan_selected_queue_is_same_handle(
+                   &device->sparse_binding_queue, &device->transfer_queue)) {
+      device->sparse_binding_queue_lane = device->transfer_queue_lane;
+    } else {
+      status = iree_hal_vulkan_logical_device_initialize_queue_lane(
+          device, &device->sparse_binding_queue,
+          IREE_HAL_VULKAN_QUEUE_ROLE_SPARSE_BINDING,
+          &device->sparse_binding_queue_lane);
+    }
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
