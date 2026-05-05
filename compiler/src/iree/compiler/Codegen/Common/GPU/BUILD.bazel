@@ -55,6 +55,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "CommonGPUPasses",
     srcs = [
+        "AMDGPULowerAsyncDMA.cpp",
         "AMDGPULowerCoalescedDMAToGatherLDS.cpp",
         "DecomposeHorizontallyFusedGemms.cpp",
         "ExpandGPUOps.cpp",
@@ -78,7 +79,6 @@ iree_compiler_cc_library(
         "GPUGeneralizeNamedOps.cpp",
         "GPUGreedilyDistributeToThreads.cpp",
         "GPUInferMemorySpace.cpp",
-        "GPULowerAsyncDMA.cpp",
         "GPUMultiBuffering.cpp",
         "GPUNestedLayoutDistributionPatterns.cpp",
         "GPUNestedLayoutUtils.cpp",

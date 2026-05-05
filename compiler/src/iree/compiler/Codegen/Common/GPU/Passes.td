@@ -94,8 +94,8 @@ def AMDGPULowerCoalescedDMAToGatherLDSPass :
   ];
 }
 
-def GPULowerAsyncDMAPass :
-    InterfacePass<"iree-codegen-gpu-lower-async-dma", "mlir::FunctionOpInterface"> {
+def AMDGPULowerAsyncDMAPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-async-dma", "mlir::FunctionOpInterface"> {
   let summary = "Lower async_dma operations to amdgpu.gather_to_lds.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",

@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-async-dma, cse, canonicalize))" \
+// RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-amdgpu-lower-async-dma, cse, canonicalize))" \
 // RUN:   --verify-diagnostics \
 // RUN:   %s | FileCheck %s
 

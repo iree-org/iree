@@ -49,6 +49,7 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPULowerAsyncDMA.cpp"
     "AMDGPULowerCoalescedDMAToGatherLDS.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
@@ -72,7 +73,6 @@ iree_cc_library(
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
     "GPUInferMemorySpace.cpp"
-    "GPULowerAsyncDMA.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUNestedLayoutUtils.cpp"

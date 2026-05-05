@@ -22,11 +22,11 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-lower-async-dma"
+#define DEBUG_TYPE "iree-codegen-amdgpu-lower-async-dma"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_GPULOWERASYNCDMAPASS
+#define GEN_PASS_DEF_AMDGPULOWERASYNCDMAPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 using namespace IREE::VectorExt;
@@ -172,7 +172,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     LDBG() << "Processing AsyncDMAOp: " << op;
 
     // Currently, only support lowering of operations with all-true in_bounds.
-    // TODO: Support cases where some dimensions are out-of-bounds.
+    // TODO(#23782): Support cases where some dimensions are out-of-bounds.
     if (std::optional<ArrayAttr> inBounds = op.getInBounds();
         inBounds && llvm::any_of(*inBounds, [](Attribute attr) {
           return !cast<BoolAttr>(attr).getValue();
@@ -196,7 +196,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
           op, "source does not have fat_raw_buffer address space");
     }
     // For now, only support contiguous memrefs.
-    // TODO: Relax this constraint.
+    // TODO(#23782): Relax this constraint.
     if (!sourceType.areTrailingDimsContiguous(sourceType.getRank())) {
       return rewriter.notifyMatchFailure(op, "source memref not contiguous");
     }
@@ -211,7 +211,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
           op, "dest does not have workgroup address space");
     }
     // For now, only support contiguous memrefs.
-    // TODO: Relax this constraint.
+    // TODO(#23782): Relax this constraint.
     if (!destType.areTrailingDimsContiguous(destType.getRank())) {
       return rewriter.notifyMatchFailure(op,
                                          "destination memref not contiguous");
@@ -312,8 +312,8 @@ private:
   int64_t numThreads;
 };
 
-struct GPULowerAsyncDMAPass final
-    : impl::GPULowerAsyncDMAPassBase<GPULowerAsyncDMAPass> {
+struct AMDGPULowerAsyncDMAPass final
+    : impl::AMDGPULowerAsyncDMAPassBase<AMDGPULowerAsyncDMAPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
