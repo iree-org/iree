@@ -80,6 +80,46 @@ static bool iree_hal_vulkan_extension_list_contains(
   return false;
 }
 
+static iree_hal_vulkan_device_extensions_t
+iree_hal_vulkan_available_device_extensions_from_list(
+    uint32_t extension_count, const VkExtensionProperties* extensions) {
+  iree_hal_vulkan_device_extensions_t available_extensions =
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_NONE;
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          IREE_HAL_VULKAN_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET;
+  }
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY;
+  }
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_WIN32;
+  }
+#else
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_FD;
+  }
+#endif  // defined(VK_USE_PLATFORM_WIN32_KHR)
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST;
+  }
+  return available_extensions;
+}
+
 static bool iree_hal_vulkan_layer_list_contains(uint32_t layer_count,
                                                 const VkLayerProperties* layers,
                                                 const char* layer_name) {
@@ -384,6 +424,11 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
           &out_snapshot->extension_count, out_snapshot->extensions);
     }
   }
+  if (iree_status_is_ok(status)) {
+    out_snapshot->available_extensions =
+        iree_hal_vulkan_available_device_extensions_from_list(
+            out_snapshot->extension_count, out_snapshot->extensions);
+  }
 
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(host_allocator, out_snapshot->extensions);
@@ -430,9 +475,8 @@ bool iree_hal_vulkan_physical_device_supports_baseline(
 
 bool iree_hal_vulkan_physical_device_has_extension(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
-    const char* extension_name) {
-  return iree_hal_vulkan_extension_list_contains(
-      snapshot->extension_count, snapshot->extensions, extension_name);
+    iree_hal_vulkan_device_extensions_t extension_bits) {
+  return iree_all_bits_set(snapshot->available_extensions, extension_bits);
 }
 
 iree_status_t iree_hal_vulkan_append_device_path(

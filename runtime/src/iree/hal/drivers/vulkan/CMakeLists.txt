@@ -25,15 +25,20 @@ iree_cc_library(
   NAME
     vulkan
   SRCS
+    "allocator.c"
+    "allocator.h"
     "api.c"
     "driver.c"
     "driver.h"
+    "logical_device.c"
+    "logical_device.h"
     "physical_device.c"
     "physical_device.h"
     "syms.h"
   DEPS
     ::api
     Vulkan::Headers
+    iree::async
     iree::base
     iree::base::internal
     iree::hal

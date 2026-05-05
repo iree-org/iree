@@ -26,15 +26,20 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "vulkan",
     srcs = [
+        "allocator.c",
+        "allocator.h",
         "api.c",
         "driver.c",
         "driver.h",
+        "logical_device.c",
+        "logical_device.h",
         "physical_device.c",
         "physical_device.h",
         "syms.h",
     ],
     deps = [
         ":api",
+        "//runtime/src/iree/async",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",

@@ -299,7 +299,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_libvulkan_load_device_syms(
 #undef IREE_HAL_VULKAN_INSTANCE_PFN
 #undef IREE_HAL_VULKAN_LOADER_PFN
 
-  if (!iree_status_is_ok(status)) {
+  if (!iree_status_is_ok(status) && !out_syms->vkDestroyDevice) {
     memset(out_syms, 0, sizeof(*out_syms));
   }
 #endif  // IREE_HAL_VULKAN_LIBVULKAN_STATIC

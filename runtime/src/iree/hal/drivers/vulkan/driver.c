@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/hal/drivers/vulkan/api.h"
+#include "iree/hal/drivers/vulkan/logical_device.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 #include "iree/hal/drivers/vulkan/syms.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
@@ -239,16 +240,9 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   IREE_ASSERT_ARGUMENT(out_device);
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   *out_device = NULL;
-
-  (void)driver;
-  (void)device_id;
-  (void)param_count;
-  (void)params;
-  (void)create_params;
-  (void)host_allocator;
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "Vulkan HAL device creation is not implemented in "
-                          "the rewrite scaffold");
+  return iree_hal_vulkan_logical_device_create_by_id(
+      driver->identifier, &driver->options, &driver->libvulkan, device_id,
+      param_count, params, create_params, host_allocator, out_device);
 }
 
 static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
@@ -261,16 +255,10 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_path(
   iree_hal_vulkan_driver_t* driver = iree_hal_vulkan_driver_cast(base_driver);
   *out_device = NULL;
 
-  (void)driver;
   (void)driver_name;
-  (void)device_path;
-  (void)param_count;
-  (void)params;
-  (void)create_params;
-  (void)host_allocator;
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "Vulkan HAL device creation is not implemented in "
-                          "the rewrite scaffold");
+  return iree_hal_vulkan_logical_device_create_by_path(
+      driver->identifier, &driver->options, &driver->libvulkan, device_path,
+      param_count, params, create_params, host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_vulkan_driver_vtable = {

@@ -133,8 +133,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   (void)host_allocator;
   return iree_make_status(
       IREE_STATUS_UNIMPLEMENTED,
-      "wrapping external VkDevice handles is not implemented in the Vulkan "
-      "HAL rewrite scaffold");
+      "wrapping external VkDevice handles requires an explicit enabled "
+      "feature/extension inventory; Vulkan function pointer presence is not a "
+      "capability contract");
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(
