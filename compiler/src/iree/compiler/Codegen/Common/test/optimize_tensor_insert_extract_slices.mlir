@@ -411,3 +411,46 @@ func.func @fold_masked_transfer_raw_masked_write_unmasked_read(%t: tensor<128xf1
 // CHECK-SAME:      : tensor<128xf16>, vector<128xf16>
 // CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[READ]]
 // CHECK:         return %[[SEL]]
+
+// -----
+
+// Test for FoldMaskedTransferRAW.
+// Both unmasked: the read is directly replaced by the written value.
+func.func @fold_masked_transfer_raw_both_unmasked(%t: tensor<128xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %val = arith.constant dense<1.0> : vector<128xf16>
+  %w = vector.transfer_write %val, %t[%c0] {in_bounds = [true]}
+     : vector<128xf16>, tensor<128xf16>
+  %r = vector.transfer_read %w[%c0], %cst {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_masked_transfer_raw_both_unmasked
+// CHECK-DAG:     %[[VAL:.*]] = arith.constant dense<1.000000e+00> : vector<128xf16>
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         return %[[VAL]]
+
+// -----
+
+// Test for FoldMaskedTransferRAW.
+// Unmasked write, masked read: re-read the original tensor with the read's mask.
+func.func @fold_masked_transfer_raw_unmasked_write_masked_read(%t: tensor<128xf16>, %mask: vector<128xi1>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %val = arith.constant dense<1.0> : vector<128xf16>
+  %w = vector.transfer_write %val, %t[%c0] {in_bounds = [true]}
+     : vector<128xf16>, tensor<128xf16>
+  %r = vector.transfer_read %w[%c0], %cst, %mask {in_bounds = [true]}
+     : tensor<128xf16>, vector<128xf16>
+  return %r : vector<128xf16>
+}
+// CHECK-LABEL: func.func @fold_masked_transfer_raw_unmasked_write_masked_read
+// CHECK-SAME:    %[[T:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f16
+// CHECK-NOT:     vector.transfer_write
+// CHECK:         %[[READ:.*]] = vector.transfer_read %[[T]]{{.*}}, %[[CST]], %[[MASK]] {in_bounds = [true]}
+// CHECK-SAME:      : tensor<128xf16>, vector<128xf16>
+// CHECK:         return %[[READ]]
