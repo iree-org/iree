@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "iree/hal/drivers/vulkan/buffer.h"
 #include "iree/hal/drivers/vulkan/syms.h"
 
 #if !defined(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
@@ -255,12 +256,6 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(
     iree_hal_buffer_t* allocated_buffer, VkDeviceMemory* out_memory,
     VkBuffer* out_handle) {
-  IREE_ASSERT_ARGUMENT(allocated_buffer);
-  IREE_ASSERT_ARGUMENT(out_memory);
-  IREE_ASSERT_ARGUMENT(out_handle);
-  *out_memory = (VkDeviceMemory)0;
-  *out_handle = (VkBuffer)0;
-  return iree_make_status(
-      IREE_STATUS_FAILED_PRECONDITION,
-      "buffer is not backed by the Vulkan HAL rewrite scaffold");
+  return iree_hal_vulkan_buffer_handle(allocated_buffer, out_memory,
+                                       out_handle);
 }

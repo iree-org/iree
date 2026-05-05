@@ -71,6 +71,9 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
   // Base and extended device properties.
   VkPhysicalDeviceProperties2 properties2;
 
+  // Vulkan 1.1 property set including maxMemoryAllocationSize.
+  VkPhysicalDeviceVulkan11Properties properties11;
+
   // Stable identity properties.
   VkPhysicalDeviceIDProperties id_properties;
 

@@ -357,9 +357,13 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
       .pNext = &out_snapshot->driver_properties,
   };
+  out_snapshot->properties11 = (VkPhysicalDeviceVulkan11Properties){
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES,
+      .pNext = &out_snapshot->id_properties,
+  };
   out_snapshot->properties2 = (VkPhysicalDeviceProperties2){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-      .pNext = &out_snapshot->id_properties,
+      .pNext = &out_snapshot->properties11,
   };
   iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
                                       handle, &out_snapshot->properties2);

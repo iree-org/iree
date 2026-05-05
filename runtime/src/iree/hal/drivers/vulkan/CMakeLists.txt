@@ -28,6 +28,8 @@ iree_cc_library(
     "allocator.c"
     "allocator.h"
     "api.c"
+    "buffer.c"
+    "buffer.h"
     "driver.c"
     "driver.h"
     "logical_device.c"

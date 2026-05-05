@@ -91,6 +91,66 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkGetDeviceQueue2,
                                 VkQueue* pQueue),
                            ARGS(device, pQueueInfo, pQueue))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateBuffer,
+                           DECL(VkDevice device,
+                                const VkBufferCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkBuffer* pBuffer),
+                           ARGS(device, pCreateInfo, pAllocator, pBuffer))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyBuffer,
+                           DECL(VkDevice device, VkBuffer buffer,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, buffer, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkGetBufferMemoryRequirements,
+                           DECL(VkDevice device, VkBuffer buffer,
+                                VkMemoryRequirements* pMemoryRequirements),
+                           ARGS(device, buffer, pMemoryRequirements))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkAllocateMemory,
+                           DECL(VkDevice device,
+                                const VkMemoryAllocateInfo* pAllocateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkDeviceMemory* pMemory),
+                           ARGS(device, pAllocateInfo, pAllocator, pMemory))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkFreeMemory,
+                           DECL(VkDevice device, VkDeviceMemory memory,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, memory, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBindBufferMemory,
+                           DECL(VkDevice device, VkBuffer buffer,
+                                VkDeviceMemory memory,
+                                VkDeviceSize memoryOffset),
+                           ARGS(device, buffer, memory, memoryOffset))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkMapMemory,
+                           DECL(VkDevice device, VkDeviceMemory memory,
+                                VkDeviceSize offset, VkDeviceSize size,
+                                VkMemoryMapFlags flags, void** ppData),
+                           ARGS(device, memory, offset, size, flags, ppData))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkUnmapMemory,
+                           DECL(VkDevice device, VkDeviceMemory memory),
+                           ARGS(device, memory))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkInvalidateMappedMemoryRanges,
+                           DECL(VkDevice device, uint32_t memoryRangeCount,
+                                const VkMappedMemoryRange* pMemoryRanges),
+                           ARGS(device, memoryRangeCount, pMemoryRanges))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkFlushMappedMemoryRanges,
+                           DECL(VkDevice device, uint32_t memoryRangeCount,
+                                const VkMappedMemoryRange* pMemoryRanges),
+                           ARGS(device, memoryRangeCount, pMemoryRanges))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkDeviceAddress, vkGetBufferDeviceAddress,
+                           DECL(VkDevice device,
+                                const VkBufferDeviceAddressInfo* pInfo),
+                           ARGS(device, pInfo))
+
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateSemaphore,
                            DECL(VkDevice device,
                                 const VkSemaphoreCreateInfo* pCreateInfo,

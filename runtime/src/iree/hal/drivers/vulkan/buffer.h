@@ -1,0 +1,50 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#ifndef IREE_HAL_DRIVERS_VULKAN_BUFFER_H_
+#define IREE_HAL_DRIVERS_VULKAN_BUFFER_H_
+
+#include "iree/base/api.h"
+#include "iree/hal/api.h"
+#include "iree/hal/drivers/vulkan/util/libvulkan.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Wraps a bound Vulkan buffer allocation in an iree_hal_buffer_t.
+iree_status_t iree_hal_vulkan_buffer_create(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_device_size_t byte_length, VkMemoryPropertyFlags memory_property_flags,
+    VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
+    VkBuffer handle, VkDeviceAddress device_address,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+// Returns true if |buffer| is a Vulkan HAL buffer.
+bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer);
+
+// Returns the Vulkan memory and buffer handles backing |buffer|.
+iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
+                                            VkDeviceMemory* out_memory,
+                                            VkBuffer* out_handle);
+
+// Returns the Vulkan buffer device address backing |buffer|.
+iree_status_t iree_hal_vulkan_buffer_device_address(
+    iree_hal_buffer_t* buffer, VkDeviceAddress* out_device_address);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
+
+#endif  // IREE_HAL_DRIVERS_VULKAN_BUFFER_H_
