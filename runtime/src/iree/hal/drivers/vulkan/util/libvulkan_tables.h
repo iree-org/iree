@@ -103,6 +103,24 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyBuffer,
                                 const VkAllocationCallbacks* pAllocator),
                            ARGS(device, buffer, pAllocator))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateFence,
+                           DECL(VkDevice device,
+                                const VkFenceCreateInfo* pCreateInfo,
+                                const VkAllocationCallbacks* pAllocator,
+                                VkFence* pFence),
+                           ARGS(device, pCreateInfo, pAllocator, pFence))
+
+IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyFence,
+                           DECL(VkDevice device, VkFence fence,
+                                const VkAllocationCallbacks* pAllocator),
+                           ARGS(device, fence, pAllocator))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkWaitForFences,
+                           DECL(VkDevice device, uint32_t fenceCount,
+                                const VkFence* pFences, VkBool32 waitAll,
+                                uint64_t timeout),
+                           ARGS(device, fenceCount, pFences, waitAll, timeout))
+
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkGetBufferMemoryRequirements,
                            DECL(VkDevice device, VkBuffer buffer,
                                 VkMemoryRequirements* pMemoryRequirements),
@@ -125,6 +143,12 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBindBufferMemory,
                                 VkDeviceMemory memory,
                                 VkDeviceSize memoryOffset),
                            ARGS(device, buffer, memory, memoryOffset))
+
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkQueueBindSparse,
+                           DECL(VkQueue queue, uint32_t bindInfoCount,
+                                const VkBindSparseInfo* pBindInfo,
+                                VkFence fence),
+                           ARGS(queue, bindInfoCount, pBindInfo, fence))
 
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkMapMemory,
                            DECL(VkDevice device, VkDeviceMemory memory,

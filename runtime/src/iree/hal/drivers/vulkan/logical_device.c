@@ -217,6 +217,9 @@ typedef struct iree_hal_vulkan_selected_queues_t {
   // Transfer queue used for copy/fill/update-capable operations.
   iree_hal_vulkan_selected_queue_t transfer;
 
+  // Internal queue used for sparse memory binding operations.
+  iree_hal_vulkan_selected_queue_t sparse_binding;
+
   // Count of distinct HAL queues exposed by this logical device.
   iree_host_size_t queue_count;
 } iree_hal_vulkan_selected_queues_t;
@@ -274,6 +277,34 @@ static uint32_t iree_hal_vulkan_select_transfer_queue_family(
              : fallback_family_index;
 }
 
+static uint32_t iree_hal_vulkan_select_sparse_binding_queue_family(
+    const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
+    uint32_t compute_family_index, uint32_t transfer_family_index) {
+  const VkQueueFamilyProperties* compute_family =
+      &snapshot->queue_families[compute_family_index].queueFamilyProperties;
+  if (iree_all_bits_set(compute_family->queueFlags,
+                        VK_QUEUE_SPARSE_BINDING_BIT)) {
+    return compute_family_index;
+  }
+
+  const VkQueueFamilyProperties* transfer_family =
+      &snapshot->queue_families[transfer_family_index].queueFamilyProperties;
+  if (iree_all_bits_set(transfer_family->queueFlags,
+                        VK_QUEUE_SPARSE_BINDING_BIT)) {
+    return transfer_family_index;
+  }
+
+  for (uint32_t i = 0; i < snapshot->queue_family_count; ++i) {
+    const VkQueueFamilyProperties* queue_family =
+        &snapshot->queue_families[i].queueFamilyProperties;
+    if (iree_hal_vulkan_queue_family_has(queue_family,
+                                         VK_QUEUE_SPARSE_BINDING_BIT)) {
+      return i;
+    }
+  }
+  return IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+}
+
 static iree_status_t iree_hal_vulkan_select_queues(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
     const iree_hal_vulkan_device_options_t* options,
@@ -288,6 +319,9 @@ static iree_status_t iree_hal_vulkan_select_queues(
   const uint32_t transfer_family_index =
       iree_hal_vulkan_select_transfer_queue_family(snapshot,
                                                    compute_family_index);
+  const uint32_t sparse_family_index =
+      iree_hal_vulkan_select_sparse_binding_queue_family(
+          snapshot, compute_family_index, transfer_family_index);
 
   const VkQueueFamilyProperties* compute_family =
       &snapshot->queue_families[compute_family_index].queueFamilyProperties;
@@ -314,6 +348,19 @@ static iree_status_t iree_hal_vulkan_select_queues(
                       ? 1ull << 0
                       : 1ull << 1,
   };
+  if (sparse_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
+    const VkQueueFamilyProperties* sparse_family =
+        &snapshot->queue_families[sparse_family_index].queueFamilyProperties;
+    out_queues->sparse_binding = (iree_hal_vulkan_selected_queue_t){
+        .family_index = sparse_family_index,
+        .queue_index = 0,
+        .flags = sparse_family->queueFlags,
+        .affinity = 0,
+    };
+  } else {
+    out_queues->sparse_binding.family_index =
+        IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+  }
   out_queues->queue_count =
       out_queues->transfer.affinity == (1ull << 0) ? 1 : 2;
   return iree_ok_status();
@@ -333,6 +380,12 @@ static iree_status_t iree_hal_vulkan_queue_affinity_normalize(
   }
   *out_normalized_affinity = normalized_affinity;
   return iree_ok_status();
+}
+
+static bool iree_hal_vulkan_selected_queues_have_sparse_binding(
+    const iree_hal_vulkan_selected_queues_t* selected_queues) {
+  return selected_queues->sparse_binding.family_index !=
+         IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
 }
 
 //===----------------------------------------------------------------------===//
@@ -370,6 +423,11 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
 
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_select_queues(snapshot, device_options, selected_queues));
+  if (!iree_any_bit_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING)) {
+    selected_queues->sparse_binding.family_index =
+        IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+  }
 
   const char* enabled_extensions[8] = {0};
   uint32_t enabled_extension_count = 0;
@@ -397,8 +455,8 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
       VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME, enabled_extensions,
       &enabled_extension_count, out_enabled_extensions);
 
-  float queue_priorities[2] = {1.0f, 1.0f};
-  VkDeviceQueueCreateInfo queue_create_infos[2] = {0};
+  float queue_priorities[3] = {1.0f, 1.0f, 1.0f};
+  VkDeviceQueueCreateInfo queue_create_infos[3] = {0};
   uint32_t queue_create_info_count = 0;
   if (selected_queues->compute.family_index ==
       selected_queues->transfer.family_index) {
@@ -420,6 +478,18 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
         .queueFamilyIndex = selected_queues->transfer.family_index,
         .queueCount = 1,
         .pQueuePriorities = &queue_priorities[1],
+    };
+  }
+  if (iree_hal_vulkan_selected_queues_have_sparse_binding(selected_queues) &&
+      selected_queues->sparse_binding.family_index !=
+          selected_queues->compute.family_index &&
+      selected_queues->sparse_binding.family_index !=
+          selected_queues->transfer.family_index) {
+    queue_create_infos[queue_create_info_count++] = (VkDeviceQueueCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = selected_queues->sparse_binding.family_index,
+        .queueCount = 1,
+        .pQueuePriorities = &queue_priorities[2],
     };
   }
 
@@ -477,6 +547,12 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,
           "requested Vulkan sparseBinding is not available");
+    }
+    if (!iree_hal_vulkan_selected_queues_have_sparse_binding(selected_queues)) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "requested Vulkan sparseBinding but no queue family reports "
+          "VK_QUEUE_SPARSE_BINDING_BIT");
     }
     enabled_features2.features.sparseBinding = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
@@ -563,6 +639,9 @@ struct iree_hal_vulkan_logical_device_t {
 
   // Selected transfer-capable queue.
   iree_hal_vulkan_selected_queue_t transfer_queue;
+
+  // Internal queue used for sparse memory binding operations.
+  iree_hal_vulkan_selected_queue_t sparse_binding_queue;
 
   // Count of distinct HAL queues exposed through queue affinity.
   iree_host_size_t queue_count;
@@ -1162,8 +1241,8 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_allocator(
   return iree_hal_vulkan_allocator_create(
       (iree_hal_device_t*)device, &device->syms, device->logical_device,
       &device->physical_device, device->enabled_features,
-      device->queue_affinity_mask, device->host_allocator,
-      &device->device_allocator);
+      device->queue_affinity_mask, device->sparse_binding_queue.handle,
+      device->host_allocator, &device->device_allocator);
 }
 
 static void iree_hal_vulkan_logical_device_assign_selected_queues(
@@ -1185,6 +1264,27 @@ static void iree_hal_vulkan_logical_device_assign_selected_queues(
   iree_vkGetDeviceQueue2(IREE_VULKAN_DEVICE(&device->syms),
                          device->logical_device, &queue_info,
                          &device->transfer_queue.handle);
+
+  device->sparse_binding_queue = selected_queues->sparse_binding;
+  if (iree_hal_vulkan_selected_queues_have_sparse_binding(selected_queues)) {
+    if (device->sparse_binding_queue.family_index ==
+            device->compute_queue.family_index &&
+        device->sparse_binding_queue.queue_index ==
+            device->compute_queue.queue_index) {
+      device->sparse_binding_queue.handle = device->compute_queue.handle;
+    } else if (device->sparse_binding_queue.family_index ==
+                   device->transfer_queue.family_index &&
+               device->sparse_binding_queue.queue_index ==
+                   device->transfer_queue.queue_index) {
+      device->sparse_binding_queue.handle = device->transfer_queue.handle;
+    } else {
+      queue_info.queueFamilyIndex = device->sparse_binding_queue.family_index;
+      queue_info.queueIndex = device->sparse_binding_queue.queue_index;
+      iree_vkGetDeviceQueue2(IREE_VULKAN_DEVICE(&device->syms),
+                             device->logical_device, &queue_info,
+                             &device->sparse_binding_queue.handle);
+    }
+  }
 
   device->queue_count = selected_queues->queue_count;
   device->queue_affinity_mask = (1ull << device->queue_count) - 1;
@@ -1399,6 +1499,23 @@ static iree_status_t iree_hal_vulkan_select_external_queues(
       out_queues->transfer.affinity = 1ull << 0;
     }
   }
+  if (external_device_params->sparse_binding_queue_set.queue_indices) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_select_external_queue(
+        snapshot, &external_device_params->sparse_binding_queue_set,
+        VK_QUEUE_SPARSE_BINDING_BIT, 0, IREE_SV("sparse binding"),
+        &out_queues->sparse_binding));
+  } else if (iree_all_bits_set(out_queues->compute.flags,
+                               VK_QUEUE_SPARSE_BINDING_BIT)) {
+    out_queues->sparse_binding = out_queues->compute;
+    out_queues->sparse_binding.affinity = 0;
+  } else if (iree_all_bits_set(out_queues->transfer.flags,
+                               VK_QUEUE_SPARSE_BINDING_BIT)) {
+    out_queues->sparse_binding = out_queues->transfer;
+    out_queues->sparse_binding.affinity = 0;
+  } else {
+    out_queues->sparse_binding.family_index =
+        IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+  }
   out_queues->queue_count =
       out_queues->transfer.affinity == (1ull << 0) ? 1 : 2;
   return iree_ok_status();
@@ -1611,6 +1728,15 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_select_external_queues(
         &snapshot, external_device_params, &selected_queues);
+  }
+  if (iree_status_is_ok(status) &&
+      iree_all_bits_set(external_device_params->enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
+      !iree_hal_vulkan_selected_queues_have_sparse_binding(&selected_queues)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external Vulkan VkDevice enabled sparseBinding but no provided queue "
+        "set reports VK_QUEUE_SPARSE_BINDING_BIT");
   }
 
   iree_hal_vulkan_logical_device_t* device = NULL;

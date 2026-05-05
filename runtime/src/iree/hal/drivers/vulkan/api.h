@@ -214,6 +214,11 @@ typedef struct iree_hal_vulkan_external_device_params_t {
   // Transfer-capable queue family and indices available to IREE. Leave
   // queue_indices zero to reuse the selected compute queue for transfers.
   iree_hal_vulkan_queue_set_t transfer_queue_set;
+
+  // Sparse-binding-capable queue family and indices available to IREE. Leave
+  // queue_indices zero to reuse compute or transfer when either supports sparse
+  // binding.
+  iree_hal_vulkan_queue_set_t sparse_binding_queue_set;
 } iree_hal_vulkan_external_device_params_t;
 
 typedef enum iree_hal_vulkan_device_flag_bits_t {

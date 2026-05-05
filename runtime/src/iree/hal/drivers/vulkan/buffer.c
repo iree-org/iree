@@ -29,7 +29,7 @@ typedef struct iree_hal_vulkan_buffer_t {
   // Vulkan logical device that owns |handle| and |device_memory|.
   VkDevice logical_device;
 
-  // Memory backing |handle|. May be VK_NULL_HANDLE for future sparse buffers.
+  // Dense memory backing |handle|.
   VkDeviceMemory device_memory;
 
   // Vulkan buffer handle.

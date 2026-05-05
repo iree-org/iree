@@ -8,7 +8,9 @@
 
 #include <string.h>
 
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/vulkan/buffer.h"
+#include "iree/hal/drivers/vulkan/sparse_buffer.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_allocator_t
@@ -60,6 +62,12 @@ typedef struct iree_hal_vulkan_allocator_t {
   // Queue affinity bits supported by this logical device.
   iree_hal_queue_affinity_t queue_affinity_mask;
 
+  // Internal queue used to perform sparse memory binding.
+  VkQueue sparse_binding_queue;
+
+  // Mutex serializing host access to |sparse_binding_queue|.
+  iree_slim_mutex_t sparse_binding_mutex;
+
   // Aggregate allocation statistics.
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_vulkan_allocator_t;
@@ -77,7 +85,7 @@ iree_status_t iree_hal_vulkan_allocator_create(
     VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
-    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(parent_device);
   IREE_ASSERT_ARGUMENT(syms);
@@ -105,6 +113,8 @@ iree_status_t iree_hal_vulkan_allocator_create(
   allocator->memory_properties2 = physical_device->memory_properties2;
   allocator->enabled_features = enabled_features;
   allocator->queue_affinity_mask = queue_affinity_mask;
+  allocator->sparse_binding_queue = sparse_binding_queue;
+  iree_slim_mutex_initialize(&allocator->sparse_binding_mutex);
 
   *out_allocator = (iree_hal_allocator_t*)allocator;
   IREE_TRACE_ZONE_END(z0);
@@ -118,6 +128,7 @@ static void iree_hal_vulkan_allocator_destroy(
   iree_allocator_t host_allocator = allocator->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_slim_mutex_deinitialize(&allocator->sparse_binding_mutex);
   iree_allocator_free(host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
@@ -382,6 +393,33 @@ static bool iree_hal_vulkan_allocator_allocation_size_in_range(
          allocation_size <= allocator->properties11.maxMemoryAllocationSize;
 }
 
+static bool iree_hal_vulkan_allocator_supports_sparse_binding(
+    const iree_hal_vulkan_allocator_t* allocator) {
+  return iree_all_bits_set(allocator->enabled_features,
+                           IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
+         allocator->sparse_binding_queue != VK_NULL_HANDLE;
+}
+
+static iree_status_t iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+    const iree_hal_vulkan_allocator_t* allocator,
+    iree_device_size_t allocation_size, iree_hal_buffer_params_t* params) {
+  if (!iree_hal_vulkan_allocator_supports_sparse_binding(allocator)) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "Vulkan sparse binding support is required for allocation size %" PRIu64
+        " above maxMemoryAllocationSize %" PRIu64
+        " but sparseBinding is not enabled with a sparse-capable queue",
+        (uint64_t)allocation_size,
+        (uint64_t)allocator->properties11.maxMemoryAllocationSize);
+  }
+  if (!iree_hal_vulkan_allocator_strip_optional_mapping(params)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan sparse buffers cannot satisfy required mapping usage");
+  }
+  return iree_ok_status();
+}
+
 static iree_hal_buffer_compatibility_t
 iree_hal_vulkan_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
@@ -390,17 +428,22 @@ iree_hal_vulkan_allocator_query_buffer_compatibility(
   iree_hal_vulkan_allocator_t* allocator =
       iree_hal_vulkan_allocator_cast(base_allocator);
 
-  iree_hal_vulkan_allocator_memory_placement_t memory_placement;
-  if (!iree_hal_vulkan_allocator_resolve_memory_placement(
-          allocator, UINT32_MAX, params, &memory_placement)) {
-    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
-  }
   if (!iree_status_is_ok(
           iree_hal_vulkan_allocator_align_allocation_size(allocation_size))) {
     return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   }
   if (!iree_hal_vulkan_allocator_allocation_size_in_range(allocator,
                                                           *allocation_size)) {
+    if (!iree_status_is_ok(
+            iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+                allocator, *allocation_size, params))) {
+      return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+    }
+  }
+
+  iree_hal_vulkan_allocator_memory_placement_t memory_placement;
+  if (!iree_hal_vulkan_allocator_resolve_memory_placement(
+          allocator, UINT32_MAX, params, &memory_placement)) {
     return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   }
 
@@ -452,11 +495,12 @@ static VkBufferUsageFlags iree_hal_vulkan_buffer_usage_from_hal(
 static iree_status_t iree_hal_vulkan_allocator_create_buffer_handle(
     iree_hal_vulkan_allocator_t* allocator,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
-    VkBuffer* out_buffer) {
+    VkBufferCreateFlags create_flags, VkBuffer* out_buffer) {
   *out_buffer = VK_NULL_HANDLE;
 
   VkBufferCreateInfo create_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .flags = create_flags,
       .size = (VkDeviceSize)allocation_size,
       .usage = iree_hal_vulkan_buffer_usage_from_hal(allocator, params->usage),
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -464,6 +508,15 @@ static iree_status_t iree_hal_vulkan_allocator_create_buffer_handle(
   return iree_vkCreateBuffer(IREE_VULKAN_DEVICE(&allocator->syms),
                              allocator->logical_device, &create_info,
                              /*pAllocator=*/NULL, out_buffer);
+}
+
+static VkMemoryAllocateFlags iree_hal_vulkan_allocator_memory_allocate_flags(
+    const iree_hal_vulkan_allocator_t* allocator) {
+  return iree_all_bits_set(
+             allocator->enabled_features,
+             IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)
+             ? VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT
+             : 0;
 }
 
 static iree_status_t iree_hal_vulkan_allocator_allocate_memory(
@@ -475,11 +528,7 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_memory(
 
   VkMemoryAllocateFlagsInfo allocate_flags_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
-      .flags = iree_all_bits_set(
-                   allocator->enabled_features,
-                   IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)
-                   ? VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT
-                   : 0,
+      .flags = iree_hal_vulkan_allocator_memory_allocate_flags(allocator),
   };
   VkMemoryAllocateInfo allocate_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -503,6 +552,28 @@ static VkDeviceAddress iree_hal_vulkan_allocator_query_device_address(
                                        &address_info);
 }
 
+static iree_status_t iree_hal_vulkan_allocator_make_buffer_params_status(
+    const iree_hal_buffer_params_t* params) {
+#if IREE_STATUS_MODE
+  iree_bitfield_string_temp_t temp0, temp1;
+  iree_string_view_t memory_type_str =
+      iree_hal_memory_type_format(params->type, &temp0);
+  iree_string_view_t usage_str =
+      iree_hal_buffer_usage_format(params->usage, &temp1);
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "allocator cannot allocate a Vulkan buffer with the given parameters; "
+      "memory_type=%.*s, usage=%.*s",
+      (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
+      usage_str.data);
+#else
+  (void)params;
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "allocator cannot allocate a Vulkan buffer with the given parameters");
+#endif  // IREE_STATUS_MODE
+}
+
 static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
@@ -515,48 +586,34 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)byte_length);
 
-  iree_hal_buffer_params_t compat_params = *params;
-  iree_hal_vulkan_allocator_memory_placement_t memory_placement;
-  if (!iree_hal_vulkan_allocator_resolve_memory_placement(
-          allocator, UINT32_MAX, &compat_params, &memory_placement)) {
-#if IREE_STATUS_MODE
-    iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t memory_type_str =
-        iree_hal_memory_type_format(params->type, &temp0);
-    iree_string_view_t usage_str =
-        iree_hal_buffer_usage_format(params->usage, &temp1);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "allocator cannot allocate a Vulkan buffer with the given parameters; "
-        "memory_type=%.*s, usage=%.*s",
-        (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
-        usage_str.data);
-#else
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "allocator cannot allocate a Vulkan buffer with the given parameters");
-#endif  // IREE_STATUS_MODE
-  }
-
   iree_status_t status =
       iree_hal_vulkan_allocator_align_allocation_size(&allocation_size);
+
+  bool use_sparse_allocation = false;
+  if (iree_status_is_ok(status)) {
+    use_sparse_allocation = !iree_hal_vulkan_allocator_allocation_size_in_range(
+        allocator, allocation_size);
+  }
+
+  iree_hal_buffer_params_t compat_params = *params;
+  if (iree_status_is_ok(status) && use_sparse_allocation) {
+    status = iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+        allocator, allocation_size, &compat_params);
+  }
+
+  iree_hal_vulkan_allocator_memory_placement_t memory_placement;
   if (iree_status_is_ok(status) &&
-      !iree_hal_vulkan_allocator_allocation_size_in_range(allocator,
-                                                          allocation_size)) {
-    status = iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan dense allocation size %" PRIu64
-        " exceeds maxMemoryAllocationSize %" PRIu64,
-        (uint64_t)allocation_size,
-        (uint64_t)allocator->properties11.maxMemoryAllocationSize);
+      !iree_hal_vulkan_allocator_resolve_memory_placement(
+          allocator, UINT32_MAX, &compat_params, &memory_placement)) {
+    status = iree_hal_vulkan_allocator_make_buffer_params_status(params);
   }
 
   VkBuffer handle = VK_NULL_HANDLE;
   if (iree_status_is_ok(status)) {
+    const VkBufferCreateFlags create_flags =
+        use_sparse_allocation ? VK_BUFFER_CREATE_SPARSE_BINDING_BIT : 0;
     status = iree_hal_vulkan_allocator_create_buffer_handle(
-        allocator, &compat_params, allocation_size, &handle);
+        allocator, &compat_params, allocation_size, create_flags, &handle);
   }
 
   VkMemoryRequirements memory_requirements = {0};
@@ -564,18 +621,35 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
     iree_vkGetBufferMemoryRequirements(IREE_VULKAN_DEVICE(&allocator->syms),
                                        allocator->logical_device, handle,
                                        &memory_requirements);
-    if (!iree_hal_vulkan_allocator_allocation_size_in_range(
-            allocator, memory_requirements.size)) {
-      status = iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "Vulkan memory requirements size %" PRIu64
-          " exceeds maxMemoryAllocationSize %" PRIu64,
-          (uint64_t)memory_requirements.size,
-          (uint64_t)allocator->properties11.maxMemoryAllocationSize);
+  }
+  if (iree_status_is_ok(status) && !use_sparse_allocation &&
+      !iree_hal_vulkan_allocator_allocation_size_in_range(
+          allocator, memory_requirements.size)) {
+    iree_vkDestroyBuffer(IREE_VULKAN_DEVICE(&allocator->syms),
+                         allocator->logical_device, handle,
+                         /*pAllocator=*/NULL);
+    handle = VK_NULL_HANDLE;
+    use_sparse_allocation = true;
+    compat_params = *params;
+    status = iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
+        allocator, memory_requirements.size, &compat_params);
+    if (iree_status_is_ok(status) &&
+        !iree_hal_vulkan_allocator_resolve_memory_placement(
+            allocator, UINT32_MAX, &compat_params, &memory_placement)) {
+      status = iree_hal_vulkan_allocator_make_buffer_params_status(params);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_vulkan_allocator_create_buffer_handle(
+          allocator, &compat_params, allocation_size,
+          VK_BUFFER_CREATE_SPARSE_BINDING_BIT, &handle);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_vkGetBufferMemoryRequirements(IREE_VULKAN_DEVICE(&allocator->syms),
+                                         allocator->logical_device, handle,
+                                         &memory_requirements);
     }
   }
   if (iree_status_is_ok(status)) {
-    compat_params = *params;
     status = iree_hal_vulkan_allocator_resolve_memory_placement(
                  allocator, memory_requirements.memoryTypeBits, &compat_params,
                  &memory_placement)
@@ -586,37 +660,65 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
   }
 
   VkDeviceMemory device_memory = VK_NULL_HANDLE;
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !use_sparse_allocation) {
     status = iree_hal_vulkan_allocator_allocate_memory(
         allocator, &memory_placement, &memory_requirements, &device_memory);
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !use_sparse_allocation) {
     status = iree_vkBindBufferMemory(IREE_VULKAN_DEVICE(&allocator->syms),
                                      allocator->logical_device, handle,
                                      device_memory, /*memoryOffset=*/0);
   }
 
   iree_hal_buffer_t* buffer = NULL;
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+  VkBuffer trace_handle = VK_NULL_HANDLE;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
   if (iree_status_is_ok(status)) {
-    const VkDeviceAddress device_address =
-        iree_hal_vulkan_allocator_query_device_address(allocator, handle);
     const iree_hal_buffer_placement_t buffer_placement = {
         .device = allocator->parent_device,
         .queue_affinity = compat_params.queue_affinity,
         .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
     };
-    status = iree_hal_vulkan_buffer_create(
-        &allocator->syms, allocator->logical_device, buffer_placement,
-        memory_placement.memory_type, compat_params.access, compat_params.usage,
-        allocation_size, byte_length, memory_placement.memory_property_flags,
-        allocator->properties2.properties.limits.nonCoherentAtomSize,
-        device_memory, handle, device_address,
-        iree_hal_buffer_release_callback_null(), allocator->host_allocator,
-        &buffer);
+    if (use_sparse_allocation) {
+      status = iree_hal_vulkan_sparse_buffer_create_bound_sync(
+          &allocator->syms, allocator->logical_device,
+          allocator->sparse_binding_queue, buffer_placement,
+          memory_placement.memory_type, compat_params.access,
+          compat_params.usage, allocation_size, byte_length, handle,
+          memory_requirements, memory_placement.memory_type_index,
+          allocator->properties11.maxMemoryAllocationSize,
+          iree_hal_vulkan_allocator_memory_allocate_flags(allocator),
+          &allocator->sparse_binding_mutex, allocator->host_allocator, &buffer);
+      if (iree_status_is_ok(status)) {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+        trace_handle = handle;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+        handle = VK_NULL_HANDLE;
+      }
+    } else {
+      status = iree_hal_vulkan_buffer_create(
+          &allocator->syms, allocator->logical_device, buffer_placement,
+          memory_placement.memory_type, compat_params.access,
+          compat_params.usage, allocation_size, byte_length,
+          memory_placement.memory_property_flags,
+          allocator->properties2.properties.limits.nonCoherentAtomSize,
+          device_memory, handle,
+          iree_hal_vulkan_allocator_query_device_address(allocator, handle),
+          iree_hal_buffer_release_callback_null(), allocator->host_allocator,
+          &buffer);
+      if (iree_status_is_ok(status)) {
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+        trace_handle = handle;
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+        device_memory = VK_NULL_HANDLE;
+        handle = VK_NULL_HANDLE;
+      }
+    }
   }
 
   if (iree_status_is_ok(status)) {
-    IREE_TRACE_ALLOC_NAMED(IREE_HAL_VULKAN_ALLOCATOR_ID, (void*)handle,
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_VULKAN_ALLOCATOR_ID, (void*)trace_handle,
                            (iree_host_size_t)allocation_size);
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, compat_params.type, allocation_size));

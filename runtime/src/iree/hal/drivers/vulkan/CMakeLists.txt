@@ -38,6 +38,8 @@ iree_cc_library(
     "physical_device.h"
     "semaphore.c"
     "semaphore.h"
+    "sparse_buffer.c"
+    "sparse_buffer.h"
     "syms.h"
   DEPS
     ::api
@@ -46,6 +48,7 @@ iree_cc_library(
     iree::async::util::proactor_pool
     iree::base
     iree::base::internal
+    iree::base::threading
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
   PUBLIC

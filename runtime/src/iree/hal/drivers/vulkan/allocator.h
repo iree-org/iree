@@ -30,7 +30,7 @@ iree_status_t iree_hal_vulkan_allocator_create(
     VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
-    iree_hal_queue_affinity_t queue_affinity_mask,
+    iree_hal_queue_affinity_t queue_affinity_mask, VkQueue sparse_binding_queue,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 #ifdef __cplusplus
