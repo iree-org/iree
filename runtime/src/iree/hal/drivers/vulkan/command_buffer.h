@@ -17,6 +17,10 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a Vulkan HAL command buffer.
+//
+// |device_allocator| is retained and used for command-owned staging buffers
+// needed when recorded transfer commands cannot be represented directly by
+// Vulkan.
 iree_status_t iree_hal_vulkan_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
