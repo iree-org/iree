@@ -127,10 +127,11 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   // Finalize online attention:
   //   unmasked: x = (1 / sum) * x
-  //   masked:   x = select(sum == 0, 0, x / sum)
-  // With a mask, fully-masked rows can have `sum == 0` and `x == 0`; guard that
-  // case to produce 0 instead of NaN. Keep this in the existing finalization
-  // loop to avoid an extra row pass.
+  //   masked:   x / max(sum, 1)
+  // With a mask, fully-masked rows can have `sum == 0` and `x == 0`, while
+  // non-fully-masked rows have `sum >= 1`; guard that case to produce 0 instead
+  // of NaN. Keep this in the existing finalization loop to avoid an extra row
+  // pass and the extra ops from a cmp/select guard.
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
@@ -145,12 +146,10 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value result;
         if (hasMask) {
-          result = arith::DivFOp::create(b, loc, args[1], args[0]);
-          Value zero =
-              arith::ConstantOp::create(b, loc, b.getFloatAttr(f32Type, 0.0));
-          Value isZero = arith::CmpFOp::create(
-              b, loc, arith::CmpFPredicate::OEQ, args[0], zero);
-          result = arith::SelectOp::create(b, loc, isZero, zero, result);
+          Value one = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(args[0].getType(), 1.0));
+          Value denominator = arith::MaximumFOp::create(b, loc, args[0], one);
+          result = arith::DivFOp::create(b, loc, args[1], denominator);
         } else {
           Value one = arith::ConstantOp::create(
               b, loc, b.getFloatAttr(args[0].getType(), 1.0));
