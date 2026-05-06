@@ -166,10 +166,9 @@ IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
   device_allocator = NULL;
 #endif  // IREE_HAL_MEMORY_FILE_CAN_IMPORT
 
-  // Try importing the buffer as a host-local staging buffer.
-  // This won't always succeed due to device, platform, HAL implementation, or
-  // buffer limitations but if it does we can avoid staging ourselves during
-  // streaming and directly read/write the memory via transfer commands.
+  // Try importing the memory file as a device-accessible storage buffer.
+  // Import is an optional fast path: the memory file remains usable as a
+  // host-backed file even when the target device cannot import this pointer.
   if (iree_status_is_ok(status) && device_allocator) {
     iree_hal_memory_file_try_import_buffer(file, queue_affinity, access,
                                            contents, device_allocator);
@@ -202,6 +201,25 @@ static void iree_hal_memory_file_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+IREE_API_EXPORT bool iree_hal_memory_file_isa(iree_hal_file_t* file) {
+  return iree_hal_resource_is((const iree_hal_resource_t*)file,
+                              &iree_hal_memory_file_vtable);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_memory_file_contents(
+    iree_hal_file_t* file, iree_byte_span_t* out_contents) {
+  IREE_ASSERT_ARGUMENT(file);
+  IREE_ASSERT_ARGUMENT(out_contents);
+  *out_contents = iree_byte_span_empty();
+  if (!iree_hal_memory_file_isa(file)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "file is not a HAL memory file");
+  }
+  iree_hal_memory_file_t* memory_file = iree_hal_memory_file_cast(file);
+  *out_contents = memory_file->storage->contents;
+  return iree_ok_status();
+}
+
 // Releases the underlying file storage after the buffer using it is released.
 static void iree_hal_memory_file_buffer_release(void* user_data,
                                                 iree_hal_buffer_t* buffer) {
@@ -209,10 +227,9 @@ static void iree_hal_memory_file_buffer_release(void* user_data,
       (iree_hal_memory_file_storage_t*)user_data);
 }
 
-// Tries to import |contents| as a device-accessible HAL buffer.
-// If this succeeds we can fast-path copies without needing to allocate any
-// staging buffers and directly make use of DMA resources. If it fails we fall
-// back to staging from host memory ourselves.
+// Imports |contents| as a device-accessible HAL buffer.
+// A storage buffer is only exposed when the device allocator can directly
+// import the host allocation with device visibility.
 static void iree_hal_memory_file_try_import_buffer(
     iree_hal_memory_file_t* file, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_byte_span_t contents,
@@ -221,7 +238,7 @@ static void iree_hal_memory_file_try_import_buffer(
 
   const bool is_aligned = iree_host_size_has_alignment(
       (uintptr_t)contents.data, IREE_HAL_HEAP_BUFFER_ALIGNMENT);
-  iree_hal_buffer_params_t staging_buffer_params = {
+  iree_hal_buffer_params_t storage_buffer_params = {
       .access = access | IREE_HAL_MEMORY_ACCESS_DISCARD |
                 (!is_aligned ? IREE_HAL_MEMORY_ACCESS_UNALIGNED : 0),
       .queue_affinity = queue_affinity,
@@ -259,31 +276,10 @@ static void iree_hal_memory_file_try_import_buffer(
   };
   iree_hal_memory_file_storage_retain(file->storage);
   iree_status_t status = iree_hal_allocator_import_buffer(
-      device_allocator, staging_buffer_params, &external_buffer,
+      device_allocator, storage_buffer_params, &external_buffer,
       imported_release_callback, &file->imported_buffer);
   if (!iree_status_is_ok(status)) {
     iree_hal_memory_file_storage_release(file->storage);
-
-    // Device import failed (common on WebGPU and other backends that cannot
-    // import host allocations as GPU buffers). Fall back to wrapping the host
-    // pointer as a HOST_LOCAL heap buffer. This ensures storage_buffer() always
-    // returns a usable buffer for HOST_ALLOCATION files, enabling queue_read/
-    // write to map it and access the host pointer without staging copies.
-    iree_status_ignore(status);
-    iree_hal_memory_file_storage_retain(file->storage);
-    status = iree_hal_heap_buffer_wrap(
-        iree_hal_buffer_placement_undefined(),
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
-        access | IREE_HAL_MEMORY_ACCESS_UNALIGNED,
-        IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
-            IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET |
-            IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
-            IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
-        contents.data_length, contents, imported_release_callback,
-        file->host_allocator, &file->imported_buffer);
-    if (!iree_status_is_ok(status)) {
-      iree_hal_memory_file_storage_release(file->storage);
-    }
   }
 
   IREE_TRACE({
@@ -295,9 +291,9 @@ static void iree_hal_memory_file_try_import_buffer(
           z0, iree_status_code_string(iree_status_code(status)));
     }
   });
+  iree_status_free(status);
 
   IREE_TRACE_ZONE_END(z0);
-  iree_status_ignore(status);
 }
 
 static iree_hal_memory_access_t iree_hal_memory_file_allowed_access(

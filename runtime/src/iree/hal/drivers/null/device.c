@@ -393,7 +393,7 @@ static iree_status_t iree_hal_null_device_import_file(
   // inefficient. The queue affinity specifies which queues may access the file
   // via read and write queue operations.
   return iree_hal_file_from_handle(
-      iree_hal_device_allocator(base_device), queue_affinity, access, handle,
+      /*device_allocator=*/NULL, queue_affinity, access, handle,
       /*proactor=*/NULL, iree_hal_device_host_allocator(base_device), out_file);
 }
 

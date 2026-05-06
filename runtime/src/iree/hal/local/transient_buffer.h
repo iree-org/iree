@@ -79,6 +79,10 @@ void iree_hal_local_transient_buffer_commit(iree_hal_buffer_t* buffer);
 // call on an already-uncommitted wrapper.
 void iree_hal_local_transient_buffer_decommit(iree_hal_buffer_t* buffer);
 
+// Returns true if queue_dealloca has been accepted for the transient buffer.
+bool iree_hal_local_transient_buffer_is_dealloca_queued(
+    iree_hal_buffer_t* buffer);
+
 // Marks the wrapper as queued for deallocation. Returns false if deallocation
 // was already queued. Queue implementations call this before accepting a
 // queue_dealloca so double-deallocation fails before any queue state changes.

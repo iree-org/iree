@@ -199,6 +199,16 @@ void iree_hal_local_transient_buffer_decommit(iree_hal_buffer_t* base_buffer) {
   }
 }
 
+bool iree_hal_local_transient_buffer_is_dealloca_queued(
+    iree_hal_buffer_t* base_buffer) {
+  iree_hal_local_transient_buffer_t* buffer =
+      iree_hal_local_transient_buffer_cast(base_buffer);
+  iree_slim_mutex_lock(&buffer->mutex);
+  const bool is_dealloca_queued = buffer->dealloca_queued != 0;
+  iree_slim_mutex_unlock(&buffer->mutex);
+  return is_dealloca_queued;
+}
+
 bool iree_hal_local_transient_buffer_begin_dealloca(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_local_transient_buffer_t* buffer =
