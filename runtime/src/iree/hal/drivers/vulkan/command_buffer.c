@@ -764,13 +764,10 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
 
 static iree_status_t
 iree_hal_vulkan_command_buffer_count_native_descriptor_pool_requirements(
-    iree_hal_vulkan_command_buffer_t* command_buffer, uint32_t* out_max_sets,
-    uint32_t* out_sampler_count, uint32_t* out_uniform_buffer_count,
-    uint32_t* out_storage_buffer_count) {
-  *out_max_sets = 0;
-  *out_sampler_count = 0;
-  *out_uniform_buffer_count = 0;
-  *out_storage_buffer_count = 0;
+    iree_hal_vulkan_command_buffer_t* command_buffer,
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t*
+        out_requirements) {
+  memset(out_requirements, 0, sizeof(*out_requirements));
 
   uint64_t max_set_count = 0;
   uint64_t sampler_count = 0;
@@ -819,59 +816,24 @@ iree_hal_vulkan_command_buffer_count_native_descriptor_pool_requirements(
         "limits");
   }
 
-  *out_max_sets = (uint32_t)max_set_count;
-  *out_sampler_count = (uint32_t)sampler_count;
-  *out_uniform_buffer_count = (uint32_t)uniform_buffer_count;
-  *out_storage_buffer_count = (uint32_t)storage_buffer_count;
+  out_requirements->set_count = (uint32_t)max_set_count;
+  out_requirements->sampler_count = (uint32_t)sampler_count;
+  out_requirements->uniform_buffer_count = (uint32_t)uniform_buffer_count;
+  out_requirements->storage_buffer_count = (uint32_t)storage_buffer_count;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_command_buffer_create_descriptor_pool(
-    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
-    iree_hal_vulkan_command_buffer_t* command_buffer,
-    VkDescriptorPool* out_descriptor_pool) {
-  *out_descriptor_pool = VK_NULL_HANDLE;
-
-  uint32_t max_set_count = 0;
-  uint32_t sampler_count = 0;
-  uint32_t uniform_buffer_count = 0;
-  uint32_t storage_buffer_count = 0;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_command_buffer_count_native_descriptor_pool_requirements(
-          command_buffer, &max_set_count, &sampler_count, &uniform_buffer_count,
-          &storage_buffer_count));
-  if (max_set_count == 0) return iree_ok_status();
-
-  VkDescriptorPoolSize pool_sizes[3];
-  uint32_t pool_size_count = 0;
-  if (sampler_count != 0) {
-    pool_sizes[pool_size_count++] = (VkDescriptorPoolSize){
-        .type = VK_DESCRIPTOR_TYPE_SAMPLER,
-        .descriptorCount = sampler_count,
-    };
-  }
-  if (uniform_buffer_count != 0) {
-    pool_sizes[pool_size_count++] = (VkDescriptorPoolSize){
-        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = uniform_buffer_count,
-    };
-  }
-  if (storage_buffer_count != 0) {
-    pool_sizes[pool_size_count++] = (VkDescriptorPoolSize){
-        .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        .descriptorCount = storage_buffer_count,
-    };
-  }
-
-  VkDescriptorPoolCreateInfo create_info = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .maxSets = max_set_count,
-      .poolSizeCount = pool_size_count,
-      .pPoolSizes = pool_sizes,
-  };
-  return iree_vkCreateDescriptorPool(IREE_VULKAN_DEVICE(syms), logical_device,
-                                     &create_info, /*pAllocator=*/NULL,
-                                     out_descriptor_pool);
+iree_status_t
+iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t*
+        out_requirements) {
+  IREE_ASSERT_ARGUMENT(base_command_buffer);
+  IREE_ASSERT_ARGUMENT(out_requirements);
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  return iree_hal_vulkan_command_buffer_count_native_descriptor_pool_requirements(
+      command_buffer, out_requirements);
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_resolve_descriptor_binding(
@@ -1382,14 +1344,12 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* base_command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_builtins_t* builtins,
-    VkCommandBuffer native_command_buffer,
+    VkCommandBuffer native_command_buffer, VkDescriptorPool descriptor_pool,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
-    iree_allocator_t host_allocator, VkDescriptorPool* out_descriptor_pool) {
+    iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(syms);
   IREE_ASSERT_ARGUMENT(native_command_buffer);
-  IREE_ASSERT_ARGUMENT(out_descriptor_pool);
-  *out_descriptor_pool = VK_NULL_HANDLE;
 
   iree_hal_vulkan_command_buffer_t* command_buffer =
       iree_hal_vulkan_command_buffer_cast(base_command_buffer);
@@ -1400,18 +1360,13 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
   }
   if (!command_buffer->has_native_commands) return iree_ok_status();
 
-  VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-  iree_status_t status = iree_hal_vulkan_command_buffer_create_descriptor_pool(
-      syms, logical_device, command_buffer, &descriptor_pool);
-
-  if (iree_status_is_ok(status)) {
-    VkCommandBufferBeginInfo begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    };
-    status = iree_vkBeginCommandBuffer(IREE_VULKAN_DEVICE(syms),
-                                       native_command_buffer, &begin_info);
-  }
+  iree_status_t status = iree_ok_status();
+  VkCommandBufferBeginInfo begin_info = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+  status = iree_vkBeginCommandBuffer(IREE_VULKAN_DEVICE(syms),
+                                     native_command_buffer, &begin_info);
   if (iree_status_is_ok(status) && profile_marker &&
       profile_marker->query_pool && profile_marker->query_count != 0) {
     iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(syms), native_command_buffer,
@@ -1509,12 +1464,6 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
                                      native_command_buffer);
   }
 
-  if (iree_status_is_ok(status)) {
-    *out_descriptor_pool = descriptor_pool;
-  } else if (descriptor_pool) {
-    iree_vkDestroyDescriptorPool(IREE_VULKAN_DEVICE(syms), logical_device,
-                                 descriptor_pool, /*pAllocator=*/NULL);
-  }
   return status;
 }
 

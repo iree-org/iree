@@ -41,6 +41,29 @@ bool iree_hal_vulkan_command_buffer_has_native_commands(
 iree_host_size_t iree_hal_vulkan_command_buffer_dispatch_count(
     iree_hal_command_buffer_t* command_buffer);
 
+// Descriptor pool capacity required to replay a command buffer once into a
+// native VkCommandBuffer.
+typedef struct iree_hal_vulkan_command_buffer_descriptor_requirements_t {
+  // Number of descriptor sets required.
+  uint32_t set_count;
+
+  // Number of sampler descriptors required.
+  uint32_t sampler_count;
+
+  // Number of uniform-buffer descriptors required.
+  uint32_t uniform_buffer_count;
+
+  // Number of storage-buffer descriptors required.
+  uint32_t storage_buffer_count;
+} iree_hal_vulkan_command_buffer_descriptor_requirements_t;
+
+// Returns descriptor pool capacity required to replay |command_buffer| once
+// into a native VkCommandBuffer.
+iree_status_t
+iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t* out_requirements);
+
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
@@ -101,17 +124,17 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 // timestamped inside |native_command_buffer| around the requested queue payload
 // and dispatch commands.
 //
-// Descriptor sets are allocated from a transient descriptor pool returned in
-// |out_descriptor_pool|. The caller must keep that pool alive until
-// |native_command_buffer| is no longer executing, then destroy it.
+// Descriptor sets are allocated from |descriptor_pool|. The caller must keep
+// that pool alive until |native_command_buffer| is no longer executing. When
+// the command buffer has no descriptor requirements this may be VK_NULL_HANDLE.
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_builtins_t* builtins,
-    VkCommandBuffer native_command_buffer,
+    VkCommandBuffer native_command_buffer, VkDescriptorPool descriptor_pool,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
-    iree_allocator_t host_allocator, VkDescriptorPool* out_descriptor_pool);
+    iree_allocator_t host_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

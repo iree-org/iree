@@ -25,7 +25,7 @@
 #define IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_SLOT_ABSENT UINT32_MAX
 #define IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_SLOT_RESERVED UINT64_MAX
 #define IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_BLOCK_CAPACITY 64
-#define IREE_HAL_VULKAN_QUEUE_DISPATCH_DESCRIPTOR_BLOCK_SET_CAPACITY 4096
+#define IREE_HAL_VULKAN_QUEUE_NATIVE_DESCRIPTOR_BLOCK_SET_CAPACITY 4096
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_SET_CAPACITY 8
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_BINDING_CAPACITY 16
 
@@ -108,38 +108,27 @@ typedef struct iree_hal_vulkan_queue_descriptor_lease_t {
   uint32_t slot;
 } iree_hal_vulkan_queue_descriptor_lease_t;
 
-typedef struct iree_hal_vulkan_queue_dispatch_descriptor_requirements_t {
-  // Number of descriptor sets required.
-  uint32_t set_count;
-
-  // Number of uniform-buffer descriptors required.
-  uint32_t uniform_buffer_count;
-
-  // Number of storage-buffer descriptors required.
-  uint32_t storage_buffer_count;
-} iree_hal_vulkan_queue_dispatch_descriptor_requirements_t;
-
-struct iree_hal_vulkan_queue_dispatch_descriptor_block_t {
-  // Next block in the queue-owned dispatch descriptor cache.
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* next;
+struct iree_hal_vulkan_queue_native_descriptor_block_t {
+  // Next block in the queue-owned native descriptor pool cache.
+  iree_hal_vulkan_queue_native_descriptor_block_t* next;
 
   // Descriptor pool backing all allocations from this block.
   VkDescriptorPool pool;
 
   // Total descriptor capacity before the pool must be reset.
-  iree_hal_vulkan_queue_dispatch_descriptor_requirements_t capacity;
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t capacity;
 
   // Descriptor capacity allocated since the last pool reset.
-  iree_hal_vulkan_queue_dispatch_descriptor_requirements_t allocated;
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t allocated;
 
   // Number of submissions still using descriptor sets from this block.
   uint32_t active_lease_count;
 };
 
-typedef struct iree_hal_vulkan_queue_dispatch_descriptor_lease_t {
-  // Dispatch descriptor block containing this submission's descriptor sets.
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* block;
-} iree_hal_vulkan_queue_dispatch_descriptor_lease_t;
+typedef struct iree_hal_vulkan_queue_native_descriptor_lease_t {
+  // Native descriptor block containing this submission's descriptor pool.
+  iree_hal_vulkan_queue_native_descriptor_block_t* block;
+} iree_hal_vulkan_queue_native_descriptor_lease_t;
 
 typedef iree_status_t(
     IREE_API_PTR* iree_hal_vulkan_queue_record_native_submission_fn_t)(
@@ -320,11 +309,8 @@ struct iree_hal_vulkan_queue_pending_submission_t {
   // Number of entries populated in native_descriptor_leases.
   uint32_t native_descriptor_slot_count;
 
-  // Dispatch descriptor cache lease held by direct queue_dispatch.
-  iree_hal_vulkan_queue_dispatch_descriptor_lease_t dispatch_descriptor_lease;
-
-  // Descriptor pool backing native command-buffer descriptor sets.
-  VkDescriptorPool native_descriptor_pool;
+  // Descriptor-pool cache lease held by native command recording.
+  iree_hal_vulkan_queue_native_descriptor_lease_t native_descriptor_lease;
 
   // Optional action invoked after native queue completion.
   iree_hal_vulkan_queue_completion_action_t completion_action;
@@ -678,34 +664,39 @@ static void iree_hal_vulkan_queue_descriptor_cache_deinitialize(
   memset(&queue->descriptor_cache, 0, sizeof(queue->descriptor_cache));
 }
 
-static bool iree_hal_vulkan_queue_dispatch_descriptor_requirements_are_zero(
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+static bool iree_hal_vulkan_queue_native_descriptor_requirements_are_zero(
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements) {
-  return requirements->set_count == 0 &&
+  return requirements->set_count == 0 && requirements->sampler_count == 0 &&
          requirements->uniform_buffer_count == 0 &&
          requirements->storage_buffer_count == 0;
 }
 
-static bool iree_hal_vulkan_queue_dispatch_descriptor_requirements_fit(
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t* capacity,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t* allocated,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+static bool iree_hal_vulkan_queue_native_descriptor_requirements_fit(
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t* capacity,
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t* allocated,
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements) {
   return allocated->set_count <= capacity->set_count &&
+         allocated->sampler_count <= capacity->sampler_count &&
          allocated->uniform_buffer_count <= capacity->uniform_buffer_count &&
          allocated->storage_buffer_count <= capacity->storage_buffer_count &&
          requirements->set_count <=
              capacity->set_count - allocated->set_count &&
+         requirements->sampler_count <=
+             capacity->sampler_count - allocated->sampler_count &&
          requirements->uniform_buffer_count <=
              capacity->uniform_buffer_count - allocated->uniform_buffer_count &&
          requirements->storage_buffer_count <=
              capacity->storage_buffer_count - allocated->storage_buffer_count;
 }
 
-static void iree_hal_vulkan_queue_dispatch_descriptor_requirements_add(
-    iree_hal_vulkan_queue_dispatch_descriptor_requirements_t* inout_value,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t* value) {
+static void iree_hal_vulkan_queue_native_descriptor_requirements_add(
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t* inout_value,
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t* value) {
   inout_value->set_count = inout_value->set_count + value->set_count;
+  inout_value->sampler_count =
+      inout_value->sampler_count + value->sampler_count;
   inout_value->uniform_buffer_count =
       inout_value->uniform_buffer_count + value->uniform_buffer_count;
   inout_value->storage_buffer_count =
@@ -715,7 +706,7 @@ static void iree_hal_vulkan_queue_dispatch_descriptor_requirements_add(
 static iree_status_t
 iree_hal_vulkan_queue_calculate_dispatch_descriptor_requirements(
     const iree_hal_vulkan_pipeline_t* pipeline,
-    iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         out_requirements) {
   memset(out_requirements, 0, sizeof(*out_requirements));
   if (pipeline->descriptor_set_layout_count > UINT32_MAX ||
@@ -727,6 +718,9 @@ iree_hal_vulkan_queue_calculate_dispatch_descriptor_requirements(
   out_requirements->set_count = (uint32_t)pipeline->descriptor_set_layout_count;
   for (iree_host_size_t i = 0; i < pipeline->descriptor_binding_count; ++i) {
     switch (pipeline->descriptor_bindings[i].descriptor_type) {
+      case VK_DESCRIPTOR_TYPE_SAMPLER:
+        out_requirements->sampler_count = out_requirements->sampler_count + 1;
+        break;
       case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
         out_requirements->uniform_buffer_count =
             out_requirements->uniform_buffer_count + 1;
@@ -745,20 +739,24 @@ iree_hal_vulkan_queue_calculate_dispatch_descriptor_requirements(
   return iree_ok_status();
 }
 
-static void iree_hal_vulkan_queue_calculate_dispatch_descriptor_block_capacity(
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+static void iree_hal_vulkan_queue_calculate_native_descriptor_block_capacity(
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements,
-    iree_hal_vulkan_queue_dispatch_descriptor_requirements_t* out_capacity) {
+    iree_hal_vulkan_command_buffer_descriptor_requirements_t* out_capacity) {
   memset(out_capacity, 0, sizeof(*out_capacity));
   if (requirements->set_count == 0) return;
 
   uint32_t submission_capacity =
-      IREE_HAL_VULKAN_QUEUE_DISPATCH_DESCRIPTOR_BLOCK_SET_CAPACITY /
+      IREE_HAL_VULKAN_QUEUE_NATIVE_DESCRIPTOR_BLOCK_SET_CAPACITY /
       requirements->set_count;
   if (submission_capacity == 0) submission_capacity = 1;
   if (requirements->uniform_buffer_count != 0) {
     submission_capacity = iree_min(
         submission_capacity, UINT32_MAX / requirements->uniform_buffer_count);
+  }
+  if (requirements->sampler_count != 0) {
+    submission_capacity =
+        iree_min(submission_capacity, UINT32_MAX / requirements->sampler_count);
   }
   if (requirements->storage_buffer_count != 0) {
     submission_capacity = iree_min(
@@ -766,35 +764,43 @@ static void iree_hal_vulkan_queue_calculate_dispatch_descriptor_block_capacity(
   }
 
   out_capacity->set_count = requirements->set_count * submission_capacity;
+  out_capacity->sampler_count =
+      requirements->sampler_count * submission_capacity;
   out_capacity->uniform_buffer_count =
       requirements->uniform_buffer_count * submission_capacity;
   out_capacity->storage_buffer_count =
       requirements->storage_buffer_count * submission_capacity;
 }
 
-static iree_status_t iree_hal_vulkan_queue_dispatch_descriptor_block_create(
+static iree_status_t iree_hal_vulkan_queue_native_descriptor_block_create(
     iree_hal_vulkan_queue_t* queue,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements,
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t** out_block) {
+    iree_hal_vulkan_queue_native_descriptor_block_t** out_block) {
   *out_block = NULL;
-  iree_hal_vulkan_queue_dispatch_descriptor_requirements_t capacity;
-  iree_hal_vulkan_queue_calculate_dispatch_descriptor_block_capacity(
-      requirements, &capacity);
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t capacity;
+  iree_hal_vulkan_queue_calculate_native_descriptor_block_capacity(requirements,
+                                                                   &capacity);
   if (capacity.set_count == 0) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan queue dispatch descriptor block requires descriptor sets");
+        "Vulkan native descriptor block requires descriptor sets");
   }
 
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* block = NULL;
+  iree_hal_vulkan_queue_native_descriptor_block_t* block = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator,
                                              sizeof(*block), (void**)&block));
   memset(block, 0, sizeof(*block));
   block->capacity = capacity;
 
-  VkDescriptorPoolSize pool_sizes[2];
+  VkDescriptorPoolSize pool_sizes[3];
   uint32_t pool_size_count = 0;
+  if (capacity.sampler_count != 0) {
+    pool_sizes[pool_size_count++] = (VkDescriptorPoolSize){
+        .type = VK_DESCRIPTOR_TYPE_SAMPLER,
+        .descriptorCount = capacity.sampler_count,
+    };
+  }
   if (capacity.uniform_buffer_count != 0) {
     pool_sizes[pool_size_count++] = (VkDescriptorPoolSize){
         .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -824,9 +830,9 @@ static iree_status_t iree_hal_vulkan_queue_dispatch_descriptor_block_create(
   return status;
 }
 
-static void iree_hal_vulkan_queue_dispatch_descriptor_block_destroy(
+static void iree_hal_vulkan_queue_native_descriptor_block_destroy(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* block) {
+    iree_hal_vulkan_queue_native_descriptor_block_t* block) {
   if (!block) return;
   if (block->pool) {
     iree_vkDestroyDescriptorPool(IREE_VULKAN_DEVICE(&queue->syms),
@@ -836,41 +842,41 @@ static void iree_hal_vulkan_queue_dispatch_descriptor_block_destroy(
   iree_allocator_free(queue->host_allocator, block);
 }
 
-static void iree_hal_vulkan_queue_dispatch_descriptor_cache_append_block(
+static void iree_hal_vulkan_queue_native_descriptor_cache_append_block(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* block) {
+    iree_hal_vulkan_queue_native_descriptor_block_t* block) {
   block->next = NULL;
-  if (queue->dispatch_descriptor_cache.tail) {
-    queue->dispatch_descriptor_cache.tail->next = block;
+  if (queue->native_descriptor_cache.tail) {
+    queue->native_descriptor_cache.tail->next = block;
   } else {
-    queue->dispatch_descriptor_cache.head = block;
+    queue->native_descriptor_cache.head = block;
   }
-  queue->dispatch_descriptor_cache.tail = block;
-  if (!queue->dispatch_descriptor_cache.cursor) {
-    queue->dispatch_descriptor_cache.cursor = block;
+  queue->native_descriptor_cache.tail = block;
+  if (!queue->native_descriptor_cache.cursor) {
+    queue->native_descriptor_cache.cursor = block;
   }
-  queue->dispatch_descriptor_cache.block_count =
-      queue->dispatch_descriptor_cache.block_count + 1;
+  queue->native_descriptor_cache.block_count =
+      queue->native_descriptor_cache.block_count + 1;
 }
 
-static void iree_hal_vulkan_queue_dispatch_descriptor_cache_deinitialize(
+static void iree_hal_vulkan_queue_native_descriptor_cache_deinitialize(
     iree_hal_vulkan_queue_t* queue) {
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* block =
-      queue->dispatch_descriptor_cache.head;
+  iree_hal_vulkan_queue_native_descriptor_block_t* block =
+      queue->native_descriptor_cache.head;
   while (block) {
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* next = block->next;
-    iree_hal_vulkan_queue_dispatch_descriptor_block_destroy(queue, block);
+    iree_hal_vulkan_queue_native_descriptor_block_t* next = block->next;
+    iree_hal_vulkan_queue_native_descriptor_block_destroy(queue, block);
     block = next;
   }
-  memset(&queue->dispatch_descriptor_cache, 0,
-         sizeof(queue->dispatch_descriptor_cache));
+  memset(&queue->native_descriptor_cache, 0,
+         sizeof(queue->native_descriptor_cache));
 }
 
-static iree_status_t iree_hal_vulkan_queue_dispatch_descriptor_block_reset(
+static iree_status_t iree_hal_vulkan_queue_native_descriptor_block_reset(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* block) {
+    iree_hal_vulkan_queue_native_descriptor_block_t* block) {
   IREE_ASSERT(block->active_lease_count == 0,
-              "cannot reset a dispatch descriptor block with active leases");
+              "cannot reset a native descriptor block with active leases");
   IREE_RETURN_IF_ERROR(iree_vkResetDescriptorPool(
       IREE_VULKAN_DEVICE(&queue->syms), queue->logical_device, block->pool,
       /*flags=*/0));
@@ -879,121 +885,109 @@ static iree_status_t iree_hal_vulkan_queue_dispatch_descriptor_block_reset(
 }
 
 static iree_status_t
-iree_hal_vulkan_queue_allocate_dispatch_descriptor_sets_from_block(
+iree_hal_vulkan_queue_acquire_native_descriptor_pool_from_block(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* block,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+    iree_hal_vulkan_queue_native_descriptor_block_t* block,
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements,
-    const iree_hal_vulkan_pipeline_t* pipeline,
-    VkDescriptorSet* out_descriptor_sets) {
-  VkDescriptorSetAllocateInfo allocate_info = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = block->pool,
-      .descriptorSetCount = requirements->set_count,
-      .pSetLayouts = pipeline->descriptor_set_layouts,
-  };
-  IREE_RETURN_IF_ERROR(iree_vkAllocateDescriptorSets(
-      IREE_VULKAN_DEVICE(&queue->syms), queue->logical_device, &allocate_info,
-      out_descriptor_sets));
-  iree_hal_vulkan_queue_dispatch_descriptor_requirements_add(&block->allocated,
-                                                             requirements);
+    VkDescriptorPool* out_descriptor_pool) {
+  iree_hal_vulkan_queue_native_descriptor_requirements_add(&block->allocated,
+                                                           requirements);
   block->active_lease_count = block->active_lease_count + 1;
-  submission->dispatch_descriptor_lease.block = block;
-  queue->dispatch_descriptor_cache.cursor = block;
+  submission->native_descriptor_lease.block = block;
+  queue->native_descriptor_cache.cursor = block;
+  *out_descriptor_pool = block->pool;
   return iree_ok_status();
 }
 
 static iree_status_t
-iree_hal_vulkan_queue_try_acquire_dispatch_descriptor_sets_under_lock(
+iree_hal_vulkan_queue_try_acquire_native_descriptor_pool_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements,
-    const iree_hal_vulkan_pipeline_t* pipeline,
-    VkDescriptorSet* out_descriptor_sets, bool* out_acquired) {
+    VkDescriptorPool* out_descriptor_pool, bool* out_acquired) {
   *out_acquired = false;
-  const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t zero = {0};
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* first_block =
-      queue->dispatch_descriptor_cache.cursor
-          ? queue->dispatch_descriptor_cache.cursor
-          : queue->dispatch_descriptor_cache.head;
-  iree_hal_vulkan_queue_dispatch_descriptor_block_t* block = first_block;
+  *out_descriptor_pool = VK_NULL_HANDLE;
+  const iree_hal_vulkan_command_buffer_descriptor_requirements_t zero = {0};
+  iree_hal_vulkan_queue_native_descriptor_block_t* first_block =
+      queue->native_descriptor_cache.cursor
+          ? queue->native_descriptor_cache.cursor
+          : queue->native_descriptor_cache.head;
+  iree_hal_vulkan_queue_native_descriptor_block_t* block = first_block;
   while (block) {
-    if (iree_hal_vulkan_queue_dispatch_descriptor_requirements_fit(
+    if (iree_hal_vulkan_queue_native_descriptor_requirements_fit(
             &block->capacity, &zero, requirements)) {
-      if (!iree_hal_vulkan_queue_dispatch_descriptor_requirements_fit(
+      if (!iree_hal_vulkan_queue_native_descriptor_requirements_fit(
               &block->capacity, &block->allocated, requirements) &&
           block->active_lease_count == 0) {
         IREE_RETURN_IF_ERROR(
-            iree_hal_vulkan_queue_dispatch_descriptor_block_reset(queue,
-                                                                  block));
+            iree_hal_vulkan_queue_native_descriptor_block_reset(queue, block));
       }
-      if (iree_hal_vulkan_queue_dispatch_descriptor_requirements_fit(
+      if (iree_hal_vulkan_queue_native_descriptor_requirements_fit(
               &block->capacity, &block->allocated, requirements)) {
         IREE_RETURN_IF_ERROR(
-            iree_hal_vulkan_queue_allocate_dispatch_descriptor_sets_from_block(
-                queue, submission, block, requirements, pipeline,
-                out_descriptor_sets));
+            iree_hal_vulkan_queue_acquire_native_descriptor_pool_from_block(
+                queue, submission, block, requirements, out_descriptor_pool));
         *out_acquired = true;
         return iree_ok_status();
       }
     }
 
     block = block->next;
-    if (!block && first_block != queue->dispatch_descriptor_cache.head) {
-      block = queue->dispatch_descriptor_cache.head;
-      first_block = queue->dispatch_descriptor_cache.head;
+    if (!block && first_block != queue->native_descriptor_cache.head) {
+      block = queue->native_descriptor_cache.head;
+      first_block = queue->native_descriptor_cache.head;
     }
   }
   return iree_ok_status();
 }
 
 static iree_status_t
-iree_hal_vulkan_queue_acquire_dispatch_descriptor_sets_under_lock(
+iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
-    const iree_hal_vulkan_queue_dispatch_descriptor_requirements_t*
+    const iree_hal_vulkan_command_buffer_descriptor_requirements_t*
         requirements,
-    const iree_hal_vulkan_pipeline_t* pipeline,
-    VkDescriptorSet* out_descriptor_sets) {
-  if (iree_hal_vulkan_queue_dispatch_descriptor_requirements_are_zero(
+    VkDescriptorPool* out_descriptor_pool) {
+  *out_descriptor_pool = VK_NULL_HANDLE;
+  if (iree_hal_vulkan_queue_native_descriptor_requirements_are_zero(
           requirements)) {
     return iree_ok_status();
   }
-  if (submission->dispatch_descriptor_lease.block) {
+  if (submission->native_descriptor_lease.block) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan queue submission already owns dispatch descriptor sets");
+        "Vulkan queue submission already owns a native descriptor pool");
   }
 
   for (;;) {
     bool acquired = false;
     iree_status_t status =
-        iree_hal_vulkan_queue_try_acquire_dispatch_descriptor_sets_under_lock(
-            queue, submission, requirements, pipeline, out_descriptor_sets,
-            &acquired);
+        iree_hal_vulkan_queue_try_acquire_native_descriptor_pool_under_lock(
+            queue, submission, requirements, out_descriptor_pool, &acquired);
     if (!iree_status_is_ok(status) || acquired) return status;
 
-    iree_hal_vulkan_queue_dispatch_descriptor_block_t* block = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_dispatch_descriptor_block_create(
+    iree_hal_vulkan_queue_native_descriptor_block_t* block = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_native_descriptor_block_create(
         queue, requirements, &block));
-    iree_hal_vulkan_queue_dispatch_descriptor_cache_append_block(queue, block);
+    iree_hal_vulkan_queue_native_descriptor_cache_append_block(queue, block);
   }
 }
 
-static void iree_hal_vulkan_queue_release_dispatch_descriptor_sets(
+static void iree_hal_vulkan_queue_release_native_descriptor_pool(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
-  iree_hal_vulkan_queue_dispatch_descriptor_lease_t* lease =
-      &submission->dispatch_descriptor_lease;
+  iree_hal_vulkan_queue_native_descriptor_lease_t* lease =
+      &submission->native_descriptor_lease;
   if (!lease->block) return;
 
   iree_slim_mutex_lock(&queue->submission_mutex);
   IREE_ASSERT(lease->block->active_lease_count > 0,
-              "dispatch descriptor block active lease count underflow");
+              "native descriptor block active lease count underflow");
   lease->block->active_lease_count = lease->block->active_lease_count - 1;
-  queue->dispatch_descriptor_cache.cursor = lease->block;
+  queue->native_descriptor_cache.cursor = lease->block;
   lease->block = NULL;
   iree_slim_mutex_unlock(&queue->submission_mutex);
 }
@@ -2486,7 +2480,7 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
     iree_allocator_free(queue->host_allocator, submission->sparse_bind.binds);
   }
   iree_hal_vulkan_queue_release_descriptor_cache_sets(queue, submission);
-  iree_hal_vulkan_queue_release_dispatch_descriptor_sets(queue, submission);
+  iree_hal_vulkan_queue_release_native_descriptor_pool(queue, submission);
   if (submission->fill.target_buffer) {
     iree_hal_buffer_release(submission->fill.target_buffer);
   }
@@ -2511,12 +2505,6 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   }
   if (submission->dealloca.buffer) {
     iree_hal_buffer_release(submission->dealloca.buffer);
-  }
-  if (submission->native_descriptor_pool) {
-    iree_vkDestroyDescriptorPool(IREE_VULKAN_DEVICE(&queue->syms),
-                                 queue->logical_device,
-                                 submission->native_descriptor_pool,
-                                 /*pAllocator=*/NULL);
   }
   iree_hal_vulkan_queue_release_completion_action(submission);
   if (submission->profile.query_pool) {
@@ -4731,7 +4719,7 @@ void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue) {
   queue->upload_staging_ring = NULL;
   queue->device_allocator = NULL;
   iree_hal_vulkan_queue_descriptor_cache_deinitialize(queue);
-  iree_hal_vulkan_queue_dispatch_descriptor_cache_deinitialize(queue);
+  iree_hal_vulkan_queue_native_descriptor_cache_deinitialize(queue);
   iree_hal_vulkan_queue_command_buffer_cache_deinitialize(queue);
   if (queue->epoch_semaphore) {
     iree_vkDestroySemaphore(IREE_VULKAN_DEVICE(&queue->syms),
@@ -6493,7 +6481,7 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
         queue, submission);
   }
 
-  iree_hal_vulkan_queue_dispatch_descriptor_requirements_t
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t
       descriptor_requirements;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_calculate_dispatch_descriptor_requirements(
@@ -6509,9 +6497,21 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
         queue->host_allocator, descriptor_requirements.set_count,
         sizeof(descriptor_sets[0]), (void**)&descriptor_sets);
   }
+  VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
   if (iree_status_is_ok(status) && descriptor_requirements.set_count != 0) {
-    status = iree_hal_vulkan_queue_acquire_dispatch_descriptor_sets_under_lock(
-        queue, submission, &descriptor_requirements, pipeline, descriptor_sets);
+    status = iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
+        queue, submission, &descriptor_requirements, &descriptor_pool);
+  }
+  if (iree_status_is_ok(status) && descriptor_requirements.set_count != 0) {
+    VkDescriptorSetAllocateInfo allocate_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptor_pool,
+        .descriptorSetCount = descriptor_requirements.set_count,
+        .pSetLayouts = pipeline->descriptor_set_layouts,
+    };
+    status = iree_vkAllocateDescriptorSets(IREE_VULKAN_DEVICE(&queue->syms),
+                                           queue->logical_device,
+                                           &allocate_info, descriptor_sets);
   }
 
   VkDescriptorBufferInfo inline_buffer_infos
@@ -6807,21 +6807,36 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
   return status;
 }
 
-static iree_status_t iree_hal_vulkan_queue_prepare_native_execute_submission(
+static iree_status_t iree_hal_vulkan_queue_record_execute_native(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_pending_submission_t* submission,
-    iree_hal_buffer_binding_table_t binding_table) {
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (!iree_hal_vulkan_command_buffer_has_native_commands(
           submission->execute.command_buffer)) {
     return iree_ok_status();
   }
   iree_status_t status =
-      iree_hal_vulkan_queue_allocate_native_command_buffer(queue, submission);
+      iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
+          queue, submission);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
         queue, submission);
   }
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t
+      descriptor_requirements;
   if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
+        submission->execute.command_buffer, &descriptor_requirements);
+  }
+  VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+  if (iree_status_is_ok(status) && descriptor_requirements.set_count != 0) {
+    status = iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
+        queue, submission, &descriptor_requirements, &descriptor_pool);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_buffer_binding_table_t binding_table = {
+        .count = submission->execute.binding_table_count,
+        .bindings = submission->execute.binding_table_bindings,
+    };
     iree_hal_vulkan_command_buffer_profile_marker_t profile_marker = {
         .query_pool = submission->profile.query_pool,
         .query_count = submission->profile.query_count,
@@ -6832,9 +6847,9 @@ static iree_status_t iree_hal_vulkan_queue_prepare_native_execute_submission(
     };
     status = iree_hal_vulkan_command_buffer_record_native(
         submission->execute.command_buffer, &queue->syms, queue->logical_device,
-        queue->builtins, submission->native_command_buffer, binding_table,
-        profile_marker.query_pool ? &profile_marker : NULL,
-        queue->host_allocator, &submission->native_descriptor_pool);
+        queue->builtins, submission->native_command_buffer, descriptor_pool,
+        binding_table, profile_marker.query_pool ? &profile_marker : NULL,
+        queue->host_allocator);
   }
   return status;
 }
@@ -6931,19 +6946,16 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
     }
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_binding_table_t captured_binding_table = {
-        .count = submission->execute.binding_table_count,
-        .bindings = submission->execute.binding_table_bindings,
-    };
     const uint64_t command_buffer_id =
         iree_hal_vulkan_queue_profile_command_buffer_id(submission);
     status = iree_hal_vulkan_command_buffer_record_profile_metadata(
         command_buffer, queue->profile_recorder, submission->profile.scope,
         command_buffer_id);
-    if (iree_status_is_ok(status)) {
-      status = iree_hal_vulkan_queue_prepare_native_execute_submission(
-          queue, submission, captured_binding_table);
-    }
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_command_buffer_has_native_commands(command_buffer)) {
+    submission->record_native_submission =
+        iree_hal_vulkan_queue_record_execute_native;
   }
   if (iree_status_is_ok(status)) {
     status =
