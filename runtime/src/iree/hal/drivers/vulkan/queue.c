@@ -1536,9 +1536,7 @@ static iree_status_t iree_hal_vulkan_queue_staging_ring_create(
     }
     *out_ring = ring;
   } else {
-    if (ring->mapping.contents.data) {
-      iree_hal_buffer_unmap_range(&ring->mapping);
-    }
+    iree_hal_buffer_unmap_range(&ring->mapping);
     iree_hal_buffer_release(ring->buffer);
     iree_slim_mutex_deinitialize(&ring->mutex);
     iree_allocator_free(queue->host_allocator, ring);
@@ -1549,9 +1547,7 @@ static iree_status_t iree_hal_vulkan_queue_staging_ring_create(
 static void iree_hal_vulkan_queue_staging_ring_destroy(
     iree_hal_vulkan_queue_staging_ring_t* ring) {
   if (!ring) return;
-  if (ring->mapping.contents.data) {
-    iree_hal_buffer_unmap_range(&ring->mapping);
-  }
+  iree_hal_buffer_unmap_range(&ring->mapping);
   iree_hal_buffer_release(ring->buffer);
   iree_slim_mutex_deinitialize(&ring->mutex);
   iree_allocator_free(ring->host_allocator, ring);
