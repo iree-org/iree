@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 
 #ifdef __cplusplus
@@ -38,6 +39,9 @@ typedef struct iree_hal_vulkan_descriptor_binding_t {
 typedef struct iree_hal_vulkan_pipeline_t {
   // Vulkan compute pipeline handle owned by the executable.
   VkPipeline handle;
+
+  // Single executable dispatch ABI bit used by this pipeline.
+  iree_hal_vulkan_dispatch_abis_t dispatch_abi;
 
   // Vulkan pipeline layout handle owned by the executable.
   VkPipelineLayout layout;
@@ -82,6 +86,7 @@ iree_status_t iree_hal_vulkan_executable_infer_format(
 // |format|.
 bool iree_hal_vulkan_executable_format_supported(
     iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     iree_string_view_t executable_format);
 
 // Creates a prepared Vulkan executable from compiler-produced FlatBuffer data.
@@ -89,6 +94,7 @@ iree_status_t iree_hal_vulkan_executable_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features, VkPipelineCache pipeline_cache,
+    iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 

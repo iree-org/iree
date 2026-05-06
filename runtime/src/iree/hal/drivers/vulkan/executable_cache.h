@@ -20,6 +20,7 @@ iree_status_t iree_hal_vulkan_executable_cache_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features, iree_string_view_t identifier,
+    iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 

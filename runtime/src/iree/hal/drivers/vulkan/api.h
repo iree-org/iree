@@ -236,10 +236,39 @@ typedef enum iree_hal_vulkan_device_flag_bits_t {
 
 typedef uint32_t iree_hal_vulkan_device_flags_t;
 
+typedef enum iree_hal_vulkan_dispatch_abi_bits_t {
+  // No executable dispatch ABIs are enabled.
+  IREE_HAL_VULKAN_DISPATCH_ABI_NONE = 0u,
+  // Descriptor-set based storage-buffer dispatch ABI.
+  IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR = 1u << 0,
+  // Buffer-device-address based storage-buffer dispatch ABI.
+  IREE_HAL_VULKAN_DISPATCH_ABI_BDA = 1u << 1,
+  // Recognized executable dispatch ABI bits accepted by public APIs.
+  IREE_HAL_VULKAN_DISPATCH_ABI_ALL_RECOGNIZED =
+      IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR |
+      IREE_HAL_VULKAN_DISPATCH_ABI_BDA,
+} iree_hal_vulkan_dispatch_abi_bits_t;
+
+typedef uint32_t iree_hal_vulkan_dispatch_abis_t;
+
+// Parses a dispatch ABI option string.
+//
+// Accepted values are "descriptor", "bda", "both", and "all". The output is a
+// non-empty bitmask suitable for iree_hal_vulkan_device_options_t.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_dispatch_abis_parse(
+    iree_string_view_t value, iree_hal_vulkan_dispatch_abis_t* out_abis);
+
+// Verifies that |dispatch_abis| contains a non-empty recognized ABI bit set.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_dispatch_abis_verify(
+    iree_hal_vulkan_dispatch_abis_t dispatch_abis);
+
 // Parameters configuring an iree_hal_vulkan_device_t.
 typedef struct iree_hal_vulkan_device_options_t {
   // Device behavior flags.
   iree_hal_vulkan_device_flags_t flags;
+
+  // Executable dispatch ABIs accepted by this logical device.
+  iree_hal_vulkan_dispatch_abis_t dispatch_abis;
 } iree_hal_vulkan_device_options_t;
 
 // Initializes |out_options| to default values.

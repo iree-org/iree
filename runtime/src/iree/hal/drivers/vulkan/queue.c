@@ -956,6 +956,12 @@ iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
           requirements)) {
     return iree_ok_status();
   }
+  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
+                         IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan descriptor dispatch ABI is disabled for this queue");
+  }
   if (submission->native_descriptor_lease.block) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -4640,11 +4646,14 @@ iree_status_t iree_hal_vulkan_queue_initialize(
   IREE_ASSERT_ARGUMENT(params->proactor);
   IREE_ASSERT_ARGUMENT(out_queue);
   memset(out_queue, 0, sizeof(*out_queue));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_dispatch_abis_verify(params->enabled_dispatch_abis));
 
   out_queue->device = params->device;
   out_queue->syms = *params->syms;
   out_queue->logical_device = params->logical_device;
   out_queue->builtins = params->builtins;
+  out_queue->enabled_dispatch_abis = params->enabled_dispatch_abis;
   out_queue->queue = params->queue;
   out_queue->queue_flags = params->queue_flags;
   out_queue->timestamp_valid_bits = params->timestamp_valid_bits;
@@ -6366,6 +6375,84 @@ iree_hal_vulkan_queue_validate_dispatch_indirect_parameters(
                                         workgroup_count_length);
 }
 
+static iree_status_t iree_hal_vulkan_queue_validate_dispatch_descriptor(
+    iree_hal_vulkan_queue_t* queue, const iree_hal_vulkan_pipeline_t* pipeline,
+    const iree_hal_buffer_ref_list_t bindings) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
+                         IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan descriptor dispatch ABI is disabled for this queue");
+  }
+  if (iree_status_is_ok(status) &&
+      bindings.count != pipeline->descriptor_binding_count) {
+    status =
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "Vulkan queue_dispatch provides %" PRIhsz
+                         " bindings but descriptor pipeline expects %" PRIhsz,
+                         bindings.count, pipeline->descriptor_binding_count);
+  }
+  for (iree_host_size_t i = 0;
+       iree_status_is_ok(status) && i < pipeline->descriptor_binding_count;
+       ++i) {
+    const VkDescriptorType descriptor_type =
+        pipeline->descriptor_bindings[i].descriptor_type;
+    status = iree_hal_vulkan_queue_validate_dispatch_binding(
+        &bindings.values[i], descriptor_type);
+    if (!iree_status_is_ok(status)) {
+      status = iree_status_annotate_f(status, "binding[%" PRIhsz "]", i);
+    }
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
+    iree_hal_vulkan_queue_t* queue, const iree_hal_vulkan_pipeline_t* pipeline,
+    const iree_hal_buffer_ref_list_t bindings) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
+                         IREE_HAL_VULKAN_DISPATCH_ABI_BDA)) {
+    status =
+        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                         "Vulkan BDA dispatch ABI is disabled for this queue");
+  }
+  if (iree_status_is_ok(status) && bindings.count != pipeline->binding_count) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan queue_dispatch provides %" PRIhsz
+                              " bindings but BDA pipeline expects %u",
+                              bindings.count, pipeline->binding_count);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan BDA dispatch ABI requires executable metadata and publication "
+        "rings");
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_queue_validate_dispatch_abi(
+    iree_hal_vulkan_queue_t* queue, const iree_hal_vulkan_pipeline_t* pipeline,
+    const iree_hal_buffer_ref_list_t bindings) {
+  switch (pipeline->dispatch_abi) {
+    case IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR:
+      return iree_hal_vulkan_queue_validate_dispatch_descriptor(queue, pipeline,
+                                                                bindings);
+    case IREE_HAL_VULKAN_DISPATCH_ABI_BDA:
+      return iree_hal_vulkan_queue_validate_dispatch_bda(queue, pipeline,
+                                                         bindings);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan pipeline has invalid dispatch ABI 0x%08x",
+                              pipeline->dispatch_abi);
+  }
+}
+
 static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
     const iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_hal_vulkan_descriptor_binding_t* descriptor_binding,
@@ -6465,13 +6552,18 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_indirect_parameters(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
+static iree_status_t iree_hal_vulkan_queue_record_dispatch_descriptor_native(
     iree_hal_vulkan_queue_t* queue,
-    iree_hal_vulkan_queue_pending_submission_t* submission) {
-  const iree_hal_vulkan_pipeline_t* pipeline = NULL;
-  iree_status_t status = iree_hal_vulkan_executable_lookup_pipeline(
-      submission->dispatch.executable, submission->dispatch.export_ordinal,
-      &pipeline);
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const iree_hal_vulkan_pipeline_t* pipeline) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
+                         IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan descriptor dispatch ABI is disabled for this queue");
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
         queue, submission);
@@ -6644,7 +6736,59 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
   if (descriptor_sets != inline_descriptor_sets) {
     iree_allocator_free(queue->host_allocator, descriptor_sets);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    const iree_hal_vulkan_pipeline_t* pipeline) {
+  (void)submission;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
+                         IREE_HAL_VULKAN_DISPATCH_ABI_BDA)) {
+    status =
+        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                         "Vulkan BDA dispatch ABI is disabled for this queue");
+  }
+  if (iree_status_is_ok(status) &&
+      pipeline->dispatch_abi != IREE_HAL_VULKAN_DISPATCH_ABI_BDA) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan pipeline has invalid BDA dispatch ABI "
+                              "0x%08x",
+                              pipeline->dispatch_abi);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan BDA dispatch ABI requires executable metadata and publication "
+        "rings");
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  const iree_hal_vulkan_pipeline_t* pipeline = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
+      submission->dispatch.executable, submission->dispatch.export_ordinal,
+      &pipeline));
+  switch (pipeline->dispatch_abi) {
+    case IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR:
+      return iree_hal_vulkan_queue_record_dispatch_descriptor_native(
+          queue, submission, pipeline);
+    case IREE_HAL_VULKAN_DISPATCH_ABI_BDA:
+      return iree_hal_vulkan_queue_record_dispatch_bda_native(queue, submission,
+                                                              pipeline);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan pipeline has invalid dispatch ABI 0x%08x",
+                              pipeline->dispatch_abi);
+  }
 }
 
 iree_status_t iree_hal_vulkan_queue_submit_dispatch(
@@ -6707,24 +6851,9 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
         constants.data_length,
         (uint32_t)pipeline->constant_count * (uint32_t)sizeof(uint32_t));
   }
-  if (iree_status_is_ok(status) &&
-      bindings.count != pipeline->descriptor_binding_count) {
+  if (iree_status_is_ok(status)) {
     status =
-        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                         "Vulkan queue_dispatch provides %" PRIhsz
-                         " bindings but pipeline expects %" PRIhsz,
-                         bindings.count, pipeline->descriptor_binding_count);
-  }
-  for (iree_host_size_t i = 0;
-       iree_status_is_ok(status) && i < pipeline->descriptor_binding_count;
-       ++i) {
-    const VkDescriptorType descriptor_type =
-        pipeline->descriptor_bindings[i].descriptor_type;
-    status = iree_hal_vulkan_queue_validate_dispatch_binding(
-        &bindings.values[i], descriptor_type);
-    if (!iree_status_is_ok(status)) {
-      status = iree_status_annotate_f(status, "binding[%" PRIhsz "]", i);
-    }
+        iree_hal_vulkan_queue_validate_dispatch_abi(queue, pipeline, bindings);
   }
   if (iree_status_is_ok(status) &&
       iree_hal_dispatch_uses_indirect_parameters(flags)) {

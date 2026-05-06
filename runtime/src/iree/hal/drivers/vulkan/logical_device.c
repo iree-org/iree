@@ -53,12 +53,19 @@ typedef struct iree_hal_vulkan_physical_device_selector_t {
 static iree_status_t iree_hal_vulkan_device_options_parse(
     iree_hal_vulkan_device_options_t* options, iree_string_pair_list_t params) {
   IREE_ASSERT_ARGUMENT(options);
-  if (!params.count) return iree_ok_status();
-  const iree_string_pair_t* first_param = &params.pairs[0];
-  return iree_make_status(
-      IREE_STATUS_INVALID_ARGUMENT,
-      "Vulkan logical device options do not support key/value parameter '%.*s'",
-      (int)first_param->key.size, first_param->key.data);
+  for (iree_host_size_t i = 0; i < params.count; ++i) {
+    const iree_string_pair_t* param = &params.pairs[i];
+    if (iree_string_view_equal(param->key, IREE_SV("dispatch_abi")) ||
+        iree_string_view_equal(param->key, IREE_SV("vulkan_dispatch_abi"))) {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_parse(
+          param->value, &options->dispatch_abis));
+    } else {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unknown Vulkan logical device option '%.*s'",
+                              (int)param->key.size, param->key.data);
+    }
+  }
+  return iree_hal_vulkan_dispatch_abis_verify(options->dispatch_abis);
 }
 
 static bool iree_hal_vulkan_selector_matches(
@@ -654,6 +661,21 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_verify_enabled_dispatch_abis(
+    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_dispatch_abis_t dispatch_abis) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_verify(dispatch_abis));
+  if (iree_all_bits_set(dispatch_abis, IREE_HAL_VULKAN_DISPATCH_ABI_BDA) &&
+      !iree_all_bits_set(
+          enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan BDA dispatch ABI requires bufferDeviceAddress");
+  }
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_logical_device_t
 //===----------------------------------------------------------------------===//
@@ -697,6 +719,9 @@ struct iree_hal_vulkan_logical_device_t {
 
   // HAL feature bits enabled on the logical device.
   iree_hal_vulkan_features_t enabled_features;
+
+  // Executable dispatch ABI bits enabled on the logical device.
+  iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis;
 
   // Recognized Vulkan device extension bits enabled on the logical device.
   iree_hal_vulkan_device_extensions_t enabled_extensions;
@@ -1130,10 +1155,11 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
     return iree_ok_status();
   }
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
-    *out_value = iree_hal_vulkan_executable_format_supported(
-                     device->enabled_features, key)
-                     ? 1
-                     : 0;
+    *out_value =
+        iree_hal_vulkan_executable_format_supported(
+            device->enabled_features, device->enabled_dispatch_abis, key)
+            ? 1
+            : 0;
     return iree_ok_status();
   }
   if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
@@ -1285,8 +1311,8 @@ static iree_status_t iree_hal_vulkan_logical_device_create_executable_cache(
       iree_hal_vulkan_logical_device_cast(base_device);
   return iree_hal_vulkan_executable_cache_create(
       &device->syms, device->logical_device, &device->physical_device,
-      device->enabled_features, identifier, device->host_allocator,
-      out_executable_cache);
+      device->enabled_features, identifier, device->enabled_dispatch_abis,
+      device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_import_file(
@@ -1952,6 +1978,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
       .syms = &device->syms,
       .logical_device = device->logical_device,
       .builtins = &device->builtins,
+      .enabled_dispatch_abis = device->enabled_dispatch_abis,
       .queue = selected_queue->handle,
       .queue_flags = selected_queue->flags,
       .timestamp_valid_bits = selected_queue->timestamp_valid_bits,
@@ -2295,7 +2322,12 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         &device->logical_device);
   }
   if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_verify_enabled_dispatch_abis(
+        device->enabled_features, device_options->dispatch_abis);
+  }
+  if (iree_status_is_ok(status)) {
     device->owns_logical_device = true;
+    device->enabled_dispatch_abis = device_options->dispatch_abis;
     status = iree_hal_vulkan_libvulkan_load_device_syms(
         &device->instance.syms, device->logical_device, &device->syms);
   }
@@ -2439,6 +2471,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
         "accept device option flags 0x%08x",
         options->flags);
   }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_vulkan_dispatch_abis_verify(options->dispatch_abis));
   if (!instance || !physical_device || !logical_device) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
@@ -2470,6 +2504,10 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     status = iree_hal_vulkan_verify_external_device_contract(
         &snapshot, external_device_params);
   }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_verify_enabled_dispatch_abis(
+        external_device_params->enabled_features, options->dispatch_abis);
+  }
 
   iree_hal_vulkan_selected_queues_t selected_queues;
   memset(&selected_queues, 0, sizeof(selected_queues));
@@ -2499,6 +2537,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     memset(&snapshot, 0, sizeof(snapshot));
     device->logical_device = logical_device;
     device->enabled_features = external_device_params->enabled_features;
+    device->enabled_dispatch_abis = options->dispatch_abis;
     device->enabled_extensions = external_device_params->enabled_extensions;
   }
   if (iree_status_is_ok(status)) {

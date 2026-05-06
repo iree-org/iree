@@ -56,17 +56,32 @@ iree_status_t iree_hal_vulkan_executable_infer_format(
 
 bool iree_hal_vulkan_executable_format_supported(
     iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     iree_string_view_t executable_format) {
   if (iree_string_view_equal(executable_format, IREE_SV("vulkan-spirv-fb"))) {
-    return true;
+    return iree_all_bits_set(enabled_dispatch_abis,
+                             IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR);
   }
   if (iree_string_view_equal(executable_format,
                              IREE_SV("vulkan-spirv-fb-ptr"))) {
-    return iree_all_bits_set(
-        enabled_features,
-        IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
+    return iree_all_bits_set(enabled_dispatch_abis,
+                             IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR) &&
+           iree_all_bits_set(
+               enabled_features,
+               IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
   }
   return false;
+}
+
+static iree_hal_vulkan_dispatch_abis_t
+iree_hal_vulkan_executable_dispatch_abi_for_format(
+    iree_string_view_t executable_format) {
+  if (iree_string_view_equal(executable_format, IREE_SV("vulkan-spirv-fb")) ||
+      iree_string_view_equal(executable_format,
+                             IREE_SV("vulkan-spirv-fb-ptr"))) {
+    return IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR;
+  }
+  return IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1005,6 +1020,7 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const VkPipelineLayout* pipeline_layouts,
     const VkDescriptorSetLayout* descriptor_set_layouts,
     const VkShaderModule* shader_modules, iree_allocator_t host_allocator,
+    iree_hal_vulkan_dispatch_abis_t dispatch_abi,
     iree_hal_vulkan_PipelineDef_table_t pipeline_def,
     iree_hal_vulkan_pipeline_t* out_pipeline) {
   const uint32_t pipeline_layout_ordinal =
@@ -1026,6 +1042,7 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
   flatbuffers_uint32_vec_t spirv_code_vec =
       iree_hal_vulkan_ShaderModuleDef_spirv_code_get(shader_module_def);
   out_pipeline->layout = pipeline_layouts[pipeline_layout_ordinal];
+  out_pipeline->dispatch_abi = dispatch_abi;
   out_pipeline->subgroup_size = subgroup_size;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
       pipeline_layout_def, descriptor_set_layouts_vec, descriptor_set_layouts,
@@ -1225,6 +1242,7 @@ iree_status_t iree_hal_vulkan_executable_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features, VkPipelineCache pipeline_cache,
+    iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(syms);
@@ -1236,13 +1254,17 @@ iree_status_t iree_hal_vulkan_executable_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (!iree_hal_vulkan_executable_format_supported(
-          enabled_features, executable_params->executable_format)) {
+          enabled_features, enabled_dispatch_abis,
+          executable_params->executable_format)) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_make_status(IREE_STATUS_NOT_FOUND,
                              "unsupported Vulkan executable format '%.*s'",
                              (int)executable_params->executable_format.size,
                              executable_params->executable_format.data));
   }
+  const iree_hal_vulkan_dispatch_abis_t dispatch_abi =
+      iree_hal_vulkan_executable_dispatch_abi_for_format(
+          executable_params->executable_format);
 
   iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
   iree_status_t status = iree_hal_read_executable_flatbuffer_header(
@@ -1344,7 +1366,7 @@ iree_status_t iree_hal_vulkan_executable_create(
         &specialization_info, pipeline_layouts_vec, descriptor_set_layouts_vec,
         shader_modules_vec, executable->pipeline_layouts,
         executable->descriptor_set_layouts, shader_modules, host_allocator,
-        pipeline_def, pipeline);
+        dispatch_abi, pipeline_def, pipeline);
     if (!iree_status_is_ok(status)) {
       status = iree_status_annotate_f(status, "pipelines[%" PRIhsz "]", i);
     }

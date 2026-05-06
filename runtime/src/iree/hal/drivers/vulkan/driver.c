@@ -72,6 +72,10 @@ static iree_status_t iree_hal_vulkan_driver_options_verify(
         "unrecognized Vulkan device option flag bits 0x%08x",
         options->device_options.flags & ~recognized_device_flags);
   }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_dispatch_abis_verify(
+        options->device_options.dispatch_abis);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
