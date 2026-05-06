@@ -2009,8 +2009,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
         "(got %" PRIhsz ")",
         pattern_length);
   }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-      command_buffer, target_ref));
+  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
+        command_buffer, target_ref));
+  }
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
       command_buffer, 1, &target_ref));
@@ -2069,8 +2071,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
         IREE_STATUS_OUT_OF_RANGE,
         "Vulkan command buffer update source range exceeds host size");
   }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-      command_buffer, target_ref));
+  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
+        command_buffer, target_ref));
+  }
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
       command_buffer, 1, &target_ref));
@@ -2121,10 +2125,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
                             ")",
                             source_ref.length, target_ref.length);
   }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-      command_buffer, source_ref));
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-      command_buffer, target_ref));
+  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
+        command_buffer, source_ref));
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
+        command_buffer, target_ref));
+  }
 
   const iree_hal_buffer_ref_t buffer_refs[2] = {source_ref, target_ref};
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
