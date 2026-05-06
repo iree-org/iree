@@ -318,6 +318,26 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vulkan-spirv-bda_vulkan
+  SRCS
+    "add.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
+    "--iree-vulkan-experimental-indirect-bindings"
+  RUNNER_ARGS
+    "--vulkan_dispatch_abi=bda"
+  LABELS
+    "manual"
+    "notap"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_cuda_graph
   SRCS
     "abs.mlir"

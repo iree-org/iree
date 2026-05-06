@@ -7118,7 +7118,9 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
       VkDeviceAddress device_address = 0;
       status = iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
           submission, pipeline, i, &device_address);
-      binding_table[i] = device_address;
+      if (iree_status_is_ok(status)) {
+        binding_table[i] = device_address;
+      }
     }
   }
   if (iree_status_is_ok(status) && binding_table_length != 0) {

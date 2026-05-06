@@ -99,19 +99,21 @@ getTargetAttrWithBdaRootAbiFeatures(IREE::GPU::TargetAttr target) {
 static iree_hal_vulkan_BdaDispatchLayoutDef_ref_t
 createBdaDispatchLayoutDef(IREE::HAL::ExecutableExportOp exportOp,
                            FlatbufferBuilder &fbb) {
-  SmallVector<iree_hal_vulkan_BdaBindingDef_ref_t> bdaBindingRefs;
-  auto bdaBindingsRef = fbb.createOffsetVecDestructive(bdaBindingRefs);
-  return iree_hal_vulkan_BdaDispatchLayoutDef_create(
-      fbb, /*abi_version=*/1,
-      /*root_push_constant_offset=*/kBdaDispatchRootOffset,
-      /*root_push_constant_length=*/kBdaDispatchRootLength,
-      /*constant_push_constant_offset=*/kBdaDispatchConstantOffset,
-      /*constant_count=*/
-      static_cast<uint32_t>(exportOp.getLayout().getConstants()),
-      iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64,
-      /*binding_count=*/
-      static_cast<uint32_t>(exportOp.getLayout().getBindings().size()),
-      bdaBindingsRef);
+  iree_hal_vulkan_BdaDispatchLayoutDef_start(fbb);
+  iree_hal_vulkan_BdaDispatchLayoutDef_abi_version_add(fbb, 1);
+  iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_offset_add(
+      fbb, kBdaDispatchRootOffset);
+  iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_length_add(
+      fbb, kBdaDispatchRootLength);
+  iree_hal_vulkan_BdaDispatchLayoutDef_constant_push_constant_offset_add(
+      fbb, kBdaDispatchConstantOffset);
+  iree_hal_vulkan_BdaDispatchLayoutDef_constant_count_add(
+      fbb, static_cast<uint32_t>(exportOp.getLayout().getConstants()));
+  iree_hal_vulkan_BdaDispatchLayoutDef_binding_table_entry_type_add(
+      fbb, iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64);
+  iree_hal_vulkan_BdaDispatchLayoutDef_binding_count_add(
+      fbb, static_cast<uint32_t>(exportOp.getLayout().getBindings().size()));
+  return iree_hal_vulkan_BdaDispatchLayoutDef_end(fbb);
 }
 
 static std::tuple<iree_hal_vulkan_DescriptorSetLayoutDef_vec_ref_t,
