@@ -292,6 +292,36 @@ typedef struct iree_hal_vulkan_queue_t {
 
     // BDA publication bytes retained by cached replay instances.
     uint64_t publication_bytes;
+
+    // Peak native replay instances cached at once.
+    uint64_t peak_instance_count;
+
+    // Peak BDA publication bytes retained by cached replay instances.
+    uint64_t peak_publication_bytes;
+
+    // Cached replay acquisitions using an idle native command buffer.
+    uint64_t hit_count;
+
+    // Cached replay acquisitions that had to record a native command buffer.
+    uint64_t miss_count;
+
+    // Cached replay instances successfully recorded and retained.
+    uint64_t create_count;
+
+    // Cached replay creations for command buffers already busy on the queue.
+    uint64_t fork_count;
+
+    // Cached replay acquisitions bypassed because descriptors were required.
+    uint64_t descriptor_bypass_count;
+
+    // Cached replay acquisitions bypassed because profiling was active.
+    uint64_t profile_bypass_count;
+
+    // Cached replay acquisitions bypassed by configured capacity limits.
+    uint64_t capacity_bypass_count;
+
+    // Cached replay instances destroyed by queue trim.
+    uint64_t trim_count;
   } native_replay_cache;
 
   // Queue-owned host-to-device staging ring for uploads.
@@ -342,6 +372,12 @@ void iree_hal_vulkan_queue_set_profile_recorder(
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t profile_scope,
     iree_atomic_int64_t* submission_counter);
+
+// Queries queue-local scalar diagnostics for device-level query_i64.
+bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,
+                                     iree_string_view_t category,
+                                     iree_string_view_t key,
+                                     int64_t* out_value);
 
 // Submits a queue-ordered semaphore barrier.
 iree_status_t iree_hal_vulkan_queue_submit_barrier(

@@ -208,6 +208,25 @@ class BdaRawSpirvTest : public CtsTestBase<> {
     EXPECT_THAT(output_data, ContainerEq(std::vector<int32_t>{8, 5, 37, 407}));
   }
 
+  int64_t QueryNativeReplayCache(iree_string_view_t key) {
+    int64_t value = 0;
+    IREE_EXPECT_OK(iree_hal_device_query_i64(
+        device_, IREE_SV("vulkan.queue.native_replay_cache"), key, &value));
+    return value;
+  }
+
+  void ExecuteCommandBufferAndWait(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_binding_table_t binding_table) {
+    SemaphoreList execute_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_execute(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+        execute_signal, command_buffer, binding_table,
+        IREE_HAL_EXECUTE_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  }
+
   iree_hal_executable_cache_t* executable_cache_ = nullptr;
   iree_hal_executable_t* executable_ = nullptr;
 };
@@ -399,6 +418,91 @@ TEST_P(BdaRawSpirvTest, CommandBufferCachesBdaPublicationRequirements) {
       command_buffer, &bda_publication_length));
   EXPECT_EQ(bda_publication_length,
             (bindings.count + oversized_bindings.size()) * sizeof(uint64_t));
+}
+
+TEST_P(BdaRawSpirvTest, CommandBufferReusesCachedNativeReplay) {
+  if (QueryNativeReplayCache(IREE_SV("max_instance_count")) == 0) {
+    GTEST_SKIP() << "Vulkan BDA native replay cache is disabled";
+  }
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  if (QueryNativeReplayCache(IREE_SV("instance_count")) >=
+      QueryNativeReplayCache(IREE_SV("max_instance_count"))) {
+    GTEST_SKIP() << "Vulkan BDA native replay cache is already full";
+  }
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/0, /*offset=*/0,
+          iree_hal_buffer_byte_length(input_buffer.get())),
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/1, /*offset=*/0,
+          iree_hal_buffer_byte_length(output_buffer.get())),
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/2, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  iree_hal_buffer_binding_t binding_table_entries[2] = {
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/iree_hal_buffer_byte_length(input_buffer.get()),
+      },
+      {
+          /*buffer=*/output_buffer.get(),
+          /*offset=*/0,
+          /*length=*/iree_hal_buffer_byte_length(output_buffer.get()),
+      },
+  };
+  iree_hal_buffer_binding_table_t binding_table = {
+      /*.count=*/IREE_ARRAYSIZE(binding_table_entries),
+      /*.bindings=*/binding_table_entries,
+  };
+
+  const int64_t initial_hit_count =
+      QueryNativeReplayCache(IREE_SV("hit_count"));
+  const int64_t initial_miss_count =
+      QueryNativeReplayCache(IREE_SV("miss_count"));
+  const int64_t initial_create_count =
+      QueryNativeReplayCache(IREE_SV("create_count"));
+  const int64_t initial_publication_bytes =
+      QueryNativeReplayCache(IREE_SV("publication_bytes"));
+
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table);
+  ExpectOutput(output_buffer.get());
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table);
+  ExpectOutput(output_buffer.get());
+
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("miss_count")) - initial_miss_count,
+            1);
+  EXPECT_GE(
+      QueryNativeReplayCache(IREE_SV("create_count")) - initial_create_count,
+      1);
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("hit_count")) - initial_hit_count,
+            1);
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("publication_bytes")) -
+                initial_publication_bytes,
+            (int64_t)(2 * sizeof(uint64_t)));
+
+  command_buffer.reset();
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
 }
 
 TEST_P(BdaRawSpirvTest, CommandBufferHandlesOversizedBdaPublication) {
