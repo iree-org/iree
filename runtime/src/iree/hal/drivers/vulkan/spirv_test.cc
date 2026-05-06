@@ -70,11 +70,10 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule)));
 
-  bool uses_physical_storage_buffer64_glsl450 = false;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(
-      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
-      &uses_physical_storage_buffer64_glsl450));
-  EXPECT_TRUE(uses_physical_storage_buffer64_glsl450);
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
 
   iree_host_size_t entry_point_count = 0;
   iree_host_size_t name_storage_size = 0;
@@ -253,28 +252,24 @@ TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {
       0u,
       1u,
   };
-  bool uses_physical_storage_buffer64_glsl450 = true;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(
-      kLogicalModule, IREE_ARRAYSIZE(kLogicalModule),
-      &uses_physical_storage_buffer64_glsl450));
-  EXPECT_FALSE(uses_physical_storage_buffer64_glsl450);
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kLogicalModule, IREE_ARRAYSIZE(kLogicalModule), &analysis));
+  EXPECT_FALSE(analysis.uses_physical_storage_buffer64_glsl450);
 }
 
 TEST(SpirvTest, DetectsPhysicalStorageBufferAddressesCapability) {
-  bool has_capability = false;
-  IREE_ASSERT_OK(
-      iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
-          kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
-          &has_capability));
-  EXPECT_TRUE(has_capability);
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
 
-  IREE_ASSERT_OK(
-      iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
-          kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability,
-          IREE_ARRAYSIZE(
-              kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability),
-          &has_capability));
-  EXPECT_FALSE(has_capability);
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability,
+      IREE_ARRAYSIZE(
+          kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability),
+      &analysis));
+  EXPECT_FALSE(analysis.has_physical_storage_buffer_addresses_capability);
 }
 
 TEST(SpirvTest, DetectsDescriptorBindingDecorations) {
@@ -295,16 +290,15 @@ TEST(SpirvTest, DetectsDescriptorBindingDecorations) {
       33u,
       2u,
   };
-  bool has_descriptor_binding_decorations = false;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kDescriptorDecoratedModule, IREE_ARRAYSIZE(kDescriptorDecoratedModule),
-      &has_descriptor_binding_decorations));
-  EXPECT_TRUE(has_descriptor_binding_decorations);
+      &analysis));
+  EXPECT_TRUE(analysis.has_descriptor_binding_decorations);
 
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
-      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
-      &has_descriptor_binding_decorations));
-  EXPECT_FALSE(has_descriptor_binding_decorations);
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_FALSE(analysis.has_descriptor_binding_decorations);
 }
 
 TEST(SpirvTest, CountsPushConstantVariables) {
@@ -320,16 +314,14 @@ TEST(SpirvTest, CountsPushConstantVariables) {
       3u,
       9u,
   };
-  iree_host_size_t push_constant_variable_count = 0;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_push_constant_variables(
-      kPushConstantModule, IREE_ARRAYSIZE(kPushConstantModule),
-      &push_constant_variable_count));
-  EXPECT_EQ(1u, push_constant_variable_count);
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kPushConstantModule, IREE_ARRAYSIZE(kPushConstantModule), &analysis));
+  EXPECT_EQ(1u, analysis.push_constant_variable_count);
 
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_push_constant_variables(
-      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
-      &push_constant_variable_count));
-  EXPECT_EQ(0u, push_constant_variable_count);
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_EQ(0u, analysis.push_constant_variable_count);
 }
 
 TEST(SpirvTest, VerifiesBdaRootPushConstantLayout) {
@@ -425,17 +417,15 @@ TEST(SpirvTest, DetectsDescriptorStorageClassVariables) {
       3u,
       12u,
   };
-  bool has_descriptor_variables = false;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kDescriptorStorageVariableModule,
-      IREE_ARRAYSIZE(kDescriptorStorageVariableModule),
-      &has_descriptor_variables));
-  EXPECT_TRUE(has_descriptor_variables);
+      IREE_ARRAYSIZE(kDescriptorStorageVariableModule), &analysis));
+  EXPECT_TRUE(analysis.has_descriptor_storage_class_variables);
 
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
-      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
-      &has_descriptor_variables));
-  EXPECT_FALSE(has_descriptor_variables);
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_FALSE(analysis.has_descriptor_storage_class_variables);
 }
 
 TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
