@@ -55,6 +55,10 @@ iree_status_t iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     bool* out_has_descriptor_variables);
 
+// Verifies the raw BDA v1 hidden root push-constant block shape.
+iree_status_t iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count);
+
 // Counts compute entry points and their NUL-terminated name storage length.
 iree_status_t iree_hal_vulkan_spirv_count_compute_entry_points(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,

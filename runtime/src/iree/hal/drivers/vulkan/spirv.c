@@ -15,8 +15,11 @@ enum {
   IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
   IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE = 16u,
   IREE_HAL_VULKAN_SPIRV_OP_CAPABILITY = 17u,
+  IREE_HAL_VULKAN_SPIRV_OP_TYPE_STRUCT = 30u,
+  IREE_HAL_VULKAN_SPIRV_OP_TYPE_POINTER = 32u,
   IREE_HAL_VULKAN_SPIRV_OP_VARIABLE = 59u,
   IREE_HAL_VULKAN_SPIRV_OP_DECORATE = 71u,
+  IREE_HAL_VULKAN_SPIRV_OP_MEMBER_DECORATE = 72u,
   IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES = 5347u,
   IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
   IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
@@ -28,8 +31,15 @@ enum {
   IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_ATOMIC_COUNTER = 10u,
   IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_IMAGE = 11u,
   IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_STORAGE_BUFFER = 12u,
+  IREE_HAL_VULKAN_SPIRV_DECORATION_BLOCK = 2u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_BINDING = 33u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET = 34u,
+  IREE_HAL_VULKAN_SPIRV_DECORATION_OFFSET = 35u,
+  IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT = 6u,
+};
+
+static const uint32_t iree_hal_vulkan_spirv_bda_root_member_offsets[] = {
+    0u, 8u, 16u, 20u, 24u, 28u,
 };
 
 static iree_status_t iree_hal_vulkan_spirv_next_instruction(
@@ -276,6 +286,223 @@ iree_status_t iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
     }
   }
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_find_single_push_constant_variable(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    uint32_t* out_type_id) {
+  *out_type_id = 0;
+
+  iree_host_size_t push_constant_variable_count = 0;
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_VARIABLE) continue;
+    if (word_count < 4) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpVariable instruction is truncated");
+    }
+    if (operands[2] != IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT) {
+      continue;
+    }
+    *out_type_id = operands[0];
+    ++push_constant_variable_count;
+  }
+
+  if (push_constant_variable_count != 1) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA executable must declare exactly one PushConstant root "
+        "variable; found %" PRIhsz,
+        push_constant_variable_count);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_find_push_constant_pointee_type(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    uint32_t pointer_type_id, uint32_t* out_pointee_type_id) {
+  *out_pointee_type_id = 0;
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_TYPE_POINTER) continue;
+    if (word_count < 4) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpTypePointer instruction is truncated");
+    }
+    if (operands[0] != pointer_type_id) continue;
+    if (operands[1] != IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA root variable type is not a PushConstant pointer");
+    }
+    *out_pointee_type_id = operands[2];
+    return iree_ok_status();
+  }
+
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "raw Vulkan BDA root variable pointer type is not declared");
+}
+
+static iree_status_t iree_hal_vulkan_spirv_find_struct_member_count(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    uint32_t struct_type_id, uint32_t* out_member_count) {
+  *out_member_count = 0;
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_TYPE_STRUCT) continue;
+    if (word_count < 2) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpTypeStruct instruction is truncated");
+    }
+    if (operands[0] != struct_type_id) continue;
+    *out_member_count = word_count - 2;
+    return iree_ok_status();
+  }
+
+  return iree_make_status(
+      IREE_STATUS_INVALID_ARGUMENT,
+      "raw Vulkan BDA root PushConstant struct type is not declared");
+}
+
+static iree_status_t iree_hal_vulkan_spirv_struct_has_block_decoration(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    uint32_t struct_type_id, bool* out_has_block_decoration) {
+  *out_has_block_decoration = false;
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_DECORATE) continue;
+    if (word_count < 3) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpDecorate instruction is truncated");
+    }
+    if (operands[0] == struct_type_id &&
+        operands[1] == IREE_HAL_VULKAN_SPIRV_DECORATION_BLOCK) {
+      *out_has_block_decoration = true;
+      return iree_ok_status();
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_verify_bda_root_member_offsets(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    uint32_t struct_type_id) {
+  bool has_member_offsets[IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT] = {0};
+  uint32_t member_offsets[IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT] = {0};
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MEMBER_DECORATE) continue;
+    if (word_count < 4) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "SPIR-V OpMemberDecorate instruction is truncated");
+    }
+    if (operands[0] != struct_type_id ||
+        operands[2] != IREE_HAL_VULKAN_SPIRV_DECORATION_OFFSET) {
+      continue;
+    }
+    if (word_count < 5) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "SPIR-V Offset member decoration instruction is truncated");
+    }
+    const uint32_t member_ordinal = operands[1];
+    if (member_ordinal >= IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA root has an unexpected member offset decoration");
+    }
+    has_member_offsets[member_ordinal] = true;
+    member_offsets[member_ordinal] = operands[3];
+  }
+
+  for (uint32_t i = 0; i < IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT; ++i) {
+    if (!has_member_offsets[i]) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA root member %u has no Offset decoration", i);
+    }
+    if (member_offsets[i] != iree_hal_vulkan_spirv_bda_root_member_offsets[i]) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA root member %u has offset %u but expected %u", i,
+          member_offsets[i], iree_hal_vulkan_spirv_bda_root_member_offsets[i]);
+    }
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_verify_module(spirv_words, spirv_word_count));
+
+  uint32_t root_pointer_type_id = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_find_single_push_constant_variable(
+      spirv_words, spirv_word_count, &root_pointer_type_id));
+
+  uint32_t root_struct_type_id = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_find_push_constant_pointee_type(
+      spirv_words, spirv_word_count, root_pointer_type_id,
+      &root_struct_type_id));
+
+  uint32_t member_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_find_struct_member_count(
+      spirv_words, spirv_word_count, root_struct_type_id, &member_count));
+  if (member_count != IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA root has %u members but expected %u", member_count,
+        IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT);
+  }
+
+  bool has_block_decoration = false;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_struct_has_block_decoration(
+      spirv_words, spirv_word_count, root_struct_type_id,
+      &has_block_decoration));
+  if (!has_block_decoration) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA root PushConstant struct must be Block-decorated");
+  }
+
+  return iree_hal_vulkan_spirv_verify_bda_root_member_offsets(
+      spirv_words, spirv_word_count, root_struct_type_id);
 }
 
 iree_status_t iree_hal_vulkan_spirv_count_compute_entry_points(

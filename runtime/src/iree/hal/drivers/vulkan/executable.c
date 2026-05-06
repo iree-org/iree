@@ -1311,16 +1311,9 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
   if (iree_all_bits_set(
           verification_flags,
           IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT)) {
-    iree_host_size_t push_constant_variable_count = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_count_push_constant_variables(
-        spirv_words, spirv_word_count, &push_constant_variable_count));
-    if (push_constant_variable_count != 1) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "raw Vulkan BDA executable must declare exactly one PushConstant "
-          "root variable; found %" PRIhsz,
-          push_constant_variable_count);
-    }
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
+            spirv_words, spirv_word_count));
   }
 
   bool entry_point_found = false;

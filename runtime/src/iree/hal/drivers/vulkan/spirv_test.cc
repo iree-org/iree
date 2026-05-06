@@ -213,6 +213,86 @@ TEST(SpirvTest, CountsPushConstantVariables) {
   EXPECT_EQ(0u, push_constant_variable_count);
 }
 
+TEST(SpirvTest, VerifiesBdaRootPushConstantLayout) {
+  static constexpr uint32_t kBdaRootModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      16u,
+      0u,
+      // Declares OpTypeInt %1 64 0.
+      0x00040015u,
+      1u,
+      64u,
+      0u,
+      // Declares OpTypeInt %2 32 0.
+      0x00040015u,
+      2u,
+      32u,
+      0u,
+      // Declares OpTypeStruct %3 %1 %1 %2 %2 %2 %2.
+      0x0008001eu,
+      3u,
+      1u,
+      1u,
+      2u,
+      2u,
+      2u,
+      2u,
+      // Declares OpTypePointer %4 PushConstant %3.
+      0x00040020u,
+      4u,
+      9u,
+      3u,
+      // Declares OpVariable %5 in PushConstant storage class.
+      0x0004003bu,
+      4u,
+      5u,
+      9u,
+      // Declares OpDecorate %3 Block.
+      0x00030047u,
+      3u,
+      2u,
+      // Declares BDA root member offsets.
+      0x00050048u,
+      3u,
+      0u,
+      35u,
+      0u,
+      0x00050048u,
+      3u,
+      1u,
+      35u,
+      8u,
+      0x00050048u,
+      3u,
+      2u,
+      35u,
+      16u,
+      0x00050048u,
+      3u,
+      3u,
+      35u,
+      20u,
+      0x00050048u,
+      3u,
+      4u,
+      35u,
+      24u,
+      0x00050048u,
+      3u,
+      5u,
+      35u,
+      28u,
+  };
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
+      kBdaRootModule, IREE_ARRAYSIZE(kBdaRootModule)));
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
+          kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule)));
+}
+
 TEST(SpirvTest, DetectsDescriptorStorageClassVariables) {
   static constexpr uint32_t kDescriptorStorageVariableModule[] = {
       0x07230203u,
