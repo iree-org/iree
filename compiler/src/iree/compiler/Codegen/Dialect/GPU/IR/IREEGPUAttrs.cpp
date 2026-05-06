@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -49,6 +50,9 @@
 #define DEBUG_TYPE "iree-gpu-attrs"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+constexpr StringLiteral kPromoteOperandsName = "promote_operands";
+constexpr StringLiteral kPromotionTypesName = "promotion_types";
 
 // HoistableConversionOp tag constants — definitions live in
 // `Codegen/Utils/MMAUtils.h` so paired tags (which match by string) can't
@@ -2829,6 +2833,39 @@ static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
   return getTileSizes(getAttributes(), GPU::TilingLevel::Workgroup);
+}
+
+LogicalResult
+LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr attributes) {
+  auto promotionTypes = attributes.getAs<ArrayAttr>(kPromotionTypesName);
+  if (!promotionTypes) {
+    return success();
+  }
+
+  auto promotedOperandsAttr = attributes.getAs<ArrayAttr>(kPromoteOperandsName);
+  if (!promotedOperandsAttr) {
+    return emitError()
+           << "promotion_types requires promote_operands to be specified";
+  }
+
+  SmallVector<int64_t> promotedOperands =
+      getIntegerVector(promotedOperandsAttr);
+  if (promotedOperands.size() != promotedOperandsAttr.size()) {
+    return emitError() << "promote_operands must be an array of integers";
+  }
+
+  if (promotionTypes.size() != promotedOperands.size()) {
+    return emitError()
+           << "promote_operands and promotion_types must have the same length";
+  }
+
+  if (!llvm::all_of(promotionTypes.getValue(), llvm::IsaPred<PromotionAttr>)) {
+    return emitError() << "promotion_types elements must implement "
+                          "IREE::GPU::PromotionAttr";
+  }
+
+  return success();
 }
 
 SmallVector<int64_t>

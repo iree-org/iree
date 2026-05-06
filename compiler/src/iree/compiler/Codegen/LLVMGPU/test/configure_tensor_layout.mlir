@@ -477,6 +477,8 @@ func.func @contraction_ceildiv_batch(%lhs: tensor<1x1x63xf16>,
   indexing_maps = #maps_block,
   iterator_types = ["parallel", "parallel", "parallel", "reduction"],
   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>,
+                                              promote_operands = [0, 1],
+                                              promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_load_dma],
                                               subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]]}>
 }
 
@@ -504,8 +506,8 @@ func.func @batch_matmul_block_intrinsic(%lhs: tensor<4x32x4xf16>,
 
 // CHECK-LABEL: func.func @batch_matmul_block_intrinsic
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]])
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]])
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion = #iree_gpu.derived_thread_config}
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion = #iree_gpu.use_global_load_dma}
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]

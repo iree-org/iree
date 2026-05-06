@@ -123,7 +123,7 @@ setPromotedOperandsList(MLIRContext *context,
   std::optional<SmallVector<int64_t>> currPromotedOperandsList =
       getPromotedOperandList(currAttr);
   if (currPromotedOperandsList &&
-      currPromotedOperandsList.value() == operands) {
+      currPromotedOperandsList.value() == operands && !promotionTypes) {
     return currAttr;
   }
 
@@ -133,6 +133,8 @@ setPromotedOperandsList(MLIRContext *context,
 
   if (promotionTypes) {
     attributes.set(kPromotionTypesName, b.getArrayAttr(promotionTypes.value()));
+  } else {
+    attributes.erase(kPromotionTypesName);
   }
   return IREE::GPU::LoweringConfigAttr::get(context,
                                             attributes.getDictionary(context));
