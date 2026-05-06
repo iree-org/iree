@@ -76,6 +76,49 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
   }
 };
 
+/// Canonicalize a rank-1 single-element vector transfer op so that its
+/// permutation map is the minor identity.
+///
+/// When the vector type is `vector<1xT>`, the permutation map is irrelevant
+/// to which element is accessed: the single vector lane has iteration offset 0,
+/// so the element is always at `memref[indices...]` regardless of which
+/// memref/tensor dimension the map points at. Replacing the map with minor
+/// identity unblocks lowering to vector.load / vector.store.
+template <typename TransferOp>
+struct CanonicalizeSize1TransferMap final : OpRewritePattern<TransferOp> {
+  using OpRewritePattern<TransferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TransferOp op,
+                                PatternRewriter &rewriter) const override {
+    VectorType vecType = op.getVectorType();
+    if (vecType.getRank() != 1 || vecType.getShape()[0] != 1) {
+      return failure();
+    }
+
+    AffineMap map = op.getPermutationMap();
+    if (map.isMinorIdentity()) {
+      return failure();
+    }
+
+    int64_t srcRank = op.getShapedType().getRank();
+    AffineMap minorIdentity =
+        AffineMap::getMinorIdentityMap(srcRank, 1, rewriter.getContext());
+
+    if constexpr (std::is_same_v<TransferOp, vector::TransferReadOp>) {
+      rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+          op, vecType, op.getBase(), op.getIndices(),
+          AffineMapAttr::get(minorIdentity), op.getPadding(), op.getMask(),
+          op.getInBoundsAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+          op, op.getVector(), op.getBase(), op.getIndices(),
+          AffineMapAttr::get(minorIdentity), op.getMask(),
+          op.getInBoundsAttr());
+    }
+    return success();
+  }
+};
+
 struct LLVMGPU1DVectorCanonicalizationsPass final
     : impl::LLVMGPU1DVectorCanonicalizationsPassBase<
           LLVMGPU1DVectorCanonicalizationsPass> {
@@ -88,6 +131,8 @@ struct LLVMGPU1DVectorCanonicalizationsPass final
     vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
     arith::SelectOp::getCanonicalizationPatterns(patterns, ctx);
     patterns.add<FoldI1SelectToBroadcast>(ctx);
+    patterns.add<CanonicalizeSize1TransferMap<vector::TransferReadOp>,
+                 CanonicalizeSize1TransferMap<vector::TransferWriteOp>>(ctx);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

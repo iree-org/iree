@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "1d_vector_canonicalization.mlir"
     "amdgpu_emulate_narrow_type.mlir"
     "assign_constant_ordinals.mlir"
     "cast_address_space_function.mlir"
