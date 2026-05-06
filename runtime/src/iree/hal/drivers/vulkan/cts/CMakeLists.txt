@@ -596,6 +596,26 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    queue_descriptor_cache_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+    "queue_descriptor_cache_test.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
     semaphore_submission_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"

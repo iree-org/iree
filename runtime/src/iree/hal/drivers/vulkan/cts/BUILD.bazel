@@ -652,6 +652,30 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "queue_descriptor_cache_tests",
+    srcs = [
+        "queue_descriptor_cache_test.cc",
+        "//runtime/src/iree/hal/cts/util:test_main.cc",
+    ],
+    data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
+    env = {
+        "LSAN_OPTIONS": "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)",
+    },
+    tags = [
+        "driver=vulkan",
+        "requires-gpu-vulkan",
+    ],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:registry",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "semaphore_submission_tests",
     srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
     data = ["//build_tools/sanitizer:lsan_suppressions_vulkan.txt"],
