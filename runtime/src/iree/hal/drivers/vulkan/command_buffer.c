@@ -192,6 +192,8 @@ static void iree_hal_vulkan_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer);
 
 enum {
+  IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_SET_CAPACITY = 8,
+  IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_BINDING_CAPACITY = 16,
   IREE_HAL_VULKAN_COMMAND_BUFFER_MINIMUM_COMMAND_BLOCK_CAPACITY =
       64 * (sizeof(iree_hal_vulkan_command_t) +
             sizeof(iree_hal_vulkan_command_dispatch_t)),
@@ -999,7 +1001,7 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_add_descriptor_count(
-    uint32_t current_count, uint32_t delta_count, uint32_t* out_count) {
+    uint32_t current_count, iree_host_size_t delta_count, uint32_t* out_count) {
   if (IREE_UNLIKELY(delta_count > UINT32_MAX - current_count)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
@@ -1842,16 +1844,21 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
     iree_allocator_t host_allocator) {
   const iree_hal_vulkan_command_dispatch_t* dispatch =
       iree_hal_vulkan_command_dispatch_payload(command);
-  VkDescriptorSet* descriptor_sets = NULL;
+  VkDescriptorSet inline_descriptor_sets
+      [IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_SET_CAPACITY];
+  VkDescriptorSet* descriptor_sets = inline_descriptor_sets;
   if (pipeline->descriptor_set_layout_count != 0) {
     if (!descriptor_pool) {
       return iree_make_status(
           IREE_STATUS_FAILED_PRECONDITION,
           "Vulkan dispatch requires descriptor sets but no pool is available");
     }
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
-        host_allocator, pipeline->descriptor_set_layout_count,
-        sizeof(descriptor_sets[0]), (void**)&descriptor_sets));
+    if (pipeline->descriptor_set_layout_count >
+        IREE_ARRAYSIZE(inline_descriptor_sets)) {
+      IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+          host_allocator, pipeline->descriptor_set_layout_count,
+          sizeof(descriptor_sets[0]), (void**)&descriptor_sets));
+    }
     VkDescriptorSetAllocateInfo allocate_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = descriptor_pool,
@@ -1862,20 +1869,28 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
         iree_vkAllocateDescriptorSets(IREE_VULKAN_DEVICE(syms), logical_device,
                                       &allocate_info, descriptor_sets);
     if (!iree_status_is_ok(status)) {
-      iree_allocator_free(host_allocator, descriptor_sets);
+      if (descriptor_sets != inline_descriptor_sets) {
+        iree_allocator_free(host_allocator, descriptor_sets);
+      }
       return status;
     }
   }
 
-  VkDescriptorBufferInfo* buffer_infos = NULL;
-  VkWriteDescriptorSet* write_infos = NULL;
+  VkDescriptorBufferInfo inline_buffer_infos
+      [IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_BINDING_CAPACITY];
+  VkDescriptorBufferInfo* buffer_infos = inline_buffer_infos;
+  VkWriteDescriptorSet inline_write_infos
+      [IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_BINDING_CAPACITY];
+  VkWriteDescriptorSet* write_infos = inline_write_infos;
   iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(status) && pipeline->descriptor_binding_count != 0) {
+  if (pipeline->descriptor_binding_count >
+      IREE_ARRAYSIZE(inline_buffer_infos)) {
     status = iree_allocator_malloc_array(
         host_allocator, pipeline->descriptor_binding_count,
         sizeof(buffer_infos[0]), (void**)&buffer_infos);
   }
-  if (iree_status_is_ok(status) && pipeline->descriptor_binding_count != 0) {
+  if (iree_status_is_ok(status) &&
+      pipeline->descriptor_binding_count > IREE_ARRAYSIZE(inline_write_infos)) {
     status = iree_allocator_malloc_array(
         host_allocator, pipeline->descriptor_binding_count,
         sizeof(write_infos[0]), (void**)&write_infos);
@@ -1909,10 +1924,16 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
         /*descriptorCopyCount=*/0, /*pDescriptorCopies=*/NULL);
   }
 
-  iree_allocator_free(host_allocator, write_infos);
-  iree_allocator_free(host_allocator, buffer_infos);
+  if (write_infos != inline_write_infos) {
+    iree_allocator_free(host_allocator, write_infos);
+  }
+  if (buffer_infos != inline_buffer_infos) {
+    iree_allocator_free(host_allocator, buffer_infos);
+  }
   if (!iree_status_is_ok(status)) {
-    iree_allocator_free(host_allocator, descriptor_sets);
+    if (descriptor_sets != inline_descriptor_sets) {
+      iree_allocator_free(host_allocator, descriptor_sets);
+    }
     return status;
   }
 
@@ -1937,7 +1958,9 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
         syms, native_command_buffer, binding_table, command, profile_marker);
   }
 
-  iree_allocator_free(host_allocator, descriptor_sets);
+  if (descriptor_sets != inline_descriptor_sets) {
+    iree_allocator_free(host_allocator, descriptor_sets);
+  }
   return status;
 }
 
