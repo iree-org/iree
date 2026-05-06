@@ -30,6 +30,12 @@ class VulkanProfilingTest : public CtsTestBase<> {
     executable_params.executable_data = executable_data(iree_make_cstring_view(
         "command_buffer_dispatch_constants_bindings_test.bin"));
 
+    if (!iree_hal_executable_cache_can_prepare_format(
+            executable_cache.get(), executable_params.caching_mode,
+            executable_params.executable_format)) {
+      return iree_ok_status();
+    }
+
     return iree_hal_executable_cache_prepare_executable(
         executable_cache.get(), &executable_params, executable.out());
   }
@@ -197,6 +203,9 @@ TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
   Ref<iree_hal_executable_cache_t> executable_cache;
   Ref<iree_hal_executable_t> executable;
   IREE_ASSERT_OK(CreateScaleAndOffsetExecutable(executable_cache, executable));
+  if (!executable) {
+    GTEST_SKIP() << "descriptor executable format is disabled on this device";
+  }
 
   Ref<iree_hal_buffer_t> input_buffer;
   {

@@ -995,12 +995,6 @@ iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
           requirements)) {
     return iree_ok_status();
   }
-  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
-                         IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan descriptor dispatch ABI is disabled for this queue");
-  }
   if (submission->native_descriptor_lease.block) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -6715,6 +6709,14 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
                               " bindings but BDA pipeline expects %u",
                               bindings.count, pipeline->binding_count);
   }
+  for (iree_host_size_t i = 0; iree_status_is_ok(status) && i < bindings.count;
+       ++i) {
+    status = iree_hal_vulkan_queue_validate_dispatch_binding(
+        &bindings.values[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    if (!iree_status_is_ok(status)) {
+      status = iree_status_annotate_f(status, "binding[%" PRIhsz "]", i);
+    }
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -6806,8 +6808,6 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
   *out_device_address = 0;
   const iree_hal_buffer_ref_t* binding =
       &submission->dispatch.bindings[binding_ordinal];
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_validate_dispatch_binding(
-      binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 
   iree_device_size_t binding_offset = 0;
   iree_device_size_t binding_length = 0;
@@ -6889,16 +6889,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_descriptor_native(
     const iree_hal_vulkan_pipeline_t* pipeline) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
-  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
-                         IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR)) {
-    status = iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan descriptor dispatch ABI is disabled for this queue");
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
-        queue, submission);
-  }
+  status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
+      queue, submission);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
         queue, submission);
@@ -7077,23 +7069,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
     const iree_hal_vulkan_pipeline_t* pipeline) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
-  if (!iree_all_bits_set(queue->enabled_dispatch_abis,
-                         IREE_HAL_VULKAN_DISPATCH_ABI_BDA)) {
-    status =
-        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                         "Vulkan BDA dispatch ABI is disabled for this queue");
-  }
-  if (iree_status_is_ok(status) &&
-      pipeline->dispatch_abi != IREE_HAL_VULKAN_DISPATCH_ABI_BDA) {
-    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "Vulkan pipeline has invalid BDA dispatch ABI "
-                              "0x%08x",
-                              pipeline->dispatch_abi);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
-        queue, submission);
-  }
+  status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
+      queue, submission);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
         queue, submission);
@@ -7102,14 +7079,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
   const iree_host_size_t binding_count =
       pipeline->bda.binding_count_known ? pipeline->binding_count
                                         : submission->dispatch.binding_count;
-  iree_device_size_t binding_table_length = 0;
-  if (iree_status_is_ok(status) &&
-      !iree_device_size_checked_mul((iree_device_size_t)binding_count,
-                                    sizeof(uint64_t), &binding_table_length)) {
-    status =
-        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                         "Vulkan BDA dispatch binding table length overflows");
-  }
+  const iree_device_size_t binding_table_length =
+      (iree_device_size_t)binding_count * sizeof(uint64_t);
 
   iree_byte_span_t binding_table_span = iree_byte_span_empty();
   VkDeviceAddress binding_table_address = 0;
@@ -7420,6 +7391,22 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
     status = iree_hal_vulkan_queue_acquire_native_descriptor_pool_under_lock(
         queue, submission, &descriptor_requirements, &descriptor_pool);
   }
+  iree_device_size_t bda_publication_length = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_command_buffer_native_bda_publication_length(
+        submission->execute.command_buffer, &bda_publication_length);
+  }
+  iree_hal_vulkan_command_buffer_bda_publication_t bda_publication = {0};
+  const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication_ptr =
+      NULL;
+  if (iree_status_is_ok(status) && bda_publication_length != 0) {
+    status = iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
+        queue, submission, bda_publication_length, &bda_publication.host_span,
+        &bda_publication.device_address);
+    if (iree_status_is_ok(status)) {
+      bda_publication_ptr = &bda_publication;
+    }
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_binding_table_t binding_table = {
         .count = submission->execute.binding_table_count,
@@ -7436,8 +7423,14 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
     status = iree_hal_vulkan_command_buffer_record_native(
         submission->execute.command_buffer, &queue->syms, queue->logical_device,
         queue->builtins, submission->native_command_buffer, descriptor_pool,
-        binding_table, profile_marker.query_pool ? &profile_marker : NULL,
+        binding_table, bda_publication_ptr,
+        profile_marker.query_pool ? &profile_marker : NULL,
         queue->host_allocator);
+  }
+  if (iree_status_is_ok(status) && bda_publication_length != 0) {
+    status = iree_hal_buffer_mapping_flush_range(
+        &submission->bda_publication_lease.block->mapping,
+        submission->bda_publication_lease.offset, bda_publication_length);
   }
   return status;
 }

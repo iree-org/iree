@@ -70,6 +70,14 @@ bool iree_hal_vulkan_executable_format_supported(
                enabled_features,
                IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
   }
+  if (iree_string_view_equal(executable_format,
+                             IREE_SV("vulkan-spirv-bda-raw"))) {
+    return iree_all_bits_set(enabled_dispatch_abis,
+                             IREE_HAL_VULKAN_DISPATCH_ABI_BDA) &&
+           iree_all_bits_set(
+               enabled_features,
+               IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
+  }
   return false;
 }
 
@@ -80,6 +88,10 @@ iree_hal_vulkan_executable_dispatch_abi_for_format(
       iree_string_view_equal(executable_format,
                              IREE_SV("vulkan-spirv-fb-ptr"))) {
     return IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR;
+  }
+  if (iree_string_view_equal(executable_format,
+                             IREE_SV("vulkan-spirv-bda-raw"))) {
+    return IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
   }
   return IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
 }
@@ -900,8 +912,11 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
 }
 
 enum {
+  IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL = 14u,
   IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
   IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE = 16u,
+  IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
+  IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
 };
@@ -947,12 +962,11 @@ static iree_status_t iree_hal_vulkan_spirv_next_instruction(
 }
 
 static iree_status_t iree_hal_vulkan_parse_spirv_workgroup_size(
-    flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_string_view_t entry_point, bool* out_entry_point_found,
     uint32_t out_workgroup_size[3]) {
+  if (out_entry_point_found) *out_entry_point_found = false;
   memset(out_workgroup_size, 0, sizeof(uint32_t) * 3);
-  const uint32_t* spirv_words = (const uint32_t*)spirv_code_vec;
-  const iree_host_size_t spirv_word_count =
-      flatbuffers_uint32_vec_len(spirv_code_vec);
   if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
     return iree_ok_status();
   }
@@ -975,6 +989,7 @@ static iree_status_t iree_hal_vulkan_parse_spirv_workgroup_size(
     if (iree_hal_vulkan_spirv_entry_point_name_matches(
             operands, (uint16_t)(word_count - 1), entry_point)) {
       entry_point_id = operands[1];
+      if (out_entry_point_found) *out_entry_point_found = true;
       break;
     }
   }
@@ -1007,6 +1022,15 @@ static iree_status_t iree_hal_vulkan_parse_spirv_workgroup_size(
     return iree_ok_status();
   }
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
+    flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
+    uint32_t out_workgroup_size[3]) {
+  return iree_hal_vulkan_parse_spirv_workgroup_size(
+      (const uint32_t*)spirv_code_vec,
+      flatbuffers_uint32_vec_len(spirv_code_vec), entry_point,
+      /*out_entry_point_found=*/NULL, out_workgroup_size);
 }
 
 static iree_status_t iree_hal_vulkan_create_compute_pipeline(
@@ -1055,7 +1079,7 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
   };
   flatbuffers_string_t entry_point =
       iree_hal_vulkan_PipelineDef_entry_point_get(pipeline_def);
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
       spirv_code_vec,
       iree_make_string_view(entry_point, flatbuffers_string_len(entry_point)),
       out_pipeline->workgroup_size));
@@ -1215,6 +1239,188 @@ static iree_status_t iree_hal_vulkan_allocate_executable(
   return status;
 }
 
+static iree_status_t iree_hal_vulkan_verify_raw_bda_spirv(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
+  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "raw Vulkan BDA executable is not SPIR-V");
+  }
+
+  bool has_physical_storage_buffer_memory_model = false;
+  iree_host_size_t word_offset = 5;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL || word_count < 3) {
+      continue;
+    }
+    has_physical_storage_buffer_memory_model =
+        operands[0] ==
+            IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
+        operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
+    break;
+  }
+  if (!has_physical_storage_buffer_memory_model) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
+  }
+
+  bool entry_point_found = false;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
+      spirv_words, spirv_word_count, entry_point, &entry_point_found,
+      out_workgroup_size));
+  if (!entry_point_found) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA executable has no compute entry point '%.*s'",
+        (int)entry_point.size, entry_point.data);
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
+    const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    VkPipelineCache pipeline_cache,
+    const iree_hal_executable_params_t* executable_params,
+    iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+  *out_executable = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (executable_params->executable_data.data_length % sizeof(uint32_t) != 0) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                             "raw Vulkan BDA executable byte length must be a "
+                             "multiple of 4"));
+  }
+
+  const iree_host_size_t spirv_word_count =
+      executable_params->executable_data.data_length / sizeof(uint32_t);
+  const uint32_t* spirv_words =
+      (const uint32_t*)executable_params->executable_data.data;
+  uint32_t* aligned_spirv_words = NULL;
+  if (executable_params->executable_data.data_length != 0 &&
+      !iree_host_ptr_has_alignment(spirv_words, sizeof(uint32_t))) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_allocator_malloc(
+                host_allocator, executable_params->executable_data.data_length,
+                (void**)&aligned_spirv_words));
+    memcpy(aligned_spirv_words, executable_params->executable_data.data,
+           executable_params->executable_data.data_length);
+    spirv_words = aligned_spirv_words;
+  }
+
+  const iree_string_view_t entry_point = IREE_SV("main");
+  uint32_t workgroup_size[3] = {0};
+  iree_status_t status = iree_hal_vulkan_verify_raw_bda_spirv(
+      spirv_words, spirv_word_count, entry_point, workgroup_size);
+
+  iree_hal_vulkan_executable_t* executable = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_allocate_executable(
+        syms, logical_device, /*descriptor_set_layout_count=*/0,
+        /*pipeline_layout_count=*/1, /*pipeline_count=*/1,
+        entry_point.size + /*NUL=*/1, host_allocator, &executable);
+  }
+
+  VkShaderModule shader_module = VK_NULL_HANDLE;
+  if (iree_status_is_ok(status)) {
+    VkShaderModuleCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = executable_params->executable_data.data_length,
+        .pCode = spirv_words,
+    };
+    status = iree_vkCreateShaderModule(IREE_VULKAN_DEVICE(syms), logical_device,
+                                       &create_info,
+                                       /*pAllocator=*/NULL, &shader_module);
+  }
+
+  if (iree_status_is_ok(status)) {
+    VkPushConstantRange root_range = {
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t),
+    };
+    VkPipelineLayoutCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &root_range,
+    };
+    status = iree_vkCreatePipelineLayout(
+        IREE_VULKAN_DEVICE(syms), logical_device, &create_info,
+        /*pAllocator=*/NULL, &executable->pipeline_layouts[0]);
+  }
+
+  VkSpecializationInfo specialization_info;
+  VkSpecializationMapEntry* specialization_map_entries = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_create_specialization_info(
+        executable_params, host_allocator, &specialization_info,
+        &specialization_map_entries);
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_pipeline_t* pipeline = &executable->pipelines[0];
+    memcpy(executable->name_storage, entry_point.data, entry_point.size);
+    executable->name_storage[entry_point.size] = 0;
+    pipeline->name =
+        iree_make_string_view(executable->name_storage, entry_point.size);
+    pipeline->handle = VK_NULL_HANDLE;
+    pipeline->dispatch_abi = IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
+    pipeline->layout = executable->pipeline_layouts[0];
+    pipeline->bda.root_push_constant_offset = 0;
+    pipeline->bda.root_push_constant_length =
+        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t);
+    pipeline->bda.binding_table_entry_length = sizeof(uint64_t);
+    pipeline->bda.binding_count_known = false;
+    memcpy(pipeline->workgroup_size, workgroup_size,
+           sizeof(pipeline->workgroup_size));
+
+    VkPipelineShaderStageCreateInfo stage_create_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = shader_module,
+        .pName = entry_point.data,
+        .pSpecializationInfo = &specialization_info,
+    };
+    VkComputePipelineCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = stage_create_info,
+        .layout = pipeline->layout,
+    };
+    if (!iree_all_bits_set(
+            executable_params->caching_mode,
+            IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION)) {
+      create_info.flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+    }
+    status = iree_vkCreateComputePipelines(
+        IREE_VULKAN_DEVICE(syms), logical_device, pipeline_cache,
+        /*createInfoCount=*/1, &create_info, /*pAllocator=*/NULL,
+        &pipeline->handle);
+  }
+
+  iree_allocator_free(host_allocator, specialization_map_entries);
+  if (shader_module) {
+    iree_vkDestroyShaderModule(IREE_VULKAN_DEVICE(syms), logical_device,
+                               shader_module, /*pAllocator=*/NULL);
+  }
+  iree_allocator_free(host_allocator, aligned_spirv_words);
+
+  if (iree_status_is_ok(status)) {
+    *out_executable = (iree_hal_executable_t*)executable;
+  } else if (executable) {
+    iree_hal_executable_destroy((iree_hal_executable_t*)executable);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_calculate_name_storage_size(
     iree_hal_vulkan_PipelineDef_vec_t pipelines_vec,
     iree_host_size_t* out_name_storage_size) {
@@ -1265,6 +1471,14 @@ iree_status_t iree_hal_vulkan_executable_create(
   const iree_hal_vulkan_dispatch_abis_t dispatch_abi =
       iree_hal_vulkan_executable_dispatch_abi_for_format(
           executable_params->executable_format);
+  if (dispatch_abi == IREE_HAL_VULKAN_DISPATCH_ABI_BDA &&
+      iree_string_view_equal(executable_params->executable_format,
+                             IREE_SV("vulkan-spirv-bda-raw"))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_hal_vulkan_create_raw_bda_executable(
+        syms, logical_device, pipeline_cache, executable_params, host_allocator,
+        out_executable);
+  }
 
   iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
   iree_status_t status = iree_hal_read_executable_flatbuffer_header(

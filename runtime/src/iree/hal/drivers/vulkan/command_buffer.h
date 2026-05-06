@@ -64,6 +64,22 @@ iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_vulkan_command_buffer_descriptor_requirements_t* out_requirements);
 
+// Host-published BDA table storage used while replaying a command buffer once
+// into a native VkCommandBuffer.
+typedef struct iree_hal_vulkan_command_buffer_bda_publication_t {
+  // Host-visible span reserved for all BDA dispatch tables in the replay.
+  iree_byte_span_t host_span;
+
+  // Device address corresponding to host_span.data.
+  VkDeviceAddress device_address;
+} iree_hal_vulkan_command_buffer_bda_publication_t;
+
+// Returns host-published BDA table bytes required to replay |command_buffer|
+// once into a native VkCommandBuffer.
+iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_device_size_t* out_publication_length);
+
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
@@ -127,12 +143,17 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 // Descriptor sets are allocated from |descriptor_pool|. The caller must keep
 // that pool alive until |native_command_buffer| is no longer executing. When
 // the command buffer has no descriptor requirements this may be VK_NULL_HANDLE.
+//
+// BDA binding tables are allocated from |bda_publication|. The caller must keep
+// that publication alive until |native_command_buffer| is no longer executing.
+// When the command buffer has no BDA dispatches this may be NULL.
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_builtins_t* builtins,
     VkCommandBuffer native_command_buffer, VkDescriptorPool descriptor_pool,
     iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
     iree_allocator_t host_allocator);
 
