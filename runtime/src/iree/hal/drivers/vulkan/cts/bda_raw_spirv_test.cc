@@ -190,6 +190,73 @@ class BdaRawSpirvTest : public CtsTestBase<> {
   iree_hal_executable_t* executable_ = nullptr;
 };
 
+static iree_hal_buffer_params_t SparseDispatchBufferParams() {
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE |
+                IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  return params;
+}
+
+class BdaSparseVirtualBufferRef {
+ public:
+  explicit BdaSparseVirtualBufferRef(iree_hal_allocator_t* allocator)
+      : allocator_(allocator) {}
+  ~BdaSparseVirtualBufferRef() { reset(); }
+
+  BdaSparseVirtualBufferRef(const BdaSparseVirtualBufferRef&) = delete;
+  BdaSparseVirtualBufferRef& operator=(const BdaSparseVirtualBufferRef&) =
+      delete;
+
+  iree_hal_buffer_t* get() const { return buffer_; }
+  iree_hal_buffer_t** out() { return &buffer_; }
+
+  void reset() {
+    if (buffer_) {
+      IREE_EXPECT_OK(
+          iree_hal_allocator_virtual_memory_release(allocator_, buffer_));
+      buffer_ = nullptr;
+    }
+  }
+
+ private:
+  // Allocator that owns the virtual reservation.
+  iree_hal_allocator_t* allocator_ = nullptr;
+
+  // Reserved virtual sparse buffer released through |allocator_|.
+  iree_hal_buffer_t* buffer_ = nullptr;
+};
+
+class BdaSparsePhysicalMemoryRef {
+ public:
+  explicit BdaSparsePhysicalMemoryRef(iree_hal_allocator_t* allocator)
+      : allocator_(allocator) {}
+  ~BdaSparsePhysicalMemoryRef() { reset(); }
+
+  BdaSparsePhysicalMemoryRef(const BdaSparsePhysicalMemoryRef&) = delete;
+  BdaSparsePhysicalMemoryRef& operator=(const BdaSparsePhysicalMemoryRef&) =
+      delete;
+
+  iree_hal_physical_memory_t* get() const { return memory_; }
+  iree_hal_physical_memory_t** out() { return &memory_; }
+
+  void reset() {
+    if (memory_) {
+      IREE_EXPECT_OK(
+          iree_hal_allocator_physical_memory_free(allocator_, memory_));
+      memory_ = nullptr;
+    }
+  }
+
+ private:
+  // Allocator that owns the physical sparse memory.
+  iree_hal_allocator_t* allocator_ = nullptr;
+
+  // Physical sparse memory handle released through |allocator_|.
+  iree_hal_physical_memory_t* memory_ = nullptr;
+};
+
 TEST_P(BdaRawSpirvTest, QueueDispatchExecutesRawBdaShader) {
   Ref<iree_hal_buffer_t> input_buffer;
   Ref<iree_hal_buffer_t> output_buffer;
@@ -234,6 +301,103 @@ TEST_P(BdaRawSpirvTest, CommandBufferExecutesRawBdaShader) {
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
   ExpectOutput(output_buffer);
+}
+
+TEST_P(BdaRawSpirvTest, CommandBufferExecutesRawBdaShaderWithSparseBindings) {
+  if (!iree_hal_allocator_supports_virtual_memory(device_allocator_)) {
+    GTEST_SKIP() << "Vulkan sparse virtual memory is not available";
+  }
+
+  iree_hal_buffer_params_t params = SparseDispatchBufferParams();
+  iree_device_size_t minimum_page_size = 0;
+  iree_device_size_t recommended_page_size = 0;
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_query_granularity(
+      device_allocator_, params, &minimum_page_size, &recommended_page_size));
+  ASSERT_NE(0u, minimum_page_size);
+  ASSERT_GE(recommended_page_size, minimum_page_size);
+  ASSERT_GE(recommended_page_size, 4 * sizeof(int32_t));
+
+  BdaSparseVirtualBufferRef input_buffer(device_allocator_);
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_reserve(
+      device_allocator_, IREE_HAL_QUEUE_AFFINITY_ANY, recommended_page_size,
+      input_buffer.out()));
+  BdaSparseVirtualBufferRef output_buffer(device_allocator_);
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_reserve(
+      device_allocator_, IREE_HAL_QUEUE_AFFINITY_ANY, recommended_page_size,
+      output_buffer.out()));
+
+  BdaSparsePhysicalMemoryRef input_memory(device_allocator_);
+  IREE_ASSERT_OK(iree_hal_allocator_physical_memory_allocate(
+      device_allocator_, params, recommended_page_size, iree_allocator_system(),
+      input_memory.out()));
+  BdaSparsePhysicalMemoryRef output_memory(device_allocator_);
+  IREE_ASSERT_OK(iree_hal_allocator_physical_memory_allocate(
+      device_allocator_, params, recommended_page_size, iree_allocator_system(),
+      output_memory.out()));
+
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_map(
+      device_allocator_, input_buffer.get(), /*virtual_offset=*/0,
+      input_memory.get(), /*physical_offset=*/0, recommended_page_size));
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_map(
+      device_allocator_, output_buffer.get(), /*virtual_offset=*/0,
+      output_memory.get(), /*physical_offset=*/0, recommended_page_size));
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_protect(
+      device_allocator_, input_buffer.get(), /*virtual_offset=*/0,
+      recommended_page_size, IREE_HAL_QUEUE_AFFINITY_ANY,
+      IREE_HAL_MEMORY_PROTECTION_READ_WRITE));
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_protect(
+      device_allocator_, output_buffer.get(), /*virtual_offset=*/0,
+      recommended_page_size, IREE_HAL_QUEUE_AFFINITY_ANY,
+      IREE_HAL_MEMORY_PROTECTION_READ_WRITE));
+
+  const int32_t input_pattern = 5;
+  SemaphoreList fill_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      fill_signal, input_buffer.get(), /*target_offset=*/0,
+      4 * sizeof(input_pattern), &input_pattern, sizeof(input_pattern),
+      IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_ref_list_t bindings =
+      MakeBindings(input_buffer.get(), output_buffer.get(), binding_refs);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+
+  Ref<iree_hal_buffer_t> readback_buffer;
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(int32_t), readback_buffer.out()));
+  SemaphoreList copy_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_copy(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      copy_signal, output_buffer.get(), /*source_offset=*/0,
+      readback_buffer.get(), /*target_offset=*/0, 4 * sizeof(int32_t),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      copy_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  std::vector<int32_t> output_data = ReadBufferData<int32_t>(readback_buffer);
+  EXPECT_THAT(output_data, ContainerEq(std::vector<int32_t>{12, 12, 12, 12}));
+
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_unmap(
+      device_allocator_, output_buffer.get(), /*virtual_offset=*/0,
+      recommended_page_size));
+  IREE_ASSERT_OK(iree_hal_allocator_virtual_memory_unmap(
+      device_allocator_, input_buffer.get(), /*virtual_offset=*/0,
+      recommended_page_size));
 }
 
 CTS_REGISTER_TEST_SUITE_WITH_TAGS(BdaRawSpirvTest, {"vulkan_bda"}, {});
