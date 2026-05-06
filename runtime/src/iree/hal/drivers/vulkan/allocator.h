@@ -73,6 +73,15 @@ iree_status_t iree_hal_vulkan_allocator_allocate_direct_buffer_from_type(
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
     iree_hal_buffer_t** out_buffer);
 
+// Allocates one whole Vulkan buffer directly from a compatible memory type.
+//
+// This bypasses the default pool set and gives the caller exclusive ownership
+// of the underlying VkDeviceMemory mapping lifetime.
+iree_status_t iree_hal_vulkan_allocator_allocate_direct_buffer(
+    iree_hal_allocator_t* base_allocator,
+    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer);
+
 // Returns the default queue-pool backend resources borrowed from |allocator|.
 iree_status_t iree_hal_vulkan_allocator_query_queue_pool_backend(
     iree_hal_allocator_t* base_allocator,

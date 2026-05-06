@@ -1763,6 +1763,16 @@ iree_status_t iree_hal_vulkan_allocator_allocate_direct_buffer_from_type(
       allocator, 1u << memory_type_index, params, allocation_size, out_buffer);
 }
 
+iree_status_t iree_hal_vulkan_allocator_allocate_direct_buffer(
+    iree_hal_allocator_t* base_allocator,
+    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_vulkan_allocator_t* allocator =
+      iree_hal_vulkan_allocator_cast(base_allocator);
+  return iree_hal_vulkan_allocator_allocate_direct_buffer_with_memory_type_bits(
+      allocator, UINT32_MAX, params, allocation_size, out_buffer);
+}
+
 static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
