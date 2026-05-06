@@ -352,8 +352,34 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
     return Tuple{1, 16, 2};
   default:
+    if (isGenericScalar(intrinsic)) {
+      return Tuple{1, 1, 1};
+    }
     return {};
   }
+}
+
+// Bit-layout constants for the `MMAIntrinsic` enum value (see IREECPUEnums.td
+// for the 0xABCD scheme). The high byte (`kMMAIntrinsicISAMask`) encodes the
+// architecture (nibble A) and the ISA-extension family (nibble B) together
+// — the abbreviation is spelled `ISA` (uppercase) here to avoid reading as
+// the English "is a". The generic-scalar family uses A=F, B=0; the low byte
+// then holds the register-budget heuristic value.
+constexpr uint32_t kMMAIntrinsicISAMask = 0xFF00;
+constexpr uint32_t kMMAIntrinsicISAGeneric = 0xF000;
+constexpr uint32_t kMMAIntrinsicGenericBudgetMask = 0x00FF;
+constexpr uint32_t kMMAIntrinsicISAX86Avx2 = 0x1200;
+constexpr uint32_t kMMAIntrinsicISAX86Avx512 = 0x1300;
+constexpr uint32_t kMMAIntrinsicISAArmSve = 0x2200;
+
+bool isGenericScalar(MMAIntrinsic intr) {
+  return (static_cast<uint32_t>(intr) & kMMAIntrinsicISAMask) ==
+         kMMAIntrinsicISAGeneric;
+}
+
+int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr) {
+  assert(isGenericScalar(intr));
+  return static_cast<uint32_t>(intr) & kMMAIntrinsicGenericBudgetMask;
 }
 
 int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
@@ -364,13 +390,13 @@ int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
   // simplification — the resulting `intrinsics_m`/`intrinsics_n` choices are
   // good enough in practice and avoid propagating scalability into the cost
   // model.
-  uint32_t arch = static_cast<uint32_t>(intrinsic) & 0xFF00;
-  switch (arch) {
-  case 0x1200: // AVX/AVX2: 16 YMM × 32 B.
+  uint32_t isa = static_cast<uint32_t>(intrinsic) & kMMAIntrinsicISAMask;
+  switch (isa) {
+  case kMMAIntrinsicISAX86Avx2: // 16 YMM × 32 B.
     return 16 * 32;
-  case 0x1300: // AVX-512: 32 ZMM × 64 B.
+  case kMMAIntrinsicISAX86Avx512: // 32 ZMM × 64 B.
     return 32 * 64;
-  case 0x2200: // Arm SVE/SVE2: 32 Z × (VL treated as 128 bits).
+  case kMMAIntrinsicISAArmSve: // 32 Z × (VL treated as 128 bits).
     return 32 * 16;
   default:
     // Plausible default, but override it on each arch you care for.
@@ -544,6 +570,32 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   }
 }
 
+/// Returns the (LHS, RHS, ACC) *storage* element types for `attr` — what
+/// `getDistributedTileTypes` should plumb into vector types and what the
+/// inner_tiled op's operand types must agree with. For most `MMAIntrinsic`
+/// values these are baked into the enum and the `MMAIntrinsic`-only
+/// overload above suffices. The `MMA_GENERIC_SCALAR_1x1x1_REG*` family is
+/// type-polymorphic — its element types live on the attr's `lhs_type` /
+/// `rhs_type` / `acc_type` parameters. We strip integer signedness here:
+/// storage is always signless, the attr keeps the `siN` / `uiN` annotation
+/// for the lowering to pick `arith.extsi` vs `arith.extui`.
+static std::tuple<Type, Type, Type>
+getABCElementTypes(MLIRContext *context, IREE::CPU::DataTiledMMAAttr attr) {
+  MMAIntrinsic intrinsic = attr.getIntrinsic();
+  if (isGenericScalar(intrinsic)) {
+    auto signless = [&](Type t) -> Type {
+      if (auto intTy = dyn_cast_if_present<IntegerType>(t);
+          intTy && !intTy.isSignless()) {
+        return IntegerType::get(context, intTy.getWidth());
+      }
+      return t;
+    };
+    return {signless(attr.getLhsType()), signless(attr.getRhsType()),
+            signless(attr.getAccType())};
+  }
+  return getABCElementTypes(context, intrinsic);
+}
+
 //===----------------------------------------------------------------------===//
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
@@ -580,7 +632,7 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
     result.clear();
     return;
   }
-  auto [aType, bType, cType] = getABCElementTypes(ctx, intrinsic);
+  auto [aType, bType, cType] = getABCElementTypes(ctx, *this);
   // Each operand's swizzle encodes its tile shape as (outer physical dim,
   // inner physical dim) in expandShape[0], expandShape[1]. This mirrors GPU's
   // DataTiledMMA, where the tile types encode the layout directly and no
@@ -726,6 +778,60 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   }
 }
 
+/// Lowers a `DataTiledMMAAttr` whose intrinsic is one of the
+/// `MMA_GENERIC_SCALAR_1x1x1_REG*` cases directly to a single
+/// `vector.contract`. Since the intrinsic's tile shape is 1×1×1, the
+/// operand tiles after applying `intrinsics_m` / `intrinsics_n` /
+/// `intrinsics_k` are simple row-major (M, K)/(N, K)/(M, N) matmul
+/// tiles — no swizzle-based distribution is needed.
+static LogicalResult lowerGenericScalarToVectorContract(
+    OpBuilder &builder, Location loc, IREE::CPU::DataTiledMMAAttr attr,
+    ValueRange inputs, ValueRange outputs, SmallVectorImpl<Value> &results) {
+  assert(isGenericScalar(attr.getIntrinsic()) &&
+         "lowerGenericScalarToVectorContract only handles "
+         "MMA_GENERIC_SCALAR_1x1x1_REG* intrinsics");
+  Value lhs = inputs[0];
+  Value rhs = inputs[1];
+  Value acc = outputs[0];
+  Type accElem = cast<VectorType>(acc.getType()).getElementType();
+  // For the generic intrinsic, ACC is always at least as wide as LHS/RHS,
+  // and they're either all float or all integer (the cost model only picks
+  // this intrinsic when element types are mutually consistent that way).
+  // Signedness lives on the attr's `lhs_type` / `rhs_type` (the operand
+  // vector types are signless storage) and picks ExtSI vs. ExtUI; ACC is
+  // treated as signed.
+  auto isUnsigned = [](Type t) {
+    auto intTy = dyn_cast_if_present<IntegerType>(t);
+    return intTy && intTy.isUnsigned();
+  };
+  auto widenToAcc = [&](Value v, bool unsignedSrc) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    if (vt.getElementType() == accElem) {
+      return v;
+    }
+    auto wideTy = VectorType::get(vt.getShape(), accElem);
+    if (isa<FloatType>(accElem)) {
+      return arith::ExtFOp::create(builder, loc, wideTy, v);
+    }
+    return unsignedSrc ? Value(arith::ExtUIOp::create(builder, loc, wideTy, v))
+                       : Value(arith::ExtSIOp::create(builder, loc, wideTy, v));
+  };
+  lhs = widenToAcc(lhs, isUnsigned(attr.getLhsType()));
+  rhs = widenToAcc(rhs, isUnsigned(attr.getRhsType()));
+  AffineExpr m = builder.getAffineDimExpr(0);
+  AffineExpr n = builder.getAffineDimExpr(1);
+  AffineExpr k = builder.getAffineDimExpr(2);
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  // LHS is (M, K), RHS is (N, K), ACC is (M, N) — same as the
+  // `iree_codegen.inner_tiled` op's own indexing maps for CPU.
+  vector::IteratorType par = vector::IteratorType::parallel;
+  vector::IteratorType red = vector::IteratorType::reduction;
+  results.push_back(vector::ContractionOp::create(
+      builder, loc, lhs, rhs, acc, MapList{{m, k}, {n, k}, {m, n}},
+      ArrayRef<vector::IteratorType>{par, par, red}));
+  return success();
+}
+
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
@@ -746,6 +852,14 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   }
 
   MMAIntrinsic intrinsic = getIntrinsic();
+  // The type-polymorphic generic intrinsic is row-major (1×1×1 base) and
+  // bypasses the swizzle/distribution machinery: it lowers directly to a
+  // single `vector.contract` over the unrolled operand tiles, the way
+  // `linalg.mmt4d` would.
+  if (isGenericScalar(intrinsic)) {
+    return lowerGenericScalarToVectorContract(builder, loc, *this, inputs,
+                                              outputs, results);
+  }
   auto emitIntrinsic = [&](OpBuilder &b, Location loc, Value lhs, Value rhs,
                            Value acc) -> Value {
     return createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs, acc);

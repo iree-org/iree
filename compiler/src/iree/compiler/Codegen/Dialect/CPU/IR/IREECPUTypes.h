@@ -82,6 +82,13 @@ Codegen::TileSwizzle getSwizzle(DataTiledMMAAttr mma, int operandIdx);
 // Values: AVX/AVX2 = 16 × 32 B, AVX-512 = 32 × 64 B, SVE/SVE2 = 32 × 16 B.
 int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic);
 
+// True if `intr` is one of the `MMA_GENERIC_SCALAR_1x1x1_REG*` cases.
+bool isGenericScalar(MMAIntrinsic intr);
+
+// For an `MMA_GENERIC_SCALAR_1x1x1_REG*` intrinsic, returns the register
+// budget encoded in the enum case (8 or 16). Asserts otherwise.
+int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr);
+
 } // namespace mlir::iree_compiler::IREE::CPU
 
 // clang-format on

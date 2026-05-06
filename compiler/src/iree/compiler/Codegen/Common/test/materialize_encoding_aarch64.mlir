@@ -597,3 +597,78 @@ func.func @matmul_lowering_i8i4i32_aarch64_i8mm(
 //  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 //  CHECK-SAME:       outs(%[[OUTS]] :
 //       CHECK:   return %[[MMT4D]]
+
+// -----
+
+// AArch64 has no element-type-specific MMA intrinsic for sub-byte float
+// types, so the data-tiling cost model falls back to the type-polymorphic
+// generic scalar. AArch64 is 64-bit, so `pickGenericScalarMMAForTarget`
+// picks `_REG16`. The chosen `DataTiledMMAAttr` carries
+// `lhs_type = f4E2M1FN`, `rhs_type = f4E2M1FN`, `acc_type = f32` — the
+// enum value alone doesn't determine element types.
+//
+// FP4 register pressure: K=2 is the smallest power-of-two K that makes
+// K*4 a multiple of 8 (for byte-addressable packed groups). Inside the
+// 16-register budget the cost model lands on a square (im=2, in=2, ik=2)
+// tile (2*2 + 2*2 + 2*2 = 12 registers), which wins on arithmetic
+// intensity. Whether the lowering can actually densely pack f4E2M1FN
+// values into bytes today is orthogonal — the framework only insists
+// that the packed K-group be byte-aligned.
+
+#map_g_fp4 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_g_fp4_1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_g_fp4_2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_g_fp4_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f4E2M1FN, f4E2M1FN, f32], user_indexing_maps = [#map_g_fp4, #map_g_fp4_1, #map_g_fp4_2], iteration_sizes = [?, ?, ?]>
+#encoding_g_fp4_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f4E2M1FN, f4E2M1FN, f32], user_indexing_maps = [#map_g_fp4, #map_g_fp4_1, #map_g_fp4_2], iteration_sizes = [?, ?, ?]>
+#encoding_g_fp4_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f4E2M1FN, f4E2M1FN, f32], user_indexing_maps = [#map_g_fp4, #map_g_fp4_1, #map_g_fp4_2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_fp4_f32_aarch64_generic(
+    %lhs: tensor<?x?xf4E2M1FN, #encoding_g_fp4_lhs>,
+    %rhs: tensor<?x?xf4E2M1FN, #encoding_g_fp4_rhs>,
+    %acc: tensor<?x?xf32, #encoding_g_fp4_res>
+) -> tensor<?x?xf32, #encoding_g_fp4_res> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "aarch64-xyz-xyz", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul ins(%lhs, %rhs : tensor<?x?xf4E2M1FN, #encoding_g_fp4_lhs>, tensor<?x?xf4E2M1FN, #encoding_g_fp4_rhs>)
+      outs(%acc : tensor<?x?xf32, #encoding_g_fp4_res>) -> tensor<?x?xf32, #encoding_g_fp4_res>
+  return %0 : tensor<?x?xf32, #encoding_g_fp4_res>
+}
+// CHECK-LABEL: func @matmul_fp4_f32_aarch64_generic(
+//       CHECK:   %[[INNER_FP4:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 2, lhs_type = f4E2M1FN, rhs_type = f4E2M1FN, acc_type = f32>
+
+// -----
+
+// FP6 LHS/RHS with f32 ACC, on AArch64 (REG16). 6 bits don't divide 8 at
+// K∈{1,2}, so the smallest K making K*6 a multiple of 8 is K = 4
+// (4*6 = 24 bits = 3 bytes). With K=4, LHS/RHS register pressure becomes
+// `intrinsics_m * 4` and `intrinsics_n * 4`; ACC stays at
+// `intrinsics_m * intrinsics_n`. Inside `_REG16`'s 16-register budget,
+// (im=1, in=2, ik=4) packs 1*4 + 1*2 + 2*4 = 14 registers and wins on
+// arithmetic intensity over (2, 1, 4) (the same intensity in mirror image).
+// On `_REG8` neither candidate would fit and we'd fall back to (1, 1) —
+// `_REG16` is the variant that gets a non-degenerate unrolling on FP6.
+// Whether the lowering can actually pack f6E3M2FN values into a byte-
+// aligned 3-byte group today is orthogonal — the framework just
+// guarantees the K-group is byte-aligned.
+
+#map_g_fp6 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_g_fp6_1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_g_fp6_2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_g_fp6_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f6E3M2FN, f6E3M2FN, f32], user_indexing_maps = [#map_g_fp6, #map_g_fp6_1, #map_g_fp6_2], iteration_sizes = [?, ?, ?]>
+#encoding_g_fp6_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f6E3M2FN, f6E3M2FN, f32], user_indexing_maps = [#map_g_fp6, #map_g_fp6_1, #map_g_fp6_2], iteration_sizes = [?, ?, ?]>
+#encoding_g_fp6_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f6E3M2FN, f6E3M2FN, f32], user_indexing_maps = [#map_g_fp6, #map_g_fp6_1, #map_g_fp6_2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_fp6_f32_aarch64_generic(
+    %lhs: tensor<?x?xf6E3M2FN, #encoding_g_fp6_lhs>,
+    %rhs: tensor<?x?xf6E3M2FN, #encoding_g_fp6_rhs>,
+    %acc: tensor<?x?xf32, #encoding_g_fp6_res>
+) -> tensor<?x?xf32, #encoding_g_fp6_res> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "aarch64-xyz-xyz", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul ins(%lhs, %rhs : tensor<?x?xf6E3M2FN, #encoding_g_fp6_lhs>, tensor<?x?xf6E3M2FN, #encoding_g_fp6_rhs>)
+      outs(%acc : tensor<?x?xf32, #encoding_g_fp6_res>) -> tensor<?x?xf32, #encoding_g_fp6_res>
+  return %0 : tensor<?x?xf32, #encoding_g_fp6_res>
+}
+// `intrinsics_m = 1` defaults out of the printed attr.
+// CHECK-LABEL: func @matmul_fp6_f32_aarch64_generic(
+//       CHECK:   %[[INNER_FP6:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_n = 2, intrinsics_k = 4, lhs_type = f6E3M2FN, rhs_type = f6E3M2FN, acc_type = f32>

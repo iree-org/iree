@@ -345,41 +345,65 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   }
 }
 
-/// Returns x86 `MMAIntrinsic` cases whose required ISA extensions are all
-/// present in `config` (`cpu_features` / target features). Only the "natural"
-/// (M<=N) intrinsic orientations are listed; the M↔N-swapped orientation is
-/// expressed by the `transposed_intrinsic` flag on DataTiledMMAAttr, enumerated
-/// separately by the cost model.
+/// Returns the `MMA_GENERIC_SCALAR_1x1x1_REG*` variant for `config`. Almost
+/// every 64-bit CPU has at least 16 architectural registers we could put
+/// scalar tiles into (GPRs or lane 0 of a SIMD register, depending on what
+/// LLVM picks), so we pick `_REG16` on 64-bit ISAs and `_REG8` on 32-bit
+/// ones. This is a performance heuristic only — too high a budget would
+/// spill, too low would underutilize — and the generic-scalar fallback is
+/// slow either way.
+static IREE::CPU::MMAIntrinsic
+pickGenericScalarMMAForTarget(DictionaryAttr config) {
+  using IREE::CPU::MMAIntrinsic;
+  std::optional<llvm::Triple> triple = getTargetTriple(config);
+  bool is64Bit = triple ? triple->isArch64Bit() : true;
+  return is64Bit ? MMAIntrinsic::MMA_GENERIC_SCALAR_1x1x1_REG16
+                 : MMAIntrinsic::MMA_GENERIC_SCALAR_1x1x1_REG8;
+}
+
+/// Returns the `MMAIntrinsic` cases potentially usable for `config`: the x86
+/// architecture-specific intrinsics whose required ISA extensions are all
+/// present, plus one of the architecture-agnostic type-polymorphic
+/// `MMA_GENERIC_SCALAR_1x1x1_REG*` fallback variants (the one whose register
+/// budget matches `config`'s target). Only the "natural" (M<=N) orientation
+/// is listed; the M↔N-swapped orientation is expressed by the
+/// `transposed_intrinsic` flag on DataTiledMMAAttr and is enumerated
+/// separately by the cost model. The 1×1×1 generic intrinsic naturally
+/// loses to any real intrinsic that fits, so it only wins as a fallback
+/// when no real MMA covers the requested element types.
 static SmallVector<IREE::CPU::MMAIntrinsic>
 getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
   using IREE::CPU::MMAIntrinsic;
-  SmallVector<MMAIntrinsic> out;
   if (!config) {
-    return out;
+    return {};
   }
-  if (!isX86(config)) {
-    return out;
-  }
-  static const MMAIntrinsic kAllX86[] = {
-      MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
-      MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
-      MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
-      MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
-      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
-      MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
-      MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
-  };
-  for (MMAIntrinsic intr : kAllX86) {
-    SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
-    if (required.empty()) {
-      continue;
-    }
-    if (llvm::all_of(required,
-                     [&](StringRef f) { return hasFeature(config, f); })) {
-      out.push_back(intr);
+  // Always include the generic-scalar fallback first — it's the only
+  // intrinsic guaranteed to apply on any target, so anchoring the list
+  // with it means an early-return below can never accidentally produce
+  // an empty result for an otherwise-valid target.
+  SmallVector<MMAIntrinsic> out{pickGenericScalarMMAForTarget(config)};
+  if (isX86(config)) {
+    static const MMAIntrinsic kAllX86[] = {
+        MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
+        MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
+        MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
+        MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
+        MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
+        MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
+        MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
+        MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
+        MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
+    };
+    for (MMAIntrinsic intr : kAllX86) {
+      SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
+      if (required.empty()) {
+        continue;
+      }
+      if (llvm::all_of(required,
+                       [&](StringRef f) { return hasFeature(config, f); })) {
+        out.push_back(intr);
+      }
     }
   }
   return out;
@@ -397,13 +421,27 @@ struct IntrinsicInfo {
 };
 
 /// Returns the IntrinsicInfo for `intr` in the given orientation, if its ABC
-/// element types match `elementTypes`. Returns nullopt otherwise.
+/// element types match `elementTypes`. Returns nullopt otherwise. The
+/// `MMA_GENERIC_SCALAR_1x1x1_REG*` family is type-polymorphic — those
+/// values match any element-type triple by construction; their `lhsBits` /
+/// `rhsBits` / `accBits` stay at the struct's default 0 since the
+/// generic-scalar branch of `chooseUnrolling` doesn't read them.
 static std::optional<IntrinsicInfo>
 getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
                  IREE::CPU::MMAIntrinsic intr, bool transposed) {
-  auto base = IREE::CPU::DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
-                                               /*intrinsics_n=*/1,
-                                               /*intrinsics_k=*/1, transposed);
+  if (IREE::CPU::isGenericScalar(intr)) {
+    if (elementTypes.size() != 3 || !elementTypes[0] || !elementTypes[1] ||
+        !elementTypes[2]) {
+      return std::nullopt;
+    }
+    IntrinsicInfo info;
+    info.intrinsicM = info.intrinsicN = info.intrinsicK = 1;
+    return info;
+  }
+  auto base = IREE::CPU::DataTiledMMAAttr::get(
+      ctx, intr, /*intrinsics_m=*/1, /*intrinsics_n=*/1,
+      /*intrinsics_k=*/1, transposed, /*lhs_type=*/Type(),
+      /*rhs_type=*/Type(), /*acc_type=*/Type());
   SmallVector<VectorType> baseTiles;
   base.getUndistributedTileTypes(baseTiles);
   if (baseTiles.size() != 3) {
@@ -489,13 +527,28 @@ static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
 // Phase 2 of `chooseCpuInnerTiledMmaForEncoding`: for an already-chosen
 // (intrinsic, transposed) pair, pick the largest power-of-two unroll
 // factors (intrinsicsM, intrinsicsN) such that the three tiles
-// (ACC + LHS + RHS) still fit in the target's vector register file,
+// (ACC + LHS + RHS) still fit in the target's register budget,
 // breaking ties with arithmetic intensity (effM*effN)/(effM+effN) so
 // approximately-square tiles win.
 //
-// Returns nullopt if no feasible (im, in) exists. The returned pair is
-// (intrinsicsM, intrinsicsN).
-static std::optional<std::pair<int64_t, int64_t>>
+// "Register budget" depends on what the lowering will use:
+//   * Architecture-specific SIMD intrinsics use the vector register file,
+//     measured in bits, with element widths from `IntrinsicInfo` so a
+//     wider element type costs proportionally more of the budget.
+//   * The type-polymorphic `MMA_GENERIC_SCALAR_1x1x1_REG*` lowers to
+//     scalar arithmetic, where one element occupies one register (a GPR
+//     or lane 0 of a SIMD register, depending on what LLVM picks)
+//     regardless of bit width. So the budget is in registers, with all
+//     element "widths" treated as 1.
+//
+// Returns nullopt if no feasible unrolling exists. The returned tuple is
+// (intrinsicsM, intrinsicsN, intrinsicsK). When the (im, in) search loop
+// finds no candidate that fits the budget — possible for the generic
+// intrinsic with a sub-byte LHS/RHS forcing intrinsics_k = 8 against an
+// 8-register budget — we fall back to (1, 1) so we still return *some*
+// valid unrolling. Some register spill is preferable to failing data-
+// tiling outright.
+static std::optional<std::tuple<int64_t, int64_t, int64_t>>
 chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
                 IREE::CPU::MMAIntrinsic intr, bool transposed,
                 const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
@@ -504,20 +557,49 @@ chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   if (!info) {
     return std::nullopt;
   }
-  int64_t regBitBudget = IREE::CPU::getRegisterSpaceBytes(intr) * 8;
-  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, regBitBudget);
-  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, regBitBudget);
-  int64_t accTerm = info->intrinsicM * info->intrinsicN * info->accBits;
-  int64_t lhsTerm = info->intrinsicM * info->intrinsicK * info->lhsBits;
-  int64_t rhsTerm = info->intrinsicN * info->intrinsicK * info->rhsBits;
-  std::optional<std::pair<int64_t, int64_t>> best;
+  int64_t intrinsicsK = 1;
+  int64_t budget;
+  int64_t accUnit, lhsUnit, rhsUnit;
+  if (IREE::CPU::isGenericScalar(intr)) {
+    // Real hardware MMA intrinsics bake whatever K-grouping they need into
+    // the intrinsic itself. The generic-scalar fallback doesn't, so for
+    // sub-byte LHS/RHS types we have to group enough K-elements per
+    // contiguous block that a packed group is byte-addressable: pick the
+    // smallest power of two K such that K*lhsBits and K*rhsBits are both
+    // multiples of 8. K∈{1,2,4,8} is enough to cover every type from i8/f8
+    // (K=1) down to i1 (K=8).
+    int64_t lhsBits = elementTypes[0].getIntOrFloatBitWidth();
+    int64_t rhsBits = elementTypes[1].getIntOrFloatBitWidth();
+    while (intrinsicsK <= 8 && (((intrinsicsK * lhsBits) % 8) != 0 ||
+                                ((intrinsicsK * rhsBits) % 8) != 0)) {
+      intrinsicsK *= 2;
+    }
+    if (intrinsicsK > 8) {
+      return std::nullopt;
+    }
+    // The budget — chosen at intrinsic-pick time as a function of the
+    // target's pointer width — is encoded in the enum value itself.
+    budget = IREE::CPU::getGenericScalarRegisterBudget(intr);
+    accUnit = lhsUnit = rhsUnit = 1;
+  } else {
+    budget = IREE::CPU::getRegisterSpaceBytes(intr) * 8;
+    accUnit = info->accBits;
+    lhsUnit = info->lhsBits;
+    rhsUnit = info->rhsBits;
+  }
+  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, budget);
+  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, budget);
+  int64_t accTerm = info->intrinsicM * info->intrinsicN * accUnit;
+  int64_t lhsTerm = info->intrinsicM * info->intrinsicK * intrinsicsK * lhsUnit;
+  int64_t rhsTerm = info->intrinsicN * info->intrinsicK * intrinsicsK * rhsUnit;
+  std::optional<std::pair<int64_t, int64_t>> bestMN;
   double bestIntensity = -1.0;
   // Enumerate power-of-two intrinsicsM; for each, pick the largest feasible
-  // power-of-two intrinsicsN under the bit budget and the static N cap.
-  // The budget bounds im on its own (im*lhsTerm alone must be < budget),
-  // which terminates the loop without any numRegs-style cap.
+  // power-of-two intrinsicsN under the budget and the static N cap. The
+  // budget bounds im on its own (im*lhsTerm alone must be < budget), which
+  // terminates the loop without any numRegs-style cap.
   for (int64_t im = 1; im <= capMPo2; im *= 2) {
-    int64_t remaining = regBitBudget - im * lhsTerm;
+    int64_t remaining = budget - im * lhsTerm;
     if (remaining <= 0) {
       break;
     }
@@ -532,10 +614,14 @@ chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
     double intensity = effM * effN / (effM + effN);
     if (intensity > bestIntensity) {
       bestIntensity = intensity;
-      best = {im, in};
+      bestMN = {im, in};
     }
   }
-  return best;
+  // Fall back to (1, 1) if no (im, in) fit — see function comment.
+  if (!bestMN) {
+    bestMN = {1, 1};
+  }
+  return std::make_tuple(bestMN->first, bestMN->second, intrinsicsK);
 }
 
 // Picks a CPU `DataTiledMMAAttr` for `iree_codegen.inner_tiled` given an
@@ -559,14 +645,24 @@ chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
     return {};
   }
   auto [intr, transposed] = *intrChoice;
-  std::optional<std::pair<int64_t, int64_t>> unroll =
+  std::optional<std::tuple<int64_t, int64_t, int64_t>> unroll =
       chooseUnrolling(ctx, elementTypes, intr, transposed, *matmulSizes);
   if (!unroll) {
     return {};
   }
-  auto [intrinsicsM, intrinsicsN] = *unroll;
+  auto [intrinsicsM, intrinsicsN, intrinsicsK] = *unroll;
+  // The type-polymorphic generic intrinsic doesn't bake element types into
+  // its enum value; we have to pin them down on the attr itself so the
+  // lowering and `getABCElementTypes(ctx, attr)` can read them back.
+  Type lhsType, rhsType, accType;
+  if (IREE::CPU::isGenericScalar(intr)) {
+    lhsType = elementTypes[0];
+    rhsType = elementTypes[1];
+    accType = elementTypes[2];
+  }
   return IREE::CPU::DataTiledMMAAttr::get(ctx, intr, intrinsicsM, intrinsicsN,
-                                          /*intrinsics_k=*/1, transposed);
+                                          intrinsicsK, transposed, lhsType,
+                                          rhsType, accType);
 }
 
 /// Lowers a contraction under a `CPUEncodingResolverAttr` with
