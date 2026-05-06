@@ -56,6 +56,15 @@ typedef struct iree_hal_vulkan_bda_dispatch_root_v1_t {
   uint32_t reserved0;
 } iree_hal_vulkan_bda_dispatch_root_v1_t;
 
+// Per-binding requirements for BDA dispatch table publication.
+typedef struct iree_hal_vulkan_bda_binding_requirement_t {
+  // Minimum device address alignment in bytes required by the shader.
+  uint32_t minimum_alignment;
+
+  // Minimum buffer range byte length required by the shader.
+  uint64_t minimum_length;
+} iree_hal_vulkan_bda_binding_requirement_t;
+
 // Prepared Vulkan compute pipeline and HAL export metadata.
 typedef struct iree_hal_vulkan_pipeline_t {
   // Vulkan compute pipeline handle owned by the executable.
@@ -87,11 +96,21 @@ typedef struct iree_hal_vulkan_pipeline_t {
     // Push-constant byte length reserved for the hidden BDA root.
     uint32_t root_push_constant_length;
 
+    // Push-constant byte offset of the first HAL inline constant.
+    uint32_t constant_push_constant_offset;
+
     // Byte length of one shader-visible binding table entry.
     uint32_t binding_table_entry_length;
 
     // Whether binding_count is a verifier-enforced ABI value.
     bool binding_count_known;
+
+    // Number of entries in binding_requirements.
+    iree_host_size_t binding_requirement_count;
+
+    // Per-binding validation requirements, or NULL when all bindings are
+    // unconstrained beyond device-visible storage-buffer validity.
+    iree_hal_vulkan_bda_binding_requirement_t* binding_requirements;
   } bda;
 
   // Export name stored in executable-owned host memory.

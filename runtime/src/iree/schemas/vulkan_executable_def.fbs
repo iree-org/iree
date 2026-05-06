@@ -26,6 +26,24 @@ enum VkDescriptorType:uint32 {
   STORAGE_BUFFER = 7,                       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
 }
 
+// HAL dispatch ABI used by a pipeline.
+enum DispatchAbi:uint8 {
+  // Descriptor sets are populated from HAL bindings before dispatch.
+  DESCRIPTOR = 0,
+
+  // Buffer-device-address dispatch root and address64 binding table ABI.
+  BDA_V1 = 1,
+}
+
+// BDA shader-visible binding table entry representation.
+enum BdaBindingTableEntryType:uint8 {
+  // One uint64_t device address per HAL binding.
+  ADDRESS64 = 0,
+
+  // One uint64_t device address followed by one uint64_t byte length.
+  ADDRESS64_LENGTH64 = 1,
+}
+
 // Subset of VkDescriptorSetLayoutBinding.
 table DescriptorSetLayoutBindingDef {
   binding:uint32;
@@ -50,6 +68,42 @@ table DescriptorSetLayoutDef {
 table PipelineLayoutDef {
   descriptor_set_layout_ordinals:[uint32];
   push_constant_ranges:[PushConstantRange];
+}
+
+// Per-binding requirements for BDA table publication.
+table BdaBindingDef {
+  // Minimum device address alignment required by the shader.
+  minimum_alignment:uint32 = 1;
+
+  // Minimum byte length required by the shader.
+  minimum_length:uint64 = 0;
+}
+
+// BDA v1 dispatch ABI layout for one exported pipeline.
+table BdaDispatchLayoutDef {
+  // BDA ABI version. Must be 1 for this schema.
+  abi_version:uint32 = 1;
+
+  // Push-constant byte offset of iree_hal_vulkan_bda_dispatch_root_v1_t.
+  root_push_constant_offset:uint32 = 0;
+
+  // Push-constant byte length of iree_hal_vulkan_bda_dispatch_root_v1_t.
+  root_push_constant_length:uint32 = 32;
+
+  // Push-constant byte offset of the first HAL inline constant.
+  constant_push_constant_offset:uint32 = 32;
+
+  // Number of HAL inline uint32_t constants accepted by the pipeline.
+  constant_count:uint32 = 0;
+
+  // Shader-visible binding table entry representation.
+  binding_table_entry_type:BdaBindingTableEntryType = ADDRESS64;
+
+  // Number of HAL bindings accepted by the pipeline.
+  binding_count:uint32 = 0;
+
+  // Optional per-binding requirements indexed by HAL binding ordinal.
+  bindings:[BdaBindingDef];
 }
 
 // Used to create a VkShaderModule.
@@ -78,6 +132,12 @@ table PipelineDef {
 
   // Optional debug information related to the export.
   debug_info:iree.hal.debug.ExportDef;
+
+  // HAL dispatch ABI expected by the entry point.
+  dispatch_abi:DispatchAbi = DESCRIPTOR;
+
+  // Required BDA v1 dispatch layout when dispatch_abi is BDA_V1.
+  bda_dispatch_layout:BdaDispatchLayoutDef;
 }
 
 // A SPIR-V shader module and runtime pipeline layout description.

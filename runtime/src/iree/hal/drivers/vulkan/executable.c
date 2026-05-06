@@ -42,6 +42,22 @@ iree_status_t iree_hal_vulkan_executable_infer_format(
   }
 
   iree_string_view_t format = IREE_SV("vulkan-spirv-fb");
+  iree_hal_vulkan_ExecutableDef_table_t executable_def =
+      iree_hal_vulkan_ExecutableDef_as_root(flatbuffer_data.data);
+  iree_hal_vulkan_PipelineDef_vec_t pipelines_vec =
+      iree_hal_vulkan_ExecutableDef_pipelines_get(executable_def);
+  const iree_host_size_t pipeline_count =
+      iree_hal_vulkan_PipelineDef_vec_len(pipelines_vec);
+  for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
+    iree_hal_vulkan_PipelineDef_table_t pipeline_def =
+        iree_hal_vulkan_PipelineDef_vec_at(pipelines_vec, i);
+    if (iree_hal_vulkan_PipelineDef_dispatch_abi_get(pipeline_def) ==
+        iree_hal_vulkan_DispatchAbi_BDA_V1) {
+      format = IREE_SV("vulkan-spirv-bda-v1");
+      break;
+    }
+  }
+
   if (format.size >= executable_format_capacity) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "executable format buffer too small");
@@ -78,6 +94,14 @@ bool iree_hal_vulkan_executable_format_supported(
                enabled_features,
                IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
   }
+  if (iree_string_view_equal(executable_format,
+                             IREE_SV("vulkan-spirv-bda-v1"))) {
+    return iree_all_bits_set(enabled_dispatch_abis,
+                             IREE_HAL_VULKAN_DISPATCH_ABI_BDA) &&
+           iree_all_bits_set(
+               enabled_features,
+               IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
+  }
   return false;
 }
 
@@ -90,7 +114,9 @@ iree_hal_vulkan_executable_dispatch_abi_for_format(
     return IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR;
   }
   if (iree_string_view_equal(executable_format,
-                             IREE_SV("vulkan-spirv-bda-raw"))) {
+                             IREE_SV("vulkan-spirv-bda-raw")) ||
+      iree_string_view_equal(executable_format,
+                             IREE_SV("vulkan-spirv-bda-v1"))) {
     return IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
   }
   return IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
@@ -450,11 +476,213 @@ static iree_status_t iree_hal_vulkan_verify_required_subgroup_size(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_pipeline_def_dispatch_abi(
+    iree_hal_vulkan_PipelineDef_table_t pipeline_def,
+    iree_hal_vulkan_dispatch_abis_t* out_dispatch_abi) {
+  switch (iree_hal_vulkan_PipelineDef_dispatch_abi_get(pipeline_def)) {
+    case iree_hal_vulkan_DispatchAbi_DESCRIPTOR:
+      *out_dispatch_abi = IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR;
+      return iree_ok_status();
+    case iree_hal_vulkan_DispatchAbi_BDA_V1:
+      *out_dispatch_abi = IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
+      return iree_ok_status();
+    default:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "pipeline declares unknown dispatch ABI %u",
+          (uint32_t)iree_hal_vulkan_PipelineDef_dispatch_abi_get(pipeline_def));
+  }
+}
+
+static bool iree_hal_vulkan_push_constant_layout_covers_range(
+    iree_hal_vulkan_PipelineLayoutDef_table_t pipeline_layout_def,
+    uint32_t required_offset, uint32_t required_length) {
+  if (required_length == 0) return true;
+  const uint64_t required_end =
+      (uint64_t)required_offset + (uint64_t)required_length;
+  iree_hal_vulkan_PushConstantRange_vec_t push_constant_ranges_vec =
+      iree_hal_vulkan_PipelineLayoutDef_push_constant_ranges_get(
+          pipeline_layout_def);
+  const iree_host_size_t push_constant_range_count =
+      iree_hal_vulkan_PushConstantRange_vec_len(push_constant_ranges_vec);
+  for (iree_host_size_t i = 0; i < push_constant_range_count; ++i) {
+    const iree_hal_vulkan_PushConstantRange_t* push_constant_range =
+        iree_hal_vulkan_PushConstantRange_vec_at(push_constant_ranges_vec, i);
+    const uint64_t range_end =
+        (uint64_t)push_constant_range->offset + push_constant_range->size;
+    if (iree_hal_vulkan_stage_flags_include_compute(
+            push_constant_range->stage_flags) &&
+        required_offset >= push_constant_range->offset &&
+        required_end <= range_end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_vulkan_verify_bda_dispatch_layout_def(
+    iree_hal_vulkan_PipelineLayoutDef_table_t pipeline_layout_def,
+    iree_hal_vulkan_BdaDispatchLayoutDef_table_t bda_dispatch_layout_def,
+    iree_host_size_t pipeline_ordinal) {
+  if (!bda_dispatch_layout_def) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "pipelines[%" PRIhsz
+                            "] BDA dispatch ABI requires a layout",
+                            pipeline_ordinal);
+  }
+
+  const uint32_t abi_version =
+      iree_hal_vulkan_BdaDispatchLayoutDef_abi_version_get(
+          bda_dispatch_layout_def);
+  if (abi_version != 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "pipelines[%" PRIhsz
+                            "] BDA dispatch layout version %u is unsupported",
+                            pipeline_ordinal, abi_version);
+  }
+
+  const uint32_t root_offset =
+      iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_offset_get(
+          bda_dispatch_layout_def);
+  const uint32_t root_length =
+      iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_length_get(
+          bda_dispatch_layout_def);
+  if (root_length != sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "pipelines[%" PRIhsz
+                            "] BDA root push constant length %u does not match "
+                            "ABI v1 length %" PRIhsz,
+                            pipeline_ordinal, root_length,
+                            sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t));
+  }
+  if ((root_offset % sizeof(uint32_t)) != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "pipelines[%" PRIhsz
+        "] BDA root push constant offset must be 4-byte aligned",
+        pipeline_ordinal);
+  }
+  if (!iree_hal_vulkan_push_constant_layout_covers_range(
+          pipeline_layout_def, root_offset, root_length)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "pipelines[%" PRIhsz
+        "] BDA root push constants are outside the pipeline layout",
+        pipeline_ordinal);
+  }
+
+  const uint32_t constant_offset =
+      iree_hal_vulkan_BdaDispatchLayoutDef_constant_push_constant_offset_get(
+          bda_dispatch_layout_def);
+  const uint32_t constant_count =
+      iree_hal_vulkan_BdaDispatchLayoutDef_constant_count_get(
+          bda_dispatch_layout_def);
+  if (constant_count > UINT16_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "pipelines[%" PRIhsz
+                            "] BDA layout declares %u constants, exceeding "
+                            "the HAL limit %u",
+                            pipeline_ordinal, constant_count, UINT16_MAX);
+  }
+  const uint64_t constant_length = (uint64_t)constant_count * sizeof(uint32_t);
+  if ((constant_offset % sizeof(uint32_t)) != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "pipelines[%" PRIhsz
+        "] BDA constant push constant offset must be 4-byte aligned",
+        pipeline_ordinal);
+  }
+  if (constant_length != 0 &&
+      !iree_hal_vulkan_push_constant_layout_covers_range(
+          pipeline_layout_def, constant_offset, (uint32_t)constant_length)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "pipelines[%" PRIhsz
+        "] BDA inline constants are outside the pipeline layout",
+        pipeline_ordinal);
+  }
+  const uint64_t root_end = (uint64_t)root_offset + root_length;
+  const uint64_t constant_end = (uint64_t)constant_offset + constant_length;
+  if (constant_length != 0 && root_offset < constant_end &&
+      constant_offset < root_end) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "pipelines[%" PRIhsz
+        "] BDA inline constants overlap the hidden root push constants",
+        pipeline_ordinal);
+  }
+
+  switch (iree_hal_vulkan_BdaDispatchLayoutDef_binding_table_entry_type_get(
+      bda_dispatch_layout_def)) {
+    case iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64:
+      break;
+    case iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64_LENGTH64:
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "pipelines[%" PRIhsz
+          "] BDA checked address64_length64 binding tables are unsupported",
+          pipeline_ordinal);
+    default:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "pipelines[%" PRIhsz
+          "] BDA layout declares an unknown binding table entry type",
+          pipeline_ordinal);
+  }
+
+  const uint32_t binding_count =
+      iree_hal_vulkan_BdaDispatchLayoutDef_binding_count_get(
+          bda_dispatch_layout_def);
+  if (binding_count > UINT16_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "pipelines[%" PRIhsz
+                            "] BDA layout declares %u bindings, exceeding "
+                            "the HAL limit %u",
+                            pipeline_ordinal, binding_count, UINT16_MAX);
+  }
+  iree_hal_vulkan_BdaBindingDef_vec_t bindings_vec =
+      iree_hal_vulkan_BdaDispatchLayoutDef_bindings_get(
+          bda_dispatch_layout_def);
+  const iree_host_size_t binding_requirement_count =
+      iree_hal_vulkan_BdaBindingDef_vec_len(bindings_vec);
+  if (binding_requirement_count != 0 &&
+      binding_requirement_count != binding_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "pipelines[%" PRIhsz "] BDA layout has %" PRIhsz
+                            " binding requirements but declares %u bindings",
+                            pipeline_ordinal, binding_requirement_count,
+                            binding_count);
+  }
+  for (iree_host_size_t i = 0; i < binding_requirement_count; ++i) {
+    iree_hal_vulkan_BdaBindingDef_table_t binding_def =
+        iree_hal_vulkan_BdaBindingDef_vec_at(bindings_vec, i);
+    if (!binding_def) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz
+                              "] BDA binding requirement[%" PRIhsz "] is NULL",
+                              pipeline_ordinal, i);
+    }
+    const uint32_t minimum_alignment =
+        iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(binding_def);
+    if (minimum_alignment == 0 ||
+        !iree_device_size_is_power_of_two(minimum_alignment)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "pipelines[%" PRIhsz "] BDA binding requirement[%" PRIhsz
+          "] minimum alignment %u is not a non-zero power of two",
+          pipeline_ordinal, i, minimum_alignment);
+    }
+  }
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_verify_pipeline_def(
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
     iree_hal_vulkan_ShaderModuleDef_vec_t shader_modules_vec,
     iree_hal_vulkan_PipelineLayoutDef_vec_t pipeline_layouts_vec,
+    iree_hal_vulkan_dispatch_abis_t executable_dispatch_abi,
     iree_hal_vulkan_PipelineDef_table_t pipeline_def,
     iree_host_size_t pipeline_ordinal) {
   if (!pipeline_def) {
@@ -489,11 +717,48 @@ static iree_status_t iree_hal_vulkan_verify_pipeline_def(
                             "] pipeline layout ordinal %u out of range",
                             pipeline_ordinal, pipeline_layout_ordinal);
   }
+  iree_hal_vulkan_PipelineLayoutDef_table_t pipeline_layout_def =
+      iree_hal_vulkan_PipelineLayoutDef_vec_at(pipeline_layouts_vec,
+                                               pipeline_layout_ordinal);
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_required_subgroup_size(
       physical_device, enabled_features,
       iree_hal_vulkan_PipelineDef_subgroup_size_get(pipeline_def),
       pipeline_ordinal));
+  iree_hal_vulkan_dispatch_abis_t pipeline_dispatch_abi =
+      IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_pipeline_def_dispatch_abi(
+      pipeline_def, &pipeline_dispatch_abi));
+  if (pipeline_dispatch_abi != executable_dispatch_abi) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "pipelines[%" PRIhsz
+                            "] dispatch ABI does not match executable format",
+                            pipeline_ordinal);
+  }
+  if (pipeline_dispatch_abi == IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR) {
+    if (iree_hal_vulkan_PipelineDef_bda_dispatch_layout_get(pipeline_def)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "pipelines[%" PRIhsz
+          "] descriptor dispatch ABI must not declare a BDA layout",
+          pipeline_ordinal);
+    }
+  } else if (pipeline_dispatch_abi == IREE_HAL_VULKAN_DISPATCH_ABI_BDA) {
+    flatbuffers_uint32_vec_t descriptor_set_layout_ordinals_vec =
+        iree_hal_vulkan_PipelineLayoutDef_descriptor_set_layout_ordinals_get(
+            pipeline_layout_def);
+    if (flatbuffers_uint32_vec_len(descriptor_set_layout_ordinals_vec) != 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "pipelines[%" PRIhsz
+          "] BDA dispatch ABI must use a descriptor-free pipeline layout",
+          pipeline_ordinal);
+    }
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_dispatch_layout_def(
+        pipeline_layout_def,
+        iree_hal_vulkan_PipelineDef_bda_dispatch_layout_get(pipeline_def),
+        pipeline_ordinal));
+  }
   return iree_hal_debug_verify_export_def(
       iree_hal_vulkan_PipelineDef_debug_info_get(pipeline_def));
 }
@@ -501,6 +766,7 @@ static iree_status_t iree_hal_vulkan_verify_pipeline_def(
 static iree_status_t iree_hal_vulkan_executable_flatbuffer_verify(
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
     iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_dispatch_abis_t executable_dispatch_abi,
     iree_const_byte_span_t flatbuffer_data) {
   const int verify_result = iree_hal_vulkan_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
@@ -555,7 +821,7 @@ static iree_status_t iree_hal_vulkan_executable_flatbuffer_verify(
   for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_pipeline_def(
         physical_device, enabled_features, shader_modules_vec,
-        pipeline_layouts_vec,
+        pipeline_layouts_vec, executable_dispatch_abi,
         iree_hal_vulkan_PipelineDef_vec_at(pipelines_vec, i), i));
   }
 
@@ -911,6 +1177,76 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_initialize_pipeline_bda_metadata(
+    iree_hal_vulkan_BdaDispatchLayoutDef_table_t bda_dispatch_layout_def,
+    iree_allocator_t host_allocator, iree_hal_vulkan_pipeline_t* out_pipeline) {
+  const uint32_t constant_count =
+      iree_hal_vulkan_BdaDispatchLayoutDef_constant_count_get(
+          bda_dispatch_layout_def);
+  const uint32_t binding_count =
+      iree_hal_vulkan_BdaDispatchLayoutDef_binding_count_get(
+          bda_dispatch_layout_def);
+  out_pipeline->constant_count = (uint16_t)constant_count;
+  out_pipeline->binding_count = (uint16_t)binding_count;
+  out_pipeline->bda.root_push_constant_offset =
+      iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_offset_get(
+          bda_dispatch_layout_def);
+  out_pipeline->bda.root_push_constant_length =
+      iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_length_get(
+          bda_dispatch_layout_def);
+  out_pipeline->bda.constant_push_constant_offset =
+      iree_hal_vulkan_BdaDispatchLayoutDef_constant_push_constant_offset_get(
+          bda_dispatch_layout_def);
+  out_pipeline->bda.binding_count_known = true;
+
+  switch (iree_hal_vulkan_BdaDispatchLayoutDef_binding_table_entry_type_get(
+      bda_dispatch_layout_def)) {
+    case iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64:
+      out_pipeline->bda.binding_table_entry_length = sizeof(uint64_t);
+      break;
+    default:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "BDA pipeline metadata has unsupported binding table entry type");
+  }
+
+  iree_hal_vulkan_BdaBindingDef_vec_t bindings_vec =
+      iree_hal_vulkan_BdaDispatchLayoutDef_bindings_get(
+          bda_dispatch_layout_def);
+  const iree_host_size_t binding_requirement_count =
+      iree_hal_vulkan_BdaBindingDef_vec_len(bindings_vec);
+  bool has_binding_requirements = false;
+  for (iree_host_size_t i = 0; i < binding_requirement_count; ++i) {
+    iree_hal_vulkan_BdaBindingDef_table_t binding_def =
+        iree_hal_vulkan_BdaBindingDef_vec_at(bindings_vec, i);
+    if (iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(binding_def) != 1 ||
+        iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def) != 0) {
+      has_binding_requirements = true;
+      break;
+    }
+  }
+  if (!has_binding_requirements) return iree_ok_status();
+
+  out_pipeline->bda.binding_requirement_count = binding_requirement_count;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+      host_allocator, binding_requirement_count,
+      sizeof(out_pipeline->bda.binding_requirements[0]),
+      (void**)&out_pipeline->bda.binding_requirements));
+  for (iree_host_size_t i = 0; i < binding_requirement_count; ++i) {
+    iree_hal_vulkan_BdaBindingDef_table_t binding_def =
+        iree_hal_vulkan_BdaBindingDef_vec_at(bindings_vec, i);
+    out_pipeline->bda.binding_requirements[i] =
+        (iree_hal_vulkan_bda_binding_requirement_t){
+            .minimum_alignment =
+                iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(
+                    binding_def),
+            .minimum_length =
+                iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def),
+        };
+  }
+  return iree_ok_status();
+}
+
 enum {
   IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL = 14u,
   IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
@@ -1033,6 +1369,51 @@ static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
       /*out_entry_point_found=*/NULL, out_workgroup_size);
 }
 
+static iree_status_t iree_hal_vulkan_verify_bda_spirv(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
+  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan BDA executable is not SPIR-V");
+  }
+
+  bool has_physical_storage_buffer_memory_model = false;
+  iree_host_size_t word_offset = 5;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL || word_count < 3) {
+      continue;
+    }
+    has_physical_storage_buffer_memory_model =
+        operands[0] ==
+            IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
+        operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
+    break;
+  }
+  if (!has_physical_storage_buffer_memory_model) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
+  }
+
+  bool entry_point_found = false;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
+      spirv_words, spirv_word_count, entry_point, &entry_point_found,
+      out_workgroup_size));
+  if (!entry_point_found) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA executable has no compute entry point '%.*s'",
+        (int)entry_point.size, entry_point.data);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkPipelineCache pipeline_cache,
@@ -1052,9 +1433,6 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
   iree_hal_vulkan_PipelineLayoutDef_table_t pipeline_layout_def =
       iree_hal_vulkan_PipelineLayoutDef_vec_at(pipeline_layouts_vec,
                                                pipeline_layout_ordinal);
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_calculate_pipeline_layout_counts(
-      descriptor_set_layouts_vec, pipeline_layout_def,
-      &out_pipeline->constant_count, &out_pipeline->binding_count));
 
   const uint32_t shader_module_ordinal =
       iree_hal_vulkan_PipelineDef_shader_module_ordinal_get(pipeline_def);
@@ -1065,24 +1443,49 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
                                              shader_module_ordinal);
   flatbuffers_uint32_vec_t spirv_code_vec =
       iree_hal_vulkan_ShaderModuleDef_spirv_code_get(shader_module_def);
+  flatbuffers_string_t entry_point =
+      iree_hal_vulkan_PipelineDef_entry_point_get(pipeline_def);
+  iree_string_view_t entry_point_view =
+      iree_make_string_view(entry_point, flatbuffers_string_len(entry_point));
   out_pipeline->layout = pipeline_layouts[pipeline_layout_ordinal];
   out_pipeline->dispatch_abi = dispatch_abi;
   out_pipeline->subgroup_size = subgroup_size;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
-      pipeline_layout_def, descriptor_set_layouts_vec, descriptor_set_layouts,
-      host_allocator, out_pipeline));
+  switch (dispatch_abi) {
+    case IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR: {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_calculate_pipeline_layout_counts(
+          descriptor_set_layouts_vec, pipeline_layout_def,
+          &out_pipeline->constant_count, &out_pipeline->binding_count));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
+              pipeline_layout_def, descriptor_set_layouts_vec,
+              descriptor_set_layouts, host_allocator, out_pipeline));
+      break;
+    }
+    case IREE_HAL_VULKAN_DISPATCH_ABI_BDA: {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_bda_metadata(
+          iree_hal_vulkan_PipelineDef_bda_dispatch_layout_get(pipeline_def),
+          host_allocator, out_pipeline));
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv(
+          (const uint32_t*)spirv_code_vec,
+          flatbuffers_uint32_vec_len(spirv_code_vec), entry_point_view,
+          out_pipeline->workgroup_size));
+      break;
+    }
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan pipeline has invalid dispatch ABI 0x%08x",
+                              dispatch_abi);
+  }
 
   VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroup_size_info = {
       .sType =
           VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO,
       .requiredSubgroupSize = subgroup_size,
   };
-  flatbuffers_string_t entry_point =
-      iree_hal_vulkan_PipelineDef_entry_point_get(pipeline_def);
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
-      spirv_code_vec,
-      iree_make_string_view(entry_point, flatbuffers_string_len(entry_point)),
-      out_pipeline->workgroup_size));
+  if (dispatch_abi == IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
+        spirv_code_vec, entry_point_view, out_pipeline->workgroup_size));
+  }
   VkPipelineShaderStageCreateInfo stage_create_info = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .pNext = subgroup_size ? &subgroup_size_info : NULL,
@@ -1239,51 +1642,6 @@ static iree_status_t iree_hal_vulkan_allocate_executable(
   return status;
 }
 
-static iree_status_t iree_hal_vulkan_verify_raw_bda_spirv(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
-  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "raw Vulkan BDA executable is not SPIR-V");
-  }
-
-  bool has_physical_storage_buffer_memory_model = false;
-  iree_host_size_t word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL || word_count < 3) {
-      continue;
-    }
-    has_physical_storage_buffer_memory_model =
-        operands[0] ==
-            IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
-        operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
-    break;
-  }
-  if (!has_physical_storage_buffer_memory_model) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "raw Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
-  }
-
-  bool entry_point_found = false;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
-      spirv_words, spirv_word_count, entry_point, &entry_point_found,
-      out_workgroup_size));
-  if (!entry_point_found) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "raw Vulkan BDA executable has no compute entry point '%.*s'",
-        (int)entry_point.size, entry_point.data);
-  }
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkPipelineCache pipeline_cache,
@@ -1317,7 +1675,7 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
 
   const iree_string_view_t entry_point = IREE_SV("main");
   uint32_t workgroup_size[3] = {0};
-  iree_status_t status = iree_hal_vulkan_verify_raw_bda_spirv(
+  iree_status_t status = iree_hal_vulkan_verify_bda_spirv(
       spirv_words, spirv_word_count, entry_point, workgroup_size);
 
   iree_hal_vulkan_executable_t* executable = NULL;
@@ -1375,6 +1733,8 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     pipeline->layout = executable->pipeline_layouts[0];
     pipeline->bda.root_push_constant_offset = 0;
     pipeline->bda.root_push_constant_length =
+        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t);
+    pipeline->bda.constant_push_constant_offset =
         sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t);
     pipeline->bda.binding_table_entry_length = sizeof(uint64_t);
     pipeline->bda.binding_count_known = false;
@@ -1486,7 +1846,7 @@ iree_status_t iree_hal_vulkan_executable_create(
       iree_hal_vulkan_ExecutableDef_file_identifier, &executable_flatbuffer);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_executable_flatbuffer_verify(
-        physical_device, enabled_features, executable_flatbuffer);
+        physical_device, enabled_features, dispatch_abi, executable_flatbuffer);
   }
 
   iree_hal_vulkan_ExecutableDef_table_t executable_def = 0;
@@ -1619,6 +1979,8 @@ static void iree_hal_vulkan_executable_destroy(
                         executable->pipelines[i].descriptor_bindings);
     iree_allocator_free(host_allocator,
                         executable->pipelines[i].descriptor_set_layouts);
+    iree_allocator_free(host_allocator,
+                        executable->pipelines[i].bda.binding_requirements);
   }
   for (iree_host_size_t i = 0; i < executable->pipeline_layout_count; ++i) {
     if (executable->pipeline_layouts[i]) {

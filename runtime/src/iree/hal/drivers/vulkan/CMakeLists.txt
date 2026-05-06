@@ -23,6 +23,42 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    headers
+  HDRS
+    "api.h"
+    "executable.h"
+    "physical_device.h"
+  DEPS
+    ::api
+    Vulkan::Headers
+    iree::base
+    iree::hal
+    iree::hal::drivers::vulkan::util::libvulkan
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    executable_test
+  SRCS
+    "executable_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::flatcc::building
+    iree::hal
+    iree::hal::utils::executable_header
+    iree::schemas::vulkan_executable_def_c_fbs
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_library(
+  NAME
     vulkan
   SRCS
     "allocator.c"

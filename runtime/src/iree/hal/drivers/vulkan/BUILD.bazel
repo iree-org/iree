@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,6 +20,42 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+    ],
+)
+
+# Provided for tests and tools that may reach in.
+# These headers are not part of the public API and should not be depended on.
+iree_runtime_cc_library(
+    name = "headers",
+    hdrs = [
+        "api.h",
+        "executable.h",
+        "physical_device.h",
+    ],
+    deps = [
+        ":api",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/vulkan/util:libvulkan",
+        "@vulkan_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "executable_test",
+    srcs = ["executable_test.cc"],
+    group = "iree-hal-drivers-vulkan-tests",
+    deps = [
+        ":headers",
+        ":vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal/flatcc:building",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:executable_header",
+        "//runtime/src/iree/schemas:vulkan_executable_def_c_fbs",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
