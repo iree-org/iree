@@ -702,10 +702,13 @@ iree_cc_test(
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
+    iree::base::internal::flatcc::building
     iree::base::tooling::flags
     iree::hal
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
+    iree::hal::utils::executable_header
+    iree::schemas::vulkan_executable_def_c_fbs
     iree::testing::gtest
   LABELS
     "driver=vulkan"

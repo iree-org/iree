@@ -765,10 +765,13 @@ iree_runtime_cc_test(
     deps = [
         ":bda_backends",
         ":testdata_vulkan_spirv_bda_lib",
+        "//runtime/src/iree/base/internal/flatcc:building",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/utils:executable_header",
+        "//runtime/src/iree/schemas:vulkan_executable_def_c_fbs",
         "//runtime/src/iree/testing:gtest",
     ],
 )
