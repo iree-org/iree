@@ -184,8 +184,8 @@ struct TransferReadToVectorLoadLowering
 
   LogicalResult matchAndRewrite(vector::TransferReadOp read,
                                 PatternRewriter &rewriter) const override {
-    if (read.getVectorType().getRank() != 1) {
-      return rewriter.notifyMatchFailure(read, "expected rank-1 vector");
+    if (read.getVectorType().getRank() > 1) {
+      return rewriter.notifyMatchFailure(read, "expected rank-1 or rank-0 vector");
     }
 
     if (!read.getPermutationMap().isMinorIdentity()) {
