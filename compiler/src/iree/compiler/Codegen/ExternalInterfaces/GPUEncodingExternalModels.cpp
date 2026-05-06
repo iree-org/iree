@@ -173,7 +173,6 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     }
     SmallVector<VectorType> vectorTypes;
     intrinsicScaledMma.getDistributedTileTypes(vectorTypes);
-
     // For scaled_matmul, the size of the LHS scales and RHS scales are added
     // to the total LHS and RHS sizes, because we use these sizes to select the
     // unrolling factors for M, N, and K, which affect both the input and the
@@ -193,7 +192,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   }
 
   //
-  // Step 1b: Select the K unrolling factor and upper bounds on M/N.
+  // Step 2: Select the K unrolling factor and upper bounds on M/N.
   //
   // The intrinsicsK factor serves to allow loads from the A and B matrices to
   // use the target ISA's vector loads. For instance, if the ISA has 128-bit
@@ -243,7 +242,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   }
 
   //
-  // Step 2: Joint search over (wavesPerSimd, sm, sn, im, in).
+  // Step 3: Joint search over (wavesPerSimd, sm, sn, im, in).
   //
   // The outermost loop iterates occupancy levels (wavesPerSimd). For each,
   // we derive the per-wave VGPR budget and search over subgroup counts (sm, sn)
@@ -272,8 +271,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   for (int64_t wps = 1; wps <= maxWavesPerSimd; ++wps) {
     // Empirically, for 1 wave per simd, using all available VGPRs for tile
     // data leads to register spilling, so we impose a safety margin by
-    // dividing available VGPRs by 2 even for 1 wave per simd.
-    int64_t perWaveVgpr = vgprSpaceBits / 2;
+    // dividing available VGPRs by at least 2 even for 1 wave per simd.
+    int64_t perWaveVgpr = vgprSpaceBits / std::max(2LL, wps);
     int64_t maxSubgroups = simdsPerWgp * wps;
     for (int64_t sm = 1; sm <= maxSubgroups; sm <<= 1) {
       for (int64_t sn = 1; sn <= maxSubgroups / sm; sn <<= 1) {
@@ -311,6 +310,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       }
     }
   }
+
   // We currently never generate subgroupsK != 1, as subgroupsK requires
   // specific partial-accumulator-reduction in the kernel, currently only done
   // in some microkernels that would provide their own DataTiledMMAAttr.

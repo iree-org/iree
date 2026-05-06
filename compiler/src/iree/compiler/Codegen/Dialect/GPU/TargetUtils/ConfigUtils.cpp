@@ -112,8 +112,7 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     // will take care of moving small chunks at a time into a shared memory
     // operand that will be created together with the ukernel op.
     SmallVector<int64_t> promotionList = {0, 1};
-    bool isScaled = isa<DataTiledScaledMMAAttr>(dataTiledMmaAttr);
-    if (isScaled) {
+    if (isa<DataTiledScaledMMAAttr>(dataTiledMmaAttr)) {
       promotionList.append({2, 3});
     }
     GPU::appendPromotedOperandsList(context, attrs, promotionList);
