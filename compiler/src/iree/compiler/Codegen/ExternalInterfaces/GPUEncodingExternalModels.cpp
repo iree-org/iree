@@ -41,6 +41,7 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/TensorEncoding.h"
@@ -172,6 +173,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     }
     SmallVector<VectorType> vectorTypes;
     intrinsicScaledMma.getDistributedTileTypes(vectorTypes);
+
     // For scaled_matmul, the size of the LHS scales and RHS scales are added
     // to the total LHS and RHS sizes, because we use these sizes to select the
     // unrolling factors for M, N, and K, which affect both the input and the
@@ -191,8 +193,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   }
 
   //
-  // Step 2: Select the total unrolling factors along the M, N, and K
-  // dimensions.
+  // Step 1b: Select the K unrolling factor and upper bounds on M/N.
   //
   // The intrinsicsK factor serves to allow loads from the A and B matrices to
   // use the target ISA's vector loads. For instance, if the ISA has 128-bit
@@ -202,49 +203,17 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   int intrinsicsK =
       std::max(1, *wgp.getMaxLoadInstructionBits() / intrinsicLoadBits);
 
-  // For scaled intrinsics, there is another reason to unroll K. Scales are held
-  // in a vector of multiple scales, but only a single scale is used for each
-  // instruction. We want to be able to load a contiguous vector of scales into
-  // registers, and use the same vector for consecutive instructions. Choose the
-  // LCM of the scales vector size unrolling factor, and the load bitwidth
-  // unrolling factor, so both are satisfied.
-  // * Note that typically, the load bitwidth unrolling factor will be 1, so the
-  // total K unrolling factor will just be the scales vector size.
+  // For scaled matmuls, operands are loaded in 128-bit blocks but scales are
+  // distributed one byte-sized scale per thread across a subgroup. We unroll K
+  // by a factor of 2 (the minimum that keeps contiguous scale loads when
+  // combined with M/N interleaving) rather than using the load-width formula.
   if (auto scaledMmaAttr = dyn_cast<ScaledMMAAttr>(intrinsicAttr)) {
-    intrinsicsK = std::lcm(intrinsicsK, scaledMmaAttr.getScalesVectorSize());
+    intrinsicsK = 2;
   }
 
-  // The total amount of unrolling along the M and N dimensions is normally
-  // limited only by the number of available registers, since larger M and N
-  // yields higher arithmetic intensity. Here, we do not yet distinguish between
-  // plain unrolling (more instructions on each thread) and
-  // unrolling-to-subgroups (more threads), since expanding to more subgroups
-  // correspondingly divides the available register space between this many
-  // subgroups, making it cancel out of the equation here.
-  //
-  // We need to find the optimal pair (totalUnrollM, totalUnrollN) by
-  // enumerating feasible (tm, tn) candidates. For each candidate, the
-  // following two constraints are enforced:
-  // 1. The A, B and C tiles must fit in VGPR space.
-  //     A-tile + B-tile + C-tile <= wgp.getVgprSpaceBits()
-  // 2. The A, B tiles must fit in shared memory.
-  //     A-tile + B-tile <= wgp.getMaxWorkgroupMemoryBytes() * 8
-  // A-tile: tm * intrinsicsK * intrinsicSizeBitsLHS
-  // B-tile: tn * intrinsicsK * intrinsicSizeBitsRHS
-  // C-tile: tm * tn * intrinsicSizeBitsACC
-  //
-  // The optimization goal is to maximize arithmetic intensity (tm * tn) / (tm +
-  // tn).
-  //
-  // We also self-impose the constraint that tm and tn are powers of 2 to
-  // avoid prematurely entering excessing fine-tuning of unrolling factors.
-  int64_t totalUnrollM = 1;
-  int64_t totalUnrollN = 1;
-  auto computeArithmeticIntensity = [&](int64_t tm, int64_t tn) -> double {
+  auto computeArithmeticIntensity = [](int64_t tm, int64_t tn) -> double {
     return double(tm * tn) / double(tm + tn);
   };
-  double bestArithmeticIntensity =
-      computeArithmeticIntensity(totalUnrollM, totalUnrollN);
   // Upper bounds of tm and tn are decided by the matrix and intrinsic sizes.
   int64_t maxTotalUnrollM = INT64_MAX;
   int64_t maxTotalUnrollN = INT64_MAX;
@@ -272,75 +241,76 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
                            numWGPs * intrinsicMSize * intrinsicNSize);
     }
   }
-  // Iterate over possible tm.
-  for (int64_t tm = 1; tm <= maxTotalUnrollM; tm <<= 1) {
-    // Compute the maximum feasible tn for this tm.
-    int64_t maxFeasibleTnVgpr =
-        (*wgp.getVgprSpaceBits() - tm * intrinsicsK * intrinsicSizeBitsLHS) /
-        (intrinsicsK * intrinsicSizeBitsRHS + tm * intrinsicSizeBitsACC);
-    int64_t maxFeasibleTnSharedMem = (wgp.getMaxWorkgroupMemoryBytes() * 8 -
-                                      tm * intrinsicsK * intrinsicSizeBitsLHS) /
-                                     (intrinsicsK * intrinsicSizeBitsRHS);
-    int64_t tn = std::min(maxFeasibleTnVgpr, maxFeasibleTnSharedMem);
-    // Clamp tn to maxTotalUnrollN.
-    tn = std::min(tn, maxTotalUnrollN);
-    // Clamp tn to maxTotalUnrollMN / tm.
-    tn = std::min(tn, maxTotalUnrollMN / tm);
-    // No feasible tn for this tm. Stop the enumeration.
-    if (tn <= 0) {
-      break;
-    }
-    // Round tn down to nearest power of two.
-    tn = 1 << (int64_t)std::floor(std::log2(tn));
-    // Maximize arithmetic intensity (tm * tn) / (tm + tn).
-    double currentArithmeticIntensity = computeArithmeticIntensity(tm, tn);
-    if (currentArithmeticIntensity > bestArithmeticIntensity) {
-      totalUnrollM = tm;
-      totalUnrollN = tn;
-      bestArithmeticIntensity = currentArithmeticIntensity;
-    }
-  }
 
   //
-  // Step 3: Split `totalUnrollM` and `totalUnrollN` into plain unrolling (more
-  // instructions on each thread) and unrolling-to-subgroups (more threads).
+  // Step 2: Joint search over (wavesPerSimd, sm, sn, im, in).
   //
-  // Unrolling-to-subgroups doesn't change the overall tile
-  // size, as it increases the number of subgroups but correspondingly decreases
-  // the number of registers available to each subgroups. In other words, the
-  // overall tile size determined above only needed to be concerned with the
-  // overall number of registers, not with how they are split between subgroups.
+  // The outermost loop iterates occupancy levels (wavesPerSimd). For each,
+  // we derive the per-wave VGPR budget and search over subgroup counts (sm, sn)
+  // and per-wave tiles (im, in). We prefer values for sm, sn, im, in that
+  // maximize the arithmetic intensity of the matmul breaking ties by favouring
+  // more waves. Constraints:
+  //   - Per-wave VGPR: im*iK*L + in*iK*R + im*in*A <= vgprSpaceBits/wps
+  //   - Total tile limits: sm*im <= maxTotalUnrollM, sn*in <= maxTotalUnrollN
+  //   - Workgroup utilization: sm*im*sn*in <= maxTotalUnrollMN
+  //   - LDS: sm*im*iK*L + sn*in*iK*R <= maxLDSBits
   //
-  // The goal is still to maximize arithmetic intensity, but now we need to
-  // optimize `intrinsicsM(N)` instead of `totalUnrollM(N)`.
+  int64_t vgprSpaceBits = *wgp.getVgprSpaceBits();
+  int64_t simdsPerWgp = *wgp.getSimdsPerWgp();
+  int64_t maxLDSBits = wgp.getMaxWorkgroupMemoryBytes() * 8;
+  int64_t maxWavesPerSimd = 2;
   int64_t subgroupsM = 1;
   int64_t subgroupsN = 1;
   int64_t intrinsicsM = 1;
   int64_t intrinsicsN = 1;
-  bestArithmeticIntensity =
-      computeArithmeticIntensity(intrinsicsM, intrinsicsN);
-  int64_t simdsPerWgp = *wgp.getSimdsPerWgp();
-  // Enumerate possible unrolling-to-subgroups on M dimension.
-  for (int64_t sm = 1; sm <= std::min(simdsPerWgp, totalUnrollM); sm <<= 1) {
-    // Calculate the unrolling-to-subgroups on N dimension, given the current
-    // sm.
-    int64_t sn = std::min(simdsPerWgp / sm, totalUnrollN);
-    // Round sn down to nearest power of two.
-    sn = 1 << (int64_t)std::floor(std::log2(sn));
-    // Calculate the plain (intrinsic) unrolling factors on M and N dimensions.
-    int64_t im = totalUnrollM / sm;
-    int64_t in = totalUnrollN / sn;
-    // Maximize arithmetic intensity (im * in) / (im + in).
-    double currentArithmeticIntensity = computeArithmeticIntensity(im, in);
-    if (currentArithmeticIntensity > bestArithmeticIntensity) {
-      subgroupsM = sm;
-      subgroupsN = sn;
-      intrinsicsM = im;
-      intrinsicsN = in;
-      bestArithmeticIntensity = currentArithmeticIntensity;
+  double bestScore = 0;
+  int64_t bestWaves = 0;
+
+  // TODO: For the same arithmetic intensity, distributing more intrinsics or
+  // subgroups along M vs N yields different performance despite the metric
+  // being symmetric. Investigate why, likely related to memory access patterns.
+  for (int64_t wps = 1; wps <= maxWavesPerSimd; ++wps) {
+    // Empirically, for 1 wave per simd, using all available VGPRs for tile
+    // data leads to register spilling, so we impose a safety margin by
+    // dividing available VGPRs by 2 even for 1 wave per simd.
+    int64_t perWaveVgpr = vgprSpaceBits / 2;
+    int64_t maxSubgroups = simdsPerWgp * wps;
+    for (int64_t sm = 1; sm <= maxSubgroups; sm <<= 1) {
+      for (int64_t sn = 1; sn <= maxSubgroups / sm; sn <<= 1) {
+        int64_t numWaves = sm * sn;
+        int64_t maxIm = maxTotalUnrollM / sm;
+        int64_t maxIn = maxTotalUnrollN / sn;
+        for (int64_t im = 1; im <= maxIm; im <<= 1) {
+          if (im * intrinsicsK * intrinsicSizeBitsLHS > perWaveVgpr) {
+            break;
+          }
+          int64_t maxInVgpr =
+              (perWaveVgpr - im * intrinsicsK * intrinsicSizeBitsLHS) /
+              (intrinsicsK * intrinsicSizeBitsRHS + im * intrinsicSizeBitsACC);
+          int64_t maxInLDS =
+              (maxLDSBits - sm * im * intrinsicsK * intrinsicSizeBitsLHS) /
+              (sn * intrinsicsK * intrinsicSizeBitsRHS);
+          int64_t maxInBudget = maxTotalUnrollMN / (sm * im * sn);
+          int64_t in = std::min({maxInVgpr, maxIn, maxInBudget, maxInLDS});
+          if (in <= 0) {
+            continue;
+          }
+          in = 1LL << llvm::Log2_64(in);
+          double score = computeArithmeticIntensity(sm * im, sn * in);
+          bool accepted =
+              score > bestScore || (score == bestScore && numWaves > bestWaves);
+          if (accepted) {
+            subgroupsM = sm;
+            subgroupsN = sn;
+            intrinsicsM = im;
+            intrinsicsN = in;
+            bestScore = score;
+            bestWaves = numWaves;
+          }
+        }
+      }
     }
   }
-
   // We currently never generate subgroupsK != 1, as subgroupsK requires
   // specific partial-accumulator-reduction in the kernel, currently only done
   // in some microkernels that would provide their own DataTiledMMAAttr.
@@ -360,10 +330,12 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
         /*operands_interleaving_intrinsics_n=*/{},
         /*operands_interleaving_intrinsics_k=*/mmaInterleaveK);
   }
-  // For scaled matmuls, interleaving happens because we want to load all
-  // the unrolled scales with each vector load, so we need to interleave at
-  // the very last dimension for the scales. For the LHS/RHS, we load in blocks,
-  // so we don't need to interleave.
+  // For scaled matmuls, we rely on M/N interleaving to achieve contiguous
+  // loads of scales.
+  auto scaledMmaInterleaveM =
+      DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandLhsScale});
+  auto scaledMmaInterleaveN =
+      DenseI64ArrayAttr::get(ctx, {kScaledMMAOperandRhsScale});
   auto scaledMmaInterleaveK = DenseI64ArrayAttr::get(
       ctx, {kScaledMMAOperandLhsScale, kScaledMMAOperandRhsScale});
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
@@ -372,8 +344,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       intrinsicScaledMma.getLhsElemType(), intrinsicScaledMma.getRhsElemType(),
       intrinsicScaledMma.getAccElemType(), intrinsicsM, subgroupsM, intrinsicsN,
       subgroupsN, intrinsicsK, subgroupsK,
-      /*operands_interleaving_intrinsics_m=*/{},
-      /*operands_interleaving_intrinsics_n=*/{},
+      /*operands_interleaving_intrinsics_m=*/scaledMmaInterleaveM,
+      /*operands_interleaving_intrinsics_n=*/scaledMmaInterleaveN,
       /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK,
       /*unswizzled_operands=*/{});
 }

@@ -138,14 +138,14 @@ func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x2x4x4x16x16xi8>
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x2x4x4x16x16xi8>
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x2x2x4x4x4x16x4xi32>
-// CHECK-SAME:   ) -> tensor<?x?x2x2x4x4x4x16x4xi32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x16x4x16x16xi8>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x8x2x4x16x16xi8>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x8x16x2x4x16x4xi32>
+// CHECK-SAME:   ) -> tensor<?x?x8x16x2x4x16x4xi32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x64_I8,  intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x64_I8, intrinsics_m = 16, intrinsics_n = 2, subgroups_n = 8, operands_interleaving_intrinsics_k = [0, 1]>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -177,14 +177,14 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x32xf8E4M3FN>
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x32xf8E4M3FN>
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x2x8x4x16x32xf8E4M3FN>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x4x4x4x16x32xf8E4M3FN>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x8x4x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x?x2x4x8x4x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x128_F8E4M3FN,  intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x128_F8E4M3FN, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, operands_interleaving_intrinsics_k = [0, 1]>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -212,14 +212,14 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x8xbf16>
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x2x4x4x16x8xbf16>
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x16x4x16x8xbf16>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x8x2x4x16x8xbf16>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x8x16x2x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x?x8x16x2x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_BF16, intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_BF16, intrinsics_m = 16, intrinsics_n = 2, subgroups_n = 8, operands_interleaving_intrinsics_k = [0, 1]>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -249,14 +249,14 @@ func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x127x
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
-// CHECK-SAME:      inner_tiles = [16, 16, 32]
-// CHECK-SAME:      : tensor<255x127x32xf4E2M1FN> -> tensor<16x8x1x16x16x32xf4E2M1FN>
+// CHECK-SAME:      inner_tiles = [16, 8, 32]
+// CHECK-SAME:      : tensor<255x127x32xf4E2M1FN> -> tensor<16x16x1x16x8x32xf4E2M1FN>
 // CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<16x8x1x16x16x32xf4E2M1FN> into tensor<16x8x1x16x4x4x32xf4E2M1FN>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x8x1x4x4x16x32xf4E2M1FN>
+// CHECK-SAME:       : tensor<16x16x1x16x8x32xf4E2M1FN> into tensor<16x16x1x16x2x4x32xf4E2M1FN>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x16x1x2x4x16x32xf4E2M1FN>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x8x1x16x4x4x32xf4E2M1FN>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x1x4x4x16x32xf4E2M1FN>)
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x16x1x16x2x4x32xf4E2M1FN>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x16x1x2x4x16x32xf4E2M1FN>)
 // CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -283,14 +283,14 @@ func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<513x127x
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
-// CHECK-SAME:      inner_tiles = [16, 16, 32]
-// CHECK-SAME:      : tensor<513x127x32xf4E2M1FN> -> tensor<33x8x1x16x16x32xf4E2M1FN>
+// CHECK-SAME:      inner_tiles = [16, 8, 32]
+// CHECK-SAME:      : tensor<513x127x32xf4E2M1FN> -> tensor<33x16x1x16x8x32xf4E2M1FN>
 // CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<33x8x1x16x16x32xf4E2M1FN> into tensor<33x8x1x16x4x4x32xf4E2M1FN>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x8x1x4x4x16x32xf4E2M1FN>
+// CHECK-SAME:       : tensor<33x16x1x16x8x32xf4E2M1FN> into tensor<33x16x1x16x2x4x32xf4E2M1FN>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x16x1x2x4x16x32xf4E2M1FN>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x8x1x16x4x4x32xf4E2M1FN>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x1x4x4x16x32xf4E2M1FN>)
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x16x1x16x2x4x32xf4E2M1FN>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x16x1x2x4x16x32xf4E2M1FN>)
 // CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -317,14 +317,14 @@ func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<2
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [16, 16]
-// CHECK-SAME:      : tensor<255x127xf8E8M0FNU> -> tensor<16x8x16x16xf8E8M0FNU>
+// CHECK-SAME:      inner_tiles = [16, 8]
+// CHECK-SAME:      : tensor<255x127xf8E8M0FNU> -> tensor<16x16x16x8xf8E8M0FNU>
 // CHECK:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<16x8x16x16xf8E8M0FNU> into tensor<16x8x16x4x4xf8E8M0FNU>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x8x4x16x4xf8E8M0FNU>
+// CHECK-SAME:       : tensor<16x16x16x8xf8E8M0FNU> into tensor<16x16x16x2x4xf8E8M0FNU>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x16x4x16x2xf8E8M0FNU>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x8x16x4x4xf8E8M0FNU>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x4x16x4xf8E8M0FNU>)
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x16x16x2x4xf8E8M0FNU>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x16x4x16x2xf8E8M0FNU>)
 // CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -351,14 +351,14 @@ func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<5
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [16, 16]
-// CHECK-SAME:      : tensor<513x127xf8E8M0FNU> -> tensor<33x8x16x16xf8E8M0FNU>
+// CHECK-SAME:      inner_tiles = [16, 8]
+// CHECK-SAME:      : tensor<513x127xf8E8M0FNU> -> tensor<33x16x16x8xf8E8M0FNU>
 // CHECK:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<33x8x16x16xf8E8M0FNU> into tensor<33x8x16x4x4xf8E8M0FNU>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x8x4x16x4xf8E8M0FNU>
+// CHECK-SAME:       : tensor<33x16x16x8xf8E8M0FNU> into tensor<33x16x16x2x4xf8E8M0FNU>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x16x4x16x2xf8E8M0FNU>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x8x16x4x4xf8E8M0FNU>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x4x16x4xf8E8M0FNU>)
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x16x16x2x4xf8E8M0FNU>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x16x4x16x2xf8E8M0FNU>)
 // CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -440,15 +440,15 @@ func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 // CHECK:     func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
-// CHECK-SAME:  %[[LHS:.+]]: tensor<16x8x1x2x2x4x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<32x8x1x2x2x4x4x16x32xf4E2M1FN>
-// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<16x8x2x2x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<32x8x2x2x4x16x4xf8E8M0FNU>
-// CHECK-SAME:  %[[RESULT:.+]]: tensor<16x32x2x2x2x2x4x16x4xf32>
+// CHECK-SAME:  %[[LHS:.+]]: tensor<16x16x1x2x2x2x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<32x16x1x4x2x4x16x32xf4E2M1FN>
+// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<16x16x2x4x16x2x2xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<32x16x4x4x16x2xf8E8M0FNU>
+// CHECK-SAME:  %[[RESULT:.+]]: tensor<16x32x2x4x2x4x16x4xf32>
 // CHECK:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // CHECK-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // CHECK-SAME:    outs(%[[RESULT]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>
 
 
 // -----
@@ -495,15 +495,15 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 // CHECK:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32(
-// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x4x4x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x4x2x4x4x16x32xf4E2M1FN>
-// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x4x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x4x2x4x16x4xf8E8M0FNU>
-// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x4x4x2x4x16x4xf32>
+// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x8x2x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x4x4x2x4x16x32xf4E2M1FN>
+// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x4x16x8x2xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x4x4x16x4x2xf8E8M0FNU>
+// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x2x4x8x4x4x16x4xf32>
 // CHECK:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // CHECK-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // CHECK-SAME:    outs(%[[RESULT]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 4, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>
 
 // -----
 
@@ -549,15 +549,15 @@ func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 // CHECK:     func.func @scaled_matmul_lowering_f8_f8_f8_f8_f32(
-// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x4x4x16x32xf8E4M3FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x4x4x16x32xf8E4M3FN>
-// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x2x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x2x4x16x4xf8E8M0FNU>
-// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x16x4xf32>
+// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x8x2x4x16x32xf8E4M3FN>, %[[RHS:.+]]: tensor<?x?x1x8x2x2x4x16x32xf8E4M3FN>
+// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x4x16x8x2xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x8x4x16x2x2xf8E8M0FNU>
+// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x8x8x2x4x16x4xf32>
 // CHECK:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // CHECK-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // CHECK-SAME:    outs(%[[RESULT]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>
 
 // -----
 
@@ -622,15 +622,15 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 // CHECK:     func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
-// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x2x2x4x2x32x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x2x2x4x2x32x32xf4E2M1FN>
-// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x2x2x32x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x2x2x2x32x4xf8E8M0FNU>
-// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x2x2x2x2x4x2x32x4xf32>
+// CHECK-SAME:  %[[LHS:.+]]: tensor<?x?x1x8x2x2x32x32xf4E2M1FN>, %[[RHS:.+]]: tensor<?x?x1x8x2x2x32x32xf4E2M1FN>
+// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<?x?x2x32x8x2xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<?x?x8x2x32x2xf8E8M0FNU>
+// CHECK-SAME:  %[[RESULT:.+]]: tensor<?x?x8x8x4x2x32x4xf32>
 // CHECK:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
 // CHECK-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
 // CHECK-SAME:    outs(%[[RESULT]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 8, subgroups_n = 8, intrinsics_k = 2, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>
 
 // -----
 
