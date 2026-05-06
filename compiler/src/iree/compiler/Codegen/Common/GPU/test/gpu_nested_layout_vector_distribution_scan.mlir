@@ -260,3 +260,129 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[ACC_BCAST:.*]] = vector.broadcast %[[SHUFFLED]] : f32 to vector<f32>
 // CHECK: iree_vector_ext.to_simd %[[ACC_BCAST]] : vector<f32> -> vector<f32>
 // CHECK: iree_vector_ext.to_simd %[[RESULT]] : vector<2x1x4xf32> -> vector<32xf32>
+
+// -----
+
+// Test 5: 2D inclusive scan along dim 1.
+
+#layout_scan_2d_dim1 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 1],
+  outer_tile    = [1, 1],
+  thread_tile   = [1, 4],
+  element_tile  = [1, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 1]
+>
+
+// CHECK-LABEL: @scan_2d_dim1_inclusive
+func.func @scan_2d_dim1_inclusive(%src: vector<2x16xf32>, %init: vector<2xf32>) -> (vector<2x16xf32>, vector<2xf32>) {
+  %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_2d_dim1) : vector<2x16xf32>
+  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 1 : i64}
+    : vector<2x16xf32>, vector<2xf32>
+  return %out#0, %out#1 : vector<2x16xf32>, vector<2xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<2x1x1x1x1xf32>
+// CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<2x16xf32> -> vector<2x1x1x1x1x4xf32>
+// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] {inclusive = true, reduction_dim = 5 : i64} : vector<2x1x1x1x1x4xf32>, vector<2x1x1x1x1xf32>
+// CHECK: %[[SCALAR0:.*]] = vector.extract %[[LOCAL_TOTAL]][0, 0, 0, 0, 0] : f32 from vector<2x1x1x1x1xf32>
+// CHECK: iree_gpu.subgroup_scan(%[[SCALAR0]], {{.*}}) cluster(size = 4)
+// CHECK: %[[SCALAR1:.*]] = vector.extract %[[LOCAL_TOTAL]][1, 0, 0, 0, 0] : f32 from vector<2x1x1x1x1xf32>
+// CHECK: iree_gpu.subgroup_scan(%[[SCALAR1]], {{.*}}) cluster(size = 4)
+// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<2x1x1xf32> -> vector<2xf32>
+// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<2x1x1x1x1x4xf32> -> vector<2x16xf32>
+
+// -----
+
+// Test 6: Exclusive f16 scan exercises shuffle pack/unpack for sub-32-bit types.
+
+#layout_scan_1d_f16_excl = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile    = [1],
+  outer_tile    = [1],
+  thread_tile   = [4],
+  element_tile  = [4],
+
+  subgroup_strides = [1],
+  thread_strides   = [1]
+>
+
+// CHECK-LABEL: @scan_single_bo_exclusive_f16
+func.func @scan_single_bo_exclusive_f16(%src: vector<16xf16>, %init: vector<f16>) -> (vector<16xf16>, vector<f16>) {
+  %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d_f16_excl) : vector<16xf16>
+  %out:2 = vector.scan <add>, %src_l, %init {inclusive = false, reduction_dim = 0 : i64}
+    : vector<16xf16>, vector<f16>
+  return %out#0, %out#1 : vector<16xf16>, vector<f16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-DAG: %[[ID_VEC_F16:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf16>
+// CHECK-DAG: %[[SRC_DIST_F16:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16xf16> -> vector<1x1x4xf16>
+// CHECK: %[[LOCAL_SCAN_F16:.*]], %[[ACC_VAL_F16:.*]] = vector.scan <add>, %[[SRC_DIST_F16]], %[[ID_VEC_F16]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
+// CHECK: %[[LAST_ACC_F16:.*]] = vector.extract %{{.*}}[0, 0, 3] : f16 from vector<1x1x4xf16>
+// CHECK: %[[PACKED:.*]] = arith.bitcast %[[LAST_ACC_F16]] : f16 to i16
+// CHECK: %[[EXTENDED:.*]] = arith.extui %[[PACKED]] : i16 to i32
+// CHECK: %[[SHUFFLED_F16:.*]], %{{.*}} = gpu.shuffle idx %[[EXTENDED]], %{{.*}}, %{{.*}} : i32
+// CHECK: %[[TRUNCATED:.*]] = arith.trunci %[[SHUFFLED_F16]] : i32 to i16
+// CHECK: %[[UNPACKED:.*]] = arith.bitcast %[[TRUNCATED]] : i16 to f16
+// CHECK: vector.broadcast %[[UNPACKED]] : f16 to vector<f16>
+// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x1x4xf16> -> vector<16xf16>
+
+// -----
+
+// Test 7: thread_tile = [1] covers the single-thread scan path.
+
+#layout_scan_1d_thread_tile_1 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile    = [1],
+  outer_tile    = [1],
+  thread_tile   = [1],
+  element_tile  = [4],
+
+  subgroup_strides = [0],
+  thread_strides   = [0]
+>
+
+// CHECK-LABEL: @scan_thread_tile_1_inclusive
+func.func @scan_thread_tile_1_inclusive(%src: vector<4xf32>, %init: vector<f32>) -> (vector<4xf32>, vector<f32>) {
+  %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d_thread_tile_1) : vector<4xf32>
+  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+    : vector<4xf32>, vector<f32>
+  return %out#0, %out#1 : vector<4xf32>, vector<f32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-DAG: %[[ID_VEC_T1:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
+// CHECK-DAG: %[[SRC_DIST_T1:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<4xf32> -> vector<1x1x4xf32>
+// CHECK: %[[LOCAL_SCAN_T1:.*]], %[[LOCAL_TOTAL_T1:.*]] = vector.scan <add>, %[[SRC_DIST_T1]], %[[ID_VEC_T1]] {inclusive = true, reduction_dim = 2 : i64} : vector<1x1x4xf32>, vector<1x1xf32>
+// CHECK-NOT: iree_gpu.subgroup_scan
+// CHECK: arith.addf %[[LOCAL_SCAN_T1]], %{{.*}} : vector<1x1x4xf32>
+// CHECK: %[[BO_RUNNING_T1:.*]] = arith.addf %[[LOCAL_TOTAL_T1]], %[[ID_VEC_T1]] : vector<1x1xf32>
+// CHECK: vector.shape_cast %[[BO_RUNNING_T1]] : vector<1x1xf32> to vector<f32>
+// CHECK-NOT: gpu.shuffle
+// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x1x4xf32> -> vector<4xf32>

@@ -795,7 +795,8 @@ static Value broadcastFromProjected(RewriterBase &rewriter, Location loc,
                                     Value source, ArrayRef<int64_t> targetShape,
                                     ArrayRef<bool> projectedDims) {
   SmallVector<int64_t> expandedShape(targetShape);
-  for (size_t i = 0; i < expandedShape.size(); ++i) {
+  for (int64_t i = 0, expandedNumDims = expandedShape.size();
+       i < expandedNumDims; ++i) {
     if (projectedDims[i]) {
       expandedShape[i] = 1;
     }
@@ -2336,7 +2337,7 @@ createSubgroupScan(PatternRewriter &rewriter, Location loc, Value value,
 /// ```
 ///
 /// To compute the scan over the block totals at the subgroup level, we simply
-/// use subgroup_reduce. For the loop over the batch/outer dimensions, we can
+/// use subgroup_scan. For the loop over the batch/outer dimensions, we can
 /// compute the scan iteratively. The loops over batch/outer do not manifest in
 /// IR, they only exist in codegen and are unrolled in IR.
 ///
@@ -2422,7 +2423,6 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     // Initialize subgroupRunning to identity with localAccType shape.
     // This matches the accumulated_value shape from the local scan, which
     // has the scan-dim element removed from chunkShape.
-    VectorType initDistType = disInit.getType();
     Value batchOuterRunning =
         getCombiningIdentityValue(loc, rewriter, kind, localAccType);
 
@@ -2509,6 +2509,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
           rewriter, loc, kind, batchOuterRunning, subgroupTotal);
     }
 
+    VectorType initDistType = disInit.getType();
     // For the inclusive case we're done.
     if (inclusive) {
       Value accumulatedValue = vector::ShapeCastOp::create(
