@@ -379,7 +379,6 @@ static void iree_hal_vulkan_command_buffer_append_command(
   uint8_t* const record =
       iree_hal_vulkan_command_buffer_block_data(block) + block->data_length;
   iree_hal_vulkan_command_t* command = (iree_hal_vulkan_command_t*)record;
-  memset(command, 0, sizeof(*command));
   command->record_length = record_length;
   command->type = type;
   block->data_length += record_length;
