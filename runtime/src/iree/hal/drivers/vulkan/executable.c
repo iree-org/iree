@@ -1270,6 +1270,15 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
   }
+  bool has_descriptor_binding_decorations = false;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
+      spirv_words, spirv_word_count, &has_descriptor_binding_decorations));
+  if (has_descriptor_binding_decorations) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA executable must not declare descriptor set or binding "
+        "decorations");
+  }
 
   bool entry_point_found = false;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_compute_workgroup_size(

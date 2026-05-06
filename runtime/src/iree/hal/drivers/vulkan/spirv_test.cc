@@ -112,6 +112,36 @@ TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {
   EXPECT_FALSE(uses_physical_storage_buffer64_glsl450);
 }
 
+TEST(SpirvTest, DetectsDescriptorBindingDecorations) {
+  static constexpr uint32_t kDescriptorDecoratedModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // OpDecorate %1 DescriptorSet 0
+      0x00040047u,
+      1u,
+      34u,
+      0u,
+      // OpDecorate %1 Binding 2
+      0x00040047u,
+      1u,
+      33u,
+      2u,
+  };
+  bool has_descriptor_binding_decorations = false;
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
+      kDescriptorDecoratedModule, IREE_ARRAYSIZE(kDescriptorDecoratedModule),
+      &has_descriptor_binding_decorations));
+  EXPECT_TRUE(has_descriptor_binding_decorations);
+
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+      &has_descriptor_binding_decorations));
+  EXPECT_FALSE(has_descriptor_binding_decorations);
+}
+
 TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
   static constexpr uint32_t kDuplicateEntryModule[] = {
       0x07230203u,
