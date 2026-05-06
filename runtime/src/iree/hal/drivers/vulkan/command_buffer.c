@@ -137,12 +137,6 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Current recording lifecycle state.
   iree_hal_vulkan_command_buffer_state_t state;
 
-  // Whether a supported device command has been recorded.
-  bool has_commands;
-
-  // Whether any command must be recorded into a native VkCommandBuffer.
-  bool has_native_commands;
-
   // Retained resources referenced by recorded commands.
   iree_hal_resource_set_t* resource_set;
 
@@ -657,14 +651,14 @@ bool iree_hal_vulkan_command_buffer_is_empty(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_command_buffer_t* command_buffer =
       iree_hal_vulkan_command_buffer_cast(base_command_buffer);
-  return !command_buffer->has_commands;
+  return command_buffer->command_count == 0;
 }
 
 bool iree_hal_vulkan_command_buffer_has_native_commands(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_vulkan_command_buffer_t* command_buffer =
       iree_hal_vulkan_command_buffer_cast(base_command_buffer);
-  return command_buffer->has_native_commands;
+  return command_buffer->command_count != 0;
 }
 
 iree_host_size_t iree_hal_vulkan_command_buffer_dispatch_count(
@@ -1955,7 +1949,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
                             "Vulkan native command buffer recording requires "
                             "ended state");
   }
-  if (!command_buffer->has_native_commands) return iree_ok_status();
+  if (command_buffer->command_count == 0) return iree_ok_status();
 
   iree_hal_vulkan_command_buffer_bda_recording_state_t bda_recording_state = {
       .host_span =
@@ -2169,8 +2163,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
   execution_barrier->target_stage_mask = target_stage_mask;
   execution_barrier->memory_barrier_count = memory_barrier_count;
   execution_barrier->buffer_barrier_count = buffer_barrier_count;
-  command_buffer->has_commands = true;
-  command_buffer->has_native_commands = true;
   return iree_ok_status();
 }
 
@@ -2283,8 +2275,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
   memcpy(fill_buffer->pattern, pattern, pattern_length);
   fill_buffer->pattern_length = pattern_length;
   fill_buffer->flags = flags;
-  command_buffer->has_commands = true;
-  command_buffer->has_native_commands = true;
   return iree_ok_status();
 }
 
@@ -2361,8 +2351,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
   update_buffer->source_data = source_data;
   update_buffer->source_data_length = (iree_host_size_t)target_ref.length;
   update_buffer->flags = flags;
-  command_buffer->has_commands = true;
-  command_buffer->has_native_commands = true;
   return iree_ok_status();
 }
 
@@ -2413,8 +2401,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
   copy_buffer->source_ref = source_ref;
   copy_buffer->target_ref = target_ref;
   copy_buffer->flags = flags;
-  command_buffer->has_commands = true;
-  command_buffer->has_native_commands = true;
   return iree_ok_status();
 }
 
@@ -2679,8 +2665,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     dispatch->binding_count = bindings.count;
     dispatch->flags = flags;
     command_buffer->dispatch_count = command_buffer->dispatch_count + 1;
-    command_buffer->has_commands = true;
-    command_buffer->has_native_commands = true;
   }
   return status;
 }
