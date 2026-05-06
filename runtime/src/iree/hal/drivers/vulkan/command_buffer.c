@@ -118,6 +118,20 @@ typedef struct iree_hal_vulkan_command_t {
   } execution_barrier;
 } iree_hal_vulkan_command_t;
 
+typedef struct iree_hal_vulkan_command_block_t {
+  // Next command block in recording order.
+  struct iree_hal_vulkan_command_block_t* next;
+
+  // Number of commands populated in commands.
+  iree_host_size_t count;
+
+  // Capacity of commands.
+  iree_host_size_t capacity;
+
+  // Recorded commands in submission order.
+  iree_hal_vulkan_command_t commands[];
+} iree_hal_vulkan_command_block_t;
+
 typedef enum iree_hal_vulkan_command_buffer_state_e {
   IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_INITIAL = 0,
   IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_RECORDING = 1,
@@ -145,14 +159,14 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Retained resources referenced by recorded commands.
   iree_hal_resource_set_t* resource_set;
 
-  // Recorded commands in submission order.
-  iree_hal_vulkan_command_t* commands;
+  // First command block in recording order.
+  iree_hal_vulkan_command_block_t* command_block_head;
 
-  // Number of commands populated in commands.
+  // Last command block in recording order.
+  iree_hal_vulkan_command_block_t* command_block_tail;
+
+  // Number of commands recorded across all command blocks.
   iree_host_size_t command_count;
-
-  // Capacity of commands.
-  iree_host_size_t command_capacity;
 
   // Number of dispatch commands recorded.
   iree_host_size_t dispatch_count;
@@ -179,11 +193,26 @@ typedef struct iree_hal_vulkan_command_buffer_bda_recording_state_t {
   bool barrier_recorded;
 } iree_hal_vulkan_command_buffer_bda_recording_state_t;
 
+typedef struct iree_hal_vulkan_command_buffer_iterator_t {
+  // Command block currently being traversed.
+  const iree_hal_vulkan_command_block_t* block;
+
+  // Index of the next command within block.
+  iree_host_size_t block_index;
+
+  // Index of the next command across the full command buffer.
+  iree_host_size_t command_index;
+} iree_hal_vulkan_command_buffer_iterator_t;
+
 static const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_command_buffer_vtable;
 
 static void iree_hal_vulkan_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer);
+
+enum {
+  IREE_HAL_VULKAN_COMMAND_BUFFER_COMMAND_BLOCK_CAPACITY = 64,
+};
 
 static iree_hal_vulkan_command_buffer_t* iree_hal_vulkan_command_buffer_cast(
     iree_hal_command_buffer_t* base_value) {
@@ -202,38 +231,73 @@ static bool iree_hal_vulkan_command_buffer_validates(
 #endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
 }
 
-static iree_host_size_t iree_hal_vulkan_command_buffer_grow_capacity(
-    iree_host_size_t current_capacity, iree_host_size_t minimum_capacity) {
-  iree_host_size_t new_capacity = current_capacity ? current_capacity : 8;
-  while (new_capacity < minimum_capacity) {
-    if (new_capacity > IREE_HOST_SIZE_MAX / 2) {
-      return minimum_capacity;
-    }
-    new_capacity = new_capacity * 2;
+static iree_status_t iree_hal_vulkan_command_buffer_ensure_command_block(
+    iree_hal_vulkan_command_buffer_t* command_buffer) {
+  if (command_buffer->command_count == IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan command buffer command count exceeds "
+                            "host size");
   }
-  return new_capacity;
+  iree_hal_vulkan_command_block_t* block = command_buffer->command_block_tail;
+  if (!block || block->count == block->capacity) {
+    iree_host_size_t block_size = 0;
+    if (!iree_host_size_checked_add(
+            sizeof(*block),
+            IREE_HAL_VULKAN_COMMAND_BUFFER_COMMAND_BLOCK_CAPACITY *
+                sizeof(block->commands[0]),
+            &block_size)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "Vulkan command block size overflows");
+    }
+    IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->payload_arena,
+                                             block_size, (void**)&block));
+    block->next = NULL;
+    block->count = 0;
+    block->capacity = IREE_HAL_VULKAN_COMMAND_BUFFER_COMMAND_BLOCK_CAPACITY;
+    if (command_buffer->command_block_tail) {
+      command_buffer->command_block_tail->next = block;
+    } else {
+      command_buffer->command_block_head = block;
+    }
+    command_buffer->command_block_tail = block;
+  }
+  return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_command_buffer_reserve_commands(
+static void iree_hal_vulkan_command_buffer_append_command(
     iree_hal_vulkan_command_buffer_t* command_buffer,
-    iree_host_size_t minimum_capacity) {
-  if (minimum_capacity <= command_buffer->command_capacity) {
-    return iree_ok_status();
+    iree_hal_vulkan_command_t** out_command) {
+  iree_hal_vulkan_command_block_t* block = command_buffer->command_block_tail;
+  iree_hal_vulkan_command_t* command = &block->commands[block->count++];
+  memset(command, 0, sizeof(*command));
+  command_buffer->command_count = command_buffer->command_count + 1;
+  *out_command = command;
+}
+
+static iree_hal_vulkan_command_buffer_iterator_t
+iree_hal_vulkan_command_buffer_iterator(
+    const iree_hal_vulkan_command_buffer_t* command_buffer) {
+  iree_hal_vulkan_command_buffer_iterator_t iterator = {
+      .block = command_buffer->command_block_head,
+      .block_index = 0,
+      .command_index = 0,
+  };
+  return iterator;
+}
+
+static bool iree_hal_vulkan_command_buffer_iterator_next(
+    iree_hal_vulkan_command_buffer_iterator_t* iterator,
+    const iree_hal_vulkan_command_t** out_command,
+    iree_host_size_t* out_command_index) {
+  while (iterator->block && iterator->block_index >= iterator->block->count) {
+    iterator->block = iterator->block->next;
+    iterator->block_index = 0;
   }
-  const iree_host_size_t new_capacity =
-      iree_hal_vulkan_command_buffer_grow_capacity(
-          command_buffer->command_capacity, minimum_capacity);
-  iree_host_size_t new_size = 0;
-  if (!iree_host_size_checked_mul(
-          new_capacity, sizeof(*command_buffer->commands), &new_size)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "Vulkan command buffer command list is too large");
-  }
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_realloc(command_buffer->host_allocator, new_size,
-                             (void**)&command_buffer->commands));
-  command_buffer->command_capacity = new_capacity;
-  return iree_ok_status();
+  if (!iterator->block) return false;
+  *out_command = &iterator->block->commands[iterator->block_index++];
+  if (out_command_index) *out_command_index = iterator->command_index;
+  ++iterator->command_index;
+  return true;
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_validate_recording_state(
@@ -649,8 +713,11 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan command buffer profile metadata requires ended state");
   }
-  for (iree_host_size_t i = 0; i < command_buffer->command_count; ++i) {
-    const iree_hal_vulkan_command_t* command = &command_buffer->commands[i];
+  iree_hal_vulkan_command_buffer_iterator_t iterator =
+      iree_hal_vulkan_command_buffer_iterator(command_buffer);
+  const iree_hal_vulkan_command_t* command = NULL;
+  while (iree_hal_vulkan_command_buffer_iterator_next(
+      &iterator, &command, /*out_command_index=*/NULL)) {
     if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
     IREE_RETURN_IF_ERROR(
         iree_hal_local_profile_recorder_record_executable_with_id(
@@ -682,11 +749,14 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
           command_buffer->host_allocator, command_buffer->command_count,
           sizeof(operation_records[0]), (void**)&operation_records);
     }
-    for (iree_host_size_t i = 0;
-         iree_status_is_ok(status) && i < command_buffer->command_count; ++i) {
+    iterator = iree_hal_vulkan_command_buffer_iterator(command_buffer);
+    iree_host_size_t command_index = 0;
+    while (iree_status_is_ok(status) &&
+           iree_hal_vulkan_command_buffer_iterator_next(&iterator, &command,
+                                                        &command_index)) {
       status = iree_hal_vulkan_command_buffer_profile_operation(
-          &command_buffer->commands[i], command_buffer_id, (uint32_t)i,
-          &operation_records[i]);
+          command, command_buffer_id, (uint32_t)command_index,
+          &operation_records[command_index]);
     }
   }
   if (iree_status_is_ok(status)) {
@@ -747,8 +817,12 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
 
   const bool is_command_buffer_dispatch = command_buffer_id != 0;
   iree_host_size_t dispatch_ordinal = 0;
-  for (iree_host_size_t i = 0; i < command_buffer->command_count; ++i) {
-    const iree_hal_vulkan_command_t* command = &command_buffer->commands[i];
+  iree_hal_vulkan_command_buffer_iterator_t iterator =
+      iree_hal_vulkan_command_buffer_iterator(command_buffer);
+  const iree_hal_vulkan_command_t* command = NULL;
+  iree_host_size_t command_index = 0;
+  while (iree_hal_vulkan_command_buffer_iterator_next(&iterator, &command,
+                                                      &command_index)) {
     if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
     if (dispatch_ordinal >= dispatch_count) {
       return iree_make_status(
@@ -758,15 +832,15 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     }
 
     const iree_hal_vulkan_pipeline_t* pipeline = command->dispatch.pipeline;
-    if (is_command_buffer_dispatch && i > UINT32_MAX) {
+    if (is_command_buffer_dispatch && command_index > UINT32_MAX) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
           "Vulkan dispatch profile command index exceeds uint32_t");
     }
-    const uint32_t command_index =
-        is_command_buffer_dispatch ? (uint32_t)i : UINT32_MAX;
+    const uint32_t profile_command_index =
+        is_command_buffer_dispatch ? (uint32_t)command_index : UINT32_MAX;
     if (!iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
-            profile_recorder, scope, command_buffer_id, command_index,
+            profile_recorder, scope, command_buffer_id, profile_command_index,
             pipeline)) {
       ++dispatch_ordinal;
       continue;
@@ -792,7 +866,7 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     event_info.command_buffer_id = command_buffer_id;
     event_info.executable_id =
         iree_hal_vulkan_executable_profile_id(command->dispatch.executable);
-    event_info.command_index = command_index;
+    event_info.command_index = profile_command_index;
     event_info.export_ordinal = command->dispatch.export_ordinal;
     if (is_command_buffer_dispatch) {
       event_info.flags |= IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
@@ -1746,9 +1820,12 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     }
   }
   uint32_t dispatch_query_ordinal = 0;
-  for (iree_host_size_t i = 0;
-       iree_status_is_ok(status) && i < command_buffer->command_count; ++i) {
-    const iree_hal_vulkan_command_t* command = &command_buffer->commands[i];
+  iree_hal_vulkan_command_buffer_iterator_t iterator =
+      iree_hal_vulkan_command_buffer_iterator(command_buffer);
+  const iree_hal_vulkan_command_t* command = NULL;
+  while (iree_status_is_ok(status) &&
+         iree_hal_vulkan_command_buffer_iterator_next(
+             &iterator, &command, /*out_command_index=*/NULL)) {
     switch (command->type) {
       case IREE_HAL_VULKAN_COMMAND_TYPE_FILL_BUFFER:
         status = iree_hal_vulkan_command_buffer_record_fill_native(
@@ -1840,7 +1917,6 @@ static void iree_hal_vulkan_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->payload_arena);
-  iree_allocator_free(host_allocator, command_buffer->commands);
   iree_allocator_free(host_allocator, command_buffer);
 }
 
@@ -1914,11 +1990,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
     return iree_ok_status();
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
-      command_buffer, command_buffer->command_count + 1));
-  iree_hal_vulkan_command_t* command =
-      &command_buffer->commands[command_buffer->command_count++];
-  memset(command, 0, sizeof(*command));
+  iree_hal_vulkan_command_t* command = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_command_block(command_buffer));
+  iree_hal_vulkan_command_buffer_append_command(command_buffer, &command);
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER;
   command->execution_barrier.source_stage_mask = source_stage_mask;
   command->execution_barrier.target_stage_mask = target_stage_mask;
@@ -2016,17 +2091,16 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
       command_buffer, 1, &target_ref));
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
-      command_buffer, command_buffer->command_count + 1));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_command_block(command_buffer));
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_command_buffer_accumulate_fill_update_descriptors(
           command_buffer));
 
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
 
-  iree_hal_vulkan_command_t* command =
-      &command_buffer->commands[command_buffer->command_count++];
-  memset(command, 0, sizeof(*command));
+  iree_hal_vulkan_command_t* command = NULL;
+  iree_hal_vulkan_command_buffer_append_command(command_buffer, &command);
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_FILL_BUFFER;
   command->fill_buffer.target_ref = target_ref;
   memset(command->fill_buffer.pattern, 0, sizeof(command->fill_buffer.pattern));
@@ -2078,28 +2152,28 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
       command_buffer, 1, &target_ref));
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
-      command_buffer, command_buffer->command_count + 1));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_command_block(command_buffer));
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_command_buffer_accumulate_fill_update_descriptors(
           command_buffer));
 
-  iree_hal_vulkan_command_t* command =
-      &command_buffer->commands[command_buffer->command_count];
-  memset(command, 0, sizeof(*command));
+  void* source_data = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_copy_payload(
       command_buffer,
       iree_make_const_byte_span((const uint8_t*)source_buffer + source_offset,
                                 (iree_host_size_t)target_ref.length),
-      &command->update_buffer.source_data));
+      &source_data));
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
 
+  iree_hal_vulkan_command_t* command = NULL;
+  iree_hal_vulkan_command_buffer_append_command(command_buffer, &command);
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_UPDATE_BUFFER;
   command->update_buffer.target_ref = target_ref;
+  command->update_buffer.source_data = source_data;
   command->update_buffer.source_data_length =
       (iree_host_size_t)target_ref.length;
   command->update_buffer.flags = flags;
-  command_buffer->command_count = command_buffer->command_count + 1;
   command_buffer->has_commands = true;
   command_buffer->has_native_commands = true;
   return iree_ok_status();
@@ -2135,15 +2209,13 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
   const iree_hal_buffer_ref_t buffer_refs[2] = {source_ref, target_ref};
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
       command_buffer, IREE_ARRAYSIZE(buffer_refs), buffer_refs));
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
-      command_buffer, command_buffer->command_count + 1));
-
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_command_block(command_buffer));
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, source_ref);
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
 
-  iree_hal_vulkan_command_t* command =
-      &command_buffer->commands[command_buffer->command_count++];
-  memset(command, 0, sizeof(*command));
+  iree_hal_vulkan_command_t* command = NULL;
+  iree_hal_vulkan_command_buffer_append_command(command_buffer, &command);
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_COPY_BUFFER;
   command->copy_buffer.source_ref = source_ref;
   command->copy_buffer.target_ref = target_ref;
@@ -2345,9 +2417,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
         command_buffer, 1, &config.workgroup_count_ref));
   }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
-      command_buffer, command_buffer->command_count + 1));
-
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_command_block(command_buffer));
   void* constants_data = NULL;
   iree_hal_buffer_ref_t* binding_refs = NULL;
   iree_status_t status = iree_ok_status();
@@ -2393,9 +2464,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
                                                        bindings.values[i]);
     }
 
-    iree_hal_vulkan_command_t* command =
-        &command_buffer->commands[command_buffer->command_count++];
-    memset(command, 0, sizeof(*command));
+    iree_hal_vulkan_command_t* command = NULL;
+    iree_hal_vulkan_command_buffer_append_command(command_buffer, &command);
     command->type = IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH;
     command->dispatch.executable = executable;
     command->dispatch.pipeline = pipeline;
