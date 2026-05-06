@@ -223,6 +223,11 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkFreeCommandBuffers,
                            ARGS(device, commandPool, commandBufferCount,
                                 pCommandBuffers))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkResetCommandBuffer,
+                           DECL(VkCommandBuffer commandBuffer,
+                                VkCommandBufferResetFlags flags),
+                           ARGS(commandBuffer, flags))
+
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBeginCommandBuffer,
                            DECL(VkCommandBuffer commandBuffer,
                                 const VkCommandBufferBeginInfo* pBeginInfo),

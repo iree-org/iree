@@ -35,6 +35,8 @@ IREE_ASYNC_FIXED_FRONTIER_TYPE(iree_hal_vulkan_queue_frontier_t,
 
 typedef struct iree_hal_vulkan_queue_pending_submission_t
     iree_hal_vulkan_queue_pending_submission_t;
+typedef struct iree_hal_vulkan_queue_command_buffer_block_t
+    iree_hal_vulkan_queue_command_buffer_block_t;
 typedef struct iree_hal_vulkan_queue_descriptor_block_t
     iree_hal_vulkan_queue_descriptor_block_t;
 typedef struct iree_hal_vulkan_queue_staging_ring_t
@@ -156,8 +158,20 @@ typedef struct iree_hal_vulkan_queue_t {
   // Queue-owned timeline semaphore signaled once per accepted submission.
   VkSemaphore epoch_semaphore;
 
-  // Queue-owned transient command pool for one-shot native submissions.
-  VkCommandPool command_pool;
+  // Queue-owned command buffer cache for one-shot native submissions.
+  struct {
+    // First command buffer block owned by this queue.
+    iree_hal_vulkan_queue_command_buffer_block_t* head;
+
+    // Last command buffer block owned by this queue.
+    iree_hal_vulkan_queue_command_buffer_block_t* tail;
+
+    // Next command buffer block considered for acquisition.
+    iree_hal_vulkan_queue_command_buffer_block_t* cursor;
+
+    // Number of command buffer blocks currently owned by this queue.
+    uint32_t block_count;
+  } command_buffer_cache;
 
   // Host-signaled timeline semaphore used to wake the completion thread.
   VkSemaphore wakeup_semaphore;
