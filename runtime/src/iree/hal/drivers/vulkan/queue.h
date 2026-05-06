@@ -39,6 +39,8 @@ typedef struct iree_hal_vulkan_queue_command_buffer_block_t
     iree_hal_vulkan_queue_command_buffer_block_t;
 typedef struct iree_hal_vulkan_queue_descriptor_block_t
     iree_hal_vulkan_queue_descriptor_block_t;
+typedef struct iree_hal_vulkan_queue_dispatch_descriptor_block_t
+    iree_hal_vulkan_queue_dispatch_descriptor_block_t;
 typedef struct iree_hal_vulkan_queue_staging_ring_t
     iree_hal_vulkan_queue_staging_ring_t;
 
@@ -217,6 +219,21 @@ typedef struct iree_hal_vulkan_queue_t {
     // Number of descriptor blocks currently owned by this queue.
     uint32_t block_count;
   } descriptor_cache;
+
+  // Queue-owned descriptor cache for direct dispatch submissions.
+  struct {
+    // First dispatch descriptor block owned by this queue.
+    iree_hal_vulkan_queue_dispatch_descriptor_block_t* head;
+
+    // Last dispatch descriptor block owned by this queue.
+    iree_hal_vulkan_queue_dispatch_descriptor_block_t* tail;
+
+    // Next dispatch descriptor block considered for acquisition.
+    iree_hal_vulkan_queue_dispatch_descriptor_block_t* cursor;
+
+    // Number of dispatch descriptor blocks currently owned by this queue.
+    uint32_t block_count;
+  } dispatch_descriptor_cache;
 
   // Queue-owned host-to-device staging ring for uploads.
   iree_hal_vulkan_queue_staging_ring_t* upload_staging_ring;

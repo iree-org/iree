@@ -368,6 +368,12 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDescriptorPool,
                                 const VkAllocationCallbacks* pAllocator),
                            ARGS(device, descriptorPool, pAllocator))
 
+IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkResetDescriptorPool,
+                           DECL(VkDevice device,
+                                VkDescriptorPool descriptorPool,
+                                VkDescriptorPoolResetFlags flags),
+                           ARGS(device, descriptorPool, flags))
+
 IREE_HAL_VULKAN_DEVICE_PFN(
     VkResult, vkAllocateDescriptorSets,
     DECL(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
