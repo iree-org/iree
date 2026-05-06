@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "iree/hal/cts/util/profile_test_util.h"
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
 
@@ -503,6 +504,91 @@ TEST_P(BdaRawSpirvTest, CommandBufferReusesCachedNativeReplay) {
 
   command_buffer.reset();
   IREE_ASSERT_OK(iree_hal_device_trim(device_));
+}
+
+TEST_P(BdaRawSpirvTest, CommandBufferProfilingBypassesCachedNativeReplay) {
+  if (QueryNativeReplayCache(IREE_SV("max_instance_count")) == 0) {
+    GTEST_SKIP() << "Vulkan BDA native replay cache is disabled";
+  }
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/0, /*offset=*/0,
+          iree_hal_buffer_byte_length(input_buffer.get())),
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/1, /*offset=*/0,
+          iree_hal_buffer_byte_length(output_buffer.get())),
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/2, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  iree_hal_buffer_binding_t binding_table_entries[2] = {
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/iree_hal_buffer_byte_length(input_buffer.get()),
+      },
+      {
+          /*buffer=*/output_buffer.get(),
+          /*offset=*/0,
+          /*length=*/iree_hal_buffer_byte_length(output_buffer.get()),
+      },
+  };
+  iree_hal_buffer_binding_table_t binding_table = {
+      /*.count=*/IREE_ARRAYSIZE(binding_table_entries),
+      /*.bindings=*/binding_table_entries,
+  };
+
+  TestProfileSink sink = {};
+  TestProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(device_);
+  iree_status_t status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+                      TestProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(status)) {
+    iree_status_ignore(status);
+    GTEST_SKIP() << "Vulkan dispatch profiling is unavailable";
+  }
+  IREE_ASSERT_OK(status);
+
+  const int64_t initial_profile_bypass_count =
+      QueryNativeReplayCache(IREE_SV("profile_bypass_count"));
+  const int64_t initial_hit_count =
+      QueryNativeReplayCache(IREE_SV("hit_count"));
+  const int64_t initial_create_count =
+      QueryNativeReplayCache(IREE_SV("create_count"));
+
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table);
+  ExpectOutput(output_buffer.get());
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(device_));
+  IREE_ASSERT_OK(profiling.End());
+
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("profile_bypass_count")) -
+                initial_profile_bypass_count,
+            1);
+  EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
+  EXPECT_EQ(initial_create_count,
+            QueryNativeReplayCache(IREE_SV("create_count")));
+  EXPECT_GE(sink.dispatch_event_count, 1);
 }
 
 TEST_P(BdaRawSpirvTest, CommandBufferHandlesOversizedBdaPublication) {

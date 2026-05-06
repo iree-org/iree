@@ -725,6 +725,7 @@ iree_cc_test(
     ::bda_backends
     iree::base::tooling::flags
     iree::hal
+    iree::hal::cts::util::profile_test_util
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
     iree::hal::drivers::vulkan
