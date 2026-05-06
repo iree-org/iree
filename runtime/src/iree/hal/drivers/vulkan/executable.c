@@ -1260,6 +1260,17 @@ static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
 static iree_status_t iree_hal_vulkan_verify_bda_spirv(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
+  bool has_physical_storage_buffer_addresses_capability = false;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
+          spirv_words, spirv_word_count,
+          &has_physical_storage_buffer_addresses_capability));
+  if (!has_physical_storage_buffer_addresses_capability) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA executable must declare PhysicalStorageBufferAddresses");
+  }
+
   bool uses_physical_storage_buffer64_glsl450 = false;
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(

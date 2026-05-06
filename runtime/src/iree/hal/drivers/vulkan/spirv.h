@@ -34,6 +34,12 @@ iree_status_t iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     bool* out_uses_memory_model);
 
+// Returns true when the module declares PhysicalStorageBufferAddresses.
+iree_status_t
+iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    bool* out_has_capability);
+
 // Returns true when the module contains descriptor set/binding decorations.
 iree_status_t iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
