@@ -1569,30 +1569,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dispatch(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
       device, queue_affinity, &queue));
 
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  iree_status_t status = iree_hal_vulkan_command_buffer_create(
-      device->device_allocator, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, queue->queue_affinity,
-      /*binding_capacity=*/0, device->host_allocator, &command_buffer);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_command_buffer_begin(command_buffer);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_command_buffer_dispatch(command_buffer, executable,
-                                              export_ordinal, config, constants,
-                                              bindings, flags);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_command_buffer_end(command_buffer);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_submit_execute(
-        queue, wait_semaphore_list, signal_semaphore_list, command_buffer,
-        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE,
-        IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH);
-  }
-  iree_hal_command_buffer_release(command_buffer);
-  return status;
+  return iree_hal_vulkan_queue_submit_dispatch(
+      queue, wait_semaphore_list, signal_semaphore_list, executable,
+      export_ordinal, config, constants, bindings, flags);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_queue_execute(

@@ -312,6 +312,16 @@ iree_status_t iree_hal_vulkan_queue_submit_copy(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_copy_flags_t flags);
 
+// Submits a direct dispatch ordered by queue semaphores.
+iree_status_t iree_hal_vulkan_queue_submit_dispatch(
+    iree_hal_vulkan_queue_t* queue,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
 // Submits a file write ordered by queue semaphores.
 iree_status_t iree_hal_vulkan_queue_submit_write(
     iree_hal_vulkan_queue_t* queue,
