@@ -440,3 +440,92 @@ func.func @argmax_dynamic_batch(%arg0: !torch.vtensor<[?,4],f32>) -> !torch.vten
 // CHECK:           iree_linalg_ext.arg_compare dimension(1)
 // CHECK:             arith.cmpf ogt
 // CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// Float identity must be -inf / +inf, not -FLT_MAX / +FLT_MAX. PyTorch
+// treats -FLT_MAX as strictly greater than -inf, so a finite seed would
+// return the wrong index for inputs like [-inf, -FLT_MAX].
+// CHECK-LABEL: func.func @argmax_float_init_is_neg_inf
+func.func @argmax_float_init_is_neg_inf(%arg0: !torch.vtensor<[5],f32>) -> !torch.vtensor<[],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int0, %false : !torch.vtensor<[5],f32>, !torch.int, !torch.bool -> !torch.vtensor<[],si64>
+  return %0 : !torch.vtensor<[],si64>
+}
+// CHECK:           %[[NEG_INF:.+]] = arith.constant 0xFF800000 : f32
+// CHECK:           linalg.fill ins(%[[NEG_INF]] : f32)
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf ogt
+
+// -----
+
+// Argmin counterpart: identity must be +inf, not +FLT_MAX.
+// CHECK-LABEL: func.func @argmin_float_init_is_pos_inf
+func.func @argmin_float_init_is_pos_inf(%arg0: !torch.vtensor<[5],f32>) -> !torch.vtensor<[],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmin %arg0, %int0, %false : !torch.vtensor<[5],f32>, !torch.int, !torch.bool -> !torch.vtensor<[],si64>
+  return %0 : !torch.vtensor<[],si64>
+}
+// CHECK:           %[[POS_INF:.+]] = arith.constant 0x7F800000 : f32
+// CHECK:           linalg.fill ins(%[[POS_INF]] : f32)
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpf olt
+
+// -----
+
+// Unsigned integer input: must use the unsigned `ugt` predicate, not `sgt`.
+// A signed comparison would treat 0xFF as -1 and pick the wrong index.
+// CHECK-LABEL: func.func @argmax_ui8_input
+func.func @argmax_ui8_input(%arg0: !torch.vtensor<[5],ui8>) -> !torch.vtensor<[],si64> {
+  %int0 = torch.constant.int 0
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmax %arg0, %int0, %false : !torch.vtensor<[5],ui8>, !torch.int, !torch.bool -> !torch.vtensor<[],si64>
+  return %0 : !torch.vtensor<[],si64>
+}
+// CHECK:           iree_linalg_ext.arg_compare dimension(0)
+// CHECK:             arith.cmpi ugt
+// CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// Unsigned integer argmin must use `ult`, not `slt`, AND seed with the
+// unsigned max (UINT32_MAX = -1 as signless i32), not the signed max.
+// A signed seed of INT32_MAX would miss any input element above 2^31-1.
+// CHECK-LABEL: func.func @argmin_ui32_input
+func.func @argmin_ui32_input(%arg0: !torch.vtensor<[3,4],ui32>) -> !torch.vtensor<[3],si64> {
+  %int1 = torch.constant.int 1
+  %false = torch.constant.bool false
+  %0 = torch.aten.argmin %arg0, %int1, %false : !torch.vtensor<[3,4],ui32>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  return %0 : !torch.vtensor<[3],si64>
+}
+// CHECK:           %[[UMAX:.+]] = arith.constant -1 : i32
+// CHECK:           linalg.fill ins(%[[UMAX]] : i32)
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpi ult
+// CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// Unsigned integer with the select-last-index chain: the non-strict path
+// must also pick the unsigned variant (`uge`).
+// CHECK-LABEL: func.func @argmax_select_last_index_ui8
+func.func @argmax_select_last_index_ui8(%arg0: !torch.vtensor<[3,4],ui8>) -> !torch.vtensor<[3],si64> {
+  %int1 = torch.constant.int 1
+  %false = torch.constant.bool false
+  %int3 = torch.constant.int 3
+  %int1_alpha = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %int1 : (!torch.int) -> !torch.list<int>
+  %flipped = torch.aten.flip %arg0, %dims : !torch.vtensor<[3,4],ui8>, !torch.list<int> -> !torch.vtensor<[3,4],ui8>
+  %argmax = torch.aten.argmax %flipped, %int1, %false : !torch.vtensor<[3,4],ui8>, !torch.int, !torch.bool -> !torch.vtensor<[3],si64>
+  %sub = torch.aten.sub.Scalar %argmax, %int3, %int1_alpha : !torch.vtensor<[3],si64>, !torch.int, !torch.int -> !torch.vtensor<[3],si64>
+  %abs = torch.aten.abs %sub : !torch.vtensor<[3],si64> -> !torch.vtensor<[3],si64>
+  return %abs : !torch.vtensor<[3],si64>
+}
+// CHECK-NOT:       torch.aten.flip
+// CHECK:           iree_linalg_ext.arg_compare dimension(1)
+// CHECK:             arith.cmpi uge
+// CHECK:             iree_linalg_ext.yield
+// CHECK-NOT:       torch.aten.sub.Scalar
+// CHECK-NOT:       torch.aten.abs

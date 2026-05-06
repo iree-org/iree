@@ -590,6 +590,10 @@ struct ArgCompareOpConversion : OpRewritePattern<OpTy> {
     Value self = op.getSelf();
 
     auto inputTensorType = cast<torch::Torch::ValueTensorType>(self.getType());
+    if (!inputTensorType.hasSizes()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected input type having sizes");
+    }
     ArrayRef<int64_t> inputShape = inputTensorType.getSizes();
     int64_t inputRank = inputShape.size();
     if (inputRank == 0) {
@@ -659,6 +663,16 @@ struct ArgCompareOpConversion : OpRewritePattern<OpTy> {
       inputShape = inputTensorType.getSizes();
     }
 
+    // Capture original signedness from the Torch dtype before lowering to a
+    // signless builtin type. arith comparison and min/max ops need the
+    // matching signed/unsigned variant for unsigned integer inputs (e.g.
+    // ui8/ui16) — picking signed `sgt`/`maxs` on a `ui8` tensor would read
+    // 0xFF as -1 and silently return the wrong argmax/argmin index.
+    bool isUnsigned = false;
+    if (auto torchIntTy = dyn_cast<IntegerType>(inputTensorType.getDtype())) {
+      isUnsigned = torchIntTy.isUnsigned();
+    }
+
     auto builtinTensorType =
         cast<RankedTensorType>(inputTensorType.toBuiltinTensor());
     Type elemType = builtinTensorType.getElementType();
@@ -699,13 +713,24 @@ struct ArgCompareOpConversion : OpRewritePattern<OpTy> {
                                                      i32Type, dynamicDims);
 
     bool isFloat = isa<FloatType>(elemType);
-    arith::AtomicRMWKind initKind =
-        isFloat
-            ? (isMax ? arith::AtomicRMWKind::maximumf
-                     : arith::AtomicRMWKind::minimumf)
-            : (isMax ? arith::AtomicRMWKind::maxs : arith::AtomicRMWKind::mins);
+    arith::AtomicRMWKind initKind;
+    if (isFloat) {
+      initKind = isMax ? arith::AtomicRMWKind::maximumf
+                       : arith::AtomicRMWKind::minimumf;
+    } else if (isUnsigned) {
+      initKind =
+          isMax ? arith::AtomicRMWKind::maxu : arith::AtomicRMWKind::minu;
+    } else {
+      initKind =
+          isMax ? arith::AtomicRMWKind::maxs : arith::AtomicRMWKind::mins;
+    }
+    // Seed with the true identity (+/-inf for floats), not a finite extremum.
+    // PyTorch's argmax/argmin treats -FLT_MAX as strictly greater than -inf,
+    // so seeding with -FLT_MAX would silently return index 0 on inputs like
+    // [-inf, -FLT_MAX] instead of 1. Strict `ogt`/`olt` already filter NaN
+    // operands, so the inf seed does not change NaN-handling behavior.
     Value valueInit = arith::getIdentityValue(initKind, elemType, rewriter, loc,
-                                              /*useOnlyFiniteValue=*/isFloat);
+                                              /*useOnlyFiniteValue=*/false);
     Value indexInit =
         arith::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
 
@@ -741,11 +766,24 @@ struct ArgCompareOpConversion : OpRewritePattern<OpTy> {
                                            : arith::CmpFPredicate::OLT);
         cmp = arith::CmpFOp::create(rewriter, loc, pred, lhs, rhs);
       } else {
-        arith::CmpIPredicate pred =
-            isMax ? (useNonStrictPredicate ? arith::CmpIPredicate::sge
-                                           : arith::CmpIPredicate::sgt)
-                  : (useNonStrictPredicate ? arith::CmpIPredicate::sle
-                                           : arith::CmpIPredicate::slt);
+        arith::CmpIPredicate pred;
+        if (isMax) {
+          if (useNonStrictPredicate) {
+            pred = isUnsigned ? arith::CmpIPredicate::uge
+                              : arith::CmpIPredicate::sge;
+          } else {
+            pred = isUnsigned ? arith::CmpIPredicate::ugt
+                              : arith::CmpIPredicate::sgt;
+          }
+        } else {
+          if (useNonStrictPredicate) {
+            pred = isUnsigned ? arith::CmpIPredicate::ule
+                              : arith::CmpIPredicate::sle;
+          } else {
+            pred = isUnsigned ? arith::CmpIPredicate::ult
+                              : arith::CmpIPredicate::slt;
+          }
+        }
         cmp = arith::CmpIOp::create(rewriter, loc, pred, lhs, rhs);
       }
       IREE::LinalgExt::YieldOp::create(rewriter, loc, cmp);
