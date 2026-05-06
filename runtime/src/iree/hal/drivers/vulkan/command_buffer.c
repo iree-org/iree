@@ -98,10 +98,16 @@ typedef struct iree_hal_vulkan_command_t {
 
   // Recorded execution-barrier command payload.
   struct {
-    // Number of memory barriers collapsed into the conservative native barrier.
+    // Source HAL execution stages captured during recording.
+    iree_hal_execution_stage_t source_stage_mask;
+
+    // Target HAL execution stages captured during recording.
+    iree_hal_execution_stage_t target_stage_mask;
+
+    // Number of memory barriers represented by the native barrier.
     iree_host_size_t memory_barrier_count;
 
-    // Number of buffer barriers collapsed into the conservative native barrier.
+    // Number of buffer barriers represented by the native barrier.
     iree_host_size_t buffer_barrier_count;
   } execution_barrier;
 } iree_hal_vulkan_command_t;
@@ -1270,16 +1276,55 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_copy_native(
       command->copy_buffer.target_ref, IREE_SV("copy target"));
 }
 
+static VkPipelineStageFlags2
+iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
+    iree_hal_execution_stage_t stage_mask, bool has_memory_visibility) {
+  VkPipelineStageFlags2 pipeline_stage_mask = 0;
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS)) {
+    pipeline_stage_mask |= VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  }
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_DISPATCH)) {
+    pipeline_stage_mask |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+  }
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_TRANSFER)) {
+    pipeline_stage_mask |= VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+  }
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_HOST)) {
+    pipeline_stage_mask |= VK_PIPELINE_STAGE_2_HOST_BIT;
+  }
+  if (pipeline_stage_mask) return pipeline_stage_mask;
+
+  if (has_memory_visibility) return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE)) {
+    return VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+  }
+  if (iree_any_bit_set(stage_mask, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE)) {
+    return VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+  }
+  return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+}
+
 static void iree_hal_vulkan_command_buffer_record_execution_barrier_native(
     const iree_hal_vulkan_device_syms_t* syms,
-    VkCommandBuffer native_command_buffer) {
+    VkCommandBuffer native_command_buffer,
+    const iree_hal_vulkan_command_t* command) {
+  const bool has_memory_visibility =
+      command->execution_barrier.memory_barrier_count != 0 ||
+      command->execution_barrier.buffer_barrier_count != 0;
   VkMemoryBarrier2 memory_barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-      .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-      .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-      .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-      .dstAccessMask =
-          VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+      .srcStageMask =
+          iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
+              command->execution_barrier.source_stage_mask,
+              has_memory_visibility),
+      .srcAccessMask = has_memory_visibility ? VK_ACCESS_2_MEMORY_WRITE_BIT : 0,
+      .dstStageMask =
+          iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
+              command->execution_barrier.target_stage_mask,
+              has_memory_visibility),
+      .dstAccessMask = has_memory_visibility ? VK_ACCESS_2_MEMORY_READ_BIT |
+                                                   VK_ACCESS_2_MEMORY_WRITE_BIT
+                                             : 0,
   };
   VkDependencyInfo dependency_info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1718,7 +1763,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
       }
       case IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER:
         iree_hal_vulkan_command_buffer_record_execution_barrier_native(
-            syms, native_command_buffer);
+            syms, native_command_buffer, command);
         break;
       default:
         status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -1830,8 +1875,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  (void)source_stage_mask;
-  (void)target_stage_mask;
   (void)memory_barriers;
   (void)buffer_barriers;
   iree_hal_vulkan_command_buffer_t* command_buffer =
@@ -1844,7 +1887,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
         "unsupported Vulkan command buffer execution barrier flags: 0x%" PRIx64,
         flags);
   }
-  if (memory_barrier_count == 0 && buffer_barrier_count == 0) {
+  if (source_stage_mask == 0 && target_stage_mask == 0 &&
+      memory_barrier_count == 0 && buffer_barrier_count == 0) {
     return iree_ok_status();
   }
 
@@ -1854,9 +1898,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
       &command_buffer->commands[command_buffer->command_count++];
   memset(command, 0, sizeof(*command));
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER;
+  command->execution_barrier.source_stage_mask = source_stage_mask;
+  command->execution_barrier.target_stage_mask = target_stage_mask;
   command->execution_barrier.memory_barrier_count = memory_barrier_count;
   command->execution_barrier.buffer_barrier_count = buffer_barrier_count;
   command_buffer->has_commands = true;
+  command_buffer->has_native_commands = true;
   return iree_ok_status();
 }
 
