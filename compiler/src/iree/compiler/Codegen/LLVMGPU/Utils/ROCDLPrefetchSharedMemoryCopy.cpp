@@ -1095,14 +1095,6 @@ static void insertAsyncDrainBefore(RewriterBase &rewriter, Location loc,
 /// Converts direct pre-existing gather_to_lds ops before the pipelined loop to
 /// async mode and inserts explicit waits that preserve their original
 /// synchronous behavior.
-///
-/// Pre-loop async groups must be fully drained before the pipelining prologue
-/// starts. Otherwise, the loop body's wait.asyncmark N would count unrelated
-/// pre-loop groups and no longer correspond to the intended N-stage pipeline.
-///
-/// This only handles direct gather_to_lds ops in the parent block. Recursively
-/// converting nested pre-loop gathers would require placing marks and waits
-/// inside those nested regions according to their local control flow.
 static void insertPreLoopAsyncMarkers(RewriterBase &rewriter, Location loc,
                                       Block::iterator preLoopStart,
                                       Block::iterator preLoopEnd) {
@@ -1324,11 +1316,17 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
+  Operation *opBeforeLoop = nullptr;
   if (mode == PipelineMode::AsyncCopy) {
     // Apply multi-buffering: numStages buffers for N-stage pipelining.
     if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
       return failure();
     }
+    // Record the operation before the original loop. After pipelining, the next
+    // operation after this marker is the start of the generated prologue. Ops
+    // before that boundary are pre-existing parent-block ops and are explicitly
+    // drained separately from the pipelined async groups.
+    opBeforeLoop = forOp->getPrevNode();
   }
 
   // Re-run classification on the (potentially multi-buffered) IR to capture
@@ -1363,15 +1361,6 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   LLVM_DEBUG(dumpSchedule(finalSchedule, opToCluster));
 
   scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
-
-  Operation *opBeforeLoop = nullptr;
-  if (mode == PipelineMode::AsyncCopy) {
-    // Record the operation before the original loop. After pipelining, the next
-    // operation after this marker is the start of the generated prologue. Ops
-    // before that boundary are pre-existing parent-block ops and are explicitly
-    // drained separately from the pipelined async groups.
-    opBeforeLoop = forOp->getPrevNode();
-  }
 
   FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
   if (failed(newForOpOr)) {
