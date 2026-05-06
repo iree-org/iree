@@ -132,6 +132,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   linalg.yield
 // P = P / sum
 // CHECK: linalg.generic
+// CHECK-NOT: arith.extf
 // CHECK-NOT: arith.addf
 // CHECK:   arith.divf
 // CHECK:   linalg.yield
@@ -148,8 +149,9 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 
-// Masked variant: clamp the sum denominator once per row so fully-masked rows
-// yield 0 instead of 0/0 == NaN.
+// Masked variant: use max(sum, 1) as a compact fully-masked-row guard. Fully
+// masked rows have a zero numerator and sum == 0, so the guard yields 0 instead
+// of 0/0 == NaN. Non-fully-masked rows have sum >= 1 and are unchanged.
 func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
                                 %key: tensor<192x1024x64xf16>,
                                 %value: tensor<192x1024x64xf16>,
@@ -198,8 +200,8 @@ func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// sum = max(sum, 1): mask is present, so fully-masked rows use a denominator
-// of 1 while non-fully-masked rows are unchanged.
+// sum = max(sum, 1): equivalent to select(sum == 0, 1, sum) because masked
+// attention rows produce either sum == 0 (fully masked) or sum >= 1.
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
 // CHECK:   linalg.yield

@@ -119,9 +119,12 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value sum = onlineAttn.getResult(2);
   bool hasMask = static_cast<bool>(mask);
 
-  // Finalize online attention. With a mask, fully-masked rows can have
-  // `sum == 0` and `x == 0`; guard that case to produce 0 instead of NaN. Keep
-  // this in the existing finalization loop to avoid an extra row pass.
+  // Finalize online attention:
+  //   unmasked: x = (1 / sum) * x
+  //   masked:   x = select(sum == 0, 0, x / sum)
+  // With a mask, fully-masked rows can have `sum == 0` and `x == 0`; guard that
+  // case to produce 0 instead of NaN. Keep this in the existing finalization
+  // loop to avoid an extra row pass.
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
