@@ -272,6 +272,21 @@ typedef struct iree_hal_vulkan_device_options_t {
   // Device creation enables the subset whose required Vulkan features are
   // present. Requesting only an unsupported ABI fails loudly.
   iree_hal_vulkan_dispatch_abis_t dispatch_abis;
+
+  // Maximum cached native BDA replay instances retained per queue lane.
+  //
+  // Additional concurrent command-buffer executions use the one-shot replay
+  // path after this limit is reached. Set to 0 to disable native BDA replay
+  // caching.
+  uint32_t max_cached_bda_replay_instances;
+
+  // Maximum host-visible BDA publication bytes retained by cached replay
+  // instances per queue lane.
+  uint64_t max_cached_bda_replay_publication_bytes;
+
+  // Idle cached native BDA replay instances retained per command buffer by
+  // trim.
+  uint32_t retained_cached_bda_replay_instances;
 } iree_hal_vulkan_device_options_t;
 
 // Initializes |out_options| to default values.

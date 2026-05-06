@@ -60,11 +60,59 @@ static iree_status_t iree_hal_vulkan_device_options_parse(
         iree_string_view_equal(param->key, IREE_SV("vulkan_dispatch_abi"))) {
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_parse(
           param->value, &options->dispatch_abis));
+    } else if (iree_string_view_equal(param->key,
+                                      IREE_SV("cached_bda_replay_instances")) ||
+               iree_string_view_equal(
+                   param->key, IREE_SV("vulkan_cached_bda_replay_instances"))) {
+      if (!iree_string_view_atoi_uint32(
+              param->value, &options->max_cached_bda_replay_instances)) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "invalid Vulkan cached BDA replay instance count '%.*s'",
+            (int)param->value.size, param->value.data);
+      }
+    } else if (iree_string_view_equal(
+                   param->key,
+                   IREE_SV("cached_bda_replay_publication_bytes")) ||
+               iree_string_view_equal(
+                   param->key,
+                   IREE_SV("vulkan_cached_bda_replay_publication_bytes"))) {
+      if (!iree_string_view_atoi_uint64(
+              param->value,
+              &options->max_cached_bda_replay_publication_bytes)) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "invalid Vulkan cached BDA replay publication byte limit '%.*s'",
+            (int)param->value.size, param->value.data);
+      }
+    } else if (iree_string_view_equal(
+                   param->key,
+                   IREE_SV("retained_cached_bda_replay_instances")) ||
+               iree_string_view_equal(
+                   param->key,
+                   IREE_SV("vulkan_retained_cached_bda_replay_instances"))) {
+      if (!iree_string_view_atoi_uint32(
+              param->value, &options->retained_cached_bda_replay_instances)) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "invalid Vulkan retained cached BDA replay instance count '%.*s'",
+            (int)param->value.size, param->value.data);
+      }
     } else {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "unknown Vulkan logical device option '%.*s'",
                               (int)param->key.size, param->key.data);
     }
+  }
+  if (options->max_cached_bda_replay_instances != 0 &&
+      options->retained_cached_bda_replay_instances >
+          options->max_cached_bda_replay_instances) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan retained cached BDA replay instances (%u) must be <= maximum "
+        "cached instances (%u)",
+        options->retained_cached_bda_replay_instances,
+        options->max_cached_bda_replay_instances);
   }
   return iree_hal_vulkan_dispatch_abis_verify(options->dispatch_abis);
 }
@@ -789,6 +837,15 @@ struct iree_hal_vulkan_logical_device_t {
   // Mask of valid queue affinity bits for this logical device.
   iree_hal_queue_affinity_t queue_affinity_mask;
 
+  // Maximum cached native BDA replay instances retained per queue lane.
+  uint32_t max_cached_bda_replay_instances;
+
+  // Maximum BDA publication bytes retained by cached replay instances per lane.
+  uint64_t max_cached_bda_replay_publication_bytes;
+
+  // Idle cached native BDA replay instances retained per lane after trim.
+  uint32_t retained_cached_bda_replay_instances;
+
   // Logical allocator.
   iree_hal_allocator_t* device_allocator;
 
@@ -1157,6 +1214,9 @@ static iree_status_t iree_hal_vulkan_logical_device_trim(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_trim(&device->queue_lanes[i]);
+  }
   iree_arena_block_pool_trim(&device->command_buffer_block_pool);
   return iree_hal_allocator_trim(device->device_allocator);
 }
@@ -2014,6 +2074,12 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
       .queue_affinity = selected_queue->affinity,
       .role = role,
       .host_allocator = device->host_allocator,
+      .max_cached_bda_replay_instances =
+          device->max_cached_bda_replay_instances,
+      .max_cached_bda_replay_publication_bytes =
+          device->max_cached_bda_replay_publication_bytes,
+      .retained_cached_bda_replay_instances =
+          device->retained_cached_bda_replay_instances,
   };
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_initialize(&params, queue));
   device->queue_lane_count = device->queue_lane_count + 1;
@@ -2355,6 +2421,12 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
   if (iree_status_is_ok(status)) {
     device->owns_logical_device = true;
     device->enabled_dispatch_abis = enabled_dispatch_abis;
+    device->max_cached_bda_replay_instances =
+        device_options->max_cached_bda_replay_instances;
+    device->max_cached_bda_replay_publication_bytes =
+        device_options->max_cached_bda_replay_publication_bytes;
+    device->retained_cached_bda_replay_instances =
+        device_options->retained_cached_bda_replay_instances;
     status = iree_hal_vulkan_libvulkan_load_device_syms(
         &device->instance.syms, device->logical_device, &device->syms);
   }
@@ -2500,6 +2572,17 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_dispatch_abis_verify(options->dispatch_abis));
+  if (options->max_cached_bda_replay_instances != 0 &&
+      options->retained_cached_bda_replay_instances >
+          options->max_cached_bda_replay_instances) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan retained cached BDA replay instances (%u) must be <= maximum "
+        "cached instances (%u)",
+        options->retained_cached_bda_replay_instances,
+        options->max_cached_bda_replay_instances);
+  }
   if (!instance || !physical_device || !logical_device) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
@@ -2569,6 +2652,12 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     device->enabled_features = external_device_params->enabled_features;
     device->enabled_dispatch_abis = enabled_dispatch_abis;
     device->enabled_extensions = external_device_params->enabled_extensions;
+    device->max_cached_bda_replay_instances =
+        options->max_cached_bda_replay_instances;
+    device->max_cached_bda_replay_publication_bytes =
+        options->max_cached_bda_replay_publication_bytes;
+    device->retained_cached_bda_replay_instances =
+        options->retained_cached_bda_replay_instances;
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_logical_device_initialize_proactor(device,

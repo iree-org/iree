@@ -303,6 +303,10 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
   IREE_ASSERT_ARGUMENT(out_options);
   memset(out_options, 0, sizeof(*out_options));
   out_options->dispatch_abis = IREE_HAL_VULKAN_DISPATCH_ABI_ALL_RECOGNIZED;
+  out_options->max_cached_bda_replay_instances = 16;
+  out_options->max_cached_bda_replay_publication_bytes =
+      64ull * 1024ull * 1024ull;
+  out_options->retained_cached_bda_replay_instances = 1;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(

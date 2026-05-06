@@ -44,6 +44,8 @@ typedef struct iree_hal_vulkan_queue_native_descriptor_block_t
     iree_hal_vulkan_queue_native_descriptor_block_t;
 typedef struct iree_hal_vulkan_queue_bda_publication_block_t
     iree_hal_vulkan_queue_bda_publication_block_t;
+typedef struct iree_hal_vulkan_queue_native_replay_t
+    iree_hal_vulkan_queue_native_replay_t;
 typedef struct iree_hal_vulkan_queue_staging_ring_t
     iree_hal_vulkan_queue_staging_ring_t;
 
@@ -99,6 +101,15 @@ typedef struct iree_hal_vulkan_queue_params_t {
 
   // Host allocator used for queue-owned allocations.
   iree_allocator_t host_allocator;
+
+  // Maximum cached native BDA replay instances retained by this queue.
+  uint32_t max_cached_bda_replay_instances;
+
+  // Maximum BDA publication bytes retained by cached replay instances.
+  uint64_t max_cached_bda_replay_publication_bytes;
+
+  // Idle cached replay instances retained per command buffer by queue trim.
+  uint32_t retained_cached_bda_replay_instances;
 } iree_hal_vulkan_queue_params_t;
 
 // Host-driven Vulkan queue lane.
@@ -259,6 +270,30 @@ typedef struct iree_hal_vulkan_queue_t {
     uint32_t block_count;
   } bda_publication_cache;
 
+  // Queue-owned native BDA command-buffer replay cache.
+  struct {
+    // First native replay instance owned by this queue.
+    iree_hal_vulkan_queue_native_replay_t* head;
+
+    // Last native replay instance owned by this queue.
+    iree_hal_vulkan_queue_native_replay_t* tail;
+
+    // Number of native replay instances currently cached.
+    uint32_t instance_count;
+
+    // Maximum cached native BDA replay instances retained by this queue.
+    uint32_t max_instance_count;
+
+    // Maximum BDA publication bytes retained by cached replay instances.
+    uint64_t max_publication_bytes;
+
+    // Idle native replay instances retained per command buffer by queue trim.
+    uint32_t retained_instance_count;
+
+    // BDA publication bytes retained by cached replay instances.
+    uint64_t publication_bytes;
+  } native_replay_cache;
+
   // Queue-owned host-to-device staging ring for uploads.
   iree_hal_vulkan_queue_staging_ring_t* upload_staging_ring;
 
@@ -289,6 +324,9 @@ iree_status_t iree_hal_vulkan_queue_initialize_staging(
 
 // Deinitializes a queue lane and releases all queue-owned resources.
 void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue);
+
+// Trims idle queue-owned replay/cache resources.
+void iree_hal_vulkan_queue_trim(iree_hal_vulkan_queue_t* queue);
 
 // Assigns this queue's causal frontier axis and starts completion processing.
 iree_status_t iree_hal_vulkan_queue_assign_frontier(

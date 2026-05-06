@@ -83,6 +83,16 @@ iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
     iree_hal_command_buffer_t* command_buffer,
     iree_device_size_t* out_publication_length);
 
+// Publishes BDA binding tables into an already-reserved publication range.
+//
+// The table layout matches iree_hal_vulkan_command_buffer_record_native, so a
+// native command buffer recorded against |bda_publication| can be resubmitted
+// after this updates the publication contents for a new binding table.
+iree_status_t iree_hal_vulkan_command_buffer_publish_bda_binding_tables(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication);
+
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
@@ -154,7 +164,8 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_builtins_t* builtins,
-    VkCommandBuffer native_command_buffer, VkDescriptorPool descriptor_pool,
+    VkCommandBuffer native_command_buffer,
+    VkCommandBufferUsageFlags usage_flags, VkDescriptorPool descriptor_pool,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,

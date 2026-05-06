@@ -40,6 +40,17 @@ IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
 IREE_FLAG(string, vulkan_dispatch_abi, "both",
           "Executable dispatch ABI policy: descriptor, bda, or both.");
 IREE_FLAG(
+    int32_t, vulkan_cached_bda_replay_instances, 16,
+    "Maximum cached native BDA command-buffer replay instances per queue lane; "
+    "0 disables replay caching.");
+IREE_FLAG(int64_t, vulkan_cached_bda_replay_publication_bytes,
+          64ll * 1024ll * 1024ll,
+          "Maximum cached native BDA replay publication bytes per queue lane.");
+IREE_FLAG(
+    int32_t, vulkan_retained_cached_bda_replay_instances, 1,
+    "Idle cached native BDA replay instances retained per command buffer after "
+    "device trim.");
+IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, true,
     "Requests a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch work.");
 
@@ -72,6 +83,35 @@ static iree_status_t iree_hal_vulkan_driver_factory_try_create(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_parse(
       iree_make_cstring_view(FLAG_vulkan_dispatch_abi),
       &options.device_options.dispatch_abis));
+  if (FLAG_vulkan_cached_bda_replay_instances < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--vulkan_cached_bda_replay_instances must be non-negative");
+  }
+  if (FLAG_vulkan_cached_bda_replay_publication_bytes < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--vulkan_cached_bda_replay_publication_bytes must be non-negative");
+  }
+  if (FLAG_vulkan_retained_cached_bda_replay_instances < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--vulkan_retained_cached_bda_replay_instances must be non-negative");
+  }
+  options.device_options.max_cached_bda_replay_instances =
+      (uint32_t)FLAG_vulkan_cached_bda_replay_instances;
+  options.device_options.max_cached_bda_replay_publication_bytes =
+      (uint64_t)FLAG_vulkan_cached_bda_replay_publication_bytes;
+  options.device_options.retained_cached_bda_replay_instances =
+      (uint32_t)FLAG_vulkan_retained_cached_bda_replay_instances;
+  if (options.device_options.max_cached_bda_replay_instances != 0 &&
+      options.device_options.retained_cached_bda_replay_instances >
+          options.device_options.max_cached_bda_replay_instances) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "--vulkan_retained_cached_bda_replay_instances must be <= "
+        "--vulkan_cached_bda_replay_instances");
+  }
   if (FLAG_vulkan_validation_layers) {
     options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS;
