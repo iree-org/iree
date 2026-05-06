@@ -317,6 +317,10 @@ typedef struct iree_hal_vulkan_queue_t {
     // Cached replay acquisitions bypassed because profiling was active.
     uint64_t profile_bypass_count;
 
+    // Cached replay acquisitions bypassed because the command buffer is
+    // one-shot.
+    uint64_t one_shot_bypass_count;
+
     // Cached replay acquisitions bypassed by configured capacity limits.
     uint64_t capacity_bypass_count;
 

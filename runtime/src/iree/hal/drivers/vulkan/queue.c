@@ -2071,6 +2071,13 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
         queue->native_replay_cache.capacity_bypass_count + 1;
     return iree_ok_status();
   }
+  if (iree_any_bit_set(
+          iree_hal_command_buffer_mode(submission->execute.command_buffer),
+          IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
+    queue->native_replay_cache.one_shot_bypass_count =
+        queue->native_replay_cache.one_shot_bypass_count + 1;
+    return iree_ok_status();
+  }
   if (iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) ||
       iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
     queue->native_replay_cache.profile_bypass_count =
@@ -5521,6 +5528,9 @@ bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,
   } else if (iree_string_view_equal(key, IREE_SV("profile_bypass_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.profile_bypass_count);
+  } else if (iree_string_view_equal(key, IREE_SV("one_shot_bypass_count"))) {
+    *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
+        queue->native_replay_cache.one_shot_bypass_count);
   } else if (iree_string_view_equal(key, IREE_SV("capacity_bypass_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.capacity_bypass_count);
