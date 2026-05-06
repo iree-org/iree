@@ -71,6 +71,7 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 // CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
 // CHECK: arith.maximumf
 // CHECK: arith.divf
+// CHECK: arith.mulf
 // CHECK-NOT: arith.cmpf
 // CHECK-NOT: arith.select
 // CHECK: arith.truncf

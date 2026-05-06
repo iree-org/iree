@@ -127,7 +127,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   // Finalize online attention:
   //   unmasked: x = (1 / sum) * x
-  //   masked:   x / max(sum, 1)
+  //   masked:   x = (1 / max(sum, 1)) * x
   // With a mask, fully-masked rows can have `sum == 0` and `x == 0`, while
   // non-fully-masked rows have `sum >= 1`; guard that case to produce 0 instead
   // of NaN. Keep this in the existing finalization loop to avoid an extra row
@@ -149,7 +149,8 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
           Value one = arith::ConstantOp::create(
               b, loc, b.getFloatAttr(args[0].getType(), 1.0));
           Value denominator = arith::MaximumFOp::create(b, loc, args[0], one);
-          result = arith::DivFOp::create(b, loc, args[1], denominator);
+          Value reciprocal = arith::DivFOp::create(b, loc, one, denominator);
+          result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
         } else {
           Value one = arith::ConstantOp::create(
               b, loc, b.getFloatAttr(args[0].getType(), 1.0));
