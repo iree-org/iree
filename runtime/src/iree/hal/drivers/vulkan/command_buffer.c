@@ -182,6 +182,17 @@ static iree_hal_vulkan_command_buffer_t* iree_hal_vulkan_command_buffer_cast(
   return (iree_hal_vulkan_command_buffer_t*)base_value;
 }
 
+static bool iree_hal_vulkan_command_buffer_validates(
+    const iree_hal_vulkan_command_buffer_t* command_buffer) {
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  return !iree_any_bit_set(command_buffer->base.mode,
+                           IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED);
+#else
+  (void)command_buffer;
+  return false;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+}
+
 static iree_host_size_t iree_hal_vulkan_command_buffer_grow_capacity(
     iree_host_size_t current_capacity, iree_host_size_t minimum_capacity) {
   iree_host_size_t new_capacity = current_capacity ? current_capacity : 8;
@@ -2269,11 +2280,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
         "Vulkan command buffer dispatch dynamic workgroup local memory is "
         "unsupported");
   }
-  if (constants.data_length % sizeof(uint32_t) != 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan command buffer dispatch constants must be 4-byte aligned");
-  }
   if (constants.data_length > UINT32_MAX) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
@@ -2294,26 +2300,33 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
       executable, export_ordinal, &pipeline));
-  if (constants.data_length >
-      (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan command buffer dispatch provides %" PRIhsz
-        " constant bytes but pipeline accepts at most %u",
-        constants.data_length,
-        (uint32_t)pipeline->constant_count * (uint32_t)sizeof(uint32_t));
-  }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_dispatch_abi(
-      pipeline, constants, bindings));
 
-  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_vulkan_command_buffer_validate_indirect_parameters_ref(
-            command_buffer, config.workgroup_count_ref));
-  }
-  for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-        command_buffer, bindings.values[i]));
+  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
+    if (constants.data_length % sizeof(uint32_t) != 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan command buffer dispatch constants must be 4-byte aligned");
+    }
+    if (constants.data_length >
+        (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan command buffer dispatch provides %" PRIhsz
+          " constant bytes but pipeline accepts at most %u",
+          constants.data_length,
+          (uint32_t)pipeline->constant_count * (uint32_t)sizeof(uint32_t));
+    }
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_dispatch_abi(
+        pipeline, constants, bindings));
+    if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_vulkan_command_buffer_validate_indirect_parameters_ref(
+              command_buffer, config.workgroup_count_ref));
+    }
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
+          command_buffer, bindings.values[i]));
+    }
   }
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_resource(
