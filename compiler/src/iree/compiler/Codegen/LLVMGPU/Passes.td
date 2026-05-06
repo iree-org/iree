@@ -89,6 +89,8 @@ def LLVMGPULower1DVectorOpsPass :
     "ub::UBDialect",
     "vector::VectorDialect",
     "IREE::VectorExt::IREEVectorExtDialect",
+  ];
+}
 
 def LLVMGPUVectorFlatteningPass :
     InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
