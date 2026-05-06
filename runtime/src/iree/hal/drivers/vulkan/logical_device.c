@@ -661,18 +661,30 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_verify_enabled_dispatch_abis(
+static iree_status_t iree_hal_vulkan_select_enabled_dispatch_abis(
     iree_hal_vulkan_features_t enabled_features,
-    iree_hal_vulkan_dispatch_abis_t dispatch_abis) {
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_verify(dispatch_abis));
-  if (iree_all_bits_set(dispatch_abis, IREE_HAL_VULKAN_DISPATCH_ABI_BDA) &&
+    iree_hal_vulkan_dispatch_abis_t requested_dispatch_abis,
+    iree_hal_vulkan_dispatch_abis_t* out_enabled_dispatch_abis) {
+  IREE_ASSERT_ARGUMENT(out_enabled_dispatch_abis);
+  *out_enabled_dispatch_abis = IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_dispatch_abis_verify(requested_dispatch_abis));
+
+  iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis =
+      requested_dispatch_abis;
+  if (iree_all_bits_set(requested_dispatch_abis,
+                        IREE_HAL_VULKAN_DISPATCH_ABI_BDA) &&
       !iree_all_bits_set(
           enabled_features,
           IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)) {
+    enabled_dispatch_abis &= ~IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
+  }
+  if (enabled_dispatch_abis == IREE_HAL_VULKAN_DISPATCH_ABI_NONE) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan BDA dispatch ABI requires bufferDeviceAddress");
   }
+  *out_enabled_dispatch_abis = enabled_dispatch_abis;
   return iree_ok_status();
 }
 
@@ -2321,13 +2333,16 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         &device->enabled_features, &device->enabled_extensions,
         &device->logical_device);
   }
+  iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis =
+      IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_verify_enabled_dispatch_abis(
-        device->enabled_features, device_options->dispatch_abis);
+    status = iree_hal_vulkan_select_enabled_dispatch_abis(
+        device->enabled_features, device_options->dispatch_abis,
+        &enabled_dispatch_abis);
   }
   if (iree_status_is_ok(status)) {
     device->owns_logical_device = true;
-    device->enabled_dispatch_abis = device_options->dispatch_abis;
+    device->enabled_dispatch_abis = enabled_dispatch_abis;
     status = iree_hal_vulkan_libvulkan_load_device_syms(
         &device->instance.syms, device->logical_device, &device->syms);
   }
@@ -2504,9 +2519,12 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     status = iree_hal_vulkan_verify_external_device_contract(
         &snapshot, external_device_params);
   }
+  iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis =
+      IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_verify_enabled_dispatch_abis(
-        external_device_params->enabled_features, options->dispatch_abis);
+    status = iree_hal_vulkan_select_enabled_dispatch_abis(
+        external_device_params->enabled_features, options->dispatch_abis,
+        &enabled_dispatch_abis);
   }
 
   iree_hal_vulkan_selected_queues_t selected_queues;
@@ -2537,7 +2555,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     memset(&snapshot, 0, sizeof(snapshot));
     device->logical_device = logical_device;
     device->enabled_features = external_device_params->enabled_features;
-    device->enabled_dispatch_abis = options->dispatch_abis;
+    device->enabled_dispatch_abis = enabled_dispatch_abis;
     device->enabled_extensions = external_device_params->enabled_extensions;
   }
   if (iree_status_is_ok(status)) {

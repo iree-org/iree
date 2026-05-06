@@ -267,7 +267,10 @@ typedef struct iree_hal_vulkan_device_options_t {
   // Device behavior flags.
   iree_hal_vulkan_device_flags_t flags;
 
-  // Executable dispatch ABIs accepted by this logical device.
+  // Requested executable dispatch ABIs for this logical device.
+  //
+  // Device creation enables the subset whose required Vulkan features are
+  // present. Requesting only an unsupported ABI fails loudly.
   iree_hal_vulkan_dispatch_abis_t dispatch_abis;
 } iree_hal_vulkan_device_options_t;
 
