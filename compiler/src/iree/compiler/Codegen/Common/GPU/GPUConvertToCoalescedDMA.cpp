@@ -229,6 +229,26 @@ getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
   return subgroupSize;
 }
 
+/// Largest numWarps in [1, totalWarps] (by repeated halving) such that
+/// `product(shape) / numWarps` satisfies the minimum DMA transfer alignment.
+/// Conservative for shapes that don't divide evenly (the real greedy in
+/// `computeSubgroupTileSizes` can sometimes pack more warps than this), but
+/// always safe. Returns 0 only if even numWarps==1 fails — the pre-check in
+/// `isCopyDMAConvertible` rejects such copies, so callers assert on 0.
+static int64_t computeMaxFeasibleNumWarps(ArrayRef<int64_t> shape,
+                                          int64_t totalWarps,
+                                          int64_t minElementsPerTransfer) {
+  int64_t totalElements = ShapedType::getNumElements(shape);
+  for (int64_t n = std::max<int64_t>(totalWarps, 1); n >= 1; n /= 2) {
+    int64_t perWarp = totalElements / n;
+    if (perWarp >= minElementsPerTransfer &&
+        perWarp % minElementsPerTransfer == 0) {
+      return n;
+    }
+  }
+  return 0;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -475,85 +495,76 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     if (pad && isValidPadForDMA(pad)) {
       Value preSource = pad.getSource();
 
-      // Find the extract_slice closest to the pad output. This is the
-      // subgroup-level tiling's extract_slice, whose offsets tell us where
-      // this warp's tile starts within the padded tensor.
+      // The per-tile view of the padded tensor is the (single) extract_slice
+      // user of the pad — created by `tileAtSubgroupLevel` (warp tile) or by
+      // `tileToThreadLevel` in the `ConvertPadFusionCopyToCoalescedDMA`
+      // fallback (thread tile). Either way, after tiling the copy's input
+      // always traces through this slice, so it must exist.
       tensor::ExtractSliceOp tilingES;
-      {
-        Value trace = input;
-        while (auto es = trace.getDefiningOp<tensor::ExtractSliceOp>()) {
-          trace = es.getSource();
-          if (trace.getDefiningOp<tensor::PadOp>() == pad) {
-            tilingES = es;
-            break;
-          }
+      for (Operation *user : pad->getUsers()) {
+        if (auto es = dyn_cast<tensor::ExtractSliceOp>(user)) {
+          tilingES = es;
+          break;
         }
       }
+      assert(tilingES &&
+             "pad output must have an extract_slice user after tiling");
 
-      if (tilingES) {
-        // Subgroup tiling applied — create a sub-slice of the pre-pad source
-        // at the warp's tiling offset with sizes clamped to source bounds.
-        // Since pad has low=[0,0], the coordinate systems of the padded
-        // output and pre-pad source are aligned.  The DMA's in_bounds
-        // attribute handles the case where the clamped source is smaller
-        // than the warp's init tile (the fat_raw_buffer returns zero for OOB
-        // reads).
-        rewriter.setInsertionPoint(inParallelOp);
+      // Build a sub-slice of the pre-pad source at this tile's offset, with
+      // sizes clamped to source bounds on padded dims. Pad uses low=[0,...]
+      // so padded and pre-pad coordinates align. The DMA's in_bounds attr
+      // handles the case where the clamped source is smaller than the init
+      // tile (fat_raw_buffer returns zero for OOB reads).
+      rewriter.setInsertionPoint(inParallelOp);
 
-        SmallVector<OpFoldResult> warpOffsets = tilingES.getMixedOffsets();
-        SmallVector<OpFoldResult> warpSizes = tilingES.getMixedSizes();
-        auto preSourceType = cast<RankedTensorType>(preSource.getType());
-        int64_t rank = preSourceType.getRank();
+      SmallVector<OpFoldResult> warpOffsets = tilingES.getMixedOffsets();
+      SmallVector<OpFoldResult> warpSizes = tilingES.getMixedSizes();
+      auto preSourceType = cast<RankedTensorType>(preSource.getType());
+      int64_t rank = preSourceType.getRank();
 
-        SmallVector<OpFoldResult> subOffsets, subSizes, subStrides;
-        for (int64_t i = 0; i < rank; i++) {
-          subStrides.push_back(rewriter.getIndexAttr(1));
+      SmallVector<OpFoldResult> subOffsets, subSizes, subStrides;
+      for (int64_t i = 0; i < rank; i++) {
+        subStrides.push_back(rewriter.getIndexAttr(1));
 
-          bool dimHasPadding = !isConstantIntValue(pad.getMixedHighPad()[i], 0);
+        bool dimHasPadding = !isConstantIntValue(pad.getMixedHighPad()[i], 0);
 
-          if (dimHasPadding) {
-            // Source may be smaller than the padded dimension. Clamp offset
-            // and size to stay within source bounds.
-            Value offsetVal =
-                getValueOrCreateConstantIndexOp(rewriter, loc, warpOffsets[i]);
-            Value tileSizeVal =
-                getValueOrCreateConstantIndexOp(rewriter, loc, warpSizes[i]);
+        if (dimHasPadding) {
+          // Source may be smaller than the padded dimension. Clamp offset
+          // and size to stay within source bounds.
+          Value offsetVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, warpOffsets[i]);
+          Value tileSizeVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, warpSizes[i]);
 
-            int64_t staticDim = preSourceType.getShape()[i];
-            Value sourceDimSize;
-            if (ShapedType::isDynamic(staticDim)) {
-              sourceDimSize =
-                  tensor::DimOp::create(rewriter, loc, preSource, i);
-            } else {
-              sourceDimSize =
-                  arith::ConstantIndexOp::create(rewriter, loc, staticDim);
-            }
-
-            Value clampedOffset =
-                arith::MinSIOp::create(rewriter, loc, offsetVal, sourceDimSize);
-            Value remaining = arith::SubIOp::create(
-                rewriter, loc, sourceDimSize, clampedOffset);
-            Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-            Value clampedRemaining =
-                arith::MaxSIOp::create(rewriter, loc, remaining, zero);
-            Value clampedSize = arith::MinSIOp::create(
-                rewriter, loc, clampedRemaining, tileSizeVal);
-
-            subOffsets.push_back(clampedOffset);
-            subSizes.push_back(clampedSize);
+          int64_t staticDim = preSourceType.getShape()[i];
+          Value sourceDimSize;
+          if (ShapedType::isDynamic(staticDim)) {
+            sourceDimSize = tensor::DimOp::create(rewriter, loc, preSource, i);
           } else {
-            subOffsets.push_back(warpOffsets[i]);
-            subSizes.push_back(warpSizes[i]);
+            sourceDimSize =
+                arith::ConstantIndexOp::create(rewriter, loc, staticDim);
           }
-        }
 
-        source = tensor::ExtractSliceOp::create(
-            rewriter, loc, preSource, subOffsets, subSizes, subStrides);
-      } else {
-        // No subgroup tiling (single-warp case) — use full pre-pad source
-        // directly.
-        source = preSource;
+          Value clampedOffset =
+              arith::MinSIOp::create(rewriter, loc, offsetVal, sourceDimSize);
+          Value remaining = arith::SubIOp::create(rewriter, loc, sourceDimSize,
+                                                  clampedOffset);
+          Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+          Value clampedRemaining =
+              arith::MaxSIOp::create(rewriter, loc, remaining, zero);
+          Value clampedSize = arith::MinSIOp::create(
+              rewriter, loc, clampedRemaining, tileSizeVal);
+
+          subOffsets.push_back(clampedOffset);
+          subSizes.push_back(clampedSize);
+        } else {
+          subOffsets.push_back(warpOffsets[i]);
+          subSizes.push_back(warpSizes[i]);
+        }
       }
+
+      source = tensor::ExtractSliceOp::create(rewriter, loc, preSource,
+                                              subOffsets, subSizes, subStrides);
 
       // Compute in_bounds based on whether padding was added per dimension.
       for (auto [low, high] :
@@ -1143,11 +1154,13 @@ private:
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
     int64_t availableElements = innermostDim;
+    bool linearizedAvailability = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
       if (tracesToTensorEmpty(output) &&
           llvm::none_of(shape, ShapedType::isDynamic)) {
         availableElements = ShapedType::getNumElements(shape);
+        linearizedAvailability = true;
       }
     }
 
@@ -1158,13 +1171,34 @@ private:
       return failure();
     }
 
+    // In the linearized-availability case the per-warp tile shrinks with more
+    // warps and can fall below the minimum DMA transfer, leaving an orphan
+    // `linalg.copy {use_global_load_dma}` inside a warp-mapped forall
+    // (issue #24139). Halve `totalWarps` until each warp's tile is aligned.
+    SmallVector<int64_t> effectiveNumWarps = numWarps;
+    int64_t feasibleNumWarps = 0;
+    if (linearizedAvailability) {
+      auto positiveWarps =
+          llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+      int64_t totalWarps = llvm::product_of(positiveWarps);
+      feasibleNumWarps =
+          computeMaxFeasibleNumWarps(shape, totalWarps, minElementsPerTransfer);
+      // The whole-tile alignment check in isCopyDMAConvertible is exactly the
+      // numWarps==1 feasibility check, so reaching here with feasible==0
+      // means the pre-check is out of sync with this distribution policy.
+      assert(feasibleNumWarps >= 1 &&
+             "DMA pre-check should have rejected this copy: even a single "
+             "warp cannot satisfy the minimum DMA transfer alignment");
+      effectiveNumWarps = {feasibleNumWarps};
+    }
+
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
 
     // Distribute across subgroups (warps) for both pad fusion and non-pad
     // cases.
     std::tie(tileSizes, numTiledDims) =
-        computeSubgroupTileSizes(rewriter, shape, numWarps);
+        computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
 
     if (numTiledDims == 0) {
       return failure();

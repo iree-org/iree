@@ -916,3 +916,86 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 
   return %result : tensor<128x16xf32>
 }
+
+// -----
+
+// Test: incremental warp-distribution halving in tileAtSubgroupLevel.
+// 32x4xf32 tile = 128 elements. Workgroup has 4 warps.  The greedy 4-warp
+// distribution would give 8x4 = 32 elements per warp, less than the
+// minimum DMA transfer (subgroup_size=64 * 1 elt/lane = 64 elements with
+// dma_sizes=[32,128] / 32-bit f32).  Halving picks numWarps=2, which gives
+// 16x4 = 64 elements per warp (== min) — DMA emit succeeds and the warp
+// forall is well-formed (preserving wave-uniformity by construction).
+// Issue #24139.
+
+#gpu_target_warp_halve = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_warp_halve = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_warp_halve}>
+#translation_warp_halve = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_warp_distribution_halving
+func.func @copy_warp_distribution_halving(%source: tensor<32x4xf32>, %off: index, %sz: index, %high: index) -> tensor<32x4xf32>
+  attributes {hal.executable.target = #exec_target_warp_halve, translation_info = #translation_warp_halve} {
+  %extracted = tensor.extract_slice %source[%off, 0] [%sz, 4] [1, 1]
+      : tensor<32x4xf32> to tensor<?x4xf32>
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
+  ^bb0(%a: index, %b: index):
+    tensor.yield %cst : f32
+  } : tensor<?x4xf32> to tensor<32x4xf32>
+  %init = tensor.empty() : tensor<32x4xf32>
+  %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<32x4xf32>) outs(%init : tensor<32x4xf32>) -> tensor<32x4xf32>
+
+  // 2-warp distribution (step=16 on dim 0, dim 1 kept whole).
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 4) step (16, 4)
+  // CHECK:   scf.forall (%{{.+}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: linalg.copy
+
+  return %r : tensor<32x4xf32>
+}
+
+// -----
+
+// Test: linearized-availability detection must not rely on
+// `availableElements != innermostDim`. With a 1D (or [1,...,N]) shape whose
+// output traces to tensor.empty(), linearization fires but the two values
+// are equal. The unmodified `numWarps` (4) on shape [128] yields a per-warp
+// tile of 32 elements (< min DMA transfer 64), so halving must still kick in
+// and pick numWarps=2 (per-warp tile = 64). Issue #24139.
+
+#gpu_target_warp_halve_1d = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_warp_halve_1d = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_warp_halve_1d}>
+#translation_warp_halve_1d = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_warp_distribution_halving_1d
+func.func @copy_warp_distribution_halving_1d(%source: tensor<128xf32>) -> tensor<128xf32>
+  attributes {hal.executable.target = #exec_target_warp_halve_1d, translation_info = #translation_warp_halve_1d} {
+  %init = tensor.empty() : tensor<128xf32>
+  %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128xf32>) outs(%init : tensor<128xf32>) -> tensor<128xf32>
+
+  // 2-warp distribution (step=64 on the only dim).
+  // CHECK: scf.forall (%{{.+}}) = (0) to (128) step (64)
+  // CHECK:   scf.forall (%{{.+}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: linalg.copy
+
+  return %r : tensor<128xf32>
+}
