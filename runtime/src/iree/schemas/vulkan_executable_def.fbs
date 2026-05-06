@@ -37,10 +37,14 @@ enum DispatchAbi:uint8 {
 
 // BDA shader-visible binding table entry representation.
 enum BdaBindingTableEntryType:uint8 {
-  // One uint64_t device address per HAL binding.
+  // Production fast path: one uint64_t device address per HAL binding. Any
+  // required range or alignment checks are expressed in BdaBindingDef metadata
+  // and validated by the host before publishing the address table.
   ADDRESS64 = 0,
 
-  // One uint64_t device address followed by one uint64_t byte length.
+  // Reserved checked/debug path: one uint64_t device address followed by one
+  // uint64_t byte length. This is not a production ABI mode; runtimes must only
+  // accept it when an explicit sanitizer/debug mode opts in.
   ADDRESS64_LENGTH64 = 1,
 }
 

@@ -99,7 +99,8 @@ typedef struct iree_hal_vulkan_pipeline_t {
     // Push-constant byte offset of the first HAL inline constant.
     uint32_t constant_push_constant_offset;
 
-    // Byte length of one shader-visible binding table entry.
+    // Byte length of one shader-visible binding table entry. The production
+    // BDA v1 path accepts only address64 entries, so this is sizeof(uint64_t).
     uint32_t binding_table_entry_length;
 
     // Whether binding_count is a verifier-enforced ABI value.

@@ -621,7 +621,8 @@ static iree_status_t iree_hal_vulkan_verify_bda_dispatch_layout_def(
       return iree_make_status(
           IREE_STATUS_UNIMPLEMENTED,
           "pipelines[%" PRIhsz
-          "] BDA checked address64_length64 binding tables are unsupported",
+          "] BDA checked address64_length64 binding tables require an "
+          "explicit sanitizer/debug mode",
           pipeline_ordinal);
     default:
       return iree_make_status(
