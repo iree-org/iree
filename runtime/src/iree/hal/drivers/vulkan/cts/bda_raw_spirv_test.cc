@@ -527,6 +527,13 @@ class BdaRawSpirvTest : public CtsTestBase<> {
     return value;
   }
 
+  int64_t QueryBdaPublicationCache(iree_string_view_t key) {
+    int64_t value = 0;
+    IREE_EXPECT_OK(iree_hal_device_query_i64(
+        device_, IREE_SV("vulkan.queue.bda_publication_cache"), key, &value));
+    return value;
+  }
+
   void ExecuteCommandBufferAndWait(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_binding_table_t binding_table) {
@@ -871,6 +878,38 @@ TEST_P(BdaRawSpirvTest, CommandBufferCachesBdaPublicationRequirements) {
       command_buffer, &bda_publication_length));
   EXPECT_EQ(bda_publication_length,
             (bindings.count + oversized_bindings.size()) * sizeof(uint64_t));
+}
+
+TEST_P(BdaRawSpirvTest, TrimDropsIdleOversizedBdaPublicationBlock) {
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  const int64_t initial_block_count =
+      QueryBdaPublicationCache(IREE_SV("block_count"));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+  std::vector<iree_hal_buffer_ref_t> oversized_bindings =
+      MakeOversizedPublicationBindings(input_buffer.get(), output_buffer.get());
+
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      dispatch_signal, executable_, /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(),
+      iree_hal_buffer_ref_list_t{
+          /*.count=*/oversized_bindings.size(),
+          /*.values=*/oversized_bindings.data(),
+      },
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  EXPECT_GT(QueryBdaPublicationCache(IREE_SV("block_count")),
+            initial_block_count);
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  EXPECT_LE(QueryBdaPublicationCache(IREE_SV("block_count")),
+            initial_block_count);
 }
 
 TEST_P(BdaRawSpirvTest, CommandBufferReusesCachedNativeReplay) {

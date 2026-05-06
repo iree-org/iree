@@ -1161,6 +1161,77 @@ static void iree_hal_vulkan_queue_bda_publication_cache_deinitialize(
          sizeof(queue->bda_publication_cache));
 }
 
+static void iree_hal_vulkan_queue_bda_publication_cache_unlink_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_bda_publication_block_t* previous,
+    iree_hal_vulkan_queue_bda_publication_block_t* block) {
+  if (previous) {
+    previous->next = block->next;
+  } else {
+    queue->bda_publication_cache.head = block->next;
+  }
+  if (queue->bda_publication_cache.tail == block) {
+    queue->bda_publication_cache.tail = previous;
+  }
+  if (queue->bda_publication_cache.cursor == block) {
+    queue->bda_publication_cache.cursor =
+        block->next ? block->next : queue->bda_publication_cache.head;
+  }
+  IREE_ASSERT(queue->bda_publication_cache.block_count > 0,
+              "BDA publication block count underflow");
+  queue->bda_publication_cache.block_count =
+      queue->bda_publication_cache.block_count - 1;
+  block->next = NULL;
+}
+
+static void iree_hal_vulkan_queue_bda_publication_cache_trim(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_hal_vulkan_queue_bda_publication_block_t* destroy_head = NULL;
+  iree_hal_vulkan_queue_bda_publication_block_t* destroy_tail = NULL;
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  bool retained_default_idle_block = false;
+  iree_hal_vulkan_queue_bda_publication_block_t* previous = NULL;
+  iree_hal_vulkan_queue_bda_publication_block_t* block =
+      queue->bda_publication_cache.head;
+  while (block) {
+    iree_hal_vulkan_queue_bda_publication_block_t* next = block->next;
+    const bool has_active_leases = block->active_lease_count != 0;
+    const bool should_retain_idle =
+        !has_active_leases && !retained_default_idle_block &&
+        block->capacity <= (iree_device_size_t)
+                               IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_BLOCK_SIZE;
+    if (has_active_leases || should_retain_idle) {
+      if (should_retain_idle) {
+        block->allocated_length = 0;
+        retained_default_idle_block = true;
+      }
+      previous = block;
+    } else {
+      iree_hal_vulkan_queue_bda_publication_cache_unlink_under_lock(
+          queue, previous, block);
+      if (destroy_tail) {
+        destroy_tail->next = block;
+      } else {
+        destroy_head = block;
+      }
+      destroy_tail = block;
+    }
+    block = next;
+  }
+  if (!queue->bda_publication_cache.cursor) {
+    queue->bda_publication_cache.cursor = queue->bda_publication_cache.head;
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  while (destroy_head) {
+    iree_hal_vulkan_queue_bda_publication_block_t* next = destroy_head->next;
+    destroy_head->next = NULL;
+    iree_hal_vulkan_queue_bda_publication_block_destroy(queue, destroy_head);
+    destroy_head = next;
+  }
+}
+
 static bool iree_hal_vulkan_queue_bda_publication_block_try_allocate(
     iree_hal_vulkan_queue_bda_publication_block_t* block,
     iree_device_size_t length, iree_device_size_t* out_offset) {
@@ -5459,6 +5530,7 @@ void iree_hal_vulkan_queue_trim(iree_hal_vulkan_queue_t* queue) {
     iree_hal_vulkan_queue_native_replay_destroy(queue, destroy_head);
     destroy_head = next;
   }
+  iree_hal_vulkan_queue_bda_publication_cache_trim(queue);
 }
 
 static int64_t iree_hal_vulkan_queue_i64_saturate_u64(uint64_t value) {
