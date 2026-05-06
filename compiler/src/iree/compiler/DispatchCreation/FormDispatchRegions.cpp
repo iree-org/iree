@@ -723,7 +723,8 @@ static bool isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          consumer)) {
     // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
@@ -892,8 +893,10 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isCloneableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(),
-                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
+          llvm::all_of(op.getUsers(), [](Operation *user) {
+            return isa<IREE::LinalgExt::AttentionOp,
+                       IREE::LinalgExt::OnlineAttentionOp>(user);
+          })) {
         continue;
       }
 

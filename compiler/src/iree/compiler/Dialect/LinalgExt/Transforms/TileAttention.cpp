@@ -100,15 +100,21 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   indexingMaps.push_back(maxMap);
   indexingMaps.push_back(sumMap);
 
-  Value mask = attnOp.getMask() ? attnOp.getMask() : Value();
+  std::optional<Value> mask =
+      attnOp.getMask() ? std::optional<Value>(attnOp.getMask()) : std::nullopt;
 
+  // Use the custom builder which correctly handles the Optional mask.
+  // ODS operand order: Q, K, V, scale, [mask], output, max, sum.
+  // Custom builder takes: Q, K, V, scale, output, max, sum, maps, mask.
   OnlineAttentionOp onlineAttn = OnlineAttentionOp::create(
       rewriter, loc,
       TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
-      mask, accFill, maxFill, sumFill,
-      rewriter.getAffineMapArrayAttr(indexingMaps),
-      attnOp.getDecompositionConfigAttr());
+      accFill, maxFill, sumFill, rewriter.getAffineMapArrayAttr(indexingMaps),
+      mask);
+  if (attnOp.getDecompositionConfigAttr()) {
+    onlineAttn.setDecompositionConfigAttr(attnOp.getDecompositionConfigAttr());
+  }
 
   rewriter.cloneRegionBefore(attnOp.getRegion(), onlineAttn.getRegion(),
                              onlineAttn.getRegion().begin());
