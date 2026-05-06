@@ -18,6 +18,8 @@ typedef struct iree_hal_amdgpu_executable_cache_t {
   iree_hal_resource_t resource;
   // Host allocator used for cache lifetime.
   iree_allocator_t host_allocator;
+  // Borrowed HAL device used for global-buffer placement metadata.
+  iree_hal_device_t* device;
   // Borrowed HSA API table used for executable loading.
   const iree_hal_amdgpu_libhsa_t* libhsa;
   // Borrowed topology describing the physical devices to load onto.
@@ -36,7 +38,7 @@ iree_hal_amdgpu_executable_cache_cast(iree_hal_executable_cache_t* base_value) {
 }
 
 iree_status_t iree_hal_amdgpu_executable_cache_create(
-    const iree_hal_amdgpu_libhsa_t* libhsa,
+    iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_string_view_t identifier, iree_allocator_t host_allocator,
@@ -61,6 +63,7 @@ iree_status_t iree_hal_amdgpu_executable_cache_create(
   iree_hal_resource_initialize(&iree_hal_amdgpu_executable_cache_vtable,
                                &executable_cache->resource);
   executable_cache->host_allocator = host_allocator;
+  executable_cache->device = device;
   executable_cache->libhsa = libhsa;
   executable_cache->topology = topology;
   executable_cache->profile_metadata = profile_metadata;
@@ -124,7 +127,8 @@ static iree_status_t iree_hal_amdgpu_executable_cache_prepare_executable(
   iree_hal_amdgpu_executable_cache_t* executable_cache =
       iree_hal_amdgpu_executable_cache_cast(base_executable_cache);
   return iree_hal_amdgpu_executable_create(
-      executable_cache->libhsa, executable_cache->topology, executable_params,
+      executable_cache->device, executable_cache->libhsa,
+      executable_cache->topology, executable_params,
       executable_cache->profile_metadata, executable_cache->host_allocator,
       out_executable);
 }

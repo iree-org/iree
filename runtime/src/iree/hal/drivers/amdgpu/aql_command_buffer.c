@@ -1315,7 +1315,8 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_check_dispatch_flags(
       IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS |
       IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS |
       IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS |
-      IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION;
+      IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION |
+      IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES;
   if (IREE_UNLIKELY(iree_any_bit_set(flags, ~supported_flags))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported dispatch flags: 0x%" PRIx64, flags);

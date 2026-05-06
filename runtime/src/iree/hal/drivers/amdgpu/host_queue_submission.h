@@ -9,6 +9,7 @@
 
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 #include "iree/hal/utils/resource_set.h"
 
 #ifdef __cplusplus
@@ -142,8 +143,8 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
 } iree_hal_amdgpu_host_queue_dispatch_submission_t;
 
 // One in-flight PM4-IB payload submission assembled under submission_mutex.
-// Operation implementations populate |pm4_ib_slot| directly while generic
-// ownership and publication stay in |kernel|.
+// Operation implementations append payload packets through |pm4_ib_builder|
+// while generic ownership and publication stay in |kernel|.
 typedef struct iree_hal_amdgpu_host_queue_pm4_ib_submission_t {
   // Generic payload-shaped submission state.
   iree_hal_amdgpu_host_queue_kernel_submission_t kernel;
@@ -154,8 +155,8 @@ typedef struct iree_hal_amdgpu_host_queue_pm4_ib_submission_t {
   iree_hal_amdgpu_aql_packet_t* pm4_ib_packet_slot;
   // Queue-owned PM4 IB storage referenced by |pm4_ib_packet_slot|.
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot;
-  // Number of PM4 dwords populated in |pm4_ib_slot|.
-  uint32_t ib_dword_count;
+  // Bounded builder for appending PM4 packets to |pm4_ib_slot|.
+  iree_hal_amdgpu_pm4_ib_builder_t pm4_ib_builder;
 } iree_hal_amdgpu_host_queue_pm4_ib_submission_t;
 
 // Returns the number of retained resources required for a submission with
@@ -316,6 +317,13 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
     bool* out_ready,
     iree_hal_amdgpu_host_queue_pm4_ib_submission_t* out_submission);
 
+// Emits reclaim-only no-op packets for a PM4-IB submission whose AQL slots were
+// reserved but whose payload could not be published. User signal semaphores are
+// not signaled; only queue-private reclaim can advance.
+void iree_hal_amdgpu_host_queue_fail_pm4_ib_submission(
+    iree_hal_amdgpu_host_queue_t* queue,
+    iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission);
+
 // Writes one final dispatch packet body into an AQL slot in forward field
 // order and returns the setup bits that must be published with the header.
 uint16_t iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
@@ -341,9 +349,10 @@ uint64_t iree_hal_amdgpu_host_queue_finish_dispatch_submission(
 
 // Finishes a PM4-IB payload submission by transferring retained resources to
 // the reclaim entry, publishing queue/semaphore frontier state, committing the
-// final PM4-IB packet header, ringing the doorbell, and returning the assigned
-// queue submission epoch. Caller must hold submission_mutex.
-uint64_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+// final PM4-IB packet header, ringing the doorbell, and writing the assigned
+// queue submission epoch to |out_submission_epoch|. Caller must hold
+// submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
@@ -352,7 +361,8 @@ uint64_t iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
     const iree_hal_amdgpu_host_queue_profile_event_info_t*
         profile_queue_event_info,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
-    iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission);
+    iree_hal_amdgpu_host_queue_pm4_ib_submission_t* submission,
+    uint64_t* out_submission_epoch);
 
 // Emits one kernel-dispatch submission using an already-prepared packet shape
 // and kernargs blob. Caller must hold submission_mutex.

@@ -2075,6 +2075,111 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             workgroupSize, subgroupSize));
 }
 
+//====---------------------------------------------------------------------===//
+// ArgCompare Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+LogicalResult setArgCompareConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op) {
+  auto argCompareOp = cast<IREE::LinalgExt::ArgCompareOp>(op);
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+  SmallVector<unsigned> partitionedLoops =
+      interfaceOp.getPartitionableLoops(std::nullopt);
+
+  auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
+                                  ArrayRef<int64_t> threadSizes) {
+    NamedAttribute attrs[2] = {{"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+                               {"thread", b.getI64ArrayAttr(threadSizes)}};
+    return IREE::GPU::LoweringConfigAttr::get(context,
+                                              b.getDictionaryAttr(attrs));
+  };
+
+  // No parallel dims (e.g. rank-1 input reducing to a scalar) means there is
+  // nothing to distribute across threads. Emit a degenerate single-thread
+  // TileAndFuse config instead of bailing: the per-loop tile size is 0 for
+  // every reduction loop, so a single thread walks the full reduction once
+  // without racing.
+  if (partitionedLoops.empty()) {
+    int64_t numLoops = argCompareOp.getInputRank();
+    SmallVector<int64_t> zeroTileSizes(numLoops, 0);
+    IREE::GPU::LoweringConfigAttr loweringConfig =
+        createLoweringConfig(zeroTileSizes, zeroTileSizes);
+    std::array<int64_t, 3> singleThread = {1, 1, 1};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig,
+        getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                              singleThread, subgroupSize));
+  }
+
+  // arg_compare's iteration domain has one loop per input dim; the single
+  // reduction dim is `getDimension()` and the rest are parallel.
+  int64_t numLoops = argCompareOp.getInputRank();
+
+  // Starting point pending tuning data: two warps per workgroup mirrors
+  // setSortConfig and gives reasonable occupancy without over-subscribing
+  // for the small parallel iteration spaces typical of arg_compare fallbacks.
+  std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> threadTileSizes(numLoops, 1);
+
+  // Set non-parallel loops (the single reduction dim) to zero tile size so
+  // each thread runs the full reduction on its parallel slice.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(llvm::from_range,
+                                               partitionedLoops);
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
+    }
+  }
+
+  // Pack as many parallel-dim iterations as possible into the workgroup tile
+  // (innermost dim first), matching the setSortConfig packing strategy.
+  ArrayRef<int64_t> loopBounds = argCompareOp.getInputType().getShape();
+  int64_t residualWorkgroupSize = workgroupSize[0];
+  for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
+      continue;
+    }
+    if (residualWorkgroupSize % loopBounds[depth] == 0) {
+      workgroupTileSizes[depth] = loopBounds[depth];
+      residualWorkgroupSize /= loopBounds[depth];
+      continue;
+    }
+    if (loopBounds[depth] % residualWorkgroupSize == 0) {
+      workgroupTileSizes[depth] = residualWorkgroupSize;
+      break;
+    }
+  }
+
+  // If the parallel iterations actually packed into the workgroup tile fit in
+  // a single subgroup, drop to one warp so we don't launch idle threads.
+  int64_t cumulativeWorkgroupTile = 1;
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (partitionedLoopsSet.contains(depth) && workgroupTileSizes[depth] > 0) {
+      cumulativeWorkgroupTile *= workgroupTileSizes[depth];
+    }
+  }
+  if (cumulativeWorkgroupTile <= subgroupSize) {
+    workgroupSize[0] = subgroupSize;
+  }
+
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      createLoweringConfig(workgroupTileSizes, threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, subgroupSize));
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//

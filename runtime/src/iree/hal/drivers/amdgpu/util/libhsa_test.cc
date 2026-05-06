@@ -28,9 +28,12 @@ TEST(LibHSATest, Load) {
     GTEST_SKIP() << "HSA not available, skipping tests";
   }
 
-  // These are just ref count adjustments but ensure we can call the APIs.
-  IREE_ASSERT_OK(iree_hsa_init(IREE_LIBHSA(&libhsa)));
-  IREE_ASSERT_OK(iree_hsa_shut_down(IREE_LIBHSA(&libhsa)));
+  // Ensure resolved symbols are callable without perturbing the HSA runtime
+  // lifetime beyond the one owned by libhsa.
+  uint16_t version_major = 0;
+  IREE_ASSERT_OK(iree_hsa_system_get_info(
+      IREE_LIBHSA(&libhsa), HSA_SYSTEM_INFO_VERSION_MAJOR, &version_major));
+  EXPECT_NE(version_major, 0u);
 
   iree_hal_amdgpu_libhsa_deinitialize(&libhsa);
 }

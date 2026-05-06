@@ -986,8 +986,8 @@ static iree_status_t iree_hal_cuda_device_create_executable_cache(
     iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_nop_executable_cache_create(
-      identifier, device->cuda_symbols, device->cu_device,
-      device->host_allocator, out_executable_cache);
+      base_device, identifier, device->cuda_symbols, device->cu_device,
+      device->cu_context, device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_cuda_device_import_file(

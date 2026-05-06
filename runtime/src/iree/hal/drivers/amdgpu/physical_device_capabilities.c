@@ -42,8 +42,6 @@ enum {
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY |
-      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_TIMESTAMP |
-      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_RELEASE_MEM_TIMESTAMP |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
@@ -482,9 +480,10 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
   // The CDNA BARRIER_VALUE rows match CLR's barrier_value_packet_ gate:
   // gfx9.0.10 or gfx9.[minor >= 4].[stepping 0..2].
   //
-  // The gfx1100 row is the currently validated RDNA3 PM4 path. Nearby gfx10,
-  // gfx11, and gfx12 parts stay on the base AQL path until each packet-family
-  // contract has hardware evidence or an explicit probe.
+  // AQL PM4-IB is selected for known gfx9-gfx12 ISAs so the timestamp strategy
+  // can own queue-device profiling support across the packet families mirrored
+  // from aqlprofile. Other PM4 packet families stay opt-in until each
+  // packet-family contract has hardware evidence or an explicit probe.
   static const iree_hal_amdgpu_vendor_packet_capability_row_t kRows[] = {
       {
           .version =
@@ -520,7 +519,10 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
       },
   };
 
-  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities = 0;
+  const bool known_pm4_ib_family = version.major >= 9 && version.major <= 12;
+  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+      known_pm4_ib_family ? IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB
+                          : 0;
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(kRows); ++i) {
     if (iree_hal_amdgpu_gfxip_version_range_contains(kRows[i].version,
                                                      version)) {
@@ -528,6 +530,27 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
     }
   }
   return capabilities;
+}
+
+iree_hal_amdgpu_pm4_timestamp_strategy_t
+iree_hal_amdgpu_select_pm4_timestamp_strategy(
+    iree_hal_amdgpu_gfxip_version_t version) {
+  // COPY_DATA GPU-clock readback is the queue-device timestamp path selected on
+  // PM4-IB queues. The destination and cache-policy fields mirror the
+  // aqlprofile command builder families: gfx9 including gfx94/gfx95 uses
+  // memory stream, gfx10/gfx11 uses TC_L2 with LRU, and gfx12 uses TC_L2 with
+  // last-use temporal policy.
+  switch (version.major) {
+    case 9:
+      return IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_MEMORY_STREAM;
+    case 10:
+    case 11:
+      return IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LRU;
+    case 12:
+      return IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_COPY_CLOCK_TC_L2_LU;
+    default:
+      return IREE_HAL_AMDGPU_PM4_TIMESTAMP_STRATEGY_NONE;
+  }
 }
 
 iree_hal_amdgpu_wait_barrier_strategy_t

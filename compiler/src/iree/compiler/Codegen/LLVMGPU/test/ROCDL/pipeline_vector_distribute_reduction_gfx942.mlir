@@ -289,6 +289,11 @@ func.func @attention_20x1x64x4096x64() attributes {hal.executable.target = #exec
   %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %7 = tensor.empty() : tensor<20x1x64xf32>
   %8 = tensor.empty() : tensor<20x1xf32>
+  %cst_zero = arith.constant 0.000000e+00 : f32
+  %cst_neg_inf = arith.constant 0xFF800000 : f32
+  %acc_fill = linalg.fill ins(%cst_zero : f32) outs(%7: tensor<20x1x64xf32>) -> tensor<20x1x64xf32>
+  %max_fill = linalg.fill ins(%cst_neg_inf : f32) outs(%8: tensor<20x1xf32>) -> tensor<20x1xf32>
+  %sum_fill = linalg.fill ins(%cst_zero : f32) outs(%8: tensor<20x1xf32>) -> tensor<20x1xf32>
   %9:3 = iree_linalg_ext.online_attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -301,7 +306,7 @@ func.func @attention_20x1x64x4096x64() attributes {hal.executable.target = #exec
                 qk_attrs = {lowering_config = #qk_config},
                 pv_attrs = {lowering_config = #pv_config}
                }}
-               ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7, %8, %8 : tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>) {
+               ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%acc_fill, %max_fill, %sum_fill : tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>) {
                 ^bb0(%score: f32):
                   iree_linalg_ext.yield %score : f32
                } -> tensor<20x1x64xf32>, tensor<20x1xf32>, tensor<20x1xf32>
@@ -464,6 +469,13 @@ func.func @attention_4xDx1x32x128xf16() attributes {hal.executable.target = #exe
   %13 = tensor.empty(%6) : tensor<4x1x1x?x32xf16>
   %14 = tensor.empty(%6) : tensor<4x?x1x32x128xf16>
   %15 = tensor.empty() : tensor<4x1x1xf32>
+
+  %cst_acc = arith.constant 0.000000e+00 : f32
+  %cst_max = arith.constant 0xFF800000 : f32
+  %acc_fill = linalg.fill ins(%cst_acc : f32) outs(%12 : tensor<4x1x1x128xf32>) -> tensor<4x1x1x128xf32>
+  %max_fill = linalg.fill ins(%cst_max : f32) outs(%15 : tensor<4x1x1xf32>) -> tensor<4x1x1xf32>
+  %sum_fill = linalg.fill ins(%cst_acc : f32) outs(%15 : tensor<4x1x1xf32>) -> tensor<4x1x1xf32>
+
   %16 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0, 0, 0], sizes = [4096, 1, 1, 1, 32, 128], strides = [1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x1x2x1x32x128xf16>> -> tensor<4096x1x32x128xf16>
   %17 = iree_linalg_ext.gather dimension_map = [0] ins(%16, %9 : tensor<4096x1x32x128xf16>, tensor<4x?xi64>) outs(%14 : tensor<4x?x1x32x128xf16>) -> tensor<4x?x1x32x128xf16>
   %18 = iree_linalg_ext.gather dimension_map = [0] ins(%16, %10 : tensor<4096x1x32x128xf16>, tensor<4x?xi64>) outs(%14 : tensor<4x?x1x32x128xf16>) -> tensor<4x?x1x32x128xf16>
@@ -500,7 +512,7 @@ func.func @attention_4xDx1x32x128xf16() attributes {hal.executable.target = #exe
       lowering_config = #attention_lowering_config
     }
      ins(%11, %17, %18, %cst, %19 : tensor<4x1x1x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x?x1x32x128xf16>, f16, tensor<4x1x1x?x32xf16>)
-    outs(%12, %15, %15 : tensor<4x1x1x128xf32>, tensor<4x1x1xf32>, tensor<4x1x1xf32>) {
+    outs(%acc_fill, %max_fill, %sum_fill : tensor<4x1x1x128xf32>, tensor<4x1x1xf32>, tensor<4x1x1xf32>) {
       ^bb0(%arg0: f32):
         iree_linalg_ext.yield %arg0 : f32
   } -> tensor<4x1x1x128xf32>, tensor<4x1x1xf32>, tensor<4x1x1xf32>

@@ -189,6 +189,20 @@ static iree_status_t iree_hal_replay_recorder_executable_lookup_export_by_name(
                                                 name, out_export_ordinal));
 }
 
+static iree_status_t iree_hal_replay_recorder_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  iree_hal_replay_recorder_executable_t* executable =
+      iree_hal_replay_recorder_executable_cast(base_executable);
+  (void)executable;
+  (void)name;
+  (void)queue_affinity;
+  *out_buffer = NULL;
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "replay recording of executable global lookup is not implemented");
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_replay_recorder_executable_cache_t
 //===----------------------------------------------------------------------===//
@@ -571,6 +585,8 @@ static const iree_hal_executable_vtable_t
             iree_hal_replay_recorder_executable_export_parameters,
         .lookup_export_by_name =
             iree_hal_replay_recorder_executable_lookup_export_by_name,
+        .lookup_global_by_name =
+            iree_hal_replay_recorder_executable_lookup_global_by_name,
 };
 
 static const iree_hal_executable_cache_vtable_t

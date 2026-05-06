@@ -339,6 +339,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
     iree_thread_affinity_t completion_thread_affinity,
     iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy,
     iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
+    iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy,
     iree_hal_amdgpu_epoch_signal_table_t* epoch_table,
     iree_arena_block_pool_t* block_pool,
     iree_hal_amdgpu_block_pool_t* profiling_signal_block_pool,
@@ -399,6 +400,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
   out_queue->axis = axis;
   out_queue->wait_barrier_strategy = wait_barrier_strategy;
   out_queue->vendor_packet_capabilities = vendor_packet_capabilities;
+  out_queue->pm4_timestamp_strategy = pm4_timestamp_strategy;
   out_queue->queue_affinity = queue_affinity;
   out_queue->last_signal.semaphore = NULL;
   out_queue->last_signal.epoch = 0;

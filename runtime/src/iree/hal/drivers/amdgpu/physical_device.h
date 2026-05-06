@@ -279,6 +279,8 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities;
   // Hardware strategy selected for cross-queue epoch waits on this GPU agent.
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy;
+  // Queue-local PM4 timestamp strategy selected from this GPU agent's ISA.
+  iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy;
 
   // Number of live host queues initialized in |host_queues|.
   iree_host_size_t host_queue_count;

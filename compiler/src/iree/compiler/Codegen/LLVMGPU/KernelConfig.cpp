@@ -2486,6 +2486,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                 target, entryPointFn, argCompareOp.getOperation()))) {
           return success();
         }
+        if (succeeded(IREE::GPU::setArgCompareConfig(
+                target, entryPointFn, argCompareOp.getOperation()))) {
+          return success();
+        }
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,

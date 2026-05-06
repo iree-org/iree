@@ -49,6 +49,11 @@ struct ElideUnusedOp : OpRewritePattern<Op> {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
+  // Wait fences and consumes carry availability/ownership effects for the
+  // imported tensor value. Folding through them would drop those effects.
+  if (getWaitFence() || getConsume()) {
+    return {};
+  }
   // Cannot fold if there is a byte offset — the import is a subview.
   if (getByteOffset()) {
     return {};
@@ -189,6 +194,11 @@ void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   if (auto importOp = getSource().getDefiningOp<TensorImportOp>()) {
+    // Wait fences and consumes carry availability/ownership effects for the
+    // imported tensor value. Folding through them would drop those effects.
+    if (importOp.getWaitFence() || importOp.getConsume()) {
+      return {};
+    }
     // Cannot fold through an import with byte_offset — it's a subview.
     if (importOp.getByteOffset()) {
       return {};
