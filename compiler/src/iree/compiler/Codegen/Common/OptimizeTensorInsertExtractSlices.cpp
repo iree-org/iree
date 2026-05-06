@@ -415,18 +415,22 @@ struct FoldTransferReadOfEmptyTensor
       Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
                                                  op.getType(), rPad);
       rewriter.replaceOpWithNewOp<arith::SelectOp>(op, mask, poison, padVal);
-    } else if (!mask && fullyInBounds) {
+      return success();
+    }
+
+    if (!mask && fullyInBounds) {
       // Unmasked, fully in-bounds: every lane reads unspecified contents.
       rewriter.replaceOp(
           op, ub::PoisonOp::create(rewriter, op.getLoc(), op.getType()));
-    } else {
-      // Not fully in-bounds (with or without mask): out-of-bounds lanes
-      // produce pad, and in-bounds lanes read unspecified contents from
-      // tensor.empty, so we may choose pad for those too.
-      Value rPad = op.getPadding();
-      rewriter.replaceOp(op, vector::BroadcastOp::create(
-                                 rewriter, rPad.getLoc(), op.getType(), rPad));
+      return success();
     }
+
+    // Not fully in-bounds (with or without mask): out-of-bounds lanes
+    // produce pad, and in-bounds lanes read unspecified contents from
+    // tensor.empty, so we may choose pad for those too.
+    Value rPad = op.getPadding();
+    rewriter.replaceOp(op, vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                                       op.getType(), rPad));
     return success();
   }
 };
