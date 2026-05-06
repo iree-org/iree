@@ -25,9 +25,32 @@ typedef struct iree_hal_vulkan_spirv_compute_entry_point_t {
   uint32_t workgroup_size[3];
 } iree_hal_vulkan_spirv_compute_entry_point_t;
 
+// Module-wide SPIR-V facts used while preparing Vulkan executables.
+typedef struct iree_hal_vulkan_spirv_module_analysis_t {
+  // Whether OpMemoryModel declares PhysicalStorageBuffer64 GLSL450.
+  bool uses_physical_storage_buffer64_glsl450;
+
+  // Whether OpCapability declares PhysicalStorageBufferAddresses.
+  bool has_physical_storage_buffer_addresses_capability;
+
+  // Whether any OpDecorate declares DescriptorSet or Binding.
+  bool has_descriptor_binding_decorations;
+
+  // Number of OpVariable declarations in the PushConstant storage class.
+  iree_host_size_t push_constant_variable_count;
+
+  // Whether any OpVariable declares a descriptor-backed storage class.
+  bool has_descriptor_storage_class_variables;
+} iree_hal_vulkan_spirv_module_analysis_t;
+
 // Verifies the structural SPIR-V header and instruction stream.
 iree_status_t iree_hal_vulkan_spirv_verify_module(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count);
+
+// Analyzes module-wide facts while verifying the structural instruction stream.
+iree_status_t iree_hal_vulkan_spirv_analyze_module(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_spirv_module_analysis_t* out_analysis);
 
 // Returns true when the module declares PhysicalStorageBuffer64 GLSL450.
 iree_status_t iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(

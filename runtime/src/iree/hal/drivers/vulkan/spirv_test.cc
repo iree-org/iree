@@ -105,6 +105,60 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   EXPECT_EQ(6u, workgroup_size[2]);
 }
 
+TEST(SpirvTest, AnalyzesModuleWideFacts) {
+  static constexpr uint32_t kMixedFactModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpCapability PhysicalStorageBufferAddresses.
+      0x00020011u,
+      5347u,
+      // Declares OpMemoryModel PhysicalStorageBuffer64 GLSL450.
+      0x0003000eu,
+      5348u,
+      1u,
+      // Declares OpDecorate %1 DescriptorSet 0.
+      0x00040047u,
+      1u,
+      34u,
+      0u,
+      // Declares OpDecorate %1 Binding 2.
+      0x00040047u,
+      1u,
+      33u,
+      2u,
+      // Declares OpVariable %3 in PushConstant storage class.
+      0x0004003bu,
+      2u,
+      3u,
+      9u,
+      // Declares OpVariable %5 in StorageBuffer storage class.
+      0x0004003bu,
+      4u,
+      5u,
+      12u,
+  };
+
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kMixedFactModule, IREE_ARRAYSIZE(kMixedFactModule), &analysis));
+  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
+  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_TRUE(analysis.has_descriptor_binding_decorations);
+  EXPECT_EQ(1u, analysis.push_constant_variable_count);
+  EXPECT_TRUE(analysis.has_descriptor_storage_class_variables);
+
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
+  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
+  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_FALSE(analysis.has_descriptor_binding_decorations);
+  EXPECT_EQ(0u, analysis.push_constant_variable_count);
+  EXPECT_FALSE(analysis.has_descriptor_storage_class_variables);
+}
+
 TEST(SpirvTest, ParsesMultipleComputeEntryPoints) {
   static constexpr uint32_t kMultiEntryModule[] = {
       0x07230203u,

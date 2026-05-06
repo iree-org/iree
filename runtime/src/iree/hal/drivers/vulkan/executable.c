@@ -1267,41 +1267,27 @@ typedef uint32_t iree_hal_vulkan_bda_spirv_verification_flags_t;
 static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
-  bool has_physical_storage_buffer_addresses_capability = false;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
-          spirv_words, spirv_word_count,
-          &has_physical_storage_buffer_addresses_capability));
-  if (!has_physical_storage_buffer_addresses_capability) {
+  iree_hal_vulkan_spirv_module_analysis_t analysis;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_analyze_module(
+      spirv_words, spirv_word_count, &analysis));
+  if (!analysis.has_physical_storage_buffer_addresses_capability) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must declare PhysicalStorageBufferAddresses");
   }
 
-  bool uses_physical_storage_buffer64_glsl450 = false;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(
-          spirv_words, spirv_word_count,
-          &uses_physical_storage_buffer64_glsl450));
-  if (!uses_physical_storage_buffer64_glsl450) {
+  if (!analysis.uses_physical_storage_buffer64_glsl450) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
   }
-  bool has_descriptor_binding_decorations = false;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
-      spirv_words, spirv_word_count, &has_descriptor_binding_decorations));
-  if (has_descriptor_binding_decorations) {
+  if (analysis.has_descriptor_binding_decorations) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must not declare descriptor set or binding "
         "decorations");
   }
-  bool has_descriptor_variables = false;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
-          spirv_words, spirv_word_count, &has_descriptor_variables));
-  if (has_descriptor_variables) {
+  if (analysis.has_descriptor_storage_class_variables) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must not declare descriptor-backed variables");

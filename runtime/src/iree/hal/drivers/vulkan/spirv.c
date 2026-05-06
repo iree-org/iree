@@ -103,6 +103,20 @@ static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
   return iree_ok_status();
 }
 
+static bool iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(
+    uint32_t storage_class) {
+  switch (storage_class) {
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM_CONSTANT:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_ATOMIC_COUNTER:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_IMAGE:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_STORAGE_BUFFER:
+      return true;
+    default:
+      return false;
+  }
+}
+
 iree_status_t iree_hal_vulkan_spirv_verify_module(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count) {
   if (IREE_UNLIKELY(!spirv_words && spirv_word_count != 0)) {
@@ -123,6 +137,83 @@ iree_status_t iree_hal_vulkan_spirv_verify_module(
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
         spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
         &operands));
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_spirv_analyze_module(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_spirv_module_analysis_t* out_analysis) {
+  IREE_ASSERT_ARGUMENT(out_analysis);
+  memset(out_analysis, 0, sizeof(*out_analysis));
+
+  if (IREE_UNLIKELY(!spirv_words && spirv_word_count != 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "SPIR-V module word storage is NULL");
+  }
+  if (spirv_word_count < IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT ||
+      spirv_words[0] != IREE_HAL_VULKAN_SPIRV_MAGIC) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "module is not SPIR-V");
+  }
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    switch (opcode) {
+      case IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL:
+        if (word_count < 3) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "SPIR-V OpMemoryModel instruction is truncated");
+        }
+        out_analysis->uses_physical_storage_buffer64_glsl450 =
+            operands[0] ==
+                IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
+            operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
+        break;
+      case IREE_HAL_VULKAN_SPIRV_OP_CAPABILITY:
+        if (word_count != 2) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "SPIR-V OpCapability instruction is malformed");
+        }
+        if (operands[0] ==
+            IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES) {
+          out_analysis->has_physical_storage_buffer_addresses_capability = true;
+        }
+        break;
+      case IREE_HAL_VULKAN_SPIRV_OP_DECORATE:
+        if (word_count < 3) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "SPIR-V OpDecorate instruction is truncated");
+        }
+        if (operands[1] == IREE_HAL_VULKAN_SPIRV_DECORATION_BINDING ||
+            operands[1] == IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET) {
+          out_analysis->has_descriptor_binding_decorations = true;
+        }
+        break;
+      case IREE_HAL_VULKAN_SPIRV_OP_VARIABLE:
+        if (word_count < 4) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "SPIR-V OpVariable instruction is truncated");
+        }
+        if (operands[2] == IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT) {
+          ++out_analysis->push_constant_variable_count;
+        }
+        if (iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(
+                operands[2])) {
+          out_analysis->has_descriptor_storage_class_variables = true;
+        }
+        break;
+      default:
+        break;
+    }
   }
   return iree_ok_status();
 }
@@ -243,20 +334,6 @@ iree_status_t iree_hal_vulkan_spirv_count_push_constant_variables(
     }
   }
   return iree_ok_status();
-}
-
-static bool iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(
-    uint32_t storage_class) {
-  switch (storage_class) {
-    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM_CONSTANT:
-    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM:
-    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_ATOMIC_COUNTER:
-    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_IMAGE:
-    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_STORAGE_BUFFER:
-      return true;
-    default:
-      return false;
-  }
 }
 
 iree_status_t iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
