@@ -6,11 +6,13 @@
 
 #include "iree/hal/drivers/vulkan/command_buffer.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #include "iree/hal/drivers/vulkan/buffer.h"
 #include "iree/hal/drivers/vulkan/executable.h"
 #include "iree/hal/drivers/vulkan/sparse_buffer.h"
+#include "iree/hal/utils/resource_set.h"
 
 typedef enum iree_hal_vulkan_command_type_e {
   IREE_HAL_VULKAN_COMMAND_TYPE_FILL_BUFFER = 0,
@@ -68,7 +70,8 @@ typedef struct iree_hal_vulkan_command_t {
 
   // Recorded dispatch command payload.
   struct {
-    // Executable retained until the command buffer is destroyed.
+    // Executable captured during recording.
+    // Retained by resource_set unless command buffer mode is UNRETAINED.
     iree_hal_executable_t* executable;
 
     // Pipeline metadata borrowed from executable and stable while retained.
@@ -133,6 +136,9 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Whether any command must be recorded into a native VkCommandBuffer.
   bool has_native_commands;
 
+  // Retained resources referenced by recorded commands.
+  iree_hal_resource_set_t* resource_set;
+
   // Recorded commands in submission order.
   iree_hal_vulkan_command_t* commands;
 
@@ -142,14 +148,6 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Capacity of commands.
   iree_host_size_t command_capacity;
 
-  // Direct buffers retained by recorded commands.
-  iree_hal_buffer_t** retained_buffers;
-
-  // Number of entries populated in retained_buffers.
-  iree_host_size_t retained_buffer_count;
-
-  // Capacity of retained_buffers.
-  iree_host_size_t retained_buffer_capacity;
 } iree_hal_vulkan_command_buffer_t;
 
 typedef struct iree_hal_vulkan_command_buffer_bda_recording_state_t {
@@ -168,6 +166,9 @@ typedef struct iree_hal_vulkan_command_buffer_bda_recording_state_t {
 
 static const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_command_buffer_vtable;
+
+static void iree_hal_vulkan_command_buffer_destroy(
+    iree_hal_command_buffer_t* base_command_buffer);
 
 static iree_hal_vulkan_command_buffer_t* iree_hal_vulkan_command_buffer_cast(
     iree_hal_command_buffer_t* base_value) {
@@ -209,36 +210,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_reserve_commands(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_command_buffer_reserve_retained_buffers(
-    iree_hal_vulkan_command_buffer_t* command_buffer,
-    iree_host_size_t additional_count) {
-  iree_host_size_t minimum_capacity = 0;
-  if (!iree_host_size_checked_add(command_buffer->retained_buffer_count,
-                                  additional_count, &minimum_capacity)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan command buffer retained-buffer list is too large");
-  }
-  if (minimum_capacity <= command_buffer->retained_buffer_capacity) {
-    return iree_ok_status();
-  }
-  const iree_host_size_t new_capacity =
-      iree_hal_vulkan_command_buffer_grow_capacity(
-          command_buffer->retained_buffer_capacity, minimum_capacity);
-  iree_host_size_t new_size = 0;
-  if (!iree_host_size_checked_mul(
-          new_capacity, sizeof(*command_buffer->retained_buffers), &new_size)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan command buffer retained-buffer list is too large");
-  }
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_realloc(command_buffer->host_allocator, new_size,
-                             (void**)&command_buffer->retained_buffers));
-  command_buffer->retained_buffer_capacity = new_capacity;
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_command_buffer_validate_recording_state(
     iree_hal_vulkan_command_buffer_t* command_buffer,
     iree_string_view_t command_name) {
@@ -277,13 +248,20 @@ static void iree_hal_vulkan_command_buffer_record_buffer_ref(
       iree_max(command_buffer->base.binding_count, buffer_ref.buffer_slot + 1);
 }
 
-static void iree_hal_vulkan_command_buffer_append_retained_buffer(
-    iree_hal_vulkan_command_buffer_t* command_buffer,
-    iree_hal_buffer_t* buffer) {
-  if (!buffer) return;
-  iree_hal_buffer_retain(buffer);
-  command_buffer->retained_buffers[command_buffer->retained_buffer_count++] =
-      buffer;
+static iree_status_t iree_hal_vulkan_command_buffer_retain_buffer_refs(
+    iree_hal_vulkan_command_buffer_t* command_buffer, iree_host_size_t count,
+    const iree_hal_buffer_ref_t* buffer_refs) {
+  if (!command_buffer->resource_set) return iree_ok_status();
+  return iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, count, buffer_refs,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(buffer_refs[0]));
+}
+
+static iree_status_t iree_hal_vulkan_command_buffer_retain_resource(
+    iree_hal_vulkan_command_buffer_t* command_buffer, void* resource) {
+  if (!command_buffer->resource_set) return iree_ok_status();
+  return iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                      &resource);
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_resolve_buffer_ref(
@@ -414,11 +392,17 @@ iree_status_t iree_hal_vulkan_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_arena_block_pool_t* resource_set_block_pool,
     iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
+  if (IREE_UNLIKELY(!resource_set_block_pool)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan command-buffer resource set block pool is "
+                            "required");
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
 
   const iree_host_size_t validation_state_size =
@@ -436,10 +420,19 @@ iree_status_t iree_hal_vulkan_command_buffer_create(
       &iree_hal_vulkan_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->state = IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_INITIAL;
-  *out_command_buffer = &command_buffer->base;
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(resource_set_block_pool,
+                                            &command_buffer->resource_set);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_command_buffer = &command_buffer->base;
+  } else {
+    iree_hal_vulkan_command_buffer_destroy(&command_buffer->base);
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 bool iree_hal_vulkan_command_buffer_isa(
@@ -1810,15 +1803,8 @@ static void iree_hal_vulkan_command_buffer_destroy(
                         command_buffer->commands[i].dispatch.constants_data);
     iree_allocator_free(host_allocator,
                         command_buffer->commands[i].dispatch.bindings);
-    if (command_buffer->commands[i].dispatch.executable) {
-      iree_hal_executable_release(
-          command_buffer->commands[i].dispatch.executable);
-    }
   }
-  for (iree_host_size_t i = 0; i < command_buffer->retained_buffer_count; ++i) {
-    iree_hal_buffer_release(command_buffer->retained_buffers[i]);
-  }
-  iree_allocator_free(host_allocator, command_buffer->retained_buffers);
+  iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer->commands);
   iree_allocator_free(host_allocator, command_buffer);
 }
@@ -1845,6 +1831,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_end(
                             "Vulkan command buffer end requires recording "
                             "state");
   }
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
   command_buffer->state = IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_ENDED;
   return iree_ok_status();
 }
@@ -1990,20 +1977,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
       command_buffer, target_ref));
 
-  const bool retain_resources = !iree_all_bits_set(
-      command_buffer->base.mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
-  const iree_host_size_t retained_buffer_count =
-      retain_resources && target_ref.buffer ? 1 : 0;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_retained_buffers(
-      command_buffer, retained_buffer_count));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
+      command_buffer, 1, &target_ref));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
       command_buffer, command_buffer->command_count + 1));
 
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
-  if (retain_resources) {
-    iree_hal_vulkan_command_buffer_append_retained_buffer(command_buffer,
-                                                          target_ref.buffer);
-  }
 
   iree_hal_vulkan_command_t* command =
       &command_buffer->commands[command_buffer->command_count++];
@@ -2055,12 +2034,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
       command_buffer, target_ref));
 
-  const bool retain_resources = !iree_all_bits_set(
-      command_buffer->base.mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
-  const iree_host_size_t retained_buffer_count =
-      retain_resources && target_ref.buffer ? 1 : 0;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_retained_buffers(
-      command_buffer, retained_buffer_count));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
+      command_buffer, 1, &target_ref));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
       command_buffer, command_buffer->command_count + 1));
 
@@ -2076,10 +2051,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
            (iree_host_size_t)target_ref.length);
   }
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
-  if (retain_resources) {
-    iree_hal_vulkan_command_buffer_append_retained_buffer(command_buffer,
-                                                          target_ref.buffer);
-  }
 
   command->type = IREE_HAL_VULKAN_COMMAND_TYPE_UPDATE_BUFFER;
   command->update_buffer.target_ref = target_ref;
@@ -2117,25 +2088,14 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
       command_buffer, target_ref));
 
-  const bool retain_resources = !iree_all_bits_set(
-      command_buffer->base.mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
-  const iree_host_size_t retained_buffer_count =
-      retain_resources
-          ? (source_ref.buffer ? 1 : 0) + (target_ref.buffer ? 1 : 0)
-          : 0;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_retained_buffers(
-      command_buffer, retained_buffer_count));
+  const iree_hal_buffer_ref_t buffer_refs[2] = {source_ref, target_ref};
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
+      command_buffer, IREE_ARRAYSIZE(buffer_refs), buffer_refs));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
       command_buffer, command_buffer->command_count + 1));
 
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, source_ref);
   iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer, target_ref);
-  if (retain_resources) {
-    iree_hal_vulkan_command_buffer_append_retained_buffer(command_buffer,
-                                                          source_ref.buffer);
-    iree_hal_vulkan_command_buffer_append_retained_buffer(command_buffer,
-                                                          target_ref.buffer);
-  }
 
   iree_hal_vulkan_command_t* command =
       &command_buffer->commands[command_buffer->command_count++];
@@ -2321,27 +2281,24 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_dispatch_abi(
       pipeline, constants, bindings));
 
-  const bool retain_resources = !iree_all_bits_set(
-      command_buffer->base.mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
-  iree_host_size_t retained_buffer_count = 0;
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     IREE_RETURN_IF_ERROR(
         iree_hal_vulkan_command_buffer_validate_indirect_parameters_ref(
             command_buffer, config.workgroup_count_ref));
-    if (retain_resources && config.workgroup_count_ref.buffer) {
-      retained_buffer_count = retained_buffer_count + 1;
-    }
   }
   for (iree_host_size_t i = 0; i < bindings.count; ++i) {
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
         command_buffer, bindings.values[i]));
-    if (retain_resources && bindings.values[i].buffer) {
-      retained_buffer_count = retained_buffer_count + 1;
-    }
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_retained_buffers(
-      command_buffer, retained_buffer_count));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_resource(
+      command_buffer, executable));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
+      command_buffer, bindings.count, bindings.values));
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_retain_buffer_refs(
+        command_buffer, 1, &config.workgroup_count_ref));
+  }
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_reserve_commands(
       command_buffer, command_buffer->command_count + 1));
 
@@ -2369,18 +2326,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
       iree_hal_vulkan_command_buffer_record_buffer_ref(
           command_buffer, config.workgroup_count_ref);
-      if (retain_resources) {
-        iree_hal_vulkan_command_buffer_append_retained_buffer(
-            command_buffer, config.workgroup_count_ref.buffer);
-      }
     }
     for (iree_host_size_t i = 0; i < bindings.count; ++i) {
       iree_hal_vulkan_command_buffer_record_buffer_ref(command_buffer,
                                                        bindings.values[i]);
-      if (retain_resources) {
-        iree_hal_vulkan_command_buffer_append_retained_buffer(
-            command_buffer, bindings.values[i].buffer);
-      }
     }
 
     iree_hal_vulkan_command_t* command =
@@ -2388,7 +2337,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     memset(command, 0, sizeof(*command));
     command->type = IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH;
     command->dispatch.executable = executable;
-    iree_hal_executable_retain(executable);
     command->dispatch.pipeline = pipeline;
     command->dispatch.export_ordinal = export_ordinal;
     command->dispatch.config = config;

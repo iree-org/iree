@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/base/internal/arena.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -214,6 +215,7 @@ static iree_status_t iree_hal_vulkan_select_physical_device(
 #define IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY UINT32_MAX
 #define IREE_HAL_VULKAN_DEFAULT_QUEUE_COUNT 2
 #define IREE_HAL_VULKAN_MAX_QUEUE_LANES 3
+#define IREE_HAL_VULKAN_COMMAND_BUFFER_BLOCK_SIZE (64 * 1024)
 
 typedef struct iree_hal_vulkan_selected_queue_t {
   // Queue family index from the selected physical device.
@@ -735,6 +737,9 @@ struct iree_hal_vulkan_logical_device_t {
   // Executable dispatch ABI bits enabled on the logical device.
   iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis;
 
+  // Host block pool for command-buffer resource sets and future command blocks.
+  iree_arena_block_pool_t command_buffer_block_pool;
+
   // Recognized Vulkan device extension bits enabled on the logical device.
   iree_hal_vulkan_device_extensions_t enabled_extensions;
 
@@ -1100,6 +1105,7 @@ static void iree_hal_vulkan_logical_device_destroy(
     iree_hal_vulkan_instance_deinitialize(&device->instance);
   }
   iree_hal_vulkan_libvulkan_deinitialize(&device->libvulkan);
+  iree_arena_block_pool_deinitialize(&device->command_buffer_block_pool);
   iree_slim_mutex_deinitialize(&device->queue_handle_mutexes.sparse_binding);
   iree_slim_mutex_deinitialize(&device->queue_handle_mutexes.transfer);
   iree_slim_mutex_deinitialize(&device->queue_handle_mutexes.compute);
@@ -1151,6 +1157,7 @@ static iree_status_t iree_hal_vulkan_logical_device_trim(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
+  iree_arena_block_pool_trim(&device->command_buffer_block_pool);
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
@@ -1303,7 +1310,8 @@ static iree_status_t iree_hal_vulkan_logical_device_create_command_buffer(
       device->queue_affinity_mask, queue_affinity, &queue_affinity));
   return iree_hal_vulkan_command_buffer_create(
       device->device_allocator, mode, command_categories, queue_affinity,
-      binding_capacity, device->host_allocator, out_command_buffer);
+      binding_capacity, &device->command_buffer_block_pool,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_create_event(
@@ -1874,6 +1882,9 @@ static iree_status_t iree_hal_vulkan_logical_device_allocate(
   iree_hal_resource_initialize(&iree_hal_vulkan_logical_device_vtable,
                                &device->resource);
   device->host_allocator = host_allocator;
+  iree_arena_block_pool_initialize(IREE_HAL_VULKAN_COMMAND_BUFFER_BLOCK_SIZE,
+                                   host_allocator,
+                                   &device->command_buffer_block_pool);
   iree_string_view_append_to_buffer(identifier, &device->identifier,
                                     (char*)device + sizeof(*device));
 
@@ -1885,6 +1896,7 @@ static iree_status_t iree_hal_vulkan_logical_device_allocate(
     iree_slim_mutex_initialize(&device->queue_handle_mutexes.sparse_binding);
     *out_device = device;
   } else {
+    iree_arena_block_pool_deinitialize(&device->command_buffer_block_pool);
     iree_allocator_free(host_allocator, device);
   }
   return status;
