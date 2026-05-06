@@ -30,6 +30,11 @@ namespace {
 template <bool UseIndirectBindings>
 std::optional<spirv::StorageClass>
 mapHALDescriptorTypeForVulkan(Attribute attr) {
+  if (!attr && UseIndirectBindings) {
+    // HAL executable-source inputs can leave storage-buffer bindings as bare
+    // memrefs; the BDA ABI still requires those to become physical pointers.
+    return spirv::StorageClass::PhysicalStorageBuffer;
+  }
   if (auto dtAttr = dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
     switch (dtAttr.getValue()) {
     case IREE::HAL::DescriptorType::UniformBuffer:

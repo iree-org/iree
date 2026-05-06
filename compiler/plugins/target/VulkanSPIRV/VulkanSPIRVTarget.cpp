@@ -28,6 +28,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -40,6 +42,54 @@ constexpr uint32_t kBdaDispatchConstantOffset = kBdaDispatchRootLength;
 
 constexpr char kVulkanSpirvFlatbufferFormat[] = "vulkan-spirv-fb";
 constexpr char kVulkanSpirvBdaFormat[] = "vulkan-spirv-bda-v1";
+
+class PropagateExecutableTargetPass final
+    : public PassWrapper<PropagateExecutableTargetPass,
+                         OperationPass<ModuleOp>> {
+public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PropagateExecutableTargetPass)
+
+  explicit PropagateExecutableTargetPass(
+      IREE::HAL::ExecutableTargetAttr targetAttr)
+      : targetAttr(targetAttr) {}
+
+  StringRef getArgument() const final {
+    return "iree-vulkan-spirv-propagate-executable-target";
+  }
+
+  StringRef getDescription() const final {
+    return "Propagates the selected Vulkan executable target into the inner "
+           "module.";
+  }
+
+  void runOnOperation() final {
+    ModuleOp moduleOp = getOperation();
+    if (failed(setOrVerifyTarget(moduleOp))) {
+      return signalPassFailure();
+    }
+    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+      if (failed(setOrVerifyTarget(funcOp))) {
+        return signalPassFailure();
+      }
+    }
+  }
+
+private:
+  LogicalResult setOrVerifyTarget(Operation *op) {
+    Attribute existingAttr = op->getAttr(IREE::HAL::ExecutableTargetAttr::name);
+    if (!existingAttr) {
+      op->setAttr(IREE::HAL::ExecutableTargetAttr::name, targetAttr);
+      return success();
+    }
+    if (existingAttr == targetAttr) {
+      return success();
+    }
+    return op->emitError() << "conflicting Vulkan executable target attribute";
+  }
+
+  // Target selected by the HAL target backend for this translation pipeline.
+  IREE::HAL::ExecutableTargetAttr targetAttr;
+};
 
 struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
@@ -284,7 +334,10 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildSPIRVCodegenPassPipeline(passManager.nest<ModuleOp>());
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    modulePassManager.addPass(
+        std::make_unique<PropagateExecutableTargetPass>(targetAttr));
+    buildSPIRVCodegenPassPipeline(modulePassManager);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 

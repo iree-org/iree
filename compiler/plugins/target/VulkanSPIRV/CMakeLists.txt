@@ -25,8 +25,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAsmParser
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRPass
     MLIRSPIRVDialect
     MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
