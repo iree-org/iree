@@ -1321,10 +1321,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#choosing-hip-targets" class="md-nav__link">
+  <a href="#choosing-rocm-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choosing HIP targets
+        Choosing ROCm targets
       
     </span>
   </a>
@@ -6337,10 +6337,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#choosing-hip-targets" class="md-nav__link">
+  <a href="#choosing-rocm-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choosing HIP targets
+        Choosing ROCm targets
       
     </span>
   </a>
@@ -6581,7 +6581,7 @@ option.</p>
 <span class="go">vulkan://00000000-1111-2222-3333-444444444444</span>
 </code></pre></div>
 <p>To see device details, including the architecture to use as a
-<a href="#choosing-hip-targets">HIP target</a> when
+<a href="#choosing-rocm-targets">ROCm target</a> when
 <a href="#compile-and-run-a-program">compiling a program</a>:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--dump_devices
 
@@ -6618,15 +6618,15 @@ pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<spa
 iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
 </code></pre></div>
 <p>Then run the following command to compile with the <code>rocm</code> target backend:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># You need to specify a HIP target for your GPU. For this example we extract</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># You need to specify a ROCm target for your GPU. For this example we extract</span>
 <span class="c1"># the architecture name for the first device using rocm_agent_enumerator.</span>
 <span class="c1"># See the section below for more context and alternatives.</span>
-<span class="nv">IREE_HIP_TARGET</span><span class="o">=</span><span class="k">$(</span>rocm_agent_enumerator<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;1 p&#39;</span><span class="k">)</span><span class="w">  </span><span class="c1"># e.g. gfx1100</span>
+<span class="nv">IREE_ROCM_TARGET</span><span class="o">=</span><span class="k">$(</span>rocm_agent_enumerator<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;1 p&#39;</span><span class="k">)</span><span class="w">  </span><span class="c1"># e.g. gfx1100</span>
 
 iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-target<span class="o">=</span><span class="si">${</span><span class="nv">IREE_HIP_TARGET</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_hip.vmfb
+</span><span class="hll"><span class="w">    </span>--iree-rocm-target<span class="o">=</span><span class="si">${</span><span class="nv">IREE_ROCM_TARGET</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
 </code></pre></div>
 <details class="tip" open="open">
 <summary>Tip - Compiler Optimizations</summary>
@@ -6636,7 +6636,7 @@ while higher levels enable progressively more aggressive optimizations. See
 <a href="../../../reference/optimization-options/">Optimization Options</a> for more details.</p>
 </details>
 <details class="tip" open="open">
-<summary>Tip - HIP bitcode files</summary>
+<summary>Tip - ROCm bitcode files</summary>
 <p>That IREE comes with bundled bitcode files, which are used for linking
 certain intrinsics on AMD GPUs. These will be used automatically or if the
 <code>--iree-rocm-bc-dir</code> is empty. As additional support may be needed for
@@ -6644,8 +6644,8 @@ different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 <code>/opt/rocm/amdgcn/bitcode</code>.</p>
 </details>
-<h4 id="choosing-hip-targets">Choosing HIP targets<a class="headerlink" href="#choosing-hip-targets" title="Permanent link">link</a></h4>
-<p>A HIP target (<code>iree-rocm-target</code>) matching the LLVM AMDGPU backend is needed
+<h4 id="choosing-rocm-targets">Choosing ROCm targets<a class="headerlink" href="#choosing-rocm-targets" title="Permanent link">link</a></h4>
+<p>A ROCm target (<code>iree-rocm-target</code>) matching the LLVM AMDGPU backend is needed
 to compile towards each GPU chip. Here is a table of commonly used
 architectures:</p>
 <table>
