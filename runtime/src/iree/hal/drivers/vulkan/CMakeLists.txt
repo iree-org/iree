@@ -26,6 +26,7 @@ iree_cc_library(
     headers
   HDRS
     "api.h"
+    "command_buffer.h"
     "executable.h"
     "physical_device.h"
   DEPS

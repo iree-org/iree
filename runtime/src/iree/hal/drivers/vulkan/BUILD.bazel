@@ -29,6 +29,7 @@ iree_runtime_cc_library(
     name = "headers",
     hdrs = [
         "api.h",
+        "command_buffer.h",
         "executable.h",
         "physical_device.h",
     ],

@@ -727,6 +727,8 @@ iree_cc_test(
     iree::hal
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
+    iree::hal::drivers::vulkan
+    iree::hal::drivers::vulkan::headers
     iree::testing::gtest
   LABELS
     "driver=vulkan"
@@ -920,6 +922,8 @@ iree_cc_test(
     iree::hal
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
+    iree::hal::drivers::vulkan
+    iree::hal::drivers::vulkan::headers
     iree::testing::gtest
   LABELS
     "driver=vulkan"

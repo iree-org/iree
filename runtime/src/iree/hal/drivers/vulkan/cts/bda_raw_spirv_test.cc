@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
+#include "iree/hal/drivers/vulkan/command_buffer.h"
 
 namespace iree::hal::cts {
 
@@ -346,6 +347,58 @@ TEST_P(BdaRawSpirvTest, CommandBufferExecutesRawBdaShader) {
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
   ExpectOutput(output_buffer);
+}
+
+TEST_P(BdaRawSpirvTest, CommandBufferCachesBdaPublicationRequirements) {
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_ref_list_t bindings =
+      MakeBindings(input_buffer.get(), output_buffer.get(), binding_refs);
+  std::vector<iree_hal_buffer_ref_t> oversized_bindings =
+      MakeOversizedPublicationBindings(input_buffer.get(), output_buffer.get());
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(),
+      iree_hal_buffer_ref_list_t{
+          /*.count=*/oversized_bindings.size(),
+          /*.values=*/oversized_bindings.data(),
+      },
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  EXPECT_TRUE(
+      iree_hal_vulkan_command_buffer_has_native_commands(command_buffer));
+  EXPECT_EQ(iree_hal_vulkan_command_buffer_dispatch_count(command_buffer), 2u);
+
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t requirements = {0};
+  IREE_ASSERT_OK(
+      iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
+          command_buffer, &requirements));
+  EXPECT_EQ(requirements.set_count, 0u);
+  EXPECT_EQ(requirements.sampler_count, 0u);
+  EXPECT_EQ(requirements.uniform_buffer_count, 0u);
+  EXPECT_EQ(requirements.storage_buffer_count, 0u);
+
+  iree_device_size_t bda_publication_length = 0;
+  IREE_ASSERT_OK(iree_hal_vulkan_command_buffer_native_bda_publication_length(
+      command_buffer, &bda_publication_length));
+  EXPECT_EQ(bda_publication_length,
+            (bindings.count + oversized_bindings.size()) * sizeof(uint64_t));
 }
 
 TEST_P(BdaRawSpirvTest, CommandBufferHandlesOversizedBdaPublication) {

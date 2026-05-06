@@ -794,6 +794,8 @@ iree_runtime_cc_test(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/drivers/vulkan",
+        "//runtime/src/iree/hal/drivers/vulkan:headers",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -1002,6 +1004,8 @@ iree_runtime_cc_test(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/hal/drivers/vulkan",
+        "//runtime/src/iree/hal/drivers/vulkan:headers",
         "//runtime/src/iree/testing:gtest",
     ],
 )

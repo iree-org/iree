@@ -10,6 +10,7 @@
 
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/test_base.h"
+#include "iree/hal/drivers/vulkan/command_buffer.h"
 
 namespace iree::hal::cts {
 
@@ -153,6 +154,88 @@ TEST_P(VulkanQueueDescriptorCacheTest, DeferredDispatchesExceedOneBlock) {
               expected.begin() + i * kElementCount);
   }
   EXPECT_THAT(output_data, ContainerEq(expected));
+}
+
+TEST_P(VulkanQueueDescriptorCacheTest,
+       DescriptorCommandBufferCachesReplayRequirements) {
+  constexpr iree_host_size_t kElementCount = 4;
+  constexpr uint32_t kScale = 3;
+  constexpr uint32_t kOffset = 10;
+  constexpr iree_device_size_t kDispatchByteLength =
+      kElementCount * sizeof(uint32_t);
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  {
+    std::vector<uint32_t> input_data = {1, 2, 3, 4};
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(input_data[0]),
+        input_buffer.out()));
+  }
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(kDispatchByteLength, output_buffer.out()));
+
+  const uint32_t constant_data[] = {kScale, kOffset};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_data, sizeof(constant_data));
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0, kDispatchByteLength),
+      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                               kDispatchByteLength),
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  const uint32_t fill_pattern = 0;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer,
+      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                               sizeof(fill_pattern)),
+      &fill_pattern, sizeof(fill_pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  const uint32_t update_data = 1;
+  IREE_ASSERT_OK(iree_hal_command_buffer_update_buffer(
+      command_buffer, &update_data, /*source_offset=*/0,
+      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                               sizeof(update_data)),
+      IREE_HAL_UPDATE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+      command_buffer, IREE_HAL_EXECUTION_STAGE_DISPATCH,
+      IREE_HAL_EXECUTION_STAGE_DISPATCH, IREE_HAL_EXECUTION_BARRIER_FLAG_NONE,
+      /*memory_barrier_count=*/0,
+      /*memory_barriers=*/nullptr, /*buffer_barrier_count=*/0,
+      /*buffer_barriers=*/nullptr));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  EXPECT_TRUE(
+      iree_hal_vulkan_command_buffer_has_native_commands(command_buffer));
+  EXPECT_EQ(iree_hal_vulkan_command_buffer_dispatch_count(command_buffer), 1u);
+
+  iree_hal_vulkan_command_buffer_descriptor_requirements_t requirements = {0};
+  IREE_ASSERT_OK(
+      iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
+          command_buffer, &requirements));
+  EXPECT_EQ(requirements.set_count, 5u);
+  EXPECT_EQ(requirements.sampler_count, 0u);
+  EXPECT_EQ(requirements.uniform_buffer_count, 0u);
+  EXPECT_EQ(requirements.storage_buffer_count, 6u);
+
+  iree_device_size_t bda_publication_length = 1;
+  IREE_ASSERT_OK(iree_hal_vulkan_command_buffer_native_bda_publication_length(
+      command_buffer, &bda_publication_length));
+  EXPECT_EQ(bda_publication_length, 0u);
 }
 
 TEST_P(VulkanQueueDescriptorCacheTest,
