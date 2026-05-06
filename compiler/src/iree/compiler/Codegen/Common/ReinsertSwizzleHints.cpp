@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -112,14 +113,16 @@ void ReinsertSwizzleHintsPass::runOnOperation() {
   IRRewriter rewriter(funcOp->getContext());
   DenseMap<Value, IREE::Codegen::SwizzleAttrInterface> swizzleCache;
 
-  // For each vector.load/store whose base traces to a swizzled alloc, wrap the
-  // base with collapse_shape -> swizzle_hint -> expand_shape.
+  // For each vector.load/store/gather_to_lds whose base traces to a swizzled
+  // alloc, wrap the base with collapse_shape -> swizzle_hint -> expand_shape.
   funcOp.walk([&](Operation *op) {
     Value base;
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
       base = loadOp.getBase();
     } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
       base = storeOp.getBase();
+    } else if (auto gatherOp = dyn_cast<amdgpu::GatherToLDSOp>(op)) {
+      base = gatherOp.getDst();
     } else {
       return;
     }
@@ -134,6 +137,8 @@ void ReinsertSwizzleHintsPass::runOnOperation() {
       loadOp.getBaseMutable().assign(wrapped);
     } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
       storeOp.getBaseMutable().assign(wrapped);
+    } else if (auto gatherOp = dyn_cast<amdgpu::GatherToLDSOp>(op)) {
+      gatherOp.getDstMutable().assign(wrapped);
     }
   });
 
