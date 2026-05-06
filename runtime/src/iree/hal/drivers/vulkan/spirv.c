@@ -583,6 +583,57 @@ static iree_status_t iree_hal_vulkan_spirv_parse_compute_workgroup_size_by_id(
   return iree_ok_status();
 }
 
+static iree_hal_vulkan_spirv_compute_entry_point_t*
+iree_hal_vulkan_spirv_find_compute_entry_point_by_id(
+    iree_host_size_t entry_point_count,
+    iree_hal_vulkan_spirv_compute_entry_point_t* entry_points,
+    uint32_t entry_point_id) {
+  for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
+    if (entry_points[i].id == entry_point_id) return &entry_points[i];
+  }
+  return NULL;
+}
+
+static iree_status_t iree_hal_vulkan_spirv_parse_compute_workgroup_sizes(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_host_size_t entry_point_count,
+    iree_hal_vulkan_spirv_compute_entry_point_t* entry_points) {
+  for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
+    memset(entry_points[i].workgroup_size, 0,
+           sizeof(entry_points[i].workgroup_size));
+  }
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE || word_count < 3) {
+      continue;
+    }
+    if (operands[1] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE) {
+      continue;
+    }
+    iree_hal_vulkan_spirv_compute_entry_point_t* entry_point =
+        iree_hal_vulkan_spirv_find_compute_entry_point_by_id(
+            entry_point_count, entry_points, operands[0]);
+    if (!entry_point) continue;
+    if (word_count < 6) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "SPIR-V LocalSize execution mode for '%.*s' is truncated",
+          (int)entry_point->name.size, entry_point->name.data);
+    }
+    entry_point->workgroup_size[0] = operands[2];
+    entry_point->workgroup_size[1] = operands[3];
+    entry_point->workgroup_size[2] = operands[4];
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_spirv_parse_compute_entry_points(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     iree_host_size_t entry_point_capacity,
@@ -625,13 +676,10 @@ iree_status_t iree_hal_vulkan_spirv_parse_compute_entry_points(
                                 entry_point->name.data);
       }
     }
-    IREE_RETURN_IF_ERROR(
-        iree_hal_vulkan_spirv_parse_compute_workgroup_size_by_id(
-            spirv_words, spirv_word_count, entry_point->id, entry_point->name,
-            entry_point->workgroup_size));
     ++entry_point_count;
   }
-  return iree_ok_status();
+  return iree_hal_vulkan_spirv_parse_compute_workgroup_sizes(
+      spirv_words, spirv_word_count, entry_point_count, out_entry_points);
 }
 
 iree_status_t iree_hal_vulkan_spirv_parse_compute_workgroup_size(

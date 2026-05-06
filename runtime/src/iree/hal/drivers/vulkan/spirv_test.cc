@@ -105,6 +105,71 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   EXPECT_EQ(6u, workgroup_size[2]);
 }
 
+TEST(SpirvTest, ParsesMultipleComputeEntryPoints) {
+  static constexpr uint32_t kMultiEntryModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpCapability PhysicalStorageBufferAddresses.
+      0x00020011u,
+      5347u,
+      // Declares OpMemoryModel PhysicalStorageBuffer64 GLSL450.
+      0x0003000eu,
+      5348u,
+      1u,
+      // Declares OpEntryPoint GLCompute %1 "main".
+      0x0005000fu,
+      5u,
+      1u,
+      0x6e69616du,
+      0u,
+      // Declares OpEntryPoint GLCompute %2 "aux".
+      0x0004000fu,
+      5u,
+      2u,
+      0x00787561u,
+      // Declares OpExecutionMode %1 LocalSize 4 5 6.
+      0x00060010u,
+      1u,
+      17u,
+      4u,
+      5u,
+      6u,
+      // Declares OpExecutionMode %2 LocalSize 7 8 9.
+      0x00060010u,
+      2u,
+      17u,
+      7u,
+      8u,
+      9u,
+  };
+
+  iree_host_size_t entry_point_count = 0;
+  iree_host_size_t name_storage_size = 0;
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_compute_entry_points(
+      kMultiEntryModule, IREE_ARRAYSIZE(kMultiEntryModule), &entry_point_count,
+      &name_storage_size));
+  EXPECT_EQ(2u, entry_point_count);
+  EXPECT_EQ(9u, name_storage_size);
+
+  iree_hal_vulkan_spirv_compute_entry_point_t entry_points[2] = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_parse_compute_entry_points(
+      kMultiEntryModule, IREE_ARRAYSIZE(kMultiEntryModule),
+      IREE_ARRAYSIZE(entry_points), entry_points));
+  EXPECT_EQ(1u, entry_points[0].id);
+  EXPECT_TRUE(iree_string_view_equal(entry_points[0].name, IREE_SV("main")));
+  EXPECT_EQ(4u, entry_points[0].workgroup_size[0]);
+  EXPECT_EQ(5u, entry_points[0].workgroup_size[1]);
+  EXPECT_EQ(6u, entry_points[0].workgroup_size[2]);
+  EXPECT_EQ(2u, entry_points[1].id);
+  EXPECT_TRUE(iree_string_view_equal(entry_points[1].name, IREE_SV("aux")));
+  EXPECT_EQ(7u, entry_points[1].workgroup_size[0]);
+  EXPECT_EQ(8u, entry_points[1].workgroup_size[1]);
+  EXPECT_EQ(9u, entry_points[1].workgroup_size[2]);
+}
+
 TEST(SpirvTest, RejectsTruncatedInstruction) {
   static constexpr uint32_t kTruncatedModule[] = {
       0x07230203u,

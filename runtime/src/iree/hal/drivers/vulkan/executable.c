@@ -1264,11 +1264,9 @@ typedef enum iree_hal_vulkan_bda_spirv_verification_flag_bits_e {
 } iree_hal_vulkan_bda_spirv_verification_flag_bits_t;
 typedef uint32_t iree_hal_vulkan_bda_spirv_verification_flags_t;
 
-static iree_status_t iree_hal_vulkan_verify_bda_spirv(
+static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_string_view_t entry_point,
-    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags,
-    uint32_t out_workgroup_size[3]) {
+    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
   bool has_physical_storage_buffer_addresses_capability = false;
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
@@ -1316,6 +1314,17 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
         iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
             spirv_words, spirv_word_count));
   }
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_verify_bda_spirv(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_string_view_t entry_point,
+    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags,
+    uint32_t out_workgroup_size[3]) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv_module(
+      spirv_words, spirv_word_count, verification_flags));
 
   bool entry_point_found = false;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_compute_workgroup_size(
@@ -1623,11 +1632,9 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
           IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION)) {
     verification_flags = IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE;
   }
-  for (iree_host_size_t i = 0;
-       iree_status_is_ok(status) && i < entry_point_count; ++i) {
-    status = iree_hal_vulkan_verify_bda_spirv(
-        spirv_words, spirv_word_count, entry_points[i].name, verification_flags,
-        entry_points[i].workgroup_size);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_verify_bda_spirv_module(
+        spirv_words, spirv_word_count, verification_flags);
   }
 
   iree_hal_vulkan_executable_t* executable = NULL;
