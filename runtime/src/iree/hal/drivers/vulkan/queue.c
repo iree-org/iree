@@ -26,6 +26,8 @@
 #define IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_SLOT_RESERVED UINT64_MAX
 #define IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_BLOCK_CAPACITY 64
 #define IREE_HAL_VULKAN_QUEUE_NATIVE_DESCRIPTOR_BLOCK_SET_CAPACITY 4096
+#define IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_BLOCK_SIZE (64ull * 1024ull)
+#define IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_ALIGNMENT 8ull
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_SET_CAPACITY 8
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_BINDING_CAPACITY 16
 
@@ -129,6 +131,40 @@ typedef struct iree_hal_vulkan_queue_native_descriptor_lease_t {
   // Native descriptor block containing this submission's descriptor pool.
   iree_hal_vulkan_queue_native_descriptor_block_t* block;
 } iree_hal_vulkan_queue_native_descriptor_lease_t;
+
+struct iree_hal_vulkan_queue_bda_publication_block_t {
+  // Next block in the queue-owned BDA publication cache.
+  iree_hal_vulkan_queue_bda_publication_block_t* next;
+
+  // BDA-capable host-visible buffer backing published tables.
+  iree_hal_buffer_t* buffer;
+
+  // Persistent host mapping of |buffer|.
+  iree_hal_buffer_mapping_t mapping;
+
+  // Device address of |buffer| byte offset zero.
+  VkDeviceAddress device_address;
+
+  // Total byte capacity of |buffer|.
+  iree_device_size_t capacity;
+
+  // Bump allocation position within |buffer|.
+  iree_device_size_t allocated_length;
+
+  // Number of submissions retaining ranges from this block.
+  uint32_t active_lease_count;
+};
+
+typedef struct iree_hal_vulkan_queue_bda_publication_lease_t {
+  // BDA publication block containing this submission's range.
+  iree_hal_vulkan_queue_bda_publication_block_t* block;
+
+  // Byte offset of the leased range within |block|.
+  iree_device_size_t offset;
+
+  // Byte length of the leased range.
+  iree_device_size_t length;
+} iree_hal_vulkan_queue_bda_publication_lease_t;
 
 typedef iree_status_t(
     IREE_API_PTR* iree_hal_vulkan_queue_record_native_submission_fn_t)(
@@ -311,6 +347,9 @@ struct iree_hal_vulkan_queue_pending_submission_t {
 
   // Descriptor-pool cache lease held by native command recording.
   iree_hal_vulkan_queue_native_descriptor_lease_t native_descriptor_lease;
+
+  // BDA publication cache lease held by native command recording.
+  iree_hal_vulkan_queue_bda_publication_lease_t bda_publication_lease;
 
   // Optional action invoked after native queue completion.
   iree_hal_vulkan_queue_completion_action_t completion_action;
@@ -995,6 +1034,229 @@ static void iree_hal_vulkan_queue_release_native_descriptor_pool(
   lease->block->active_lease_count = lease->block->active_lease_count - 1;
   queue->native_descriptor_cache.cursor = lease->block;
   lease->block = NULL;
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+}
+
+static iree_status_t iree_hal_vulkan_queue_bda_publication_block_create(
+    iree_hal_vulkan_queue_t* queue, iree_device_size_t minimum_capacity,
+    iree_hal_vulkan_queue_bda_publication_block_t** out_block) {
+  *out_block = NULL;
+  if (!queue->device_allocator) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan BDA publication requires initialized queue staging resources");
+  }
+  iree_device_size_t capacity = iree_max(
+      minimum_capacity,
+      (iree_device_size_t)IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_BLOCK_SIZE);
+  if (!iree_device_size_checked_align(
+          capacity, IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_ALIGNMENT,
+          &capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan BDA publication block size overflows");
+  }
+
+  iree_hal_vulkan_queue_bda_publication_block_t* block = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator,
+                                             sizeof(*block), (void**)&block));
+  memset(block, 0, sizeof(*block));
+  block->capacity = capacity;
+
+  iree_hal_buffer_params_t params = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
+              IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      .access = IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ |
+               IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+               IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE,
+      .queue_affinity = queue->queue_affinity,
+  };
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      queue->device_allocator, params, capacity, &block->buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_buffer_device_address(block->buffer,
+                                                   &block->device_address);
+  }
+  if (iree_status_is_ok(status) && block->device_address == 0) {
+    status =
+        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                         "Vulkan BDA publication buffer has no device address");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_range(
+        block->buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0, capacity,
+        &block->mapping);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_block = block;
+  } else {
+    if (block->mapping.contents.data) {
+      iree_hal_buffer_unmap_range(&block->mapping);
+    }
+    iree_hal_buffer_release(block->buffer);
+    iree_allocator_free(queue->host_allocator, block);
+  }
+  return status;
+}
+
+static void iree_hal_vulkan_queue_bda_publication_block_destroy(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_bda_publication_block_t* block) {
+  if (!block) return;
+  if (block->mapping.contents.data) {
+    iree_hal_buffer_unmap_range(&block->mapping);
+  }
+  iree_hal_buffer_release(block->buffer);
+  iree_allocator_free(queue->host_allocator, block);
+}
+
+static void iree_hal_vulkan_queue_bda_publication_cache_append_block(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_bda_publication_block_t* block) {
+  block->next = NULL;
+  if (queue->bda_publication_cache.tail) {
+    queue->bda_publication_cache.tail->next = block;
+  } else {
+    queue->bda_publication_cache.head = block;
+  }
+  queue->bda_publication_cache.tail = block;
+  if (!queue->bda_publication_cache.cursor) {
+    queue->bda_publication_cache.cursor = block;
+  }
+  queue->bda_publication_cache.block_count =
+      queue->bda_publication_cache.block_count + 1;
+}
+
+static void iree_hal_vulkan_queue_bda_publication_cache_deinitialize(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_hal_vulkan_queue_bda_publication_block_t* block =
+      queue->bda_publication_cache.head;
+  while (block) {
+    iree_hal_vulkan_queue_bda_publication_block_t* next = block->next;
+    iree_hal_vulkan_queue_bda_publication_block_destroy(queue, block);
+    block = next;
+  }
+  memset(&queue->bda_publication_cache, 0,
+         sizeof(queue->bda_publication_cache));
+}
+
+static bool iree_hal_vulkan_queue_bda_publication_block_try_allocate(
+    iree_hal_vulkan_queue_bda_publication_block_t* block,
+    iree_device_size_t length, iree_device_size_t* out_offset) {
+  iree_device_size_t aligned_offset = block->allocated_length;
+  if (!iree_device_size_checked_align(
+          aligned_offset, IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_ALIGNMENT,
+          &aligned_offset)) {
+    return false;
+  }
+  if (aligned_offset > block->capacity ||
+      length > block->capacity - aligned_offset) {
+    return false;
+  }
+  *out_offset = aligned_offset;
+  block->allocated_length = aligned_offset + length;
+  block->active_lease_count = block->active_lease_count + 1;
+  return true;
+}
+
+static iree_status_t
+iree_hal_vulkan_queue_try_acquire_bda_publication_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    iree_device_size_t length, bool* out_acquired) {
+  *out_acquired = false;
+  iree_hal_vulkan_queue_bda_publication_block_t* first_block =
+      queue->bda_publication_cache.cursor ? queue->bda_publication_cache.cursor
+                                          : queue->bda_publication_cache.head;
+  iree_hal_vulkan_queue_bda_publication_block_t* block = first_block;
+  while (block) {
+    if (length <= block->capacity) {
+      if (length > block->capacity - block->allocated_length &&
+          block->active_lease_count == 0) {
+        block->allocated_length = 0;
+      }
+      iree_device_size_t offset = 0;
+      if (iree_hal_vulkan_queue_bda_publication_block_try_allocate(
+              block, length, &offset)) {
+        submission->bda_publication_lease =
+            (iree_hal_vulkan_queue_bda_publication_lease_t){
+                .block = block,
+                .offset = offset,
+                .length = length,
+            };
+        queue->bda_publication_cache.cursor = block;
+        *out_acquired = true;
+        return iree_ok_status();
+      }
+    }
+
+    block = block->next;
+    if (!block && first_block != queue->bda_publication_cache.head) {
+      block = queue->bda_publication_cache.head;
+      first_block = queue->bda_publication_cache.head;
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    iree_device_size_t length, iree_byte_span_t* out_host_span,
+    VkDeviceAddress* out_device_address) {
+  *out_host_span = iree_byte_span_empty();
+  *out_device_address = 0;
+  if (length == 0) return iree_ok_status();
+  if (length > IREE_HOST_SIZE_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan BDA publication length exceeds host addressable size");
+  }
+  if (submission->bda_publication_lease.block) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan queue submission already owns BDA publication storage");
+  }
+
+  for (;;) {
+    bool acquired = false;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_queue_try_acquire_bda_publication_under_lock(
+            queue, submission, length, &acquired));
+    if (acquired) break;
+
+    iree_hal_vulkan_queue_bda_publication_block_t* block = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_bda_publication_block_create(
+        queue, length, &block));
+    iree_hal_vulkan_queue_bda_publication_cache_append_block(queue, block);
+  }
+
+  iree_hal_vulkan_queue_bda_publication_lease_t* lease =
+      &submission->bda_publication_lease;
+  *out_host_span =
+      iree_make_byte_span(lease->block->mapping.contents.data + lease->offset,
+                          (iree_host_size_t)lease->length);
+  *out_device_address = lease->block->device_address + lease->offset;
+  return iree_ok_status();
+}
+
+static void iree_hal_vulkan_queue_release_bda_publication(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_hal_vulkan_queue_bda_publication_lease_t* lease =
+      &submission->bda_publication_lease;
+  if (!lease->block) return;
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  IREE_ASSERT(lease->block->active_lease_count > 0,
+              "BDA publication block active lease count underflow");
+  lease->block->active_lease_count = lease->block->active_lease_count - 1;
+  if (lease->block->active_lease_count == 0) {
+    lease->block->allocated_length = 0;
+  }
+  queue->bda_publication_cache.cursor = lease->block;
+  memset(lease, 0, sizeof(*lease));
   iree_slim_mutex_unlock(&queue->submission_mutex);
 }
 
@@ -2487,6 +2749,7 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   }
   iree_hal_vulkan_queue_release_descriptor_cache_sets(queue, submission);
   iree_hal_vulkan_queue_release_native_descriptor_pool(queue, submission);
+  iree_hal_vulkan_queue_release_bda_publication(queue, submission);
   if (submission->fill.target_buffer) {
     iree_hal_buffer_release(submission->fill.target_buffer);
   }
@@ -4729,6 +4992,7 @@ void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue) {
   queue->device_allocator = NULL;
   iree_hal_vulkan_queue_descriptor_cache_deinitialize(queue);
   iree_hal_vulkan_queue_native_descriptor_cache_deinitialize(queue);
+  iree_hal_vulkan_queue_bda_publication_cache_deinitialize(queue);
   iree_hal_vulkan_queue_command_buffer_cache_deinitialize(queue);
   if (queue->epoch_semaphore) {
     iree_vkDestroySemaphore(IREE_VULKAN_DEVICE(&queue->syms),
@@ -6411,6 +6675,7 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_descriptor(
 
 static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
     iree_hal_vulkan_queue_t* queue, const iree_hal_vulkan_pipeline_t* pipeline,
+    iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
@@ -6420,17 +6685,35 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
         iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                          "Vulkan BDA dispatch ABI is disabled for this queue");
   }
-  if (iree_status_is_ok(status) && bindings.count != pipeline->binding_count) {
+  if (iree_status_is_ok(status) &&
+      pipeline->bda.root_push_constant_length !=
+          sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t)) {
+    status = iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan BDA pipeline root push constant length %u does not match ABI "
+        "v1 length %" PRIhsz,
+        pipeline->bda.root_push_constant_length,
+        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t));
+  }
+  if (iree_status_is_ok(status) &&
+      pipeline->bda.binding_table_entry_length != sizeof(uint64_t)) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan BDA pipeline binding table entry length %u is unsupported",
+        pipeline->bda.binding_table_entry_length);
+  }
+  if (iree_status_is_ok(status) && constants.data_length != 0) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan BDA dispatch inline constants require constants-table "
+        "metadata");
+  }
+  if (iree_status_is_ok(status) && pipeline->bda.binding_count_known &&
+      bindings.count != pipeline->binding_count) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Vulkan queue_dispatch provides %" PRIhsz
                               " bindings but BDA pipeline expects %u",
                               bindings.count, pipeline->binding_count);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan BDA dispatch ABI requires executable metadata and publication "
-        "rings");
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -6438,6 +6721,7 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
 
 static iree_status_t iree_hal_vulkan_queue_validate_dispatch_abi(
     iree_hal_vulkan_queue_t* queue, const iree_hal_vulkan_pipeline_t* pipeline,
+    iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings) {
   switch (pipeline->dispatch_abi) {
     case IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR:
@@ -6445,7 +6729,7 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_abi(
                                                                 bindings);
     case IREE_HAL_VULKAN_DISPATCH_ABI_BDA:
       return iree_hal_vulkan_queue_validate_dispatch_bda(queue, pipeline,
-                                                         bindings);
+                                                         constants, bindings);
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Vulkan pipeline has invalid dispatch ABI 0x%08x",
@@ -6513,6 +6797,53 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
       .offset = (VkDeviceSize)backing_offset,
       .range = (VkDeviceSize)descriptor_length,
   };
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
+    const iree_hal_vulkan_queue_pending_submission_t* submission,
+    iree_host_size_t binding_ordinal, VkDeviceAddress* out_device_address) {
+  *out_device_address = 0;
+  const iree_hal_buffer_ref_t* binding =
+      &submission->dispatch.bindings[binding_ordinal];
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_validate_dispatch_binding(
+      binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+
+  iree_device_size_t binding_offset = 0;
+  iree_device_size_t binding_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_calculate_range(
+      /*base_offset=*/0, iree_hal_buffer_byte_length(binding->buffer),
+      binding->offset, binding->length, &binding_offset, &binding_length));
+  if (binding_length == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan queue_dispatch binding %" PRIhsz
+                            " resolved to an empty buffer range",
+                            binding_ordinal);
+  }
+
+  VkDeviceAddress buffer_address = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_buffer_device_address(binding->buffer, &buffer_address));
+  if (buffer_address == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "Vulkan queue_dispatch binding %" PRIhsz
+                            " buffer has no device address",
+                            binding_ordinal);
+  }
+  if (binding_offset > UINT64_MAX - buffer_address) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan queue_dispatch binding %" PRIhsz
+                            " device address overflows",
+                            binding_ordinal);
+  }
+  const VkDeviceAddress device_address = buffer_address + binding_offset;
+  if (binding_length > UINT64_MAX - device_address) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan queue_dispatch binding %" PRIhsz
+                            " device range overflows",
+                            binding_ordinal);
+  }
+  *out_device_address = device_address;
   return iree_ok_status();
 }
 
@@ -6744,7 +7075,6 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_hal_vulkan_pipeline_t* pipeline) {
-  (void)submission;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(queue->enabled_dispatch_abis,
@@ -6761,10 +7091,139 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
                               pipeline->dispatch_abi);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan BDA dispatch ABI requires executable metadata and publication "
-        "rings");
+    status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
+        queue, submission);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+        queue, submission);
+  }
+
+  const iree_host_size_t binding_count =
+      pipeline->bda.binding_count_known ? pipeline->binding_count
+                                        : submission->dispatch.binding_count;
+  iree_device_size_t binding_table_length = 0;
+  if (iree_status_is_ok(status) &&
+      !iree_device_size_checked_mul((iree_device_size_t)binding_count,
+                                    sizeof(uint64_t), &binding_table_length)) {
+    status =
+        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                         "Vulkan BDA dispatch binding table length overflows");
+  }
+
+  iree_byte_span_t binding_table_span = iree_byte_span_empty();
+  VkDeviceAddress binding_table_address = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
+        queue, submission, binding_table_length, &binding_table_span,
+        &binding_table_address);
+  }
+  if (iree_status_is_ok(status) && binding_count != 0) {
+    uint64_t* binding_table = (uint64_t*)binding_table_span.data;
+    for (iree_host_size_t i = 0; iree_status_is_ok(status) && i < binding_count;
+         ++i) {
+      VkDeviceAddress device_address = 0;
+      status = iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
+          submission, i, &device_address);
+      binding_table[i] = device_address;
+    }
+  }
+  if (iree_status_is_ok(status) && binding_table_length != 0) {
+    status = iree_hal_buffer_mapping_flush_range(
+        &submission->bda_publication_lease.block->mapping,
+        submission->bda_publication_lease.offset, binding_table_length);
+  }
+
+  VkBuffer indirect_parameters_handle = VK_NULL_HANDLE;
+  VkDeviceSize indirect_parameters_offset = 0;
+  if (iree_status_is_ok(status) &&
+      iree_hal_dispatch_uses_indirect_parameters(submission->dispatch.flags)) {
+    status = iree_hal_vulkan_queue_resolve_dispatch_indirect_parameters(
+        submission, &indirect_parameters_handle, &indirect_parameters_offset);
+  }
+
+  if (iree_status_is_ok(status)) {
+    VkCommandBufferBeginInfo begin_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+    status = iree_vkBeginCommandBuffer(IREE_VULKAN_DEVICE(&queue->syms),
+                                       submission->native_command_buffer,
+                                       &begin_info);
+  }
+  if (iree_status_is_ok(status) && submission->profile.query_pool &&
+      submission->profile.query_count != 0) {
+    iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
+                             submission->native_command_buffer,
+                             submission->profile.query_pool,
+                             /*firstQuery=*/0, submission->profile.query_count);
+  }
+  if (iree_status_is_ok(status)) {
+    if (binding_table_length != 0) {
+      VkMemoryBarrier2 memory_barrier = {
+          .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+          .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+          .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
+          .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+          .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+      };
+      VkDependencyInfo dependency_info = {
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .memoryBarrierCount = 1,
+          .pMemoryBarriers = &memory_barrier,
+      };
+      iree_vkCmdPipelineBarrier2(IREE_VULKAN_DEVICE(&queue->syms),
+                                 submission->native_command_buffer,
+                                 &dependency_info);
+    }
+    iree_hal_vulkan_queue_profile_write_timestamp_begin(queue, submission);
+    iree_hal_vulkan_bda_dispatch_root_v1_t root = {
+        .binding_table_address = binding_table_address,
+        .constants_address = 0,
+        .binding_base = 0,
+        .constant_base = 0,
+        .flags = 0,
+        .reserved0 = 0,
+    };
+    iree_vkCmdPushConstants(
+        IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
+        pipeline->layout, VK_SHADER_STAGE_COMPUTE_BIT,
+        pipeline->bda.root_push_constant_offset, sizeof(root), &root);
+    iree_vkCmdBindPipeline(IREE_VULKAN_DEVICE(&queue->syms),
+                           submission->native_command_buffer,
+                           VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
+    if (submission->profile.query_pool &&
+        submission->profile.dispatch_base_query !=
+            IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+      iree_vkCmdWriteTimestamp2(IREE_VULKAN_DEVICE(&queue->syms),
+                                submission->native_command_buffer,
+                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                submission->profile.query_pool,
+                                submission->profile.dispatch_base_query);
+    }
+    if (indirect_parameters_handle) {
+      iree_vkCmdDispatchIndirect(
+          IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
+          indirect_parameters_handle, indirect_parameters_offset);
+    } else {
+      iree_vkCmdDispatch(IREE_VULKAN_DEVICE(&queue->syms),
+                         submission->native_command_buffer,
+                         submission->dispatch.config.workgroup_count[0],
+                         submission->dispatch.config.workgroup_count[1],
+                         submission->dispatch.config.workgroup_count[2]);
+    }
+    if (submission->profile.query_pool &&
+        submission->profile.dispatch_base_query !=
+            IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+      iree_vkCmdWriteTimestamp2(IREE_VULKAN_DEVICE(&queue->syms),
+                                submission->native_command_buffer,
+                                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                submission->profile.query_pool,
+                                submission->profile.dispatch_base_query + 1);
+    }
+    iree_hal_vulkan_queue_profile_write_timestamp_end(queue, submission);
+    status = iree_vkEndCommandBuffer(IREE_VULKAN_DEVICE(&queue->syms),
+                                     submission->native_command_buffer);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -6852,8 +7311,8 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
         (uint32_t)pipeline->constant_count * (uint32_t)sizeof(uint32_t));
   }
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_vulkan_queue_validate_dispatch_abi(queue, pipeline, bindings);
+    status = iree_hal_vulkan_queue_validate_dispatch_abi(queue, pipeline,
+                                                         constants, bindings);
   }
   if (iree_status_is_ok(status) &&
       iree_hal_dispatch_uses_indirect_parameters(flags)) {

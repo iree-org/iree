@@ -42,6 +42,8 @@ typedef struct iree_hal_vulkan_queue_descriptor_block_t
     iree_hal_vulkan_queue_descriptor_block_t;
 typedef struct iree_hal_vulkan_queue_native_descriptor_block_t
     iree_hal_vulkan_queue_native_descriptor_block_t;
+typedef struct iree_hal_vulkan_queue_bda_publication_block_t
+    iree_hal_vulkan_queue_bda_publication_block_t;
 typedef struct iree_hal_vulkan_queue_staging_ring_t
     iree_hal_vulkan_queue_staging_ring_t;
 
@@ -241,6 +243,21 @@ typedef struct iree_hal_vulkan_queue_t {
     // Number of native descriptor blocks currently owned by this queue.
     uint32_t block_count;
   } native_descriptor_cache;
+
+  // Queue-owned BDA binding-table publication cache.
+  struct {
+    // First BDA publication block owned by this queue.
+    iree_hal_vulkan_queue_bda_publication_block_t* head;
+
+    // Last BDA publication block owned by this queue.
+    iree_hal_vulkan_queue_bda_publication_block_t* tail;
+
+    // Next BDA publication block considered for acquisition.
+    iree_hal_vulkan_queue_bda_publication_block_t* cursor;
+
+    // Number of BDA publication blocks currently owned by this queue.
+    uint32_t block_count;
+  } bda_publication_cache;
 
   // Queue-owned host-to-device staging ring for uploads.
   iree_hal_vulkan_queue_staging_ring_t* upload_staging_ring;

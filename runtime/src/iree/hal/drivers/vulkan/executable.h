@@ -35,6 +35,27 @@ typedef struct iree_hal_vulkan_descriptor_binding_t {
   VkDescriptorType descriptor_type;
 } iree_hal_vulkan_descriptor_binding_t;
 
+// Hidden push-constant root for BDA dispatch ABI version 1.
+typedef struct iree_hal_vulkan_bda_dispatch_root_v1_t {
+  // Device address of the first address64 binding-table entry.
+  uint64_t binding_table_address;
+
+  // Device address of the first uint32_t constant-table entry, or zero.
+  uint64_t constants_address;
+
+  // First binding table element visible to the shader.
+  uint32_t binding_base;
+
+  // First constant table element visible to the shader.
+  uint32_t constant_base;
+
+  // ABI-specific dispatch flags.
+  uint32_t flags;
+
+  // Reserved field kept zero for ABI v1.
+  uint32_t reserved0;
+} iree_hal_vulkan_bda_dispatch_root_v1_t;
+
 // Prepared Vulkan compute pipeline and HAL export metadata.
 typedef struct iree_hal_vulkan_pipeline_t {
   // Vulkan compute pipeline handle owned by the executable.
@@ -57,6 +78,21 @@ typedef struct iree_hal_vulkan_pipeline_t {
 
   // HAL dispatch binding mappings in binding ordinal order.
   iree_hal_vulkan_descriptor_binding_t* descriptor_bindings;
+
+  // Buffer-device-address dispatch layout, zeroed for descriptor pipelines.
+  struct {
+    // Push-constant byte offset of iree_hal_vulkan_bda_dispatch_root_v1_t.
+    uint32_t root_push_constant_offset;
+
+    // Push-constant byte length reserved for the hidden BDA root.
+    uint32_t root_push_constant_length;
+
+    // Byte length of one shader-visible binding table entry.
+    uint32_t binding_table_entry_length;
+
+    // Whether binding_count is a verifier-enforced ABI value.
+    bool binding_count_known;
+  } bda;
 
   // Export name stored in executable-owned host memory.
   iree_string_view_t name;
