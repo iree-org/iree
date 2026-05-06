@@ -16,6 +16,7 @@
 #include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/allocator.h"
+#include "iree/hal/drivers/vulkan/builtins.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 #include "iree/hal/local/profile.h"
@@ -25,12 +26,19 @@ extern "C" {
 #endif  // __cplusplus
 
 #define IREE_HAL_VULKAN_QUEUE_FRONTIER_CAPACITY 64
+#define IREE_HAL_VULKAN_QUEUE_DESCRIPTOR_BLOCK_CAPACITY 4096
+#define IREE_HAL_VULKAN_QUEUE_STAGING_SLOT_COUNT 16
+#define IREE_HAL_VULKAN_QUEUE_STAGING_SLOT_SIZE (1ull << 20)
 
 IREE_ASYNC_FIXED_FRONTIER_TYPE(iree_hal_vulkan_queue_frontier_t,
                                IREE_HAL_VULKAN_QUEUE_FRONTIER_CAPACITY);
 
 typedef struct iree_hal_vulkan_queue_pending_submission_t
     iree_hal_vulkan_queue_pending_submission_t;
+typedef struct iree_hal_vulkan_queue_descriptor_block_t
+    iree_hal_vulkan_queue_descriptor_block_t;
+typedef struct iree_hal_vulkan_queue_staging_ring_t
+    iree_hal_vulkan_queue_staging_ring_t;
 
 typedef enum iree_hal_vulkan_queue_role_e {
   IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE = 0,
@@ -48,6 +56,9 @@ typedef struct iree_hal_vulkan_queue_params_t {
 
   // Vulkan logical device that owns all queue handles and semaphores.
   VkDevice logical_device;
+
+  // Device-owned built-in pipelines. Borrowed.
+  const iree_hal_vulkan_builtins_t* builtins;
 
   // Vulkan queue handle borrowed from the logical device.
   VkQueue queue;
@@ -90,6 +101,12 @@ typedef struct iree_hal_vulkan_queue_t {
 
   // Vulkan logical device that owns queue resources.
   VkDevice logical_device;
+
+  // Device-owned built-in pipelines. Borrowed.
+  const iree_hal_vulkan_builtins_t* builtins;
+
+  // Device allocator used for queue-owned staging resources. Borrowed.
+  iree_hal_allocator_t* device_allocator;
 
   // Vulkan queue handle borrowed from the logical device.
   VkQueue queue;
@@ -172,6 +189,27 @@ typedef struct iree_hal_vulkan_queue_t {
   // Tail of deferred submissions whose software waits have resolved.
   iree_hal_vulkan_queue_pending_submission_t* ready_tail;
 
+  // Queue-owned descriptor cache for built-in command packets.
+  struct {
+    // First descriptor block owned by this queue.
+    iree_hal_vulkan_queue_descriptor_block_t* head;
+
+    // Last descriptor block owned by this queue.
+    iree_hal_vulkan_queue_descriptor_block_t* tail;
+
+    // Next descriptor block considered for acquisition.
+    iree_hal_vulkan_queue_descriptor_block_t* cursor;
+
+    // Number of descriptor blocks currently owned by this queue.
+    uint32_t block_count;
+  } descriptor_cache;
+
+  // Queue-owned host-to-device staging ring for uploads.
+  iree_hal_vulkan_queue_staging_ring_t* upload_staging_ring;
+
+  // Queue-owned device-to-host staging ring for downloads.
+  iree_hal_vulkan_queue_staging_ring_t* download_staging_ring;
+
   // Queue-owned completion thread waiting on epoch_semaphore.
   iree_thread_t* completion_thread;
 
@@ -189,6 +227,10 @@ typedef struct iree_hal_vulkan_queue_t {
 iree_status_t iree_hal_vulkan_queue_initialize(
     const iree_hal_vulkan_queue_params_t* params,
     iree_hal_vulkan_queue_t* out_queue);
+
+// Initializes queue-owned staging resources once the device allocator exists.
+iree_status_t iree_hal_vulkan_queue_initialize_staging(
+    iree_hal_vulkan_queue_t* queue, iree_hal_allocator_t* device_allocator);
 
 // Deinitializes a queue lane and releases all queue-owned resources.
 void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue);
@@ -243,7 +285,7 @@ iree_status_t iree_hal_vulkan_queue_submit_sparse_bind(
     const iree_hal_semaphore_list_t signal_semaphore_list, VkBuffer buffer,
     iree_host_size_t bind_count, const VkSparseMemoryBind* binds);
 
-// Submits a host-mediated buffer fill ordered by queue semaphores.
+// Submits a buffer fill ordered by queue semaphores.
 iree_status_t iree_hal_vulkan_queue_submit_fill(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -252,7 +294,7 @@ iree_status_t iree_hal_vulkan_queue_submit_fill(
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
 
-// Submits a host-mediated buffer update ordered by queue semaphores.
+// Submits a buffer update ordered by queue semaphores.
 iree_status_t iree_hal_vulkan_queue_submit_update(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -261,7 +303,7 @@ iree_status_t iree_hal_vulkan_queue_submit_update(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_update_flags_t flags);
 
-// Submits a host-mediated buffer copy ordered by queue semaphores.
+// Submits a buffer copy ordered by queue semaphores.
 iree_status_t iree_hal_vulkan_queue_submit_copy(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,

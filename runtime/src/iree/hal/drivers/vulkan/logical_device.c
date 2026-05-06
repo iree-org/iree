@@ -18,6 +18,7 @@
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/hal/drivers/vulkan/allocator.h"
+#include "iree/hal/drivers/vulkan/builtins.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
 #include "iree/hal/drivers/vulkan/executable.h"
 #include "iree/hal/drivers/vulkan/executable_cache.h"
@@ -259,7 +260,7 @@ static uint32_t iree_hal_vulkan_select_compute_queue_family(
     const iree_hal_vulkan_device_options_t* options) {
   const bool prefer_dedicated = iree_any_bit_set(
       options->flags, IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE);
-  uint32_t fallback_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+  uint32_t candidate_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
   for (uint32_t i = 0; i < snapshot->queue_family_count; ++i) {
     const VkQueueFamilyProperties* queue_family =
         &snapshot->queue_families[i].queueFamilyProperties;
@@ -269,17 +270,17 @@ static uint32_t iree_hal_vulkan_select_compute_queue_family(
     const bool has_graphics =
         iree_any_bit_set(queue_family->queueFlags, VK_QUEUE_GRAPHICS_BIT);
     if (!prefer_dedicated || !has_graphics) return i;
-    if (fallback_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
-      fallback_family_index = i;
+    if (candidate_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
+      candidate_family_index = i;
     }
   }
-  return fallback_family_index;
+  return candidate_family_index;
 }
 
 static uint32_t iree_hal_vulkan_select_transfer_queue_family(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
     uint32_t compute_family_index) {
-  uint32_t fallback_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
+  uint32_t candidate_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
   uint32_t same_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
   uint32_t non_graphics_family_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY;
   for (uint32_t i = 0; i < snapshot->queue_family_count; ++i) {
@@ -302,8 +303,8 @@ static uint32_t iree_hal_vulkan_select_transfer_queue_family(
         non_graphics_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
       non_graphics_family_index = i;
     }
-    if (fallback_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
-      fallback_family_index = i;
+    if (candidate_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
+      candidate_family_index = i;
     }
   }
   if (same_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
@@ -316,8 +317,8 @@ static uint32_t iree_hal_vulkan_select_transfer_queue_family(
   if (non_graphics_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
     return non_graphics_family_index;
   }
-  if (fallback_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
-    return fallback_family_index;
+  if (candidate_family_index != IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY) {
+    return candidate_family_index;
   }
   return same_family_index == IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY
              ? compute_family_index
@@ -700,6 +701,9 @@ struct iree_hal_vulkan_logical_device_t {
   // Recognized Vulkan device extension bits enabled on the logical device.
   iree_hal_vulkan_device_extensions_t enabled_extensions;
 
+  // Device-owned built-in pipelines used by queue command polyfills.
+  iree_hal_vulkan_builtins_t builtins;
+
   // Selected compute-capable queue.
   iree_hal_vulkan_selected_queue_t compute_queue;
 
@@ -1043,10 +1047,11 @@ static void iree_hal_vulkan_logical_device_destroy(
 
   iree_hal_vulkan_logical_device_clear_topology_info(device);
   iree_hal_channel_provider_release(device->channel_provider);
-  iree_hal_allocator_release(device->device_allocator);
   for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
     iree_hal_vulkan_queue_deinitialize(&device->queue_lanes[i]);
   }
+  iree_hal_allocator_release(device->device_allocator);
+  iree_hal_vulkan_builtins_deinitialize(&device->builtins);
   iree_async_proactor_pool_release(device->proactor_pool);
   if (device->logical_device && device->owns_logical_device) {
     iree_vkDestroyDevice(IREE_VULKAN_DEVICE(&device->syms),
@@ -1288,14 +1293,35 @@ static iree_status_t iree_hal_vulkan_logical_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
-  (void)flags;
+  IREE_ASSERT_ARGUMENT(out_file);
+  *out_file = NULL;
+  if (flags != IREE_HAL_EXTERNAL_FILE_FLAG_NONE) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unsupported Vulkan external file flags: 0x%" PRIx32, flags);
+  }
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
       device->queue_affinity_mask, queue_affinity, &queue_affinity));
-  return iree_hal_file_from_handle(device->device_allocator, queue_affinity,
-                                   access, handle, device->proactor,
-                                   device->host_allocator, out_file);
+
+  iree_hal_file_t* file = NULL;
+  iree_status_t status = iree_hal_file_from_handle(
+      device->device_allocator, queue_affinity, access, handle,
+      device->proactor, device->host_allocator, &file);
+  if (iree_status_is_ok(status) &&
+      iree_io_file_handle_type(handle) == IREE_IO_FILE_HANDLE_TYPE_FD &&
+      !iree_hal_file_storage_buffer(file)) {
+    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "Vulkan fd file transfers require queue staging "
+                              "support");
+  }
+  if (iree_status_is_ok(status)) {
+    *out_file = file;
+  } else {
+    iree_hal_file_release(file);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_create_semaphore(
@@ -1946,6 +1972,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
       .device = device,
       .syms = &device->syms,
       .logical_device = device->logical_device,
+      .builtins = &device->builtins,
       .queue = selected_queue->handle,
       .queue_flags = selected_queue->flags,
       .timestamp_valid_bits = selected_queue->timestamp_valid_bits,
@@ -1996,6 +2023,20 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queues(
           IREE_HAL_VULKAN_QUEUE_ROLE_SPARSE_BINDING,
           &device->sparse_binding_queue_lane);
     }
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_staging(
+    iree_hal_vulkan_logical_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(device->device_allocator);
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       i < device->queue_lane_count && iree_status_is_ok(status); ++i) {
+    status = iree_hal_vulkan_queue_initialize_staging(&device->queue_lanes[i],
+                                                      device->device_allocator);
   }
   return status;
 }
@@ -2280,6 +2321,11 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         &device->instance.syms, device->logical_device, &device->syms);
   }
   if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_builtins_initialize(
+        &device->syms, device->logical_device, &device->physical_device,
+        &device->builtins);
+  }
+  if (iree_status_is_ok(status)) {
     iree_hal_vulkan_logical_device_assign_selected_queues(device,
                                                           &selected_queues);
   }
@@ -2288,6 +2334,9 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_logical_device_initialize_allocator(device);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_initialize_queue_staging(device);
   }
 
   if (iree_status_is_ok(status)) {
@@ -2482,6 +2531,11 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
         &device->instance.syms, device->logical_device, &device->syms);
   }
   if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_builtins_initialize(
+        &device->syms, device->logical_device, &device->physical_device,
+        &device->builtins);
+  }
+  if (iree_status_is_ok(status)) {
     iree_hal_vulkan_logical_device_assign_selected_queues(device,
                                                           &selected_queues);
   }
@@ -2490,6 +2544,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_logical_device_initialize_allocator(device);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_initialize_queue_staging(device);
   }
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;

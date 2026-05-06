@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/vulkan/builtins.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 #include "iree/hal/local/profile.h"
 
@@ -17,10 +18,6 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a Vulkan HAL command buffer.
-//
-// |device_allocator| is retained and used for command-owned staging buffers
-// needed when recorded transfer commands cannot be represented directly by
-// Vulkan.
 iree_status_t iree_hal_vulkan_command_buffer_create(
     iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -36,10 +33,6 @@ bool iree_hal_vulkan_command_buffer_isa(
 bool iree_hal_vulkan_command_buffer_is_empty(
     iree_hal_command_buffer_t* command_buffer);
 
-// Returns true if |command_buffer| contains host-replayed commands.
-bool iree_hal_vulkan_command_buffer_has_host_commands(
-    iree_hal_command_buffer_t* command_buffer);
-
 // Returns true if |command_buffer| contains Vulkan-native commands.
 bool iree_hal_vulkan_command_buffer_has_native_commands(
     iree_hal_command_buffer_t* command_buffer);
@@ -53,11 +46,6 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id);
-
-// Replays a recorded Vulkan command buffer using host-mediated operations.
-iree_status_t iree_hal_vulkan_command_buffer_replay_host(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_buffer_binding_table_t binding_table);
 
 // Appends dispatch profile events from timestamp pairs recorded around each
 // dispatch command.
@@ -119,6 +107,7 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    const iree_hal_vulkan_builtins_t* builtins,
     VkCommandBuffer native_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,

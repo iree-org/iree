@@ -984,9 +984,21 @@ static bool iree_hal_vulkan_allocator_supports_sparse_virtual_memory(
 
 static bool iree_hal_vulkan_allocator_supports_host_allocation_import(
     const iree_hal_vulkan_allocator_t* allocator) {
-  return iree_all_bits_set(
-      allocator->enabled_extensions,
-      IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST);
+  if (!iree_all_bits_set(
+          allocator->enabled_extensions,
+          IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST)) {
+    return false;
+  }
+  // Arbitrary host pointers only become usable Vulkan buffers when the device
+  // and host share memory. Discrete devices may expose the extension while
+  // still rejecting normal heap pointers for device-visible storage.
+  switch (allocator->properties2.properties.deviceType) {
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+      return true;
+    default:
+      return false;
+  }
 }
 
 static iree_status_t iree_hal_vulkan_allocator_prepare_sparse_buffer_params(
@@ -1118,9 +1130,7 @@ iree_hal_vulkan_allocator_query_buffer_compatibility(
   }
   if (iree_hal_vulkan_allocator_supports_host_allocation_import(allocator) &&
       iree_all_bits_set(memory_placement.memory_type,
-                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
-      !iree_all_bits_set(memory_placement.memory_type,
-                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     const VkDeviceSize import_alignment =
         allocator->external_memory_host_properties
             .minImportedHostPointerAlignment;
@@ -1157,6 +1167,11 @@ static VkBufferUsageFlags iree_hal_vulkan_buffer_usage_from_hal(
     usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
   }
   if (iree_any_bit_set(hal_usage, IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+    usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  }
+  if (iree_any_bit_set(hal_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+    // Device-side transfer polyfills bind buffers as storage buffers even when
+    // the public HAL usage only exposes transfer operations.
     usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
   }
   if (iree_any_bit_set(hal_usage,
@@ -1690,7 +1705,7 @@ iree_hal_vulkan_allocator_allocate_direct_buffer_with_memory_type_bits(
           compat_params.usage, allocation_size, byte_length,
           memory_placement.memory_property_flags,
           allocator->properties2.properties.limits.nonCoherentAtomSize,
-          device_memory, handle,
+          device_memory, /*device_memory_offset=*/0, handle,
           iree_hal_vulkan_allocator_query_device_address(
               allocator, compat_params.usage, handle),
           iree_hal_buffer_release_callback_null(), allocator->host_allocator,
@@ -1847,6 +1862,21 @@ static void iree_hal_vulkan_allocator_deallocate_buffer(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static void iree_hal_vulkan_allocator_normalize_host_allocation_import_params(
+    iree_hal_buffer_params_t* params) {
+  const bool requires_host_local =
+      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL);
+  if (iree_any_bit_set(params->type, IREE_HAL_MEMORY_TYPE_OPTIMAL)) {
+    params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  }
+  if (requires_host_local) {
+    params->type &= ~IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
+    params->type |=
+        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
+  }
+  params->type |= IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+}
+
 static iree_status_t iree_hal_vulkan_allocator_validate_host_allocation_import(
     const iree_hal_vulkan_allocator_t* allocator,
     const iree_hal_buffer_params_t* params,
@@ -1894,6 +1924,14 @@ static iree_status_t iree_hal_vulkan_allocator_validate_host_allocation_import(
   const VkDeviceSize import_alignment =
       allocator->external_memory_host_properties
           .minImportedHostPointerAlignment;
+  if (import_alignment > IREE_DEVICE_SIZE_MAX ||
+      (import_alignment != 0 && !iree_device_size_is_valid_alignment(
+                                    (iree_device_size_t)import_alignment))) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan reported invalid minImportedHostPointerAlignment %" PRIu64,
+        (uint64_t)import_alignment);
+  }
   if (import_alignment != 0 &&
       (import_alignment > IREE_HOST_SIZE_MAX ||
        !iree_host_ptr_has_alignment(external_buffer->handle.host_allocation.ptr,
@@ -1905,9 +1943,8 @@ static iree_status_t iree_hal_vulkan_allocator_validate_host_allocation_import(
         (uint64_t)import_alignment);
   }
   if (import_alignment != 0 &&
-      (import_alignment > IREE_DEVICE_SIZE_MAX ||
-       !iree_device_size_has_alignment(external_buffer->size,
-                                       (iree_device_size_t)import_alignment))) {
+      !iree_device_size_has_alignment(external_buffer->size,
+                                      (iree_device_size_t)import_alignment)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "host allocation import size %" PRIu64
@@ -1971,6 +2008,8 @@ static iree_status_t iree_hal_vulkan_allocator_import_buffer(
   }
 
   iree_hal_buffer_params_t compat_params = *params;
+  iree_hal_vulkan_allocator_normalize_host_allocation_import_params(
+      &compat_params);
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   if (iree_status_is_ok(status)) {
@@ -2073,13 +2112,17 @@ static iree_status_t iree_hal_vulkan_allocator_import_buffer(
         .queue_affinity = compat_params.queue_affinity,
         .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
     };
+    iree_hal_memory_type_t imported_memory_type = memory_placement.memory_type;
+    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+      imported_memory_type |= IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
+    }
     status = iree_hal_vulkan_buffer_create(
         &allocator->syms, allocator->logical_device, placement,
-        memory_placement.memory_type, compat_params.access, compat_params.usage,
+        imported_memory_type, compat_params.access, compat_params.usage,
         allocation_size, external_buffer->size,
         memory_placement.memory_property_flags,
         allocator->properties2.properties.limits.nonCoherentAtomSize,
-        device_memory, handle,
+        device_memory, /*device_memory_offset=*/0, handle,
         iree_hal_vulkan_allocator_query_device_address(
             allocator, compat_params.usage, handle),
         release_callback, allocator->host_allocator, &buffer);

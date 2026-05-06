@@ -30,6 +30,8 @@ iree_cc_library(
     "api.c"
     "buffer.c"
     "buffer.h"
+    "builtins.c"
+    "builtins.h"
     "command_buffer.c"
     "command_buffer.h"
     "driver.c"

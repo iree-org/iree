@@ -136,14 +136,15 @@ iree_status_t iree_hal_vulkan_buffer_create(
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_length, VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkBuffer handle, VkDeviceAddress device_address,
+    VkDeviceSize device_memory_offset, VkBuffer handle,
+    VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   return iree_hal_vulkan_buffer_create_internal(
       syms, logical_device, placement, memory_type, allowed_access,
       allowed_usage, allocation_size, /*byte_offset=*/0, byte_length,
       memory_property_flags, non_coherent_atom_size, device_memory,
-      /*device_memory_offset=*/0, handle, device_address,
+      device_memory_offset, handle, device_address,
       IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE |
           IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY,
       release_callback, host_allocator, out_buffer);
