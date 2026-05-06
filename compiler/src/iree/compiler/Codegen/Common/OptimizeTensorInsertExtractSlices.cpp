@@ -331,20 +331,20 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
                                       valToStore, originalRead);
     }
 
+    if (!rMask) {
+      rewriter.replaceOp(readOp, inner);
+      return success();
+    }
+
     // Build the outer value: select(rMask, inner, broadcast(rPad)).
     // When rMask is absent (unmasked read), the result is just inner.
-    if (rMask) {
-      Value rPad = readOp.getPadding();
-      assert(!isa<VectorType>(rPad.getType()) &&
-             "masked transfers on vector element types are not supported; see "
-             "verifyTransferOp in upstream MLIR VectorOps.cpp");
-      Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
-                                                 valToStore.getType(), rPad);
-      rewriter.replaceOpWithNewOp<arith::SelectOp>(readOp, rMask, inner,
-                                                   padVal);
-    } else {
-      rewriter.replaceOp(readOp, inner);
-    }
+    Value rPad = readOp.getPadding();
+    assert(!isa<VectorType>(rPad.getType()) &&
+           "masked transfers on vector element types are not supported; see "
+           "verifyTransferOp in upstream MLIR VectorOps.cpp");
+    Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                               valToStore.getType(), rPad);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(readOp, rMask, inner, padVal);
     return success();
   }
 };
