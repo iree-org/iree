@@ -1615,11 +1615,17 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     status = iree_hal_vulkan_spirv_parse_compute_entry_points(
         spirv_words, spirv_word_count, entry_point_count, entry_points);
   }
+  iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags =
+      IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT;
+  if (iree_all_bits_set(
+          executable_params->caching_mode,
+          IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION)) {
+    verification_flags = IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE;
+  }
   for (iree_host_size_t i = 0;
        iree_status_is_ok(status) && i < entry_point_count; ++i) {
     status = iree_hal_vulkan_verify_bda_spirv(
-        spirv_words, spirv_word_count, entry_points[i].name,
-        IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT,
+        spirv_words, spirv_word_count, entry_points[i].name, verification_flags,
         entry_points[i].workgroup_size);
   }
 

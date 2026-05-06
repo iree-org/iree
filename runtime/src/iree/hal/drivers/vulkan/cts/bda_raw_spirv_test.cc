@@ -132,6 +132,58 @@ static const uint32_t kRawBdaSpirv[] = {
     0x00000048, 0x00000002, 0x00000004, 0x000100fd, 0x00010038,
 };
 
+// Valid descriptor-free BDA-environment no-op shader with no push-constant
+// root. Normal raw loading rejects it because reflection cannot prove the HAL
+// root convention; explicitly unverified raw loading accepts it for
+// hand-authored/custom-argument kernels.
+static const uint32_t kRawBdaNoopSpirvWithoutPushConstantRoot[] = {
+    0x07230203u,
+    0x00010600u,
+    0u,
+    5u,
+    0u,
+    // Declares OpCapability Shader.
+    0x00020011u,
+    1u,
+    // Declares OpCapability PhysicalStorageBufferAddresses.
+    0x00020011u,
+    5347u,
+    // Declares OpMemoryModel PhysicalStorageBuffer64 GLSL450.
+    0x0003000eu,
+    5348u,
+    1u,
+    // Declares OpEntryPoint GLCompute %main "main".
+    0x0005000fu,
+    5u,
+    3u,
+    0x6e69616du,
+    0u,
+    // Declares OpExecutionMode %main LocalSize 1 1 1.
+    0x00060010u,
+    3u,
+    17u,
+    1u,
+    1u,
+    1u,
+    // Declares OpTypeVoid %void.
+    0x00020013u,
+    1u,
+    // Declares OpTypeFunction %fn %void.
+    0x00030021u,
+    2u,
+    1u,
+    // Defines %main as an empty compute function.
+    0x00050036u,
+    1u,
+    3u,
+    0u,
+    2u,
+    0x000200f8u,
+    4u,
+    0x000100fdu,
+    0x00010038u,
+};
+
 static const uint32_t
     kRawBdaSpirvMissingPhysicalStorageBufferAddressesCapability[] = {
         0x07230203u,
@@ -263,17 +315,25 @@ class BdaRawSpirvTest : public CtsTestBase<> {
 
   iree_status_t PrepareRawBdaExecutable(
       iree_const_byte_span_t executable_data,
+      iree_hal_executable_caching_mode_t caching_mode,
       iree_hal_executable_t** out_executable) {
     *out_executable = nullptr;
     iree_hal_executable_params_t executable_params;
     iree_hal_executable_params_initialize(&executable_params);
-    executable_params.caching_mode =
-        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
+    executable_params.caching_mode = caching_mode;
     executable_params.executable_format =
         iree_make_cstring_view("vulkan-spirv-bda-raw");
     executable_params.executable_data = executable_data;
     return iree_hal_executable_cache_prepare_executable(
         executable_cache_, &executable_params, out_executable);
+  }
+
+  iree_status_t PrepareRawBdaExecutable(
+      iree_const_byte_span_t executable_data,
+      iree_hal_executable_t** out_executable) {
+    return PrepareRawBdaExecutable(
+        executable_data, IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA,
+        out_executable);
   }
 
   void CreateInputOutputBuffers(Ref<iree_hal_buffer_t>* input_buffer,
@@ -453,6 +513,40 @@ TEST_P(BdaRawSpirvTest, PrepareRejectsRawBdaSpirvWithoutPushConstantRoot) {
                               &executable));
   EXPECT_EQ(nullptr, executable);
   iree_hal_executable_release(executable);
+}
+
+TEST_P(BdaRawSpirvTest, PrepareRejectsRawBdaNoopWithoutVerificationDisabled) {
+  iree_hal_executable_t* executable = nullptr;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      PrepareRawBdaExecutable(
+          iree_make_const_byte_span(
+              kRawBdaNoopSpirvWithoutPushConstantRoot,
+              sizeof(kRawBdaNoopSpirvWithoutPushConstantRoot)),
+          &executable));
+  EXPECT_EQ(nullptr, executable);
+  iree_hal_executable_release(executable);
+}
+
+TEST_P(BdaRawSpirvTest, QueueDispatchExecutesUnverifiedRawBdaNoop) {
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(PrepareRawBdaExecutable(
+      iree_make_const_byte_span(
+          kRawBdaNoopSpirvWithoutPushConstantRoot,
+          sizeof(kRawBdaNoopSpirvWithoutPushConstantRoot)),
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA |
+          IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION,
+      executable.out()));
+
+  iree_hal_buffer_ref_list_t bindings = {};
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      dispatch_signal, executable.get(), /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
 TEST_P(BdaRawSpirvTest, PrepareRejectsRawBdaSpirvWithDescriptorVariable) {
