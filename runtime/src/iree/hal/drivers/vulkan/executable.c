@@ -1298,6 +1298,15 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
         "Vulkan BDA executable must not declare descriptor set or binding "
         "decorations");
   }
+  bool has_descriptor_variables = false;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
+          spirv_words, spirv_word_count, &has_descriptor_variables));
+  if (has_descriptor_variables) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA executable must not declare descriptor-backed variables");
+  }
 
   if (iree_all_bits_set(
           verification_flags,

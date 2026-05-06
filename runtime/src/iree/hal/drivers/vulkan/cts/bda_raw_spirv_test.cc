@@ -186,6 +186,44 @@ static const uint32_t kRawBdaSpirvMissingPushConstantRoot[] = {
     1u,
 };
 
+static const uint32_t kRawBdaSpirvWithDescriptorStorageVariable[] = {
+    0x07230203u,
+    0x00010600u,
+    0u,
+    8u,
+    0u,
+    // Declares OpCapability PhysicalStorageBufferAddresses.
+    0x00020011u,
+    5347u,
+    // Declares OpMemoryModel PhysicalStorageBuffer64 GLSL450.
+    0x0003000eu,
+    5348u,
+    1u,
+    // Declares OpEntryPoint GLCompute %1 "main".
+    0x0005000fu,
+    5u,
+    1u,
+    0x6e69616du,
+    0u,
+    // Declares OpExecutionMode %1 LocalSize 1 1 1.
+    0x00060010u,
+    1u,
+    17u,
+    1u,
+    1u,
+    1u,
+    // Declares OpVariable %3 in PushConstant storage class.
+    0x0004003bu,
+    2u,
+    3u,
+    9u,
+    // Declares OpVariable %5 in StorageBuffer storage class.
+    0x0004003bu,
+    4u,
+    5u,
+    12u,
+};
+
 static std::vector<uint32_t> MakeDescriptorDecoratedRawBdaSpirv() {
   std::vector<uint32_t> spirv(kRawBdaSpirv,
                               kRawBdaSpirv + IREE_ARRAYSIZE(kRawBdaSpirv));
@@ -413,6 +451,19 @@ TEST_P(BdaRawSpirvTest, PrepareRejectsRawBdaSpirvWithoutPushConstantRoot) {
                                   kRawBdaSpirvMissingPushConstantRoot,
                                   sizeof(kRawBdaSpirvMissingPushConstantRoot)),
                               &executable));
+  EXPECT_EQ(nullptr, executable);
+  iree_hal_executable_release(executable);
+}
+
+TEST_P(BdaRawSpirvTest, PrepareRejectsRawBdaSpirvWithDescriptorVariable) {
+  iree_hal_executable_t* executable = nullptr;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      PrepareRawBdaExecutable(
+          iree_make_const_byte_span(
+              kRawBdaSpirvWithDescriptorStorageVariable,
+              sizeof(kRawBdaSpirvWithDescriptorStorageVariable)),
+          &executable));
   EXPECT_EQ(nullptr, executable);
   iree_hal_executable_release(executable);
 }

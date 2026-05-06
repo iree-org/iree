@@ -213,6 +213,32 @@ TEST(SpirvTest, CountsPushConstantVariables) {
   EXPECT_EQ(0u, push_constant_variable_count);
 }
 
+TEST(SpirvTest, DetectsDescriptorStorageClassVariables) {
+  static constexpr uint32_t kDescriptorStorageVariableModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpVariable %3 in StorageBuffer storage class.
+      0x0004003bu,
+      2u,
+      3u,
+      12u,
+  };
+  bool has_descriptor_variables = false;
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
+      kDescriptorStorageVariableModule,
+      IREE_ARRAYSIZE(kDescriptorStorageVariableModule),
+      &has_descriptor_variables));
+  EXPECT_TRUE(has_descriptor_variables);
+
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+      &has_descriptor_variables));
+  EXPECT_FALSE(has_descriptor_variables);
+}
+
 TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
   static constexpr uint32_t kDuplicateEntryModule[] = {
       0x07230203u,

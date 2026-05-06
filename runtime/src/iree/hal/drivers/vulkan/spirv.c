@@ -22,7 +22,12 @@ enum {
   IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM_CONSTANT = 0u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM = 2u,
   IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT = 9u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_ATOMIC_COUNTER = 10u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_IMAGE = 11u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_STORAGE_BUFFER = 12u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_BINDING = 33u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET = 34u,
 };
@@ -225,6 +230,49 @@ iree_status_t iree_hal_vulkan_spirv_count_push_constant_variables(
     }
     if (operands[2] == IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT) {
       ++*out_push_constant_variable_count;
+    }
+  }
+  return iree_ok_status();
+}
+
+static bool iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(
+    uint32_t storage_class) {
+  switch (storage_class) {
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM_CONSTANT:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_ATOMIC_COUNTER:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_IMAGE:
+    case IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_STORAGE_BUFFER:
+      return true;
+    default:
+      return false;
+  }
+}
+
+iree_status_t iree_hal_vulkan_spirv_has_descriptor_storage_class_variables(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    bool* out_has_descriptor_variables) {
+  IREE_ASSERT_ARGUMENT(out_has_descriptor_variables);
+  *out_has_descriptor_variables = false;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_verify_module(spirv_words, spirv_word_count));
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_VARIABLE) continue;
+    if (word_count < 4) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpVariable instruction is truncated");
+    }
+    if (iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(operands[2])) {
+      *out_has_descriptor_variables = true;
+      return iree_ok_status();
     }
   }
   return iree_ok_status();
