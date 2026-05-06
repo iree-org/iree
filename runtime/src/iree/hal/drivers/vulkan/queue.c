@@ -139,9 +139,6 @@ struct iree_hal_vulkan_queue_bda_publication_block_t {
   // BDA-capable host-visible buffer backing published tables.
   iree_hal_buffer_t* buffer;
 
-  // Persistent host mapping of |buffer|.
-  iree_hal_buffer_mapping_t mapping;
-
   // Device address of |buffer| byte offset zero.
   VkDeviceAddress device_address;
 
@@ -1059,9 +1056,9 @@ static iree_status_t iree_hal_vulkan_queue_bda_publication_block_create(
   iree_hal_buffer_params_t params = {
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE |
               IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      .access = IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+      .access = IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
       .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE_READ |
-               IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+               IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
                IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE,
       .queue_affinity = queue->queue_affinity,
   };
@@ -1083,17 +1080,8 @@ static iree_status_t iree_hal_vulkan_queue_bda_publication_block_create(
         "Vulkan BDA publication buffer device address range overflows");
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_map_range(
-        block->buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-        IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0, capacity,
-        &block->mapping);
-  }
-  if (iree_status_is_ok(status)) {
     *out_block = block;
   } else {
-    if (block->mapping.contents.data) {
-      iree_hal_buffer_unmap_range(&block->mapping);
-    }
     iree_hal_buffer_release(block->buffer);
     iree_allocator_free(queue->host_allocator, block);
   }
@@ -1104,9 +1092,6 @@ static void iree_hal_vulkan_queue_bda_publication_block_destroy(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_bda_publication_block_t* block) {
   if (!block) return;
-  if (block->mapping.contents.data) {
-    iree_hal_buffer_unmap_range(&block->mapping);
-  }
   iree_hal_buffer_release(block->buffer);
   iree_allocator_free(queue->host_allocator, block);
 }
@@ -1203,9 +1188,7 @@ iree_hal_vulkan_queue_try_acquire_bda_publication_under_lock(
 static iree_status_t iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
-    iree_device_size_t length, iree_byte_span_t* out_host_span,
-    VkDeviceAddress* out_device_address) {
-  *out_host_span = iree_byte_span_empty();
+    iree_device_size_t length, VkDeviceAddress* out_device_address) {
   *out_device_address = 0;
   if (length == 0) return iree_ok_status();
   if (length > IREE_HOST_SIZE_MAX) {
@@ -1234,9 +1217,6 @@ static iree_status_t iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
 
   iree_hal_vulkan_queue_bda_publication_lease_t* lease =
       &submission->bda_publication_lease;
-  *out_host_span =
-      iree_make_byte_span(lease->block->mapping.contents.data + lease->offset,
-                          (iree_host_size_t)lease->length);
   *out_device_address = lease->block->device_address + lease->offset;
   return iree_ok_status();
 }
@@ -7110,15 +7090,22 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
                             "Vulkan BDA binding table length overflows");
   }
 
-  iree_byte_span_t binding_table_span = iree_byte_span_empty();
   VkDeviceAddress binding_table_address = 0;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
-        queue, submission, binding_table_length, &binding_table_span,
-        &binding_table_address);
+        queue, submission, binding_table_length, &binding_table_address);
+  }
+  iree_hal_buffer_mapping_t binding_table_mapping = {0};
+  if (iree_status_is_ok(status) && binding_table_length != 0) {
+    iree_hal_vulkan_queue_bda_publication_lease_t* lease =
+        &submission->bda_publication_lease;
+    status = iree_hal_buffer_map_range(
+        lease->block->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, lease->offset,
+        binding_table_length, &binding_table_mapping);
   }
   if (iree_status_is_ok(status) && binding_count != 0) {
-    uint64_t* binding_table = (uint64_t*)binding_table_span.data;
+    uint64_t* binding_table = (uint64_t*)binding_table_mapping.contents.data;
     for (iree_host_size_t i = 0; iree_status_is_ok(status) && i < binding_count;
          ++i) {
       VkDeviceAddress device_address = 0;
@@ -7130,10 +7117,11 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
     }
   }
   if (iree_status_is_ok(status) && binding_table_length != 0) {
-    status = iree_hal_buffer_mapping_flush_range(
-        &submission->bda_publication_lease.block->mapping,
-        submission->bda_publication_lease.offset, binding_table_length);
+    status = iree_hal_buffer_mapping_flush_range(&binding_table_mapping, 0,
+                                                 binding_table_length);
   }
+  status = iree_status_join(
+      status, iree_hal_buffer_unmap_range(&binding_table_mapping));
 
   VkBuffer indirect_parameters_handle = VK_NULL_HANDLE;
   VkDeviceSize indirect_parameters_offset = 0;
@@ -7437,13 +7425,25 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
   iree_hal_vulkan_command_buffer_bda_publication_t bda_publication = {0};
   const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication_ptr =
       NULL;
+  iree_hal_buffer_mapping_t bda_publication_mapping = {0};
   if (iree_status_is_ok(status) && bda_publication_length != 0) {
     status = iree_hal_vulkan_queue_acquire_bda_publication_under_lock(
-        queue, submission, bda_publication_length, &bda_publication.host_span,
+        queue, submission, bda_publication_length,
         &bda_publication.device_address);
+  }
+  if (iree_status_is_ok(status) && bda_publication_length != 0) {
+    iree_hal_vulkan_queue_bda_publication_lease_t* lease =
+        &submission->bda_publication_lease;
+    status = iree_hal_buffer_map_range(
+        lease->block->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, lease->offset,
+        bda_publication_length, &bda_publication_mapping);
     if (iree_status_is_ok(status)) {
-      bda_publication_ptr = &bda_publication;
+      bda_publication.host_span = bda_publication_mapping.contents;
     }
+  }
+  if (iree_status_is_ok(status) && bda_publication_length != 0) {
+    bda_publication_ptr = &bda_publication;
   }
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_binding_table_t binding_table = {
@@ -7466,10 +7466,11 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
         queue->host_allocator);
   }
   if (iree_status_is_ok(status) && bda_publication_length != 0) {
-    status = iree_hal_buffer_mapping_flush_range(
-        &submission->bda_publication_lease.block->mapping,
-        submission->bda_publication_lease.offset, bda_publication_length);
+    status = iree_hal_buffer_mapping_flush_range(&bda_publication_mapping, 0,
+                                                 bda_publication_length);
   }
+  status = iree_status_join(
+      status, iree_hal_buffer_unmap_range(&bda_publication_mapping));
   return status;
 }
 
