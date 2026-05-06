@@ -325,6 +325,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    bda_command_buffer_dispatch_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_dispatch_pipeline_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
@@ -345,6 +366,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    bda_command_buffer_dispatch_pipeline_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_pipeline_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_dispatch_reuse_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
@@ -361,6 +403,27 @@ iree_cc_test(
   LABELS
     "driver=vulkan"
     "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    bda_command_buffer_dispatch_reuse_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_reuse_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
 )
 
 iree_cc_test(
@@ -426,6 +489,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    bda_command_buffer_dispatch_constants_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_constants_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_dispatch_indirect_parameters_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
@@ -442,6 +526,27 @@ iree_cc_test(
   LABELS
     "driver=vulkan"
     "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    bda_command_buffer_dispatch_indirect_parameters_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_indirect_parameters_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
 )
 
 iree_cc_test(
@@ -466,6 +571,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    bda_command_buffer_dispatch_multi_entrypoint_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_multi_entrypoint_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_dispatch_multi_workgroup_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
@@ -482,6 +608,27 @@ iree_cc_test(
   LABELS
     "driver=vulkan"
     "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
+    bda_command_buffer_dispatch_multi_workgroup_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    ::testdata_vulkan_spirv_bda_lib
+    iree::base::tooling::flags
+    iree::hal::cts::command_buffer::dispatch_multi_workgroup_test
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
 )
 
 iree_cc_test(
