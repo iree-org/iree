@@ -84,16 +84,10 @@ typedef struct iree_hal_vulkan_command_dispatch_t {
   // Dispatch workgroup configuration captured during recording.
   iree_hal_dispatch_config_t config;
 
-  // Push constant bytes copied from the recording caller into the record.
-  void* constants_data;
-
-  // Number of bytes in constants_data.
+  // Number of trailing push constant bytes copied after the fixed payload.
   iree_host_size_t constants_data_length;
 
-  // Buffer references copied from the recording caller into the record.
-  iree_hal_buffer_ref_t* bindings;
-
-  // Number of entries in bindings.
+  // Number of trailing buffer references copied after push constants.
   iree_host_size_t binding_count;
 
   // HAL dispatch flags captured during recording.
@@ -280,6 +274,25 @@ iree_hal_vulkan_command_dispatch_payload(
     const iree_hal_vulkan_command_t* command) {
   return (const iree_hal_vulkan_command_dispatch_t*)
       iree_hal_vulkan_command_buffer_const_command_payload(command);
+}
+
+static const void* iree_hal_vulkan_command_dispatch_constants_data(
+    const iree_hal_vulkan_command_dispatch_t* dispatch) {
+  if (dispatch->constants_data_length == 0) return NULL;
+  return (const uint8_t*)dispatch +
+         iree_host_align(sizeof(*dispatch), iree_alignof(uint32_t));
+}
+
+static const iree_hal_buffer_ref_t* iree_hal_vulkan_command_dispatch_bindings(
+    const iree_hal_vulkan_command_dispatch_t* dispatch) {
+  if (dispatch->binding_count == 0) return NULL;
+  const iree_host_size_t constants_offset =
+      iree_host_align(sizeof(*dispatch), iree_alignof(uint32_t));
+  const iree_host_size_t bindings_offset =
+      iree_host_align(constants_offset + dispatch->constants_data_length,
+                      iree_alignof(iree_hal_buffer_ref_t));
+  return (const iree_hal_buffer_ref_t*)((const uint8_t*)dispatch +
+                                        bindings_offset);
 }
 
 static const iree_hal_vulkan_command_execution_barrier_t*
@@ -772,9 +785,11 @@ static iree_status_t iree_hal_vulkan_command_buffer_profile_operation(
         memcpy(record.workgroup_count, dispatch->config.workgroup_count,
                sizeof(record.workgroup_count));
       }
+      const iree_hal_buffer_ref_t* bindings =
+          iree_hal_vulkan_command_dispatch_bindings(dispatch);
       for (iree_host_size_t i = 0; i < dispatch->binding_count; ++i) {
-        record.flags |= iree_hal_vulkan_command_buffer_profile_binding_flags(
-            dispatch->bindings[i]);
+        record.flags |=
+            iree_hal_vulkan_command_buffer_profile_binding_flags(bindings[i]);
       }
       break;
     }
@@ -1765,14 +1780,16 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
         host_allocator, pipeline->descriptor_binding_count,
         sizeof(write_infos[0]), (void**)&write_infos);
   }
+  const iree_hal_buffer_ref_t* bindings =
+      iree_hal_vulkan_command_dispatch_bindings(dispatch);
   for (iree_host_size_t i = 0;
        iree_status_is_ok(status) && i < pipeline->descriptor_binding_count;
        ++i) {
     const iree_hal_vulkan_descriptor_binding_t* descriptor_binding =
         &pipeline->descriptor_bindings[i];
     status = iree_hal_vulkan_command_buffer_resolve_descriptor_binding(
-        binding_table, dispatch->bindings[i], i,
-        descriptor_binding->descriptor_type, &buffer_infos[i]);
+        binding_table, bindings[i], i, descriptor_binding->descriptor_type,
+        &buffer_infos[i]);
     if (iree_status_is_ok(status)) {
       write_infos[i] = (VkWriteDescriptorSet){
           .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1807,11 +1824,11 @@ iree_hal_vulkan_command_buffer_record_dispatch_descriptor_native(
         /*dynamicOffsetCount=*/0, /*pDynamicOffsets=*/NULL);
   }
   if (dispatch->constants_data_length != 0) {
-    iree_vkCmdPushConstants(IREE_VULKAN_DEVICE(syms), native_command_buffer,
-                            pipeline->layout, VK_SHADER_STAGE_COMPUTE_BIT,
-                            /*offset=*/0,
-                            (uint32_t)dispatch->constants_data_length,
-                            dispatch->constants_data);
+    iree_vkCmdPushConstants(
+        IREE_VULKAN_DEVICE(syms), native_command_buffer, pipeline->layout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        /*offset=*/0, (uint32_t)dispatch->constants_data_length,
+        iree_hal_vulkan_command_dispatch_constants_data(dispatch));
   }
   iree_vkCmdBindPipeline(IREE_VULKAN_DEVICE(syms), native_command_buffer,
                          VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
@@ -1853,11 +1870,13 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_dispatch_bda_native(
           bda_recording_state, binding_table_length, &binding_table_span,
           &binding_table_address));
   if (binding_count != 0) {
+    const iree_hal_buffer_ref_t* bindings =
+        iree_hal_vulkan_command_dispatch_bindings(dispatch);
     uint64_t* published_binding_table = (uint64_t*)binding_table_span.data;
     for (iree_host_size_t i = 0; i < binding_count; ++i) {
       VkDeviceAddress device_address = 0;
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_resolve_bda_binding(
-          binding_table, dispatch->bindings[i], i, pipeline, &device_address));
+          binding_table, bindings[i], i, pipeline, &device_address));
       published_binding_table[i] = device_address;
     }
     iree_hal_vulkan_command_buffer_record_bda_publication_barrier(
@@ -1877,11 +1896,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_dispatch_bda_native(
                           pipeline->bda.root_push_constant_offset, sizeof(root),
                           &root);
   if (dispatch->constants_data_length != 0) {
-    iree_vkCmdPushConstants(IREE_VULKAN_DEVICE(syms), native_command_buffer,
-                            pipeline->layout, VK_SHADER_STAGE_COMPUTE_BIT,
-                            pipeline->bda.constant_push_constant_offset,
-                            (uint32_t)dispatch->constants_data_length,
-                            dispatch->constants_data);
+    iree_vkCmdPushConstants(
+        IREE_VULKAN_DEVICE(syms), native_command_buffer, pipeline->layout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        pipeline->bda.constant_push_constant_offset,
+        (uint32_t)dispatch->constants_data_length,
+        iree_hal_vulkan_command_dispatch_constants_data(dispatch));
   }
   iree_vkCmdBindPipeline(IREE_VULKAN_DEVICE(syms), native_command_buffer,
                          VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
@@ -2642,14 +2662,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
         payload_offset, /*out_command=*/NULL, &payload);
     iree_hal_vulkan_command_dispatch_t* dispatch =
         (iree_hal_vulkan_command_dispatch_t*)payload;
-    void* constants_data = NULL;
     if (constants.data_length != 0) {
-      constants_data = (uint8_t*)payload + constants_offset;
+      void* constants_data = (uint8_t*)payload + constants_offset;
       memcpy(constants_data, constants.data, constants.data_length);
     }
-    iree_hal_buffer_ref_t* binding_refs = NULL;
     if (bindings.count != 0) {
-      binding_refs =
+      iree_hal_buffer_ref_t* binding_refs =
           (iree_hal_buffer_ref_t*)((uint8_t*)payload + bindings_offset);
       memcpy(binding_refs, bindings.values,
              bindings.count * sizeof(binding_refs[0]));
@@ -2658,9 +2676,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     dispatch->pipeline = pipeline;
     dispatch->export_ordinal = export_ordinal;
     dispatch->config = config;
-    dispatch->constants_data = constants_data;
     dispatch->constants_data_length = constants.data_length;
-    dispatch->bindings = binding_refs;
     dispatch->binding_count = bindings.count;
     dispatch->flags = flags;
     command_buffer->dispatch_count = command_buffer->dispatch_count + 1;
