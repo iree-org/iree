@@ -1257,9 +1257,17 @@ static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
       /*out_entry_point_found=*/NULL, out_workgroup_size);
 }
 
+typedef enum iree_hal_vulkan_bda_spirv_verification_flag_bits_e {
+  IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE = 0u,
+  IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT = 0x1u,
+} iree_hal_vulkan_bda_spirv_verification_flag_bits_t;
+typedef uint32_t iree_hal_vulkan_bda_spirv_verification_flags_t;
+
 static iree_status_t iree_hal_vulkan_verify_bda_spirv(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
+    iree_string_view_t entry_point,
+    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags,
+    uint32_t out_workgroup_size[3]) {
   bool has_physical_storage_buffer_addresses_capability = false;
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_spirv_has_physical_storage_buffer_addresses_capability(
@@ -1289,6 +1297,21 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must not declare descriptor set or binding "
         "decorations");
+  }
+
+  if (iree_all_bits_set(
+          verification_flags,
+          IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT)) {
+    iree_host_size_t push_constant_variable_count = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_count_push_constant_variables(
+        spirv_words, spirv_word_count, &push_constant_variable_count));
+    if (push_constant_variable_count != 1) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA executable must declare exactly one PushConstant "
+          "root variable; found %" PRIhsz,
+          push_constant_variable_count);
+    }
   }
 
   bool entry_point_found = false;
@@ -1358,6 +1381,7 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv(
           (const uint32_t*)spirv_code_vec,
           flatbuffers_uint32_vec_len(spirv_code_vec), entry_point_view,
+          IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE,
           out_pipeline->workgroup_size));
       break;
     }
@@ -1591,9 +1615,10 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
   }
   for (iree_host_size_t i = 0;
        iree_status_is_ok(status) && i < entry_point_count; ++i) {
-    status = iree_hal_vulkan_verify_bda_spirv(spirv_words, spirv_word_count,
-                                              entry_points[i].name,
-                                              entry_points[i].workgroup_size);
+    status = iree_hal_vulkan_verify_bda_spirv(
+        spirv_words, spirv_word_count, entry_points[i].name,
+        IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT,
+        entry_points[i].workgroup_size);
   }
 
   iree_hal_vulkan_executable_t* executable = NULL;

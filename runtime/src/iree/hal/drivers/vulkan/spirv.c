@@ -15,12 +15,14 @@ enum {
   IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
   IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE = 16u,
   IREE_HAL_VULKAN_SPIRV_OP_CAPABILITY = 17u,
+  IREE_HAL_VULKAN_SPIRV_OP_VARIABLE = 59u,
   IREE_HAL_VULKAN_SPIRV_OP_DECORATE = 71u,
   IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES = 5347u,
   IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
   IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
+  IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT = 9u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_BINDING = 33u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET = 34u,
 };
@@ -195,6 +197,34 @@ iree_status_t iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
         decoration == IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET) {
       *out_has_descriptor_binding_decorations = true;
       return iree_ok_status();
+    }
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_spirv_count_push_constant_variables(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_host_size_t* out_push_constant_variable_count) {
+  IREE_ASSERT_ARGUMENT(out_push_constant_variable_count);
+  *out_push_constant_variable_count = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_verify_module(spirv_words, spirv_word_count));
+
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_VARIABLE) continue;
+    if (word_count < 4) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "SPIR-V OpVariable instruction is truncated");
+    }
+    if (operands[2] == IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_PUSH_CONSTANT) {
+      ++*out_push_constant_variable_count;
     }
   }
   return iree_ok_status();

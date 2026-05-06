@@ -45,6 +45,11 @@ iree_status_t iree_hal_vulkan_spirv_has_descriptor_binding_decorations(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     bool* out_has_descriptor_binding_decorations);
 
+// Counts variables declared in the PushConstant storage class.
+iree_status_t iree_hal_vulkan_spirv_count_push_constant_variables(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_host_size_t* out_push_constant_variable_count);
+
 // Counts compute entry points and their NUL-terminated name storage length.
 iree_status_t iree_hal_vulkan_spirv_count_compute_entry_points(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,

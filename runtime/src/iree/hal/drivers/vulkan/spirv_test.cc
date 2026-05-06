@@ -188,6 +188,31 @@ TEST(SpirvTest, DetectsDescriptorBindingDecorations) {
   EXPECT_FALSE(has_descriptor_binding_decorations);
 }
 
+TEST(SpirvTest, CountsPushConstantVariables) {
+  static constexpr uint32_t kPushConstantModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpVariable %3 in PushConstant storage class.
+      0x0004003bu,
+      2u,
+      3u,
+      9u,
+  };
+  iree_host_size_t push_constant_variable_count = 0;
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_push_constant_variables(
+      kPushConstantModule, IREE_ARRAYSIZE(kPushConstantModule),
+      &push_constant_variable_count));
+  EXPECT_EQ(1u, push_constant_variable_count);
+
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_push_constant_variables(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+      &push_constant_variable_count));
+  EXPECT_EQ(0u, push_constant_variable_count);
+}
+
 TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
   static constexpr uint32_t kDuplicateEntryModule[] = {
       0x07230203u,
