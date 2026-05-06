@@ -715,6 +715,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    bda_raw_spirv_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+    "bda_raw_spirv_test.cc"
+  DATA
+    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
+  DEPS
+    ::bda_backends
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+    "vulkan_uses_vk_khr_buffer_device_address"
+)
+
+iree_cc_test(
+  NAME
     file_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
