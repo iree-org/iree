@@ -687,6 +687,10 @@ util.func public @online_attention_unit_m_dim(
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1)>
 //  CHECK-SAME:     ins({{.+}} : tensor<8x4x128xf32>, tensor<?x32x8x128xf32>, tensor<?x32x8x128xf32>, f32)
 //  CHECK-SAME:     outs({{.+}} : tensor<8x4x128xf32>, tensor<8x4xf32>, tensor<8x4xf32>)
+//   CHECK-NOT:     iree_linalg_ext.index
+//       CHECK:     ^bb0(%[[SCORE:[a-zA-Z0-9]+]]: f32):
+//       CHECK:       iree_linalg_ext.yield %[[SCORE]] : f32
+//   CHECK-NOT:     iree_linalg_ext.index
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ATTN]]#0
 //  CHECK-SAME:     tensor<8x4x128xf32> into tensor<8x4x1x128xf32>
 //       CHECK:   %[[EXPAND1:.+]] = tensor.expand_shape %[[ATTN]]#1
@@ -694,3 +698,61 @@ util.func public @online_attention_unit_m_dim(
 //       CHECK:   %[[EXPAND2:.+]] = tensor.expand_shape %[[ATTN]]#2
 //  CHECK-SAME:     tensor<8x4xf32> into tensor<8x4x1xf32>
 //       CHECK:   util.return %[[EXPAND]], %[[EXPAND1]], %[[EXPAND2]]
+
+// -----
+
+util.func public @online_attention_remap_index_after_unit_dim_drop(
+    %query: tensor<1x8x64x64xf16>,
+    %key: tensor<1x8x64x64xf16>,
+    %value: tensor<1x8x64x64xf16>,
+    %scale: f32,
+    %output: tensor<1x8x64x64xf32>,
+    %max: tensor<1x8x64xf32>,
+    %sum: tensor<1x8x64xf32>) -> (tensor<1x8x64x64xf32>, tensor<1x8x64xf32>, tensor<1x8x64xf32>) {
+  %result:3 = iree_linalg_ext.online_attention {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+    ins(%query, %key, %value, %scale
+      : tensor<1x8x64x64xf16>, tensor<1x8x64x64xf16>,
+        tensor<1x8x64x64xf16>, f32)
+    outs(%output, %max, %sum
+      : tensor<1x8x64x64xf32>, tensor<1x8x64xf32>, tensor<1x8x64xf32>) {
+  ^bb0(%score: f32):
+    %q_index = iree_linalg_ext.index 2 : index
+    %kv_index = iree_linalg_ext.index 3 : index
+    %masked = arith.cmpi sge, %q_index, %kv_index : index
+    %zero = arith.constant 0.000000e+00 : f32
+    %result_score = arith.select %masked, %zero, %score : f32
+    iree_linalg_ext.yield %result_score : f32
+  } -> tensor<1x8x64x64xf32>, tensor<1x8x64xf32>, tensor<1x8x64xf32>
+  util.return %result#0, %result#1, %result#2
+    : tensor<1x8x64x64xf32>, tensor<1x8x64xf32>, tensor<1x8x64xf32>
+}
+// CHECK-LABEL: func public @online_attention_remap_index_after_unit_dim_drop
+//       CHECK:   %[[ATTN:.+]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> ()>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+//  CHECK-SAME:     ins({{.+}} : tensor<8x64x64xf16>, tensor<8x64x64xf16>, tensor<8x64x64xf16>, f32)
+//  CHECK-SAME:     outs({{.+}} : tensor<8x64x64xf32>, tensor<8x64xf32>, tensor<8x64xf32>)
+//       CHECK:     %[[Q_INDEX:.+]] = iree_linalg_ext.index 1 : index
+//       CHECK:     %[[KV_INDEX:.+]] = iree_linalg_ext.index 2 : index
+//   CHECK-NOT:     iree_linalg_ext.index 3
+//       CHECK:     arith.cmpi sge, %[[Q_INDEX]], %[[KV_INDEX]] : index
+//       CHECK:   %[[EXPAND0:.+]] = tensor.expand_shape %[[ATTN]]#0
+//  CHECK-SAME:     tensor<8x64x64xf32> into tensor<1x8x64x64xf32>
+//       CHECK:   %[[EXPAND1:.+]] = tensor.expand_shape %[[ATTN]]#1
+//  CHECK-SAME:     tensor<8x64xf32> into tensor<1x8x64xf32>
+//       CHECK:   %[[EXPAND2:.+]] = tensor.expand_shape %[[ATTN]]#2
+//  CHECK-SAME:     tensor<8x64xf32> into tensor<1x8x64xf32>
+//       CHECK:   util.return %[[EXPAND0]], %[[EXPAND1]], %[[EXPAND2]]

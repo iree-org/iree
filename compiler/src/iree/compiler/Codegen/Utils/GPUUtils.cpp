@@ -21,7 +21,10 @@
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -1365,6 +1368,63 @@ SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   });
 
   return rootOps;
+}
+
+Value applyInverseXorSwizzleToDMASourceOffset(
+    OpBuilder &builder, Location loc, Value srcLinearOffset,
+    IREE::Codegen::XORShuffleAttr swizzle, Value dest) {
+  // Compute the subgroup's base offset within the full allocation by tracing
+  // through view-like ops and accumulating the linear element offset.
+  Value destTrace = dest;
+  OpFoldResult totalOffset = builder.getIndexAttr(0);
+  while (auto viewOp = destTrace.getDefiningOp<ViewLikeOpInterface>()) {
+    if (auto subviewOp = dyn_cast<memref::SubViewOp>(viewOp.getOperation())) {
+      auto parentType = cast<MemRefType>(subviewOp.getSource().getType());
+      SmallVector<int64_t> strides;
+      int64_t offset;
+      LogicalResult res = parentType.getStridesAndOffset(strides, offset);
+      assert(succeeded(res) && "expected strided layout on subview source");
+      (void)res;
+      SmallVector<OpFoldResult> strideOFRs =
+          getAsIndexOpFoldResult(builder.getContext(), strides);
+      auto &&[expr, values] = computeLinearIndex(totalOffset, strideOFRs,
+                                                 subviewOp.getMixedOffsets());
+      totalOffset =
+          affine::makeComposedFoldedAffineApply(builder, loc, expr, values);
+    } else {
+      assert((isa<memref::ExpandShapeOp, memref::CollapseShapeOp>(
+                 viewOp.getOperation())) &&
+             "unexpected view-like op in dest chain");
+    }
+    destTrace = viewOp.getViewSource();
+  }
+
+  // Only the offset unaligned to the swizzle period affects the XOR
+  // computation.
+  auto cst = getConstantIntValue(totalOffset);
+  Value swizzleBaseOffset;
+  int64_t swizzlePeriod = swizzle.getSwizzlePeriod();
+  if (!cst || (*cst % swizzlePeriod != 0)) {
+    swizzleBaseOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, totalOffset);
+  }
+
+  // Add the subgroup's base offset within the full allocation.
+  Value swizzleInput = srcLinearOffset;
+  if (swizzleBaseOffset) {
+    swizzleInput =
+        arith::AddIOp::create(builder, loc, swizzleBaseOffset, srcLinearOffset);
+  }
+
+  // Apply the swizzle (handles access-width alignment internally).
+  Value swizzled = getValueOrCreateConstantIndexOp(
+      builder, loc, swizzle.swizzleOffset(builder, loc, swizzleInput, dest));
+
+  // Subtract the subgroup base offset.
+  if (swizzleBaseOffset) {
+    return arith::SubIOp::create(builder, loc, swizzled, swizzleBaseOffset);
+  }
+  return swizzled;
 }
 
 } // namespace mlir::iree_compiler

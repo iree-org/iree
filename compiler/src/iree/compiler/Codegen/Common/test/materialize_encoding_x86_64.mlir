@@ -176,6 +176,9 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
   return %5 : tensor<?x?xf32>
 }
 //   CHECK-DAG: #[[$MAP_INNER:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//   CHECK-DAG: #[[$MAP_LHS:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+//   CHECK-DAG: #[[$MAP_RHS:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//   CHECK-DAG: #[[$MAP_ACC:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: func @pack_gemm_fill_dynamic_inner_tiled_avx512(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -192,6 +195,11 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[PACK_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
+// The RHS pack uses `outer_dims_perm = [1, 0]`, so its outer dims come out as
+// (N_iter, K_iter) — mmt4d-style — not (K_iter, N_iter). The inner_tiled op
+// must label its RHS operand with the matching `(d1, d2)` map, otherwise the
+// verifier rejects the op with "shape does not match iteration bounds".
+//  CHECK-SAME:       indexing_maps = [#[[$MAP_LHS]], #[[$MAP_RHS]], #[[$MAP_ACC]]]
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>, semantics = #iree_cpu.mma_semantics<>
 //       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INNER]]
 //       CHECK:   return %[[UNPACK]]

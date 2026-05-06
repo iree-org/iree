@@ -326,7 +326,7 @@ func.func @vector_distribute_dispatch() attributes {hal.executable.target = #exe
 //   CHECK-LABEL: llvm.func @vector_distribute_dispatch
 // CHECK-COUNT-5:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
-//         CHECK:     nvvm.barrier0
+//         CHECK:     nvvm.barrier
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync bfly
 
@@ -372,7 +372,7 @@ func.func @vector_distribution_broadcast_dispatch() attributes {hal.executable.t
 //   CHECK-LABEL: llvm.func @vector_distribution_broadcast_dispatch
 // CHECK-COUNT-5:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} : vector<1xf32>, !llvm.ptr<3>
-//         CHECK:     nvvm.barrier0
+//         CHECK:     nvvm.barrier
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}

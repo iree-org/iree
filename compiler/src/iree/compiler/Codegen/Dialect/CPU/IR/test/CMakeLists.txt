@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "invalid.mlir"
     "iree_cpu_inner_tiled_ops.mlir"
+    "lower_inner_tiled.mlir"
     "roundtrip.mlir"
   TOOLS
     FileCheck

@@ -89,6 +89,20 @@ def LLVMGPULower1DVectorOpsPass :
     "ub::UBDialect",
     "vector::VectorDialect",
     "IREE::VectorExt::IREEVectorExtDialect",
+
+def LLVMGPUVectorFlatteningPass :
+    InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
+  let summary = "Flatten n-D vectors.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPUVectorMultiReductionLoweringPass :
+    InterfacePass<"iree-llvmgpu-vector-multi-reduction-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Lower vector.multi_reduction ops.";
+  let dependentDialects = [
+    "vector::VectorDialect",
   ];
 }
 

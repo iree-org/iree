@@ -9,6 +9,32 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 
+// Out-of-line definitions for the `llvm::cl::parser` specializations declared
+// in CodegenOptions.h.
+namespace llvm::cl {
+
+template class basic_parser<mlir::iree_compiler::CPUCodegenOptions>;
+bool parser<mlir::iree_compiler::CPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::CPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::CPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::anchor() {}
+
+template class basic_parser<mlir::iree_compiler::GPUCodegenOptions>;
+bool parser<mlir::iree_compiler::GPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::GPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::GPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::anchor() {}
+
+} // namespace llvm::cl
+
 namespace mlir::iree_compiler {
 
 namespace {

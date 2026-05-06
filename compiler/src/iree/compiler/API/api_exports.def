@@ -290,6 +290,9 @@ EXPORTS
   mlirComplexTypeGetElementType
   mlirComplexTypeGetName
   mlirComplexTypeGetTypeID
+  mlirConditionallySpeculatableOpInterfaceAttachFallbackModel
+  mlirConditionallySpeculatableOpInterfaceGetSpeculatability
+  mlirConditionallySpeculatableOpInterfaceTypeID
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
   mlirContextCreate

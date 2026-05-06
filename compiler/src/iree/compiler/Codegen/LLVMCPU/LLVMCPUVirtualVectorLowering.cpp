@@ -4,14 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmNeon/Transforms.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
@@ -148,7 +152,8 @@ public:
     registry.insert<affine::AffineDialect, arith::ArithDialect,
                     linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, tensor::TensorDialect,
-                    vector::VectorDialect, arm_neon::ArmNeonDialect>();
+                    vector::VectorDialect, arm_neon::ArmNeonDialect,
+                    LLVM::LLVMDialect, IREE::Util::UtilDialect>();
   }
   void runOnOperation() override;
 };
@@ -236,7 +241,30 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     vector::populateVectorMultiReductionUnrollingPatterns(
         patterns, vectorMultiReductionLowering);
     populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
+
+    // Lower vector-semantics `iree_codegen.inner_tiled` ops (e.g. data-tiled
+    // matmul on CPU) the same way we lower other high-level vector ops: unroll
+    // any non-unit iter dim, drop the (now-unit) iter domain, then replace the
+    // op with the per-intrinsic ops emitted by its kind's
+    // `buildUnderlyingOperations` (`llvm.call_intrinsic` for CPU's
+    // `IREE::CPU::DataTiledMMAAttr`). Note that the preceding
+    // `DropVectorUnitDimsPass` only handles `vector.*` ops; the op-specific
+    // `populateDropInnerTiledUnitDimsPatterns` here handles the iter
+    // dimensions of `inner_tiled` itself, so they don't conflict.
+    IREE::Codegen::populateUnrollInnerTiledPatterns(patterns);
+    IREE::Codegen::populateDropInnerTiledUnitDimsPatterns(patterns);
+    IREE::Codegen::populateLowerInnerTiledPatterns(patterns);
+
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
+  }
+
+  // The `inner_tiled` lowering patterns above wrap their per-intrinsic ACC
+  // distribute/reassemble in `IREE::Util::HoistableConversionOp` pairs so
+  // those conversions can sink/hoist out of any reduction loop wrapping the
+  // intrinsic. Cancel the surviving inverse pairs in this function — anything
+  // that didn't get hoisted out is a trivial round-trip and folds away here.
+  if (failed(IREE::Util::eliminateHoistableConversions(funcOp))) {
+    return signalPassFailure();
   }
 }
 } // namespace

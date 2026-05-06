@@ -6,10 +6,14 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -628,10 +632,129 @@ DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
   return OpFoldResult();
 }
 
+// Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
+// additional ops (potentially broadcasting or widening LHS/RHS or creating an
+// add op if the intrinsic isn't already adding the accumulator).
+//
+// Currently assumes that if one of LHS or RHS needs to be broadcasted, then it
+// musst be LHS. This corresponds to the fact that transposed intrinsics are not
+// currently handled by the caller, which is just a temporary limitation.
+static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
+                                       MMAIntrinsic intrinsic, Value lhs,
+                                       Value rhs, Value acc) {
+  // Replicate LHS (M=1, K elements) across RHS's N lanes so both have the
+  // intrinsic's flat lane width. Going through a (N, K) 2-D form keeps the
+  // K-pair contiguous; a final shape_cast collapses to the flat 1-D vector
+  // the LLVM intrinsic expects. All x86 LLVM intrinsics we target here
+  // (AVX-512 FMA, VNNI vpdpwssd, BF16 dpbf16ps, integer pmaddwd) take same-
+  // width vector operands — there is no narrow-input variant. The ISA-level
+  // `{1toN}` broadcast-from-memory form is recovered later by the x86
+  // backend's instruction selector pattern-matching this `vector.broadcast`-
+  // of-load into the EVEX broadcast operand, so the explicit broadcast here
+  // is what *enables* that, not a perf liability.
+  // TODO(24311): Arm's by-element FMA (`fmla.4s vd, vn, vm[idx]`) is exposed
+  // via separate intrinsics (e.g. `llvm.aarch64.neon.fma.lane.v4f32`) that
+  // take `(vector, vector, lane_idx)`; when we add Arm support, those cases
+  // should bypass this broadcast and emit the lane-index intrinsic directly.
+  auto lhsType = cast<VectorType>(lhs.getType());
+  auto rhsType = cast<VectorType>(rhs.getType());
+  if (lhsType.getNumElements() != rhsType.getNumElements()) {
+    int64_t replicate = rhsType.getNumElements() / lhsType.getNumElements();
+    auto bcastType = VectorType::get({replicate, lhsType.getNumElements()},
+                                     lhsType.getElementType());
+    Value bcast = vector::BroadcastOp::create(builder, loc, bcastType, lhs);
+    lhs = vector::ShapeCastOp::create(builder, loc, rhsType, bcast);
+  }
+
+  // Sign-/float-extend a vector to a wider element type. Used by the
+  // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
+  // intrinsic only exists at the wider type.
+  auto widen = [&builder, loc](Value v, Type wider) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    auto wideTy = VectorType::get(vt.getShape(), wider);
+    if (isa<FloatType>(vt.getElementType())) {
+      return arith::ExtFOp::create(builder, loc, wideTy, v);
+    }
+    return arith::ExtSIOp::create(builder, loc, wideTy, v);
+  };
+
+  // Emit llvm.call_intrinsic.
+  auto call = [&builder, loc](StringRef name, Type resultType,
+                              ValueRange args) -> Value {
+    return LLVM::CallIntrinsicOp::create(builder, loc, resultType,
+                                         builder.getStringAttr(name), args)
+        .getResult(0);
+  };
+
+  Type f32 = builder.getF32Type();
+  Type i16 = builder.getI16Type();
+  Type accType = acc.getType();
+  switch (intrinsic) {
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+    return call("llvm.fma.v8f32", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+    return call("llvm.fma.v8f64", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+    return call("llvm.fma.v16f32", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+    return call("llvm.fma.v16f32", accType,
+                ValueRange{widen(lhs, f32), widen(rhs, f32), acc});
+  case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+    return call("llvm.fma.v32f16", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+    return call("llvm.x86.avx512bf16.dpbf16ps.512", accType,
+                ValueRange{acc, lhs, rhs});
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+    return call("llvm.x86.avx512.vpdpwssd.512", accType,
+                ValueRange{acc, lhs, rhs});
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+    return call("llvm.x86.avx512.vpdpwssd.512", accType,
+                ValueRange{acc, widen(lhs, i16), widen(rhs, i16)});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16: {
+    return arith::AddIOp::create(
+        builder, loc, acc,
+        call("llvm.x86.avx512.pmaddw.d.512", accType, ValueRange{lhs, rhs}));
+  }
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16: {
+    return arith::AddIOp::create(
+        builder, loc, acc,
+        call("llvm.x86.avx512.pmaddw.d.512", accType,
+             ValueRange{widen(lhs, i16), widen(rhs, i16)}));
+  }
+  default:
+    return {};
+  }
+}
+
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
-  return failure();
+  // TODO: handle `transposed_intrinsic`. When set, LHS and RHS swap roles
+  // (narrow-N case), and the broadcast in `createCpuMmaIntrinsicCall` would
+  // need to broadcast whichever operand is narrower rather than always LHS.
+  // Bail for now so we don't silently produce wrong code.
+  if (getTransposedIntrinsic()) {
+    return failure();
+  }
+
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (inputs.size() != 2 || outputs.size() != 1 ||
+      !llvm::equal(regTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  MMAIntrinsic intrinsic = getIntrinsic();
+  auto emitIntrinsic = [&](OpBuilder &b, Location loc, Value lhs, Value rhs,
+                           Value acc) -> Value {
+    return createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs, acc);
+  };
+  return Codegen::buildDataTiledMMAUnderlyingOperations(
+      builder, loc, getSwizzle(*this, /*operandIdx=*/0),
+      getSwizzle(*this, /*operandIdx=*/1), getSwizzle(*this, /*operandIdx=*/2),
+      getIntrinsicsM(), getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
+      emitIntrinsic, results);
 }
 
 //===----------------------------------------------------------------------===//

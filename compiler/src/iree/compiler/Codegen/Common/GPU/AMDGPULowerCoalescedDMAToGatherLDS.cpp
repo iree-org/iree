@@ -218,16 +218,16 @@ static void applyOOBClamping(OpBuilder &builder, Location loc, Value source,
 /// Trace a memref value through view-like ops to find a SwizzleHintOp.
 /// Returns the swizzle attribute if it is an XOR swizzle (which is
 /// self-inverse), std::nullopt otherwise.
-static std::optional<IREE::Codegen::SwizzleAttrInterface>
+static std::optional<IREE::Codegen::XORShuffleAttr>
 getDestSwizzleAttr(Value dest) {
   dest = getRootSource(dest);
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
-    auto swizzle = hintOp.getSwizzle();
     // Only XOR swizzle is self-inverse (swizzle(swizzle(x)) = x), so it can
     // be applied to source addresses as the inverse transformation. Other
     // swizzle types (e.g. rotate_rows) are not self-inverse.
-    if (isa<IREE::Codegen::XORShuffleAttr>(swizzle)) {
-      return swizzle;
+    if (auto xorSwizzle =
+            dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle())) {
+      return xorSwizzle;
     }
   }
   return std::nullopt;
@@ -342,7 +342,7 @@ struct LowerCoalescedGatherDMAPattern final
 
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
-    std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle =
+    std::optional<IREE::Codegen::XORShuffleAttr> destSwizzle =
         getDestSwizzleAttr(dest);
 
     auto sourceType = cast<MemRefType>(source.getType());
@@ -493,7 +493,7 @@ private:
       ArrayRef<int64_t> destShape, int64_t numLinearDims, Type elementType,
       OperandRange indices, ArrayRef<TransferSegment> segments,
       ArrayRef<Value> segmentLaneOffsets, std::optional<ArrayAttr> inBoundsAttr,
-      std::optional<IREE::Codegen::SwizzleAttrInterface> destSwizzle) const {
+      std::optional<IREE::Codegen::XORShuffleAttr> destSwizzle) const {
     int64_t destRank = destShape.size();
     int64_t numOuterDims = destRank - numLinearDims;
     LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
@@ -543,10 +543,8 @@ private:
           // Apply inverse source swizzle when destination has XOR swizzle.
           // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
           if (destSwizzle) {
-            srcLinearOffset = getValueOrCreateConstantIndexOp(
-                rewriter, loc,
-                destSwizzle->swizzleOffset(rewriter, loc, srcLinearOffset,
-                                           dest));
+            srcLinearOffset = applyInverseXorSwizzleToDMASourceOffset(
+                rewriter, loc, srcLinearOffset, *destSwizzle, dest);
           }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);

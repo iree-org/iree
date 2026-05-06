@@ -118,3 +118,38 @@ func.func @gather_tensor_base_2d(%buffer: tensor<10x20xf32>,
 // CHECK-SAME:        %[[BUF:[^:]+]]: tensor<10x20xf32>
 // CHECK-NOT:   vector.gather
 // CHECK:       tensor.extract %[[BUF]]
+
+// -----
+
+// `iree_codegen.inner_tiled` lowering. The pass runs three pattern sets in
+// sequence on the op (unroll non-unit iter dims to unit, drop the now-unit
+// iter domain, lower the iter-free vector `inner_tiled` to
+// `llvm.call_intrinsic` via the kind's `buildUnderlyingOperations`) and ends
+// with `IREE::Util::eliminateHoistableConversions` to cancel the inverse
+// conversion pairs the lowering patterns leave around the ACC. On a single-
+// tile AVX-512 1x16x1 f32 matmul, the end result is one `llvm.fma.v16f32`
+// call with no surviving `util.hoistable_conversion`s.
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (j, k)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+func.func @lower_avx512_1x16x1_f32(
+    %lhs: vector<1x1x1x1xf32>, %rhs: vector<1x1x16x1xf32>,
+    %acc: vector<1x1x1x16xf32>) -> vector<1x1x1x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<1x1x1x1xf32>, vector<1x1x16x1xf32> into vector<1x1x1x16xf32>
+  return %0 : vector<1x1x1x16xf32>
+}
+
+// CHECK-LABEL: func @lower_avx512_1x16x1_f32
+//   CHECK-NOT:   iree_codegen.inner_tiled
+//   CHECK-NOT:   util.hoistable_conversion
+//       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>

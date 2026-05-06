@@ -185,14 +185,8 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
                     bool insertBarrier);
 
 // Various populate pattern methods.
-void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
-void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
-void populateIREEGPUVectorUnrollPatterns(
-    RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
-// Version of unrolling with a preset configuration.
-void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 // Populate patterns to fold tensor.empty ops through swizzle hint ops.
 void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns);
 
