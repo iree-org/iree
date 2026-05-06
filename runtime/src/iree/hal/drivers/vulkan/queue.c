@@ -1076,6 +1076,12 @@ static iree_status_t iree_hal_vulkan_queue_bda_publication_block_create(
         iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                          "Vulkan BDA publication buffer has no device address");
   }
+  if (iree_status_is_ok(status) &&
+      capacity > UINT64_MAX - block->device_address) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan BDA publication buffer device address range overflows");
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_map_range(
         block->buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,

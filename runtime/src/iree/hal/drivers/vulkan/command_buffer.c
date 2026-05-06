@@ -1382,6 +1382,14 @@ static iree_status_t iree_hal_vulkan_command_buffer_allocate_bda_binding_table(
         IREE_STATUS_OUT_OF_RANGE,
         "Vulkan BDA dispatch binding table exceeds publication storage");
   }
+  if (IREE_UNLIKELY(
+          byte_offset > UINT64_MAX - bda_recording_state->device_address ||
+          host_length > UINT64_MAX - (bda_recording_state->device_address +
+                                      byte_offset))) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan BDA dispatch binding table device address range overflows");
+  }
 
   *out_host_span = iree_make_byte_span(
       bda_recording_state->host_span.data + byte_offset, host_length);
