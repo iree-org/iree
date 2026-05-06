@@ -74,14 +74,8 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
   EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
-
-  iree_host_size_t entry_point_count = 0;
-  iree_host_size_t name_storage_size = 0;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_compute_entry_points(
-      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &entry_point_count,
-      &name_storage_size));
-  EXPECT_EQ(1u, entry_point_count);
-  EXPECT_EQ(5u, name_storage_size);
+  EXPECT_EQ(1u, analysis.compute_entry_point_count);
+  EXPECT_EQ(5u, analysis.compute_entry_point_name_storage_size);
 
   iree_hal_vulkan_spirv_compute_entry_point_t entry_point = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_parse_compute_entry_points(
@@ -148,6 +142,8 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
   EXPECT_TRUE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(1u, analysis.push_constant_variable_count);
   EXPECT_TRUE(analysis.has_descriptor_storage_class_variables);
+  EXPECT_EQ(0u, analysis.compute_entry_point_count);
+  EXPECT_EQ(0u, analysis.compute_entry_point_name_storage_size);
 
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
@@ -156,6 +152,8 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
   EXPECT_FALSE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(0u, analysis.push_constant_variable_count);
   EXPECT_FALSE(analysis.has_descriptor_storage_class_variables);
+  EXPECT_EQ(1u, analysis.compute_entry_point_count);
+  EXPECT_EQ(5u, analysis.compute_entry_point_name_storage_size);
 }
 
 TEST(SpirvTest, ParsesMultipleComputeEntryPoints) {
@@ -199,13 +197,11 @@ TEST(SpirvTest, ParsesMultipleComputeEntryPoints) {
       9u,
   };
 
-  iree_host_size_t entry_point_count = 0;
-  iree_host_size_t name_storage_size = 0;
-  IREE_ASSERT_OK(iree_hal_vulkan_spirv_count_compute_entry_points(
-      kMultiEntryModule, IREE_ARRAYSIZE(kMultiEntryModule), &entry_point_count,
-      &name_storage_size));
-  EXPECT_EQ(2u, entry_point_count);
-  EXPECT_EQ(9u, name_storage_size);
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kMultiEntryModule, IREE_ARRAYSIZE(kMultiEntryModule), &analysis));
+  EXPECT_EQ(2u, analysis.compute_entry_point_count);
+  EXPECT_EQ(9u, analysis.compute_entry_point_name_storage_size);
 
   iree_hal_vulkan_spirv_compute_entry_point_t entry_points[2] = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_parse_compute_entry_points(
@@ -238,6 +234,26 @@ TEST(SpirvTest, RejectsTruncatedInstruction) {
       StatusCode::kInvalidArgument,
       iree_hal_vulkan_spirv_verify_module(kTruncatedModule,
                                           IREE_ARRAYSIZE(kTruncatedModule)));
+}
+
+TEST(SpirvTest, RejectsTruncatedEntryPointOperands) {
+  static constexpr uint32_t kTruncatedEntryPointModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // OpEntryPoint declares only ExecutionModel and EntryPoint id.
+      0x0003000fu,
+      5u,
+      1u,
+  };
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_analyze_module(
+          kTruncatedEntryPointModule,
+          IREE_ARRAYSIZE(kTruncatedEntryPointModule), &analysis));
 }
 
 TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {

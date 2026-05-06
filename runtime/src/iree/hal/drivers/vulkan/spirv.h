@@ -41,6 +41,12 @@ typedef struct iree_hal_vulkan_spirv_module_analysis_t {
 
   // Whether any OpVariable declares a descriptor-backed storage class.
   bool has_descriptor_storage_class_variables;
+
+  // Number of OpEntryPoint declarations in the GLCompute execution model.
+  iree_host_size_t compute_entry_point_count;
+
+  // Byte length needed to copy all compute entry point names with NULs.
+  iree_host_size_t compute_entry_point_name_storage_size;
 } iree_hal_vulkan_spirv_module_analysis_t;
 
 // Verifies the structural SPIR-V header and instruction stream.
@@ -55,12 +61,6 @@ iree_status_t iree_hal_vulkan_spirv_analyze_module(
 // Verifies the raw BDA v1 hidden root push-constant block shape.
 iree_status_t iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count);
-
-// Counts compute entry points and their NUL-terminated name storage length.
-iree_status_t iree_hal_vulkan_spirv_count_compute_entry_points(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_host_size_t* out_entry_point_count,
-    iree_host_size_t* out_name_storage_size);
 
 // Parses compute entry points and their static local workgroup sizes.
 //

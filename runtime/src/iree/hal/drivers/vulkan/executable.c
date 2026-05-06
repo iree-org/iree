@@ -1264,30 +1264,28 @@ typedef enum iree_hal_vulkan_bda_spirv_verification_flag_bits_e {
 } iree_hal_vulkan_bda_spirv_verification_flag_bits_t;
 typedef uint32_t iree_hal_vulkan_bda_spirv_verification_flags_t;
 
-static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
+static iree_status_t iree_hal_vulkan_verify_bda_spirv_analysis(
+    const iree_hal_vulkan_spirv_module_analysis_t* analysis,
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
-  iree_hal_vulkan_spirv_module_analysis_t analysis;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_analyze_module(
-      spirv_words, spirv_word_count, &analysis));
-  if (!analysis.has_physical_storage_buffer_addresses_capability) {
+  if (!analysis->has_physical_storage_buffer_addresses_capability) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must declare PhysicalStorageBufferAddresses");
   }
 
-  if (!analysis.uses_physical_storage_buffer64_glsl450) {
+  if (!analysis->uses_physical_storage_buffer64_glsl450) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
   }
-  if (analysis.has_descriptor_binding_decorations) {
+  if (analysis->has_descriptor_binding_decorations) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must not declare descriptor set or binding "
         "decorations");
   }
-  if (analysis.has_descriptor_storage_class_variables) {
+  if (analysis->has_descriptor_storage_class_variables) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must not declare descriptor-backed variables");
@@ -1302,6 +1300,16 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
   }
 
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
+  iree_hal_vulkan_spirv_module_analysis_t analysis;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_analyze_module(
+      spirv_words, spirv_word_count, &analysis));
+  return iree_hal_vulkan_verify_bda_spirv_analysis(
+      &analysis, spirv_words, spirv_word_count, verification_flags);
 }
 
 static iree_status_t iree_hal_vulkan_verify_bda_spirv(
@@ -1585,10 +1593,12 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     spirv_words = aligned_spirv_words;
   }
 
-  iree_host_size_t entry_point_count = 0;
-  iree_host_size_t name_storage_size = 0;
-  iree_status_t status = iree_hal_vulkan_spirv_count_compute_entry_points(
-      spirv_words, spirv_word_count, &entry_point_count, &name_storage_size);
+  iree_hal_vulkan_spirv_module_analysis_t analysis;
+  iree_status_t status = iree_hal_vulkan_spirv_analyze_module(
+      spirv_words, spirv_word_count, &analysis);
+  const iree_host_size_t entry_point_count = analysis.compute_entry_point_count;
+  const iree_host_size_t name_storage_size =
+      analysis.compute_entry_point_name_storage_size;
   if (iree_status_is_ok(status) && entry_point_count == 0) {
     status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "raw Vulkan BDA executable has no compute entry "
@@ -1619,8 +1629,8 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     verification_flags = IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE;
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_verify_bda_spirv_module(
-        spirv_words, spirv_word_count, verification_flags);
+    status = iree_hal_vulkan_verify_bda_spirv_analysis(
+        &analysis, spirv_words, spirv_word_count, verification_flags);
   }
 
   iree_hal_vulkan_executable_t* executable = NULL;
