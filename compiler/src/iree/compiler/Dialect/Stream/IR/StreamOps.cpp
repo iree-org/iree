@@ -3863,7 +3863,7 @@ void AsyncParameterWriteOp::getAsyncAccessRanges(
 
 LogicalResult AsyncParameterGatherOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, PropertyRef properties, RegionRange regions,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   // The result type matches the target operand type.
   AsyncParameterGatherOpAdaptor adaptor(operands, attributes, properties,
@@ -3929,7 +3929,7 @@ void AsyncParameterGatherOp::getAsyncAccessRanges(
 
 LogicalResult AsyncParameterScatterOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, PropertyRef properties, RegionRange regions,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   // The result type matches the source operand type.
   AsyncParameterScatterOpAdaptor adaptor(operands, attributes, properties,
