@@ -736,17 +736,18 @@ materializeDuplicatableLinalgOp(linalg::LinalgOp linalgOp,
                 DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
   };
 
-  setTileSizeAttr(linalgOp, useGroups.front().first);
-
   OpBuilder builder(linalgOp);
   builder.setInsertionPointAfter(linalgOp);
-  for (auto &useGroup : llvm::drop_begin(useGroups)) {
+  for (auto &useGroup : useGroups) {
     Operation *cloned = builder.clone(*linalgOp.getOperation());
     setTileSizeAttr(cloned, useGroup.first);
     Value clonedResult = cloned->getResult(0);
     for (OpOperand *use : useGroup.second) {
       use->set(clonedResult);
     }
+  }
+  if (result.use_empty()) {
+    linalgOp->erase();
   }
   return success();
 }
