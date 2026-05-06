@@ -29,6 +29,7 @@ iree_cc_library(
     "command_buffer.h"
     "executable.h"
     "physical_device.h"
+    "spirv.h"
   DEPS
     ::api
     Vulkan::Headers
@@ -52,6 +53,21 @@ iree_cc_test(
     iree::hal
     iree::hal::utils::executable_header
     iree::schemas::vulkan_executable_def_c_fbs
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    spirv_test
+  SRCS
+    "spirv_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   GROUP
@@ -89,6 +105,8 @@ iree_cc_library(
     "slab_provider.h"
     "sparse_buffer.c"
     "sparse_buffer.h"
+    "spirv.c"
+    "spirv.h"
     "syms.h"
   DEPS
     ::api

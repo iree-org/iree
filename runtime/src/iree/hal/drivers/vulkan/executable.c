@@ -10,6 +10,7 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/flatcc/parsing.h"
+#include "iree/hal/drivers/vulkan/spirv.h"
 #include "iree/hal/utils/executable_debug_info.h"
 #include "iree/hal/utils/executable_header.h"
 #include "iree/schemas/vulkan_executable_def_reader.h"
@@ -1247,200 +1248,10 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_bda_metadata(
   return iree_ok_status();
 }
 
-enum {
-  IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL = 14u,
-  IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT = 15u,
-  IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE = 16u,
-  IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
-  IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
-  IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
-  IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
-};
-
-static bool iree_hal_vulkan_spirv_entry_point_name_matches(
-    const uint32_t* operands, uint16_t operand_word_count,
-    iree_string_view_t entry_point) {
-  if (operand_word_count < 3) return false;
-  const char* name = (const char*)&operands[2];
-  const iree_host_size_t name_capacity = (operand_word_count - 2) * 4;
-  iree_host_size_t name_length = 0;
-  while (name_length < name_capacity && name[name_length] != 0) {
-    ++name_length;
-  }
-  return name_length == entry_point.size &&
-         memcmp(name, entry_point.data, name_length) == 0;
-}
-
-static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
-    const uint32_t* operands, uint16_t operand_word_count,
-    iree_string_view_t* out_name) {
-  if (operand_word_count < 3) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "SPIR-V entry point instruction is truncated");
-  }
-  const char* name = (const char*)&operands[2];
-  const iree_host_size_t name_capacity = (operand_word_count - 2) * 4;
-  iree_host_size_t name_length = 0;
-  while (name_length < name_capacity && name[name_length] != 0) {
-    ++name_length;
-  }
-  if (name_length == name_capacity) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "SPIR-V entry point name is not NUL-terminated");
-  }
-  *out_name = iree_make_string_view(name, name_length);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_spirv_next_instruction(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_host_size_t* inout_word_offset, uint16_t* out_opcode,
-    uint16_t* out_word_count, const uint32_t** out_operands) {
-  if (*inout_word_offset >= spirv_word_count) {
-    *out_opcode = 0;
-    *out_word_count = 0;
-    *out_operands = NULL;
-    return iree_ok_status();
-  }
-  const uint32_t header = spirv_words[*inout_word_offset];
-  const uint16_t word_count = (uint16_t)(header >> 16);
-  const uint16_t opcode = (uint16_t)(header & 0xFFFFu);
-  if (word_count == 0 || *inout_word_offset > spirv_word_count - word_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "SPIR-V instruction at word %" PRIhsz
-                            " exceeds module length",
-                            *inout_word_offset);
-  }
-  *inout_word_offset += word_count;
-  *out_opcode = opcode;
-  *out_word_count = word_count;
-  *out_operands = &spirv_words[*inout_word_offset - word_count + 1];
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_parse_spirv_workgroup_size(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_string_view_t entry_point, bool* out_entry_point_found,
-    uint32_t out_workgroup_size[3]) {
-  if (out_entry_point_found) *out_entry_point_found = false;
-  memset(out_workgroup_size, 0, sizeof(uint32_t) * 3);
-  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
-    return iree_ok_status();
-  }
-
-  uint32_t entry_point_id = 0;
-  iree_host_size_t word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT || word_count < 4) {
-      continue;
-    }
-    if (operands[0] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE) {
-      continue;
-    }
-    if (iree_hal_vulkan_spirv_entry_point_name_matches(
-            operands, (uint16_t)(word_count - 1), entry_point)) {
-      entry_point_id = operands[1];
-      if (out_entry_point_found) *out_entry_point_found = true;
-      break;
-    }
-  }
-  if (entry_point_id == 0) return iree_ok_status();
-
-  word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_EXECUTION_MODE || word_count < 3) {
-      continue;
-    }
-    if (operands[0] != entry_point_id ||
-        operands[1] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE) {
-      continue;
-    }
-    if (word_count < 6) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "SPIR-V LocalSize execution mode for '%.*s' is truncated",
-          (int)entry_point.size, entry_point.data);
-    }
-    out_workgroup_size[0] = operands[2];
-    out_workgroup_size[1] = operands[3];
-    out_workgroup_size[2] = operands[4];
-    return iree_ok_status();
-  }
-  return iree_ok_status();
-}
-
-typedef struct iree_hal_vulkan_raw_bda_entry_point_t {
-  // NUL-terminated compute entry point name inside the raw SPIR-V module.
-  iree_string_view_t name;
-
-  // Static local workgroup size declared for this compute entry point.
-  uint32_t workgroup_size[3];
-} iree_hal_vulkan_raw_bda_entry_point_t;
-
-static iree_status_t iree_hal_vulkan_count_raw_bda_entry_points(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_host_size_t* out_entry_point_count,
-    iree_host_size_t* out_name_storage_size) {
-  *out_entry_point_count = 0;
-  *out_name_storage_size = 0;
-  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "Vulkan BDA executable is not SPIR-V");
-  }
-
-  iree_host_size_t word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT || word_count < 4) {
-      continue;
-    }
-    if (operands[0] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE) {
-      continue;
-    }
-
-    iree_string_view_t name = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_entry_point_name(
-        operands, (uint16_t)(word_count - 1), &name));
-    iree_host_size_t entry_name_storage_size = 0;
-    if (!iree_host_size_checked_add(name.size, /*NUL=*/1,
-                                    &entry_name_storage_size) ||
-        !iree_host_size_checked_add(*out_name_storage_size,
-                                    entry_name_storage_size,
-                                    out_name_storage_size)) {
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "raw Vulkan BDA export name storage overflows");
-    }
-    ++*out_entry_point_count;
-  }
-  if (*out_entry_point_count == 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "raw Vulkan BDA executable has no compute entry "
-                            "points");
-  }
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
     flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
     uint32_t out_workgroup_size[3]) {
-  return iree_hal_vulkan_parse_spirv_workgroup_size(
+  return iree_hal_vulkan_spirv_parse_compute_workgroup_size(
       (const uint32_t*)spirv_code_vec,
       flatbuffers_uint32_vec_len(spirv_code_vec), entry_point,
       /*out_entry_point_found=*/NULL, out_workgroup_size);
@@ -1449,37 +1260,19 @@ static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
 static iree_status_t iree_hal_vulkan_verify_bda_spirv(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
     iree_string_view_t entry_point, uint32_t out_workgroup_size[3]) {
-  if (spirv_word_count < 5 || spirv_words[0] != 0x07230203u) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "Vulkan BDA executable is not SPIR-V");
-  }
-
-  bool has_physical_storage_buffer_memory_model = false;
-  iree_host_size_t word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MEMORY_MODEL || word_count < 3) {
-      continue;
-    }
-    has_physical_storage_buffer_memory_model =
-        operands[0] ==
-            IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
-        operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
-    break;
-  }
-  if (!has_physical_storage_buffer_memory_model) {
+  bool uses_physical_storage_buffer64_glsl450 = false;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_spirv_uses_physical_storage_buffer64_glsl450(
+          spirv_words, spirv_word_count,
+          &uses_physical_storage_buffer64_glsl450));
+  if (!uses_physical_storage_buffer64_glsl450) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
   }
 
   bool entry_point_found = false;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_parse_spirv_workgroup_size(
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_compute_workgroup_size(
       spirv_words, spirv_word_count, entry_point, &entry_point_found,
       out_workgroup_size));
   if (!entry_point_found) {
@@ -1487,51 +1280,6 @@ static iree_status_t iree_hal_vulkan_verify_bda_spirv(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable has no compute entry point '%.*s'",
         (int)entry_point.size, entry_point.data);
-  }
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_parse_raw_bda_entry_points(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_host_size_t entry_point_capacity,
-    iree_hal_vulkan_raw_bda_entry_point_t* out_entry_points) {
-  iree_host_size_t entry_point_count = 0;
-  iree_host_size_t word_offset = 5;
-  while (word_offset < spirv_word_count) {
-    uint16_t opcode = 0;
-    uint16_t word_count = 0;
-    const uint32_t* operands = NULL;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
-        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
-        &operands));
-    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_ENTRY_POINT || word_count < 4) {
-      continue;
-    }
-    if (operands[0] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE) {
-      continue;
-    }
-    if (entry_point_count >= entry_point_capacity) {
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "raw Vulkan BDA entry point table overflowed");
-    }
-
-    iree_hal_vulkan_raw_bda_entry_point_t* entry_point =
-        &out_entry_points[entry_point_count];
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_entry_point_name(
-        operands, (uint16_t)(word_count - 1), &entry_point->name));
-    for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
-      if (iree_string_view_equal(out_entry_points[i].name, entry_point->name)) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "raw Vulkan BDA executable has duplicate "
-                                "compute entry point '%.*s'",
-                                (int)entry_point->name.size,
-                                entry_point->name.data);
-      }
-    }
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv(
-        spirv_words, spirv_word_count, entry_point->name,
-        entry_point->workgroup_size));
-    ++entry_point_count;
   }
   return iree_ok_status();
 }
@@ -1797,10 +1545,15 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
 
   iree_host_size_t entry_point_count = 0;
   iree_host_size_t name_storage_size = 0;
-  iree_status_t status = iree_hal_vulkan_count_raw_bda_entry_points(
+  iree_status_t status = iree_hal_vulkan_spirv_count_compute_entry_points(
       spirv_words, spirv_word_count, &entry_point_count, &name_storage_size);
+  if (iree_status_is_ok(status) && entry_point_count == 0) {
+    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "raw Vulkan BDA executable has no compute entry "
+                              "points");
+  }
 
-  iree_hal_vulkan_raw_bda_entry_point_t* entry_points = NULL;
+  iree_hal_vulkan_spirv_compute_entry_point_t* entry_points = NULL;
   if (iree_status_is_ok(status)) {
     iree_host_size_t entry_point_table_size = 0;
     if (!iree_host_size_checked_mul(entry_point_count, sizeof(entry_points[0]),
@@ -1813,8 +1566,14 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     }
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_parse_raw_bda_entry_points(
+    status = iree_hal_vulkan_spirv_parse_compute_entry_points(
         spirv_words, spirv_word_count, entry_point_count, entry_points);
+  }
+  for (iree_host_size_t i = 0;
+       iree_status_is_ok(status) && i < entry_point_count; ++i) {
+    status = iree_hal_vulkan_verify_bda_spirv(spirv_words, spirv_word_count,
+                                              entry_points[i].name,
+                                              entry_points[i].workgroup_size);
   }
 
   iree_hal_vulkan_executable_t* executable = NULL;
