@@ -181,6 +181,27 @@ class BdaRawSpirvTest : public CtsTestBase<> {
     };
   }
 
+  static std::vector<iree_hal_buffer_ref_t> MakeOversizedPublicationBindings(
+      iree_hal_buffer_t* input_buffer, iree_hal_buffer_t* output_buffer) {
+    static constexpr iree_host_size_t kDefaultPublicationBlockLength =
+        64 * 1024;
+    static constexpr iree_host_size_t kBindingCount =
+        kDefaultPublicationBlockLength / sizeof(uint64_t) + 1;
+
+    std::vector<iree_hal_buffer_ref_t> binding_refs(kBindingCount);
+    binding_refs[0] = iree_hal_make_buffer_ref(
+        input_buffer, /*offset=*/0, iree_hal_buffer_byte_length(input_buffer));
+    binding_refs[1] =
+        iree_hal_make_buffer_ref(output_buffer, /*offset=*/0,
+                                 iree_hal_buffer_byte_length(output_buffer));
+    for (iree_host_size_t i = 2; i < binding_refs.size(); ++i) {
+      binding_refs[i] =
+          iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
+                                   iree_hal_buffer_byte_length(input_buffer));
+    }
+    return binding_refs;
+  }
+
   void ExpectOutput(iree_hal_buffer_t* output_buffer) {
     std::vector<int32_t> output_data = ReadBufferData<int32_t>(output_buffer);
     EXPECT_THAT(output_data, ContainerEq(std::vector<int32_t>{8, 5, 37, 407}));
@@ -278,6 +299,30 @@ TEST_P(BdaRawSpirvTest, QueueDispatchExecutesRawBdaShader) {
   ExpectOutput(output_buffer);
 }
 
+TEST_P(BdaRawSpirvTest, QueueDispatchHandlesOversizedBdaPublication) {
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  std::vector<iree_hal_buffer_ref_t> binding_refs =
+      MakeOversizedPublicationBindings(input_buffer, output_buffer);
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/binding_refs.size(),
+      /*.values=*/binding_refs.data(),
+  };
+
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      dispatch_signal, executable_, /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  ExpectOutput(output_buffer);
+}
+
 TEST_P(BdaRawSpirvTest, CommandBufferExecutesRawBdaShader) {
   Ref<iree_hal_buffer_t> input_buffer;
   Ref<iree_hal_buffer_t> output_buffer;
@@ -286,6 +331,34 @@ TEST_P(BdaRawSpirvTest, CommandBufferExecutesRawBdaShader) {
   iree_hal_buffer_ref_t binding_refs[2];
   iree_hal_buffer_ref_list_t bindings =
       MakeBindings(input_buffer, output_buffer, binding_refs);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
+  ExpectOutput(output_buffer);
+}
+
+TEST_P(BdaRawSpirvTest, CommandBufferHandlesOversizedBdaPublication) {
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  std::vector<iree_hal_buffer_ref_t> binding_refs =
+      MakeOversizedPublicationBindings(input_buffer, output_buffer);
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/binding_refs.size(),
+      /*.values=*/binding_refs.data(),
+  };
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
