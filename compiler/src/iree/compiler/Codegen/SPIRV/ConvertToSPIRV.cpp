@@ -87,6 +87,7 @@ struct SubspanResourceInfo {
 /// spirv.GlobalVariable ops.
 using InterfaceResourceMap = llvm::DenseMap<Operation *, SubspanResourceInfo>;
 
+constexpr unsigned kBdaDispatchRootDwordCount = 8;
 constexpr uint32_t kIndirectBindingsSetIndex = 3;
 
 /// Creates a resource variable using the `globalVariableType` at the beginning
@@ -196,8 +197,8 @@ static InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
 }
 
 static spirv::PointerType
-getGlobalVarTypeForIndirectBinding(MLIRContext *ctx, uint32_t set,
-                                   uint32_t maxBinding) {
+getIndirectBindingTableType(MLIRContext *ctx, uint32_t maxBinding,
+                            spirv::StorageClass tableStorageClass) {
   auto placeholderResourceType = IntegerType::get(ctx, 32);
   auto memberPtr = spirv::PointerType::get(
       placeholderResourceType, spirv::StorageClass::PhysicalStorageBuffer);
@@ -205,21 +206,20 @@ getGlobalVarTypeForIndirectBinding(MLIRContext *ctx, uint32_t set,
   // We are creating a top-level Block decorated interface type here, it needs
   // explicit layout per SPIR-V requirements.
   SmallVector<uint32_t> offsets(maxBinding + 1);
-  for (int i = 0; i < offsets.size(); ++i) {
-    offsets[i] = 8 * i; // Each pointer takes 8 bytes.
+  for (size_t i = 0; i < offsets.size(); ++i) {
+    offsets[i] = static_cast<uint32_t>(8 * i); // Each pointer takes 8 bytes.
   }
   auto structType = spirv::StructType::get(members, offsets);
 
-  return spirv::PointerType::get(structType,
-                                 spirv::StorageClass::StorageBuffer);
+  return spirv::PointerType::get(structType, tableStorageClass);
 }
 
-/// Scans all hal.interface.binding.subspan ops in `module`, creates their
-/// corresponding spirv.GlobalVariables when needed, and returns the map.
-/// Assumes indirect bindings and creates one global variable for each set, with
-/// struct members matching the bindings numbers.
+/// Scans all hal.interface.binding.subspan ops in `module` and returns the map.
+/// Descriptor-table indirect bindings create one spirv.GlobalVariable for each
+/// set, while BDA root bindings leave the table address in push constants.
 static InterfaceResourceMap
-createIndirectResourceVariables(mlir::ModuleOp module) {
+createIndirectResourceVariables(mlir::ModuleOp module,
+                                bool useBdaRootBindings) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceInfo;
 
@@ -252,10 +252,15 @@ createIndirectResourceVariables(mlir::ModuleOp module) {
       spirv::GlobalVariableOp existingVar = setToVar.lookup(set);
       SubspanResourceInfo resource = {set, binding, subspanOp.getType(), false,
                                       existingVar};
+      if (useBdaRootBindings) {
+        interfaceToResourceInfo[subspanOp] = resource;
+        continue;
+      }
       if (!resource.var) {
         uint32_t maxBindingIdx = setToMaxBindingIdx[set];
-        spirv::PointerType globalVarType = getGlobalVarTypeForIndirectBinding(
-            module->getContext(), set, maxBindingIdx);
+        spirv::PointerType globalVarType =
+            getIndirectBindingTableType(module->getContext(), maxBindingIdx,
+                                        spirv::StorageClass::StorageBuffer);
 
         resource.var =
             createResourceVariable(subspanOp.getLoc(), resource, globalVarType,
@@ -282,11 +287,14 @@ namespace {
 struct HALInterfaceLoadConstantConverter final
     : OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   bool supportsAssume = false;
+  bool useBdaRootBindings = false;
 
   HALInterfaceLoadConstantConverter(TypeConverter &typeConverter,
-                                    MLIRContext *context, bool supportsAssume)
+                                    MLIRContext *context, bool supportsAssume,
+                                    bool useBdaRootBindings)
       : OpConversionPattern(typeConverter, context),
-        supportsAssume(supportsAssume) {}
+        supportsAssume(supportsAssume), useBdaRootBindings(useBdaRootBindings) {
+  }
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
@@ -295,6 +303,10 @@ struct HALInterfaceLoadConstantConverter final
     auto layoutAttr = loadOp.getLayout();
     uint64_t elementCount = layoutAttr.getConstants();
     unsigned index = loadOp.getOrdinal().getZExtValue();
+    if (useBdaRootBindings) {
+      elementCount += kBdaDispatchRootDwordCount;
+      index += kBdaDispatchRootDwordCount;
+    }
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly. This is expected to be
@@ -398,10 +410,12 @@ struct HALInterfaceBindingSubspanConverter final
   HALInterfaceBindingSubspanConverter(
       TypeConverter &typeConverter, MLIRContext *context,
       const InterfaceResourceMap &interfaceToResourceVars,
-      bool useIndirectBindings, PatternBenefit benefit = 1)
+      bool useIndirectBindings, bool useBdaRootBindings,
+      PatternBenefit benefit = 1)
       : OpConversionPattern(typeConverter, context, benefit),
         interfaceToResourceVars(interfaceToResourceVars),
-        useIndirectBindings(useIndirectBindings) {}
+        useIndirectBindings(useIndirectBindings),
+        useBdaRootBindings(useBdaRootBindings) {}
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
@@ -428,9 +442,9 @@ struct HALInterfaceBindingSubspanConverter final
     }
     SubspanResourceInfo info = interfaceToResourceVars.lookup(subspanOp);
     spirv::GlobalVariableOp varOp = info.var;
-    assert(varOp);
 
     if (!useIndirectBindings) {
+      assert(varOp);
       // Fix up the variable's type.
       varOp.setTypeAttr(TypeAttr::get(convertedType));
 
@@ -446,11 +460,22 @@ struct HALInterfaceBindingSubspanConverter final
     }
 
     Location loc = subspanOp.getLoc();
-    Value globalAddr = spirv::AddressOfOp::create(rewriter, loc, varOp);
     auto i32Ty = rewriter.getI32Type();
     Value idx = spirv::ConstantOp::create(
         rewriter, loc, i32Ty, rewriter.getI32IntegerAttr(info.binding));
-    auto ptr = spirv::AccessChainOp::create(rewriter, loc, globalAddr, idx);
+    Value bindingTable = nullptr;
+    if (useBdaRootBindings) {
+      Value tableAddress = loadBdaRootBindingTableAddress(subspanOp, rewriter);
+      auto tablePtrType = getIndirectBindingTableType(
+          rewriter.getContext(), info.binding,
+          spirv::StorageClass::PhysicalStorageBuffer);
+      bindingTable = spirv::ConvertUToPtrOp::create(rewriter, loc, tablePtrType,
+                                                    tableAddress);
+    } else {
+      assert(varOp);
+      bindingTable = spirv::AddressOfOp::create(rewriter, loc, varOp);
+    }
+    auto ptr = spirv::AccessChainOp::create(rewriter, loc, bindingTable, idx);
     auto addr = spirv::LoadOp::create(rewriter, loc, ptr);
     assert(cast<spirv::PointerType>(addr.getType()).getStorageClass() ==
                spirv::StorageClass::PhysicalStorageBuffer &&
@@ -466,8 +491,31 @@ struct HALInterfaceBindingSubspanConverter final
   }
 
 private:
+  Value
+  loadBdaRootBindingTableAddress(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                                 ConversionPatternRewriter &rewriter) const {
+    Location loc = subspanOp.getLoc();
+    auto i32Type = rewriter.getI32Type();
+    auto i64Type = rewriter.getI64Type();
+    const unsigned pushConstantDwordCount =
+        kBdaDispatchRootDwordCount +
+        static_cast<unsigned>(subspanOp.getLayout().getConstants());
+    Value low32 = spirv::getPushConstantValue(subspanOp, pushConstantDwordCount,
+                                              /*offset=*/0, i32Type, rewriter);
+    Value high32 = spirv::getPushConstantValue(
+        subspanOp, pushConstantDwordCount, /*offset=*/1, i32Type, rewriter);
+    Value low64 = spirv::UConvertOp::create(rewriter, loc, i64Type, low32);
+    Value high64 = spirv::UConvertOp::create(rewriter, loc, i64Type, high32);
+    Value shiftAmount = spirv::ConstantOp::create(
+        rewriter, loc, i64Type, rewriter.getI64IntegerAttr(32));
+    Value shiftedHigh64 =
+        spirv::ShiftLeftLogicalOp::create(rewriter, loc, high64, shiftAmount);
+    return spirv::BitwiseOrOp::create(rewriter, loc, low64, shiftedHigh64);
+  }
+
   const InterfaceResourceMap &interfaceToResourceVars;
   const bool useIndirectBindings;
+  const bool useBdaRootBindings;
 };
 
 /// Pattern to lower operations that become a no-ops at this level.
@@ -564,6 +612,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
+  bool useBdaRootBindings = usesBdaRootDispatchAbiAttr(moduleOp);
 
   // Build a map from function name to dispatch_config for workgroup_size
   // and subgroup_size lookup.
@@ -641,12 +690,15 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
-  if (indexBits != 32 && indexBits != 64) {
+  // Indirect bindings pass device addresses through 64-bit scalars regardless
+  // of the module's normal index width preference.
+  const unsigned effectiveIndexBits = useIndirectBindings ? 64 : indexBits;
+  if (effectiveIndexBits != 32 && effectiveIndexBits != 64) {
     moduleOp.emitOpError(
         "only 32-bit or 64-bit indices are supported for SPIR-V");
     return signalPassFailure();
   }
-  bool use64bitIndex = indexBits == 64;
+  bool use64bitIndex = effectiveIndexBits == 64;
 
   auto targetAttr = moduleOp->getAttrOfType<spirv::TargetEnvAttr>(
       spirv::getTargetEnvAttrName());
@@ -662,11 +714,6 @@ void ConvertToSPIRVPass::runOnOperation() {
         "environment");
     return signalPassFailure();
   }
-  if (useIndirectBindings && !use64bitIndex) {
-    moduleOp->emitError("indirect bindings require 64-bit indexing");
-    return signalPassFailure();
-  }
-
   if (useIndirectBindings &&
       (!targetEnv.allows({spirv::Capability::PhysicalStorageBufferAddresses,
                           spirv::Capability::Int64}) ||
@@ -733,17 +780,19 @@ void ConvertToSPIRVPass::runOnOperation() {
                                         spirv::BuiltIn::NumWorkgroups>,
       UtilAssumeIntConverter>(typeConverter, context);
 
-  patterns.add<HALInterfaceLoadConstantConverter>(typeConverter, context,
-                                                  supportsAssume);
+  patterns.add<HALInterfaceLoadConstantConverter>(
+      typeConverter, context, supportsAssume, useBdaRootBindings);
 
   // Performs a preliminary step to analyze all hal.interface.binding.subspan
   // ops and creates spirv.GlobalVariables.
   InterfaceResourceMap interfaceToResourceVars =
-      useIndirectBindings ? createIndirectResourceVariables(moduleOp)
-                          : createResourceVariables(moduleOp);
+      useIndirectBindings
+          ? createIndirectResourceVariables(moduleOp, useBdaRootBindings)
+          : createResourceVariables(moduleOp);
   // For using use them in conversion.
   patterns.add<HALInterfaceBindingSubspanConverter>(
-      typeConverter, context, interfaceToResourceVars, useIndirectBindings);
+      typeConverter, context, interfaceToResourceVars, useIndirectBindings,
+      useBdaRootBindings);
 
   /// Fold certain operations as no-ops:
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in

@@ -231,7 +231,7 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_address_capabilities
-  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb-ptr",
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-bda-v1",
   //  CHECK-SAME:   {iree.spirv.features = ["vulkan-spirv", "compute.bitwidths.int=4", "address.mode=1"]}>)
   //       CHECK:   %{{.+}}, %[[V0:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.int") : i1, i32 = 0 : i32
@@ -242,7 +242,7 @@ hal.executable private @dispatch_executable {
   //       CHECK:   %[[TARGET1:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V1]], %[[TARGET1]] : i32
   hal.executable.variant public @test_address_capabilities target(
-    #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb-ptr", {
+    #hal.executable.target<"vulkan-spirv", "vulkan-spirv-bda-v1", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
                                                       [Int64, PhysicalStorageBufferAddresses],
                                                       [SPV_KHR_physical_storage_buffer]>,
