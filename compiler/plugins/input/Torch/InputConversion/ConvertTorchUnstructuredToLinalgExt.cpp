@@ -184,10 +184,9 @@ static Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
       rewriter, loc, tensorType.toBuiltinTensor(), torchTensor);
 }
 
-static FailureOr<Value> repeatTensorElementsForDim(PatternRewriter &rewriter,
-                                                   Operation *op, Type resType,
-                                                   Value self, int64_t repeats,
-                                                   int64_t dim) {
+static Value repeatTensorElementsForDim(PatternRewriter &rewriter,
+                                        Operation *op, Type resType, Value self,
+                                        int64_t repeats, int64_t dim) {
   Location loc = op->getLoc();
   auto selfType = cast<torch::Torch::ValueTensorType>(self.getType());
 
@@ -198,12 +197,8 @@ static FailureOr<Value> repeatTensorElementsForDim(PatternRewriter &rewriter,
   Value dimValuePlusOne =
       torch::Torch::ConstantIntOp::create(rewriter, loc, dim + 1);
 
-  FailureOr<Value> unsqueezed =
-      torch::Torch::unsqueezeTensor(rewriter, op, self, dimValuePlusOne);
-  if (failed(unsqueezed)) {
-    return failure();
-  }
-  self = *unsqueezed;
+  self = torch::Torch::unsqueezeTensor(rewriter, op, self, dimValuePlusOne)
+             .value();
 
   SmallVector<int64_t> expandShape(selfType.getSizes());
   expandShape.insert(expandShape.begin() + dim + 1, repeats);
@@ -252,7 +247,7 @@ preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
 
   auto repeatToQueryHeadCount = [&](Value input,
                                     torch::Torch::ValueTensorType inputType,
-                                    int64_t inputNumHeads) -> FailureOr<Value> {
+                                    int64_t inputNumHeads) -> Value {
     SmallVector<int64_t> resultShape(inputType.getSizes());
     resultShape[rank - 3] = qNumHeads;
     Type resultType = inputType.getWithSizesAndDtype(
@@ -261,18 +256,8 @@ preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
                                       qNumHeads / inputNumHeads, rank - 3);
   };
 
-  FailureOr<Value> repeatedKey =
-      repeatToQueryHeadCount(key, keyType, kNumHeads);
-
-  FailureOr<Value> repeatedValue =
-      repeatToQueryHeadCount(value, valueType, vNumHeads);
-
-  if (failed(repeatedKey) || failed(repeatedValue)) {
-    return failure();
-  }
-
-  key = *repeatedKey;
-  value = *repeatedValue;
+  key = repeatToQueryHeadCount(key, keyType, kNumHeads);
+  value = repeatToQueryHeadCount(value, valueType, vNumHeads);
   return success();
 }
 
