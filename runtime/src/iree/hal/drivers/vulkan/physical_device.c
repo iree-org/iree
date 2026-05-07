@@ -562,7 +562,6 @@ bool iree_hal_vulkan_physical_device_supports_baseline(
   const VkPhysicalDeviceProperties* properties =
       &snapshot->properties2.properties;
   return properties->apiVersion >= VK_API_VERSION_1_3 &&
-         snapshot->features12.bufferDeviceAddress &&
          snapshot->features12.timelineSemaphore &&
          snapshot->features12.scalarBlockLayout &&
          snapshot->features13.synchronization2 &&
@@ -808,17 +807,13 @@ static iree_status_t iree_hal_vulkan_append_baseline_report(
   const bool supported =
       iree_hal_vulkan_physical_device_supports_baseline(snapshot);
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-      builder, "feature_tier[vulkan-1.3-bda]: %s\n",
+      builder, "feature_tier[vulkan-1.3]: %s\n",
       supported ? "supported" : "unsupported"));
   if (supported) return iree_ok_status();
 
   if (properties->apiVersion < VK_API_VERSION_1_3) {
     IREE_RETURN_IF_ERROR(iree_string_builder_append_string(
         builder, IREE_SV("  missing: Vulkan API 1.3\n")));
-  }
-  if (!snapshot->features12.bufferDeviceAddress) {
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_string(
-        builder, IREE_SV("  missing: bufferDeviceAddress\n")));
   }
   if (!snapshot->features12.timelineSemaphore) {
     IREE_RETURN_IF_ERROR(iree_string_builder_append_string(

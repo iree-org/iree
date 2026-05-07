@@ -92,7 +92,6 @@ typedef enum iree_hal_vulkan_feature_bits_t {
   IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL = 1u << 10,
   // Required enabled logical-device feature set for the rewrite baseline.
   IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
-      IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES |
       IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2 |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT,
@@ -104,6 +103,7 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES |
       IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL,
 } iree_hal_vulkan_feature_bits_t;
@@ -253,7 +253,7 @@ typedef uint32_t iree_hal_vulkan_dispatch_abis_t;
 
 // Parses a dispatch ABI option string.
 //
-// Accepted values are "descriptor", "bda", "both", and "all". The output is a
+// Accepted values are "descriptor", "bda", and "all". The output is a
 // non-empty bitmask suitable for iree_hal_vulkan_device_options_t.
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_dispatch_abis_parse(
     iree_string_view_t value, iree_hal_vulkan_dispatch_abis_t* out_abis);

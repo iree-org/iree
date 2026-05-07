@@ -82,7 +82,7 @@ iree_hal_cts_testdata(
   TESTDATA_DIR
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
   FLAGS
-    "--iree-vulkan-experimental-indirect-bindings"
+    "--iree-vulkan-dispatch-abi=bda"
 )
 
 iree_cc_test(

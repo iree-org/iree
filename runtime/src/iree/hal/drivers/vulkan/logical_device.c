@@ -623,7 +623,7 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
       .shaderInt8 = snapshot->features12.shaderInt8,
       .scalarBlockLayout = VK_TRUE,
       .timelineSemaphore = VK_TRUE,
-      .bufferDeviceAddress = VK_TRUE,
+      .bufferDeviceAddress = VK_FALSE,
       .vulkanMemoryModel = snapshot->features12.vulkanMemoryModel,
       .vulkanMemoryModelDeviceScope =
           snapshot->features12.vulkanMemoryModelDeviceScope,
@@ -684,6 +684,17 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
     enabled_features2.features.sparseResidencyAliased = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
   }
+  if (iree_any_bit_set(
+          requested_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)) {
+    if (!snapshot->features12.bufferDeviceAddress) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "requested Vulkan bufferDeviceAddress is not available");
+    }
+    enabled_features12.bufferDeviceAddress = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
+  }
   if (iree_any_bit_set(requested_features,
                        IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL) &&
       !snapshot->features13.subgroupSizeControl) {
@@ -731,7 +742,7 @@ static iree_status_t iree_hal_vulkan_select_enabled_dispatch_abis(
   }
   if (enabled_dispatch_abis == IREE_HAL_VULKAN_DISPATCH_ABI_NONE) {
     return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
+        IREE_STATUS_UNAVAILABLE,
         "Vulkan BDA dispatch ABI requires bufferDeviceAddress");
   }
   *out_enabled_dispatch_abis = enabled_dispatch_abis;
@@ -2196,9 +2207,6 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
                             (name));                                      \
   }
   IREE_HAL_VULKAN_REQUIRE_ENABLED_FEATURE(
-      IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES,
-      "bufferDeviceAddress");
-  IREE_HAL_VULKAN_REQUIRE_ENABLED_FEATURE(
       IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES, "timelineSemaphore");
   IREE_HAL_VULKAN_REQUIRE_ENABLED_FEATURE(
       IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2, "synchronization2");
@@ -2218,6 +2226,15 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "external Vulkan VkDevice enabled robustBufferAccess but the physical "
+        "device did not report it");
+  }
+  if (iree_all_bits_set(
+          enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES) &&
+      !snapshot->features12.bufferDeviceAddress) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "external Vulkan VkDevice enabled bufferDeviceAddress but the physical "
         "device did not report it");
   }
   if (iree_all_bits_set(enabled_features,
@@ -2441,6 +2458,11 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         &device->enabled_features, &device->enabled_extensions,
         &device->logical_device);
   }
+  if (iree_status_is_ok(status)) {
+    device->owns_logical_device = true;
+    status = iree_hal_vulkan_libvulkan_load_device_syms(
+        &device->instance.syms, device->logical_device, &device->syms);
+  }
   iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis =
       IREE_HAL_VULKAN_DISPATCH_ABI_NONE;
   if (iree_status_is_ok(status)) {
@@ -2449,7 +2471,6 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         &enabled_dispatch_abis);
   }
   if (iree_status_is_ok(status)) {
-    device->owns_logical_device = true;
     device->enabled_dispatch_abis = enabled_dispatch_abis;
     device->max_cached_bda_replay_instances =
         device_options->max_cached_bda_replay_instances;
@@ -2457,8 +2478,6 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
         device_options->max_cached_bda_replay_publication_bytes;
     device->retained_cached_bda_replay_instances =
         device_options->retained_cached_bda_replay_instances;
-    status = iree_hal_vulkan_libvulkan_load_device_syms(
-        &device->instance.syms, device->logical_device, &device->syms);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_builtins_initialize(

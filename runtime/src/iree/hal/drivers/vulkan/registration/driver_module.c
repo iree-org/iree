@@ -37,8 +37,8 @@ IREE_FLAG(bool, vulkan_sparse_residency, true,
           "Requests sparse residency and aliased sparse buffer mappings.");
 IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
           "Requests buffer device addresses for pointer-first executables.");
-IREE_FLAG(string, vulkan_dispatch_abi, "both",
-          "Executable dispatch ABI policy: descriptor, bda, or both.");
+IREE_FLAG(string, vulkan_dispatch_abi, "all",
+          "Executable dispatch ABI policy: descriptor, bda, or all.");
 IREE_FLAG(
     int32_t, vulkan_cached_bda_replay_instances, 16,
     "Maximum cached native BDA command-buffer replay instances per queue lane; "

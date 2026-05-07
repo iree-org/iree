@@ -63,7 +63,7 @@ iree_hal_cts_testdata(
 
 iree_hal_cts_testdata(
     backend_name = "vulkan_bda",
-    flags = ["--iree-vulkan-experimental-indirect-bindings"],
+    flags = ["--iree-vulkan-dispatch-abi=bda"],
     format_name = "vulkan_spirv_bda",
     format_string = '"vulkan-spirv-bda-v1"',
     identifier = "iree_cts_testdata_vulkan_spirv_bda",

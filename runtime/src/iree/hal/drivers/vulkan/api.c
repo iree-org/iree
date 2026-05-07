@@ -285,13 +285,12 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_dispatch_abis_parse(
   } else if (iree_string_view_equal(value, IREE_SV("bda")) ||
              iree_string_view_equal(value, IREE_SV("buffer-device-address"))) {
     *out_abis = IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
-  } else if (iree_string_view_equal(value, IREE_SV("both")) ||
-             iree_string_view_equal(value, IREE_SV("all"))) {
+  } else if (iree_string_view_equal(value, IREE_SV("all"))) {
     *out_abis = IREE_HAL_VULKAN_DISPATCH_ABI_ALL_RECOGNIZED;
   } else {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "unknown Vulkan dispatch ABI '%.*s'; expected descriptor, bda, or both",
+        "unknown Vulkan dispatch ABI '%.*s'; expected descriptor, bda, or all",
         (int)value.size, value.data);
   }
 
