@@ -77,6 +77,24 @@ typedef struct iree_hal_vulkan_command_buffer_bda_publication_t {
   VkDeviceAddress device_address;
 } iree_hal_vulkan_command_buffer_bda_publication_t;
 
+// Cached BDA properties for one queue_execute binding table slot.
+typedef struct iree_hal_vulkan_command_buffer_bda_binding_slot_t {
+  // Device address of the bound buffer range at the binding-table offset.
+  VkDeviceAddress device_address;
+
+  // Byte length of the bound buffer range after the binding-table offset.
+  iree_device_size_t length;
+} iree_hal_vulkan_command_buffer_bda_binding_slot_t;
+
+// Per-submit BDA binding-table cache used while publishing replay tables.
+typedef struct iree_hal_vulkan_command_buffer_bda_binding_cache_t {
+  // Mutable slot cache storage indexed by HAL binding-table slot ordinal.
+  iree_hal_vulkan_command_buffer_bda_binding_slot_t* slots;
+
+  // Number of entries in slots.
+  iree_host_size_t slot_count;
+} iree_hal_vulkan_command_buffer_bda_binding_cache_t;
+
 // Returns host-published BDA table bytes required to replay |command_buffer|
 // once into a native VkCommandBuffer.
 iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
@@ -91,7 +109,8 @@ iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
 iree_status_t iree_hal_vulkan_command_buffer_publish_bda_binding_tables(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
-    const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication);
+    const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication,
+    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache);
 
 // Emits executable/export metadata referenced by recorded dispatch commands.
 iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
@@ -160,6 +179,9 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 // BDA binding tables are allocated from |bda_publication|. The caller must keep
 // that publication alive until |native_command_buffer| is no longer executing.
 // When the command buffer has no BDA dispatches this may be NULL.
+//
+// |bda_binding_cache| may be NULL. When present, it caches binding-table slot
+// device addresses for the duration of this recording/publication pass.
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
@@ -168,6 +190,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     VkCommandBufferUsageFlags usage_flags, VkDescriptorPool descriptor_pool,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication,
+    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache,
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
     iree_allocator_t host_allocator);
 
