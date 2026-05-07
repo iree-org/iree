@@ -34,6 +34,13 @@ LogicalResult populateWarpAndThreadIndices(
 SmallVector<int64_t>
 getElementVectorTileShape(IREE::VectorExt::NestedLayoutAttr vectorLayout);
 
+/// Builds the nested layout used by derived_thread_config from explicit
+/// element tile sizes.
+FailureOr<IREE::VectorExt::NestedLayoutAttr>
+getDerivedThreadLayout(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
+                       ArrayRef<int64_t> logicalShape,
+                       ArrayRef<int64_t> elementTile);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUNESTEDLAYOUTUTILS_H_

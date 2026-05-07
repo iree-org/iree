@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -95,6 +96,53 @@ SmallVector<int64_t> getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
     tileShape[i] = 1;
   }
   return tileShape;
+}
+
+FailureOr<NestedLayoutAttr>
+getDerivedThreadLayout(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
+                       ArrayRef<int64_t> logicalShape,
+                       ArrayRef<int64_t> elementTile) {
+  int64_t rank = logicalShape.size();
+  if (rank == 0 || elementTile.size() != rank) {
+    return failure();
+  }
+
+  SmallVector<int64_t> opShape(logicalShape);
+  for (auto [size, element] : llvm::zip_equal(opShape, elementTile)) {
+    if (ShapedType::isDynamic(size) || element <= 0 || size % element != 0) {
+      return failure();
+    }
+    size /= element;
+  }
+
+  SmallVector<int64_t> threadTile(rank, 1);
+  SmallVector<int64_t> threadStrides(rank, 0);
+  int64_t residualThreads = ShapedType::getNumElements(workgroupSize);
+  int64_t currStride = 1;
+  for (auto [tile, stride, size] :
+       llvm::reverse(llvm::zip(threadTile, threadStrides, opShape))) {
+    int64_t threadBlock;
+    if (residualThreads % size == 0) {
+      threadBlock = size;
+    } else if (size % residualThreads == 0) {
+      threadBlock = residualThreads;
+    } else {
+      return failure();
+    }
+
+    tile = threadBlock;
+    stride = currStride;
+    size /= threadBlock;
+    currStride *= threadBlock;
+    residualThreads /= threadBlock;
+  }
+
+  SmallVector<int64_t> subgroupTile(rank, 1);
+  SmallVector<int64_t> subgroupStrides(rank, 0);
+  SmallVector<int64_t> outerTile(rank, 1);
+  return NestedLayoutAttr::get(context, subgroupTile, opShape, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
 }
 
 } // namespace mlir::iree_compiler
