@@ -11,6 +11,7 @@
 namespace iree::hal::cts {
 
 using iree::testing::status::StatusIs;
+using ::testing::AnyOf;
 
 class ExecutableTest : public CtsTestBase<> {
  protected:
@@ -135,6 +136,16 @@ TEST_P(ExecutableTest, LookupExportByName) {
   IREE_ASSERT_OK(iree_hal_executable_lookup_export_by_name(
       executable_, IREE_SV("export0"), &ordinal));
   EXPECT_EQ(ordinal, 0);
+}
+
+TEST_P(ExecutableTest, LookupGlobalByNameNotFoundOrUnsupported) {
+  iree_hal_buffer_t* buffer = nullptr;
+  EXPECT_THAT(Status(iree_hal_executable_lookup_global_by_name(
+                  executable_, IREE_SV("NOT_FOUND"),
+                  IREE_HAL_QUEUE_AFFINITY_ANY, &buffer)),
+              AnyOf(StatusIs(StatusCode::kNotFound),
+                    StatusIs(StatusCode::kUnimplemented)));
+  EXPECT_EQ(buffer, nullptr);
 }
 
 CTS_REGISTER_EXECUTABLE_TEST_SUITE(ExecutableTest);

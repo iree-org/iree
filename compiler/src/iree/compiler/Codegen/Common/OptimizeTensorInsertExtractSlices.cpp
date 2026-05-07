@@ -256,77 +256,181 @@ struct CastLikeInsertSliceOpFolder final
   }
 };
 
-/// Folds IR resembling:
-/// ```
-///   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]}
-//      : vector<128xf16>, tensor<?xf16>
-//    %21 = vector.transfer_read %20[%c0], %cst_2, %17
-///     : tensor<?xf16>, vector<128xf16>
-/// ```
-/// into a simpler masked vector.transfer_read.
+/// Folds a transfer_read that reads from the result of a transfer_write on
+/// the same region (Read-After-Write) into arithmetic on the written value,
+/// the original tensor, the masks, and the read's padding.
+///
+/// The general semantics are:
+///
+///   written_tensor[i] = wMask[i] ? valToStore[i] : original[i]
+///   result[i]         = rMask[i] ? written_tensor[i] : rPad
+///
+/// Which gives:
+///   result = select(rMask, select(wMask, valToStore, original),
+///   broadcast(rPad))
+///
+/// Special cases avoid emitting unnecessary IR:
+///   - No wMask (unmasked write): wMask is implicitly all-true, inner select
+///     collapses to valToStore.
+///   - No rMask (unmasked read): rMask is implicitly all-true, outer select
+///     collapses away.
+///   - wMask == rMask: the original tensor is never needed (anywhere rMask is
+///     true, wMask is also true), so the inner select collapses to valToStore.
+///
 /// After bufferization, this generally removes the need for materializing the
 /// write to memory.
 // TODO: Consider upstreaming
-struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
+struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
   using Base::Base;
 
-  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 PatternRewriter &rewriter) const override {
-    // Fail to match if the read doesn't have pure tensor semantics.
-    if (!op.hasPureTensorSemantics()) {
+    if (!readOp.hasPureTensorSemantics()) {
       return failure();
     }
 
-    // Try to get the producing write op.
     auto writeOp = dyn_cast_if_present<vector::TransferWriteOp>(
-        op.getBase().getDefiningOp());
-    // Fail to match if the write doesn't have pure tensor semantics.
+        readOp.getBase().getDefiningOp());
     if (!writeOp || !writeOp.hasPureTensorSemantics()) {
       return failure();
     }
 
     Value valToStore = writeOp.getValueToStore();
-    // Fail to match if the in/out types are different
-    if (valToStore.getType() != op.getType()) {
+    if (valToStore.getType() != readOp.getType()) {
       return failure();
     }
 
     // Work only with trivial or equal indices.
-    if ((llvm::any_of(op.getIndices(),
+    if ((llvm::any_of(readOp.getIndices(),
                       [](Value v) { return !isZeroInteger(v); }) ||
          llvm::any_of(writeOp.getIndices(),
                       [](Value v) { return !isZeroInteger(v); })) &&
-        (op.getIndices() != writeOp.getIndices())) {
+        (readOp.getIndices() != writeOp.getIndices())) {
       return failure();
     }
 
-    // Work only with minor identity mappings.
-    if (!op.getPermutationMap().isMinorIdentity() ||
+    if (!readOp.getPermutationMap().isMinorIdentity() ||
         !writeOp.getPermutationMap().isMinorIdentity()) {
       return failure();
     }
 
     TypedValue<VectorType> wMask = writeOp.getMask();
-    Value rPad = op.getPadding();
+    TypedValue<VectorType> rMask = readOp.getMask();
 
-    // Match only if the write and read op are masked and have the same mask.
-    if (!wMask || (wMask != op.getMask())) {
+    // Build the inner value: select(wMask, valToStore, original).
+    // When wMask is absent (unmasked write) or wMask == rMask (original is
+    // never accessed), this simplifies to just valToStore.
+    Value inner = valToStore;
+    bool needsOriginal = wMask && wMask != rMask;
+    if (needsOriginal) {
+      Value originalRead = vector::TransferReadOp::create(
+          rewriter, readOp.getLoc(), readOp.getType(), writeOp.getBase(),
+          readOp.getIndices(), readOp.getPermutationMap(), readOp.getPadding(),
+          /*mask=*/Value(), readOp.getInBoundsAttr());
+      inner = arith::SelectOp::create(rewriter, readOp.getLoc(), wMask,
+                                      valToStore, originalRead);
+    }
+
+    if (!rMask) {
+      rewriter.replaceOp(readOp, inner);
+      return success();
+    }
+
+    // Build the outer value: select(rMask, inner, broadcast(rPad)).
+    // When rMask is absent (unmasked read), the result is just inner.
+    Value rPad = readOp.getPadding();
+    assert(!isa<VectorType>(rPad.getType()) &&
+           "masked transfers on vector element types are not supported; see "
+           "verifyTransferOp in upstream MLIR VectorOps.cpp");
+    Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                               valToStore.getType(), rPad);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(readOp, rMask, inner, padVal);
+    return success();
+  }
+};
+
+/// Folds transfer_read(tensor.empty).
+///
+/// Since tensor.empty has unspecified contents, reading from it produces
+/// an unspecified value, which is exactly the semantics of ub.poison.
+/// Out of bounds means that pad is used.
+///
+///   Case 1 — fully in-bounds, no mask:
+///     %e = tensor.empty() : tensor<128xf16>
+///     %r = vector.transfer_read %e[%c0], %pad {in_bounds = [true]}
+///   ->
+///     %r = ub.poison : vector<128xf16>
+///
+///   Case 2 — fully in-bounds, masked:
+///     %e = tensor.empty() : tensor<128xf16>
+///     %r = vector.transfer_read %e[%c0], %pad, %mask {in_bounds = [true]}
+///   ->
+///     %poison = ub.poison : vector<128xf16>
+///     %bcast  = vector.broadcast %pad : f16 to vector<128xf16>
+///     %r = arith.select %mask, %poison, %bcast
+///
+///   Case 3 — not fully in-bounds, no mask:
+///     %e = tensor.empty() : tensor<100xf16>
+///     %r = vector.transfer_read %e[%c0], %pad
+///                              : tensor<100xf16>, vector<128xf16>
+///   ->
+///     %r = vector.broadcast %pad : f16 to vector<128xf16>
+///
+///   Case 4 — not fully in-bounds, masked:
+///     %e = tensor.empty() : tensor<100xf16>
+///     %r = vector.transfer_read %e[%c0], %pad, %mask
+///                              : tensor<100xf16>, vector<128xf16>
+///   ->
+///     %r = vector.broadcast %pad : f16 to vector<128xf16>
+struct FoldTransferReadOfEmptyTensor
+    : OpRewritePattern<vector::TransferReadOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.hasPureTensorSemantics()) {
       return failure();
     }
 
-    // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
-    // types with vector element types (see `verifyTransferOp` in upstream MLIR
-    // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
-    // never has a vector type. But for sanity add an assert in case things
-    // change upstream.
-    assert(!isa<VectorType>(rPad.getType()) &&
-           "search `NOTE[FoldMaskedTransferRAW]` in "
-           "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
+    if (!op.getBase().getDefiningOp<tensor::EmptyOp>()) {
+      return failure();
+    }
 
-    // Materialize the padding with a constant.
-    auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
-                                              valToStore.getType(), rPad);
-    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
+    if (!op.getPermutationMap().isMinorIdentity()) {
+      return failure();
+    }
+
+    bool fullyInBounds =
+        llvm::all_of(op.getInBoundsValues(), [](bool v) { return v; });
+    TypedValue<VectorType> mask = op.getMask();
+
+    if (mask && fullyInBounds) {
+      // Masked, fully in-bounds: mask-on lanes read unspecified contents
+      // (poison), mask-off lanes produce the padding value.
+      Value rPad = op.getPadding();
+      assert(!isa<VectorType>(rPad.getType()) &&
+             "masked transfers on vector element types are not supported; "
+             "see verifyTransferOp in upstream MLIR VectorOps.cpp");
+      Value poison = ub::PoisonOp::create(rewriter, op.getLoc(), op.getType());
+      Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                                 op.getType(), rPad);
+      rewriter.replaceOpWithNewOp<arith::SelectOp>(op, mask, poison, padVal);
+      return success();
+    }
+
+    if (!mask && fullyInBounds) {
+      // Unmasked, fully in-bounds: every lane reads unspecified contents.
+      rewriter.replaceOp(
+          op, ub::PoisonOp::create(rewriter, op.getLoc(), op.getType()));
+      return success();
+    }
+
+    // Not fully in-bounds (with or without mask): out-of-bounds lanes
+    // produce pad, and in-bounds lanes read unspecified contents from
+    // tensor.empty, so we may choose pad for those too.
+    Value rPad = op.getPadding();
+    rewriter.replaceOp(op, vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                                       op.getType(), rPad));
     return success();
   }
 };
@@ -391,7 +495,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   // Apply masked transfer_write + transfer_read folding to avoid spurious
   // (future) roundtrips to memory.
   // TODO: consider upstreaming.
-  patterns.add<FoldMaskedTransferRAW>(context);
+  patterns.add<FoldTransferRAW, FoldTransferReadOfEmptyTensor>(context);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

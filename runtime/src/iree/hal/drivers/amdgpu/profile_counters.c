@@ -17,6 +17,7 @@
 #include "iree/hal/drivers/amdgpu/profile_aqlprofile.h"
 #include "iree/hal/drivers/amdgpu/system.h"
 #include "iree/hal/drivers/amdgpu/util/libaqlprofile.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_capabilities.h"
 #include "iree/hal/drivers/amdgpu/util/signal_pool.h"
 
 //===----------------------------------------------------------------------===//
@@ -452,6 +453,9 @@ static iree_status_t iree_hal_amdgpu_profile_counter_create_packets(
     const iree_hal_amdgpu_profile_aqlprofile_memory_context_t* memory_context,
     iree_hal_amdgpu_aqlprofile_handle_t* out_handle,
     iree_hal_amdgpu_aqlprofile_pmc_aql_packets_t* out_packets) {
+  // aqlprofile owns the architecture-specific PMC PM4 program generation here.
+  // IREE only wraps the returned AQL PM4-IB packet templates so factory splits
+  // such as gfx950, gfx115x, and gfx1201 stay centralized in aqlprofile.
   iree_hal_amdgpu_aqlprofile_pmc_profile_t profile = {
       .agent = counter_set->agent,
       .events = counter_set->events,
@@ -563,6 +567,37 @@ static iree_status_t iree_hal_amdgpu_profile_counter_initialize_set(
   return status;
 }
 
+static iree_status_t
+iree_hal_amdgpu_profile_counter_validate_physical_device_support(
+    const iree_hal_amdgpu_logical_device_t* logical_device,
+    iree_hal_amdgpu_profile_counter_session_flags_t session_flags) {
+  const bool capture_queue_ranges = iree_any_bit_set(
+      session_flags, IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_QUEUE_RANGES);
+  for (iree_host_size_t i = 0; i < logical_device->physical_device_count; ++i) {
+    const iree_hal_amdgpu_physical_device_t* physical_device =
+        logical_device->physical_devices[i];
+    if (IREE_UNLIKELY(!iree_any_bit_set(
+            physical_device->vendor_packet_capabilities,
+            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB))) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "AMDGPU counter profiling requires AQL PM4-IB packet support on "
+          "physical device %" PRIhsz,
+          physical_device->device_ordinal);
+    }
+    if (IREE_UNLIKELY(capture_queue_ranges &&
+                      !iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+                          physical_device->pm4_timestamp_strategy))) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "AMDGPU counter range profiling requires PM4 timestamp range support "
+          "on physical device %" PRIhsz,
+          physical_device->device_ordinal);
+    }
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_amdgpu_profile_counter_session_allocate(
     iree_hal_amdgpu_logical_device_t* logical_device,
     const iree_hal_device_profiling_options_t* options,
@@ -575,6 +610,15 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_allocate(
       iree_hal_device_profiling_options_requests_counter_samples(options);
   const bool capture_queue_ranges =
       iree_hal_device_profiling_options_requests_counter_ranges(options);
+  iree_hal_amdgpu_profile_counter_session_flags_t session_flags =
+      IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_NONE;
+  if (capture_dispatch_samples) {
+    session_flags |=
+        IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_DISPATCH_SAMPLES;
+  }
+  if (capture_queue_ranges) {
+    session_flags |= IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_QUEUE_RANGES;
+  }
   if (!capture_dispatch_samples && !capture_queue_ranges) {
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
@@ -595,6 +639,9 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_allocate(
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "AMDGPU physical device count exceeds uint32_t");
   }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_profile_counter_validate_physical_device_support(
+              logical_device, session_flags));
 
   iree_host_size_t counter_set_total_count = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_mul(
@@ -673,14 +720,7 @@ iree_status_t iree_hal_amdgpu_profile_counter_session_allocate(
       iree_allocator_malloc(host_allocator, session_size, (void**)&session));
   memset(session, 0, session_size);
   session->host_allocator = host_allocator;
-  session->flags = IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_NONE;
-  if (capture_dispatch_samples) {
-    session->flags |=
-        IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_DISPATCH_SAMPLES;
-  }
-  if (capture_queue_ranges) {
-    session->flags |= IREE_HAL_AMDGPU_PROFILE_COUNTER_SESSION_FLAG_QUEUE_RANGES;
-  }
+  session->flags = session_flags;
   session->libhsa = &logical_device->system->libhsa;
   session->physical_device_count = logical_device->physical_device_count;
   session->counter_set_count = (uint32_t)options->counter_set_count;
@@ -1074,6 +1114,14 @@ iree_status_t iree_hal_amdgpu_host_queue_enable_profile_counters(
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "AMDGPU counter profiling requires AQL PM4-IB packet support");
+  }
+  if (IREE_UNLIKELY(enable_queue_ranges &&
+                    !iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+                        queue->pm4_timestamp_strategy))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "AMDGPU counter range profiling requires PM4 timestamp range support");
   }
   if (IREE_UNLIKELY(queue->profiling.counters.session)) {
     IREE_TRACE_ZONE_END(z0);

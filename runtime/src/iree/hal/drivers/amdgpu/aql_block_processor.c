@@ -29,6 +29,14 @@ enum iree_hal_amdgpu_aql_block_processor_packet_flag_bits_t {
   IREE_HAL_AMDGPU_AQL_BLOCK_PROCESSOR_PACKET_RELEASE_SCOPE_MASK = 0x30u,
 };
 
+// Command flags split across multi-packet replay implementations.
+typedef struct iree_hal_amdgpu_aql_block_processor_packet_flag_pair_t {
+  // Flags applied to the first AQL packet implementing a recorded command.
+  iree_hal_amdgpu_aql_block_processor_packet_flags_t first;
+  // Flags applied to the final AQL packet implementing a recorded command.
+  iree_hal_amdgpu_aql_block_processor_packet_flags_t final;
+} iree_hal_amdgpu_aql_block_processor_packet_flag_pair_t;
+
 typedef struct iree_hal_amdgpu_aql_block_processor_state_t {
   // Packet cursors advanced while invoking the block.
   struct {
@@ -178,10 +186,32 @@ iree_hal_amdgpu_aql_block_processor_packet_flags_merge(
 }
 
 static iree_hal_amdgpu_aql_block_processor_packet_flags_t
-iree_hal_amdgpu_aql_block_processor_agent_barrier_packet_flags(void) {
+iree_hal_amdgpu_aql_block_processor_execution_barrier_packet_flags(void) {
   return iree_hal_amdgpu_aql_block_processor_packet_flags_set_fence_scopes(
       IREE_HAL_AMDGPU_AQL_BLOCK_PROCESSOR_PACKET_FLAG_EXECUTION_BARRIER,
-      IREE_HSA_FENCE_SCOPE_AGENT, IREE_HSA_FENCE_SCOPE_AGENT);
+      IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE);
+}
+
+static iree_hal_amdgpu_aql_block_processor_packet_flag_pair_t
+iree_hal_amdgpu_aql_block_processor_split_command_packet_flags(
+    const iree_hal_amdgpu_command_buffer_command_header_t* command) {
+  const iree_hal_amdgpu_aql_block_processor_packet_flags_t command_flags =
+      iree_hal_amdgpu_aql_block_processor_command_packet_flags(command);
+  const iree_hsa_fence_scope_t acquire_scope =
+      iree_hal_amdgpu_aql_block_processor_packet_flags_acquire_scope(
+          command_flags);
+  const iree_hsa_fence_scope_t release_scope =
+      iree_hal_amdgpu_aql_block_processor_packet_flags_release_scope(
+          command_flags);
+  return (iree_hal_amdgpu_aql_block_processor_packet_flag_pair_t){
+      .first =
+          iree_hal_amdgpu_aql_block_processor_packet_flags_set_fence_scopes(
+              command_flags, acquire_scope, IREE_HSA_FENCE_SCOPE_NONE),
+      .final = iree_hal_amdgpu_aql_block_processor_packet_flags_set_fence_scopes(
+          command_flags &
+              ~IREE_HAL_AMDGPU_AQL_BLOCK_PROCESSOR_PACKET_FLAG_EXECUTION_BARRIER,
+          IREE_HSA_FENCE_SCOPE_NONE, release_scope),
+  };
 }
 
 static bool iree_hal_amdgpu_aql_block_processor_command_uses_queue_kernargs(
@@ -942,8 +972,11 @@ static iree_status_t iree_hal_amdgpu_aql_block_processor_emit_indirect_dispatch(
   iree_hal_amdgpu_aql_packet_t* dispatch_packet =
       iree_hal_amdgpu_aql_block_processor_packet(processor,
                                                  dispatch_packet_index);
+  const iree_hal_amdgpu_aql_block_processor_packet_flag_pair_t command_flags =
+      iree_hal_amdgpu_aql_block_processor_split_command_packet_flags(
+          &dispatch_command->header);
   iree_hal_amdgpu_aql_block_processor_packet_flags_t dispatch_packet_flags =
-      IREE_HAL_AMDGPU_AQL_BLOCK_PROCESSOR_PACKET_FLAG_NONE;
+      command_flags.final;
   if (iree_hal_amdgpu_aql_block_processor_is_block_final(
           block, state, /*recorded_packet_count=*/2) &&
       iree_all_bits_set(
@@ -967,7 +1000,9 @@ static iree_status_t iree_hal_amdgpu_aql_block_processor_emit_indirect_dispatch(
           &processor->packets.setups[dispatch_packet_index]);
   if (iree_status_is_ok(status)) {
     const iree_hal_amdgpu_aql_block_processor_packet_flags_t patch_flags =
-        iree_hal_amdgpu_aql_block_processor_agent_barrier_packet_flags();
+        iree_hal_amdgpu_aql_block_processor_packet_flags_merge(
+            iree_hal_amdgpu_aql_block_processor_execution_barrier_packet_flags(),
+            command_flags.first);
     const iree_hsa_fence_scope_t patch_acquire_scope =
         iree_hal_amdgpu_aql_block_processor_payload_acquire_scope(
             processor, state, payload_acquire_packet_count, patch_packet_index,

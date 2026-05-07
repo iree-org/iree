@@ -94,6 +94,18 @@ def AMDGPULowerCoalescedDMAToGatherLDSPass :
   ];
 }
 
+def AMDGPULowerAsyncDMAPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-async-dma", "mlir::FunctionOpInterface"> {
+  let summary = "Lower async_dma operations to amdgpu.gather_to_lds.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

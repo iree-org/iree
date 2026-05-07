@@ -1939,11 +1939,53 @@ LogicalResult ArgCompareOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult ArgCompareOp::getIterationDomainTileFromResultTile(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  // Result tiles are in the output coordinate space (reduction dim removed).
+  // Re-insert the reduction dimension as the full range to get input-rank
+  // coordinates for the iteration domain.
+  int64_t reductionDim = getDimension();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult reductionDimSize =
+      getDim(builder, getLoc(), getInputValue(), reductionDim);
+  int64_t inputRank = offsets.size() + 1;
+  iterDomainOffsets.reserve(inputRank);
+  iterDomainSizes.reserve(inputRank);
+  int64_t outIdx = 0;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i == reductionDim) {
+      iterDomainOffsets.push_back(zero);
+      iterDomainSizes.push_back(reductionDimSize);
+    } else {
+      iterDomainOffsets.push_back(offsets[outIdx]);
+      iterDomainSizes.push_back(sizes[outIdx]);
+      ++outIdx;
+    }
+  }
+  return success();
+}
+
 FailureOr<TilingResult>
 ArgCompareOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
                                       ArrayRef<OpFoldResult> offsets,
                                       ArrayRef<OpFoldResult> sizes) {
-  return getTiledImplementation(builder, offsets, sizes);
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromResultTile(
+          builder, resultNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  FailureOr<TilingResult> tilingResult =
+      getTiledImplementation(builder, mappedOffsets, mappedSizes);
+  if (failed(tilingResult)) {
+    return failure();
+  }
+  return TilingResult{
+      tilingResult->tiledOps,
+      SmallVector<Value>{tilingResult->tiledValues[resultNumber]},
+      tilingResult->generatedSlices};
 }
 
 LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,

@@ -73,6 +73,15 @@ Codegen::TileSwizzle getIntrinsicSwizzle(MMAIntrinsic mma, bool transposed,
 // Returns the TileSwizzle for the given MMA attr and operand index.
 Codegen::TileSwizzle getSwizzle(DataTiledMMAAttr mma, int operandIdx);
 
+// Returns the architectural vector register file capacity, in bytes, that the
+// inner-tiled MMA cost model may use to fit the union of ACC, LHS and RHS
+// tiles. For ISAs with scalable vectors (e.g. SVE/SVE2) the vector length is
+// treated as its 128-bit minimum — a deliberate simplification that produces
+// good-enough `intrinsics_m`/`intrinsics_n` choices without leaking
+// scalability into the cost model.
+// Values: AVX/AVX2 = 16 × 32 B, AVX-512 = 32 × 64 B, SVE/SVE2 = 32 × 16 B.
+int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic);
+
 } // namespace mlir::iree_compiler::IREE::CPU
 
 // clang-format on

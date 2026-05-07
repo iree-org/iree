@@ -44,10 +44,12 @@ iree_cc_library(
   NAME
     CommonGPUPasses
   HDRS
+    "GPUNestedLayoutUtils.h"
     "GPUPatterns.h"
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPULowerAsyncDMA.cpp"
     "AMDGPULowerCoalescedDMAToGatherLDS.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
@@ -73,6 +75,7 @@ iree_cc_library(
     "GPUInferMemorySpace.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
+    "GPUNestedLayoutUtils.cpp"
     "GPUPackPartialReductions.cpp"
     "GPUPackToIntrinsics.cpp"
     "GPUPadConvs.cpp"

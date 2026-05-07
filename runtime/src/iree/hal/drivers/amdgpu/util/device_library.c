@@ -34,6 +34,47 @@ typedef struct iree_hal_amdgpu_agent_available_isas_t {
   hsa_isa_t values[32];
 } iree_hal_amdgpu_agent_available_isas_t;
 
+static iree_status_t iree_hal_amdgpu_device_library_query_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
+    hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), device_agent, HSA_AGENT_INFO_PROFILE, out_profile));
+  return iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
+                                 HSA_AGENT_INFO_DEFAULT_FLOAT_ROUNDING_MODE,
+                                 out_rounding_mode);
+}
+
+static iree_status_t iree_hal_amdgpu_device_library_select_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology, hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  if (topology->gpu_agent_count == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no GPU agents available for device library load");
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_device_library_query_agent_profile(
+      libhsa, topology->gpu_agents[0], out_profile, out_rounding_mode));
+  for (iree_host_size_t i = 1; i < topology->gpu_agent_count; ++i) {
+    hsa_profile_t profile = HSA_PROFILE_BASE;
+    hsa_default_float_rounding_mode_t rounding_mode =
+        HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_device_library_query_agent_profile(
+        libhsa, topology->gpu_agents[i], &profile, &rounding_mode));
+    if (profile != *out_profile || rounding_mode != *out_rounding_mode) {
+      return iree_make_status(
+          IREE_STATUS_INCOMPATIBLE,
+          "GPU agents must have matching HSA executable profiles and default "
+          "rounding modes; agent[%" PRIhsz
+          "] has profile %d and rounding mode %d but the device library "
+          "requires profile %d and rounding mode %d",
+          i, (int)profile, (int)rounding_mode, (int)*out_profile,
+          (int)*out_rounding_mode);
+    }
+  }
+  return iree_ok_status();
+}
+
 static hsa_status_t iree_hal_amdgpu_iterate_agent_isa(hsa_isa_t isa,
                                                       void* user_data) {
   iree_hal_amdgpu_agent_available_isas_t* isas =
@@ -251,12 +292,17 @@ iree_status_t iree_hal_amdgpu_device_library_initialize(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status);
 
   // Create the executable that will hold all of the loaded code objects.
-  // TODO(benvanik): pass profile/rounding mode from queried info.
+  hsa_profile_t executable_profile = HSA_PROFILE_BASE;
+  hsa_default_float_rounding_mode_t executable_rounding_mode =
+      HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+  status = iree_hal_amdgpu_device_library_select_agent_profile(
+      libhsa, topology, &executable_profile, &executable_rounding_mode);
   IREE_LEAK_CHECK_DISABLE_PUSH();
-  status =
-      iree_hsa_executable_create_alt(IREE_LIBHSA(libhsa), HSA_PROFILE_FULL,
-                                     HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT,
-                                     options, &out_library->executable);
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_executable_create_alt(
+        IREE_LIBHSA(libhsa), executable_profile, executable_rounding_mode,
+        options, &out_library->executable);
+  }
   IREE_LEAK_CHECK_DISABLE_POP();
 
   // Load the code object for each agent.

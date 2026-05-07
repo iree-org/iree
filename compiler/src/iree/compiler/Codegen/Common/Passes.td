@@ -647,7 +647,12 @@ def GenericVectorizationPass :
             /*default=*/"2147483647",
            "Max vector size allowed to avoid creating large vectors.">,
     Option<"vectorizeMapStore", "vectorize-map-store", "bool", /*default=*/"false",
-      "Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.">
+      "Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.">,
+    Option<"vectorizeArgCompare", "vectorize-arg-compare", "bool", /*default=*/"true",
+      "Vectorize iree_linalg_ext.arg_compare. Disable for pipelines without a "
+      "lowering for iree_vector_ext.arg_compare. "
+      "TODO(#24365): remove once a generic vector lowering for "
+      "iree_vector_ext.arg_compare exists.">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithDialect"

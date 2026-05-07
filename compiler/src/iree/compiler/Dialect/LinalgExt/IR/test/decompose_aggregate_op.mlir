@@ -81,6 +81,7 @@ module attributes { transform.with_named_sequence } {
 #mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+#mapMask = affine_map<(batch, m, k1, k2, n) -> (batch, m, k2)>
 
 func.func @attention_f16(%query: tensor<192x1024x64xf16>,
                          %key: tensor<192x1024x64xf16>,
@@ -129,9 +130,10 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK-NOT: arith.extf
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// P = P /= sum
+// P = P / sum
 // CHECK: linalg.generic
 // CHECK-NOT: arith.extf
+// CHECK-NOT: arith.addf
 // CHECK:   arith.divf
 // CHECK:   linalg.yield
 // truncf P : f32 to f16
@@ -145,6 +147,68 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.extf
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
+// CHECK:   linalg.yield
+
+// Masked variant: use max(sum, 1) as a compact fully-masked-row guard. Fully
+// masked rows have a zero numerator and sum == 0, so the guard yields 0 instead
+// of 0/0 == NaN. Non-fully-masked rows have sum >= 1 and are unchanged.
+func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
+                                %key: tensor<192x1024x64xf16>,
+                                %value: tensor<192x1024x64xf16>,
+                                %mask: tensor<192x1024x1024xf16>,
+                                %output: tensor<192x1024x64xf32>)
+                                -> (tensor<192x1024x64xf32>) {
+  %scale = arith.constant 1.0 : f16
+
+  %out = iree_linalg_ext.attention
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapMask, #mapO] }
+        ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16, tensor<192x1024x1024xf16>)
+        outs(%output : tensor<192x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     }
+        -> tensor<192x1024x64xf32>
+
+  return %out : tensor<192x1024x64xf32>
+}
+
+// CHECK-LABEL: @attention_f16_masked
+// Q = Q * scale
+// CHECK: linalg.generic
+// CHECK:   arith.mulf
+// S = Q @ K
+// CHECK: linalg.generic
+// CHECK:   arith.extf
+// CHECK:   arith.extf
+// CHECK:   arith.mulf
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+// S += mask
+// CHECK: linalg.generic
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+// max = rowMax(S)
+// CHECK: linalg.generic
+// CHECK:   arith.maximumf
+// CHECK:   linalg.yield
+// P = exp2(S - max)
+// CHECK: linalg.generic
+// CHECK:   arith.subf
+// CHECK:   math.exp2
+// CHECK:   linalg.yield
+// sum = rowSum(P)
+// CHECK: linalg.generic
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+// sum = max(sum, 1): equivalent to select(sum == 0, 1, sum) because masked
+// attention rows produce either sum == 0 (fully masked) or sum >= 1.
+// CHECK: linalg.generic
+// CHECK:   arith.maximumf
+// CHECK:   linalg.yield
+// P = P / sum
+// CHECK: linalg.generic
+// CHECK-NOT: arith.addf
+// CHECK:   arith.divf
 // CHECK:   linalg.yield
 
 // -----

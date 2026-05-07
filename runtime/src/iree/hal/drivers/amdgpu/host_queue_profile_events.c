@@ -368,9 +368,8 @@ iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_queue_device_events(
         IREE_STATUS_FAILED_PRECONDITION,
         "queue device profiling requires queue-local PM4 IB slots");
   }
-  if (IREE_UNLIKELY(
-          !iree_hal_amdgpu_vendor_packet_capabilities_support_timestamp_range(
-              queue->vendor_packet_capabilities))) {
+  if (IREE_UNLIKELY(!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+          queue->pm4_timestamp_strategy))) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "queue device profiling requires PM4 timestamp range support");

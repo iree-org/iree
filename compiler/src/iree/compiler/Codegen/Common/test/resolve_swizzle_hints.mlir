@@ -141,14 +141,18 @@ func.func @swizzle_dynamic(%src: memref<?xf32>, %vec: vector<4xf32>, %offset: in
 //   CHECK-DAG:   %[[ROW_WIDTH:.+]] = arith.constant 64 : index
 //   CHECK-DAG:   %[[GROUP_COUNT:.+]] = arith.constant 16 : index
 //   CHECK-DAG:   %[[GROUP_WIDTH:.+]] = arith.constant 4 : index
-//       CHECK:   %[[I:.+]] = arith.divui %[[OFFSET]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[JELEM:.+]] = arith.remui %[[OFFSET]], %[[ROW_WIDTH]] : index
+//       CHECK:   %[[REM:.+]] = arith.remui %[[OFFSET]], %[[GROUP_WIDTH]] : index
+//       CHECK:   %[[ALIGNED:.+]] = arith.subi %[[OFFSET]], %[[REM]] : index
+//       CHECK:   %[[I:.+]] = arith.divui %[[ALIGNED]], %[[ROW_WIDTH]] : index
+//       CHECK:   %[[JELEM:.+]] = arith.remui %[[ALIGNED]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[J:.+]] = arith.divui %[[JELEM]], %[[GROUP_WIDTH]] : index
 //       CHECK:   %[[ADD:.+]] = arith.addi %[[I]], %[[J]] : index
 //       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[ADD]], %[[GROUP_COUNT]] : index
 //       CHECK:   %[[ROTATEJELEM:.+]] = arith.muli %[[ROTATEJ]], %[[GROUP_WIDTH]] : index
 //       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
+//       CHECK:   %[[SWIZZLED:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
+//       CHECK:   %[[DIFF:.+]] = arith.subi %[[SWIZZLED]], %[[ALIGNED]] : index
+//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[OFFSET]], %[[DIFF]] : index
 
 // Make sure both the load and store get the same calculation.
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
@@ -177,20 +181,23 @@ func.func @swizzle_adjust_add_offset(%src: memref<?xf32>, %vec: vector<4xf32>, %
 //   CHECK-DAG:   %[[GROUP_WIDTH:.+]] = arith.constant 4 : index
 //   CHECK-DAG:   %[[C1040:.+]] = arith.constant 1040 : index
 //       CHECK:   %[[APPLY_BASE:.+]] = arith.addi %[[OFFSET]], %[[GROUP_COUNT]] overflow<nsw> : index
-//       CHECK:   %[[I:.+]] = arith.divui %[[APPLY_BASE]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[JELEM:.+]] = arith.remui %[[APPLY_BASE]], %[[ROW_WIDTH]] : index
+//       CHECK:   %[[REM:.+]] = arith.remui %[[APPLY_BASE]], %[[GROUP_WIDTH]] : index
+//       CHECK:   %[[ALIGNED:.+]] = arith.subi %[[APPLY_BASE]], %[[REM]] : index
+//       CHECK:   %[[I:.+]] = arith.divui %[[ALIGNED]], %[[ROW_WIDTH]] : index
+//       CHECK:   %[[JELEM:.+]] = arith.remui %[[ALIGNED]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[J:.+]] = arith.divui %[[JELEM]], %[[GROUP_WIDTH]] : index
 //       CHECK:   %[[ADD:.+]] = arith.addi %[[I]], %[[J]] : index
 //       CHECK:   %[[ROTATEJ:.+]] = arith.remui %[[ADD]], %[[GROUP_COUNT]] : index
 //       CHECK:   %[[ROTATEJELEM:.+]] = arith.muli %[[ROTATEJ]], %[[GROUP_WIDTH]] : index
 //       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
-//       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
+//       CHECK:   %[[SWIZZLED:.+]] = arith.addi %[[ROTATEJELEM]], %[[IELEM]] : index
+//       CHECK:   %[[DIFF:.+]] = arith.subi %[[SWIZZLED]], %[[ALIGNED]] : index
 
-//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
+//       CHECK:   %[[LOAD_SWOFF:.+]] = arith.addi %[[APPLY_BASE]], %[[DIFF]] : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[LOAD_SWOFF]]]
 
 //       CHECK:   %[[STORE_BASE:.+]] = arith.addi %[[OFFSET]], %[[C1040]] overflow<nsw> : index
-//       CHECK:   %[[OFFSET_DIFF:.+]] = arith.subi %[[SWOFF]], %[[APPLY_BASE]] : index
-//       CHECK:   %[[STORE_SWOFF:.+]] = arith.addi %[[STORE_BASE]], %[[OFFSET_DIFF]] : index
+//       CHECK:   %[[STORE_SWOFF:.+]] = arith.addi %[[STORE_BASE]], %[[DIFF]] : index
 //       CHECK:   vector.store %[[VEC]], %[[SRC]][%[[STORE_SWOFF]]]
 //       CHECK:   return %[[VECTOR]]
 
@@ -227,6 +234,23 @@ func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
 // CHECK-LABEL: func @swizzle_load_xor
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
 //       CHECK:   %[[SWOFF:.+]] = arith.constant 2000 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
+func.func @swizzle_load_xor_unaligned(%src: memref<?xi8>) -> vector<16xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+
+  // Offset 1955 = 1952 + 3, where 1952 swizzles to 2000, so result = 2000 + 3 = 2003.
+  %offset = arith.constant 1955 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<16xi8>
+  return %1: vector<16xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load_xor_unaligned
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 2003 : index
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
 //       CHECK:   return %[[VECTOR]]
 

@@ -291,6 +291,9 @@ VER_0 {
     mlirComplexTypeGetElementType;
     mlirComplexTypeGetName;
     mlirComplexTypeGetTypeID;
+    mlirConditionallySpeculatableOpInterfaceAttachFallbackModel;
+    mlirConditionallySpeculatableOpInterfaceGetSpeculatability;
+    mlirConditionallySpeculatableOpInterfaceTypeID;
     mlirContextAppendDialectRegistry;
     mlirContextAttachDiagnosticHandler;
     mlirContextCreate;
@@ -725,12 +728,14 @@ VER_0 {
     mlirLocationIsAFileLineColRange;
     mlirLocationIsAFused;
     mlirLocationIsAName;
+    mlirLocationIsAUnknown;
     mlirLocationNameGet;
     mlirLocationNameGetChildLoc;
     mlirLocationNameGetName;
     mlirLocationNameGetTypeID;
     mlirLocationPrint;
     mlirLocationUnknownGet;
+    mlirLocationUnknownGetTypeID;
     mlirMemRefTypeContiguousGet;
     mlirMemRefTypeContiguousGetChecked;
     mlirMemRefTypeGet;

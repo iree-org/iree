@@ -32,14 +32,18 @@ iree_cc_library(
     ::IREECPUEnums
     LLVMSupport
     MLIRAffineDialect
+    MLIRArithDialect
     MLIRIR
+    MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRParser
     MLIRSupport
     MLIRTensorDialect
+    MLIRVectorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
+    iree::compiler::Codegen::Dialect::Codegen::Utils::MMAUtils
     iree::compiler::Dialect::Encoding::IR
   PUBLIC
 )

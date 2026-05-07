@@ -272,7 +272,8 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool vectorizeCopies, bool enableMasking,
                                       bool foldIdentitySlices,
-                                      bool decomposeMasks) {
+                                      bool decomposeMasks,
+                                      bool vectorizeArgCompare) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -286,6 +287,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.foldCastIntoContract = true;
   options.enableVectorMasking = enableMasking;
   options.vectorizeMapStore = true;
+  options.vectorizeArgCompare = vectorizeArgCompare;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   // Im2col decomposition runs after vectorization so that im2col ops get
   // direct vectorization via VectorizableOpInterface when possible. Any
@@ -326,7 +328,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/false);
+                            /*decomposeMasks=*/false,
+                            /*vectorizeArgCompare=*/true);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -571,10 +574,18 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Step 6. Vectorize.
+  // Skip vectorization of `iree_linalg_ext.arg_compare` here: the resulting
+  // `iree_vector_ext.arg_compare` only has a lowering through the nested-layout
+  // distribution patterns owned by the VectorDistribute pipeline. Ops routed
+  // to TileAndFuse (small reductions, f64) need the scalar-loop lowering from
+  // `LinalgExtToLoops` instead. This gate is intentionally narrow.
+  // TODO(#24365): Remove this option once a generic vector lowering for
+  // `iree_vector_ext.arg_compare` exists.
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true,
-                            /*decomposeMasks=*/false);
+                            /*decomposeMasks=*/false,
+                            /*vectorizeArgCompare=*/false);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
@@ -659,7 +670,8 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/false);
+                            /*decomposeMasks=*/false,
+                            /*vectorizeArgCompare=*/true);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -822,7 +834,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/true);
+                            /*decomposeMasks=*/true,
+                            /*vectorizeArgCompare=*/true);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
@@ -838,6 +851,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
+  if (forROCDL) {
+    funcPassManager.addPass(createAMDGPULowerAsyncDMAPass());
+  }
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapStorePass());
   funcPassManager.addPass(createHoistInnerTiledAccReshapesPass());
   funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
@@ -995,7 +1011,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // This pass needs to run before SCF -> CF.
   // Lower vector operations and legalize all operations to 1D vectors.
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
+      .addPass(createLLVMGPUVectorFlatteningPass)
       .addPass(createLLVMGPULegalizeNDVectorsPass)
+      .addPass(createLLVMGPUVectorMultiReductionLoweringPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 
@@ -1048,6 +1066,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
             ConvertUnsupportedFloatArithPassOptions{
                 clLLVMGPUEnableSmallFloatEmulation});
       });
+
+  // Group global loads together to improve AMDGPU instruction scheduling.
+  // The transformation is target-agnostic, but currently only enabled for
+  // ROCDL targets until there is data to support that it benefits other
+  // targets.
+  funcPassManager.addPredicatedPass(forROCDL,
+                                    createLLVMGPUGroupGlobalLoadsPass);
 
   // Commit the func-level adaptor before adding module-level passes.
   funcPassManager.commitPass();

@@ -572,6 +572,44 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
 
 // -----
 
+util.func public @collapse_online_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>) {
+  %cst0 = arith.constant 0.0 : f32
+  %cst_neg = arith.constant -3.4028235e+38 : f32
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 16] : tensor<20x4096x16xf16> into tensor<2x10x4096x16xf16>
+  %expanded_0 = tensor.expand_shape %arg1 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 16] : tensor<20x1024x16xf16> into tensor<2x10x1024x16xf16>
+  %expanded_1 = tensor.expand_shape %arg2 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 64] : tensor<20x1024x64xf16> into tensor<2x10x1024x64xf16>
+  %0:3 = flow.dispatch.region -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>) {
+    %acc_e = tensor.empty() : tensor<2x10x4096x64xf32>
+    %ms_e = tensor.empty() : tensor<2x10x4096xf32>
+    %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+    %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
+    %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
+    %r:3 = iree_linalg_ext.online_attention {indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]
+    } ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16)
+      outs(%acc, %max, %sum : tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score : f32
+    } -> tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>
+    flow.return %r#0, %r#1, %r#2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>
+  }
+  util.return %0#0, %0#1, %0#2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>
+}
+
+// CHECK-LABEL: util.func public @collapse_online_attention
+//       CHECK:   %[[ATTN:.*]]:3 = iree_linalg_ext.online_attention
+//  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
+//  CHECK-SAME:      tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+//       CHECK:   flow.return %[[ATTN]]#0, %[[ATTN]]#1, %[[ATTN]]#2
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, %arg1: tensor<20x1024x16xf32>, %arg2: tensor<20x1024x64xf32>, %arg3: f32) -> tensor<2x10x4096x64xf16> {
     %expanded = tensor.expand_shape %arg0 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 16] : tensor<20x4096x16xf32> into tensor<2x10x4096x16xf32>
@@ -993,30 +1031,33 @@ util.func public @no_collapse_scatter_generic(%src: tensor<1x25x25x32xf16>) -> t
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c25 = arith.constant 25 : index
-  %empty = tensor.empty() : tensor<1x52x52x32xf16>
-  %result = linalg.generic {
-    indexing_maps = [#map],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-  } outs(%empty : tensor<1x52x52x32xf16>) {
-  ^bb0(%out: f16):
-    %n = linalg.index 0 : index
-    %h = linalg.index 1 : index
-    %w = linalg.index 2 : index
-    %c_idx = linalg.index 3 : index
-    %sh = arith.subi %h, %c1 : index
-    %rem_h = arith.remsi %sh, %c2 : index
-    %div_h = arith.divsi %sh, %c2 : index
-    %ge = arith.cmpi sge, %sh, %c0 : index
-    %eq = arith.cmpi eq, %rem_h, %c0 : index
-    %lt = arith.cmpi slt, %div_h, %c25 : index
-    %valid = arith.andi %ge, %eq : i1
-    %valid2 = arith.andi %valid, %lt : i1
-    %clamped = arith.maxsi %div_h, %c0 : index
-    %extracted = tensor.extract %src[%n, %clamped, %w, %c_idx] : tensor<1x25x25x32xf16>
-    %val = arith.select %valid2, %extracted, %zero : f16
-    linalg.yield %val : f16
-  } -> tensor<1x52x52x32xf16>
-  util.return %result : tensor<1x52x52x32xf16>
+  %0 = flow.dispatch.region -> (tensor<1x52x52x32xf16>) {
+    %empty = tensor.empty() : tensor<1x52x52x32xf16>
+    %result = linalg.generic {
+      indexing_maps = [#map],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+    } outs(%empty : tensor<1x52x52x32xf16>) {
+    ^bb0(%out: f16):
+      %n = linalg.index 0 : index
+      %h = linalg.index 1 : index
+      %w = linalg.index 2 : index
+      %c_idx = linalg.index 3 : index
+      %sh = arith.subi %h, %c1 : index
+      %rem_h = arith.remsi %sh, %c2 : index
+      %div_h = arith.divsi %sh, %c2 : index
+      %ge = arith.cmpi sge, %sh, %c0 : index
+      %eq = arith.cmpi eq, %rem_h, %c0 : index
+      %lt = arith.cmpi slt, %div_h, %c25 : index
+      %valid = arith.andi %ge, %eq : i1
+      %valid2 = arith.andi %valid, %lt : i1
+      %clamped = arith.maxsi %div_h, %c0 : index
+      %extracted = tensor.extract %src[%n, %clamped, %w, %c_idx] : tensor<1x25x25x32xf16>
+      %val = arith.select %valid2, %extracted, %zero : f16
+      linalg.yield %val : f16
+    } -> tensor<1x52x52x32xf16>
+    flow.return %result : tensor<1x52x52x32xf16>
+  }
+  util.return %0 : tensor<1x52x52x32xf16>
 }
 
 // CHECK-LABEL: @no_collapse_scatter_generic
@@ -1025,3 +1066,88 @@ util.func public @no_collapse_scatter_generic(%src: tensor<1x25x25x32xf16>) -> t
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK:         tensor.extract
 // CHECK:         arith.select
+
+// -----
+
+// Rotate-half RoPE pattern: same body pattern as above, but `ins` operands
+// are present so the scatter-skip predicate does not fire. The pass
+// collapses `(d0,d1)` and `(d3,d4)`, dropping the iteration space from 5
+// to 3 dims.
+#map_iter   = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+#map_brdcst = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+util.func public @collapse_rope_rotate_half(
+    %v:   tensor<4x2048x8x2x64xf16>,
+    %cos: tensor<4x2048x2x64xf16>,
+    %sin: tensor<4x2048x2x64xf16>) -> tensor<4x2048x8x2x64xf16> {
+  %c1 = arith.constant 1 : index
+  %0 = flow.dispatch.region -> (tensor<4x2048x8x2x64xf16>) {
+    %empty = tensor.empty() : tensor<4x2048x8x2x64xf16>
+    %result = linalg.generic {
+      indexing_maps = [#map_iter, #map_brdcst, #map_brdcst, #map_iter],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+    } ins(%v, %cos, %sin : tensor<4x2048x8x2x64xf16>,
+                            tensor<4x2048x2x64xf16>,
+                            tensor<4x2048x2x64xf16>)
+      outs(%empty : tensor<4x2048x8x2x64xf16>) {
+    ^bb0(%a: f16, %c: f16, %s: f16, %o: f16):
+      %1 = linalg.index 0 : index
+      %2 = linalg.index 1 : index
+      %3 = linalg.index 2 : index
+      %4 = linalg.index 3 : index
+      %5 = linalg.index 4 : index
+      %6 = arith.subi %c1, %4 : index
+      %extracted = tensor.extract %v[%1, %2, %3, %6, %5] : tensor<4x2048x8x2x64xf16>
+      %7 = arith.negf %extracted : f16
+      %8 = arith.cmpi eq, %6, %c1 : index
+      %9 = arith.select %8, %7, %extracted : f16
+      %10 = arith.mulf %9, %s : f16
+      %11 = arith.mulf %a, %c : f16
+      %12 = arith.addf %11, %10 : f16
+      linalg.yield %12 : f16
+    } -> tensor<4x2048x8x2x64xf16>
+    flow.return %result : tensor<4x2048x8x2x64xf16>
+  }
+  util.return %0 : tensor<4x2048x8x2x64xf16>
+}
+
+// CHECK-LABEL: @collapse_rope_rotate_half
+// CHECK:         tensor.collapse_shape {{.*}} into tensor<8192x8x128xf16>
+// CHECK:         tensor.collapse_shape {{.*}} into tensor<8192x128xf16>
+// CHECK:         flow.dispatch.region
+// CHECK:         linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+// CHECK:         tensor.extract
+
+// -----
+
+// Gather-like generic with `tensor.extract` + `linalg.index` but WITHOUT an
+// `arith.select`. The scatter-skip predicate must not match this shape (no
+// bounds check), so the generic is collapsed to a single parallel dim.
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+util.func public @collapse_reverse_generic(%src: tensor<2x2x2xf32>) -> tensor<2x2x2xf32> {
+  %c1 = arith.constant 1 : index
+  %0 = flow.dispatch.region -> (tensor<2x2x2xf32>) {
+    %empty = tensor.empty() : tensor<2x2x2xf32>
+    %result = linalg.generic {
+      indexing_maps = [#map],
+      iterator_types = ["parallel", "parallel", "parallel"]
+    } outs(%empty : tensor<2x2x2xf32>) {
+    ^bb0(%out: f32):
+      %i0 = linalg.index 0 : index
+      %i1 = linalg.index 1 : index
+      %i2 = linalg.index 2 : index
+      %rev = arith.subi %c1, %i1 : index
+      %extracted = tensor.extract %src[%i0, %rev, %i2] : tensor<2x2x2xf32>
+      linalg.yield %extracted : f32
+    } -> tensor<2x2x2xf32>
+    flow.return %result : tensor<2x2x2xf32>
+  }
+  util.return %0 : tensor<2x2x2xf32>
+}
+
+// CHECK-LABEL: @collapse_reverse_generic
+// CHECK:         flow.dispatch.region -> (tensor<8xf32>)
+// CHECK:         linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel"]
+// CHECK:         tensor.extract
+// CHECK:         tensor.expand_shape

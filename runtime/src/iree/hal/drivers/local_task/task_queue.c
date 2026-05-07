@@ -3795,17 +3795,21 @@ iree_status_t iree_hal_task_queue_submit_dispatch(
     }
   }
 
-  // Retain executable and all bound buffers.
-  if (iree_status_is_ok(status)) {
+  // Retain executable and all bound buffers unless the caller guarantees that
+  // resource lifetimes extend until the dispatch signals completion.
+  const bool borrow_resource_lifetimes =
+      iree_any_bit_set(flags, IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES);
+  if (iree_status_is_ok(status) && !borrow_resource_lifetimes) {
     status = iree_hal_resource_set_insert(
         operation->resource_set, 1, (iree_hal_resource_t* const*)&executable);
   }
-  if (iree_status_is_ok(status) && binding_count > 0) {
+  if (iree_status_is_ok(status) && !borrow_resource_lifetimes &&
+      binding_count > 0) {
     status = iree_hal_resource_set_insert_strided(
         operation->resource_set, binding_count, bindings,
         offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t));
   }
-  if (iree_status_is_ok(status) &&
+  if (iree_status_is_ok(status) && !borrow_resource_lifetimes &&
       iree_hal_dispatch_uses_indirect_parameters(flags)) {
     status = iree_hal_resource_set_insert(operation->resource_set, 1,
                                           &config.workgroup_count_ref.buffer);

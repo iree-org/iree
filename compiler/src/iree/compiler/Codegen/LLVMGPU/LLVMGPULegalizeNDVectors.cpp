@@ -710,6 +710,63 @@ struct ConvertVectorBitcast final
   }
 };
 
+/// Lowers 2D vector.multi_reduction to a sequence of vector.reduction Ops.
+/// This assumes that the src rank will always be two dimensional.
+///
+/// The reduction dimension must be the inner-most dimension.
+///
+/// BEFORE:
+///  vector.multi_reduction <mul>, %src, %acc [1] : vector<2x4xf32> to
+///  vector<2xf32>
+///
+/// AFTER:
+///   // 1st reduction
+///   %v_0 = vector.extract %src[0] : vector<4xf32> from vector<2x4xf32>
+///   %a_0 = vector.extract %acc[0] : f32 from vector<2xf32>
+///   %red_1 = vector.multi_reduction <mul>, %v_0, %a_1 [0] : vector<4xf32> into
+///   f32 %res_tmp = vector.insert %red_1, %res [0] : f32 into vector<2xf32>
+///
+///   // 2nd reduction
+///   %v_1 = vector.extract %src[1] : vector<4xf32> from vector<2x4xf32>
+///   %a_1 = vector.extract %acc[1] : f32 from vector<2xf32>
+///   %red_2 = vector.multi_reduction <mul>, %v_1, %a_1 [0] : vector<4xf32> into
+///   f32 %res_final = vector.insert %red_2, %res_tmp [1] : f32 into
+///   vector<2xf32>
+struct ConvertVectorMultiReduction final
+    : public OpConversionPattern<vector::MultiDimReductionOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(vector::MultiDimReductionOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    VectorType srcType = cast<VectorType>(op.getSource().getType());
+    if (srcType.getRank() != 2) {
+      return failure();
+    }
+
+    if (op.isReducedDim(0) || !op.isReducedDim(1)) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    Value acc = adaptor.getAcc()[0];
+    Type resultType = op.getResult().getType();
+    Value result = ub::PoisonOp::create(rewriter, loc, resultType);
+
+    SmallVector<Value> srcs(adaptor.getSource());
+    for (int64_t i = 0, e = srcs.size(); i < e; i++) {
+      Value accElem = vector::ExtractOp::create(rewriter, loc, acc, i);
+      auto reduced = vector::MultiDimReductionOp::create(
+          rewriter, loc, op.getKind(), srcs[i], accElem, ArrayRef<int64_t>{0});
+      result = vector::InsertOp::create(rewriter, loc, reduced, result, i);
+    }
+
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 /// Convert vector.interleave on n-D vectors. The lhs and rhs are already
 /// split into flat 1-D vectors by the type converter; create a 1-D interleave
 /// for each corresponding pair.
@@ -814,7 +871,8 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorInsertStridedSlice, ConvertArithConstant, ConvertUBPoison,
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast, ConvertVectorInterleave,
-        ConvertVectorDeinterleave>(typeConverter, ctx);
+        ConvertVectorDeinterleave, ConvertVectorMultiReduction>(typeConverter,
+                                                                ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_lower_async_dma.mlir"
     "amdgpu_lower_coalesced_dma_to_gather_lds.mlir"
     "decompose_horizontally_fused_gemms.mlir"
     "expand_gpu_ops_scan.mlir"

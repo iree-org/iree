@@ -80,6 +80,14 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
+  Option<bool> splitReductionLowParallelism{
+      *this,
+      "split-reduction-low-parallelism",
+      llvm::cl::desc("Use the low-parallelism split reduction parameter set "
+                     "(RDNA-class targets) instead of the high-parallelism "
+                     "default (CDNA-class targets)"),
+      llvm::cl::init(false),
+  };
   Option<bool> enableAggressiveReshapeMovement{
       *this,
       "aggressive-reshape-movement",

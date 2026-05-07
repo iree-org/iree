@@ -212,6 +212,9 @@ void GenericVectorizationPass::runOnOperation() {
     if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(operation)) {
       return;
     }
+    if (!vectorizeArgCompare && isa<IREE::LinalgExt::ArgCompareOp>(operation)) {
+      return;
+    }
     candidates.push_back(op);
   });
 

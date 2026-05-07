@@ -425,7 +425,7 @@ endif()
 # chip because that would rely too much on guessing what the target chip is.
 # But silently continuing with ROCm testing disabled by default has also been
 # surprising.
-if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_ROCM_TEST_TARGET_CHIP} AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_ROCM_TEST_TARGET_CHIP})
   find_program(_ROCMINFO_COMMAND rocminfo)
   if (_ROCMINFO_COMMAND)
     execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
@@ -448,13 +448,6 @@ endif()
 set(IREE_ROCM_TEST_TARGET_CHIP "" CACHE STRING
   "Target chip for ROCm tests that need to compile device code. \
    Defaults to empty string to disable tests.")
-# Backward compatibility: accept the old IREE_HIP_TEST_TARGET_CHIP name.
-set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
-  "Deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
-if(IREE_HIP_TEST_TARGET_CHIP AND NOT IREE_ROCM_TEST_TARGET_CHIP)
-  message(WARNING "IREE_HIP_TEST_TARGET_CHIP is deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
-  set(IREE_ROCM_TEST_TARGET_CHIP "${IREE_HIP_TEST_TARGET_CHIP}" CACHE STRING "" FORCE)
-endif()
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options

@@ -886,6 +886,8 @@ iree_hal_amdgpu_physical_device_initialize_vendor_packet_strategy(
 
   iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(gfxip_version);
+  iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy =
+      iree_hal_amdgpu_select_pm4_timestamp_strategy(gfxip_version);
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy =
       IREE_HAL_AMDGPU_WAIT_BARRIER_STRATEGY_DEFER;
   if (!options->force_wait_barrier_defer) {
@@ -895,6 +897,7 @@ iree_hal_amdgpu_physical_device_initialize_vendor_packet_strategy(
   out_physical_device->isa.target_id = target_id;
   out_physical_device->vendor_packet_capabilities = vendor_packet_capabilities;
   out_physical_device->wait_barrier_strategy = wait_barrier_strategy;
+  out_physical_device->pm4_timestamp_strategy = pm4_timestamp_strategy;
   return iree_ok_status();
 }
 
@@ -1144,7 +1147,8 @@ iree_status_t iree_hal_amdgpu_physical_device_assign_frontier(
         &kernarg_ring_memory.descriptor, host_memory_pools->fine_pool,
         frontier_tracker, queue_axis, resolved.queue_affinity,
         completion_thread_affinity, physical_device->wait_barrier_strategy,
-        physical_device->vendor_packet_capabilities, epoch_signal_table,
+        physical_device->vendor_packet_capabilities,
+        physical_device->pm4_timestamp_strategy, epoch_signal_table,
         &physical_device->fine_host_block_pool,
         &physical_device->fine_block_pools.small,
         &physical_device->buffer_transfer_context,

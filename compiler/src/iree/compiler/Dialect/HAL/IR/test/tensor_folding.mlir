@@ -12,6 +12,66 @@ util.func public @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer
 
 // -----
 
+// Import wait fences must not be folded away.
+
+// CHECK-LABEL: @noFoldTensorImportExportWithWait
+// CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[WAIT:.+]]: !hal.fence)
+util.func public @noFoldTensorImportExportWithWait(%arg0: !hal.buffer_view, %wait: !hal.fence) -> !hal.buffer_view {
+  // CHECK: %[[IMPORT:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] : !hal.buffer_view -> tensor<5xi32>
+  %0 = hal.tensor.import wait(%wait) => %arg0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[IMPORT]] : tensor<5xi32> -> !hal.buffer_view
+  %1 = hal.tensor.export %0 : tensor<5xi32> -> !hal.buffer_view
+  // CHECK: util.return %[[EXPORT]] : !hal.buffer_view
+  util.return %1 : !hal.buffer_view
+}
+
+// -----
+
+// Import consumes must not be folded away.
+
+// CHECK-LABEL: @noFoldTensorImportExportWithConsume
+// CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view)
+util.func public @noFoldTensorImportExportWithConsume(%arg0: !hal.buffer_view) -> !hal.buffer_view {
+  // CHECK: %[[IMPORT:.+]] = hal.tensor.import consume %[[ARG0]] : !hal.buffer_view -> tensor<5xi32>
+  %0 = hal.tensor.import consume %arg0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[IMPORT]] : tensor<5xi32> -> !hal.buffer_view
+  %1 = hal.tensor.export %0 : tensor<5xi32> -> !hal.buffer_view
+  // CHECK: util.return %[[EXPORT]] : !hal.buffer_view
+  util.return %1 : !hal.buffer_view
+}
+
+// -----
+
+// Import wait fences must not be folded away from export/import pairs.
+
+// CHECK-LABEL: @noFoldTensorExportImportWithWait
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<5xi32>, %[[WAIT:.+]]: !hal.fence)
+util.func public @noFoldTensorExportImportWithWait(%arg0: tensor<5xi32>, %wait: !hal.fence) -> tensor<5xi32> {
+  // CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[ARG0]] : tensor<5xi32> -> !hal.buffer_view
+  %0 = hal.tensor.export %arg0 : tensor<5xi32> -> !hal.buffer_view
+  // CHECK: %[[IMPORT:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[EXPORT]] : !hal.buffer_view -> tensor<5xi32>
+  %1 = hal.tensor.import wait(%wait) => %0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: util.return %[[IMPORT]] : tensor<5xi32>
+  util.return %1 : tensor<5xi32>
+}
+
+// -----
+
+// Import consumes must not be folded away from export/import pairs.
+
+// CHECK-LABEL: @noFoldTensorExportImportWithConsume
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<5xi32>)
+util.func public @noFoldTensorExportImportWithConsume(%arg0: tensor<5xi32>) -> tensor<5xi32> {
+  // CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[ARG0]] : tensor<5xi32> -> !hal.buffer_view
+  %0 = hal.tensor.export %arg0 : tensor<5xi32> -> !hal.buffer_view
+  // CHECK: %[[IMPORT:.+]] = hal.tensor.import consume %[[EXPORT]] : !hal.buffer_view -> tensor<5xi32>
+  %1 = hal.tensor.import consume %0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: util.return %[[IMPORT]] : tensor<5xi32>
+  util.return %1 : tensor<5xi32>
+}
+
+// -----
+
 // Import with byte_offset must not fold — the import is a subview.
 
 // CHECK-LABEL: @noFoldTensorImportExportWithOffset

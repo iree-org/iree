@@ -110,7 +110,7 @@ iree_status_t iree_hal_amdgpu_executable_infer_format(
 // may begin after executable preparation, so this cold-path metadata is always
 // durable instead of being gated on an active profiling session.
 iree_status_t iree_hal_amdgpu_executable_create(
-    const iree_hal_amdgpu_libhsa_t* libhsa,
+    iree_hal_device_t* device, const iree_hal_amdgpu_libhsa_t* libhsa,
     const iree_hal_amdgpu_topology_t* topology,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,

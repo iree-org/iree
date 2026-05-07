@@ -106,7 +106,7 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
+                    llvm::cl::Hidden, llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
@@ -2483,6 +2483,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
         LDBG() << "ArgCompare Config";
         if (succeeded(IREE::GPU::setReductionConfig(
+                target, entryPointFn, argCompareOp.getOperation()))) {
+          return success();
+        }
+        if (succeeded(IREE::GPU::setArgCompareConfig(
                 target, entryPointFn, argCompareOp.getOperation()))) {
           return success();
         }

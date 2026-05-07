@@ -786,8 +786,11 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_host_call(
 // the queue it is scheduled on.
 //
 // The provided constant data and binding list will be recorded into the queue
-// and need not remain live beyond the call. Binding buffers will be retained by
-// the queue until it the operation has completed.
+// and need not remain live beyond the call. By default the executable, binding
+// buffers, and indirect parameter buffer will be retained by the queue until
+// the operation has completed. Callers that already guarantee resource
+// lifetimes may pass IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES to allow
+// implementations to skip that tracking on hot paths.
 //
 // All provided |bindings| must be directly specified and not reference binding
 // table slots.

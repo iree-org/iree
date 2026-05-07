@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "apply_pdl_patterns_tosa.mlir"
+    "apply_scale_lowering.mlir"
     "auto_input_conversion.mlir"
     "convert_i48_to_i64.mlir"
     "strip_signedness.mlir"

@@ -198,21 +198,27 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_write_data(
       &submission));
   if (!*out_ready) return iree_ok_status();
 
+  bool did_emit = false;
   if (write_data->length == 4) {
     uint32_t value = 0;
     memcpy(&value, &write_data->value, sizeof(value));
-    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_write_data32(
-        submission.pm4_ib_slot, write_data->target_device_ptr, value);
+    did_emit = iree_hal_amdgpu_pm4_ib_builder_emit_write_data32(
+        &submission.pm4_ib_builder, write_data->target_device_ptr, value);
   } else {
-    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_write_data64(
-        submission.pm4_ib_slot, write_data->target_device_ptr,
+    did_emit = iree_hal_amdgpu_pm4_ib_builder_emit_write_data64(
+        &submission.pm4_ib_builder, write_data->target_device_ptr,
         write_data->value);
   }
-  const uint64_t submission_epoch =
-      iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
-          queue, resolution, signal_semaphore_list, operation_resources,
-          IREE_ARRAYSIZE(operation_resources), profile_event_info,
-          submission_flags, &submission);
+  if (IREE_UNLIKELY(!did_emit)) {
+    iree_hal_amdgpu_host_queue_fail_pm4_ib_submission(queue, &submission);
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "PM4 WRITE_DATA payload does not fit IB slot");
+  }
+  uint64_t submission_epoch = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      IREE_ARRAYSIZE(operation_resources), profile_event_info, submission_flags,
+      &submission, &submission_epoch));
   if (out_submission_id) *out_submission_id = submission_epoch;
   return iree_ok_status();
 }
@@ -271,20 +277,26 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_copy_data(
       &submission));
   if (!*out_ready) return iree_ok_status();
 
+  bool did_emit = false;
   if (copy_data->length == 4) {
-    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_copy_data32(
-        submission.pm4_ib_slot, copy_data->source_device_ptr,
+    did_emit = iree_hal_amdgpu_pm4_ib_builder_emit_copy_data32(
+        &submission.pm4_ib_builder, copy_data->source_device_ptr,
         copy_data->target_device_ptr);
   } else {
-    submission.ib_dword_count = iree_hal_amdgpu_pm4_emit_copy_data64(
-        submission.pm4_ib_slot, copy_data->source_device_ptr,
+    did_emit = iree_hal_amdgpu_pm4_ib_builder_emit_copy_data64(
+        &submission.pm4_ib_builder, copy_data->source_device_ptr,
         copy_data->target_device_ptr);
   }
-  const uint64_t submission_epoch =
-      iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
-          queue, resolution, signal_semaphore_list, operation_resources,
-          IREE_ARRAYSIZE(operation_resources), profile_event_info,
-          submission_flags, &submission);
+  if (IREE_UNLIKELY(!did_emit)) {
+    iree_hal_amdgpu_host_queue_fail_pm4_ib_submission(queue, &submission);
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "PM4 COPY_DATA payload does not fit IB slot");
+  }
+  uint64_t submission_epoch = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_finish_pm4_ib_submission(
+      queue, resolution, signal_semaphore_list, operation_resources,
+      IREE_ARRAYSIZE(operation_resources), profile_event_info, submission_flags,
+      &submission, &submission_epoch));
   if (out_submission_id) *out_submission_id = submission_epoch;
   return iree_ok_status();
 }

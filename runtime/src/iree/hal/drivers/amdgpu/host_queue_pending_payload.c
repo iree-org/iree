@@ -444,7 +444,11 @@ iree_status_t iree_hal_amdgpu_host_queue_defer_dispatch(
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pending_op_allocate(
       queue, wait_semaphore_list, signal_semaphore_list,
       IREE_HAL_AMDGPU_PENDING_OP_DISPATCH, max_resources, &op));
-  iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)executable);
+  const bool borrow_resource_lifetimes =
+      iree_any_bit_set(flags, IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES);
+  if (!borrow_resource_lifetimes) {
+    iree_hal_amdgpu_pending_op_retain(op, (iree_hal_resource_t*)executable);
+  }
   op->dispatch.executable = executable;
   op->dispatch.export_ordinal = export_ordinal;
   op->dispatch.config = config;
@@ -476,13 +480,20 @@ iree_status_t iree_hal_amdgpu_host_queue_defer_dispatch(
     }
     if (iree_status_is_ok(status)) {
       memcpy(bindings_copy, bindings.values, binding_ref_size);
-      for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-        iree_hal_amdgpu_pending_op_retain(
-            op, (iree_hal_resource_t*)bindings_copy[i].buffer);
+      if (!borrow_resource_lifetimes) {
+        for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+          iree_hal_amdgpu_pending_op_retain(
+              op, (iree_hal_resource_t*)bindings_copy[i].buffer);
+        }
       }
       op->dispatch.bindings.count = bindings.count;
       op->dispatch.bindings.values = bindings_copy;
     }
+  }
+  if (iree_status_is_ok(status) && !borrow_resource_lifetimes &&
+      iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    iree_hal_amdgpu_pending_op_retain(
+        op, (iree_hal_resource_t*)config.workgroup_count_ref.buffer);
   }
 
   if (iree_status_is_ok(status)) {

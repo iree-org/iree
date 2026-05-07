@@ -111,11 +111,13 @@ typedef struct iree_hal_amdgpu_aql_block_processor_timestamp_t {
       // Fixed binary command-buffer timestamp record, or NULL when disabled.
       iree_hal_amdgpu_command_buffer_timestamp_record_t* record;
     } target;
+    // PM4 packet sequence used for command-buffer timestamp ranges.
+    iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy;
     // PM4 timestamp packets owned by the enclosing submission.
     struct {
       // Start timestamp packet emitted before the payload span.
       struct {
-        // AQL packet receiving the top-of-pipe timestamp PM4 IB envelope.
+        // AQL packet receiving the start-timestamp PM4 IB envelope.
         iree_hal_amdgpu_aql_packet_t* packet;
         // PM4 IB slot referenced by |packet|.
         iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot;
@@ -124,7 +126,7 @@ typedef struct iree_hal_amdgpu_aql_block_processor_timestamp_t {
       } start;
       // End timestamp packet emitted after the payload and harvest spans.
       struct {
-        // AQL packet receiving the bottom-of-pipe timestamp PM4 IB envelope.
+        // AQL packet receiving the end-timestamp PM4 IB envelope.
         iree_hal_amdgpu_aql_packet_t* packet;
         // PM4 IB slot referenced by |packet|.
         iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot;

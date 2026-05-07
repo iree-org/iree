@@ -68,6 +68,7 @@ iree_lit_test_suite(
     "vectorize_with_masking_and_hoist.mlir"
     "verify_linalg_transform_legality.mlir"
     "verify_vector_size_legality.mlir"
+    "virtual_vector_lowering.mlir"
   TOOLS
     FileCheck
     iree-compile

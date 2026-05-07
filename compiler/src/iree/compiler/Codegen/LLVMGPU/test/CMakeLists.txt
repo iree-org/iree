@@ -46,6 +46,7 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "link_executables.mlir"
     "llvmgpu_bufferize.mlir"
+    "llvmgpu_group_global_loads.mlir"
     "nvvm_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "pipeline_coalesced_dma.mlir"
@@ -69,7 +70,9 @@ iree_lit_test_suite(
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
+    "vector_flattening.mlir"
     "vector_lowering.mlir"
+    "vector_multi_reduction_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
   TOOLS

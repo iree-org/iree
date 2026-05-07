@@ -579,6 +579,17 @@ enum iree_hal_dispatch_flag_bits_t {
   // knows the workload is small enough that worker wake-up latency would
   // dominate the total cost.
   IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION = 1ull << 5,
+
+  // Allows queue_dispatch implementations to borrow resource lifetimes instead
+  // of retaining them until the submitted work completes. Callers using this
+  // flag must keep the executable and all directly referenced buffers live and
+  // backed by stable storage until the submission's signal semaphores indicate
+  // completion. Implementations may ignore this hint and retain resources.
+  //
+  // Command buffer dispatches ignore this flag. Command buffer lifetime
+  // control is expressed by command buffer modes such as
+  // IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED.
+  IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES = 1ull << 6,
 };
 
 // Returns true if the given dispatch uses indirect workgroup parameters.

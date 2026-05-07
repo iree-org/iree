@@ -279,6 +279,9 @@ def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
 // LinalgExt-style ops.
 //===----------------------------------------------------------------------===//
 
+// TODO(#24365): the only lowering for this op today is via the nested-layout
+// distribution patterns owned by the VectorDistribute pipeline. Add a generic
+// lowering (e.g. via vector.* ops) so CPU and other GPU backends can use it.
 def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
   Pure,
   AttrSizedOperandSegments,

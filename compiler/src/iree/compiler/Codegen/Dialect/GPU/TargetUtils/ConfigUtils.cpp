@@ -557,6 +557,42 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+/// Returns true if direct load DMA should be rejected, and fall back to stream
+/// copies.
+///
+/// Rejection cases:
+///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
+///   2. Not a GEMM. TODO(#23907): support convolution.
+///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
+///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
+                                      Type lhsElemType, Type rhsElemType,
+                                      bool transposedLhs, bool transposedRhs) {
+  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+
+  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
+  if (!targetSupportsGlobalLoadDMA(target)) {
+    return true;
+  }
+
+  // Case 2: Only GEMM are supported currently.
+  if (!isGemm) {
+    return true;
+  }
+
+  // Case 3: Only f16/bf16 are supported currently.
+  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+    return true;
+  }
+
+  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
+  if (transposedLhs && !transposedRhs) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -572,7 +608,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
-    bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
+    bool scaled, bool &useDirectLoad, int64_t prefetchNumStages,
     int64_t splitReductionTripCnt, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
@@ -750,13 +786,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-  // compilation doesn't support it. Once this is fixed, we should use global
-  // load DMA here when possible.
   Location loc = operands[0].getLoc();
-  if (scaled && useDirectLoad) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
-                              "supported for scaled matmuls, ignoring";
+  if (useDirectLoad &&
+      shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
+                                transposedLhs, transposedRhs)) {
+    LDBG() << "overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
 
@@ -882,7 +916,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid LDS bank conflicts.
     // TODO(#24255): Fix untuned swizzle logic for DMA.
-    if (lhsElemType.isBF16() && !transposedLhs) {
+    if (!transposedLhs) {
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
           /*skipUntunedFallback=*/true);
@@ -890,7 +924,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         lhsAttr = *lhsSwizzleAttr;
       }
     }
-    if (rhsElemType.isBF16() && transposedRhs) {
+    if (transposedRhs) {
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
           /*skipUntunedFallback=*/true);
@@ -2065,6 +2099,111 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       workgroupTileSizes[depth] = residualWorkgroupSize;
       break;
     }
+  }
+
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      createLoweringConfig(workgroupTileSizes, threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, subgroupSize));
+}
+
+//====---------------------------------------------------------------------===//
+// ArgCompare Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+LogicalResult setArgCompareConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op) {
+  auto argCompareOp = cast<IREE::LinalgExt::ArgCompareOp>(op);
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+  SmallVector<unsigned> partitionedLoops =
+      interfaceOp.getPartitionableLoops(std::nullopt);
+
+  auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
+                                  ArrayRef<int64_t> threadSizes) {
+    NamedAttribute attrs[2] = {{"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+                               {"thread", b.getI64ArrayAttr(threadSizes)}};
+    return IREE::GPU::LoweringConfigAttr::get(context,
+                                              b.getDictionaryAttr(attrs));
+  };
+
+  // No parallel dims (e.g. rank-1 input reducing to a scalar) means there is
+  // nothing to distribute across threads. Emit a degenerate single-thread
+  // TileAndFuse config instead of bailing: the per-loop tile size is 0 for
+  // every reduction loop, so a single thread walks the full reduction once
+  // without racing.
+  if (partitionedLoops.empty()) {
+    int64_t numLoops = argCompareOp.getInputRank();
+    SmallVector<int64_t> zeroTileSizes(numLoops, 0);
+    IREE::GPU::LoweringConfigAttr loweringConfig =
+        createLoweringConfig(zeroTileSizes, zeroTileSizes);
+    std::array<int64_t, 3> singleThread = {1, 1, 1};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig,
+        getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                              singleThread, subgroupSize));
+  }
+
+  // arg_compare's iteration domain has one loop per input dim; the single
+  // reduction dim is `getDimension()` and the rest are parallel.
+  int64_t numLoops = argCompareOp.getInputRank();
+
+  // Starting point pending tuning data: two warps per workgroup mirrors
+  // setSortConfig and gives reasonable occupancy without over-subscribing
+  // for the small parallel iteration spaces typical of arg_compare fallbacks.
+  std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> threadTileSizes(numLoops, 1);
+
+  // Set non-parallel loops (the single reduction dim) to zero tile size so
+  // each thread runs the full reduction on its parallel slice.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(llvm::from_range,
+                                               partitionedLoops);
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
+    }
+  }
+
+  // Pack as many parallel-dim iterations as possible into the workgroup tile
+  // (innermost dim first), matching the setSortConfig packing strategy.
+  ArrayRef<int64_t> loopBounds = argCompareOp.getInputType().getShape();
+  int64_t residualWorkgroupSize = workgroupSize[0];
+  for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
+      continue;
+    }
+    if (residualWorkgroupSize % loopBounds[depth] == 0) {
+      workgroupTileSizes[depth] = loopBounds[depth];
+      residualWorkgroupSize /= loopBounds[depth];
+      continue;
+    }
+    if (loopBounds[depth] % residualWorkgroupSize == 0) {
+      workgroupTileSizes[depth] = residualWorkgroupSize;
+      break;
+    }
+  }
+
+  // If the parallel iterations actually packed into the workgroup tile fit in
+  // a single subgroup, drop to one warp so we don't launch idle threads.
+  int64_t cumulativeWorkgroupTile = 1;
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (partitionedLoopsSet.contains(depth) && workgroupTileSizes[depth] > 0) {
+      cumulativeWorkgroupTile *= workgroupTileSizes[depth];
+    }
+  }
+  if (cumulativeWorkgroupTile <= subgroupSize) {
+    workgroupSize[0] = subgroupSize;
   }
 
   IREE::GPU::LoweringConfigAttr loweringConfig =
