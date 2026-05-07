@@ -6472,7 +6472,10 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
   int64_t,   # intrinsics_m
   int64_t,   # intrinsics_n
   int64_t,   # intrinsics_k
-  bool   # transposed_intrinsic
+  bool,   # transposed_intrinsic
+  ::mlir::Type,   # lhs_type
+  ::mlir::Type,   # rhs_type
+  ::mlir::Type   # acc_type
 &gt;
 </code></pre></div>
 <p>CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
@@ -6485,6 +6488,15 @@ orientation and an M↔N-swapped orientation (same hardware instruction with
 LHS/RHS roles exchanged, accumulator laid out column-major). Orthogonal to
 the intrinsic itself: any intrinsic may be used transposed, including
 square ones where the effect is only the accumulator layout change.</p>
+<p>For most <code>intrinsic</code> values the (LHS, RHS, ACC) element types are baked
+into the enum and <code>lhs_type</code> / <code>rhs_type</code> / <code>acc_type</code> are unused. The
+one exception is <code>MMA_GENERIC_SCALAR_1x1x1</code>: it is a type-polymorphic
+fallback used when no element-type-specific intrinsic matches the
+target, and it carries its element types in those three optional
+parameters instead. This deliberately breaks the otherwise-strong
+invariant that an <code>MMAIntrinsic</code> enum value pins down a specific element
+type triple, in exchange for not having to add one enum value per
+supported (LHS, RHS, ACC) combination.</p>
 <p>Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
 here but are unused.</p>
 <h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
@@ -6521,6 +6533,21 @@ here but are unused.</p>
 <td style="text-align: center;">transposed_intrinsic</td>
 <td style="text-align: center;"><code>bool</code></td>
 <td>If true, the intrinsic is used in an M↔N-swapped orientation (LHS/RHS roles exchanged, accumulator column-major).</td>
+</tr>
+<tr>
+<td style="text-align: center;">lhs_type</td>
+<td style="text-align: center;"><code>::mlir::Type</code></td>
+<td>LHS element type, used only by type-polymorphic intrinsics such as MMA_GENERIC_SCALAR_1x1x1.</td>
+</tr>
+<tr>
+<td style="text-align: center;">rhs_type</td>
+<td style="text-align: center;"><code>::mlir::Type</code></td>
+<td>RHS element type, used only by type-polymorphic intrinsics such as MMA_GENERIC_SCALAR_1x1x1.</td>
+</tr>
+<tr>
+<td style="text-align: center;">acc_type</td>
+<td style="text-align: center;"><code>::mlir::Type</code></td>
+<td>ACC element type, used only by type-polymorphic intrinsics such as MMA_GENERIC_SCALAR_1x1x1.</td>
 </tr>
 </tbody>
 </table>
@@ -6772,6 +6799,16 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <td style="text-align: center;">MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32</td>
 <td style="text-align: center;"><code>8720</code></td>
 <td>MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_GENERIC_SCALAR_1x1x1_REG8</td>
+<td style="text-align: center;"><code>61448</code></td>
+<td>MMA_GENERIC_SCALAR_1x1x1_REG8</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_GENERIC_SCALAR_1x1x1_REG16</td>
+<td style="text-align: center;"><code>61456</code></td>
+<td>MMA_GENERIC_SCALAR_1x1x1_REG16</td>
 </tr>
 </tbody>
 </table>
