@@ -1008,7 +1008,8 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 }
 
 std::function<LogicalResult(XorShuffleParams)>
-makeDmaConstraintFn(IREE::GPU::TargetAttr target, int64_t elemBits) {
+makeDmaConstraintForXorShuffleFn(IREE::GPU::TargetAttr target,
+                                 int64_t elemBits) {
   return [target, elemBits](XorShuffleParams params) -> LogicalResult {
     DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
     if (!dmaSizesAttr || dmaSizesAttr.empty()) {
