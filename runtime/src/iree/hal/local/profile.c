@@ -978,14 +978,26 @@ iree_status_t iree_hal_local_profile_recorder_append_dispatch_event(
   }
 
   iree_hal_profile_event_ring_t* ring = &recorder->dispatch_event_ring;
-  iree_slim_mutex_lock(&recorder->mutex);
   uint64_t event_position = 0;
   uint64_t event_id = 0;
-  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
-                                              &event_id)) {
+  while (true) {
+    iree_slim_mutex_lock(&recorder->mutex);
+    const iree_host_size_t available_capacity =
+        iree_hal_profile_event_ring_available_capacity(ring);
+    if (available_capacity != 0) {
+      const bool appended = iree_hal_profile_event_ring_try_append(
+          ring, &event_position, &event_id);
+      IREE_ASSERT(appended);
+      if (IREE_LIKELY(appended)) break;
+    }
+    const bool ring_is_enabled = ring->records && ring->capacity != 0;
     iree_slim_mutex_unlock(&recorder->mutex);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "local profiling dispatch event ring is full");
+    if (IREE_UNLIKELY(!ring_is_enabled)) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "local profiling dispatch event ring is unavailable");
+    }
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_flush(recorder));
   }
 
   iree_hal_local_profile_dispatch_event_record_t* record =
@@ -1084,14 +1096,26 @@ iree_status_t iree_hal_local_profile_recorder_append_queue_device_event(
   }
 
   iree_hal_profile_event_ring_t* ring = &recorder->queue_device_event_ring;
-  iree_slim_mutex_lock(&recorder->mutex);
   uint64_t event_position = 0;
   uint64_t event_id = 0;
-  if (!iree_hal_profile_event_ring_try_append(ring, &event_position,
-                                              &event_id)) {
+  while (true) {
+    iree_slim_mutex_lock(&recorder->mutex);
+    const iree_host_size_t available_capacity =
+        iree_hal_profile_event_ring_available_capacity(ring);
+    if (available_capacity != 0) {
+      const bool appended = iree_hal_profile_event_ring_try_append(
+          ring, &event_position, &event_id);
+      IREE_ASSERT(appended);
+      if (IREE_LIKELY(appended)) break;
+    }
+    const bool ring_is_enabled = ring->records && ring->capacity != 0;
     iree_slim_mutex_unlock(&recorder->mutex);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "local profiling queue device event ring is full");
+    if (IREE_UNLIKELY(!ring_is_enabled)) {
+      return iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "local profiling queue device event ring is unavailable");
+    }
+    IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_flush(recorder));
   }
 
   iree_hal_profile_queue_device_event_t* event =

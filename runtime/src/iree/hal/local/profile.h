@@ -502,10 +502,10 @@ iree_status_t iree_hal_local_profile_recorder_record_command_buffer(
 // Appends one producer-owned dispatch event to |recorder|.
 //
 // |out_event_id| may be NULL. When provided it receives the assigned event id,
-// or 0 if dispatch events were not requested. Dispatch events are precise
-// profiling records; a full ring is returned as RESOURCE_EXHAUSTED so
-// producers can fail the profiled operation/session instead of silently
-// truncating device timelines.
+// or 0 if dispatch events were not requested. Dispatch events are lossless
+// profiling records. A full ring is flushed synchronously before appending; if
+// that flush fails, the pending records are preserved and the failure is
+// returned to the producer instead of silently truncating device timelines.
 iree_status_t iree_hal_local_profile_recorder_append_dispatch_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_dispatch_event_info_t* event_info,
@@ -525,9 +525,10 @@ void iree_hal_local_profile_recorder_append_queue_event(
 //
 // |out_event_id| may be NULL. When provided it receives the assigned event id,
 // or 0 if queue device events were not requested. Unlike host queue events,
-// queue device events are precise profiling records; a full ring is returned as
-// RESOURCE_EXHAUSTED so producers can fail the profiled operation/session
-// instead of silently truncating device timelines.
+// queue device events are lossless profiling records. A full ring is flushed
+// synchronously before appending; if that flush fails, the pending records are
+// preserved and the failure is returned to the producer instead of silently
+// truncating device timelines.
 iree_status_t iree_hal_local_profile_recorder_append_queue_device_event(
     iree_hal_local_profile_recorder_t* recorder,
     const iree_hal_local_profile_queue_device_event_info_t* event_info,
