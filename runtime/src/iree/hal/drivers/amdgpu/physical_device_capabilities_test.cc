@@ -566,6 +566,31 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsCdnaBarrierValueCapabilities) {
   EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
 }
 
+TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx94xCapabilities) {
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t expected_capabilities =
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
+  const iree_hal_amdgpu_gfxip_version_t versions[] = {
+      GfxIp(9, 4, 0),
+      GfxIp(9, 4, 1),
+      GfxIp(9, 4, 2),
+      GfxIp(9, 5, 0),
+  };
+  for (iree_hal_amdgpu_gfxip_version_t version : versions) {
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+        iree_hal_amdgpu_select_vendor_packet_capabilities(version);
+    EXPECT_TRUE(iree_all_bits_set(capabilities, expected_capabilities));
+    EXPECT_TRUE(
+        iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+            capabilities));
+  }
+}
+
 TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
   iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(11, 0, 0));
@@ -597,24 +622,21 @@ TEST_F(PhysicalDeviceCapabilitiesTest,
             0u);
   iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(10, 3, 0));
-  EXPECT_EQ(capabilities,
-            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
+  EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_FALSE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
           capabilities));
 
   capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(11, 0, 1));
-  EXPECT_EQ(capabilities,
-            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
+  EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_FALSE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
           capabilities));
 
   capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(12, 0, 0));
-  EXPECT_EQ(capabilities,
-            IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
+  EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_FALSE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
           capabilities));
@@ -629,13 +651,12 @@ TEST_F(PhysicalDeviceCapabilitiesTest,
   };
   const ProcessorCase processors[] = {
       {"gfx900"},  {"gfx902"},  {"gfx904"},  {"gfx906"},  {"gfx908"},
-      {"gfx909"},  {"gfx90c"},  {"gfx90a"},  {"gfx940"},  {"gfx941"},
-      {"gfx942"},  {"gfx950"},  {"gfx1010"}, {"gfx1011"}, {"gfx1012"},
-      {"gfx1013"}, {"gfx1030"}, {"gfx1031"}, {"gfx1032"}, {"gfx1033"},
-      {"gfx1034"}, {"gfx1035"}, {"gfx1036"}, {"gfx1101"}, {"gfx1102"},
-      {"gfx1103"}, {"gfx1150"}, {"gfx1151"}, {"gfx1152"}, {"gfx1153"},
-      {"gfx1170"}, {"gfx1171"}, {"gfx1172"}, {"gfx1200"}, {"gfx1201"},
-      {"gfx1250"}, {"gfx1251"},
+      {"gfx909"},  {"gfx90c"},  {"gfx90a"},  {"gfx943"},  {"gfx953"},
+      {"gfx1010"}, {"gfx1011"}, {"gfx1012"}, {"gfx1013"}, {"gfx1030"},
+      {"gfx1031"}, {"gfx1032"}, {"gfx1033"}, {"gfx1034"}, {"gfx1035"},
+      {"gfx1036"}, {"gfx1101"}, {"gfx1102"}, {"gfx1103"}, {"gfx1150"},
+      {"gfx1151"}, {"gfx1152"}, {"gfx1153"}, {"gfx1170"}, {"gfx1171"},
+      {"gfx1172"}, {"gfx1200"}, {"gfx1201"}, {"gfx1250"}, {"gfx1251"},
   };
   const iree_hal_amdgpu_vendor_packet_capability_flags_t direct_pm4_families =
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_WAIT_REG_MEM64 |
