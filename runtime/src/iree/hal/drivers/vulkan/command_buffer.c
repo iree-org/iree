@@ -147,6 +147,12 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Last command block in recording order.
   iree_hal_vulkan_command_block_t* command_block_tail;
 
+  // Next writable byte in command_block_tail's data segment.
+  uint8_t* command_block_next;
+
+  // One byte past command_block_tail's writable data segment.
+  uint8_t* command_block_end;
+
   // Number of commands recorded across all command blocks.
   iree_host_size_t command_count;
 
@@ -343,8 +349,9 @@ static iree_status_t iree_hal_vulkan_command_buffer_ensure_command_capacity(
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_record_length(
       payload_length, &record_length, &payload_offset));
 
-  iree_hal_vulkan_command_block_t* block = command_buffer->command_block_tail;
-  if (!block || record_length > block->capacity - block->data_length) {
+  if (!command_buffer->command_block_tail ||
+      record_length > (iree_host_size_t)(command_buffer->command_block_end -
+                                         command_buffer->command_block_next)) {
     const iree_host_size_t header_length =
         iree_hal_vulkan_command_buffer_block_header_length();
     iree_host_size_t block_pool_capacity =
@@ -362,6 +369,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_ensure_command_capacity(
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "Vulkan command block size overflows");
     }
+    iree_hal_vulkan_command_block_t* block = NULL;
     IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->payload_arena,
                                              block_size, (void**)&block));
     block->next = NULL;
@@ -373,6 +381,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_ensure_command_capacity(
       command_buffer->command_block_head = block;
     }
     command_buffer->command_block_tail = block;
+    command_buffer->command_block_next =
+        iree_hal_vulkan_command_buffer_block_data(block);
+    command_buffer->command_block_end =
+        command_buffer->command_block_next + capacity;
   }
   *out_record_length = record_length;
   *out_payload_offset = payload_offset;
@@ -385,12 +397,14 @@ static void iree_hal_vulkan_command_buffer_append_command(
     iree_host_size_t payload_offset, iree_hal_vulkan_command_t** out_command,
     void** out_payload) {
   iree_hal_vulkan_command_block_t* block = command_buffer->command_block_tail;
-  IREE_ASSERT(record_length <= block->capacity - block->data_length);
-  uint8_t* const record =
-      iree_hal_vulkan_command_buffer_block_data(block) + block->data_length;
+  IREE_ASSERT(record_length <=
+              (iree_host_size_t)(command_buffer->command_block_end -
+                                 command_buffer->command_block_next));
+  uint8_t* const record = command_buffer->command_block_next;
   iree_hal_vulkan_command_t* command = (iree_hal_vulkan_command_t*)record;
   command->record_length = record_length;
   command->type = type;
+  command_buffer->command_block_next += record_length;
   block->data_length += record_length;
   command_buffer->command_count = command_buffer->command_count + 1;
   if (out_command) *out_command = command;
