@@ -6,6 +6,7 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
 load(
     "//build_tools/bazel:iree_hal_cts_test_suite.bzl",
     "iree_hal_cts_testdata",
@@ -174,6 +175,7 @@ iree_runtime_cc_library(
     name = "packet",
     hdrs = [
         "aql_emitter.h",
+        "pm4_barrier.h",
         "pm4_capabilities.h",
         "pm4_emitter.h",
     ],
@@ -260,6 +262,17 @@ iree_runtime_cc_library(
         ":libhsa",
         ":packet",
         "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "pm4_dispatch",
+    srcs = ["pm4_dispatch.c"],
+    hdrs = ["pm4_dispatch.h"],
+    deps = [
+        ":packet",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
     ],
 )
 
@@ -351,6 +364,7 @@ iree_runtime_cc_library(
         ":info",
         ":kfd",
         ":packet",
+        ":pm4_dispatch",
         ":pm4_program",
         ":queue_primitives",
         ":target_id",
@@ -368,6 +382,17 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "benchmark_profile",
+    testonly = True,
+    srcs = ["benchmark_profile.cc"],
+    hdrs = ["benchmark_profile.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
     ],
 )
 
@@ -580,6 +605,71 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":packet",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "pm4_barrier_test",
+    srcs = ["pm4_barrier_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":packet",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "pm4_dispatch_test",
+    srcs = ["pm4_dispatch_test.cc"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":packet",
+        ":pm4_dispatch",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_amdgpu_binary(
+    name = "pm4_dispatch_test_kernels_gfx1100",
+    srcs = ["pm4_dispatch_test_kernels.c"],
+    arch = "gfx1100",
+    target = "amdgcn-amd-amdhsa",
+)
+
+iree_runtime_cc_test(
+    name = "pm4_dispatch_live_test",
+    srcs = ["pm4_dispatch_live_test.cc"],
+    data = [":pm4_dispatch_test_kernels_gfx1100.so"],
+    group = "iree-hal-drivers-amdgpu-tests",
+    tags = [
+        "driver=amdgpu",
+        "nodocker",
+    ],
+    deps = [
+        ":libhsa",
+        ":packet",
+        ":pm4_dispatch",
+        ":pm4_program",
+        ":queue_primitives",
+        ":topology",
+        ":vmem",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/hal/drivers/amdgpu/abi",
+        "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

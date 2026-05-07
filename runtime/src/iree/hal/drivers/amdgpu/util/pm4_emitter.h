@@ -43,10 +43,18 @@ enum {
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT = 2,
   IREE_HAL_AMDGPU_PM4_SET_REGISTER_DWORD_COUNT = 3,
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DWORD_COUNT = 6,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_DIRECT_DWORD_COUNT = 5,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INDIRECT_MEC_DWORD_COUNT = 4,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_DWORD_COUNT = 8,
+  IREE_HAL_AMDGPU_PM4_HDR_SHADER_TYPE_COMPUTE = 1u << 1,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_DIRECT = 0x15,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_INDIRECT = 0x16,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WRITE_DATA = 0x37,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER = 0x3F,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA = 0x40,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_EVENT_WRITE = 0x46,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_RELEASE_MEM = 0x49,
+  IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM = 0x58,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_SH_REG = 0x76,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_SET_UCONFIG_REG = 0x79,
   IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_WAIT_REG_MEM64 = 0x93,
@@ -72,11 +80,50 @@ enum {
   IREE_HAL_AMDGPU_PM4_COPY_DATA_DST_TEMPORAL_LU = 3 << 25,
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH = 7 << 0,
   IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH = 4 << 8,
+  IREE_HAL_AMDGPU_PM4_RELEASE_MEM_INT_SEL_SEND_DATA_AFTER_WR_CONFIRM = 3 << 24,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_DST_SEL_TC_L2 = 2 << 8,
   IREE_HAL_AMDGPU_PM4_WRITE_DATA_WR_CONFIRM_WAIT_CONFIRMATION = 1 << 20,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_COMPUTE_SHADER_EN = 1 << 0,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_FORCE_START_AT_000 = 1 << 2,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_USE_THREAD_DIMENSIONS = 1 << 5,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_ORDER_MODE = 1 << 6,
+  IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_CS_W32_EN = 1 << 15,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_ENGINE_ME = 1u << 31,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_COHER_SIZE = 0xFFFFFFFFu,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_COHER_SIZE_HI = 0x01FFFFFFu,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_POLL_INTERVAL = 0x0000000Au,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLI_INV_ALL = 3 << 0,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLM_WB = 1 << 4,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLM_INV = 1 << 5,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLK_INV = 1 << 7,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLV_INV = 1 << 8,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL1_INV = 1 << 9,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL2_INV = 1 << 14,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL2_WB = 1 << 15,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE =
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLI_INV_ALL |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLK_INV |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLV_INV |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL1_INV |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLM_WB |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GLM_INV |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL2_INV |
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL2_WB,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_FUNC_LESS_THAN = 1,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_SPACE_MEMORY = 1,
   IREE_HAL_AMDGPU_PM4_WAIT_REG_MEM_OPERATION_WAIT_REG_MEM = 0,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_DISPATCH_INITIATOR_REGISTER = 0x00002E00,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_START_X_REGISTER = 0x00002E04,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_NUM_THREAD_X_REGISTER = 0x00002E07,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_PGM_LO_REGISTER = 0x00002E0C,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_PGM_HI_REGISTER = 0x00002E0D,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_PGM_RSRC1_REGISTER = 0x00002E12,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_PGM_RSRC2_REGISTER = 0x00002E13,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_RESOURCE_LIMITS_REGISTER = 0x00002E15,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_TMPRING_SIZE_REGISTER = 0x00002E18,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_RESTART_X_REGISTER = 0x00002E1B,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_PGM_RSRC3_REGISTER = 0x00002E28,
+  IREE_HAL_AMDGPU_PM4_COMPUTE_USER_DATA_0_REGISTER = 0x00002E40,
 };
 
 static const uint32_t
@@ -92,9 +139,23 @@ typedef enum iree_hal_amdgpu_pm4_write_confirmation_e {
   IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_WAIT = 1,
 } iree_hal_amdgpu_pm4_write_confirmation_t;
 
+typedef enum iree_hal_amdgpu_pm4_acquire_mem_engine_e {
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_DEFAULT = 0,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_PFP = 0,
+  IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME = 1,
+} iree_hal_amdgpu_pm4_acquire_mem_engine_t;
+
+typedef uint32_t iree_hal_amdgpu_pm4_dispatch_initiator_flags_t;
+
 static inline uint32_t iree_hal_amdgpu_pm4_make_header(uint32_t opcode,
                                                        uint32_t dword_count) {
   return (3u << 30) | (opcode << 8) | ((dword_count - 2u) << 16);
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_make_compute_header(
+    uint32_t opcode, uint32_t dword_count) {
+  return iree_hal_amdgpu_pm4_make_header(opcode, dword_count) |
+         IREE_HAL_AMDGPU_PM4_HDR_SHADER_TYPE_COMPUTE;
 }
 
 // Bounded builder for one queue-private PM4 IB slot.
@@ -210,6 +271,79 @@ static inline uint32_t iree_hal_amdgpu_pm4_copy_data_write_confirmation(
   return write_confirmation == IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_WAIT
              ? IREE_HAL_AMDGPU_PM4_COPY_DATA_WR_CONFIRM_WAIT_CONFIRMATION
              : 0;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_dispatch_initiator(
+    iree_hal_amdgpu_pm4_dispatch_initiator_flags_t flags) {
+  return IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_COMPUTE_SHADER_EN | flags;
+}
+
+static inline uint32_t iree_hal_amdgpu_pm4_acquire_mem_gfx10_engine(
+    iree_hal_amdgpu_pm4_acquire_mem_engine_t engine) {
+  return engine == IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME
+             ? IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_ENGINE_ME
+             : 0u;
+}
+
+// Appends a gfx10+ ACQUIRE_MEM packet for cache management. The packet form
+// matches the Mesa/RADV gfx10+ sequence: eight dwords, optional ME engine bit
+// in dword 1, full coherent size, poll interval, and GCR_CNTL in dword 7.
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx10(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder,
+    iree_hal_amdgpu_pm4_acquire_mem_engine_t engine, uint32_t gcr_cntl) {
+  if (engine != IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_PFP &&
+      engine != IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME) {
+    return false;
+  }
+  if (gcr_cntl == 0) return false;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM,
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_DWORD_COUNT);
+  if (!dword) return false;
+  dword[1] = iree_hal_amdgpu_pm4_acquire_mem_gfx10_engine(engine);
+  dword[2] = IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_COHER_SIZE;
+  dword[3] = IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_COHER_SIZE_HI;
+  dword[4] = 0;
+  dword[5] = 0;
+  dword[6] = IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_POLL_INTERVAL;
+  dword[7] = gcr_cntl;
+  return true;
+}
+
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_direct(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, uint32_t workgroup_count_x,
+    uint32_t workgroup_count_y, uint32_t workgroup_count_z,
+    uint32_t dispatch_initiator) {
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_DIRECT,
+      IREE_HAL_AMDGPU_PM4_DISPATCH_DIRECT_DWORD_COUNT);
+  if (!dword) return false;
+  dword[0] = iree_hal_amdgpu_pm4_make_compute_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_DIRECT,
+      IREE_HAL_AMDGPU_PM4_DISPATCH_DIRECT_DWORD_COUNT);
+  dword[1] = workgroup_count_x;
+  dword[2] = workgroup_count_y;
+  dword[3] = workgroup_count_z;
+  dword[4] = dispatch_initiator;
+  return true;
+}
+
+static inline bool iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_indirect_mec(
+    iree_hal_amdgpu_pm4_ib_builder_t* builder, const void* indirect_args,
+    uint32_t dispatch_initiator) {
+  const uintptr_t address = (uintptr_t)indirect_args;
+  if (!iree_host_ptr_has_alignment(indirect_args, 4)) return false;
+  uint32_t* dword = iree_hal_amdgpu_pm4_ib_builder_append_packet(
+      builder, IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_INDIRECT,
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INDIRECT_MEC_DWORD_COUNT);
+  if (!dword) return false;
+  dword[0] = iree_hal_amdgpu_pm4_make_compute_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_INDIRECT,
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INDIRECT_MEC_DWORD_COUNT);
+  dword[1] = iree_hal_amdgpu_pm4_addr_lo(address);
+  dword[2] = iree_hal_amdgpu_pm4_addr_hi(address);
+  dword[3] = dispatch_initiator;
+  return true;
 }
 
 // Appends an EVENT_WRITE CS_PARTIAL_FLUSH packet. This is the queue-local

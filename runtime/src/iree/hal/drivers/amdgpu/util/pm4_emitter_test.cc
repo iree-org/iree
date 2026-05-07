@@ -63,6 +63,38 @@ TEST(PM4CapabilitiesTest, TimestampRangeRequiresStrategy) {
             IREE_HAL_AMDGPU_PM4_TIMESTAMP_RANGE_DWORD_COUNT);
 }
 
+TEST(PM4CapabilitiesTest, ComputeDispatchDirectRequiresPM4IBSetShRegAndPacket) {
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_direct(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_direct(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_direct(
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT));
+}
+
+TEST(PM4CapabilitiesTest, DispatchCommandBuffersRequireBarrierPacketFamilies) {
+  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+  capabilities &= ~IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM;
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+}
+
 TEST(PM4CapabilitiesTest, Gfx10PmcProgramsRequireAllPacketFamilies) {
   iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
@@ -161,6 +193,68 @@ TEST(PM4EmitterTest, BuilderAppendsRegisterProgrammingPackets) {
   EXPECT_EQ(dwords[7], 0x22222222u);
 }
 
+TEST(PM4EmitterTest, BuilderAppendsAcquireMemGfx10Packet) {
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(&slot, &builder);
+
+  EXPECT_TRUE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx10(
+      &builder, IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME,
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE));
+  EXPECT_EQ(iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder), 8u);
+
+  const uint32_t* dwords = slot.dwords;
+  EXPECT_EQ(dwords[0], iree_hal_amdgpu_pm4_make_header(
+                           IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM,
+                           IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_DWORD_COUNT));
+  EXPECT_EQ(dwords[1], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_ENGINE_ME);
+  EXPECT_EQ(dwords[2], 0xFFFFFFFFu);
+  EXPECT_EQ(dwords[3], 0x01FFFFFFu);
+  EXPECT_EQ(dwords[4], 0u);
+  EXPECT_EQ(dwords[5], 0u);
+  EXPECT_EQ(dwords[6], 0x0000000Au);
+  EXPECT_EQ(dwords[7], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE);
+}
+
+TEST(PM4EmitterTest, BuilderAppendsComputeDispatchPackets) {
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(&slot, &builder);
+
+  const uint32_t direct_initiator = iree_hal_amdgpu_pm4_dispatch_initiator(
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_FORCE_START_AT_000 |
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_USE_THREAD_DIMENSIONS |
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_ORDER_MODE |
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_CS_W32_EN);
+  const void* indirect_args = reinterpret_cast<const void*>(
+      static_cast<uintptr_t>(0x123456789ABCDEF0ull));
+  const uint32_t indirect_initiator = iree_hal_amdgpu_pm4_dispatch_initiator(
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_FORCE_START_AT_000 |
+      IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_ORDER_MODE);
+  EXPECT_TRUE(iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_direct(
+      &builder, /*workgroup_count_x=*/11, /*workgroup_count_y=*/22,
+      /*workgroup_count_z=*/33, direct_initiator));
+  EXPECT_TRUE(iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_indirect_mec(
+      &builder, indirect_args, indirect_initiator));
+  EXPECT_EQ(iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder), 9u);
+
+  const uint32_t* dwords = slot.dwords;
+  EXPECT_EQ(dwords[0], iree_hal_amdgpu_pm4_make_compute_header(
+                           IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_DIRECT,
+                           IREE_HAL_AMDGPU_PM4_DISPATCH_DIRECT_DWORD_COUNT));
+  EXPECT_EQ(dwords[1], 11u);
+  EXPECT_EQ(dwords[2], 22u);
+  EXPECT_EQ(dwords[3], 33u);
+  EXPECT_EQ(dwords[4], 0x00008065u);
+  EXPECT_EQ(dwords[5],
+            iree_hal_amdgpu_pm4_make_compute_header(
+                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_DISPATCH_INDIRECT,
+                IREE_HAL_AMDGPU_PM4_DISPATCH_INDIRECT_MEC_DWORD_COUNT));
+  EXPECT_EQ(dwords[6], 0x9ABCDEF0u);
+  EXPECT_EQ(dwords[7], 0x12345678u);
+  EXPECT_EQ(dwords[8], 0x00000045u);
+}
+
 TEST(PM4EmitterTest, BuilderAppendsRegisterCopyPackets) {
   iree_hal_amdgpu_pm4_ib_slot_t slot;
   iree_hal_amdgpu_pm4_ib_builder_t builder;
@@ -224,6 +318,15 @@ TEST(PM4EmitterTest, BuilderRejectsInvalidRegisterPackets) {
       &builder, IREE_HAL_AMDGPU_PM4_REGISTER_SPACE_MEM_MAPPED_REGISTER,
       /*register_address=*/0x3456, unaligned_target,
       IREE_HAL_AMDGPU_PM4_WRITE_CONFIRMATION_NONE));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx10(
+      &builder, (iree_hal_amdgpu_pm4_acquire_mem_engine_t)7,
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx10(
+      &builder, IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME, /*gcr_cntl=*/0));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_indirect_mec(
+      &builder, unaligned_target,
+      iree_hal_amdgpu_pm4_dispatch_initiator(
+          IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_FORCE_START_AT_000)));
   EXPECT_EQ(iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder), 0u);
 }
 

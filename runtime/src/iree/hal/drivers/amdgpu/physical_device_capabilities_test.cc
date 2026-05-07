@@ -580,19 +580,44 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_REGISTER_READBACK |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE));
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT));
+  EXPECT_FALSE(iree_any_bit_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_INDIRECT));
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
 }
 
 TEST_F(PhysicalDeviceCapabilitiesTest,
        LeavesUnvalidatedGfxFamiliesOnBaseAqlPath) {
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(8, 0, 0)),
             0u);
-  EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(10, 3, 0)),
+  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(10, 3, 0));
+  EXPECT_EQ(capabilities,
             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
-  EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(11, 0, 1)),
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+
+  capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(11, 0, 1));
+  EXPECT_EQ(capabilities,
             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
-  EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(12, 0, 0)),
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+
+  capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(12, 0, 0));
+  EXPECT_EQ(capabilities,
             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(13, 0, 0)),
             0u);
 }
@@ -621,7 +646,10 @@ TEST_F(PhysicalDeviceCapabilitiesTest,
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_UCONFIG_REG |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_REGISTER_READBACK |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_PERFCOUNTER_READBACK |
-      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE;
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_IMMEDIATE_WRITE |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_INDIRECT;
   for (const ProcessorCase& processor : processors) {
     SCOPED_TRACE(processor.processor);
     iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =

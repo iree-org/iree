@@ -79,6 +79,15 @@ enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_WRITE_DATA_MEMORY = 1u << 9,
   // PM4 COPY_DATA can copy memory through TC_L2 into memory through TC_L2.
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY = 1u << 10,
+  // PM4 ACQUIRE_MEM can perform explicit cache-management operations.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM = 1u << 11,
+  // PM4 DISPATCH_DIRECT can launch compute work from a PM4 command stream.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT = 1u
+                                                                         << 12,
+  // PM4 DISPATCH_INDIRECT can launch indirect compute work from a PM4 command
+  // stream.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_INDIRECT =
+      1u << 13,
 };
 typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
 
@@ -102,6 +111,42 @@ iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_memory_copy_data(
       capabilities,
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
           IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COPY_DATA_MEMORY);
+}
+
+// Returns true if the device can emit PM4 compute DISPATCH_DIRECT streams.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_direct(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT);
+}
+
+// Returns true if the device can emit PM4 compute DISPATCH_INDIRECT streams.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_indirect(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_INDIRECT);
+}
+
+// Returns true if the device can run the initial dispatch-only PM4
+// command-buffer path with conservative in-stream barriers.
+static inline bool
+iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  return iree_all_bits_set(
+      capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT);
 }
 
 // Returns true if the device can emit the gfx10+ packet families needed for
