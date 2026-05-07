@@ -441,6 +441,8 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_ib_with_binding_table_fixup(
     iree_hal_resource_t* const* operation_resources,
     iree_host_size_t operation_resource_count,
     iree_hal_resource_set_t** inout_resource_set,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready, uint64_t* out_submission_id);
 

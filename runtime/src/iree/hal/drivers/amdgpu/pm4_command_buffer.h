@@ -11,6 +11,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/abi/command_buffer.h"
+#include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_capabilities.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_program.h"
@@ -147,6 +148,7 @@ iree_status_t iree_hal_amdgpu_pm4_command_buffer_create(
     iree_hal_amdgpu_pm4_command_buffer_flags_t flags,
     iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities,
     iree_hal_amdgpu_pm4_command_buffer_resident_pool_t* resident_pool,
+    iree_hal_amdgpu_profile_metadata_registry_t* profile_metadata,
     iree_arena_block_pool_t* resource_set_block_pool,
     iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
@@ -161,6 +163,15 @@ iree_host_size_t iree_hal_amdgpu_pm4_command_buffer_device_ordinal(
 
 // Returns the immutable resident PM4 program produced by end().
 const iree_hal_amdgpu_pm4_program_t* iree_hal_amdgpu_pm4_command_buffer_program(
+    iree_hal_command_buffer_t* command_buffer);
+
+// Returns the session-local profile id for this command buffer, or 0 when it
+// was not created with retained profile metadata.
+uint64_t iree_hal_amdgpu_pm4_command_buffer_profile_id(
+    iree_hal_command_buffer_t* command_buffer);
+
+// Returns the number of recorded profile-visible operations.
+uint32_t iree_hal_amdgpu_pm4_command_buffer_operation_count(
     iree_hal_command_buffer_t* command_buffer);
 
 // Returns the immutable resident kernarg template and fixup plan from end().

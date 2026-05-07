@@ -2189,16 +2189,31 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_aql_command_buffer(
       out_command_buffer);
 }
 
+static bool
+iree_hal_amdgpu_logical_device_profiling_requires_aql_command_buffer(
+    const iree_hal_amdgpu_logical_device_t* logical_device) {
+  return iree_any_bit_set(
+      logical_device->profiling.options.data_families,
+      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+          IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
+          IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES |
+          IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS);
+}
+
 static bool iree_hal_amdgpu_logical_device_can_auto_select_pm4_command_buffer(
+    const iree_hal_amdgpu_logical_device_t* logical_device,
     const iree_hal_amdgpu_physical_device_t* physical_device,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories) {
+  if (iree_hal_amdgpu_logical_device_profiling_requires_aql_command_buffer(
+          logical_device)) {
+    return false;
+  }
   if (iree_any_bit_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     return false;
   }
   const iree_hal_command_buffer_mode_t unsupported_modes =
       IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
-      IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA |
       IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA;
   if (iree_any_bit_set(mode, unsupported_modes)) {
     return false;
@@ -2237,10 +2252,6 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_pm4_command_buffer(
   }
   iree_hal_amdgpu_pm4_command_buffer_flags_t flags =
       IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_FLAG_NONE;
-  if (logical_device->profiling.options.data_families !=
-      IREE_HAL_DEVICE_PROFILING_DATA_NONE) {
-    flags |= IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_FLAG_COLLECT_FINALIZE_TIMINGS;
-  }
   if (logical_device->pm4_command_buffer_publication_mode ==
       IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_COPY) {
     flags |= IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_FLAG_MATERIALIZE_TO_HOST_COPY;
@@ -2261,6 +2272,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_pm4_command_buffer(
       effective_queue_affinity, binding_capacity, device_ordinal, flags,
       physical_device->vendor_packet_capabilities,
       physical_device->pm4_command_buffer_resident_pool,
+      &logical_device->profile_metadata,
       &logical_device->host_block_pools.small, logical_device->host_allocator,
       out_command_buffer);
 }
@@ -2293,7 +2305,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_command_buffer(
           out_command_buffer);
     case IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO:
       if (iree_hal_amdgpu_logical_device_can_auto_select_pm4_command_buffer(
-              physical_device, mode, command_categories)) {
+              logical_device, physical_device, mode, command_categories)) {
         return iree_hal_amdgpu_logical_device_create_pm4_command_buffer(
             logical_device, physical_device, mode, command_categories,
             effective_queue_affinity, binding_capacity, device_ordinal,

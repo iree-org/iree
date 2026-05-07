@@ -10,6 +10,7 @@
 #include "iree/hal/drivers/amdgpu/aql_program_validation.h"
 #include "iree/hal/drivers/amdgpu/host_queue_command_buffer_block.h"
 #include "iree/hal/drivers/amdgpu/host_queue_command_buffer_replay.h"
+#include "iree/hal/drivers/amdgpu/host_queue_profile.h"
 #include "iree/hal/drivers/amdgpu/pm4_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -111,6 +112,33 @@ static void iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
       command_buffer);
 }
 
+static iree_status_t
+iree_hal_amdgpu_host_queue_verify_pm4_command_buffer_profiling_supported(
+    const iree_hal_amdgpu_host_queue_t* queue) {
+  if (!queue->profiling.dispatch_profiling_enabled) {
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "AMDGPU PM4 command-buffer dispatch-attributed iree-profile emission is "
+      "not implemented; use AQL command-buffer mode while capturing dispatch, "
+      "counter-sample, or executable-trace events");
+}
+
+static iree_hal_amdgpu_host_queue_profile_event_info_t
+iree_hal_amdgpu_host_queue_pm4_command_buffer_profile_event_info(
+    iree_hal_command_buffer_t* command_buffer,
+    const iree_hal_amdgpu_pm4_program_t* program) {
+  return (iree_hal_amdgpu_host_queue_profile_event_info_t){
+      .type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE,
+      .command_buffer_id =
+          iree_hal_amdgpu_pm4_command_buffer_profile_id(command_buffer),
+      .payload_length = (uint64_t)program->dword_count * sizeof(uint32_t),
+      .operation_count =
+          iree_hal_amdgpu_pm4_command_buffer_operation_count(command_buffer),
+  };
+}
+
 static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
@@ -135,6 +163,17 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "PM4 command buffer has not been finalized");
   }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_host_queue_verify_pm4_command_buffer_profiling_supported(
+          queue));
+  iree_hal_amdgpu_host_queue_profile_event_info_t profile_event_info =
+      iree_hal_amdgpu_host_queue_pm4_command_buffer_profile_event_info(
+          command_buffer, program);
+  const iree_hal_amdgpu_host_queue_profile_event_info_t*
+      profile_event_info_ptr = (queue->profiling.queue_events_enabled ||
+                                queue->profiling.queue_device_events_enabled)
+                                   ? &profile_event_info
+                                   : NULL;
 
   iree_hal_resource_t* command_buffer_resource =
       (iree_hal_resource_t*)command_buffer;
@@ -150,16 +189,21 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
     const iree_hal_amdgpu_reclaim_action_t publication_retire_action =
         iree_hal_amdgpu_host_queue_make_pm4_publication_retire_action(
             command_buffer, publication_signal);
+    uint64_t submission_id = 0;
     iree_status_t status = iree_hal_amdgpu_host_queue_submit_pm4_ib(
         queue, resolution, signal_semaphore_list, program->dwords,
         program->dword_count, publication_signal, publication_retire_action,
         &command_buffer_resource, /*operation_resource_count=*/1,
-        /*profile_queue_event_info=*/NULL,
+        profile_event_info_ptr,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, out_ready,
-        /*out_submission_id=*/NULL);
+        &submission_id);
     if (!iree_status_is_ok(status) || !*out_ready) {
       iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
           command_buffer, publication_signal);
+    } else {
+      profile_event_info.submission_id = submission_id;
+      iree_hal_amdgpu_host_queue_record_profile_queue_event(
+          queue, resolution, signal_semaphore_list, &profile_event_info);
     }
     return status;
   }
@@ -202,6 +246,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
     const iree_hal_amdgpu_reclaim_action_t publication_retire_action =
         iree_hal_amdgpu_host_queue_make_pm4_publication_retire_action(
             command_buffer, publication_signal);
+    uint64_t submission_id = 0;
     status = iree_hal_amdgpu_host_queue_submit_pm4_ib_with_binding_table_fixup(
         queue, resolution, signal_semaphore_list,
         &queue->transfer_context->kernels
@@ -210,12 +255,16 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
         binding_ptrs, command_buffer->binding_count, program->dwords,
         program->dword_count, publication_signal, publication_retire_action,
         &command_buffer_resource, /*operation_resource_count=*/1,
-        inout_binding_resource_set,
+        inout_binding_resource_set, profile_event_info_ptr,
         IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, out_ready,
-        /*out_submission_id=*/NULL);
+        &submission_id);
     if (!iree_status_is_ok(status) || !*out_ready) {
       iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
           command_buffer, publication_signal);
+    } else {
+      profile_event_info.submission_id = submission_id;
+      iree_hal_amdgpu_host_queue_record_profile_queue_event(
+          queue, resolution, signal_semaphore_list, &profile_event_info);
     }
   }
   iree_arena_deinitialize(&scratch_arena);
