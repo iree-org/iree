@@ -95,6 +95,15 @@ typedef struct iree_hal_vulkan_command_buffer_bda_binding_cache_t {
   iree_host_size_t slot_count;
 } iree_hal_vulkan_command_buffer_bda_binding_cache_t;
 
+// Resolves one HAL binding table slot to its BDA device address and length.
+//
+// |bda_binding_cache| may be NULL. When present and the slot is within cache
+// bounds, the resolved address and length are cached for the caller.
+iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
+    iree_hal_buffer_binding_table_t binding_table, uint32_t buffer_slot,
+    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache,
+    iree_hal_vulkan_command_buffer_bda_binding_slot_t* out_slot);
+
 // Returns host-published BDA table bytes required to replay |command_buffer|
 // once into a native VkCommandBuffer.
 iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(

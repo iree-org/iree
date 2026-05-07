@@ -183,6 +183,15 @@ struct iree_hal_vulkan_queue_native_replay_t {
   // Stable BDA publication storage baked into native_command_buffer.
   iree_hal_vulkan_queue_bda_publication_lease_t bda_publication_lease;
 
+  // Last resolved BDA slot snapshot for this replay instance.
+  iree_hal_vulkan_command_buffer_bda_binding_slot_t* bda_binding_slots;
+
+  // Number of entries in bda_binding_slots.
+  iree_host_size_t bda_binding_slot_count;
+
+  // Whether bda_binding_slots matches the current publication contents.
+  bool bda_binding_slots_valid;
+
   // Queue epoch owning this replay instance, 0 when free, or RESERVED.
   uint64_t owner_epoch;
 };
@@ -1966,6 +1975,72 @@ iree_hal_vulkan_queue_execute_bda_binding_cache(
   };
 }
 
+static iree_status_t iree_hal_vulkan_queue_calculate_native_replay_layout(
+    iree_host_size_t bda_binding_slot_count,
+    iree_host_size_t* out_allocation_size,
+    iree_host_size_t* out_bda_binding_slots_offset) {
+  return IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_hal_vulkan_queue_native_replay_t),
+      out_allocation_size,
+      IREE_STRUCT_FIELD_ALIGNED(
+          bda_binding_slot_count,
+          iree_hal_vulkan_command_buffer_bda_binding_slot_t,
+          iree_alignof(iree_hal_vulkan_command_buffer_bda_binding_slot_t),
+          out_bda_binding_slots_offset));
+}
+
+static void iree_hal_vulkan_queue_store_native_replay_bda_binding_slots(
+    iree_hal_vulkan_queue_native_replay_t* replay,
+    const iree_hal_vulkan_command_buffer_bda_binding_cache_t*
+        bda_binding_cache) {
+  if (replay->bda_binding_slot_count != 0) {
+    memcpy(
+        replay->bda_binding_slots, bda_binding_cache->slots,
+        replay->bda_binding_slot_count * sizeof(replay->bda_binding_slots[0]));
+  }
+  replay->bda_binding_slots_valid = true;
+}
+
+static bool iree_hal_vulkan_queue_native_replay_bda_binding_slots_match(
+    const iree_hal_vulkan_queue_native_replay_t* replay,
+    const iree_hal_vulkan_command_buffer_bda_binding_cache_t*
+        bda_binding_cache) {
+  if (!replay->bda_binding_slots_valid) return false;
+  if (replay->bda_binding_slot_count != bda_binding_cache->slot_count) {
+    return false;
+  }
+  for (iree_host_size_t i = 0; i < replay->bda_binding_slot_count; ++i) {
+    const iree_hal_vulkan_command_buffer_bda_binding_slot_t* expected_slot =
+        &replay->bda_binding_slots[i];
+    const iree_hal_vulkan_command_buffer_bda_binding_slot_t* actual_slot =
+        &bda_binding_cache->slots[i];
+    if (expected_slot->device_address != actual_slot->device_address ||
+        expected_slot->length != actual_slot->length) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static iree_status_t iree_hal_vulkan_queue_resolve_native_replay_bda_slots(
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_vulkan_queue_native_replay_t* replay,
+    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache) {
+  for (iree_host_size_t i = 0; i < replay->bda_binding_slot_count; ++i) {
+    if (replay->bda_binding_slots[i].device_address == 0) continue;
+    if (i > UINT32_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan native replay BDA binding slot ordinal exceeds uint32_t");
+    }
+    iree_hal_vulkan_command_buffer_bda_binding_slot_t slot = {0};
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
+            binding_table, (uint32_t)i, bda_binding_cache, &slot));
+  }
+  return iree_ok_status();
+}
+
 static void iree_hal_vulkan_queue_native_replay_cache_append_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_native_replay_t* replay) {
@@ -2098,10 +2173,22 @@ static iree_status_t iree_hal_vulkan_queue_create_native_replay_under_lock(
     return iree_ok_status();
   }
 
+  const iree_host_size_t bda_binding_slot_count = bda_binding_cache->slot_count;
+  iree_host_size_t bda_binding_slots_offset = 0;
+  iree_host_size_t allocation_size = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_calculate_native_replay_layout(
+      bda_binding_slot_count, &allocation_size, &bda_binding_slots_offset));
+
   iree_hal_vulkan_queue_native_replay_t* replay = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator,
-                                             sizeof(*replay), (void**)&replay));
-  memset(replay, 0, sizeof(*replay));
+                                             allocation_size, (void**)&replay));
+  memset(replay, 0, allocation_size);
+  replay->bda_binding_slot_count = bda_binding_slot_count;
+  if (bda_binding_slot_count != 0) {
+    replay->bda_binding_slots =
+        (iree_hal_vulkan_command_buffer_bda_binding_slot_t*)((uint8_t*)replay +
+                                                             bda_binding_slots_offset);
+  }
   replay->command_buffer_lease.slot =
       IREE_HAL_VULKAN_QUEUE_COMMAND_BUFFER_SLOT_ABSENT;
   replay->owner_epoch = IREE_HAL_VULKAN_QUEUE_NATIVE_REPLAY_OWNER_RESERVED;
@@ -2131,6 +2218,8 @@ static iree_status_t iree_hal_vulkan_queue_create_native_replay_under_lock(
         &replay->bda_publication_lease);
   }
   if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_queue_store_native_replay_bda_binding_slots(
+        replay, bda_binding_cache);
     iree_hal_command_buffer_retain(command_buffer);
     replay->command_buffer = command_buffer;
     iree_hal_vulkan_queue_native_replay_cache_append_under_lock(queue, replay);
@@ -2177,7 +2266,12 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
 
   iree_hal_vulkan_command_buffer_bda_binding_cache_t bda_binding_cache =
       iree_hal_vulkan_queue_execute_bda_binding_cache(submission);
+  iree_hal_buffer_binding_table_t binding_table = {
+      .count = submission->execute.binding_table_count,
+      .bindings = submission->execute.binding_table_bindings,
+  };
   bool has_busy_replay = false;
+  bool replay_publication_current = false;
   iree_hal_vulkan_queue_native_replay_t* replay =
       queue->native_replay_cache.head;
   while (replay) {
@@ -2196,36 +2290,43 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
   if (!replay) {
     queue->native_replay_cache.miss_count =
         queue->native_replay_cache.miss_count + 1;
-    iree_hal_buffer_binding_table_t binding_table = {
-        .count = submission->execute.binding_table_count,
-        .bindings = submission->execute.binding_table_bindings,
-    };
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_create_native_replay_under_lock(
         queue, submission->execute.command_buffer, binding_table,
         &bda_binding_cache, publication_length, &replay));
     if (!replay) return iree_ok_status();
+    replay_publication_current = true;
     if (has_busy_replay) {
       queue->native_replay_cache.fork_count =
           queue->native_replay_cache.fork_count + 1;
     }
   }
 
-  iree_hal_buffer_binding_table_t binding_table = {
-      .count = submission->execute.binding_table_count,
-      .bindings = submission->execute.binding_table_bindings,
-  };
   const iree_hal_vulkan_command_buffer_bda_publication_t publication =
       iree_hal_vulkan_queue_bda_publication_for_lease(
           &replay->bda_publication_lease);
   iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !replay_publication_current) {
+    status = iree_hal_vulkan_queue_resolve_native_replay_bda_slots(
+        binding_table, replay, &bda_binding_cache);
+  }
+  if (iree_status_is_ok(status) && !replay_publication_current) {
+    replay_publication_current =
+        iree_hal_vulkan_queue_native_replay_bda_binding_slots_match(
+            replay, &bda_binding_cache);
+  }
+  if (iree_status_is_ok(status) && !replay_publication_current) {
+    replay->bda_binding_slots_valid = false;
     status = iree_hal_vulkan_command_buffer_publish_bda_binding_tables(
         submission->execute.command_buffer, binding_table,
         publication_length != 0 ? &publication : NULL, &bda_binding_cache);
   }
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && !replay_publication_current) {
     status = iree_hal_vulkan_queue_flush_bda_publication_lease(
         &replay->bda_publication_lease);
+  }
+  if (iree_status_is_ok(status) && !replay_publication_current) {
+    iree_hal_vulkan_queue_store_native_replay_bda_binding_slots(
+        replay, &bda_binding_cache);
   }
   if (iree_status_is_ok(status)) {
     submission->native_replay = replay;

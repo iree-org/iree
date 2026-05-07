@@ -1341,6 +1341,17 @@ static iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_slot(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
+    iree_hal_buffer_binding_table_t binding_table, uint32_t buffer_slot,
+    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache,
+    iree_hal_vulkan_command_buffer_bda_binding_slot_t* out_slot) {
+  IREE_ASSERT_ARGUMENT(out_slot);
+  *out_slot = (iree_hal_vulkan_command_buffer_bda_binding_slot_t){0};
+  return iree_hal_vulkan_command_buffer_resolve_bda_binding_slot(
+      binding_table, buffer_slot, bda_binding_cache, &out_slot->device_address,
+      &out_slot->length);
+}
+
 static iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding(
     iree_hal_buffer_binding_table_t binding_table,
     iree_hal_buffer_ref_t buffer_ref, iree_host_size_t binding_ordinal,
