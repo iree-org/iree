@@ -561,6 +561,14 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF32EQ) {
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
 }
 
+TEST(BufferViewMatchersMathTest, FuzzyCompareF64HandlesFiniteAndNonFinite) {
+  EXPECT_TRUE(
+      iree_math_fuzzy_compare_f64(729.0, 729.0001220703125, 1e-5, 1e-5));
+  EXPECT_TRUE(iree_math_fuzzy_compare_f64(NAN, NAN, 0.0, 0.0));
+  EXPECT_TRUE(iree_math_fuzzy_compare_f64(INFINITY, INFINITY, 0.0, 0.0));
+  EXPECT_FALSE(iree_math_fuzzy_compare_f64(INFINITY, -INFINITY, 0.0, 0.0));
+}
+
 // 2-ULP drift at magnitude 729 fails an atol-only check at 1e-4 but passes
 // once the rtol*|expected| term is added.
 TEST_F(BufferViewMatchersTest, CompareElementwiseF32NumpyULPDrift) {

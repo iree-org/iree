@@ -6,8 +6,6 @@
 
 #include "iree/tooling/buffer_view_matchers.h"
 
-#include <math.h>
-
 #include "iree/base/internal/math.h"
 
 //===----------------------------------------------------------------------===//
@@ -76,28 +74,15 @@ static bool iree_hal_compare_strided_elements_exact(
   return true;
 }
 
-// Returns true if actual and expected are within tolerance:
-//   |actual - expected| <= atol + rtol * |expected|
-// NaN is considered equal to NaN; non-finite expected is only equal when
-// bit-equal to actual.
-static inline bool iree_hal_approximate_compare_f64(double actual,
-                                                    double expected,
-                                                    double atol, double rtol) {
-  if (actual == expected) return true;
-  if (isnan(actual) && isnan(expected)) return true;
-  if (!isfinite(expected)) return false;
-  return fabs(actual - expected) <= atol + rtol * fabs(expected);
-}
-
 static bool iree_hal_compare_strided_elements_approximate_f16(
     iree_hal_buffer_equality_t equality, iree_host_size_t element_count,
     const uint16_t* expected_ptr, iree_host_size_t expected_stride,
     const uint16_t* actual_ptr, iree_host_size_t actual_stride,
     iree_host_size_t* out_index) {
   for (iree_host_size_t i = 0; i < element_count; ++i) {
-    if (!iree_hal_approximate_compare_f64(iree_math_f16_to_f32(*actual_ptr),
-                                          iree_math_f16_to_f32(*expected_ptr),
-                                          equality.f16_atol, equality.rtol)) {
+    if (!iree_math_fuzzy_compare_f64(iree_math_f16_to_f32(*actual_ptr),
+                                     iree_math_f16_to_f32(*expected_ptr),
+                                     equality.f16_atol, equality.rtol)) {
       *out_index = i;
       return false;
     }
@@ -113,8 +98,8 @@ static bool iree_hal_compare_strided_elements_approximate_f32(
     const float* actual_ptr, iree_host_size_t actual_stride,
     iree_host_size_t* out_index) {
   for (iree_host_size_t i = 0; i < element_count; ++i) {
-    if (!iree_hal_approximate_compare_f64(*actual_ptr, *expected_ptr,
-                                          equality.f32_atol, equality.rtol)) {
+    if (!iree_math_fuzzy_compare_f64(*actual_ptr, *expected_ptr,
+                                     equality.f32_atol, equality.rtol)) {
       *out_index = i;
       return false;
     }
@@ -130,8 +115,8 @@ static bool iree_hal_compare_strided_elements_approximate_f64(
     const double* actual_ptr, iree_host_size_t actual_stride,
     iree_host_size_t* out_index) {
   for (iree_host_size_t i = 0; i < element_count; ++i) {
-    if (!iree_hal_approximate_compare_f64(*actual_ptr, *expected_ptr,
-                                          equality.f64_atol, equality.rtol)) {
+    if (!iree_math_fuzzy_compare_f64(*actual_ptr, *expected_ptr,
+                                     equality.f64_atol, equality.rtol)) {
       *out_index = i;
       return false;
     }
@@ -147,9 +132,9 @@ static bool iree_hal_compare_strided_elements_approximate_bf16(
     const uint16_t* actual_ptr, iree_host_size_t actual_stride,
     iree_host_size_t* out_index) {
   for (iree_host_size_t i = 0; i < element_count; ++i) {
-    if (!iree_hal_approximate_compare_f64(iree_math_bf16_to_f32(*actual_ptr),
-                                          iree_math_bf16_to_f32(*expected_ptr),
-                                          equality.bf16_atol, equality.rtol)) {
+    if (!iree_math_fuzzy_compare_f64(iree_math_bf16_to_f32(*actual_ptr),
+                                     iree_math_bf16_to_f32(*expected_ptr),
+                                     equality.bf16_atol, equality.rtol)) {
       *out_index = i;
       return false;
     }
