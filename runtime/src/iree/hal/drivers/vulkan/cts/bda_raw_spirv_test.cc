@@ -1181,6 +1181,113 @@ TEST_P(BdaRawSpirvReplayCacheTest, TrimDropsIdleCachedNativeReplay) {
             1);
 }
 
+TEST_P(BdaRawSpirvReplayCacheTest, CommandBufferSkipsUnchangedBdaPublication) {
+  ASSERT_GE(QueryNativeReplayCache(IREE_SV("max_instance_count")), 1);
+  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("retained_instance_count")));
+
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  CreateIndirectDispatchCommandBuffer(/*workgroup_count=*/kElementCount,
+                                      &command_buffer);
+
+  iree_hal_buffer_binding_t binding_table_entries[2];
+  iree_hal_buffer_binding_table_t binding_table = MakeBindingTable(
+      input_buffer.get(), output_buffer.get(), binding_table_entries);
+
+  const int64_t initial_hit_count =
+      QueryNativeReplayCache(IREE_SV("hit_count"));
+  const int64_t initial_miss_count =
+      QueryNativeReplayCache(IREE_SV("miss_count"));
+  const int64_t initial_publication_skip_count =
+      QueryNativeReplayCache(IREE_SV("publication_skip_count"));
+  const int64_t initial_publication_update_count =
+      QueryNativeReplayCache(IREE_SV("publication_update_count"));
+
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table);
+  ExpectOutput(output_buffer.get());
+
+  const int32_t reset_pattern = 0;
+  SemaphoreList fill_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_fill(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      fill_signal, output_buffer.get(), /*target_offset=*/0,
+      kDispatchByteLength, &reset_pattern, sizeof(reset_pattern),
+      IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  ExpectFilledOutputPrefix(output_buffer.get(), /*expected_value=*/0);
+
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table);
+  ExpectOutput(output_buffer.get());
+
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("miss_count")) - initial_miss_count,
+            1);
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("hit_count")) - initial_hit_count,
+            1);
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("publication_skip_count")) -
+                initial_publication_skip_count,
+            1);
+  EXPECT_EQ(initial_publication_update_count,
+            QueryNativeReplayCache(IREE_SV("publication_update_count")));
+}
+
+TEST_P(BdaRawSpirvReplayCacheTest,
+       CommandBufferRepublishesChangedBdaPublication) {
+  ASSERT_GE(QueryNativeReplayCache(IREE_SV("max_instance_count")), 1);
+  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("retained_instance_count")));
+
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_a_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_a_buffer);
+  Ref<iree_hal_buffer_t> output_b_buffer;
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(kDispatchByteLength, output_b_buffer.out()));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  CreateIndirectDispatchCommandBuffer(/*workgroup_count=*/kElementCount,
+                                      &command_buffer);
+
+  iree_hal_buffer_binding_t binding_table_a_entries[2];
+  iree_hal_buffer_binding_table_t binding_table_a = MakeBindingTable(
+      input_buffer.get(), output_a_buffer.get(), binding_table_a_entries);
+  iree_hal_buffer_binding_t binding_table_b_entries[2];
+  iree_hal_buffer_binding_table_t binding_table_b = MakeBindingTable(
+      input_buffer.get(), output_b_buffer.get(), binding_table_b_entries);
+
+  const int64_t initial_hit_count =
+      QueryNativeReplayCache(IREE_SV("hit_count"));
+  const int64_t initial_miss_count =
+      QueryNativeReplayCache(IREE_SV("miss_count"));
+  const int64_t initial_publication_skip_count =
+      QueryNativeReplayCache(IREE_SV("publication_skip_count"));
+  const int64_t initial_publication_update_count =
+      QueryNativeReplayCache(IREE_SV("publication_update_count"));
+
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_a);
+  ExpectOutput(output_a_buffer.get());
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_b);
+  ExpectOutput(output_b_buffer.get());
+
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("miss_count")) - initial_miss_count,
+            1);
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("hit_count")) - initial_hit_count,
+            1);
+  EXPECT_EQ(initial_publication_skip_count,
+            QueryNativeReplayCache(IREE_SV("publication_skip_count")));
+  EXPECT_GE(QueryNativeReplayCache(IREE_SV("publication_update_count")) -
+                initial_publication_update_count,
+            1);
+}
+
 TEST_P(BdaRawSpirvReplayCacheTest, ConcurrentExecutionsForkCachedNativeReplay) {
   ASSERT_GE(QueryNativeReplayCache(IREE_SV("max_instance_count")), 2);
   ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("retained_instance_count")));

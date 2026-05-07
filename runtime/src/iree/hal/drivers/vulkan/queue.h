@@ -311,6 +311,12 @@ typedef struct iree_hal_vulkan_queue_t {
     // Cached replay creations for command buffers already busy on the queue.
     uint64_t fork_count;
 
+    // Cached replay hits that reused existing BDA publication bytes.
+    uint64_t publication_skip_count;
+
+    // Cached replay hits that republished changed BDA table bytes.
+    uint64_t publication_update_count;
+
     // Cached replay acquisitions bypassed because descriptors were required.
     uint64_t descriptor_bypass_count;
 

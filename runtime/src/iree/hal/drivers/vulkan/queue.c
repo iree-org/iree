@@ -2313,6 +2313,10 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
     replay_publication_current =
         iree_hal_vulkan_queue_native_replay_bda_binding_slots_match(
             replay, &bda_binding_cache);
+    if (replay_publication_current && publication_length != 0) {
+      queue->native_replay_cache.publication_skip_count =
+          queue->native_replay_cache.publication_skip_count + 1;
+    }
   }
   if (iree_status_is_ok(status) && !replay_publication_current) {
     replay->bda_binding_slots_valid = false;
@@ -2327,6 +2331,10 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
   if (iree_status_is_ok(status) && !replay_publication_current) {
     iree_hal_vulkan_queue_store_native_replay_bda_binding_slots(
         replay, &bda_binding_cache);
+    if (publication_length != 0) {
+      queue->native_replay_cache.publication_update_count =
+          queue->native_replay_cache.publication_update_count + 1;
+    }
   }
   if (iree_status_is_ok(status)) {
     submission->native_replay = replay;
@@ -5871,6 +5879,12 @@ bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,
   } else if (iree_string_view_equal(key, IREE_SV("fork_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.fork_count);
+  } else if (iree_string_view_equal(key, IREE_SV("publication_skip_count"))) {
+    *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
+        queue->native_replay_cache.publication_skip_count);
+  } else if (iree_string_view_equal(key, IREE_SV("publication_update_count"))) {
+    *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
+        queue->native_replay_cache.publication_update_count);
   } else if (iree_string_view_equal(key, IREE_SV("descriptor_bypass_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.descriptor_bypass_count);
