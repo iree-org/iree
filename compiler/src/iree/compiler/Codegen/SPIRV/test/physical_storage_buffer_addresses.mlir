@@ -41,7 +41,7 @@ hal.executable private @interface_binding {
 
 // CHECK-LABEL: spirv.module PhysicalStorageBuffer64
 //   CHECK-NOT:   bind(3, 0)
-//       CHECK:   spirv.GlobalVariable [[ROOT:@.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<8 x i32, stride=4> [0])>, PushConstant>
+//       CHECK:   spirv.GlobalVariable [[ROOT:@.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<8 x i32, stride=4> [0]), Block>, PushConstant>
 //       CHECK:   spirv.func
 //       CHECK:   %[[root_addr0:.+]] = spirv.mlir.addressof [[ROOT]]
 //       CHECK:   %[[low_addr0:.+]] = spirv.AccessChain %[[root_addr0]][%{{.+}}, %{{.+}}]
@@ -55,17 +55,17 @@ hal.executable private @interface_binding {
 //       CHECK:   %[[table_addr0:.+]] = spirv.BitwiseOr %[[low64_0]], %[[shifted0]] : i64
 //       CHECK:   %[[table0:.+]] = spirv.ConvertUToPtr %[[table_addr0]] : i64 to !spirv.ptr<!spirv.struct<(!spirv.ptr<i32, PhysicalStorageBuffer> [0])>, PhysicalStorageBuffer>
 //       CHECK:   %[[slot0:.+]] = spirv.AccessChain %[[table0]][%{{.+}}]
-//       CHECK:   %[[ld0:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot0]]
+//       CHECK:   %[[ld0:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot0]] ["Aligned", 8]
 //       CHECK:   %[[int0:.+]] = spirv.ConvertPtrToU %[[ld0]] : !spirv.ptr<i32, PhysicalStorageBuffer> to i64
 //       CHECK:   %[[ptr0:.+]] = spirv.ConvertUToPtr %[[int0]] : i64 to !spirv.ptr<!spirv.struct<(!spirv.array<40 x f32, stride=4> [0])>, PhysicalStorageBuffer>
 //       CHECK:   %[[table1:.+]] = spirv.ConvertUToPtr %{{.+}} : i64 to !spirv.ptr<!spirv.struct<(!spirv.ptr<i32, PhysicalStorageBuffer> [0], !spirv.ptr<i32, PhysicalStorageBuffer> [8])>, PhysicalStorageBuffer>
 //       CHECK:   %[[slot1:.+]] = spirv.AccessChain %[[table1]][%{{.+}}]
-//       CHECK:   %[[ld1:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot1]]
+//       CHECK:   %[[ld1:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot1]] ["Aligned", 8]
 //       CHECK:   %[[int1:.+]] = spirv.ConvertPtrToU %[[ld1]] : !spirv.ptr<i32, PhysicalStorageBuffer> to i64
 //       CHECK:   %[[ptr1:.+]] = spirv.ConvertUToPtr %[[int1]] : i64 to !spirv.ptr<!spirv.struct<(!spirv.array<5 x f32, stride=4> [0])>, PhysicalStorageBuffer>
 //       CHECK:   %[[table2:.+]] = spirv.ConvertUToPtr %{{.+}} : i64 to !spirv.ptr<!spirv.struct<(!spirv.ptr<i32, PhysicalStorageBuffer> [0], !spirv.ptr<i32, PhysicalStorageBuffer> [8], !spirv.ptr<i32, PhysicalStorageBuffer> [16])>, PhysicalStorageBuffer>
 //       CHECK:   %[[slot2:.+]] = spirv.AccessChain %[[table2]][%{{.+}}]
-//       CHECK:   %[[ld2:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot2]]
+//       CHECK:   %[[ld2:.+]] = spirv.Load "PhysicalStorageBuffer" %[[slot2]] ["Aligned", 8]
 //       CHECK:   %[[int2:.+]] = spirv.ConvertPtrToU %[[ld2]] : !spirv.ptr<i32, PhysicalStorageBuffer> to i64
 //       CHECK:   %[[ptr2:.+]] = spirv.ConvertUToPtr %[[int2]] : i64 to !spirv.ptr<!spirv.struct<(!spirv.array<20 x f32, stride=4> [0])>, PhysicalStorageBuffer>
 //

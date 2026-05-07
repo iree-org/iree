@@ -197,6 +197,105 @@ static InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
 }
 
 static spirv::PointerType
+getBlockDecoratedStructPointerType(spirv::PointerType pointerType) {
+  auto structType = dyn_cast<spirv::StructType>(pointerType.getPointeeType());
+  if (!structType || structType.hasDecoration(spirv::Decoration::Block)) {
+    return pointerType;
+  }
+
+  SmallVector<spirv::StructType::OffsetInfo> offsets;
+  if (structType.hasOffset()) {
+    offsets.reserve(structType.getNumElements());
+    for (unsigned i = 0; i < structType.getNumElements(); ++i) {
+      offsets.push_back(structType.getMemberOffset(i));
+    }
+  }
+  SmallVector<spirv::StructType::MemberDecorationInfo> memberDecorations;
+  structType.getMemberDecorations(memberDecorations);
+  SmallVector<spirv::StructType::StructDecorationInfo> structDecorations;
+  structType.getStructDecorations(structDecorations);
+  structDecorations.emplace_back(spirv::Decoration::Block,
+                                 UnitAttr::get(pointerType.getContext()));
+  SmallVector<Type> elementTypes(structType.getElementTypes());
+  auto blockStructType = spirv::StructType::get(
+      elementTypes, offsets, memberDecorations, structDecorations);
+  return spirv::PointerType::get(blockStructType,
+                                 pointerType.getStorageClass());
+}
+
+// Push-constant blocks need an explicit Block decoration before serialization.
+// Otherwise a push constant and a descriptor buffer with the same struct body
+// can be uniqued to the same SPIR-V type id and receive duplicate decorations.
+static spirv::PointerType
+getBlockDecoratedPushConstantStorageType(unsigned elementCount,
+                                         OpBuilder &builder, Type integerType) {
+  auto arrayType =
+      spirv::ArrayType::get(integerType, elementCount, /*stride=*/4);
+  auto structType = spirv::StructType::get({arrayType}, /*offsetInfo=*/0);
+  auto pointerType =
+      spirv::PointerType::get(structType, spirv::StorageClass::PushConstant);
+  return getBlockDecoratedStructPointerType(pointerType);
+}
+
+static spirv::GlobalVariableOp getPushConstantVariable(Block &body,
+                                                       unsigned elementCount) {
+  for (auto varOp : body.getOps<spirv::GlobalVariableOp>()) {
+    auto pointerType = dyn_cast<spirv::PointerType>(varOp.getType());
+    if (!pointerType ||
+        pointerType.getStorageClass() != spirv::StorageClass::PushConstant) {
+      continue;
+    }
+    auto structType = dyn_cast<spirv::StructType>(pointerType.getPointeeType());
+    if (!structType || structType.getNumElements() != 1) {
+      continue;
+    }
+    auto arrayType = dyn_cast<spirv::ArrayType>(structType.getElementType(0));
+    if (arrayType && arrayType.getNumElements() == elementCount) {
+      return varOp;
+    }
+  }
+  return nullptr;
+}
+
+static spirv::GlobalVariableOp
+getOrInsertPushConstantVariable(Location loc, Block &block,
+                                unsigned elementCount, OpBuilder &builder,
+                                Type integerType) {
+  auto pointerType = getBlockDecoratedPushConstantStorageType(
+      elementCount, builder, integerType);
+  if (auto varOp = getPushConstantVariable(block, elementCount)) {
+    varOp.setTypeAttr(TypeAttr::get(pointerType));
+    return varOp;
+  }
+
+  OpBuilder moduleBuilder =
+      OpBuilder::atBlockBegin(&block, builder.getListener());
+  return spirv::GlobalVariableOp::create(moduleBuilder, loc, pointerType,
+                                         "__push_constant_var__",
+                                         /*initializer=*/nullptr);
+}
+
+static Value getPushConstantValue(Operation *op, unsigned elementCount,
+                                  unsigned offset, Type integerType,
+                                  OpBuilder &builder) {
+  Operation *parent = SymbolTable::getNearestSymbolTable(op->getParentOp());
+  if (!parent) {
+    op->emitError("expected operation to be within a module-like op");
+    return nullptr;
+  }
+  spirv::GlobalVariableOp varOp = getOrInsertPushConstantVariable(
+      op->getLoc(), parent->getRegion(0).front(), elementCount, builder,
+      integerType);
+  Value zeroOp = spirv::ConstantOp::getZero(integerType, op->getLoc(), builder);
+  Value offsetOp = spirv::ConstantOp::create(builder, op->getLoc(), integerType,
+                                             builder.getI32IntegerAttr(offset));
+  auto addrOp = spirv::AddressOfOp::create(builder, op->getLoc(), varOp);
+  auto accessChainOp = spirv::AccessChainOp::create(
+      builder, op->getLoc(), addrOp, llvm::ArrayRef({zeroOp, offsetOp}));
+  return spirv::LoadOp::create(builder, op->getLoc(), accessChainOp);
+}
+
+static spirv::PointerType
 getIndirectBindingTableType(MLIRContext *ctx, uint32_t maxBinding,
                             spirv::StorageClass tableStorageClass) {
   auto placeholderResourceType = IntegerType::get(ctx, 32);
@@ -210,7 +309,6 @@ getIndirectBindingTableType(MLIRContext *ctx, uint32_t maxBinding,
     offsets[i] = static_cast<uint32_t>(8 * i); // Each pointer takes 8 bytes.
   }
   auto structType = spirv::StructType::get(members, offsets);
-
   return spirv::PointerType::get(structType, tableStorageClass);
 }
 
@@ -312,8 +410,8 @@ struct HALInterfaceLoadConstantConverter final
     // type "conversion" (index -> i32) implicitly. This is expected to be
     // paired with a cast (i32 -> index) afterwards.
     IntegerType i32Type = rewriter.getIntegerType(32);
-    Value value = spirv::getPushConstantValue(loadOp, elementCount, index,
-                                              i32Type, rewriter);
+    Value value =
+        getPushConstantValue(loadOp, elementCount, index, i32Type, rewriter);
 
     if (loadOp.getResult().hasOneUse() && supportsAssume) {
       OpOperand *operand = loadOp.getResult().getUses().begin().getOperand();
@@ -476,7 +574,12 @@ struct HALInterfaceBindingSubspanConverter final
       bindingTable = spirv::AddressOfOp::create(rewriter, loc, varOp);
     }
     auto ptr = spirv::AccessChainOp::create(rewriter, loc, bindingTable, idx);
-    auto addr = spirv::LoadOp::create(rewriter, loc, ptr);
+    auto pointerAlignedAccess = spirv::MemoryAccessAttr::get(
+        rewriter.getContext(), spirv::MemoryAccess::Aligned);
+    auto pointerAlignment =
+        rewriter.getIntegerAttr(rewriter.getI32Type(), sizeof(uint64_t));
+    auto addr = spirv::LoadOp::create(rewriter, loc, ptr, pointerAlignedAccess,
+                                      pointerAlignment);
     assert(cast<spirv::PointerType>(addr.getType()).getStorageClass() ==
                spirv::StorageClass::PhysicalStorageBuffer &&
            "Expected a physical storage buffer pointer");
@@ -500,10 +603,10 @@ private:
     const unsigned pushConstantDwordCount =
         kBdaDispatchRootDwordCount +
         static_cast<unsigned>(subspanOp.getLayout().getConstants());
-    Value low32 = spirv::getPushConstantValue(subspanOp, pushConstantDwordCount,
-                                              /*offset=*/0, i32Type, rewriter);
-    Value high32 = spirv::getPushConstantValue(
-        subspanOp, pushConstantDwordCount, /*offset=*/1, i32Type, rewriter);
+    Value low32 = getPushConstantValue(subspanOp, pushConstantDwordCount,
+                                       /*offset=*/0, i32Type, rewriter);
+    Value high32 = getPushConstantValue(subspanOp, pushConstantDwordCount,
+                                        /*offset=*/1, i32Type, rewriter);
     Value low64 = spirv::UConvertOp::create(rewriter, loc, i64Type, low32);
     Value high64 = spirv::UConvertOp::create(rewriter, loc, i64Type, high32);
     Value shiftAmount = spirv::ConstantOp::create(

@@ -12,18 +12,18 @@ hal.executable private @push_constant {
     }
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
-      // CHECK: spirv.GlobalVariable @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
+      // CHECK: spirv.GlobalVariable @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
       // CHECK: spirv.func @push_constant()
       func.func @push_constant() -> index {
         // CHECK-DAG: %[[INDEX_0:.+]] = spirv.Constant 0 : i32
         // CHECK-DAG: %[[INDEX_1:.+]] = spirv.Constant 2 : i32
-        // CHECK: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
-        // CHECK: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
+        // CHECK: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
+        // CHECK: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
         // CHECK: spirv.Load "PushConstant" %[[AC]] : i32
         // INDEX64-DAG: %[[INDEX_0:.+]] = spirv.Constant 0 : i32
         // INDEX64-DAG: %[[INDEX_1:.+]] = spirv.Constant 2 : i32
-        // INDEX64: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
-        // INDEX64: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
+        // INDEX64: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
+        // INDEX64: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
         // INDEX64: %[[LOAD:.+]] = spirv.Load "PushConstant" %[[AC]] : i32
         // INDEX64: spirv.UConvert %[[LOAD]] : i32 to i64
         %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
