@@ -167,6 +167,16 @@ iree_status_t iree_hal_vulkan_executable_lookup_pipeline(
     iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_vulkan_pipeline_t** out_pipeline);
 
+// Verifies common structural requirements for one BDA pipeline invocation.
+//
+// This does not validate queue/device policy or individual buffer references;
+// callers keep those checks in the submission path that owns the required
+// context. |operation| names the invoking API in diagnostics.
+iree_status_t iree_hal_vulkan_pipeline_validate_bda_dispatch_abi(
+    const iree_hal_vulkan_pipeline_t* pipeline,
+    iree_const_byte_span_t constants, iree_host_size_t binding_count,
+    iree_string_view_t operation);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

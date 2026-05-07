@@ -1283,6 +1283,51 @@ static iree_status_t iree_hal_vulkan_initialize_raw_pipeline_bda_metadata(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_vulkan_pipeline_validate_bda_dispatch_abi(
+    const iree_hal_vulkan_pipeline_t* pipeline,
+    iree_const_byte_span_t constants, iree_host_size_t binding_count,
+    iree_string_view_t operation) {
+  if (pipeline->dispatch_abi != IREE_HAL_VULKAN_DISPATCH_ABI_BDA) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s expected a BDA pipeline but found dispatch ABI 0x%08x",
+        (int)operation.size, operation.data, pipeline->dispatch_abi);
+  }
+  const iree_host_size_t expected_constant_length =
+      (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t);
+  if (constants.data_length != expected_constant_length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "%.*s provides %" PRIhsz
+                            " constant bytes but BDA pipeline expects %" PRIhsz,
+                            (int)operation.size, operation.data,
+                            constants.data_length, expected_constant_length);
+  }
+  if (pipeline->bda.root_push_constant_length !=
+      sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan BDA pipeline root push constant length %u does not match ABI "
+        "v1 length %" PRIhsz,
+        pipeline->bda.root_push_constant_length,
+        (iree_host_size_t)sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t));
+  }
+  if (pipeline->bda.binding_table_entry_length != sizeof(uint64_t)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan BDA pipeline binding table entry length %u is unsupported",
+        pipeline->bda.binding_table_entry_length);
+  }
+  if (pipeline->bda.binding_count_known &&
+      binding_count != pipeline->binding_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "%.*s provides %" PRIhsz
+                            " bindings but BDA pipeline expects %u",
+                            (int)operation.size, operation.data, binding_count,
+                            pipeline->binding_count);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
     flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
     uint32_t out_workgroup_size[3]) {

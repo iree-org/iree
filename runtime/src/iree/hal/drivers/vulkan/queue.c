@@ -7930,39 +7930,9 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
         iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                          "Vulkan BDA dispatch ABI is disabled for this queue");
   }
-  const iree_host_size_t expected_constant_length =
-      (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t);
-  if (iree_status_is_ok(status) &&
-      constants.data_length != expected_constant_length) {
-    status =
-        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                         "Vulkan queue_dispatch provides %" PRIhsz
-                         " constant bytes but BDA pipeline expects %" PRIhsz,
-                         constants.data_length, expected_constant_length);
-  }
-  if (iree_status_is_ok(status) &&
-      pipeline->bda.root_push_constant_length !=
-          sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t)) {
-    status = iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan BDA pipeline root push constant length %u does not match ABI "
-        "v1 length %" PRIhsz,
-        pipeline->bda.root_push_constant_length,
-        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t));
-  }
-  if (iree_status_is_ok(status) &&
-      pipeline->bda.binding_table_entry_length != sizeof(uint64_t)) {
-    status = iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "Vulkan BDA pipeline binding table entry length %u is unsupported",
-        pipeline->bda.binding_table_entry_length);
-  }
-  if (iree_status_is_ok(status) && pipeline->bda.binding_count_known &&
-      bindings.count != pipeline->binding_count) {
-    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "Vulkan queue_dispatch provides %" PRIhsz
-                              " bindings but BDA pipeline expects %u",
-                              bindings.count, pipeline->binding_count);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_pipeline_validate_bda_dispatch_abi(
+        pipeline, constants, bindings.count, IREE_SV("Vulkan queue_dispatch"));
   }
   for (iree_host_size_t i = 0; iree_status_is_ok(status) && i < bindings.count;
        ++i) {
