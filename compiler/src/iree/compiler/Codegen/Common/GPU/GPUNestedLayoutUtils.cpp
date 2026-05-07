@@ -23,7 +23,7 @@ static bool isBroadcast(AffineExpr expr) {
 SmallVector<Value> getTransferIndicesFromNestedLayout(
     OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
     NestedLayoutAttr vectorLayout, AffineMap permutationMap,
-    ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices) {
+    ValueRange warpIndices, ValueRange threadIndices) {
 
   int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of

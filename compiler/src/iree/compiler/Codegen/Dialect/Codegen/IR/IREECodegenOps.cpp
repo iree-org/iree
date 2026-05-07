@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Twine.h"
@@ -472,7 +473,7 @@ ParseResult WorkgroupCountHintOp::parse(OpAsmParser &parser,
   // correctly when used as a custom directive so manually infer it from the
   // number of parsed sizes.
   IndexType indexType = parser.getBuilder().getIndexType();
-  SmallVector<Type> dynamicSizeTypes(dynamicSizes.size(), indexType);
+  llvm::Repeated<Type> dynamicSizeTypes(dynamicSizes.size(), indexType);
 
   if (parser.resolveOperands(dynamicSizes, dynamicSizeTypes,
                              parser.getCurrentLocation(), result.operands)) {

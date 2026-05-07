@@ -28,6 +28,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -737,7 +738,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   VectorType vectorType =
       VectorType::get(fromType.getShape(), fromType.getElementType());
   Value c0 = arith::ConstantIndexOp::create(builder, loc, 0);
-  SmallVector<Value> indices(vectorType.getRank(), c0);
+  llvm::Repeated<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   Value read =
       vector::TransferReadOp::create(builder, loc, vectorType, from, indices,

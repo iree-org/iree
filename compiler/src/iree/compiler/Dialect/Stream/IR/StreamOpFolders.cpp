@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -964,7 +965,8 @@ struct CanonicalizeResourcePackIntervals : OpRewritePattern<ResourcePackOp> {
       lifetimeIntervals[2 * i + 1] = slice.lifetimeEnd;
       dynamicSliceSizes[i] = slice.dynamicSize;
     }
-    SmallVector<Type> packedOffsetTypes(slices.size(), rewriter.getIndexType());
+    llvm::Repeated<Type> packedOffsetTypes(slices.size(),
+                                           rewriter.getIndexType());
     auto newOp = ResourcePackOp::create(
         rewriter, op.getLoc(), op.getTotalLength().getType(), packedOffsetTypes,
         op.getOffset(), rewriter.getIndexArrayAttr(lifetimeIntervals),

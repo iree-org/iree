@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -87,7 +88,7 @@ createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
 
   // Create the constraints op.
   smt::IntType smtIntTy = smt::IntType::get(ctx);
-  SmallVector<Type> blockArgTypes(numLoops, smtIntTy);
+  llvm::Repeated<Type> blockArgTypes(numLoops, smtIntTy);
 
   auto constraintsOp = IREE::Codegen::ConstraintsOp::create(
       builder, loc, rootOpAttr, pipelineAttr, knobs, dimValues);

@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
@@ -1105,7 +1106,7 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   // the transient allocation required.
   auto fusedLoc = externalBuilder.getFusedLoc(locs);
   auto indexType = externalBuilder.getIndexType();
-  SmallVector<Type> packedOffsetTypes(dynamicSliceSizes.size(), indexType);
+  llvm::Repeated<Type> packedOffsetTypes(dynamicSliceSizes.size(), indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
       externalBuilder, fusedLoc, indexType, packedOffsetTypes,
       /*offset=*/nullptr, externalBuilder.getIndexArrayAttr(lifetimeIntervals),

@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -79,7 +80,8 @@ generateSizeQueryFunction(FunctionOpInterface funcOp, StringRef sizeQueryName,
   // - For each pack, we'll return its total size.
   // - For simplicity, we return one index per pack (the total size).
   SmallVector<Type> inputTypes(funcOp.getArgumentTypes());
-  SmallVector<Type> resultTypes(packOps.size(), moduleBuilder.getIndexType());
+  llvm::Repeated<Type> resultTypes(packOps.size(),
+                                   moduleBuilder.getIndexType());
   auto sizeQueryFuncType =
       FunctionType::get(funcOp.getContext(), inputTypes, resultTypes);
 

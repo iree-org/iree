@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -53,7 +54,7 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
   allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
 
   Value c0 = arith::ConstantIndexOp::create(b, loc, 0);
-  SmallVector<Value> indices(vectorType.getRank(), c0);
+  llvm::Repeated<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   Value copied = vector::TransferWriteOp::create(b, loc, vector, allocTensorOp,
                                                  indices, inBounds)
@@ -64,7 +65,7 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
 static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
                                   Value tensor) {
   Value c0 = arith::ConstantIndexOp::create(b, tensor.getLoc(), 0);
-  SmallVector<Value> indices(vectorType.getRank(), c0);
+  llvm::Repeated<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   return vector::TransferReadOp::create(b, tensor.getLoc(), vectorType, tensor,
                                         indices, /*padding=*/std::nullopt,

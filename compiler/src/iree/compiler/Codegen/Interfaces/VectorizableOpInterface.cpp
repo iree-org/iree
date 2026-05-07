@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/Indexing.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -167,7 +168,7 @@ struct GatherOpVectorizationModel
         ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
     auto indicesVecRead = vector::TransferReadOp::create(
         rewriter, loc, indicesVecTy.clone(indicesTy.getElementType()),
-        gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
+        gatherOp.getIndices(), llvm::Repeated<Value>(indicesTy.getRank(), zero),
         std::nullopt);
     rewriter.modifyOpInPlace(indicesVecRead, [&] {
       indicesVecRead.getMaskMutable().assign(indicesMask);
@@ -176,7 +177,7 @@ struct GatherOpVectorizationModel
     indicesVec =
         arith::IndexCastOp::create(rewriter, loc, indicesVecTy, indicesVec);
 
-    SmallVector<Value> baseOffsets(sourceTy.getRank(), zero);
+    llvm::Repeated<Value> baseOffsets(sourceTy.getRank(), zero);
     Value padding =
         ub::PoisonOp::create(rewriter, loc, gatherTy.getElementType());
 
@@ -225,7 +226,7 @@ struct GatherOpVectorizationModel
         rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseOffsets,
         ValueRange{indicesVec}, rewriter.getAffineMapArrayAttr(indexingMaps),
         padding, /*mask=*/gatherMask);
-    SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
+    llvm::Repeated<Value> writeIndices(gatherTy.getRank(), zero);
     auto writeOp = vector::TransferWriteOp::create(
         rewriter, loc, transferGatherOp.getResult(), gatherOp.getOutput(),
         writeIndices);
@@ -281,7 +282,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> inputVecs;
     auto vectorizeInput = [&](Value input) {
       auto inputTy = cast<ShapedType>(input.getType());
-      SmallVector<Value> readIndices(inputTy.getRank(), zero);
+      llvm::Repeated<Value> readIndices(inputTy.getRank(), zero);
       auto inputVecTy =
           VectorType::get(inputTy.getShape(), inputTy.getElementType());
       // TODO(Bangtian): Add masking/padding support for partial tiles.
@@ -301,7 +302,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> initVecs;
     for (Value init : argCompareOp.getDpsInits()) {
       auto initTy = cast<ShapedType>(init.getType());
-      SmallVector<Value> readIndices(initShape.size(), zero);
+      llvm::Repeated<Value> readIndices(initShape.size(), zero);
       auto initVecTy = VectorType::get(initShape, initTy.getElementType());
       auto readOp = vector::TransferReadOp::create(
           rewriter, loc, initVecTy, init, readIndices, std::nullopt);
@@ -365,7 +366,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> results;
     for (auto [result, output] : llvm::zip_equal(
              vectorArgCompareOp.getResults(), argCompareOp.getDpsInits())) {
-      SmallVector<Value> writeIndices(initShape.size(), zero);
+      llvm::Repeated<Value> writeIndices(initShape.size(), zero);
       auto writeOp = vector::TransferWriteOp::create(rewriter, loc, result,
                                                      output, writeIndices);
       results.push_back(writeOp.getResult());
@@ -419,7 +420,7 @@ struct ToLayoutOpVectorizationModel
         rewriter, loc,
         /*type=*/vectorType,
         /*source=*/toLayoutOp.getInput(),
-        /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
+        /*indices=*/llvm::Repeated<Value>(readShape.size(), zero),
         /*permutation_map=*/identityMap,
         /*padding=*/padValue,
         /*mask=*/mask,
@@ -441,7 +442,7 @@ struct ToLayoutOpVectorizationModel
         /*result=*/resType,
         /*vector=*/newLayoutOp,
         /*source=*/toLayoutOp.getInput(),
-        /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
+        /*indices=*/llvm::Repeated<Value>(rank, zero),
         /*permutation_map=*/writeIdentityMap,
         /*mask=*/mask,
         /*inBounds=*/writeInBounds);
@@ -502,7 +503,7 @@ struct MapStoreOpVectorizationModel
     rewriter.setInsertionPoint(mapStoreOp);
     ShapedType inputType = mapStoreOp.getInputType();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    SmallVector<Value> zeros(inputType.getRank(), zero);
+    llvm::Repeated<Value> zeros(inputType.getRank(), zero);
     auto inputVectorType =
         VectorType::get(inputType.getShape(), inputType.getElementType());
     Value inputVector = vector::TransferReadOp::create(
@@ -784,7 +785,7 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
       Type elemType = getElementTypeOrSelf(index);
       AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
       VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
-      SmallVector<Value> operandIndices(map.getNumResults(), zero);
+      llvm::Repeated<Value> operandIndices(map.getNumResults(), zero);
       auto read = vector::TransferReadOp::create(
           rewriter, loc, readType, tensor, operandIndices,
           /*padding=*/std::nullopt, readMap);
@@ -831,7 +832,7 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   // Create a empty tensor to write to.
   auto emptyOp = tensor::EmptyOp::create(rewriter, loc, canonicalVectorSizes,
                                          gatherTy.getElementType());
-  SmallVector<Value> writeIndices(canonicalVectorSizes.size(), zero);
+  llvm::Repeated<Value> writeIndices(canonicalVectorSizes.size(), zero);
 
   auto writeOp = vector::TransferWriteOp::create(
       rewriter, loc, transferGatherOp.getResult(), emptyOp, writeIndices);
@@ -1036,13 +1037,13 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   Value f0 =
       arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
 
-  SmallVector<Value> baseOffsets(inRank, c0);
+  llvm::Repeated<Value> baseOffsets(inRank, c0);
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
       rewriter, loc, vectorType, inOperand->get(), baseOffsets,
       ValueRange{indices},
       rewriter.getAffineMapArrayAttr({sourceMap, indexMap}), f0, Value());
 
-  SmallVector<Value> writeOffsets(outRank, c0);
+  llvm::Repeated<Value> writeOffsets(outRank, c0);
   auto transferWriteOp = vector::TransferWriteOp::create(
       rewriter, loc, transferGatherOp.getResult(), outOperand->get(),
       writeOffsets);

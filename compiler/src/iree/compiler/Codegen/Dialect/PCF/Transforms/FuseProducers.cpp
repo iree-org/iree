@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Transforms.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -192,7 +193,7 @@ static void fuseTilableProducerImpl(RewriterBase &rewriter, OpTy scopedOp,
     if (auto vectorType = dyn_cast<VectorType>(readSlice.getType())) {
       auto tensorType = cast<RankedTensorType>(replacement.getType());
       Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-      SmallVector<Value> indices(tensorType.getRank(), zero);
+      llvm::Repeated<Value> indices(tensorType.getRank(), zero);
       SmallVector<bool> inBounds(tensorType.getRank(), true);
       replacement = vector::TransferReadOp::create(
           rewriter, loc, vectorType, replacement, indices,

@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Utils/RegionOpUtils.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
@@ -964,7 +965,7 @@ createPackedAllocation(OpBuilder &builder, Location loc,
   }
 
   // Create the pack operation with affinity from the transients op.
-  SmallVector<Type> packedOffsetTypes(sliceSizes.size(), indexType);
+  llvm::Repeated<Type> packedOffsetTypes(sliceSizes.size(), indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
       builder, loc, indexType, packedOffsetTypes,
       /*offset=*/nullptr, builder.getIndexArrayAttr(lifetimeIntervals),
