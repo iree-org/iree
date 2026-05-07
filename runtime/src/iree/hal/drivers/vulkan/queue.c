@@ -2502,6 +2502,14 @@ static iree_status_t iree_hal_vulkan_queue_validate_host_call(
 static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
     iree_hal_vulkan_queue_t* queue, iree_hal_semaphore_list_t semaphore_list,
     iree_string_view_t usage) {
+  if (semaphore_list.count != 0 &&
+      (!semaphore_list.semaphores || !semaphore_list.payload_values)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan queue %.*s semaphore list storage is NULL for %" PRIhsz
+        " entries",
+        (int)usage.size, usage.data, semaphore_list.count);
+  }
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
     iree_hal_semaphore_t* semaphore = semaphore_list.semaphores[i];
     if (!iree_hal_vulkan_semaphore_is_local(semaphore, queue->device)) {
@@ -2520,6 +2528,31 @@ static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
     }
   }
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_queue_calculate_submission_layout(
+    iree_host_size_t wait_count, iree_host_size_t signal_count,
+    iree_host_size_t payload_storage_length, iree_host_size_t* out_total_size,
+    iree_host_size_t* out_wait_semaphores_offset,
+    iree_host_size_t* out_wait_payload_values_offset,
+    iree_host_size_t* out_signal_semaphores_offset,
+    iree_host_size_t* out_signal_payload_values_offset,
+    iree_host_size_t* out_payload_storage_offset) {
+  return IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_hal_vulkan_queue_pending_submission_t),
+      out_total_size,
+      IREE_STRUCT_FIELD_ALIGNED(wait_count, iree_hal_semaphore_t*,
+                                iree_alignof(iree_hal_semaphore_t*),
+                                out_wait_semaphores_offset),
+      IREE_STRUCT_FIELD_ALIGNED(wait_count, uint64_t, iree_alignof(uint64_t),
+                                out_wait_payload_values_offset),
+      IREE_STRUCT_FIELD_ALIGNED(signal_count, iree_hal_semaphore_t*,
+                                iree_alignof(iree_hal_semaphore_t*),
+                                out_signal_semaphores_offset),
+      IREE_STRUCT_FIELD_ALIGNED(signal_count, uint64_t, iree_alignof(uint64_t),
+                                out_signal_payload_values_offset),
+      IREE_STRUCT_FIELD_ALIGNED(payload_storage_length, uint8_t,
+                                iree_max_align_t, out_payload_storage_offset));
 }
 
 static uint32_t iree_hal_vulkan_queue_profile_count(iree_host_size_t value) {
@@ -3148,6 +3181,26 @@ static void iree_hal_vulkan_queue_consume_completion_action(
   }
 }
 
+// Captures a retained semaphore list into caller-owned storage.
+static void iree_hal_vulkan_queue_capture_semaphore_list(
+    iree_hal_semaphore_list_t source_list,
+    iree_hal_semaphore_t** semaphore_storage, uint64_t* payload_value_storage,
+    iree_hal_semaphore_list_t* out_list) {
+  *out_list = iree_hal_semaphore_list_empty();
+  if (source_list.count == 0) return;
+
+  *out_list = (iree_hal_semaphore_list_t){
+      .count = source_list.count,
+      .semaphores = semaphore_storage,
+      .payload_values = payload_value_storage,
+  };
+  for (iree_host_size_t i = 0; i < source_list.count; ++i) {
+    out_list->semaphores[i] = source_list.semaphores[i];
+    iree_hal_semaphore_retain(out_list->semaphores[i]);
+    out_list->payload_values[i] = source_list.payload_values[i];
+  }
+}
+
 // Allocates a pending submission with optional trailing payload storage owned
 // by the submission allocation.
 static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
@@ -3164,16 +3217,17 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
     *out_payload_storage = iree_byte_span_empty();
   }
 
+  iree_host_size_t wait_semaphores_offset = 0;
+  iree_host_size_t wait_payload_values_offset = 0;
+  iree_host_size_t signal_semaphores_offset = 0;
+  iree_host_size_t signal_payload_values_offset = 0;
   iree_host_size_t payload_storage_offset = 0;
-  iree_host_size_t allocation_size =
-      sizeof(iree_hal_vulkan_queue_pending_submission_t);
-  if (payload_storage_length != 0) {
-    IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
-        iree_sizeof_struct(iree_hal_vulkan_queue_pending_submission_t),
-        &allocation_size,
-        IREE_STRUCT_FIELD_ALIGNED(payload_storage_length, uint8_t,
-                                  iree_max_align_t, &payload_storage_offset)));
-  }
+  iree_host_size_t allocation_size = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_calculate_submission_layout(
+      wait_semaphore_list.count, signal_semaphore_list.count,
+      payload_storage_length, &allocation_size, &wait_semaphores_offset,
+      &wait_payload_values_offset, &signal_semaphores_offset,
+      &signal_payload_values_offset, &payload_storage_offset));
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -3201,45 +3255,31 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
            sizeof(submission->host_call.args));
     submission->host_call.flags = flags;
   }
+  iree_hal_vulkan_queue_capture_semaphore_list(
+      wait_semaphore_list,
+      (iree_hal_semaphore_t**)((uint8_t*)submission + wait_semaphores_offset),
+      (uint64_t*)((uint8_t*)submission + wait_payload_values_offset),
+      &submission->wait_semaphore_list);
+  iree_hal_vulkan_queue_capture_semaphore_list(
+      signal_semaphore_list,
+      (iree_hal_semaphore_t**)((uint8_t*)submission + signal_semaphores_offset),
+      (uint64_t*)((uint8_t*)submission + signal_payload_values_offset),
+      &submission->signal_semaphore_list);
   iree_hal_vulkan_queue_profile_submission_initialize(queue, submission);
 
-  iree_status_t status =
-      iree_hal_semaphore_list_clone(&wait_semaphore_list, queue->host_allocator,
-                                    &submission->wait_semaphore_list);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_list_clone(&signal_semaphore_list,
-                                           queue->host_allocator,
-                                           &submission->signal_semaphore_list);
+  if (out_payload_storage && payload_storage_length != 0) {
+    *out_payload_storage = iree_make_byte_span(
+        (uint8_t*)submission + payload_storage_offset, payload_storage_length);
   }
-  if (iree_status_is_ok(status)) {
-    if (out_payload_storage && payload_storage_length != 0) {
-      *out_payload_storage =
-          iree_make_byte_span((uint8_t*)submission + payload_storage_offset,
-                              payload_storage_length);
-    }
-    *out_submission = submission;
-  } else {
-    if (submission->wait_semaphore_list.semaphores) {
-      iree_hal_semaphore_list_free(submission->wait_semaphore_list,
-                                   queue->host_allocator);
-    }
-    iree_notification_deinitialize(&submission->callback_notification);
-    iree_allocator_free(queue->host_allocator, submission);
-  }
-  return status;
+  *out_submission = submission;
+  return iree_ok_status();
 }
 
 static void iree_hal_vulkan_queue_pending_submission_destroy(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
-  if (submission->wait_semaphore_list.semaphores) {
-    iree_hal_semaphore_list_free(submission->wait_semaphore_list,
-                                 queue->host_allocator);
-  }
-  if (submission->signal_semaphore_list.semaphores) {
-    iree_hal_semaphore_list_free(submission->signal_semaphore_list,
-                                 queue->host_allocator);
-  }
+  iree_hal_semaphore_list_release(submission->wait_semaphore_list);
+  iree_hal_semaphore_list_release(submission->signal_semaphore_list);
   iree_status_t wait_failure_status = (iree_status_t)iree_atomic_exchange(
       &submission->wait_failure_status, 0, iree_memory_order_acquire);
   iree_status_free(wait_failure_status);
